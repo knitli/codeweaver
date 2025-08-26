@@ -9,21 +9,18 @@ import logging
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
-from typing import Any, NamedTuple, cast, overload
+from typing import Any, ClassVar, Literal, NamedTuple, cast, overload
+from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, PositiveInt
+from pydantic import UUID4, BaseModel, ConfigDict, PositiveInt
+from pydantic.main import IncEx
 
-from codeweaver._data_structures import CodeChunk
+from codeweaver._data_structures import CodeChunk, SimpleTypedStore, StructuredDataInput
 from codeweaver._server import get_statistics
 from codeweaver._settings import Provider
 from codeweaver.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.tokenizers import Tokenizer, get_tokenizer
 
-
-type StructuredDataInput = str | bytes | bytearray | CodeChunk
-type StructuredDataSequence = (
-    Sequence[str] | Sequence[bytes] | Sequence[bytearray] | Sequence[CodeChunk]
-)
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +34,7 @@ class RerankingResult(NamedTuple):
     chunk: CodeChunk
 
 
-def default_reranking_input_transformer(
-    documents: StructuredDataSequence | StructuredDataInput,
-) -> Sequence[str]:
+def default_reranking_input_transformer(documents: StructuredDataInput) -> Sequence[str]:
     """Default input transformer that converts documents to strings."""
     if isinstance(documents, list | tuple | set):
         return [doc.serialize() if isinstance(doc, CodeChunk) else str(doc) for doc in documents]
@@ -70,10 +65,17 @@ def default_reranking_output_transformer(
     return processed_results
 
 
+class QueryType(NamedTuple):
+    """Represents a query and its associated metadata."""
+
+    query: str
+    docs: Sequence[CodeChunk]
+
+
 class RerankingProvider[RerankingClient](BaseModel, ABC):
     """Base class for reranking providers."""
 
-    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
+    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True, serialize_by_alias=True)
 
     _client: RerankingClient
     _provider: Provider
@@ -81,12 +83,14 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
     _prompt: str | None = None
 
     _rerank_kwargs: dict[str, Any]
-    _input_transformer: Callable[[StructuredDataSequence | StructuredDataInput], Sequence[str]] = (
-        staticmethod(default_reranking_input_transformer)
+    # transforms the input documents into a format suitable for the provider
+    _input_transformer: Callable[[StructuredDataInput], Any] = staticmethod(
+        default_reranking_input_transformer
     )
     _output_transformer: Callable[[Any, Sequence[CodeChunk]], Sequence[RerankingResult]] = (
         staticmethod(default_reranking_output_transformer)
     )
+    _store: ClassVar[SimpleTypedStore] = SimpleTypedStore()
     """The output transformer is a function that takes the raw results from the provider and returns a Sequence of RerankingResult."""
 
     def __init__(
@@ -98,6 +102,7 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
         **kwargs: dict[str, Any] | None,
     ) -> None:
         """Initialize the RerankingProvider."""
+        self._model_dump_json = super().model_dump_json
         self._client = client
         self._prompt = prompt
         self._caps = capabilities
@@ -132,15 +137,21 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
         """
         raise NotImplementedError
 
+    @overload
+    async def rerank(
+        self, query: str, documents: None, data_id: UUID4, **kwargs: dict[str, Any] | None
+    ) -> None: ...  # sourcery skip: docstrings-for-functions
     async def rerank(
         self,
         query: str,
-        documents: StructuredDataInput | StructuredDataSequence,
+        documents: StructuredDataInput,
+        data_id: UUID4,
         **kwargs: dict[str, Any] | None,
     ) -> Sequence[RerankingResult]:
         """Rerank the given documents based on the query."""
         processed_kwargs = self._set_kwargs(**kwargs)
         transformed_docs = self._process_documents(documents)
+        self._store_value(uuid4(), (query, transformed_docs))
         transformed_docs = self._input_transformer(transformed_docs)
         reranked = await self._execute_rerank(
             query, transformed_docs, top_k=self.top_k, **processed_kwargs
@@ -216,15 +227,20 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
             )
             statistics.add_token_usage(reranking_generated=token_count)
 
-    def _process_documents(
-        self, documents: StructuredDataInput | StructuredDataSequence
-    ) -> Sequence[str]:
+    def _process_documents(self, documents: StructuredDataInput) -> Sequence[CodeChunk]:
         """Process the input documents into a uniform format."""
         if isinstance(documents, list | tuple | set):
             return [
-                doc.serialize() if isinstance(doc, CodeChunk) else str(doc) for doc in documents
+                item
+                if isinstance(item, CodeChunk) and item
+                else CodeChunk.model_validate_json(item)
+                for item in documents
             ]
-        return [documents.serialize()] if isinstance(documents, CodeChunk) else [str(documents)]
+        return [
+            documents
+            if isinstance(documents, CodeChunk) and documents
+            else CodeChunk.model_validate_json(documents)
+        ]
 
     def _process_results(
         self, results: Any, transformed_docs: Sequence[str]
@@ -244,19 +260,13 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
         return self._output_transformer(results, chunks)
 
     @staticmethod
-    def to_code_chunk(
-        text: StructuredDataInput | StructuredDataSequence,
-    ) -> CodeChunk | Sequence[CodeChunk]:
+    def to_code_chunk(text: StructuredDataInput) -> CodeChunk | Sequence[CodeChunk]:
         """Convert text to a CodeChunk."""
         if isinstance(text, list | tuple | set):
             return tuple(
                 t if isinstance(t, CodeChunk) else CodeChunk.model_validate_json(t) for t in text
             )  # type: ignore[return-value]
-        return (
-            text
-            if isinstance(text, CodeChunk)
-            else CodeChunk.model_validate_json(cast(str | bytes | bytearray, text))
-        )
+        return text if isinstance(text, CodeChunk) else CodeChunk.model_validate_json(text)
 
     def _report_token_savings(
         self, results: Sequence[RerankingResult], processed_chunks: Sequence[str]
@@ -280,3 +290,43 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
         # To keep things simple, we default to `cl100k_base`, as this is the tokenizer used by most LLMs.
         tokenizer = get_tokenizer("tiktoken", "cl100k_base")
         return tokenizer.estimate_batch(discarded_chunks)  # pyright: ignore[reportArgumentType]
+
+    def model_dump_json(
+        self,
+        *,
+        indent: int | None = None,
+        include: IncEx | None = None,
+        exclude: IncEx | None = None,
+        context: Any | None = None,
+        by_alias: bool | None = None,
+        exclude_unset: bool = False,
+        exclude_defaults: bool = False,
+        exclude_none: bool = False,
+        round_trip: bool = False,
+        warnings: bool | Literal["none", "warn", "error"] = True,
+        fallback: Callable[[Any], Any] | None = None,
+        serialize_as_any: bool = False,
+    ) -> str:
+        """Serialize the model to JSON, excluding certain fields."""
+        return self._model_dump_json(
+            indent=indent,
+            include=include,
+            exclude={"_client", "_input_transformer", "_output_transformer"},
+            context=context,
+            by_alias=by_alias,
+            exclude_unset=exclude_unset,
+            exclude_defaults=exclude_defaults,
+            exclude_none=exclude_none,
+            round_trip=round_trip,
+            warnings=warnings,
+            fallback=fallback,
+            serialize_as_any=serialize_as_any,
+        )
+
+    def _store_value(self, key: str, value: Any) -> None:
+        """Store a value in the simple store."""
+        type(self)._store.set(key, value)
+
+    def _get_stored_value(self, key: str) -> Any | None:
+        """Get a value from the simple store."""
+        return type(self)._store.get(key)

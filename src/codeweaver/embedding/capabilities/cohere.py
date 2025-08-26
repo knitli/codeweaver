@@ -20,8 +20,69 @@ MODEL_MAP: MappingProxyType[Provider, tuple[str, ...]] = MappingProxyType({
 
 
 def _get_shared_cohere_embedding_capabilities() -> PartialCapabilities:
-    return {"model": MODEL_MAP[Provider.COHERE], "provider": Provider.COHERE}
+    return {
+        "name": MODEL_MAP[Provider.COHERE],
+        "provider": Provider.COHERE,
+        "supports_context_chunk_embedding": False,
+        "preferred_metrics": ("cosine", "dot", "euclidean"),
+        "is_normalized": False,
+        "tokenizer": "tokenizers",
+        "custom_document_prompt": None,
+        "custom_query_prompt": None,
+        "output_dtypes": ("float32",),
+        "supports_custom_prompts": False,
+    }
 
 
-def get_cohere_embedding_capabilities() -> EmbeddingModelCapabilities:
+def get_cohere_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
     """Get the capabilities for cohere embedding models."""
+    shared_caps = _get_shared_cohere_embedding_capabilities()
+    base_capabilities: dict[str, PartialCapabilities] = {
+        "embed-english-v3.0": {
+            **shared_caps,
+            "version": 3,
+            "default_dimension": 1024,
+            "output_dimensions": (1024,),
+            "context_window": 512,
+        },
+        "embed-multilingual-v3.0": {
+            **shared_caps,
+            "version": 3,
+            "default_dimension": 1024,
+            "output_dimensions": (1024,),
+            "context_window": 512,
+        },
+        "embed-multilingual-light-v3.0": {
+            **shared_caps,
+            "version": 3,
+            "default_dimension": 384,
+            "output_dimensions": (384,),
+            "context_window": 512,
+        },
+        "embed-v4.0": {
+            **shared_caps,
+            "version": 4,
+            "default_dimension": 1536,
+            "output_dimensions": (1536, 1024, 512, 256),
+            "context_window": 128_000,
+        },
+    }
+    output_models: list[EmbeddingModelCapabilities] = []
+    for model, caps in base_capabilities.items():
+        for provider, models in MODEL_MAP.items():
+            if provider == Provider.GITHUB and model in (
+                "embed-multilingual-v3.0",
+                "embed-english-v3.0",
+            ):
+                model = models[0] if model == "embed-multilingual-v3.0" else models[1]
+            elif provider == Provider.HEROKU and model == "embed-multilingual-v3.0":
+                model = models[0]
+            if model in models:
+                output_models.append(
+                    EmbeddingModelCapabilities.model_validate({
+                        **caps,
+                        "name": model,
+                        "provider": provider,
+                    })
+                )
+    return tuple(EmbeddingModelCapabilities.model_validate(m) for m in output_models)

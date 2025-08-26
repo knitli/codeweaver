@@ -1,6 +1,6 @@
 """Settings for BAAI embedding models."""
 
-from codeweaver.embedding.capabilities import EmbeddingModelProfile
+"""
+Stats copy + paste:
 
-
-class BaaiEmbeddingModelProfile(EmbeddingModelProfile): ...
+"""

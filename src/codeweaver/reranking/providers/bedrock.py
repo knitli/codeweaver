@@ -29,7 +29,6 @@ from codeweaver.reranking.providers.base import (
     RerankingProvider,
     RerankingResult,
     StructuredDataInput,
-    StructuredDataSequence,
 )
 
 
@@ -285,7 +284,7 @@ class BedrockRerankingProvider(RerankingProvider[boto3_client]):
         ]
 
     def bedrock_reranking_input_transformer(
-        self, documents: StructuredDataInput | StructuredDataSequence
+        self, documents: StructuredDataInput
     ) -> list[BedrockInlineDocumentSource]:  # this is the sources field of BedrockRerankRequest
         """Transform input documents into the format expected by the Bedrock API.
 

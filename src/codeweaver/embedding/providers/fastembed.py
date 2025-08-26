@@ -1,3 +1,4 @@
+# sourcery skip: lambdas-should-be-short
 # SPDX=FileCopyrightText: 2024-2025 (c) Qdrant Solutions GmBh
 # SPDX-LicenseIdentifier: Apache-2.0
 # This file is partly derived from code in the `mcp-server-qdrant` project
@@ -14,12 +15,13 @@ import asyncio
 import multiprocessing
 
 from collections.abc import Callable, Sequence
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 import numpy as np
 
 from codeweaver._data_structures import CodeChunk
 from codeweaver._settings import Provider
+from codeweaver._utils import rpartial
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.embedding.providers import EmbeddingProvider
 
@@ -88,8 +90,8 @@ class FastEmbedProvider(EmbeddingProvider[TextEmbedding]):
         """Initialize the FastEmbed client."""
         if "model_name" not in self._doc_kwargs:
             model = self._caps.name
-            type(self)._doc_kwargs["model_name"] = model
-            type(self)._query_kwargs["model_name"] = model
+            self.doc_kwargs["model_name"] = model
+            self.query_kwargs["model_name"] = model
         self._client = TextEmbedding(**self._doc_kwargs)
 
     @property
@@ -97,31 +99,29 @@ class FastEmbedProvider(EmbeddingProvider[TextEmbedding]):
         """FastEmbed does not use a base URL."""
         return None
 
-    async def embed_documents(
-        self, documents: Sequence[CodeChunk] | CodeChunk, **kwargs: dict[str, Any] | None
+    async def _embed_documents(
+        self, documents: Sequence[CodeChunk], **kwargs: dict[str, Any] | None
     ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
         """Embed a list of documents into vectors."""
-        processed_kwargs: dict[str, Any] = self._set_kwargs(self.doc_kwargs, kwargs or {})
-        processed_documents: Sequence[str] = self._process_input(documents)
+        ready_documents = self.chunks_to_strings(documents)
         loop = asyncio.get_event_loop()
         embeddings = await loop.run_in_executor(
-            None, lambda: self._client.passage_embed(processed_documents, **processed_kwargs)
+            None, lambda: self._client.passage_embed(cast(Sequence[str], ready_documents), **kwargs)
         )
-        self._update_token_stats(from_docs=processed_documents)
-        return list(self._process_output(embeddings))
+        partial_tokens = rpartial(self._update_token_stats, from_docs=ready_documents)
+        await loop.run_in_executor(None, partial_tokens)  # pyright: ignore[reportArgumentType]
+        return await loop.run_in_executor(None, lambda: list(self._process_output(embeddings)))
 
-    async def embed_query(
-        self, query: str | Sequence[str], **kwargs: dict[str, Any] | None
+    async def _embed_query(
+        self, query: Sequence[str], **kwargs: dict[str, Any] | None
     ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
         """Embed a query into a vector."""
-        processed_kwargs: dict[str, Any] = self._set_kwargs(self.query_kwargs, kwargs or {})
-        processed_query: Sequence[str] = self._process_input(query)
         loop = asyncio.get_event_loop()
         embeddings = await loop.run_in_executor(
-            None, lambda: list(self._client.query_embed(processed_query, **processed_kwargs))
+            None, lambda: list(self._client.query_embed(query, **kwargs))
         )
-        self._update_token_stats(from_docs=processed_query)
-        return list(self._process_output(embeddings))
+        self._update_token_stats(from_docs=query)
+        return self._process_output(embeddings)
 
     @property
     def dimension(self) -> int:

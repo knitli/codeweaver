@@ -1,12 +1,11 @@
 """Reranking model capabilities and settings."""
 
 from collections.abc import Callable, Sequence
-from re import A
 from typing import Annotated, Any, Literal, NotRequired, Required, TypedDict
 
 from pydantic import BaseModel, Field, NonNegativeInt, PositiveInt
 
-from codeweaver._data_structures import CodeChunk
+from codeweaver._data_structures import CodeChunk, SerializedCodeChunk
 from codeweaver._settings import Provider
 from codeweaver.tokenizers.base import Tokenizer
 
@@ -23,9 +22,11 @@ def _is_correct_return_type(output: Any) -> bool:
     )
 
 
-def default_input_transformer(input_chunks: list[CodeChunk]) -> list[str]:
+def default_input_transformer(
+    input_chunks: list[CodeChunk],
+) -> list[SerializedCodeChunk[CodeChunk]]:
     """Default input transformer for reranking models."""
-    return [chunk.serialize() for chunk in input_chunks]
+    return [chunk.serialize_for_embedding() for chunk in input_chunks]
 
 
 def default_output_transformer(results: Any) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
@@ -65,8 +66,8 @@ type PartialRerankingCapabilities = dict[
     | Provider
     | Callable[[Sequence[CodeChunk], str], Any]
     | Callable[..., Sequence[Sequence[float]] | Sequence[Sequence[int]]]
-    | tuple[bool, NonNegativeInt],
-    | dict[str, Any]
+    | tuple[bool, NonNegativeInt]
+    | dict[str, Any],
 ]
 
 
@@ -174,7 +175,17 @@ class RerankingModelCapabilities(BaseModel):
         if not self.max_input:
             return True, 0
         if isinstance(self.max_input, int):
-            return self._handle_int_max_input([
-                (query + chunk.serialize()) for chunk in input_chunks
+            # before we do an expensive check, let's check if we're in the neighborhood of the limit
+            if query and not self.query_ok(query):
+                return False, 0
+            # we'll check if we're within 85% of the max_input limit, assuming 4 tokens per character as a rough estimate
+            if (
+                input_chunks
+                and sum(len(chunk.content) for chunk in input_chunks) < (self.max_input * 4) * 0.85
+            ):
+                return True, 0
+            return self._handle_int_max_input([  # pyright: ignore[reportUnknownArgumentType]
+                (query + chunk.serialize_for_embedding())  # pyright: ignore[reportOperatorIssue]  # it's a string, I promise
+                for chunk in input_chunks  # pyright: ignore[reportOperatorIssue]
             ])
         return self.max_input(input_chunks, query) if callable(self.max_input) else (True, 0)

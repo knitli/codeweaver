@@ -77,7 +77,10 @@ class EmbeddingModelCapabilities(BaseModel):
     """Describes the capabilities of an embedding model, such as the default dimension."""
 
     model_config = ConfigDict(
-        str_strip_whitespace=True, extra="allow", arbitrary_types_allowed=True
+        str_strip_whitespace=True,
+        extra="allow",
+        arbitrary_types_allowed=True,
+        serialize_by_alias=True,
     )
 
     name: Annotated[

@@ -39,8 +39,8 @@ def _handle_too_large(token_list: Sequence[int]) -> tuple[bool, NonNegativeInt]:
 def _voyage_max_limit(chunks: list[CodeChunk], query: str) -> tuple[bool, NonNegativeInt]:
     """Check if the number of chunks exceeds the maximum limit."""
     tokenizer = get_tokenizer("tokenizers", "voyageai/voyage-rerank-2.5")
-    stringified_chunks = [chunk.serialize() for chunk in chunks]
-    sizes = [tokenizer.estimate(chunk) + tokenizer.estimate(query) for chunk in stringified_chunks]
+    stringified_chunks = [chunk.serialize_for_embedding() for chunk in chunks]
+    sizes = [tokenizer.estimate(chunk) + tokenizer.estimate(query) for chunk in stringified_chunks]  # pyright: ignore[reportArgumentType]
     too_large = sum(sizes) > 600_000
     too_many = len(stringified_chunks) > 1000
     too_big = any(size > 32_000 for size in sizes)
@@ -55,9 +55,10 @@ def _voyage_max_limit(chunks: list[CodeChunk], query: str) -> tuple[bool, NonNeg
     if too_many:
         # Truncate to the first 1000 chunks and re-evaluate once without recursion.
         truncated_chunks = chunks[:1000]
-        truncated_strings = [chunk.serialize() for chunk in truncated_chunks]
+        truncated_strings = [chunk.serialize_for_embedding() for chunk in truncated_chunks]
         truncated_sizes = [
-            tokenizer.estimate(c) + tokenizer.estimate(query) for c in truncated_strings
+            tokenizer.estimate(c) + tokenizer.estimate(query)  # pyright: ignore[reportArgumentType]
+            for c in truncated_strings
         ]
         # If still too large, determine where to cut; otherwise accept the truncated set.
         if sum(truncated_sizes) > 600_000:

@@ -1,6 +1,6 @@
 """Settings for Alibaba NLP models."""
 
-from codeweaver.embedding.capabilities import EmbeddingModelProfile
+"""
+Stats copy + paste:
 
-
-class AlibabaNLPEmbeddingModelProfile(EmbeddingModelProfile): ...
+"""

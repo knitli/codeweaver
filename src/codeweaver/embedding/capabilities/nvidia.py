@@ -1,6 +1,6 @@
 """Settings for Nvidia embedding models."""
 
-from codeweaver.embedding.capabilities import EmbeddingModelProfile
+"""
+Stats copy + paste:
 
-
-class NVIDIAEmbeddingModelProfile(EmbeddingModelProfile): ...
+"""

@@ -1,6 +1,6 @@
 """Settings for WhereIsAI embedding models."""
 
-from codeweaver.embedding.capabilities import EmbeddingModelProfile
+"""
+Stats copy + paste:
 
-
-class WhereIsAIEmbeddingModelProfile(EmbeddingModelProfile): ...
+"""

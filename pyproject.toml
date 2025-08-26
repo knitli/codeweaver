@@ -55,6 +55,7 @@ dependencies = [
     "uvicorn[standard]>=0.35.0",
     "voyageai>=0.3.4",
     "watchfiles>=1.1.0",
+    "blake3>=1.0.5",
 ]
 dynamic = ["version"]
 description = "Extensible MCP server for semantic code search with plugin architecture supporting multiple embedding providers, vector databases, and data sources."
@@ -118,44 +119,44 @@ build-backend = "hatchling.build"
 [dependency-groups]
 build = ["hatchling>=1.14.1", "uv-dynamic-versioning>=0.7.0"]
 test = [
-    "pytest>=8.4.1",
+    "dirty-equals>=0.9.0",
+    "httpx>=0.28.1",
+    "pdbpp>=0.11.7",
     "pytest-asyncio>=1.1.0",
     "pytest-cov>=6.2.1",
-    "pytest-mock>=3.14.1",
-    "httpx>=0.28.1",
     "pytest-env>=1.1.5",
     "pytest-flakefinder>=1.1.0",
     "pytest-httpx>=0.35.0",
+    "pytest-mock>=3.14.1",
     "pytest-report>=0.2.1",
     "pytest-timeout>=2.4.0",
-    "dirty-equals>=0.9.0",
-    "pdbpp>=0.11.7",
+    "pytest>=8.4.1",
 ]
 docs = [
-    "mkdocs>=1.6.1",
+    "mkdocs-awesome-nav>=3.1.2",
+    "mkdocs-gen-files>=0.5.0",
     "mkdocs-git-revision-date-localized-plugin>=1.3.0",
     "mkdocs-material>=9.6.15",
-    "mkdocs-redirects>=1.0.0",
-    "mkdocstrings[python]>=0.30.0",
-    "mkdocs-gen-files>=0.5.0",
     "mkdocs-minify-plugin>=0.8.0",
+    "mkdocs-redirects>=1.0.0",
     "mkdocs-rss-plugin==1.17.3",
-    "mkdocs-awesome-nav>=3.1.2",
-    "pymdown-extensions>=10.16.1",
+    "mkdocs>=1.6.1",
+    "mkdocstrings[python]>=0.30.0",
     "pygments>=2.19.1",
+    "pymdown-extensions>=10.16.1",
 ]
 dev = [
-    "ruff>=0.12.4",
-    "superclaude>=3.0.0.2",
-    "uv>=0.8.2,<0.9.0",
+    "basedpyright>=1.31.3",
+    "copychat>=0.7.2",
     "ipython>=9.4.0",
     "jsonlines>=4.0.0",
-    "copychat>=0.7.2",
     "pdbpp>=0.11.7",
-    "pyperclip>=1.9.0",
     "pydantic-ai>=0.6.2",
-    "basedpyright>=1.31.3",
+    "pyperclip>=1.9.0",
+    "ruff>=0.12.4",
+    "superclaude>=3.0.0.2",
     "types-boto3-custom",
+    "uv>=0.8.2,<0.9.0",
 ]
 all-dev = [
     "basedpyright>=1.31.3",
@@ -214,9 +215,9 @@ recommended = [
     "qdrant-client>=1.15.0",
     "rich>=14.0.0",
     "rignore>=0.6.4",
-    "tomli-w>=1.2.0",
     "tiktoken>=0.1.0",
     "tokenizers>=0.21.4",
+    "tomli-w>=1.2.0",
     "typing_extensions>=4.14.1",
     "uvicorn[standard]>=0.35.0",
     "voyageai>=0.3.4",
@@ -240,8 +241,8 @@ recommended-no-telemetry = [
     "rich>=14.0.0",
     "rignore>=0.6.4",
     "tiktoken>=0.1.0",
-    "tomli-w>=1.2.0",
     "tokenizers>=0.21.4",
+    "tomli-w>=1.2.0",
     "typing-extensions>=4.14.1",
     "uvicorn[standard]>=0.35.0",
     "voyageai>=0.3.4",
@@ -250,9 +251,9 @@ recommended-no-telemetry = [
 
 recommended-local-only = [
     "aenum>=3.1.16",
-    "fastembed>=0.7.1",
     "ast-grep-py>=0.39.1",
     "cyclopts>=3.22.5",
+    "fastembed>=0.7.1",
     "fastmcp>=2.10.6",
     "langchain-text-splitters>=0.3.9",
     "mcp>=1.13.0",
@@ -291,14 +292,15 @@ required-core = [
     "aenum>=3.1.16",
     "ast-grep-py>=0.39.1",
     "fastmcp>=2.10.6",
+    "langchain-text-splitters>=0.3.9",
     "mcp>=1.13.0",
     "numpy>=2.3.0",
-    "pydantic-settings>=2.10.1",
     "pydantic-graph>=0.6.2",
+    "pydantic-settings>=2.10.1",
     "pydantic>=2.11.7",
     "rignore>=0.6.4",
-    "typing-extensions>=4.14.1",
     "tiktoken>=0.1.0",
+    "typing-extensions>=4.14.1",
     "uvicorn[standard]>=0.35.0",
 ]
 
@@ -318,6 +320,7 @@ provider-anthropic = ["pydantic-ai-slim[anthropic]>=0.6.2"]
 provider-groq = ["pydantic-ai-slim[groq]>=0.6.2"]
 
 #    --- Embedding and Agent Providers --- (no rerank)
+provider-huggingface = ["pydantic-ai-slim[huggingface]>=0.6.2"]
 provider-google = ["pydantic-ai-slim[google]>=0.6.2"]
 provider-openai = ["pydantic-ai-slim[openai]>=0.6.2"]
 # OpenAI includes support for:
@@ -327,28 +330,25 @@ provider-openai = ["pydantic-ai-slim[openai]>=0.6.2"]
 provider-mistral = ["pydantic-ai-slim[mistral]>=0.6.2"]
 
 #    --- Embedding, Rerank and Agent Providers --- (the trifecta)
-provider-huggingface = ["pydantic-ai-slim[huggingface]>=0.6.2"]
+
 provider-bedrock = ["pydantic-ai-slim[bedrock]>=0.6.2"]
 provider-cohere = ["pydantic-ai-slim[cohere]>=0.6.2"]
 
 #    --- Embedding and Rerank Only --- (no agent)
-provider-voyageai = ["voyageai>=0.3.4"]
 provider-fastembed = ["fastembed>=0.7.1"]
 provider-fastembed-gpu = ["fastembed-gpu>=0.7.1"]
+provider-sentence-transformers = ["sentence-transformers>=5.1.0"]
+provider-sentence-transformers-gpu = ["sentence-transformers[onnx-gpu]>=5.1.0"]
+provider-voyageai = ["voyageai>=0.3.4"]
 # Requires additional setup, see https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/
 
 # ==== Vector Stores ====
-provider-in-memory = ["fastembed-vectorstore>=0.1.6", "tokenizers>=0.13.2"]
-provider-in-memory-gpu = [
-    "fastembed-vectorstore>=0.1.6",
-    "tokenizers>=0.13.2",
-    "fastembed-gpu>=0.7.1",
-]
+provider-in-memory = ["langchain-text-splitters>=0.3.9", "tokenizers>=0.13.2"]
 provider-qdrant = ["qdrant-client>=1.15.0"]
 
 # ==== Data Sources ====
 
-source-filesystem = ["watchfiles>=1.1.0"]
+source-filesystem = ["langchain-text-splitters>=0.3.9", "watchfiles>=1.1.0"]
 source-tavily = ["pydantic-ai-slim[tavily]>=0.6.2"]
 source-duckduckgo = ["pydantic-ai-slim[duckduckgo]>=0.6.2"]
 
@@ -379,18 +379,18 @@ auth-eunomia = ["eunomia-mcp>=0.3.9"]
 all = [
     "aenum>=3.1.16",
     "ast-grep-py>=0.39.1",
-    "eunomia-mcp>=0.3.9",
     "cyclopts>=3.22.5",
+    "eunomia-mcp>=0.3.9",
     "fastembed>=0.7.1",
     "fastmcp>=2.10.6",
     "httpx>=0.28.1",
     "langchain-text-splitters>=0.3.9",
     "mcp>=1.13.0",
     "numpy>=2.3.0",
-    "posthog>=6.3.0",
     "permit-fastmcp>=0.1.1",
+    "posthog>=6.3.0",
+    "pydantic-ai-slim[anthropic,cohere,bedrock,huggingface,openai,google,groq]>=0.6.2",
     "pydantic-ai>=0.6.2",
-    "pydantic-ai-slim[cohere,bedrock,huggingface,mistral,openai,google,groq,anthropic]>=0.6.2",
     "pydantic-graph>=0.6.2",
     "pydantic-settings>=2.10.1",
     "pydantic>=2.11.7",
@@ -410,18 +410,18 @@ all = [
 all-gpu = [
     "aenum>=3.1.16",
     "ast-grep-py>=0.39.1",
-    "eunomia-mcp>=0.3.9",
     "cyclopts>=3.22.5",
+    "eunomia-mcp>=0.3.9",
     "fastembed-gpu>=0.7.1",
     "fastmcp>=2.10.6",
     "httpx>=0.28.1",
     "langchain-text-splitters>=0.3.9",
     "mcp>=1.13.0",
     "numpy>=2.3.0",
-    "posthog>=6.3.0",
     "permit-fastmcp>=0.1.1",
+    "posthog>=6.3.0",
+    "pydantic-ai-slim[anthropic,cohere,bedrock,huggingface,openai,google,groq]>=0.6.2",
     "pydantic-ai>=0.6.2",
-    "pydantic-ai-slim[cohere,bedrock,huggingface,mistral,openai,google,groq,anthropic]>=0.6.2",
     "pydantic-graph>=0.6.2",
     "pydantic-settings>=2.10.1",
     "pydantic>=2.11.7",
@@ -459,6 +459,7 @@ include = [
     "CHANGELOG.md",
     "LICENSE-MIT",
     "LICENSE-APACHE-2.0",
+    "LICENSE",
 ]
 
 [tool.pytest.ini_options]

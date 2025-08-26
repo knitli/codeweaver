@@ -1,6 +1,6 @@
 """Settings for Ling AI Research models."""
 
-from codeweaver.embedding.capabilities import EmbeddingModelProfile
+"""
+Stats copy + paste:
 
-
-class LingAIResearchEmbeddingModelProfile(EmbeddingModelProfile): ...
+"""

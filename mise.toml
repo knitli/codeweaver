@@ -56,19 +56,25 @@ echo "Environment deactivated."
 
 [tasks]
 
+sync = """
+#!/bin/bash
+echo "Syncing dependencies..."
+uv sync --extra all --group all-dev
+"""
+
 # Development setup
 setup = """
 #!/bin/bash
 mise trust -y &&
 mise install -y &&
 mise reshim &&
-mise run activate &&
+mise activate &&
 echo "Initializing CodeWeaver MCP..."
 hk init --mise &&
 echo "Setting up development environment..."
 uv venv --allow-existing .venv &&
 source .venv/bin/activate
-uv sync --group all-dev --extra all &&
+mise run sync &&
 # Determine if we're in CI
 if [ "$GITHUB_ACTIONS" == true ]; then
     export CI=true

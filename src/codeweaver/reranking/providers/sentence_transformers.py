@@ -4,10 +4,13 @@
 import asyncio
 import logging
 
-from collections.abc import Sequence
-from typing import Any, ClassVar
+from collections.abc import Callable, Sequence
+from typing import Any, cast
+
+import numpy as np
 
 from codeweaver._settings import Provider
+from codeweaver._utils import rpartial
 from codeweaver.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.reranking.providers.base import RerankingProvider
 
@@ -54,7 +57,7 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
     _provider: Provider = Provider.SENTENCE_TRANSFORMERS
     _caps: RerankingModelCapabilities
 
-    _kwargs: ClassVar[dict[str, Any]] = {"trust_remote_code": True}
+    _rerank_kwargs: dict[str, Any] = {"trust_remote_code": True}  # noqa: RUF012
 
     def __init__(
         self,
@@ -66,20 +69,29 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
     ) -> None:
         """Initialize the SentenceTransformersRerankingProvider."""
         self._caps = capabilities
-        self._client = client or CrossEncoder(self._caps.name, **self._kwargs)
-        self._kwargs = kwargs
+        self._rerank_kwargs = {**type(self)._rerank_kwargs, **kwargs}
+        self._client = client or CrossEncoder(self._caps.name, **self._rerank_kwargs)
         self._prompt = prompt
         self._top_k = top_k
-        super().__init__(capabilities, client=self._client, prompt=prompt, top_k=top_k, **kwargs)
+        super().__init__(
+            capabilities,
+            client=self._client,
+            prompt=prompt,
+            top_k=top_k,
+            **self._rerank_kwargs,  # pyright: ignore[reportCallIssue]  # we're intentionally reassigning here
+        )
 
     def _initialize(self) -> None:
         """
         Initialize the SentenceTransformersRerankingProvider.
         """
-        if "model_name" not in self._kwargs:
-            self._kwargs["model_name"] = self._caps.name
-        self._client = self.get_client_for_model(self._kwargs["model_name"])
-        if "Qwen3" in self._kwargs["model_name"]:
+        if "model_name" not in self.kwargs:
+            self.kwargs["model_name"] = self._caps.name
+        name = self.kwargs.pop("model_name")
+        if not isinstance(name, str):
+            raise TypeError(f"Expected model_name to be str, got {type(name).__name__}")
+        self._client = self._client or CrossEncoder(name, **(self.kwargs or {}))  # pyright: ignore[reportArgumentType]
+        if "Qwen3" in name:
             self._setup_qwen3()
 
     async def _execute_rerank(
@@ -95,21 +107,26 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
             preprocess_for_qwen(
                 query=query,
                 documents=documents,
-                instruction=self._caps.custom_prompt,
+                instruction=self._caps.custom_prompt or "",
                 prefix=self._query_prefix,
                 suffix=self._doc_suffix,
-                model_name=self.kwargs["model_name"],
+                model_name=self.kwargs["model_name"]
+                if isinstance(self.kwargs["model_name"], str)
+                else "this won't happen",
             )
             if "Qwen3" in self._caps.name
             else [(query, doc) for doc in documents]
         )
+        predict_partial = rpartial(
+            cast(Callable[..., np.ndarray], self._client.predict), convert_to_numpy=True
+        )
         loop = asyncio.get_running_loop()
-        scores = await loop.run_in_executor(None, self._client.predict, preprocessed)
+        scores = await loop.run_in_executor(None, predict_partial, preprocessed)  # pyright: ignore[reportArgumentType, reportUnknownMemberType, reportUnknownVariableType]
         return scores.tolist()
 
     def _setup_qwen3(self) -> None:
         """Sets up Qwen3 specific parameters."""
-        if "Qwen3" not in self._kwargs["model_name"]:
+        if "Qwen3" not in cast(str, self.kwargs["model_name"]):
             return
         from importlib import metadata
 

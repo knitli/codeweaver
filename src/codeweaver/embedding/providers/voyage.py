@@ -10,17 +10,18 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from collections.abc import Callable, Sequence
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
+
+from voyageai.object.embeddings import EmbeddingsObject
 
 from codeweaver._data_structures import CodeChunk
 from codeweaver._settings import Provider
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.embedding.providers import EmbeddingProvider
-from codeweaver.embedding.providers.base import (
-    default_input_transformer,
-    default_output_transformer,
-)
+from codeweaver.embedding.providers.base import default_output_transformer
 
 
 try:
@@ -60,7 +61,6 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
 
     _doc_kwargs: ClassVar[dict[str, Any]] = {"input_type": "document"}
     _query_kwargs: ClassVar[dict[str, Any]] = {"input_type": "query"}
-    _input_transformer: Callable[[Sequence[CodeChunk]], Sequence[str]] = default_input_transformer
     _output_transformer: Callable[[Any], Sequence[Sequence[float]] | Sequence[Sequence[int]]] = (
         default_output_transformer
     )
@@ -76,8 +76,8 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
             "output_dimension": self._caps.default_dimension,
             "output_dtype": self._caps.default_dtype,
         }
-        type(self)._doc_kwargs |= shared_kwargs
-        type(self)._query_kwargs |= shared_kwargs
+        self.doc_kwargs |= shared_kwargs
+        self.query_kwargs |= shared_kwargs
 
     @property
     def name(self) -> Provider:
@@ -94,27 +94,28 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
         """Get the client for the embedding provider."""
         return self._client
 
-    async def embed_documents(
-        self, documents: list[CodeChunk] | CodeChunk, **kwargs: dict[str, Any]
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+    async def _embed_documents(
+        self, documents: Sequence[CodeChunk], **kwargs: dict[str, Any]
+    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:  # pyright: ignore[reportReturnType]
         """Embed a list of documents into vectors."""
-        kwargs = self._set_kwargs(self.doc_kwargs, kwargs)
-        transformed_input = self._process_input(documents)
-        response = await self._client.embed(transformed_input, **kwargs)  # pyright: ignore[reportArgumentType] # a list is a sequence...
-        self._update_token_stats(token_count=response.total_tokens)
-        return self._process_output(response)
+        ready_documents = cast(list[str], self.chunks_to_strings(documents))
+        results: EmbeddingsObject = await self._client.embed(texts=ready_documents, **kwargs)  # pyright: ignore[reportArgumentType]
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            None, lambda: self._update_token_stats(token_count=results.total_tokens)
+        )
+        return await loop.run_in_executor(None, lambda: self._process_output(results))
 
-    async def embed_query(
-        self, query: str | Sequence[str], **kwargs: dict[str, Any]
+    async def _embed_query(
+        self, query: Sequence[str], **kwargs: dict[str, Any]
     ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
-        """Embed a query into a vector."""
-        kwargs = self._set_kwargs(self.query_kwargs, kwargs)
-        if isinstance(query, str):
-            query = [query]
-        transformed_input = self._process_input(query)
-        response = await self._client.embed(transformed_input, **kwargs)  # pyright: ignore[reportArgumentType] # a list is a sequence...
-        self._update_token_stats(token_count=response.total_tokens)
-        return self._process_output(response)
+        """Embed a query or group of queries into vectors."""
+        results: EmbeddingsObject = await self._client.embed(texts=query, **kwargs)  # pyright: ignore[reportArgumentType]
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            None, lambda: self._update_token_stats(token_count=results.total_tokens)
+        )
+        return await loop.run_in_executor(None, lambda: self._process_output(results))
 
     @property
     def dimension(self) -> int:

@@ -16,7 +16,10 @@ from codeweaver.tokenizers import get_tokenizer
 def cohere_max_input(chunks: Sequence[CodeChunk], query: str) -> tuple[bool, NonNegativeInt]:
     """Determine the maximum input length for the Cohere model."""
     tokenizer = get_tokenizer("tokenizers", "Cohere/rerank-v3.5")
-    sizes = [tokenizer.estimate(chunk.serialize()) + tokenizer.estimate(query) for chunk in chunks]
+    sizes = [
+        tokenizer.estimate(chunk.serialize_for_embedding()) + tokenizer.estimate(query)  # pyright: ignore[reportArgumentType]
+        for chunk in chunks
+    ]
     if all(size <= 4096 for size in sizes):
         return True, 4096
     return False, next(i - 1 for i, size in enumerate(sizes) if size > 4096)

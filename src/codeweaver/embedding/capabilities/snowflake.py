@@ -1,6 +1,6 @@
 """Settings for Snowflake embedding models."""
 
-from codeweaver.embedding.capabilities import EmbeddingModelProfile
+"""
+Stats copy + paste:
 
-
-class SnowflakeEmbeddingModelProfile(EmbeddingModelProfile): ...
+"""

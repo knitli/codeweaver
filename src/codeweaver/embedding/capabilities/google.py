@@ -1,6 +1,6 @@
 """Settings for Google embedding models."""
 
-from codeweaver.embedding.capabilities import EmbeddingModelProfile
+"""
+Stats copy + paste:
 
-
-class GoogleEmbeddingModelProfile(EmbeddingModelProfile): ...
+"""

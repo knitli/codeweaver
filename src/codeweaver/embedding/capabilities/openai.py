@@ -15,7 +15,7 @@ def _get_openai_models(
     match provider:
         case Provider.OPENAI | Provider.AZURE | Provider.VERCEL:
             return ("text-embedding-3-small", "text-embedding-3-large")
-        case Provider.GITHUB:
+        case _:
             return ("openai/text-embedding-3-small", "openai/text-embedding-3-large")
 
 

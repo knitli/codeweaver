@@ -1,6 +1,6 @@
 """Settings for ONNX embedding models."""
 
-from codeweaver.embedding.capabilities import EmbeddingModelProfile
+"""
+Stats copy + paste:
 
-
-class ONNXEmbeddingModelProfile(EmbeddingModelProfile): ...
+"""

@@ -1,6 +1,6 @@
 """Settings for Salesforce embedding models."""
 
-from codeweaver.embedding.capabilities import EmbeddingModelProfile
+"""
+Stats copy + paste:
 
-
-class SalesforceEmbeddingModelProfile(EmbeddingModelProfile): ...
+"""

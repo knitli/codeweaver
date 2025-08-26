@@ -7,25 +7,37 @@
 from __future__ import annotations
 
 import contextlib
+import copy
+import os
+import sys
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, ItemsView, Iterable, Iterator, KeysView, Sequence, ValuesView
 from datetime import UTC, datetime
-from functools import cache
-from hashlib import sha256
+from functools import cache, cached_property
 from pathlib import Path
+from types import MappingProxyType
 from typing import (
     Annotated,
     Any,
+    Literal,
     LiteralString,
     NamedTuple,
+    NewType,
     NotRequired,
     Required,
     Self,
+    SupportsBytes,
+    SupportsIndex,
     TypedDict,
     TypeGuard,
+    TypeVar,
+    cast,
+    overload,
 )
 from uuid import uuid4
+from weakref import WeakValueDictionary
 
+from _typeshed import ReadableBuffer
 from ast_grep_py import SgNode
 from pydantic import (
     UUID4,
@@ -34,10 +46,13 @@ from pydantic import (
     NonNegativeFloat,
     NonNegativeInt,
     PositiveFloat,
+    PositiveInt,
+    PrivateAttr,
     computed_field,
     model_validator,
 )
 from pydantic.dataclasses import dataclass
+from typing_extensions import TypeIs
 
 from codeweaver._common import BaseEnum
 from codeweaver._constants import get_ext_lang_pairs
@@ -45,9 +60,26 @@ from codeweaver._utils import normalize_ext
 from codeweaver.language import ConfigLanguage, SemanticSearchLanguage
 
 
+try:
+    # there are a handful of rare situations where users might not be able to install blake3
+    # luckily the apis are the same
+    from blake3 import blake3
+except ImportError:
+    from hashlib import blake2b as blake3
+
+
+BlakeKey = NewType("BlakeKey", str)
+BlakeHashKey = Annotated[
+    BlakeKey, Field(description="A blake3 hash key string", min_length=64, max_length=64)
+]
+
 # ------------------------------------------------
 # *          Metadata Types and Enums          *
 # ------------------------------------------------
+
+type SerializedCodeChunk[CodeChunk] = str | bytes | bytearray
+type ChunkSequence = Sequence[CodeChunk] | Sequence[SerializedCodeChunk[CodeChunk]]
+type StructuredDataInput = CodeChunk | SerializedCodeChunk[CodeChunk] | ChunkSequence
 
 
 class ChunkKind(BaseEnum):
@@ -209,7 +241,7 @@ class Span:
 
     def __xor__(self, other: Span) -> tuple[Span, ...] | None:  # Symmetric Difference
         """Return the symmetric difference between two spans."""
-        if self._source_id != other._source_id or not self & other:
+        if self._source_id.hex != other._source_id.hex or not self & other:
             return (self, other)
         diff1 = self - other
         diff2 = other - self
@@ -221,17 +253,17 @@ class Span:
         return tuple(result) if result else None
 
     def __le__(self, other: Span) -> bool:  # Subset
-        if self._source_id != other._source_id:
+        if self._source_id.hex != other._source_id.hex:
             return False
         return self.start >= other.start and self.end <= other.end
 
     def __ge__(self, other: Span) -> bool:  # Superset
-        if self._source_id != other._source_id:
+        if self._source_id.hex != other._source_id.hex:
             return False
         return self.start <= other.start and self.end >= other.end
 
     def __eq__(self, other: object) -> bool:  # Equality
-        if not isinstance(other, Span) or self._source_id != other._source_id:
+        if not isinstance(other, Span) or self._source_id.hex != other._source_id.hex:
             return False
         return self.start == other.start and self.end == other.end
 
@@ -280,9 +312,9 @@ class Span:
         return (self.start, self.end, self._source_id)
 
     @property
-    def source_id(self) -> UUID4:
+    def source_id(self) -> str:
         """The identifier for the source of the span."""
-        return self._source_id
+        return self._source_id.hex
 
     def from_sourced_lines(self, start: NonNegativeInt, end: NonNegativeInt) -> Span:
         """Create a Span for the same source as this one, but with a new start and end."""
@@ -301,7 +333,7 @@ class Span:
 
     def intersection(self, other: Span) -> Span | None:
         """Return the intersection of this span with another span."""
-        return None if self._source_id != other._source_id else self & other
+        return None if self._source_id.hex != other._source_id.hex else self & other
 
     def difference(self, other: Span) -> Span | tuple[Span, Span] | None:
         """
@@ -368,7 +400,7 @@ class SpanGroup:
 
     @computed_field
     @property
-    def source_id(self) -> UUID4 | None:
+    def source_id(self) -> str | None:
         """Get the source_id of the span group."""
         if not self.spans or not self.is_unform:
             return None
@@ -376,7 +408,7 @@ class SpanGroup:
 
     @computed_field
     @property
-    def sources(self) -> frozenset[UUID4]:
+    def sources(self) -> frozenset[str]:
         """Get the source_ids of the span group."""
         return frozenset(span.source_id for span in self.spans)
 
@@ -472,6 +504,18 @@ class SearchResult(BaseModel):
     ] = None
 
 
+class CodeChunkDict(TypedDict, total=False):
+    content: str
+    line_range: SpanTuple
+    file_path: Path | None
+    language: SemanticSearchLanguage | LiteralString | None
+    timestamp: PositiveFloat
+    chunk_id: UUID4
+    parent_id: UUID4 | None
+    metadata: Metadata | None
+    _embedding_batch: UUID4 | None
+
+
 class CodeChunk(BaseModel):
     """Represents a chunk of code with metadata."""
 
@@ -500,8 +544,7 @@ class CodeChunk(BaseModel):
         ),
     ] = uuid4()
     parent_id: Annotated[
-        UUID4 | None,
-        Field(default=None, description="Parent chunk ID, such as the file ID, if applicable"),
+        UUID4 | None, Field(description="Parent chunk ID, such as the file ID, if applicable")
     ] = None
     metadata: Annotated[
         Metadata | None,
@@ -511,10 +554,26 @@ class CodeChunk(BaseModel):
             description="Additional metadata about the code chunk",
         ),
     ] = None
+    _embedding_batch: Annotated[
+        UUID4 | None,
+        Field(
+            repr=False, description="Batch ID for the embedding batch the chunk was processed in."
+        ),
+    ] = None
 
-    def serialize(self) -> str:
+    def serialize(self) -> SerializedCodeChunk[CodeChunk]:
         """Serialize the CodeChunk to a dictionary."""
         return self.model_dump_json(round_trip=True, exclude_none=True)
+
+    def serialize_for_embedding(self) -> SerializedCodeChunk[CodeChunk]:
+        """Serialize the CodeChunk for embedding."""
+        return self.model_dump_json(
+            round_trip=False, exclude_none=True, exclude={"chunk_id", "timestamp", "parent_id"}
+        )
+
+    def set_batch_id(self, batch_id: UUID4) -> None:
+        """Set the batch ID for the code chunk."""
+        self._embedding_batch = batch_id
 
 
 @dataclass(frozen=True, slots=True)
@@ -522,13 +581,15 @@ class DiscoveredFile:
     path: Annotated[Path, Field(description="Relative path to the discovered file")]
     ext_kind: ExtKind
 
-    file_hash: Annotated[str, Field(description="sha256 hash of the file contents", init=False)]
+    file_hash: Annotated[
+        BlakeHashKey, Field(description="blake3 hash of the file contents", init=False)
+    ]
 
     @classmethod
     def from_path(cls, path: Path) -> DiscoveredFile | None:
         """Create a DiscoveredFile from a file path."""
         if ext_kind := (ext_kind := ExtKind.from_file(path)):
-            file_hash = sha256(path.read_bytes()).hexdigest()
+            file_hash = BlakeKey(blake3(path.read_bytes()).hexdigest())
             return cls(path=path, ext_kind=ext_kind, file_hash=file_hash)
         return None
 
@@ -617,3 +678,396 @@ class ExtKind(NamedTuple):
             ),
             None,
         )
+
+
+HashKeyKind = TypeVar("HashKeyKind", UUID4, BlakeHashKey)
+# General sub-value type for container-like value types.
+SubT = TypeVar("SubT")
+
+
+def get_blake_hash[AnyStr: (str, bytes)](value: AnyStr) -> BlakeHashKey:
+    """Hash a value using blake3 and return the hex digest."""
+    return BlakeKey(blake3(value.encode("utf-8") if isinstance(value, str) else value).hexdigest())
+
+
+def to_uuid() -> UUID4:
+    """Generate a new UUID4."""
+    return uuid4()
+
+
+class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](BaseModel):
+    """A key-value store with precise typing for keys, values, and optional sub-values.
+
+    - KeyT is either UUID4 or BlakeHashKey, determined by use_uuid.
+    - T is the value type for all items in the store.
+    - SubT is the type of elements within T if T is a container; otherwise None.
+
+    The store protects data integrity by copying data on get, pushes removed items to a trash heap for
+    potential recovery, and can optionally limit the total size (default is 3MB).
+    """
+
+    value_type: Annotated[
+        type[T],
+        Field(init=True, kw_only=True, description="The type of values stored in the store."),
+    ]
+
+    # When specialized via subclasses below, this is narrowed to Literal[True] / Literal[False]
+    use_uuid: Annotated[Literal[False, True], Field(description="Whether to use UUID4 keys")] = True
+
+    store: Annotated[
+        dict[KeyT, T],
+        Field(
+            init=False,
+            default_factory=dict,
+            description="The key-value store. Keys are UUID4 or Blake3 hash keys depending on configuration.",
+        ),
+    ]
+
+    sub_value_type: Annotated[
+        type[SubT] | None,
+        Field(
+            description="If value_type is a container, this is the type of its elements; otherwise None.",
+            discriminator="sub_value_type",
+        ),
+    ] = None
+
+    # Key generator is derived from use_uuid at runtime; keep it private to the model
+    _keygen: Callable[[], UUID4] | Callable[[str | bytes], BlakeHashKey] = PrivateAttr(
+        default=to_uuid
+    )
+
+    _size_limit: Annotated[PositiveInt | None, Field(repr=False, kw_only=True)] = (
+        3 * 1024 * 1024
+    )  # 3 MB default limit
+
+    # Per-instance trash heap; avoid shared default
+    _trash_heap: WeakValueDictionary[KeyT, T] = PrivateAttr(default_factory=WeakValueDictionary)
+
+    _id: Annotated[
+        UUID4,
+        Field(default_factory=uuid4, description="Unique identifier for the store", init=False),
+    ] = to_uuid()
+
+    # Track sub-value type at runtime when inferred lazily
+    _sub_value_type: type[SubT] | None = PrivateAttr(default=None)
+
+    def __model_post_init__(self) -> None:
+        """Post-initialization processing."""
+
+    @model_validator(mode="after")
+    def check_store(self) -> Self:
+        """Ensure the store is initialized and keygen is set from use_uuid."""
+        if not self.store:
+            self.store = {}
+        if not self.value_type:
+            raise ValueError("value_type must be specified")
+        # Initialize key generator based on use_uuid
+        self._keygen = to_uuid if self.use_uuid else get_blake_hash  # pyright: ignore[reportAttributeAccessIssue]
+        return self
+
+    @property
+    def id(self) -> UUID4:
+        """Return the unique identifier for the store."""
+        return self._id
+
+    @staticmethod
+    def _trial_and_error_copy(item: T) -> Literal["deepcopy", "copy", "iter"] | None:
+        """Attempt to copy an item, falling back to a simpler method on failure."""
+        with contextlib.suppress(Exception):
+            if copy.deepcopy(item):
+                return "deepcopy"
+        with contextlib.suppress(Exception):
+            if copy.copy(item):
+                return "copy"
+        if hasattr(item, "__iter__") and callable(item):
+            with contextlib.suppress(Exception):
+                if item(iter(item)):  # pyright: ignore[reportCallIssue, reportArgumentType]
+                    return "iter"
+        return None
+
+    @cached_property
+    def _get_copy_strategy(self) -> Callable[[T], T] | None:
+        """Determine the best strategy for copying items from the store."""
+        sample_item: T | None = None
+        if self.values():
+            sample_item = next(iter(self.values()))
+        elif callable(self.value_type):
+            with contextlib.suppress(Exception):
+                sample_item = self.value_type()
+        if not sample_item:
+            return lambda item: item  # no-op copy
+        if isinstance(sample_item, (list | dict | set)):
+            return lambda item: item.copy()  # pyright: ignore[reportUnknownMemberType, reportUnknownLambdaType, reportAttributeAccessIssue]
+        if copy_strategy := self._trial_and_error_copy(sample_item):
+            if copy_strategy in ("deepcopy", "copy"):
+                return copy.deepcopy if copy_strategy == "deepcopy" else copy.copy
+            return lambda item: type(item)(iter(item))  # type: ignore
+        return lambda item: item  # no-op copy
+
+    def get(self, key: KeyT, default: T | None = None) -> T | None:
+        """Get a value from the store."""
+        if item := self.store.get(key):  # pyright: ignore[reportArgumentType]
+            return self._get_copy_strategy(item) if self._get_copy_strategy else item
+        return self.get(key) if self.recover(key) else self.store.get(key, default)
+
+    def __iter__(self) -> Iterator[KeyT]:  # pyright: ignore[reportIncompatibleMethodOverride]
+        """Return an iterator over the keys in the store."""
+        return iter(self.store)
+
+    def __getitem__(self, key: KeyT) -> T:
+        """Get an item from the store by key."""
+        return self.store[key]
+
+    def __contains__(self, key: KeyT) -> bool:
+        """Check if a key is in the store."""
+        return key in self.store
+
+    def __len__(self) -> int:
+        return len(self.store)
+
+    def __setitem__(self, key: KeyT, value: T) -> None:
+        self.store[key] = value
+
+    def __and__(self, other: SimpleTypedStore[KeyT, T, SubT]) -> SimpleTypedStore[KeyT, T, SubT]:
+        """Return a new store with items from both stores."""
+        if self.value_type != other.value_type or self.use_uuid != other.use_uuid:
+            return self
+        new_store = SimpleTypedStore[KeyT, T, SubT](  # type: ignore[call-arg]
+            value_type=self.value_type,
+            use_uuid=self.use_uuid,
+            sub_value_type=self.sub_value_type,
+            _size_limit=self._size_limit,
+        )
+        new_store.store = self.store.copy()
+        new_store.store |= other.store
+        return new_store
+
+    def _guard(self, item: Any) -> TypeIs[T]:
+        """Ensure the item is of the correct type."""
+        return isinstance(item, self.value_type)
+
+    def _guard_subtype(self, item: Any) -> TypeIs[SubT]:
+        if not self._sub_value_type:
+            self._set_sub_value_type(item)
+            return True
+        return isinstance(item, self._sub_value_type)
+
+    def _set_sub_value_type(self, item: Any) -> None:
+        if self._sub_value_type or not item:
+            return
+        self._sub_value_type = type(item)
+
+    @property
+    def keygen(self) -> Callable[[], UUID4] | Callable[[str | bytes], BlakeHashKey]:
+        """Return the key generator function."""
+        return self._keygen
+
+    def generate(self, value: str | bytes | None = None) -> KeyT:
+        """Generate a new key for the store."""
+        if self.use_uuid and self._keygen == to_uuid:
+            return cast(KeyT, to_uuid())
+        # we're dealing with BlakeHashKey:
+        if not value:
+            rand = os.urandom(16)
+            value = rand
+        return cast(KeyT, self._keygen(value))  # pyright: ignore[reportCallIssue]
+
+    @property
+    def item_type(self) -> type[T]:
+        """Return the type of items stored."""
+        return self.value_type
+
+    @property
+    def sub_item_type(self) -> type[SubT] | None:
+        """Return the type of sub-items stored, if any."""
+        return self._sub_value_type
+
+    @computed_field
+    @property
+    def data_size(self) -> NonNegativeInt:
+        """Return the size of the store in bytes."""
+        return sum(sys.getsizeof(key) + sys.getsizeof(value) for key, value in self.store.items())
+
+    def keys(self) -> KeysView[KeyT]:
+        """Return the keys in the store."""
+        return self.store.keys()
+
+    def values(self) -> ValuesView[T]:
+        """Return the values in the store."""
+        return self.store.values()
+
+    def items(self) -> ItemsView[KeyT, T]:
+        """Return the items in the store."""
+        return self.store.items()
+
+    @property
+    def view(self) -> MappingProxyType[KeyT, T]:
+        """Return a read-only view of the store."""
+        return MappingProxyType(self.store)
+
+    def _validate_value(self, value: Any) -> TypeGuard[T]:
+        """Validate that the value is of the correct type."""
+        if not self._guard(value):
+            return False
+        if self._sub_value_type and not all(self._guard_subtype(v) for v in value):  # pyright: ignore[reportUnknownArgumentType, reportGeneralTypeIssues, reportUnknownVariableType]
+            return False
+        if (
+            value
+            and not self._sub_value_type
+            and hasattr(value, "__iter__")
+            and not isinstance(value, (str | bytes | bytearray))
+        ):
+            first_elem: SubT = next(iter(value), None)  # pyright: ignore[reportGeneralTypeIssues, reportCallIssue, reportUnknownVariableType, reportUnknownArgumentType, reportArgumentType, reportAssignmentType]
+            if first_elem is not None:
+                self._set_sub_value_type(first_elem)
+                return all(self._guard_subtype(v) for v in value)  # pyright: ignore[reportUnknownArgumentType, reportGeneralTypeIssues, reportUnknownVariableType]
+        return True
+
+    def _check_and_set(self, key: KeyT, value: T) -> KeyT:
+        """Check the value type and set the sub-value type if needed."""
+        if key in self.store:
+            return key
+        self.set(key, value)
+        return key
+
+    def add(self, value: Any, *, hash_value: bytes | bytearray | None = None) -> KeyT:
+        """Add a value to the store and return its key.
+
+        Optionally provide a value to hash for the key if not using UUIDs and the value is large or complex.
+        """
+        if not self._validate_value(value):
+            raise TypeError(f"Invalid value: {value}")
+        key: UUID4 | None = to_uuid() if self.use_uuid and self.keygen == to_uuid else None  # pyright: ignore[reportAssignmentType]
+        if key:
+            return self._check_and_set(cast(KeyT, key), value)
+        if hash_value:
+            blake_key: BlakeHashKey = (  # pyright: ignore[reportRedeclaration]
+                get_blake_hash(hash_value)
+                if isinstance(hash_value, bytes)
+                else get_blake_hash(bytes(hash_value))
+            )
+        elif isinstance(value, SupportsIndex | SupportsBytes | ReadableBuffer) or (
+            isinstance(value, Iterable) and all(v for v in value if isinstance(v, SupportsIndex))  # pyright: ignore[reportUnknownVariableType]
+        ):  # pyright: ignore[reportUnknownVariableType]
+            blake_key: BlakeHashKey = get_blake_hash(bytes(value))  # pyright: ignore[reportUnknownArgumentType]
+        else:
+            value = os.urandom(16)
+            blake_key = get_blake_hash(value)
+        return self._check_and_set(cast(KeyT, blake_key), value)  # pyright: ignore[reportCallIssue, reportArgumentType]
+
+    def _make_room(self, required_space: int) -> None:
+        """Make room in the store by removing the least recently used items."""
+        if not self._size_limit or required_space <= 0:
+            return
+        weight_loss_goal = (self._size_limit - self.data_size) + required_space
+        if not self.store or weight_loss_goal <= 0:
+            # We either have no items, or the item is too large to fit
+            self.store.clear()
+            return
+        while self._size_limit and weight_loss_goal > 0:
+            # LIFO removal strategy for simplicity
+            removed = self.store.popitem()
+            weight_loss_goal -= sys.getsizeof(removed[0]) + sys.getsizeof(removed[1])
+            self._trash_heap[removed[0]] = removed[1]
+            if weight_loss_goal <= 0:
+                break
+
+    def set(self, key: KeyT, value: Any) -> None:
+        """Set a value in the store."""
+        if not self._validate_value(value):
+            raise TypeError(f"Invalid value: {value}")
+        if not self.has_room(sys.getsizeof(value) + sys.getsizeof(key)):
+            self._make_room(sys.getsizeof(value) + sys.getsizeof(key))
+        if key in self.store:
+            return
+        if key in self._trash_heap and self._trash_heap[key] is not None:
+            del self._trash_heap[key]
+        self.store[key] = value
+
+    def has_room(self, additional_size: int = 0) -> bool:
+        """Check if the store has room for additional data."""
+        return not self._size_limit or (self.data_size + additional_size) <= self._size_limit
+
+    def delete(self, key: KeyT) -> None:
+        """Delete a value from the store."""
+        if key in self.store:
+            del self.store[key]
+        if key in self._trash_heap:
+            del self._trash_heap[key]
+
+    def clear(self) -> None:
+        """Clear the store."""
+        self._trash_heap.update(self.store)
+        self.store.clear()
+
+    def clear_trash(self) -> None:
+        """Clear the trash heap."""
+        self._trash_heap.clear()
+
+    def recover(self, key: KeyT) -> bool:
+        """Recover a value from the trash heap."""
+        if (
+            key in self._trash_heap
+            and key not in self.store
+            and (actually_there := self._trash_heap.get(key)) is not None
+        ):
+            self.set(key, actually_there)
+            return True
+        return False
+
+
+class UUIDStore[T, SubT: object | None](SimpleTypedStore[UUID4, T, SubT]):
+    """Typed store specialized for UUID keys."""
+
+    use_uuid: Literal[True] = True  # pyright: ignore[reportIncompatibleVariableOverride]
+
+
+class BlakeStore[T, SubT: object | None](SimpleTypedStore[BlakeHashKey, T, SubT]):
+    """Typed store specialized for Blake3-hash keys."""
+
+    use_uuid: Literal[False] = False  # pyright: ignore[reportIncompatibleVariableOverride]
+
+
+@overload
+def make_store[T, SubT: object | None](
+    *,
+    value_type: type[T],
+    use_uuid: Literal[True] = True,
+    sub_value_type: type[SubT] | None = None,
+    size_limit: PositiveInt | None = ...,
+) -> UUIDStore[T, SubT]: ...
+
+
+@overload
+def make_store[T, SubT: object | None](
+    *,
+    value_type: type[T],
+    use_uuid: Literal[False],
+    sub_value_type: type[SubT] | None = None,
+    size_limit: PositiveInt | None = ...,
+) -> BlakeStore[T, SubT]: ...
+
+
+def make_store[T, SubT: object | None](
+    *,
+    value_type: type[T],
+    use_uuid: bool = True,
+    sub_value_type: type[SubT] | None = None,
+    size_limit: PositiveInt | None = None,
+) -> UUIDStore[T, SubT] | BlakeStore[T, SubT]:
+    """Factory with overloads to construct a precisely-typed store based on use_uuid."""
+    if use_uuid:
+        return UUIDStore[T, SubT](
+            value_type=value_type,
+            store={},
+            use_uuid=True,
+            sub_value_type=sub_value_type,
+            _size_limit=size_limit,
+        )
+    return BlakeStore[T, SubT](
+        value_type=value_type,
+        store={},
+        use_uuid=False,
+        sub_value_type=sub_value_type,
+        _size_limit=size_limit,
+    )

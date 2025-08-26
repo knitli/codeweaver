@@ -20,12 +20,6 @@ except ImportError as e:
     raise ImportError("Voyage AI SDK is not installed.") from e
 
 
-type StructuredDataInput = str | bytes | bytearray | CodeChunk
-type StructuredDataSequence = (
-    Sequence[str] | Sequence[bytes] | Sequence[bytearray] | Sequence[CodeChunk]
-)
-
-
 class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
     """Base class for reranking providers."""
 
