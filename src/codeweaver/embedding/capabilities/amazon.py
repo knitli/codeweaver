@@ -16,7 +16,10 @@ def get_amazon_embedding_capabilities() -> Sequence[EmbeddingModelCapabilities]:
             "default_dimension": 1024,
             "output_dimensions": (1024, 512, 256),
             "default_dtype": "float",
-            "output_dtypes": ("float", "binary"),
+            "output_dtypes": (
+                "float",
+                "binary",
+            ),  # In this context, "binary" means "integer" -- probably "uint8"
             "supports_custom_prompts": False,
             "is_normalized": False,  # it can be, but isn't by default
             "context_window": 8192,

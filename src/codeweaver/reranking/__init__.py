@@ -6,6 +6,7 @@
 
 from typing import Literal
 
+from codeweaver._settings import Provider
 from codeweaver.reranking.providers.base import RerankingProvider
 
 
@@ -37,8 +38,35 @@ type KnownRerankModelName = Literal[
 ]
 
 
-def get_rerank_model_provider() -> None:  # -> EmbeddingProvider[Any]:
+def get_rerank_model_provider(provider: Provider) -> type[RerankingProvider]:
     """Get rerank model provider."""
+    if provider in {Provider.VOYAGE}:
+        from codeweaver.reranking.providers.voyage import VoyageRerankingProvider
+
+        return VoyageRerankingProvider  # type: ignore[return-value]
+
+    if provider == Provider.COHERE:
+        from codeweaver.reranking.providers.cohere import CohereRerankingProvider
+
+        return CohereRerankingProvider  # type: ignore[return-value]
+
+    if provider == Provider.BEDROCK:
+        from codeweaver.reranking.providers.bedrock import BedrockRerankingProvider
+
+        return BedrockRerankingProvider  # type: ignore[return-value]
+
+    if provider == Provider.FASTEMBED:
+        from codeweaver.reranking.providers.fastembed import FastEmbedRerankingProvider
+
+        return FastEmbedRerankingProvider  # type: ignore[return-value]
+
+    if provider == Provider.SENTENCE_TRANSFORMERS:
+        from codeweaver.reranking.providers.sentence_transformers import (
+            SentenceTransformersRerankingProvider,
+        )
+
+        return SentenceTransformersRerankingProvider
+    raise ValueError(f"Unknown reranking provider: {provider}")
 
 
 __all__ = ("KnownRerankModelName", "RerankingProvider")

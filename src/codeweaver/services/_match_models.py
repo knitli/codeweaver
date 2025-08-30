@@ -45,7 +45,7 @@ class PayloadField(BaseModel, extra="forbid"):
 
 
 class MinShould(BaseModel, extra="forbid"):
-    conditions: Annotated[Sequence[Condition], Field(..., description="List of conditions")]
+    conditions: Annotated[Sequence[Condition], Field(description="List of conditions")]
     min_count: Annotated[int, Field(description="Minimum count of conditions that must match")]
 
 
@@ -87,7 +87,7 @@ class NestedCondition(BaseModel, extra="forbid"):
     """
 
     nested: Annotated[
-        Nested, Field(..., description="Select points with payload for a specified nested field")
+        Nested, Field(description="Select points with payload for a specified nested field")
     ]
 
 
@@ -116,9 +116,7 @@ class HasIdCondition(BaseModel, extra="forbid"):
     ID-based filtering condition.
     """
 
-    has_id: Annotated[
-        Sequence[ExtendedPointId], Field(..., description="ID-based filtering condition")
-    ]
+    has_id: Annotated[Sequence[ExtendedPointId], Field(description="ID-based filtering condition")]
 
 
 class HasVectorCondition(BaseModel, extra="forbid"):
@@ -127,7 +125,7 @@ class HasVectorCondition(BaseModel, extra="forbid"):
     """
 
     has_vector: Annotated[
-        str, Field(..., description="Filter points which have specific vector assigned")
+        str, Field(description="Filter points which have specific vector assigned")
     ]
 
 
@@ -171,7 +169,7 @@ class MatchAny(BaseModel, extra="forbid"):
     """
 
     any: Annotated[
-        AnyVariants | None, Field(..., description="Exact match on any of the given values")
+        AnyVariants | None, Field(description="Exact match on any of the given values")
     ] = None
 
 
@@ -195,9 +193,7 @@ class MatchPhrase(BaseModel, extra="forbid"):
     Full-text phrase match of the string.
     """
 
-    phrase: Annotated[
-        str | None, Field(..., description="Full-text phrase match of the string.")
-    ] = None
+    phrase: Annotated[str | None, Field(description="Full-text phrase match of the string.")] = None
 
 
 class MatchText(BaseModel, extra="forbid"):
@@ -205,7 +201,7 @@ class MatchText(BaseModel, extra="forbid"):
     Full-text match of the strings.
     """
 
-    text: Annotated[str | None, Field(..., description="Full-text match of the strings.")] = None
+    text: Annotated[str | None, Field(description="Full-text match of the strings.")] = None
 
 
 class MatchValue(BaseModel, extra="forbid"):
@@ -213,9 +209,9 @@ class MatchValue(BaseModel, extra="forbid"):
     Exact match of the given value.
     """
 
-    value: Annotated[
-        ValueVariants | None, Field(..., description="Exact match of the given value")
-    ] = None
+    value: Annotated[ValueVariants | None, Field(description="Exact match of the given value")] = (
+        None
+    )
 
 
 class ValuesCount(BaseModel, extra="forbid"):
@@ -242,8 +238,8 @@ class GeoPoint(BaseModel, extra="forbid"):
     Geo point payload schema.
     """
 
-    lon: Annotated[float, Field(..., description="Geo point payload schema")]
-    lat: Annotated[float, Field(..., description="Geo point payload schema")]
+    lon: Annotated[float, Field(description="Geo point payload schema")]
+    lat: Annotated[float, Field(description="Geo point payload schema")]
 
 
 class GeoBoundingBox(BaseModel, extra="forbid"):
@@ -273,8 +269,7 @@ class GeoLineString(BaseModel, extra="forbid"):
     """
 
     points: Annotated[
-        Sequence[GeoPoint],
-        Field(..., description="Ordered sequence of GeoPoints representing the line"),
+        Sequence[GeoPoint], Field(description="Ordered sequence of GeoPoints representing the line")
     ]
 
 
@@ -311,7 +306,7 @@ class GeoRadius(BaseModel, extra="forbid"):
             description="Geo filter request  Matches coordinates inside the circle of `radius` and center with coordinates `center`",
         ),
     ]
-    radius: Annotated[float, Field(..., description="Radius of the area in meters")]
+    radius: Annotated[float, Field(description="Radius of the area in meters")]
 
 
 class FieldCondition(BaseModel, extra="forbid"):
@@ -319,7 +314,7 @@ class FieldCondition(BaseModel, extra="forbid"):
     All possible payload filtering conditions.
     """
 
-    key: str = Field(..., description="Payload key")
+    key: str = Field(description="Payload key")
     match: Annotated[
         Match | None, Field(default=None, description="Check if point has field with a given value")
     ] = None

@@ -1,5 +1,6 @@
 """Base class for embedding providers."""
 
+import asyncio
 import logging
 import uuid
 
@@ -189,6 +190,11 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
         return self._client
 
     @property
+    def model_name(self) -> str:
+        """Get the model name for the embedding provider."""
+        return self._caps.name
+
+    @property
     def model_capabilities(self) -> EmbeddingModelCapabilities | None:
         """Get the model capabilities for the embedding provider."""
         return self._caps
@@ -274,6 +280,14 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
             )
             raise ValueError("Transformed output is not in the expected format.")
         return transformed_output
+
+    def _fire_and_forget(self, task: Callable[..., Any]) -> None:
+        """Execute a fire-and-forget task."""
+        try:
+            loop = asyncio.get_event_loop()
+            loop.run_in_executor(None, task)
+        except Exception:
+            logger.exception("Error occurred while executing fire-and-forget task.")
 
     def model_dump_json(
         self,

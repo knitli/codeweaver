@@ -7,6 +7,7 @@ from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities, P
 
 
 MODEL_MAP: MappingProxyType[Provider, tuple[str, ...]] = MappingProxyType({
+    Provider.AZURE: ("embed-english-v3.0", "embed-multilingual-v3.0", "embed-v4.0"),
     Provider.COHERE: (
         "embed-english-v3.0",
         "embed-multilingual-v3.0",

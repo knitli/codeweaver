@@ -24,6 +24,7 @@ type PartialCapabilities = dict[
         "custom_query_prompt",
         "default_dimension",
         "default_dtype",
+        "other",
         "is_normalized",
         "name",
         "output_dimensions",
@@ -71,6 +72,7 @@ class EmbeddingCapabilities(TypedDict, total=False):
     preferred_metrics: NotRequired[
         tuple[Literal["dot", "cosine", "euclidean", "manhattan", "hamming", "chebyshev"], ...]
     ]
+    other: NotRequired[dict[str, Any]]
 
 
 class EmbeddingModelCapabilities(BaseModel):
@@ -149,6 +151,7 @@ class EmbeddingModelCapabilities(BaseModel):
             description="The version for the capabilities schema.",
         ),
     ] = "1.0.0"
+    other: dict[str, Any] | None = None
 
     @classmethod
     def default(cls) -> Self:

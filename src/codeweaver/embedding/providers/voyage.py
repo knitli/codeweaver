@@ -10,8 +10,6 @@
 
 from __future__ import annotations
 
-import asyncio
-
 from collections.abc import Callable, Sequence
 from typing import Any, ClassVar, cast
 
@@ -100,22 +98,16 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
         """Embed a list of documents into vectors."""
         ready_documents = cast(list[str], self.chunks_to_strings(documents))
         results: EmbeddingsObject = await self._client.embed(texts=ready_documents, **kwargs)  # pyright: ignore[reportArgumentType]
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
-            None, lambda: self._update_token_stats(token_count=results.total_tokens)
-        )
-        return await loop.run_in_executor(None, lambda: self._process_output(results))
+        self._fire_and_forget(lambda: self._update_token_stats(token_count=results.total_tokens))
+        return await self._process_output(results)
 
     async def _embed_query(
         self, query: Sequence[str], **kwargs: dict[str, Any]
     ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
         """Embed a query or group of queries into vectors."""
         results: EmbeddingsObject = await self._client.embed(texts=query, **kwargs)  # pyright: ignore[reportArgumentType]
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
-            None, lambda: self._update_token_stats(token_count=results.total_tokens)
-        )
-        return await loop.run_in_executor(None, lambda: self._process_output(results))
+        self._fire_and_forget(lambda: self._update_token_stats(token_count=results.total_tokens))
+        return await self._process_output(results)
 
     @property
     def dimension(self) -> int:

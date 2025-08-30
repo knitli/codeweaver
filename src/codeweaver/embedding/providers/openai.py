@@ -1,3 +1,4 @@
+# sourcery skip: avoid-single-character-names-variables
 # Copyright (c) 2024 to present Pydantic Services Inc
 # SPDX-License-Identifier: MIT
 # Applies to original code in this directory (`src/codeweaver/embedding_providers/`) from `pydantic_ai`.
@@ -11,9 +12,19 @@
 from __future__ import annotations as _annotations
 
 
-try:
-    from openai import AsyncOpenAI
-except ImportError as _import_error:
+def raise_import_error() -> None:
+    """Raise an import error for the OpenAI package."""
     raise ImportError(
         'Please install the `openai` package to use the OpenAI provider, \nyou can use the `openai` optional group — `pip install "codeweaver[openai]"`'
-    ) from _import_error
+    )
+
+
+try:
+    from importlib.util import find_spec
+
+    if not find_spec("openai"):
+        raise_import_error()
+except ImportError as e:
+    raise ImportError(
+        'Please install the `openai` package to use the OpenAI provider, \nyou can use the `openai` optional group — `pip install "codeweaver[openai]"`'
+    ) from e

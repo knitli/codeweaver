@@ -87,7 +87,7 @@ class RerankingCapabilities(TypedDict, total=False):
     custom_prompt: NotRequired[str]
     tokenizer: NotRequired[Literal["tokenizers", "tiktoken"]]
     tokenizer_model: NotRequired[str]
-    extra: NotRequired[dict[str, Any]]
+    other: NotRequired[dict[str, Any]]
 
 
 class RerankingModelCapabilities(BaseModel):
@@ -125,7 +125,7 @@ class RerankingModelCapabilities(BaseModel):
     tokenizer_model: Annotated[
         str | None, Field(description="The tokenizer model to use for the model.")
     ] = None
-    extra: Annotated[dict[str, Any], Field(description="Extra model-specific settings.")] = {}
+    other: Annotated[dict[str, Any], Field(description="Extra model-specific settings.")] = {}
 
     @property
     def token_processor(self) -> Tokenizer[Any]:

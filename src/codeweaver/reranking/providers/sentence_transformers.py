@@ -135,9 +135,9 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
         except Exception:
             has_flash_attention = None
 
-        if extra := self._caps.extra:
-            self._query_prefix = f"{extra.get('prefix', '')}{self._caps.custom_prompt}\n<Query>:\n"
-            self._doc_suffix = extra.get("suffix", "")
+        if other := self._caps.other:
+            self._query_prefix = f"{other.get('prefix', '')}{self._caps.custom_prompt}\n<Query>:\n"
+            self._doc_suffix = other.get("suffix", "")
         self.kwargs["model_kwargs"] = {"torch_dtype": "torch.float16"}
         if has_flash_attention:
             self.kwargs["model_kwargs"]["attention_implementation"] = "flash_attention_2"

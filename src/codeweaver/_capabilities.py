@@ -32,7 +32,7 @@ PROVIDER_CAPABILITIES: MappingProxyType[Provider, frozenset[ProviderKind]] = Map
     Provider.X_AI: frozenset({ProviderKind.AGENT}),
     Provider.GROQ: frozenset({ProviderKind.AGENT}),
     Provider.HEROKU: frozenset({ProviderKind.AGENT, ProviderKind.EMBEDDING}),
-    Provider.HUGGINGFACE: frozenset({ProviderKind.EMBEDDING, ProviderKind.AGENT}),
+    Provider.HUGGINGFACE_INFERENCE: frozenset({ProviderKind.AGENT}),
     Provider.MISTRAL: frozenset({ProviderKind.AGENT, ProviderKind.EMBEDDING}),
     Provider.MOONSHOT: frozenset({ProviderKind.AGENT}),
     Provider.OLLAMA: frozenset({ProviderKind.AGENT, ProviderKind.EMBEDDING}),

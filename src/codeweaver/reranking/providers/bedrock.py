@@ -37,6 +37,7 @@ class BaseBedrockModel(BaseModel):
 
     model_config = ConfigDict(
         alias_generator=AliasGenerator(validation_alias=to_snake, serialization_alias=to_camel),
+        from_attributes=True,
         str_strip_whitespace=True,
         # spellchecker:off
         ser_json_inf_nan="null",

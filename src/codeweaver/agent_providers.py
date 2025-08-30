@@ -95,7 +95,7 @@ def get_agent_model_provider(provider: Provider) -> type[AgentProvider[Self]]:  
         from pydantic_ai.providers.heroku import HerokuProvider as HerokuAgentProvider
 
         return HerokuAgentProvider
-    if provider == Provider.HUGGINGFACE:
+    if provider == Provider.HUGGINGFACE_INFERENCE:
         from pydantic_ai.providers.huggingface import (
             HuggingFaceProvider as HuggingFaceAgentProvider,
         )

@@ -1,0 +1,1 @@
+"""Mistral embedding capabilities."""

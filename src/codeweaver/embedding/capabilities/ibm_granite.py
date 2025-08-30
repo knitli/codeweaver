@@ -1,17 +1,17 @@
-"""Capabilities for Alibaba-NLP embedding models."""
+"""Capabilities for ibm-granite embedding models."""
 
 # SPDX-FileCopyrightText: 2025 (c) 2025 Knitli Inc.
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 from __future__ import annotations
-
+from typing import Any
 from codeweaver.embedding.capabilities.base import PartialCapabilities
 
 
-ALIBABA_NLP_GTE_MODERNBERT_BASE_CAPABILITIES: PartialCapabilities = {
-    "name": "Alibaba-NLP/gte-modernbert-base",
+IBM_GRANITE_GRANITE_EMBEDDING_278M_MULTILINGUAL_CAPABILITIES: PartialCapabilities = {
+    "name": "ibm-granite/granite-embedding-278m-multilingual",
     "default_dimension": 768,
-    "context_window": 8192,
+    "context_window": 512,
     "preferred_metrics": ("cosine", "dot_product", "euclidean"),
     "supports_context_chunk_embedding": False,
     "supports_custom_prompts": False,
@@ -21,16 +21,16 @@ ALIBABA_NLP_GTE_MODERNBERT_BASE_CAPABILITIES: PartialCapabilities = {
         "framework": ["Sentence Transformers", "PyTorch"],
         "license": "apache-2.0",
         "loader": {
-            "model_name": "Alibaba-NLP/gte-modernbert-base",
-            "revision": "7ca8b4ca700621b67618669f5378fe5f5820b8e4",
+            "model_name": "ibm-granite/granite-embedding-278m-multilingual",
+            "revision": "84e3546b88b0cb69f8078608a1df558020bcbf1f",
         },
-        "memory_usage_mb": 284,
+        "memory_usage_mb": 530,
         "modalities": ["text"],
-        "n_parameters": 149000000,
+        "n_parameters": 278000000,
         "open_weights": True,
-        "reference": "https://huggingface.co/Alibaba-NLP/gte-modernbert-base",
-        "release_date": "2025-01-21",
-        "revision": "7ca8b4ca700621b67618669f5378fe5f5820b8e4",
-        "memory_usage_gb": 0.27734375,
+        "reference": "https://huggingface.co/ibm-granite/granite-embedding-278m-multilingual",
+        "release_date": "2024-12-18",
+        "revision": "84e3546b88b0cb69f8078608a1df558020bcbf1f",
+        "memory_usage_gb": 0.517578125,
     },
 }

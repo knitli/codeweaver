@@ -6,11 +6,14 @@ from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities, P
 
 CAP_MAP = {
     "jina-embeddings-v2-base-code": {
-        "providers": {Provider.FASTEMBED, Provider.HUGGINGFACE},
+        "providers": {Provider.FASTEMBED, Provider.HUGGINGFACE_INFERENCE},
         "default_dimension": 768,
     },
     "jina-embeddings-v3": {"providers": {Provider.FASTEMBED}, "default_dimension": 1024},
-    "jina-embeddings-v4": {"providers": {Provider.HUGGINGFACE}, "default_dimension": 2048},
+    "jina-embeddings-v4": {
+        "providers": {Provider.HUGGINGFACE_INFERENCE},
+        "default_dimension": 2048,
+    },
 }
 
 
@@ -26,7 +29,7 @@ def _get_shared_capabilities() -> PartialCapabilities:
     }
 
 
-def get_jinaai_model_capapabilities() -> tuple[EmbeddingModelCapabilities, ...]:
+def get_jinaai_embedding_capapabilities() -> tuple[EmbeddingModelCapabilities, ...]:
     """Get capabilities for all JinaAI embedding models."""
     shared_caps = _get_shared_capabilities()
     models: list[EmbeddingModelCapabilities] = []
