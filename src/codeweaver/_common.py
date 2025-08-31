@@ -35,16 +35,46 @@ class BaseEnum(Enum):
             value = value.replace("_" * underscore_length, "_")
         return [v for v in value.split("_") if v]
 
+    @property
+    def aka(self) -> tuple[str, ...] | tuple[int, ...]:
+        """Return the alias for the enum member, if one exists."""
+        if isinstance(self.value, str):
+            baseline_variations = {
+                val.lower()
+                for val in (
+                    self.value,
+                    self.name,
+                    self.value.replace("-", "_"),
+                    self.name.replace("_", "-"),
+                    self.value,
+                )
+            }
+            return tuple(baseline_variations)
+        return (self.value,)
+
     @classmethod
-    def from_string(cls, value: str) -> Self:
+    def aliases(cls) -> dict[str, BaseEnum] | dict[int, BaseEnum]:
+        """Optionally provides a way to identify alternate names for a member, used in string conversion and identification."""
+        keys = {alias: member for member in cls for alias in member.aka if member}
+        return {k: v for k, v in keys.items() if k and v}  # pyright: ignore[reportReturnType]
+
+    @classmethod
+    def from_string(cls, value: str) -> BaseEnum:
         """Convert a string to the corresponding enum member."""
         try:
             if cls._value_type() is int and value.isdigit():
                 return cls(int(value))
             normalized_value = cls._encode_name(value).upper()
             cls.__members__: dict[str, type[BaseEnum]]  # noqa: B032
-            return cast(Self, cls.__members__[normalized_value])
-        except KeyError as e:
+            if normalized_value in cls.__members__:
+                return cast(Self, cls.__members__[normalized_value])
+            if (aliases := cls.aliases()) and (
+                found_member := next(
+                    (member for alias, member in aliases.items() if alias == normalized_value)
+                )
+            ):
+                return found_member
+        except (KeyError, StopIteration) as e:
             value_parts = cls._deconstruct_string(value)
             if found_member := next(
                 (member for member in cls if cls._deconstruct_string(member.name) == value_parts),
@@ -52,6 +82,7 @@ class BaseEnum(Enum):
             ):
                 return found_member
             raise ValueError(f"{value} is not a valid {cls.__qualname__} member") from e
+        raise ValueError(f"{value} is not a valid {cls.__qualname__} member")
 
     @staticmethod
     def _encode_name(value: str) -> str:
@@ -97,6 +128,9 @@ class BaseEnum(Enum):
         return (
             ((cls._encode_name(value) if isinstance(value, str) else value) in cls.values())
             or (value == "grok")
+            or value == "x_ai"
+            or value == "hf-inference"
+            or value in cls.aliases()
             or (
                 isinstance(value, str)
                 and any(

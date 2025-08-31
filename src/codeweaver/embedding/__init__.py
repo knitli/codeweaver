@@ -93,9 +93,9 @@ type KnownEmbeddingModelName = Literal[
     "fastembed:jinaai/jina-embeddings-v2-base-code",
     "fastembed:jinaai/jina-embeddings-v3",
     "fastembed:nomic-ai/nomic-embed-text-v1.5",
-    "fastembed:nomic-ai/nomic-embed-text-v1.5-Q",
+    "fastembed:nomic-ai/nomic-embed-text-v1.5-Q",  # in HF as nomic-ai/nomic-embed-text-v1.5-GGUF
     "fastembed:sentence-transformers/all-MiniLM-L6-v2",
-    "fastembed:snowflake/snowflake-arctic-embed-l",  # hf lists these without the snowflake in the name
+    "fastembed:snowflake/snowflake-arctic-embed-l",
     "fastembed:snowflake/snowflake-arctic-embed-m",
     "fastembed:snowflake/snowflake-arctic-embed-m-long",
     "fastembed:snowflake/snowflake-arctic-embed-s",

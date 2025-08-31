@@ -846,6 +846,45 @@ class Provider(BaseEnum):
         # TODO: We need to allow for dynamic providers in the future, we would check if there's a provider class registered for the value, then register the provider here with `cls.add_member("NEW_PROVIDER", "new_provider")`.
         raise ConfigurationError(f"Invalid provider: {value}")
 
+    @classmethod
+    def aliases(cls) -> dict[str, Provider]:
+        """Get a mapping of provider aliases to their corresponding enum members."""
+        base_map = {
+            "hf": cls.HUGGINGFACE_INFERENCE,
+            "hf_inference": cls.HUGGINGFACE_INFERENCE,
+            "huggingface": cls.HUGGINGFACE_INFERENCE,
+            "huggingface-inference": cls.HUGGINGFACE_INFERENCE,
+            "hugging-face": cls.HUGGINGFACE_INFERENCE,
+            "fastembed-gpu": cls.FASTEMBED,
+            "fastembed-cpu": cls.FASTEMBED,
+            "grok": cls.X_AI,
+            "x-ai": cls.X_AI,
+            "google-vertex": cls.GOOGLE,
+            "google-gemini": cls.GOOGLE,
+            "moonshot-ai": cls.MOONSHOT,
+            "moonshotai": cls.MOONSHOT,
+            "github-models": cls.GITHUB,
+            "fireworks-ai": cls.FIREWORKS,
+            "fireworksai": cls.FIREWORKS,
+            "aws": cls.BEDROCK,
+            "aws-bedrock": cls.BEDROCK,
+            "awsbedrock": cls.BEDROCK,
+            "claude": cls.ANTHROPIC,
+            "azure-openai": cls.AZURE,
+            "azure-foundry": cls.AZURE,
+            "together-ai": cls.TOGETHER,
+            "togetherai": cls.TOGETHER,
+            "perplexity-ai": cls.PERPLEXITY,
+            "perplexityai": cls.PERPLEXITY,
+            "duck-duck-go": cls.DUCKDUCKGO,
+            "duckduck-go": cls.DUCKDUCKGO,
+        }
+        return (
+            base_map
+            | {cls._encode_name(k): v for k, v in base_map.items()}
+            | {k.replace("-", "_"): v for k, v in base_map.items()}
+        )
+
     @property
     def other_env_vars(self) -> ProviderEnvVars | tuple[ProviderEnvVars, ProviderEnvVars] | None:  # noqa: C901
         """Get the environment variables used by the provider's client that are not part of CodeWeaver's settings."""
@@ -903,7 +942,7 @@ class Provider(BaseEnum):
                     note="These variables are for any OpenAI-compatible service, including OpenAI itself, Azure OpenAI, and others -- any provider that we use the OpenAI client to connect to.",
                     api_key=(
                         "OPENAI_API_KEY",
-                        "API key for OpenAI-compatible services (not necessarily an API key *for* OpenAI)",
+                        "API key for OpenAI-compatible services (not necessarily an API key *for* OpenAI). The OpenAI client also requires an API key, even if you don't actually need one for your provider -- in that case, use a mock value like 'MADEUPAPIKEY'",
                     ),
                     log_level=("OPENAI_LOG", "One of: 'debug', 'info', 'warning', 'error'"),
                 )

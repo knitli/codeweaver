@@ -26,6 +26,7 @@ type PartialCapabilities = dict[
         "default_dtype",
         "other",
         "is_normalized",
+        "hf_name",
         "name",
         "output_dimensions",
         "output_dtypes",
@@ -72,6 +73,7 @@ class EmbeddingCapabilities(TypedDict, total=False):
     preferred_metrics: NotRequired[
         tuple[Literal["dot", "cosine", "euclidean", "manhattan", "hamming", "chebyshev"], ...]
     ]
+    hf_name: NotRequired[str]
     other: NotRequired[dict[str, Any]]
 
 
@@ -151,6 +153,12 @@ class EmbeddingModelCapabilities(BaseModel):
             description="The version for the capabilities schema.",
         ),
     ] = "1.0.0"
+    hf_name: Annotated[
+        str | None,
+        Field(
+            description="The Hugging Face model name, if it applies *and* is different from the model name. Currently only applies to some models from `fastembed` and `ollama`"
+        ),
+    ] = None
     other: dict[str, Any] | None = None
 
     @classmethod
