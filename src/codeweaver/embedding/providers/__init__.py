@@ -15,7 +15,7 @@ from codeweaver._settings import Provider
 from codeweaver.embedding.providers.base import EmbeddingProvider
 
 
-def _infer_embedding_provider_class(
+def _infer_embedding_provider_class(  # noqa: C901
     provider: Provider,
     client: Any | None = None,
     model_name: str | None = None,

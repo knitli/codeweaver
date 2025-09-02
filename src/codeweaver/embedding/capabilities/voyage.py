@@ -41,7 +41,7 @@ def _get_shared_capabilities() -> PartialCapabilities:
     }
 
 
-def get_voyage_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
+def get_voyage_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
     """Get the capabilities for Voyage AI embedding models."""
     models = "voyage-3-large", "voyage-3.5", "voyage-3.5-lite", "voyage-code-3", "voyage-context-3"
     settings = [{**_get_shared_capabilities()} for _ in models]

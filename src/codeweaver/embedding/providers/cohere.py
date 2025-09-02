@@ -7,7 +7,7 @@
 """
 for Azure implementation, see: https://github.com/Azure/azureml-examples/blob/main/sdk/python/foundation-models/cohere/cohere-embed.ipynb
 
-We'll need to make the provider flexible to handle both cohere.com and Azure endpoints. Bedrock uses the AWS API, but Azure uses Cohere for Cohere models.
+We'll need to make the provider flexible to handle both cohere.com, Azure, and Heroku endpoints. Bedrock uses the AWS API, but Azure uses Cohere for Cohere models.
 
 
 """

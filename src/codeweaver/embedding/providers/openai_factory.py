@@ -12,20 +12,80 @@
 from __future__ import annotations as _annotations
 
 import asyncio
+import os
 
-from collections.abc import Sequence
-from types import MethodType
+from collections.abc import Callable, Sequence
 from typing import Any, Self, cast
 
-from pydantic import create_model
+from pydantic import AnyHttpUrl, create_model
 
 from codeweaver._data_structures import CodeChunk
 from codeweaver._settings import Provider
-from codeweaver.embedding.capabilities import (
-    EmbeddingModelCapabilities,
-    get_capabilities_by_model_and_provider,
-)
+from codeweaver.embedding.capabilities import get_capabilities_by_model_and_provider
+from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.embedding.providers.base import EmbeddingProvider
+
+
+def ensure_v1(url: str) -> str:
+    """Ensure the URL ends with /v1."""
+    return url if url.rstrip("/").endswith("/v1") else f"{url.rstrip('/')}/v1"
+
+
+def try_for_heroku_endpoint(kwargs: dict[str, Any]) -> str:
+    """Try to identify the Heroku endpoint."""
+
+    def ensure_v1(url: str) -> str:
+        return url if url.rstrip("/").endswith("/v1") else f"{url.rstrip('/')}/v1"
+
+    if "base_url" in kwargs:
+        return ensure_v1(kwargs["base_url"])
+    if "api_base" in kwargs:
+        return ensure_v1(kwargs["api_base"])
+    if (
+        env_set := os.getenv("INFERENCE_URL")
+        or os.getenv("HEROKU_INFERENCE_URL")
+        or os.getenv("OPENAI_API_BASE")
+    ):
+        return ensure_v1(env_set)
+    return ""
+
+
+def parse_endpoint(endpoint: str, region: str | None = None) -> str:
+    """Parse the Azure endpoint URL."""
+    if endpoint.startswith("http"):
+        if endpoint.endswith("v1"):
+            return endpoint
+        endpoint = endpoint.split("//", 1)[1].split(".")[0]
+        region = region or endpoint.split(".")[1]
+        return f"https://{endpoint}.{region}.inference.ai.azure.com/v1"
+    endpoint = endpoint.split(".")[0]
+    region = region or endpoint.split(".")[1]
+    return f"https://{endpoint}.{region}.inference.ai.azure.com/v1"
+
+
+def try_for_azure_endpoint(kwargs: dict[str, Any]) -> str:
+    """Try to identify the Azure endpoint.
+
+    Azure uses this format: `https://<endpoint>.<region_name>.inference.ai.azure.com/v1`,
+    But because people often conflate `endpoint` and `url`, we try to be flexible.
+    """
+    endpoint, region = kwargs.get("endpoint"), kwargs.get("region_name")
+    if endpoint and region:
+        if not endpoint.startswith("http") or "azure" not in endpoint:
+            # URL looks right
+            return f"{endpoint}.{region}.inference.ai.azure.com/v1"
+        return parse_endpoint(endpoint, region)
+    if endpoint and (region := os.getenv("AZURE_OPENAI_REGION")):
+        return f"https://{endpoint}.{region}.inference.ai.azure.com/v1"
+    if region and (endpoint := os.getenv("AZURE_OPENAI_ENDPOINT")):
+        return parse_endpoint(endpoint, region)
+    if "base_url" in kwargs:
+        return ensure_v1(kwargs["base_url"])
+    if "api_base" in kwargs:
+        return ensure_v1(kwargs["api_base"])
+    if env_set := os.getenv("AZURE_OPENAI_ENDPOINT") or os.getenv("AZURE_API_BASE"):
+        return parse_endpoint(env_set, region or os.getenv("AZURE_OPENAI_REGION"))
+    return ""
 
 
 try:
@@ -54,7 +114,9 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         Create a new embedding provider class for the specified model and provider.
         """
         name = f"{str(provider).title()}EmbeddingProvider"
-        capabilities = get_capabilities_by_model_and_provider(model_name, provider)
+        capabilities: EmbeddingModelCapabilities = get_capabilities_by_model_and_provider(
+            model_name, provider
+        )
 
         def make_init(
             base: type,
@@ -63,12 +125,12 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
             base_url: str | None,
             provider_kwargs: dict[str, Any] | None,
             client: AsyncOpenAI | None = None,
-        ) -> MethodType:
+        ) -> Callable[..., None]:
             """
             Construct an __init__ method for our newborn provider class.
             """
 
-            def __init__(self, *args: Any, **kwargs: Any) -> None:  # noqa: N807  # it's an __init__! It has to be __init__
+            def __init__(self: EmbeddingProvider[AsyncOpenAI], *args: Any, **kwargs: Any) -> None:  # noqa: N807  # it's an __init__! It has to be __init__
                 """
                 Initialize the embedding provider.
                 """
@@ -81,6 +143,8 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
                     kwargs.setdefault("base_url", base_url)
                 if provider_kwargs:
                     kwargs.setdefault("provider_kwargs", provider_kwargs)
+                if self._provider == Provider.OLLAMA:
+                    kwargs.setdefault("api_key", "ollama")
                 base.__init__(self, *args, **kwargs)
 
             return __init__
@@ -139,14 +203,15 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         }
 
     @property
-    def base_url(self) -> str | None:
+    def base_url(self) -> str:
         """Get the base URL for the OpenAI client."""
-        return self.client.base_url
+        expected_url = self._base_urls()[self._provider]
+        return cast(str, str(self.client.base_url) if self.client.base_url else expected_url)
 
     @property
-    def dimension(self) -> int | None:
+    def dimension(self) -> int:
         """Get the dimension of the embeddings."""
-        return self.doc_kwargs.get("dimensions") or self._caps.default_dimension
+        return self.doc_kwargs.get("dimensions") or self._caps.default_dimension or 1024  # type: ignore
 
     def _report(self, response: CreateEmbeddingResponse, texts: Sequence[str]) -> None:
         loop = asyncio.get_event_loop()
@@ -191,3 +256,16 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         self, query: Sequence[str], **kwargs: dict[str, Any] | None
     ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
         return await self._get_vectors(query, **kwargs)
+
+    def _base_urls(self) -> dict[Provider, AnyHttpUrl | str]:
+        return {
+            Provider.FIREWORKS: "https://api.fireworks.ai/inference/v1",
+            Provider.GROQ: "https://api.groq.com/openai/v1",
+            Provider.OPENAI: "https://api.openai.com/v1",
+            Provider.TOGETHER: "https://api.together.xyz/v1",
+            Provider.OLLAMA: self.doc_kwargs.get(
+                "endpoint", self.doc_kwargs.get("api_base", "http://localhost:11434/v1")
+            ),  # pyright: ignore[reportReturnType]
+            Provider.HEROKU: try_for_heroku_endpoint(self.doc_kwargs or {}),  # pyright: ignore[reportUnknownArgumentType,reportUnknownMemberType,reportUnknownAssignmentType]
+            Provider.AZURE: try_for_azure_endpoint(self.doc_kwargs or {}),
+        }

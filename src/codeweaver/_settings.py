@@ -18,7 +18,7 @@ import ssl
 
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Annotated, Any, Literal, LiteralString, NotRequired, Required, Self, TypedDict
+from typing import Annotated, Any, Literal, LiteralString, NotRequired, Required, TypedDict, cast
 
 from fastmcp.contrib.bulk_tool_caller.bulk_tool_caller import BulkToolCaller
 from fastmcp.server.auth.auth import OAuthProvider
@@ -172,7 +172,7 @@ def walk_pattern(s: str) -> str:
     return "".join(out)
 
 
-def validate_regex_pattern(value: re.Pattern | str | None) -> re.Pattern | None:
+def validate_regex_pattern(value: re.Pattern[str] | str | None) -> re.Pattern[str] | None:
     """Validate and compile a regex pattern from config/env.
 
     - Accepts compiled patterns as-is.
@@ -183,8 +183,6 @@ def validate_regex_pattern(value: re.Pattern | str | None) -> re.Pattern | None:
         return None
     if isinstance(value, re.Pattern):
         return value
-    if not isinstance(value, str):
-        raise TypeError("Pattern must be a string or a compiled regex.")
 
     if len(value) > MAX_REGEX_PATTERN_LENGTH:
         raise ConfigurationError(
@@ -196,16 +194,13 @@ def validate_regex_pattern(value: re.Pattern | str | None) -> re.Pattern | None:
     # Heuristic check for patterns likely to cause catastrophic backtracking
     if _NESTED_QUANTIFIER_RE.search(normalized):
         raise ConfigurationError(
-            "Pattern contains nested quantifiers (e.g., (.+)+), which can cause excessive backtracking. "
-            "Please simplify the pattern."
+            "Pattern contains nested quantifiers (e.g., (.+)+), which can cause excessive backtracking. Please simplify the pattern."
         )
 
     # Optional sanity check on number of groups (very large numbers are often accidental or risky)
     try:
         open_groups = sum(
-            1
-            for i, c in enumerate(normalized)
-            if c == "(" and (i == 0 or normalized[i - 1] != "\\")
+            c == "(" and (i == 0 or normalized[i - 1] != "\\") for i, c in enumerate(normalized)
         )
     except Exception:
         logging.getLogger(__name__).debug(
@@ -241,7 +236,7 @@ class SerializableLoggingFilter(BaseModel, logging.Filter):
     include_pattern: Annotated[
         re.Pattern[str] | None,
         # NOTE: `include_pattern` and `exclude_pattern` are prime candidates for Python 3.14's `template strings`.
-        # TODO: Once they become more available, we should use them here with `raw template strings`
+        # TODO: Once they become more available, we should use `raw template strings` here
         # See 👁️ https://docs.python.org/3.14/library/string.templatelib.html#template-strings
         BeforeValidator(validate_regex_pattern),
         Field(
@@ -263,7 +258,8 @@ class SerializableLoggingFilter(BaseModel, logging.Filter):
     ] = None
 
     @field_serializer("include_pattern", "exclude_pattern", when_used="json-unless-none")
-    def serialize_patterns(self, value: re.Pattern, info: FieldSerializationInfo) -> str:
+    def serialize_patterns(self, value: re.Pattern[str], info: FieldSerializationInfo) -> str:
+        """Serialize a regex pattern for JSON output."""
         return value.pattern
 
 
@@ -806,15 +802,15 @@ class Provider(BaseEnum):
     FASTEMBED = "fastembed"
 
     QDRANT = "qdrant"
-    FASTEMBED_VECTORSTORE = "fastembed_vectorstore"
+    FASTEMBED_VECTORSTORE = "fastembed-vectorstore"
 
     ANTHROPIC = "anthropic"
     BEDROCK = "bedrock"
     COHERE = "cohere"
     GOOGLE = "google"
-    X_AI = "x_ai"
+    X_AI = "x-ai"
     HUGGINGFACE_INFERENCE = "hf-inference"
-    SENTENCE_TRANSFORMERS = "sentence_transformers"
+    SENTENCE_TRANSFORMERS = "sentence-transformers"
     MISTRAL = "mistral"
     OPENAI = "openai"
 
@@ -838,7 +834,7 @@ class Provider(BaseEnum):
     _UNSET = "unset"
 
     @classmethod
-    def validate(cls, value: str) -> Self:
+    def validate(cls, value: str) -> BaseEnum:
         """Validate provider-specific settings."""
         with contextlib.suppress(AttributeError, KeyError, ValueError):
             if value_in_self := cls.from_string(value.strip()):
@@ -846,48 +842,22 @@ class Provider(BaseEnum):
         # TODO: We need to allow for dynamic providers in the future, we would check if there's a provider class registered for the value, then register the provider here with `cls.add_member("NEW_PROVIDER", "new_provider")`.
         raise ConfigurationError(f"Invalid provider: {value}")
 
-    @classmethod
-    def aliases(cls) -> dict[str, Provider]:
-        """Get a mapping of provider aliases to their corresponding enum members."""
-        base_map = {
-            "hf": cls.HUGGINGFACE_INFERENCE,
-            "hf_inference": cls.HUGGINGFACE_INFERENCE,
-            "huggingface": cls.HUGGINGFACE_INFERENCE,
-            "huggingface-inference": cls.HUGGINGFACE_INFERENCE,
-            "hugging-face": cls.HUGGINGFACE_INFERENCE,
-            "fastembed-gpu": cls.FASTEMBED,
-            "fastembed-cpu": cls.FASTEMBED,
-            "grok": cls.X_AI,
-            "x-ai": cls.X_AI,
-            "google-vertex": cls.GOOGLE,
-            "google-gemini": cls.GOOGLE,
-            "moonshot-ai": cls.MOONSHOT,
-            "moonshotai": cls.MOONSHOT,
-            "github-models": cls.GITHUB,
-            "fireworks-ai": cls.FIREWORKS,
-            "fireworksai": cls.FIREWORKS,
-            "aws": cls.BEDROCK,
-            "aws-bedrock": cls.BEDROCK,
-            "awsbedrock": cls.BEDROCK,
-            "claude": cls.ANTHROPIC,
-            "azure-openai": cls.AZURE,
-            "azure-foundry": cls.AZURE,
-            "together-ai": cls.TOGETHER,
-            "togetherai": cls.TOGETHER,
-            "perplexity-ai": cls.PERPLEXITY,
-            "perplexityai": cls.PERPLEXITY,
-            "duck-duck-go": cls.DUCKDUCKGO,
-            "duckduck-go": cls.DUCKDUCKGO,
-        }
-        return (
-            base_map
-            | {cls._encode_name(k): v for k, v in base_map.items()}
-            | {k.replace("-", "_"): v for k, v in base_map.items()}
-        )
-
     @property
-    def other_env_vars(self) -> ProviderEnvVars | tuple[ProviderEnvVars, ProviderEnvVars] | None:  # noqa: C901
+    def other_env_vars(  # noqa: C901
+        self,
+    ) -> (
+        ProviderEnvVars
+        | tuple[ProviderEnvVars, ProviderEnvVars]
+        | tuple[ProviderEnvVars, ProviderEnvVars, ProviderEnvVars]
+        | None
+    ):
         """Get the environment variables used by the provider's client that are not part of CodeWeaver's settings."""
+        httpx_env_vars = {
+            "other": {
+                "http_proxy": ("HTTPS_PROXY", "HTTP proxy for requests"),
+                "ssl_cert_file": ("SSL_CERT_FILE", "Path to the SSL certificate file for requests"),
+            }
+        }
         match self:
             case Provider.QDRANT:
                 return ProviderEnvVars(
@@ -896,17 +866,20 @@ class Provider(BaseEnum):
                     api_key=("QDRANT__SERVICE__API_KEY", "API key for Qdrant service"),
                     tls_on_off=(
                         "QDRANT__SERVICE__ENABLE_TLS",
-                        "Enable TLS for Qdrant service, expects truthy or false value (e.g. 1 for on, 0 for off)",
+                        "Enable TLS for Qdrant service, expects truthy or false value (e.g. 1 for on, 0 for off).",
                     ),
                     tls_cert_path=(
                         "QDRANT__TLS__CERT",
-                        "Path to the TLS certificate file for Qdrant service",
+                        "Path to the TLS certificate file for Qdrant service. Only needed if using a self-signed certificate. If you're using qdrant-cloud, you don't need this.",
                     ),
                     host=("QDRANT__SERVICE__HOST", "Hostname or URL of the Qdrant service"),
                     port=("QDRANT__SERVICE__HTTP_PORT", "Port number for the Qdrant service"),
                 )
             case Provider.VOYAGE:
-                return ProviderEnvVars(api_key=("VOYAGE_API_KEY", "API key for Voyage service"))
+                return ProviderEnvVars(
+                    api_key=("VOYAGE_API_KEY", "API key for Voyage service"),
+                    **httpx_env_vars,  # pyright: ignore[reportArgumentType]
+                )
             case Provider.AZURE:
                 # Azure has env vars by model provider, so we return a tuple of them.
                 return (
@@ -915,13 +888,46 @@ class Provider(BaseEnum):
                         api_key=("AZURE_OPENAI_API_KEY", "API key for Azure OpenAI service"),
                         endpoint=("AZURE_OPENAI_ENDPOINT", "Endpoint for Azure OpenAI service"),
                         region=("AZURE_OPENAI_REGION", "Region for Azure OpenAI service"),
+                        **httpx_env_vars,  # pyright: ignore[reportArgumentType]
                     ),
                     ProviderEnvVars(
                         note="These variables are for the Azure Cohere service.",
                         api_key=("AZURE_COHERE_API_KEY", "API key for Azure Cohere service"),
                         endpoint=("AZURE_COHERE_ENDPOINT", "Endpoint for Azure Cohere service"),
                         region=("AZURE_COHERE_REGION", "Region for Azure Cohere service"),
+                        **httpx_env_vars,  # pyright: ignore[reportArgumentType]
                     ),
+                    cast(ProviderEnvVars, self.OPENAI.other_env_vars),
+                )
+            case Provider.VERCEL:
+                return (
+                    ProviderEnvVars(
+                        note="You may also use the OpenAI-compatible environment variables with Vercel, since it uses the OpenAI client.",
+                        api_key=("AI_GATEWAY_API_KEY", "API key for Vercel service"),
+                        **httpx_env_vars,  # pyright: ignore[reportArgumentType]
+                    ),
+                    ProviderEnvVars(api_key=("VERCEL_OIDC_TOKEN", "OIDC token for Vercel service")),
+                    cast(ProviderEnvVars, self.OPENAI.other_env_vars),
+                )
+            case Provider.TOGETHER:
+                return (
+                    ProviderEnvVars(
+                        note="These variables are for the Together service.",
+                        api_key=("TOGETHER_API_KEY", "API key for Together service"),
+                        **httpx_env_vars,  # pyright: ignore[reportArgumentType]
+                    ),
+                    cast(ProviderEnvVars, self.OPENAI.other_env_vars),
+                )
+            case Provider.HEROKU:
+                return (
+                    ProviderEnvVars(
+                        note="These variables are for the Heroku service.",
+                        api_key=("INFERENCE_KEY", "API key for Heroku service"),
+                        host=("INFERENCE_URL", "Host URL for Heroku service"),
+                        other={"model_id": ("INFERENCE_MODEL_ID", "Model ID for Heroku service")},
+                        **httpx_env_vars,  # pyright: ignore[reportArgumentType]
+                    ),
+                    cast(ProviderEnvVars, self.OPENAI.other_env_vars),
                 )
             case (
                 Provider.OPENAI
@@ -930,13 +936,10 @@ class Provider(BaseEnum):
                 | Provider.GITHUB
                 | Provider.X_AI
                 | Provider.GROQ
-                | Provider.HEROKU
                 | Provider.MOONSHOT
                 | Provider.OLLAMA
                 | Provider.OPENROUTER
                 | Provider.PERPLEXITY
-                | Provider.TOGETHER
-                | Provider.VERCEL
             ):
                 return ProviderEnvVars(
                     note="These variables are for any OpenAI-compatible service, including OpenAI itself, Azure OpenAI, and others -- any provider that we use the OpenAI client to connect to.",
@@ -945,6 +948,7 @@ class Provider(BaseEnum):
                         "API key for OpenAI-compatible services (not necessarily an API key *for* OpenAI). The OpenAI client also requires an API key, even if you don't actually need one for your provider -- in that case, use a mock value like 'MADEUPAPIKEY'",
                     ),
                     log_level=("OPENAI_LOG", "One of: 'debug', 'info', 'warning', 'error'"),
+                    **httpx_env_vars,  # pyright: ignore[reportArgumentType]
                 )
             case Provider.HUGGINGFACE_INFERENCE:
                 return ProviderEnvVars(
@@ -954,6 +958,7 @@ class Provider(BaseEnum):
                         "HF_HUB_VERBOSITY",
                         "One of: 'debug', 'info', 'warning', 'error', or 'critical'",
                     ),
+                    **httpx_env_vars,  # pyright: ignore[reportArgumentType]
                 )
             case Provider.BEDROCK:
                 return ProviderEnvVars(
@@ -963,15 +968,58 @@ class Provider(BaseEnum):
                 return ProviderEnvVars(
                     api_key=("COHERE_API_KEY", "Your Cohere API Key"),
                     host=("CO_API_URL", "Host URL for Cohere service"),
+                    **httpx_env_vars,  # pyright: ignore[reportArgumentType]
                 )
             case Provider.TAVILY:
-                return ProviderEnvVars(api_key=("TAVILY_API_KEY", "Your Tavily API Key"))
+                return ProviderEnvVars(
+                    api_key=("TAVILY_API_KEY", "Your Tavily API Key"),
+                    **httpx_env_vars,  # pyright: ignore[reportArgumentType]
+                )
             case Provider.GOOGLE:
-                return ProviderEnvVars(api_key=("GEMINI_API_KEY", "Your Google Gemini API Key"))
+                return ProviderEnvVars(
+                    api_key=("GEMINI_API_KEY", "Your Google Gemini API Key"),
+                    **httpx_env_vars,  # pyright: ignore[reportArgumentType]
+                )
             case Provider.MISTRAL:
-                return ProviderEnvVars(api_key=("MISTRAL_API_KEY", "Your Mistral API Key"))
+                return ProviderEnvVars(
+                    api_key=("MISTRAL_API_KEY", "Your Mistral API Key"),
+                    **httpx_env_vars,  # pyright: ignore[reportArgumentType]
+                )
             case _:
                 return None
+
+    @property
+    def is_huggingface_model_provider(self) -> bool:
+        """Check if the provider is a Hugging Face model provider."""
+        return self in {
+            Provider.HUGGINGFACE_INFERENCE,
+            Provider.FASTEMBED,
+            Provider.GROQ,
+            Provider.SENTENCE_TRANSFORMERS,
+            Provider.FIREWORKS,
+            Provider.OLLAMA,
+            Provider.TOGETHER,
+        }
+
+    @property
+    def uses_openai_api(self) -> bool:
+        """Check if the provider uses the OpenAI API."""
+        return self in {
+            Provider.OPENAI,
+            Provider.AZURE,
+            Provider.DEEPSEEK,
+            Provider.FIREWORKS,
+            Provider.GITHUB,
+            Provider.X_AI,
+            Provider.GROQ,
+            Provider.HEROKU,
+            Provider.MOONSHOT,
+            Provider.OLLAMA,
+            Provider.OPENROUTER,
+            Provider.PERPLEXITY,
+            Provider.TOGETHER,
+            Provider.VERCEL,
+        }
 
     @classmethod
     def all_envs(cls) -> dict[Provider, ProviderEnvVars | tuple[ProviderEnvVars, ...]]:

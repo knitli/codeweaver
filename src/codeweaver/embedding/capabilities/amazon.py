@@ -1,14 +1,12 @@
 """Capabilities for Amazon embedding models."""
 
-from collections.abc import Sequence
-
 from codeweaver._settings import Provider
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities
 
 
-def get_amazon_embedding_capabilities() -> Sequence[EmbeddingModelCapabilities]:
+def get_amazon_embedding_capabilities() -> tuple[EmbeddingModelCapabilities]:
     """Get the capabilities for Amazon embedding models."""
-    return [
+    return (
         EmbeddingModelCapabilities.model_validate({
             "name": "amazon.titan-embed-text-v2:0",
             "provider": Provider.BEDROCK,
@@ -31,5 +29,5 @@ def get_amazon_embedding_capabilities() -> Sequence[EmbeddingModelCapabilities]:
                 "dot",
                 "cosine",
             ),  # we normalize by default, so dot and cosine are equivalent
-        })
-    ]
+        }),
+    )

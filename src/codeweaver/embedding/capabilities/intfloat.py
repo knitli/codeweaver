@@ -1,3 +1,4 @@
+# THIS FILE IS AUTO-GENERATED - DO NOT EDIT MANUALLY. The `mteb_to_codeweaver.py` script is used to generate this file.
 """Capabilities for intfloat embedding models."""
 
 # SPDX-FileCopyrightText: 2025 (c) 2025 Knitli Inc.
@@ -5,15 +6,85 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 from __future__ import annotations
 
-from codeweaver.embedding.capabilities.base import PartialCapabilities
+from typing import Literal
 
+from codeweaver._settings import Provider
+from codeweaver.embedding.capabilities.base import (
+    EmbeddingCapabilities,
+    EmbeddingModelCapabilities,
+    PartialCapabilities,
+)
+
+
+type IntfloatProvider = Literal[
+    Provider.FASTEMBED,
+    Provider.HUGGINGFACE_INFERENCE,
+    Provider.SENTENCE_TRANSFORMERS,
+    Provider.TOGETHER,
+]
+
+CAP_MAP: dict[
+    Literal["intfloat/multilingual-e5-large", "intfloat/multilingual-e5-large-instruct"],
+    tuple[IntfloatProvider, ...],
+] = {
+    "intfloat/multilingual-e5-large": (
+        Provider.HUGGINGFACE_INFERENCE,
+        Provider.FASTEMBED,
+        Provider.SENTENCE_TRANSFORMERS,
+    ),
+    "intfloat/multilingual-e5-large-instruct": (
+        Provider.HUGGINGFACE_INFERENCE,
+        Provider.SENTENCE_TRANSFORMERS,
+        Provider.TOGETHER,
+    ),
+}
+
+
+INTFLOAT_MULTILINGUAL_E5_LARGE_CAPABILITIES: PartialCapabilities = {
+    "name": "intfloat/multilingual-e5-large",
+    "default_dimension": 1024,
+    "context_window": 512,
+    "preferred_metrics": ("cosine", "dot", "euclidean"),
+    "supports_context_chunk_embedding": False,
+    "tokenizer": "tokenizers",
+    "tokenizer_model": "intfloat/multilingual-e5-large",
+    "default_dtype": "float",
+    "output_dtypes": ("float",),
+    "version": None,
+    "supports_custom_prompts": True,
+    "custom_query_prompt": None,
+    "custom_document_prompt": None,
+    "other": {
+        "adapted_from": "FacebookAI/xlm-roberta-large",
+        "framework": ["Sentence Transformers", "PyTorch"],
+        "license": "mit",
+        "loader": {
+            "model_name": "intfloat/multilingual-e5-large",
+            "model_prompts": {"document": "passage: ", "query": "query: "},
+            "revision": "ab10c1a7f42e74530fe7ae5be82e6d4f11a719eb",
+        },
+        "memory_usage_mb": 2136,
+        "modalities": ["text"],
+        "n_parameters": 560000000,
+        "open_weights": True,
+        "reference": "https://huggingface.co/intfloat/multilingual-e5-large",
+        "release_date": "2024-02-08",
+        "revision": "ab10c1a7f42e74530fe7ae5be82e6d4f11a719eb",
+        "memory_usage_gb": 2.09,
+    },
+}
 
 INTFLOAT_MULTILINGUAL_E5_LARGE_INSTRUCT_CAPABILITIES: PartialCapabilities = {
     "name": "intfloat/multilingual-e5-large-instruct",
     "default_dimension": 1024,
-    "context_window": 514,
-    "preferred_metrics": ("cosine", "dot_product", "euclidean"),
+    "context_window": 512,
+    "preferred_metrics": ("cosine", "dot", "euclidean"),
     "supports_context_chunk_embedding": False,
+    "tokenizer": "tokenizers",
+    "tokenizer_model": "intfloat/multilingual-e5-large-instruct",
+    "default_dtype": "float",
+    "output_dtypes": ("float",),
+    "version": None,
     "supports_custom_prompts": True,
     "custom_query_prompt": None,
     "custom_document_prompt": None,
@@ -37,35 +108,23 @@ INTFLOAT_MULTILINGUAL_E5_LARGE_INSTRUCT_CAPABILITIES: PartialCapabilities = {
         "reference": "https://huggingface.co/intfloat/multilingual-e5-large-instruct",
         "release_date": "2024-02-08",
         "revision": "baa7be480a7de1539afce709c8f13f833a510e0a",
-        "memory_usage_gb": 1.04296875,
+        "memory_usage_gb": 1.04,
     },
 }
 
-INTFLOAT_MULTILINGUAL_E5_LARGE_CAPABILITIES: PartialCapabilities = {
-    "name": "intfloat/multilingual-e5-large",
-    "default_dimension": 1024,
-    "context_window": 514,
-    "preferred_metrics": ("cosine", "dot_product", "euclidean"),
-    "supports_context_chunk_embedding": False,
-    "supports_custom_prompts": True,
-    "custom_query_prompt": None,
-    "custom_document_prompt": None,
-    "other": {
-        "adapted_from": "FacebookAI/xlm-roberta-large",
-        "framework": ["Sentence Transformers", "PyTorch"],
-        "license": "mit",
-        "loader": {
-            "model_name": "intfloat/multilingual-e5-large",
-            "model_prompts": {"document": "passage: ", "query": "query: "},
-            "revision": "ab10c1a7f42e74530fe7ae5be82e6d4f11a719eb",
-        },
-        "memory_usage_mb": 2136,
-        "modalities": ["text"],
-        "n_parameters": 560000000,
-        "open_weights": True,
-        "reference": "https://huggingface.co/intfloat/multilingual-e5-large",
-        "release_date": "2024-02-08",
-        "revision": "ab10c1a7f42e74530fe7ae5be82e6d4f11a719eb",
-        "memory_usage_gb": 2.0859375,
-    },
-}
+
+ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (
+    INTFLOAT_MULTILINGUAL_E5_LARGE_CAPABILITIES,
+    INTFLOAT_MULTILINGUAL_E5_LARGE_INSTRUCT_CAPABILITIES,
+)
+
+
+def get_intfloat_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
+    """Get the capabilities for intfloat embedding models."""
+    capabilities: list[EmbeddingCapabilities] = []
+    for cap in ALL_CAPABILITIES:
+        capabilities.extend([
+            EmbeddingCapabilities({**cap, "provider": provider})  # pyright: ignore[reportArgumentType]
+            for provider in CAP_MAP[cap["name"]]  # pyright: ignore[reportArgumentType]
+        ])
+    return tuple(EmbeddingModelCapabilities.model_validate(cap) for cap in capabilities)

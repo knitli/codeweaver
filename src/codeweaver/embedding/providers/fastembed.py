@@ -27,11 +27,17 @@ from codeweaver.embedding.providers import EmbeddingProvider
 
 
 try:
+    from fastembed.sparse import SparseTextEmbedding
     from fastembed.text import TextEmbedding
+
+    from codeweaver.embedding.fastembed_extensions import get_sparse_embedder, get_text_embedder
 except ImportError as e:
     raise ImportError(
         "FastEmbed is not installed. Please install it with `pip install fastembed`."
     ) from e
+
+_TextEmbedding = get_text_embedder()
+_SparseTextEmbedding = get_sparse_embedder()
 
 
 def fastembed_all_kwargs(**kwargs: dict[str, Any] | None) -> dict[str, Any]:
@@ -92,7 +98,7 @@ class FastEmbedProvider(EmbeddingProvider[TextEmbedding]):
             model = self._caps.name
             self.doc_kwargs["model_name"] = model
             self.query_kwargs["model_name"] = model
-        self._client = TextEmbedding(**self._doc_kwargs)
+        self._client = _TextEmbedding(**self._doc_kwargs)
 
     @property
     def base_url(self) -> str | None:
@@ -109,7 +115,7 @@ class FastEmbedProvider(EmbeddingProvider[TextEmbedding]):
             None, lambda: self._client.passage_embed(cast(Sequence[str], ready_documents), **kwargs)
         )
         partial_tokens = rpartial(self._update_token_stats, from_docs=ready_documents)
-        await loop.run_in_executor(None, partial_tokens)  # pyright: ignore[reportArgumentType]
+        self._fire_and_forget(partial_tokens)  # pyright: ignore[reportArgumentType]
         return await loop.run_in_executor(None, lambda: list(self._process_output(embeddings)))
 
     async def _embed_query(
@@ -127,3 +133,41 @@ class FastEmbedProvider(EmbeddingProvider[TextEmbedding]):
     def dimension(self) -> int:
         """Get the size of the vector for the Qdrant collection."""
         return self._client.embedding_size
+
+
+class FastEmbedSparseProvider(FastEmbedProvider):
+    """
+    FastEmbed implementation for sparse embeddings.
+    """
+
+    _client: SparseTextEmbedding
+
+    def _initialize(self) -> None:
+        """Initialize the FastEmbed client."""
+        if "model_name" not in self._doc_kwargs:
+            model = self._caps.name
+            self.doc_kwargs["model_name"] = model
+            self.query_kwargs["model_name"] = model
+        self._client = _SparseTextEmbedding(**self._doc_kwargs)  # pyright: ignore[reportIncompatibleVariableOverride]
+
+    async def _embed_documents(
+        self, documents: Sequence[CodeChunk], **kwargs: dict[str, Any] | None
+    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+        """Embed a list of documents into vectors."""
+        ready_documents = self.chunks_to_strings(documents)
+        loop = asyncio.get_event_loop()
+        embeddings = await loop.run_in_executor(
+            None,
+            lambda: self._client.embed(cast(Sequence[str], ready_documents), **kwargs),  # type: ignore
+        )
+        return await loop.run_in_executor(None, lambda: list(self._process_output(embeddings)))
+
+    async def _embed_query(
+        self, query: Sequence[str], **kwargs: dict[str, Any] | None
+    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+        """Embed a query into a vector."""
+        loop = asyncio.get_event_loop()
+        embeddings = await loop.run_in_executor(
+            None, lambda: list(self._client.query_embed(query, **kwargs))
+        )
+        return await loop.run_in_executor(None, lambda: self._process_output(embeddings))

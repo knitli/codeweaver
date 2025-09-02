@@ -6,7 +6,7 @@ import uuid
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
-from typing import Any, ClassVar, Literal, cast, overload
+from typing import Any, ClassVar, Literal, NotRequired, Required, TypedDict, cast, overload
 
 from pydantic import UUID4, BaseModel, ConfigDict
 from pydantic.main import IncEx
@@ -25,6 +25,19 @@ from codeweaver.tokenizers import Tokenizer, get_tokenizer
 
 
 logger = logging.getLogger(__name__)
+
+
+class EmbeddingErrorInfo(TypedDict):
+    """Information about an embedding error and the embedding batch.
+
+    If the error occurs during a document embedding request, `EmbeddingErrorInfo` will have the `documents` and (usually) the `batch_id` fields populated. These fields aren't present for query embedding requests.
+    For a query `EmbeddingErrorInfo`, only the `error` and `queries` fields are populated.
+    """
+
+    error: Required[str]
+    batch_id: NotRequired[UUID4 | None]
+    documents: NotRequired[Sequence[CodeChunk] | None]
+    queries: NotRequired[Sequence[str] | None]
 
 
 def default_input_transformer(chunks: StructuredDataInput) -> Sequence[CodeChunk]:
@@ -147,13 +160,30 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
     ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
         """Abstract method to implement document embedding logic."""
 
+    def _handle_embedding_error(
+        self,
+        error: Exception,
+        batch_id: UUID4 | None,
+        documents: Sequence[CodeChunk] | None,
+        queries: Sequence[str] | None,
+    ) -> EmbeddingErrorInfo:
+        """Handle errors that occur during embedding."""
+        logger.exception(
+            "Error occurred during document embedding. Batch ID: %s failed during `embed_documents`",
+            batch_id,
+            extra={"documents": documents, "batch_id": batch_id},
+        )
+        if queries:
+            return EmbeddingErrorInfo(error=str(error), queries=queries)
+        return EmbeddingErrorInfo(error=str(error), batch_id=batch_id, documents=documents)
+
     async def embed_documents(
         self,
         documents: Sequence[CodeChunk],
         *,
         batch_id: UUID4 | None = None,
         **kwargs: dict[str, Any] | None,
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]] | EmbeddingErrorInfo:
         """Embed a list of documents into vectors.
 
         Optionally takes a `batch_id` parameter to reprocess a specific batch of documents.
@@ -162,8 +192,15 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
         if batch_id and batch_id in type(self)._store:
             documents = type(self)._store[batch_id]
             is_old_batch = True
-        chunks = self._process_input(documents, is_old_batch=is_old_batch)
-        return await self._embed_documents(chunks, **kwargs)  # pyright: ignore[reportUnknownVariableType, reportGeneralTypeIssues]
+        chunks, cache_key = self._process_input(documents, is_old_batch=is_old_batch)
+        try:
+            results: (
+                Sequence[Sequence[float]] | Sequence[Sequence[int]]
+            ) = await self._embed_documents(chunks, **kwargs)
+        except Exception as e:
+            return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)
+        else:
+            return results
 
     @abstractmethod
     async def _embed_query(
@@ -173,11 +210,18 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
 
     async def embed_query(
         self, query: str | Sequence[str], **kwargs: dict[str, Any] | None
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]] | EmbeddingErrorInfo:
         """Embed a query into a vector."""
         processed_kwargs: dict[str, Any] = self._set_kwargs(self.query_kwargs, kwargs or {})
         queries: Sequence[str] = query if isinstance(query, list | tuple | set) else [query]  # pyright: ignore[reportAssignmentType]
-        return await self._embed_query(queries, **processed_kwargs)  # pyright: ignore[reportUnknownVariableType, reportGeneralTypeIssues]
+        try:
+            results: Sequence[Sequence[float]] | Sequence[Sequence[int]] = await self._embed_query(
+                queries, **processed_kwargs
+            )  # pyright: ignore[reportUnknownVariableType, reportGeneralTypeIssues]
+        except Exception as e:
+            return self._handle_embedding_error(e, batch_id=None, documents=None, queries=queries)
+        else:
+            return results
 
     @property
     @abstractmethod
@@ -235,6 +279,36 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
             statistics.add_token_usage(embedding_generated=token_count)
 
     @staticmethod
+    def normalize(embedding: Sequence[float] | Sequence[int]) -> Sequence[float]:
+        """Normalize an embedding vector to unit L2 length.
+
+        Returns the input as floats if the vector is empty or has zero norm.
+        Raises ValueError if the input contains non-finite values.
+        """
+        import numpy as np
+
+        arr = np.asarray(embedding, dtype=np.float32)
+        if arr.size == 0:
+            return arr.tolist()
+        if not np.all(np.isfinite(arr)):
+            raise ValueError("Embedding contains non-finite values.")
+        denom = float(np.linalg.norm(arr))
+        if denom == 0.0:
+            return arr.tolist()
+        return (arr / denom).tolist()
+
+    @staticmethod
+    def is_normalized(embedding: Sequence[float] | Sequence[int], *, tol: float = 1e-6) -> bool:
+        """Return True if the vector's L2 norm is approximately 1 within tol."""
+        import numpy as np
+
+        arr = np.asarray(embedding, dtype=np.float32)
+        if arr.size == 0 or not np.all(np.isfinite(arr)):
+            return False
+        norm = float(np.linalg.norm(arr))
+        return bool(np.isclose(norm, 1.0, atol=tol, rtol=0.0))
+
+    @staticmethod
     def chunks_to_strings(chunks: Sequence[CodeChunk]) -> Sequence[SerializedCodeChunk[CodeChunk]]:
         """Convert a sequence of CodeChunk objects to their string representations."""
         return [chunk.serialize_for_embedding() for chunk in chunks if chunk]
@@ -249,11 +323,11 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
 
     def _process_input(
         self, input_data: StructuredDataInput, *, is_old_batch: bool = False
-    ) -> Sequence[CodeChunk]:
+    ) -> tuple[Sequence[CodeChunk], UUID4 | None]:
         """Process input data for embedding."""
         processed_chunks = default_input_transformer(input_data)
         if is_old_batch:
-            return processed_chunks
+            return processed_chunks, None
         key = uuid.uuid4()
         hashes = [self._hash_store.keygen.__call__(chunk.content) for chunk in processed_chunks]
         for i, chunk in enumerate(processed_chunks):
@@ -264,7 +338,7 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
                 chunk = None
         final_chunks = [chunk for chunk in processed_chunks if chunk]
         self._store[key] = final_chunks
-        return final_chunks
+        return final_chunks, key
 
     def _process_output(
         self, output_data: Any
@@ -285,7 +359,7 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
         """Execute a fire-and-forget task."""
         try:
             loop = asyncio.get_event_loop()
-            loop.run_in_executor(None, task)
+            _ = loop.run_in_executor(None, task)
         except Exception:
             logger.exception("Error occurred while executing fire-and-forget task.")
 

@@ -17,7 +17,7 @@ def _get_shared_capabilities() -> PartialRerankingCapabilities:
         "max_input": 32_000,
         "context_window": 32_000,
         "supports_custom_prompt": True,
-        "custom_prompt": "Given search results from a codebase, retrieve relevant Documents that answer the Query. Documents may be a code snippet, a text passage from code comments or documentation, a representation of a TreeSitter parse tree, or a combination of these.",
+        "custom_prompt": "Given search results containing code snippets, tree-sitter parse trees, documentation and code comments from a codebase, retrieve relevant Documents that answer the Query.",
         "tokenizer": "tokenizers",
         "other": {  # pyright: ignore[reportReturnType]  # string is Any...
             "prefix": '"<|im_start|>system\nJudge whether the Document meets the requirements based on the Query and the Instruct provided. Note that the answer can only be "yes" or "no".<|im_end|>\n<|im_start|>user\n"',
