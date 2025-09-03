@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 from codeweaver._settings import Provider, ProviderKind
 from codeweaver.embedding.providers import EmbeddingProvider
 from codeweaver.exceptions import ConfigurationError
-from codeweaver.reranking.base import RerankingProvider
+from codeweaver.reranking.providers.base import RerankingProvider
 from codeweaver.vector_stores.base import VectorStoreProvider
 
 

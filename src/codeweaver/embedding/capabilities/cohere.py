@@ -28,10 +28,7 @@ def _get_shared_cohere_embedding_capabilities() -> PartialCapabilities:
         "preferred_metrics": ("cosine", "dot", "euclidean"),
         "is_normalized": False,
         "tokenizer": "tokenizers",
-        "custom_document_prompt": None,
-        "custom_query_prompt": None,
-        "output_dtypes": ("float32",),
-        "supports_custom_prompts": False,
+        "output_dtypes": ("float",),
     }
 
 

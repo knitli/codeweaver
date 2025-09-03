@@ -438,6 +438,10 @@ CONFIG_FILE_LANGUAGES = frozenset({
     "properties",
 })
 
+CODE_LANGUAGES = frozenset({ext.language for ext in CODE_FILES_EXTENSIONS})
+
+DOCS_LANGUAGES = frozenset({ext.language for ext in DOC_FILES_EXTENSIONS})
+
 
 def get_ext_lang_pairs() -> Generator[ExtLangPair]:
     """Yield all `ExtLangPair` instances for code, config, and docs files."""

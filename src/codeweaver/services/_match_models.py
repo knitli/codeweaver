@@ -41,30 +41,32 @@ class PayloadField(BaseModel, extra="forbid"):
     Payload field.
     """
 
-    key: Annotated[str, Field(description="Payload field name")]
+    key: Annotated[str, Field(description="""Payload field name""")]
 
 
 class MinShould(BaseModel, extra="forbid"):
-    conditions: Annotated[Sequence[Condition], Field(description="List of conditions")]
-    min_count: Annotated[int, Field(description="Minimum count of conditions that must match")]
+    conditions: Annotated[Sequence[Condition], Field(description="""List of conditions""")]
+    min_count: Annotated[int, Field(description="""Minimum count of conditions that must match""")]
 
 
 class Filter(BaseModel, extra="forbid"):
     should: Annotated[
         Sequence[Condition] | Condition | None,
-        Field(default=None, description="At least one of those conditions should match"),
+        Field(default=None, description="""At least one of those conditions should match"""),
     ] = None
     min_should: Annotated[
         MinShould | None,
-        Field(default=None, description="At least minimum amount of given conditions should match"),
+        Field(
+            default=None, description="""At least minimum amount of given conditions should match"""
+        ),
     ] = None
     must: Annotated[
         Sequence[Condition] | Condition | None,
-        Field(default=None, description="All conditions must match"),
+        Field(default=None, description="""All conditions must match"""),
     ] = None
     must_not: Annotated[
         Sequence[Condition] | Condition | None,
-        Field(default=None, description="All conditions must NOT match"),
+        Field(default=None, description="""All conditions must NOT match"""),
     ] = None
 
 
@@ -74,10 +76,10 @@ class Nested(BaseModel, extra="forbid"):
     """
 
     key: Annotated[
-        str, Field(description="Select points with payload for a specified nested field")
+        str, Field(description="""Select points with payload for a specified nested field""")
     ]
     filter: Annotated[
-        Filter, Field(description="Select points with payload for a specified nested field")
+        Filter, Field(description="""Select points with payload for a specified nested field""")
     ]
 
 
@@ -87,7 +89,7 @@ class NestedCondition(BaseModel, extra="forbid"):
     """
 
     nested: Annotated[
-        Nested, Field(description="Select points with payload for a specified nested field")
+        Nested, Field(description="""Select points with payload for a specified nested field""")
     ]
 
 
@@ -97,7 +99,8 @@ class IsEmptyCondition(BaseModel, extra="forbid"):
     """
 
     is_empty: Annotated[
-        PayloadField, Field(description="Select points with empty payload for a specified field")
+        PayloadField,
+        Field(description="""Select points with empty payload for a specified field"""),
     ]
 
 
@@ -107,7 +110,7 @@ class IsNullCondition(BaseModel, extra="forbid"):
     """
 
     is_null: Annotated[
-        PayloadField, Field(description="Select points with null payload for a specified field")
+        PayloadField, Field(description="""Select points with null payload for a specified field""")
     ]
 
 
@@ -125,7 +128,7 @@ class HasVectorCondition(BaseModel, extra="forbid"):
     """
 
     has_vector: Annotated[
-        str, Field(description="Filter points which have specific vector assigned")
+        str, Field(description="""Filter points which have specific vector assigned""")
     ]
 
 
@@ -169,7 +172,7 @@ class MatchAny(BaseModel, extra="forbid"):
     """
 
     any: Annotated[
-        AnyVariants | None, Field(description="Exact match on any of the given values")
+        AnyVariants | None, Field(description="""Exact match on any of the given values""")
     ] = None
 
 
@@ -182,7 +185,7 @@ class MatchExcept(BaseModel, extra="forbid"):
         AnyVariants | None,
         Field(
             ...,
-            description="Should have at least one value not matching the any given values",
+            description="""Should have at least one value not matching the any given values""",
             alias="except",
         ),
     ] = None
@@ -209,9 +212,9 @@ class MatchValue(BaseModel, extra="forbid"):
     Exact match of the given value.
     """
 
-    value: Annotated[ValueVariants | None, Field(description="Exact match of the given value")] = (
-        None
-    )
+    value: Annotated[
+        ValueVariants | None, Field(description="""Exact match of the given value""")
+    ] = None
 
 
 class ValuesCount(BaseModel, extra="forbid"):
@@ -238,8 +241,8 @@ class GeoPoint(BaseModel, extra="forbid"):
     Geo point payload schema.
     """
 
-    lon: Annotated[float, Field(description="Geo point payload schema")]
-    lat: Annotated[float, Field(description="Geo point payload schema")]
+    lon: Annotated[float, Field(description="""Geo point payload schema""")]
+    lat: Annotated[float, Field(description="""Geo point payload schema""")]
 
 
 class GeoBoundingBox(BaseModel, extra="forbid"):
@@ -269,7 +272,8 @@ class GeoLineString(BaseModel, extra="forbid"):
     """
 
     points: Annotated[
-        Sequence[GeoPoint], Field(description="Ordered sequence of GeoPoints representing the line")
+        Sequence[GeoPoint],
+        Field(description="""Ordered sequence of GeoPoints representing the line"""),
     ]
 
 
@@ -282,7 +286,7 @@ class GeoPolygon(BaseModel, extra="forbid"):
         GeoLineString,
         Field(
             ...,
-            description="Geo filter request  Matches coordinates inside the polygon, defined by `exterior` and `interiors`",
+            description="""Geo filter request  Matches coordinates inside the polygon, defined by `exterior` and `interiors`""",
         ),
     ]
     interiors: Annotated[
@@ -303,10 +307,10 @@ class GeoRadius(BaseModel, extra="forbid"):
         GeoPoint,
         Field(
             ...,
-            description="Geo filter request  Matches coordinates inside the circle of `radius` and center with coordinates `center`",
+            description="""Geo filter request  Matches coordinates inside the circle of `radius` and center with coordinates `center`""",
         ),
     ]
-    radius: Annotated[float, Field(description="Radius of the area in meters")]
+    radius: Annotated[float, Field(description="""Radius of the area in meters""")]
 
 
 class FieldCondition(BaseModel, extra="forbid"):
@@ -314,28 +318,30 @@ class FieldCondition(BaseModel, extra="forbid"):
     All possible payload filtering conditions.
     """
 
-    key: str = Field(description="Payload key")
+    key: str = Field(description="""Payload key""")
     match: Annotated[
-        Match | None, Field(default=None, description="Check if point has field with a given value")
+        Match | None,
+        Field(default=None, description="""Check if point has field with a given value"""),
     ] = None
     range: Annotated[
         RangeInterface | None,
-        Field(default=None, description="Check if points value lies in a given range"),
+        Field(default=None, description="""Check if points value lies in a given range"""),
     ] = None
     geo_bounding_box: Annotated[
         GeoBoundingBox | None,
-        Field(default=None, description="Check if points geolocation lies in a given area"),
+        Field(default=None, description="""Check if points geolocation lies in a given area"""),
     ] = None
     geo_radius: Annotated[
         GeoRadius | None,
-        Field(default=None, description="Check if geo point is within a given radius"),
+        Field(default=None, description="""Check if geo point is within a given radius"""),
     ] = None
     geo_polygon: Annotated[
         GeoPolygon | None,
-        Field(default=None, description="Check if geo point is within a given polygon"),
+        Field(default=None, description="""Check if geo point is within a given polygon"""),
     ] = None
     values_count: Annotated[
-        ValuesCount | None, Field(default=None, description="Check number of values of the field")
+        ValuesCount | None,
+        Field(default=None, description="""Check number of values of the field"""),
     ] = None
     is_empty: Annotated[
         bool | None,

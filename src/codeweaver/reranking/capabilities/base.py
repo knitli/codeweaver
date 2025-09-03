@@ -93,11 +93,15 @@ class RerankingCapabilities(TypedDict, total=False):
 class RerankingModelCapabilities(BaseModel):
     """Capabilities of a reranking model."""
 
-    name: Annotated[str, Field(description="The name of the model.")] = ""
-    provider: Annotated[Provider, Field(description="The provider of the model.")] = Provider._UNSET  # pyright: ignore[reportPrivateUsage]
+    name: Annotated[str, Field(description="""The name of the model.""")] = ""
+    provider: Annotated[Provider, Field(description="""The provider of the model.""")] = (
+        Provider._UNSET  # pyright: ignore[reportPrivateUsage]
+    )
     max_query: Annotated[
         PositiveInt | None,
-        Field(description="The maximum number of tokens the model can handle for a single query."),
+        Field(
+            description="""The maximum number of tokens the model can handle for a single query."""
+        ),
     ] = None
     max_input: Annotated[
         Callable[[Sequence[CodeChunk], str], tuple[bool, NonNegativeInt]] | PositiveInt | None,
@@ -110,20 +114,20 @@ class RerankingModelCapabilities(BaseModel):
         Callable[..., Sequence[Sequence[float]] | Sequence[Sequence[int]]] | None
     ) = default_output_transformer
     context_window: Annotated[
-        PositiveInt, Field(description="The context window size of the model.")
+        PositiveInt, Field(description="""The context window size of the model.""")
     ] = 256
     supports_custom_prompt: Annotated[
-        bool | None, Field(description="Whether the model supports custom prompts.")
+        bool | None, Field(description="""Whether the model supports custom prompts.""")
     ] = None
     custom_prompt: Annotated[
-        str | None, Field(description="The custom prompt to use for the model.")
+        str | None, Field(description="""The custom prompt to use for the model.""")
     ] = None
     tokenizer: Annotated[
         Literal["tokenizers", "tiktoken"] | None,
-        Field(description="The tokenizer to use for the model."),
+        Field(description="""The tokenizer to use for the model."""),
     ] = None
     tokenizer_model: Annotated[
-        str | None, Field(description="The tokenizer model to use for the model.")
+        str | None, Field(description="""The tokenizer model to use for the model.""")
     ] = None
     other: Annotated[dict[str, Any], Field(description="Extra model-specific settings.")] = {}
 

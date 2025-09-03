@@ -19,12 +19,12 @@ from importlib import metadata
 from pathlib import Path
 from typing import Literal
 
-from typing_extensions import Sentinel
+from codeweaver._common import Sentinel
 
 
 logger = logging.getLogger(__name__)
 
-type NoValue = Sentinel("NoValue")
+MISSING = Sentinel("MISSING", "Sentinel<MISSING>", __name__)
 
 
 # Even Python's latest and greatest typing (as of 3.12+) can't properly express this.
@@ -81,7 +81,7 @@ def rpartial[**P, R](func: Callable[P, R], *args: object, **kwargs: object) -> C
 def is_git_repo(directory: Path | None = None) -> bool:
     """Is the given directory version-controlled with git?"""
     directory = directory or Path.cwd()
-    if git_dir := (directory / ".git").exists():
+    if (git_dir := (directory / ".git")) and git_dir.exists():
         return git_dir.is_dir()
     return False
 
@@ -98,33 +98,38 @@ def walk_down_to_git_root(path: Path | None = None) -> Path:
     raise FileNotFoundError("No .git directory found in the path hierarchy.")
 
 
+def get_project_root() -> Path:
+    """Get the root directory of the project."""
+    from codeweaver._server import get_settings
+
+    settings = get_settings()
+    return settings.project_root or walk_down_to_git_root()
+
+
 def has_git() -> bool:
     """Check if git is installed and available."""
     git = shutil.which("git")
     if not git:
         return False
     with contextlib.suppress(subprocess.CalledProcessError):
-        subprocess.check_output([git, "--version"], stderr=subprocess.STDOUT)  # noqa: S603
+        subprocess.run(["--version"], executable=git, stderr=subprocess.STDOUT)  # pyright: ignore[reportUnusedCallResult]  # noqa: S607
         return True
     return False
 
 
-def get_git_revision(directory: Path) -> str | NoValue:
+def get_git_revision(directory: Path) -> str | MISSING:  # pyright: ignore[reportUnknownParameterType]
     """Get the SHA-1 of the HEAD of a git repository."""
     if not is_git_repo(directory):
         with contextlib.suppress(FileNotFoundError):
             directory = walk_down_to_git_root(directory)
         if not directory or not is_git_repo(directory):
-            return NoValue
+            return MISSING
     if has_git():
         git = shutil.which("git")
         with contextlib.suppress(subprocess.CalledProcessError):
-            return (
-                subprocess.check_output([git, "rev-parse", "--short", "HEAD"], cwd=directory)  # noqa: S603
-                .decode("utf-8")
-                .strip()
-            )
-    return NoValue
+            output = subprocess.run(["rev-parse", "--short", "HEAD"], executable=git, cwd=directory)  # noqa: S607
+            return output.stdout.decode("utf-8").strip()
+    return MISSING
 
 
 def in_codeweaver_clone(path: Path) -> bool:
@@ -155,15 +160,9 @@ def _check_env_var(var_name: str) -> str | None:
 
 def get_possible_env_vars() -> tuple[tuple[str, str], ...] | None:
     """Get a tuple of any resolved environment variables for all providers and provider environment variables. If none are set, returns None."""
-    from codeweaver._settings import Provider, ProviderEnvVar
+    from codeweaver._settings import Provider
 
-    mapped_envs = Provider.all_envs()
-    # we can't use a set here because ProviderEnvVar is unhashable (TypedDict)
-    var_maps = [(v if isinstance(v, ProviderEnvVar) else iter(v)) for v in mapped_envs.values()]
-    env_vars = []
-    for var_map in var_maps:
-        env_vars.extend(v[0] if isinstance(v, tuple) else None for v in var_map.values())
-    env_vars = sorted({v for v in env_vars if v is not None})
+    env_vars = sorted({item[1][0] for item in Provider.all_envs()})
     found_vars = tuple(
         (var, value) for var in env_vars if (value := _check_env_var(var)) is not None
     )

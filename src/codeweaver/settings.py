@@ -45,9 +45,9 @@ from codeweaver.exceptions import ConfigurationError, MissingValueError
 
 
 DefaultDataProviderSettings = (
-    DataProviderSettings(provider=Provider.TAVILY, enabled=False, api_key=None, extra=None),
+    DataProviderSettings(provider=Provider.TAVILY, enabled=False, api_key=None, other=None),
     # DuckDuckGo
-    DataProviderSettings(provider=Provider.DUCKDUCKGO, enabled=True, api_key=None, extra=None),
+    DataProviderSettings(provider=Provider.DUCKDUCKGO, enabled=True, api_key=None, other=None),
 )
 
 DefaultEmbeddingProviderSettings = (
@@ -117,9 +117,9 @@ class FileFilterSettings(BaseModel):
     ] = DEFAULT_EXCLUDED_DIRS
     excluded_extensions: Annotated[
         frozenset[LiteralString],
-        Field(description="File extensions to exclude from search and indexing"),
+        Field(description="""File extensions to exclude from search and indexing"""),
     ] = DEFAULT_EXCLUDED_EXTENSIONS
-    use_gitignore: Annotated[bool, Field(description="Whether to use .gitignore for filtering")] = (
+    use_gitignore: Annotated[bool, Field(description="""Whether to use .gitignore for filtering""")] = (
         True
     )
     use_other_ignore_files: Annotated[
@@ -143,24 +143,24 @@ class ProviderSettings(BaseModel):
     """Settings for provider configuration."""
 
     data: Annotated[
-        tuple[DataProviderSettings, ...] | None, Field(description="Data provider configuration")
+        tuple[DataProviderSettings, ...] | None, Field(description="""Data provider configuration""")
     ] = DefaultDataProviderSettings
 
     embedding: Annotated[
-        tuple[EmbeddingProviderSettings, ...], Field(description="Embedding provider configuration")
+        tuple[EmbeddingProviderSettings, ...], Field(description="""Embedding provider configuration""")
     ] = DefaultEmbeddingProviderSettings
 
     reranking: Annotated[
-        tuple[RerankingProviderSettings, ...], Field(description="Reranking provider configuration")
+        tuple[RerankingProviderSettings, ...], Field(description="""Reranking provider configuration""")
     ] = DefaultRerankingProviderSettings
     """
     vector: Annotated[
         tuple[BaseVectorStoreConfig, ...],
-        Field(default_factory=QdrantVectorStore, description="Vector store provider configuration"),
+        Field(default_factory=QdrantVectorStore, description="""Vector store provider configuration"""),
     ] = QdrantConfig()
     """
     agent: Annotated[
-        tuple[AgentProviderSettings, ...] | None, Field(description="Agent provider configuration")
+        tuple[AgentProviderSettings, ...] | None, Field(description="""Agent provider configuration""")
     ] = DefaultAgentProviderSettings
 
 
@@ -186,7 +186,7 @@ class FastMcpServerSettings(BaseModel):
             description="Transport protocol to use for the FastMCP server. Stdio is for local use and cannot support concurrent requests. HTTP (streamable HTTP) can be used for local or remote use and supports concurrent requests. Unlike many MCP servers, CodeWeaver **defaults to http**."
         ),
     ] = "http"
-    host: Annotated[str | None, Field(description="Host address for the FastMCP server.")] = (
+    host: Annotated[str | None, Field(description="""Host address for the FastMCP server.""")] = (
         "127.0.0.1"
     )
     port: Annotated[
@@ -252,7 +252,7 @@ class CodeWeaverSettings(BaseSettings):
     project_path: Annotated[
         Path,
         Field(
-            description="Root path of the codebase to analyze. CodeWeaver will try to detect the project root automatically if you don't provide one."
+            description="""Root path of the codebase to analyze. CodeWeaver will try to detect the project root automatically if you don't provide one."""
         ),
     ] = walk_down_to_git_root()
 
@@ -261,15 +261,15 @@ class CodeWeaverSettings(BaseSettings):
     ] = None
 
     config_file: Annotated[
-        Path | None, Field(description="Path to the configuration file, if any", exclude=True)
+        Path | None, Field(description="""Path to the configuration file, if any""", exclude=True)
     ] = None
 
     # Performance settings
     token_limit: Annotated[
-        PositiveInt, Field(le=130_000, description="Maximum tokens per response")
+        PositiveInt, Field(le=130_000, description="""Maximum tokens per response""")
     ] = 10_000
     max_file_size: Annotated[
-        PositiveInt, Field(ge=51_200, description="Maximum file size to process in bytes")
+        PositiveInt, Field(ge=51_200, description="""Maximum file size to process in bytes""")
     ] = 1_048_576  # 1 MB
     max_results: Annotated[
         PositiveInt,
@@ -279,29 +279,29 @@ class CodeWeaverSettings(BaseSettings):
         ),
     ] = 75
     server: Annotated[
-        FastMcpServerSettings, Field(description="Optionally customize FastMCP server settings.")
+        FastMcpServerSettings, Field(description="""Optionally customize FastMCP server settings.""")
     ] = DefaultFastMcpServerSettings
 
     logging: Annotated[
-        LoggingSettings | None, Field(default_factory=dict, description="Logging configuration")
+        LoggingSettings | None, Field(default_factory=dict, description="""Logging configuration""")
     ] = None
 
     middleware_settings: Annotated[
-        MiddlewareOptions | None, Field(description="Middleware settings")
+        MiddlewareOptions | None, Field(description="""Middleware settings""")
     ] = None
 
-    filter_settings: Annotated[FileFilterSettings, Field(description="File filtering settings")] = (
+    filter_settings: Annotated[FileFilterSettings, Field(description="""File filtering settings""")] = (
         FileFilterSettings()
     )
 
     """ # Disabled while implementing...
     # Provider configuration
     embedding: Annotated[
-        tuple[EmbeddingConfig, ...], Field(description="Embedding provider configuration")
+        tuple[EmbeddingConfig, ...], Field(description="""Embedding provider configuration""")
     ] = (VoyageConfig(),)
     vector_store: Annotated[
         BaseVectorStoreConfig,
-        Field(default_factory=QdrantConfig, description="Vector store provider configuration"),
+        Field(default_factory=QdrantConfig, description="""Vector store provider configuration"""),
     ] = QdrantConfig()
     """
     # Feature flags
@@ -318,16 +318,16 @@ class CodeWeaverSettings(BaseSettings):
         ),
     ] = True
     enable_health_endpoint: Annotated[
-        bool, Field(description="Enable the health check endpoint")
+        bool, Field(description="""Enable the health check endpoint""")
     ] = True
     health_endpoint_path: Annotated[
-        str | None, Field(description="Path for the health check endpoint")
+        str | None, Field(description="""Path for the health check endpoint""")
     ] = "/health/"
     enable_statistics_endpoint: Annotated[
-        bool, Field(description="Enable the statistics endpoint")
+        bool, Field(description="""Enable the statistics endpoint""")
     ] = True
     statistics_endpoint_path: Annotated[
-        str | None, Field(description="Path for the statistics endpoint")
+        str | None, Field(description="""Path for the statistics endpoint""")
     ] = "/statistics/"
     allow_identifying_telemetry: Annotated[
         bool,
@@ -347,18 +347,18 @@ class CodeWeaverSettings(BaseSettings):
 
     agent_settings: Annotated[
         AgentModelSettings | None,
-        Field(description="Model settings for ai agents. Required for `enable_precontext`"),
+        Field(description="""Model settings for ai agents. Required for `enable_precontext`"""),
     ] = None
 
     uvicorn_settings: Annotated[
         UvicornServerSettings | None,
-        Field(default_factory=UvicornServerSettings, description="Settings for the Uvicorn server"),
+        Field(default_factory=UvicornServerSettings, description="""Settings for the Uvicorn server"""),
     ] = None
 
     __version__: Annotated[
         str,
         Field(
-            description="Schema version for CodeWeaver settings",
+            description="""Schema version for CodeWeaver settings""",
             pattern=r"\d{1,2}\.\d{1,3}\.\d{1,3}",
         ),
     ] = "1.0.0"

@@ -179,9 +179,6 @@ class EmbeddingCapabilities(TypedDict, total=False):
     output_dimensions: NotRequired[tuple[PositiveInt, ...] | None]
     default_dtype: NotRequired[str | None]
     output_dtypes: NotRequired[tuple[str, ...] | None]
-    supports_custom_prompts: NotRequired[bool]
-    custom_document_prompt: NotRequired[str] | None
-    custom_query_prompt: NotRequired[str] | None
     is_normalized: NotRequired[bool]
     context_window: NotRequired[PositiveInt]
     supports_context_chunk_embedding: NotRequired[bool]
@@ -205,18 +202,18 @@ class EmbeddingModelCapabilities(BaseModel):
     )
 
     name: Annotated[
-        str, Field(min_length=3, description="The name of the model or family of models.")
+        str, Field(min_length=3, description="""The name of the model or family of models.""")
     ] = ""
     provider: Annotated[
         Provider,
         Field(
-            description="The provider of the model. Since available settings vary across providers, each capabilities instance is tied to a provider."
+            description="""The provider of the model. Since available settings vary across providers, each capabilities instance is tied to a provider."""
         ),
     ] = Provider._UNSET  # type: ignore
     version: Annotated[
         str | int | None,
         Field(
-            description="The version of the model, if applicable. Can be a string or an integer. If not specified, defaults to `None`."
+            description="""The version of the model, if applicable. Can be a string or an integer. If not specified, defaults to `None`."""
         ),
     ] = None
     default_dimension: Annotated[PositiveInt, Field(multiple_of=8)] = 512
@@ -224,7 +221,7 @@ class EmbeddingModelCapabilities(BaseModel):
         tuple[PositiveInt, ...] | None,
         Field(
             multiple_of=8,
-            description="Supported output dimensions, if the model and provider support multiple output dimensions. If not specified, defaults to `None`.",
+            description="""Supported output dimensions, if the model and provider support multiple output dimensions. If not specified, defaults to `None`.""",
         ),
     ] = None
     default_dtype: Annotated[
@@ -256,7 +253,7 @@ class EmbeddingModelCapabilities(BaseModel):
     preferred_metrics: Annotated[
         tuple[Literal["dot", "cosine", "euclidean", "manhattan", "hamming", "chebyshev"], ...],
         Field(
-            description="A tuple of preferred metrics for comparing embeddings.",
+            description="""A tuple of preferred metrics for comparing embeddings.""",
             examples=[
                 "VoyageAI: `('dot',)` for the voyage 3-series models, since they are normalized to length 1."
             ],
@@ -267,7 +264,7 @@ class EmbeddingModelCapabilities(BaseModel):
         Field(
             init=False,
             pattern=r"^\d{1,2}\.\d{1,3}\.\d{1,3}$",
-            description="The version for the capabilities schema.",
+            description="""The version for the capabilities schema.""",
         ),
     ] = "1.0.0"
     hf_name: Annotated[
@@ -276,7 +273,7 @@ class EmbeddingModelCapabilities(BaseModel):
             description="The Hugging Face model name, if it applies *and* is different from the model name. Currently only applies to some models from `fastembed` and `ollama`"
         ),
     ] = None
-    other: dict[str, Any] | None = None
+    other: Annotated[dict[str, Any], Field(description="Extra model-specific settings.")] = {}
 
     @classmethod
     def default(cls) -> Self:
@@ -314,7 +311,7 @@ class SparseEmbeddingModelCapabilities(BaseModel):
         serialize_by_alias=True,
     )
 
-    name: Annotated[LiteralString, Field(description="The name of the model.")]
+    name: Annotated[LiteralString, Field(description="""The name of the model.""")]
     multilingual: bool = False
     provider: Annotated[
         Literal[Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS, Provider._UNSET],  # pyright: ignore[reportPrivateUsage]
@@ -344,51 +341,59 @@ class SparseEmbeddingModelCapabilities(BaseModel):
             description="The Hugging Face model name, if it applies *and* is different from the model name. Currently only applies to some models from `fastembed` and `ollama`"
         ),
     ] = None
+    other: Annotated[dict[str, Any], Field(description="Extra model-specific settings.")] = {}
 
 
 def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:
     """Get sparse embedding model capabilities."""
-    caps = {
+    caps = {  # type: ignore
         "Qdrant/bm25": {"name": "Qdrant/bm25", "multilingual": True},
         "Qdrant/bm42-all-minilm-l6-v2-attentions": {
             "name": "Qdrant/bm42-all-minilm-l6-v2-attentions",
             "multilingual": False,
+            "other": {},
         },
         "prithivida/Splade-PP_en_v1": {
             "name": "prithivida/Splade-PP_en_v1",
             "multilingual": False,
             "hf_name": "Qdrant/Splade-PP_en_v1",
+            "other": {},
         },
         "prithivida/Splade-PP_en_v2": {
             "name": "prithivida/Splade-PP_en_v2",
             "multilingual": False,
             "hf_name": None,
+            "other": {},
         },
         "ibm-granite/granite-embedding-30m-sparse": {
             "name": "ibm-granite/granite-embedding-30m-sparse",
             "multilingual": False,
+            "other": {},
         },
         "opensearch-project/opensearch-neural-sparse-encoding-doc-v2-mini": {
             "name": "opensearch-project/opensearch-neural-sparse-encoding-doc-v2-mini",
             "multilingual": False,
+            "other": {},
         },
         "opensearch-project/opensearch-neural-sparse-encoding-doc-v3-distill": {
             "name": "opensearch-project/opensearch-neural-sparse-encoding-doc-v3-distill",
             "multilingual": False,
+            "other": {},
         },
         "opensearch-project/opensearch-neural-sparse-encoding-doc-v3-gte": {
             "name": "opensearch-project/opensearch-neural-sparse-encoding-doc-v3-gte",
             "multilingual": False,
+            "other": {},
         },
     }
     fastembed_caps = tuple(
         SparseEmbeddingModelCapabilities.model_validate(cap | {"provider": Provider.FASTEMBED})
-        for cap in list(caps.values())[:4]
+        for cap in list(caps.values())[:4]  # type: ignore
     )
     st_caps = tuple(
         SparseEmbeddingModelCapabilities.model_validate(
             cap | {"provider": Provider.SENTENCE_TRANSFORMERS}
         )
-        for cap in list(caps.values())[3:]
+        for cap in list(caps.values())[3:]  # type: ignore
     )
     return fastembed_caps + st_caps

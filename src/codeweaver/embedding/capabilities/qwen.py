@@ -112,6 +112,7 @@ QWEN_QWEN3_EMBEDDING_8B_CAPABILITIES: PartialCapabilities = {
         "release_date": "2025-06-05",
         "revision": "4e423935c619ae4df87b646a3ce949610c66241c",
         "memory_usage_gb": 28.19,
+        "prefix": "",
     },
 }
 
@@ -131,4 +132,16 @@ def get_qwen_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
             EmbeddingCapabilities({**cap, "provider": provider})  # pyright: ignore[reportArgumentType]
             for provider in CAP_MAP[cap["name"]]  # pyright: ignore[reportArgumentType]
         ])
-    return tuple(EmbeddingModelCapabilities.model_validate(cap) for cap in capabilities)
+    return tuple(
+        EmbeddingModelCapabilities.model_validate(
+            cap
+            | {
+                "other": {
+                    "model": {
+                        "instruction": "Given search results containing code snippets, tree-sitter parse trees, documentation and code comments from a codebase, retrieve relevant Documents that answer the Query."
+                    }
+                }
+            }
+        )
+        for cap in capabilities
+    )

@@ -110,49 +110,49 @@ class TimingStatistics:
         dict[ToolOrPromptName, list[PositiveFloat]],
         Field(
             default_factory=dict,
-            description="Time taken for on_call_tool requests in milliseconds.",
+            description="""Time taken for on_call_tool requests in milliseconds.""",
         ),
     ]
     on_read_resource_requests: Annotated[
         dict[ResourceUri, list[PositiveFloat]],
         Field(
             default_factory=dict,
-            description="Time taken for on_read_resource requests in milliseconds.",
+            description="""Time taken for on_read_resource requests in milliseconds.""",
         ),
     ]
     on_get_prompt_requests: Annotated[
         dict[ToolOrPromptName, list[PositiveFloat]],
         Field(
             default_factory=dict,
-            description="Time taken for on_get_prompt requests in milliseconds.",
+            description="""Time taken for on_get_prompt requests in milliseconds.""",
         ),
     ]
     on_list_tools_requests: Annotated[
         list[PositiveFloat],
         Field(
             default_factory=list,
-            description="Time taken for on_list_tools requests in milliseconds.",
+            description="""Time taken for on_list_tools requests in milliseconds.""",
         ),
     ]
     on_list_resources_requests: Annotated[
         list[PositiveFloat],
         Field(
             default_factory=list,
-            description="Time taken for on_list_resources requests in milliseconds.",
+            description="""Time taken for on_list_resources requests in milliseconds.""",
         ),
     ]
     on_list_resource_templates_requests: Annotated[
         list[PositiveFloat],
         Field(
             default_factory=list,
-            description="Time taken for on_list_resource_templates requests in milliseconds.",
+            description="""Time taken for on_list_resource_templates requests in milliseconds.""",
         ),
     ]
     on_list_prompts_requests: Annotated[
         list[PositiveFloat],
         Field(
             default_factory=list,
-            description="Time taken for on_list_prompts requests in milliseconds.",
+            description="""Time taken for on_list_prompts requests in milliseconds.""",
         ),
     ]
 
@@ -300,23 +300,23 @@ class _LanguageStatistics:
     language: Annotated[
         str | SemanticSearchLanguage | ConfigLanguage,
         Field(
-            description="`SemanticSearchLanguage` member, `ConfigLanguage` member, or string representing the language."
+            description="""`SemanticSearchLanguage` member, `ConfigLanguage` member, or string representing the language."""
         ),
     ]
     indexed: Annotated[
-        NonNegativeInt, Field(description="Number of files indexed for this language.")
+        NonNegativeInt, Field(description="""Number of files indexed for this language.""")
     ] = 0
     retrieved: Annotated[
-        NonNegativeInt, Field(description="Number of files retrieved for this language.")
+        NonNegativeInt, Field(description="""Number of files retrieved for this language.""")
     ] = 0
     processed: Annotated[
-        NonNegativeInt, Field(description="Number of files processed for this language.")
+        NonNegativeInt, Field(description="""Number of files processed for this language.""")
     ] = 0
     reindexed: Annotated[
-        NonNegativeInt, Field(description="Number of files reindexed for this language.")
+        NonNegativeInt, Field(description="""Number of files reindexed for this language.""")
     ] = 0
     skipped: Annotated[
-        NonNegativeInt, Field(description="Number of files skipped for this language.")
+        NonNegativeInt, Field(description="""Number of files skipped for this language.""")
     ] = 0
     unique_files: ClassVar[
         Annotated[set[Path], Field(default_factory=set, init=False, repr=False, exclude=True)]
@@ -675,30 +675,31 @@ class SessionStatistics:
     """Statistics for tracking session performance and usage."""
 
     total_requests: Annotated[
-        NonNegativeInt | None, Field(description="Total requests made during the session.")
+        NonNegativeInt | None, Field(description="""Total requests made during the session.""")
     ] = None
     successful_requests: Annotated[
-        NonNegativeInt | None, Field(description="Total successful requests during the session.")
+        NonNegativeInt | None,
+        Field(description="""Total successful requests during the session."""),
     ] = None
     failed_requests: Annotated[
-        NonNegativeInt | None, Field(description="Total failed requests during the session.")
+        NonNegativeInt | None, Field(description="""Total failed requests during the session.""")
     ] = None
     timing_statistics: Annotated[
-        TimingStatistics | None, Field(description="Timing statistics for the session.")
+        TimingStatistics | None, Field(description="""Timing statistics for the session.""")
     ] = None
 
     index_statistics: Annotated[
         FileStatistics | None,
         Field(
             default_factory=FileStatistics,
-            description="Comprehensive file statistics tracking categories, languages, and operations.",
+            description="""Comprehensive file statistics tracking categories, languages, and operations.""",
         ),
     ] = None
     token_statistics: Annotated[
         TokenCounter | None,
         Field(
             default_factory=TokenCounter,
-            description="A typed Counter that tracks token usage statistics.",
+            description="""A typed Counter that tracks token usage statistics.""",
         ),
     ] = None
 

@@ -127,7 +127,7 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
         self._fire_and_forget(
             lambda: self._update_token_stats(from_docs=transformed_input)  # pyright: ignore[reportArgumentType]
         )
-        return await self._process_output(all_output)
+        return self._process_output(all_output)
 
     async def _embed_query(
         self, query: str | Sequence[str], **kwargs: dict[str, Any] | None

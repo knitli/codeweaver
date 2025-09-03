@@ -101,6 +101,7 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
     _store: ClassVar[UUIDStore[Sequence[CodeChunk], CodeChunk]] = UUIDStore(
         value_type=Sequence, store={}, use_uuid=True, sub_value_type=CodeChunk
     )
+
     """The store for embedding documents, keyed by batch ID and stored as a batch of CodeChunks."""
     _hash_store: ClassVar[BlakeStore[UUID4, None]] = BlakeStore(
         value_type=uuid.UUID,
@@ -254,6 +255,16 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
         """Get the tokenizer for the embedding provider."""
         return self._tokenizer()
 
+    @property
+    def is_instruct_model(self) -> bool:
+        """Return True if the model supports custom prompts."""
+        return self.model_name in (
+            "intfloat/multilingual-e5-large-instruct",
+            "Qwen/Qwen3-Embedding-0.6B",
+            "Qwen/Qwen3-Embedding-4B",
+            "Qwen/Qwen3-Embedding-8B",
+        )
+
     @overload
     def _update_token_stats(self, *, token_count: int) -> None: ...
     @overload
@@ -293,9 +304,7 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
         if not np.all(np.isfinite(arr)):
             raise ValueError("Embedding contains non-finite values.")
         denom = float(np.linalg.norm(arr))
-        if denom == 0.0:
-            return arr.tolist()
-        return (arr / denom).tolist()
+        return arr.tolist() if denom == 0.0 else (arr / denom).tolist()
 
     @staticmethod
     def is_normalized(embedding: Sequence[float] | Sequence[int], *, tol: float = 1e-6) -> bool:

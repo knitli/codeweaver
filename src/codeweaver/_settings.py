@@ -18,7 +18,17 @@ import ssl
 
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Annotated, Any, Literal, LiteralString, NotRequired, Required, TypedDict, cast
+from typing import (
+    Annotated,
+    Any,
+    Literal,
+    LiteralString,
+    NotRequired,
+    Required,
+    TypedDict,
+    cast,
+    is_typeddict,
+)
 
 from fastmcp.contrib.bulk_tool_caller.bulk_tool_caller import BulkToolCaller
 from fastmcp.server.auth.auth import OAuthProvider
@@ -100,7 +110,7 @@ class FormattersDict(TypedDict, total=False):
         Annotated[
             str,
             Field(
-                description="The class name of the formatter in the form of an import path, like `logging.Formatter` or `rich.logging.RichFormatter`.",
+                description="""The class name of the formatter in the form of an import path, like `logging.Formatter` or `rich.logging.RichFormatter`.""",
                 alias="class",
             ),
         ]
@@ -137,7 +147,7 @@ def walk_pattern(s: str) -> str:
     This aims to accept inputs written as if they were r-strings while remaining robust to
     config/env string parsing that may have processed standard escapes like "\n".
     """
-    if not isinstance(s, str):
+    if not isinstance(s, str):  # pyright: ignore[reportUnnecessaryIsInstance]  # just being defensive
         raise TypeError("Pattern must be a string.")
 
     out: list[str] = []
@@ -159,11 +169,10 @@ def walk_pattern(s: str) -> str:
             if nxt in legal_next:
                 # Keep known/valid escapes and escaped metacharacters as-is.
                 out.append("\\")
-                out.append(nxt)
             else:
                 # Unknown escape — make it literal by doubling the backslash.
                 out.append("\\\\")
-                out.append(nxt)
+            out.append(nxt)
             i += 2
             continue
         out.append(ch)
@@ -276,7 +285,7 @@ class HandlersDict(TypedDict, total=False):
         Annotated[
             str,
             Field(
-                description="The class name of the handler in the form of an import path, like `logging.StreamHandler` or `rich.logging.RichHandler`.",
+                description="""The class name of the handler in the form of an import path, like `logging.StreamHandler` or `rich.logging.RichHandler`.""",
                 alias="class",
             ),
         ]
@@ -315,7 +324,9 @@ class LoggingConfigDict(TypedDict, total=False):
     filters: NotRequired[FiltersDict]
     handlers: NotRequired[dict[HandlerID, HandlersDict]]
     loggers: NotRequired[dict[str, LoggersDict]]
-    root: NotRequired[Annotated[LoggersDict, Field(description="The root logger configuration.")]]
+    root: NotRequired[
+        Annotated[LoggersDict, Field(description="""The root logger configuration.""")]
+    ]
     incremental: NotRequired[
         Annotated[
             bool,
@@ -328,7 +339,7 @@ class LoggingConfigDict(TypedDict, total=False):
         Annotated[
             bool,
             Field(
-                description="Whether to disable all existing loggers when configuring logging. If not present, defaults to `True`."
+                description="""Whether to disable all existing loggers when configuring logging. If not present, defaults to `True`."""
             ),
         ]
     ]
@@ -563,7 +574,7 @@ class RerankingProviderSettings(BaseProviderSettings):
 
     model_settings: Required[RerankingModelSettings | tuple[RerankingModelSettings, ...] | None]
     """Settings for the re-ranking model(s)."""
-    top_k: NotRequired[PositiveInt | None]
+    top_n: NotRequired[PositiveInt | None]
     fastembed_gpu: NotRequired[FastembedGPUProviderSettings | None]
     """Optional settings specific to the Fastembed-GPU provider."""
 
@@ -1021,10 +1032,49 @@ class Provider(BaseEnum):
             Provider.VERCEL,
         }
 
+    @staticmethod
+    def _flatten_envvars(env_vars: ProviderEnvVars) -> list[ProviderEnvVarInfo]:
+        """Flatten a ProviderEnvVars TypedDict into a list of ProviderEnvVarInfo tuples."""
+        found_vars: list[ProviderEnvVarInfo] = []
+        for key, value in env_vars.items():
+            if key not in ("note", "other") and isinstance(value, tuple):
+                found_vars.append((key, value))  # pyright: ignore[reportArgumentType]
+            elif key == "other" and isinstance(value, dict) and value:
+                found_vars.extend(
+                    (key, nested_value)
+                    for nested_value in value.values()  # type: ignore
+                )
+        return found_vars
+
     @classmethod
-    def all_envs(cls) -> dict[Provider, ProviderEnvVars | tuple[ProviderEnvVars, ...]]:
+    def all_envs(cls) -> tuple[tuple[Provider, ProviderEnvVarInfo], ...]:
         """Get all environment variables used by all providers."""
-        return {k: v for k, v in ((p, p.other_env_vars) for p in cls) if v is not None}
+        found_vars: list[tuple[Provider, ProviderEnvVarInfo]] = []
+        for p in cls:
+            if (v := p.other_env_vars) is not None and is_typeddict(v):
+                # singleton
+                found_vars.extend(cls._flatten_envvars(v))  # pyright: ignore[reportArgumentType]
+            if isinstance(v, tuple):
+                found_vars.extend(cls._flatten_envvars(v) for v in v if is_typeddict(v))  # pyright: ignore[reportArgumentType]
+        return tuple(found_vars)
+
+    def is_embedding_provider(self) -> bool:
+        """Check if the provider is an embedding provider."""
+        from codeweaver._capabilities import get_provider_kinds
+
+        return ProviderKind.EMBEDDING in get_provider_kinds(self)
+
+    def is_sparse_provider(self) -> bool:
+        """Check if the provider is a sparse embedding provider."""
+        from codeweaver._capabilities import get_provider_kinds
+
+        return ProviderKind.SPARSE_EMBEDDING in get_provider_kinds(self)
+
+    def is_reranking_provider(self) -> bool:
+        """Check if the provider is a reranking provider."""
+        from codeweaver._capabilities import get_provider_kinds
+
+        return ProviderKind.RERANKING in get_provider_kinds(self)
 
 
 class ProviderKind(BaseEnum):
@@ -1034,6 +1084,8 @@ class ProviderKind(BaseEnum):
     """Provider for data retrieval and processing (e.g. Tavily)"""
     EMBEDDING = "embedding"
     """Provider for text embedding (e.g. Voyage)"""
+    SPARSE_EMBEDDING = "sparse_embedding"
+    """Provider for sparse text embedding (traditional indexed search, more-or-less)."""
     RERANKING = "reranking"
     """Provider for re-ranking (e.g. Voyage)"""
     VECTOR_STORE = "vector_store"

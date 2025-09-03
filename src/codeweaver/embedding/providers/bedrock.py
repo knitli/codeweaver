@@ -116,11 +116,11 @@ class CohereEmbeddingRequestBody(BaseBedrockModel):
 
     input_type: Annotated[
         Literal["search_document", "search_query", "classification", "clustering", "image"],
-        Field(description="The type of input to generate embeddings for."),
+        Field(description="""The type of input to generate embeddings for."""),
     ]
     texts: Annotated[
         list[Annotated[str, Field(max_length=2048)]],
-        Field(description="The input texts to generate embeddings for.", max_length=96),
+        Field(description="""The input texts to generate embeddings for.""", max_length=96),
     ]
     images: Annotated[
         list[str] | None,
@@ -130,12 +130,12 @@ class CohereEmbeddingRequestBody(BaseBedrockModel):
         ),
     ] = None
     truncate: Annotated[
-        Literal["NONE", "START", "END"] | None, Field(description="Truncation strategy.")
+        Literal["NONE", "START", "END"] | None, Field(description="""Truncation strategy.""")
     ] = None
     embedding_types: Annotated[
         list[Literal["float", "int8", "uint8", "binary", "ubinary"]] | None,
         Field(
-            description="The type of embeddings to generate. You can specify one or more types. Default is float."
+            description="""The type of embeddings to generate. You can specify one or more types. Default is float."""
         ),
     ] = None
 
@@ -161,16 +161,16 @@ class TitanEmbeddingV2RequestBody(BaseBedrockModel):
     """
 
     input_text: Annotated[
-        str, Field(description="The input text to generate embeddings for.", max_length=50_000)
+        str, Field(description="""The input text to generate embeddings for.""", max_length=50_000)
     ]
     dimensions: Annotated[
         Literal[1024, 512, 256],
-        Field(description="The number of dimensions for the generated embeddings."),
+        Field(description="""The number of dimensions for the generated embeddings."""),
     ] = 1024
     normalize: Annotated[
         bool,
         Field(
-            description="Whether to normalize the embeddings. Amazon defaults to False, but we default to True for our purposes."
+            description="""Whether to normalize the embeddings. Amazon defaults to False, but we default to True for our purposes."""
         ),
     ] = True
     embedding_types: Annotated[
@@ -298,7 +298,7 @@ class BedrockInvokeEmbeddingRequest(BaseBedrockModel):
     trace: Annotated[
         Literal["ENABLED", "DISABLED", "ENABLED_FULL"],
         Field(
-            description="The trace level to use for the request. This controls the amount of tracing information returned in the response."
+            description="""The trace level to use for the request. This controls the amount of tracing information returned in the response."""
         ),
     ] = "DISABLED"
     guardrail_identifier: Annotated[
@@ -308,12 +308,12 @@ class BedrockInvokeEmbeddingRequest(BaseBedrockModel):
         ),
     ] = None
     guardrail_version: Annotated[
-        str | None, Field(description="The guardrail version to use, if using guardrail.")
+        str | None, Field(description="""The guardrail version to use, if using guardrail.""")
     ] = None
     performance_config_latency: Annotated[
         Literal["standard", "optimized"],
         Field(
-            description="The performance configuration to use for the request. This controls the latency and throughput of the request."
+            description="""The performance configuration to use for the request. This controls the latency and throughput of the request."""
         ),
     ] = "standard"
 
@@ -322,14 +322,14 @@ class TitanEmbeddingV2Response(BaseBedrockModel):
     """Response from Titan Embedding V2."""
 
     embedding: Annotated[
-        Sequence[float], Field(description="The generated embedding as a list of floats.")
+        Sequence[float], Field(description="""The generated embedding as a list of floats.""")
     ]
     input_text_token_count: Annotated[
-        int, Field(description="The number of tokens in the input text.")
+        int, Field(description="""The number of tokens in the input text.""")
     ]
     embeddings_by_type: Annotated[
         dict[Literal["float", "binary"], list[float] | list[int]],
-        Field(description="The generated embeddings by type."),
+        Field(description="""The generated embeddings by type."""),
     ]
 
     @model_serializer
@@ -358,19 +358,19 @@ class CohereEmbeddingResponse(BaseBedrockModel):
     embeddings: Annotated[
         Sequence[Sequence[float] | Sequence[Sequence[int]]],
         Field(
-            description="The generated embeddings as a list of lists. Floats or ints depending on type."
+            description="""The generated embeddings as a list of lists. Floats or ints depending on type."""
         ),
     ]
-    id: Annotated[str, Field(description="The ID of the request.")]
+    id: Annotated[str, Field(description="""The ID of the request.""")]
     response_type: Annotated[
-        Literal["embedding_floats"], Field(description="The type of response.")
+        Literal["embedding_floats"], Field(description="""The type of response.""")
     ] = "embedding_floats"
     texts: Annotated[
-        list[str] | None, Field(description="The input texts for the embedding request.")
+        list[str] | None, Field(description="""The input texts for the embedding request.""")
     ]
     images: Annotated[
         list[ImageDescription] | None,
-        Field(description="A description of the image in the request."),
+        Field(description="""A description of the image in the request."""),
     ] = None
 
     @model_serializer

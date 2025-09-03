@@ -28,12 +28,7 @@ except ImportError as e:
 
 
 def preprocess_for_qwen(
-    query: str,
-    documents: Sequence[str],
-    instruction: str,
-    prefix: str,
-    suffix: str,
-    model_name: str,
+    query: str, documents: Sequence[str], instruction: str, prefix: str, suffix: str
 ) -> Sequence[tuple[str, str]]:
     """Preprocess the query and documents for Qwen models."""
 
@@ -64,7 +59,7 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
         capabilities: RerankingModelCapabilities,
         client: CrossEncoder | None = None,
         prompt: str | None = None,
-        top_k: int = 40,
+        top_n: int = 40,
         **kwargs: Any,
     ) -> None:
         """Initialize the SentenceTransformersRerankingProvider."""
@@ -72,12 +67,12 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
         self._rerank_kwargs = {**type(self)._rerank_kwargs, **kwargs}
         self._client = client or CrossEncoder(self._caps.name, **self._rerank_kwargs)
         self._prompt = prompt
-        self._top_k = top_k
+        self._top_n = top_n
         super().__init__(
             capabilities,
-            client=self._client,
+            client=self._client,  # pyright: ignore[reportCallIssue]
             prompt=prompt,
-            top_k=top_k,
+            top_n=top_n,
             **self._rerank_kwargs,  # pyright: ignore[reportCallIssue]  # we're intentionally reassigning here
         )
 
@@ -85,8 +80,8 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
         """
         Initialize the SentenceTransformersRerankingProvider.
         """
-        if "model_name" not in self.kwargs:
-            self.kwargs["model_name"] = self._caps.name
+        if "model_name" not in self.kwargs or "model_name_or_path" not in self.kwargs:
+            self.kwargs["model_name_or_path"] = self._caps.name
         name = self.kwargs.pop("model_name")
         if not isinstance(name, str):
             raise TypeError(f"Expected model_name to be str, got {type(name).__name__}")
@@ -99,7 +94,7 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
         query: str,
         documents: Sequence[str],
         *,
-        top_k: int = 40,
+        top_n: int = 40,
         **kwargs: dict[str, Any] | None,
     ) -> Any:
         """Execute the reranking process."""
@@ -110,15 +105,13 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
                 instruction=self._caps.custom_prompt or "",
                 prefix=self._query_prefix,
                 suffix=self._doc_suffix,
-                model_name=self.kwargs["model_name"]
-                if isinstance(self.kwargs["model_name"], str)
-                else "this won't happen",
             )
             if "Qwen3" in self._caps.name
             else [(query, doc) for doc in documents]
         )
         predict_partial = rpartial(
-            cast(Callable[..., np.ndarray], self._client.predict), convert_to_numpy=True
+            cast(Callable[..., np.ndarray], self._client.predict),  # pyright: ignore[reportUnknownMemberType]
+            convert_to_numpy=True,
         )
         loop = asyncio.get_running_loop()
         scores = await loop.run_in_executor(None, predict_partial, preprocessed)  # pyright: ignore[reportArgumentType, reportUnknownMemberType, reportUnknownVariableType]

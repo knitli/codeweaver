@@ -578,6 +578,7 @@ all = [
     { name = "httpx" },
     { name = "langchain-text-splitters" },
     { name = "mcp" },
+    { name = "mistral-common" },
     { name = "numpy" },
     { name = "permit-fastmcp" },
     { name = "posthog" },
@@ -608,6 +609,7 @@ all-gpu = [
     { name = "httpx" },
     { name = "langchain-text-splitters" },
     { name = "mcp" },
+    { name = "mistral-common" },
     { name = "numpy" },
     { name = "permit-fastmcp" },
     { name = "posthog" },
@@ -674,6 +676,7 @@ provider-in-memory = [
     { name = "tokenizers" },
 ]
 provider-mistral = [
+    { name = "mistral-common" },
     { name = "pydantic-ai-slim", extra = ["mistral"] },
 ]
 provider-openai = [
@@ -796,6 +799,7 @@ all-dev = [
     { name = "httpx" },
     { name = "ipython" },
     { name = "jsonlines" },
+    { name = "mistral-common" },
     { name = "mkdocs" },
     { name = "mkdocs-awesome-nav" },
     { name = "mkdocs-gen-files" },
@@ -933,6 +937,9 @@ requires-dist = [
     { name = "mcp", marker = "extra == 'recommended-local-only'", specifier = ">=1.13.0" },
     { name = "mcp", marker = "extra == 'recommended-no-telemetry'", specifier = ">=1.13.0" },
     { name = "mcp", marker = "extra == 'required-core'", specifier = ">=1.13.0" },
+    { name = "mistral-common", marker = "extra == 'all'", specifier = ">=1.8.4" },
+    { name = "mistral-common", marker = "extra == 'all-gpu'", specifier = ">=1.8.4" },
+    { name = "mistral-common", marker = "extra == 'provider-mistral'", specifier = ">=1.8.4" },
     { name = "numpy", specifier = ">=2.3.0" },
     { name = "numpy", marker = "extra == 'all'", specifier = ">=2.3.0" },
     { name = "numpy", marker = "extra == 'all-gpu'", specifier = ">=2.3.0" },
@@ -1073,6 +1080,7 @@ all-dev = [
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "ipython", specifier = ">=9.4.0" },
     { name = "jsonlines", specifier = ">=4.0.0" },
+    { name = "mistral-common", specifier = ">=1.8.4" },
     { name = "mkdocs", specifier = ">=1.6.1" },
     { name = "mkdocs-awesome-nav", specifier = ">=3.1.2" },
     { name = "mkdocs-gen-files", specifier = ">=0.5.0" },
@@ -2673,6 +2681,25 @@ wheels = [
 ]
 
 [[package]]
+name = "mistral-common"
+version = "1.8.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jsonschema" },
+    { name = "numpy" },
+    { name = "pillow" },
+    { name = "pydantic" },
+    { name = "pydantic-extra-types", extra = ["pycountry"] },
+    { name = "requests" },
+    { name = "tiktoken" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ba/dd/1beb1e3d56300f0e4b45ba975ffa7f4b07e6f96a6e06601483f58931893b/mistral_common-1.8.4.tar.gz", hash = "sha256:e611c16ef59c2b60ffdecef4d5e9158e1bf838fad6bad34aa050123601af703a", size = 6333167, upload-time = "2025-08-20T07:22:26.347Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d6/4f/756a66c608a767c7af7010b23992343e97558ce7f86c5c15929f1215f6ef/mistral_common-1.8.4-py3-none-any.whl", hash = "sha256:bfaf2550046cebe8289946adc267ba807ac266e5325647af4c4f67292124bc2f", size = 6517094, upload-time = "2025-08-20T07:22:23.686Z" },
+]
+
+[[package]]
 name = "mistralai"
 version = "1.9.3"
 source = { registry = "https://pypi.org/simple" }
@@ -4100,6 +4127,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pycountry"
+version = "24.6.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/76/57/c389fa68c50590881a75b7883eeb3dc15e9e73a0fdc001cdd45c13290c92/pycountry-24.6.1.tar.gz", hash = "sha256:b61b3faccea67f87d10c1f2b0fc0be714409e8fcdcc1315613174f6466c10221", size = 6043910, upload-time = "2024-06-01T04:12:15.05Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b1/ec/1fb891d8a2660716aadb2143235481d15ed1cbfe3ad669194690b0604492/pycountry-24.6.1-py3-none-any.whl", hash = "sha256:f1a4fb391cd7214f8eefd39556d740adcc233c778a27f8942c8dca351d6ce06f", size = 6335189, upload-time = "2024-06-01T04:11:49.711Z" },
+]
+
+[[package]]
 name = "pycparser"
 version = "2.22"
 source = { registry = "https://pypi.org/simple" }
@@ -4292,6 +4328,24 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d5/bd/35310daeac019da1b979ee84f272d4323588dd6d1b3c156fb49df724de93/pydantic_evals-0.6.2.tar.gz", hash = "sha256:0b4895da682c0511c30ed35d794475f494ec8ab719ac05e4bbb1464f2e73c8d1", size = 44088, upload-time = "2025-08-07T15:49:05.226Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f4/b8/f9621c225319d42a321c05f2160353a01c7ed69701316a1b3da907bd1874/pydantic_evals-0.6.2-py3-none-any.whl", hash = "sha256:f6eec289d0ee256bd937a00a31fbbf1e3f54b0ca34f03e10344752042e93d9f7", size = 52753, upload-time = "2025-08-07T15:48:54.559Z" },
+]
+
+[[package]]
+name = "pydantic-extra-types"
+version = "2.10.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/7e/ba/4178111ec4116c54e1dc7ecd2a1ff8f54256cdbd250e576882911e8f710a/pydantic_extra_types-2.10.5.tar.gz", hash = "sha256:1dcfa2c0cf741a422f088e0dbb4690e7bfadaaf050da3d6f80d6c3cf58a2bad8", size = 138429, upload-time = "2025-06-02T09:31:52.713Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/70/1a/5f4fd9e7285f10c44095a4f9fe17d0f358d1702a7c74a9278c794e8a7537/pydantic_extra_types-2.10.5-py3-none-any.whl", hash = "sha256:b60c4e23d573a69a4f1a16dd92888ecc0ef34fb0e655b4f305530377fa70e7a8", size = 38315, upload-time = "2025-06-02T09:31:51.229Z" },
+]
+
+[package.optional-dependencies]
+pycountry = [
+    { name = "pycountry" },
 ]
 
 [[package]]

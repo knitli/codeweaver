@@ -131,7 +131,7 @@ class ConfigLanguage(BaseEnum):
         This is used to quickly look up the SemanticSearchLanguage based on ConfigLanguage.
         """
         if self.is_semantic_search_language:
-            return SemanticSearchLanguage.from_string(self.value)
+            return SemanticSearchLanguage.from_string(self.value)  # pyright: ignore[reportReturnType]
         return None
 
 
@@ -560,7 +560,7 @@ class SemanticSearchLanguage(BaseEnum):
             ConfigLanguage.from_string(self.value)
             if self in type(self).config_languages()
             else None
-        )
+        )  # pyright: ignore[reportReturnType]
 
     @classmethod
     def config_languages(cls) -> tuple[SemanticSearchLanguage, ...]:

@@ -76,7 +76,7 @@ class FastEmbedRerankingProvider(RerankingProvider[TextCrossEncoder]):
         query: str,
         documents: Sequence[str],
         *,
-        top_k: int = 40,
+        top_n: int = 40,
         **kwargs: dict[str, Any] | None,
     ) -> Any:
         """Execute the reranking process."""

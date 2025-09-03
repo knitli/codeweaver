@@ -44,12 +44,12 @@ class QueryIntent(BaseModel):
     intent_type: IntentType
 
     confidence: Annotated[NonNegativeFloat, Field(le=1.0)]
-    reasoning: Annotated[str, Field(description="Why this intent was detected")]
+    reasoning: Annotated[str, Field(description="""Why this intent was detected""")]
 
     # Intent-specific parameters
     focus_areas: Annotated[
         tuple[str],
-        Field(default_factory=tuple, description="Specific areas of focus within the intent"),
+        Field(default_factory=tuple, description="""Specific areas of focus within the intent"""),
     ]
     complexity_level: Annotated[
         QueryComplexity | Literal["simple", "moderate", "complex"],
@@ -64,30 +64,30 @@ class IntentResult(BaseModel):
 
     # Strategy parameters
     file_patterns: Annotated[
-        list[str], Field(default_factory=list, description="File patterns to prioritize")
+        list[str], Field(default_factory=list, description="""File patterns to prioritize""")
     ]
     exclude_patterns: Annotated[
-        tuple[str], Field(default_factory=tuple, description="Patterns to exclude from search")
+        tuple[str], Field(default_factory=tuple, description="""Patterns to exclude from search""")
     ]
 
     # Search strategy weights
     semantic_weight: Annotated[
-        NonNegativeFloat, Field(default=0.6, le=1.0, description="Weight for semantic search")
+        NonNegativeFloat, Field(default=0.6, le=1.0, description="""Weight for semantic search""")
     ]
     syntactic_weight: Annotated[
-        NonNegativeFloat, Field(default=0.3, le=1.0, description="Weight for syntactic search")
+        NonNegativeFloat, Field(default=0.3, le=1.0, description="""Weight for syntactic search""")
     ]
     keyword_weight: Annotated[
-        NonNegativeFloat, Field(default=0.1, le=1.0, description="Weight for keyword search")
+        NonNegativeFloat, Field(default=0.1, le=1.0, description="""Weight for keyword search""")
     ]
 
     # Response formatting preferences
     include_context: Annotated[
-        bool, Field(description="Whether to include context in the response")
+        bool, Field(description="""Whether to include context in the response""")
     ] = True
     max_matches_per_file: Annotated[
-        NonNegativeInt, Field(default=5, description="Maximum matches per file")
+        NonNegativeInt, Field(default=5, description="""Maximum matches per file""")
     ]
     prioritize_entry_points: Annotated[
-        bool, Field(description="Whether to prioritize entry points in results")
+        bool, Field(description="""Whether to prioritize entry points in results""")
     ] = False

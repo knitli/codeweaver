@@ -9,13 +9,12 @@ import logging
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
-from typing import Any, ClassVar, Literal, NamedTuple, cast, overload
-from uuid import uuid4
+from typing import Any, Literal, NamedTuple, cast, overload
 
-from pydantic import UUID4, BaseModel, ConfigDict, PositiveInt
+from pydantic import BaseModel, ConfigDict, PositiveInt
 from pydantic.main import IncEx
 
-from codeweaver._data_structures import CodeChunk, SimpleTypedStore, StructuredDataInput
+from codeweaver._data_structures import CodeChunk, StructuredDataInput
 from codeweaver._server import get_statistics
 from codeweaver._settings import Provider
 from codeweaver.reranking.capabilities.base import RerankingModelCapabilities
@@ -37,8 +36,15 @@ class RerankingResult(NamedTuple):
 def default_reranking_input_transformer(documents: StructuredDataInput) -> Sequence[str]:
     """Default input transformer that converts documents to strings."""
     if isinstance(documents, list | tuple | set):
-        return [doc.serialize() if isinstance(doc, CodeChunk) else str(doc) for doc in documents]
-    return [documents.serialize()] if isinstance(documents, CodeChunk) else [str(documents)]
+        return [
+            cast(str, doc.serialize_for_embedding()) if isinstance(doc, CodeChunk) else str(doc)
+            for doc in documents
+        ]
+    return (
+        [cast(str, documents.serialize_for_embedding())]
+        if isinstance(documents, CodeChunk)
+        else [str(documents)]
+    )
 
 
 def default_reranking_output_transformer(
@@ -90,15 +96,17 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
     _output_transformer: Callable[[Any, Sequence[CodeChunk]], Sequence[RerankingResult]] = (
         staticmethod(default_reranking_output_transformer)
     )
-    _store: ClassVar[SimpleTypedStore] = SimpleTypedStore()
     """The output transformer is a function that takes the raw results from the provider and returns a Sequence of RerankingResult."""
+
+    _chunk_store: Sequence[CodeChunk] | None = None
+    """Stores the chunks while they are processed. We do this because we don't send the whole chunk to the provider, so we want to reassemble it later."""
 
     def __init__(
         self,
         client: RerankingClient,
         capabilities: RerankingModelCapabilities,
         prompt: str | None = None,
-        top_k: PositiveInt = 40,
+        top_n: PositiveInt = 40,
         **kwargs: dict[str, Any] | None,
     ) -> None:
         """Initialize the RerankingProvider."""
@@ -108,8 +116,8 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
         self._caps = capabilities
         self.kwargs = {**(type(self)._rerank_kwargs or {}), **(kwargs or {})}
         logger.debug("RerankingProvider kwargs", extra=self.kwargs)
-        self._top_k = cast(int, self.kwargs.get("top_k", top_k))
-        logger.debug("Initialized RerankingProvider with top_k=%d", self._top_k)
+        self._top_n = cast(int, self.kwargs.get("top_n", top_n))
+        logger.debug("Initialized RerankingProvider with top_n=%d", self._top_n)
 
         self._initialize()
 
@@ -117,9 +125,9 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
         """_initialize is an optional function in subclasses for any additional setup."""
 
     @property
-    def top_k(self) -> PositiveInt:
-        """Get the top_k value."""
-        return self._top_k
+    def top_n(self) -> PositiveInt:
+        """Get the top_n value."""
+        return self._top_n
 
     @abstractmethod
     async def _execute_rerank(
@@ -127,7 +135,7 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
         query: str,
         documents: Sequence[str],
         *,
-        top_k: int = 40,
+        top_n: int = 40,
         **kwargs: dict[str, Any] | None,
     ) -> Any:
         """Execute the reranking process.
@@ -137,33 +145,43 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
         """
         raise NotImplementedError
 
-    @overload
     async def rerank(
-        self, query: str, documents: None, data_id: UUID4, **kwargs: dict[str, Any] | None
-    ) -> None: ...  # sourcery skip: docstrings-for-functions
-    async def rerank(
-        self,
-        query: str,
-        documents: StructuredDataInput,
-        data_id: UUID4,
-        **kwargs: dict[str, Any] | None,
+        self, query: str, documents: StructuredDataInput, **kwargs: dict[str, Any] | None
     ) -> Sequence[RerankingResult]:
         """Rerank the given documents based on the query."""
         processed_kwargs = self._set_kwargs(**kwargs)
         transformed_docs = self._process_documents(documents)
-        self._store_value(uuid4(), (query, transformed_docs))
-        transformed_docs = self._input_transformer(transformed_docs)
+        self._chunk_store = transformed_docs
+        processed_docs = self._input_transformer(transformed_docs)
         reranked = await self._execute_rerank(
-            query, transformed_docs, top_k=self.top_k, **processed_kwargs
+            query, processed_docs, top_n=self.top_n, **processed_kwargs
         )
         loop = asyncio.get_event_loop()
-        processed_results = self._process_results(reranked, transformed_docs)
-        if len(processed_results) > self.top_k:
+        processed_results = self._process_results(reranked, processed_docs)
+        if len(processed_results) > self.top_n:
             # results already sorted in descending order
-            processed_results = processed_results[: self.top_k]
+            processed_results = processed_results[: self.top_n]
+
+        # Reorder processed_docs so included (reranked) docs appear first in reranked order,
+        # followed by all excluded docs. This allows token-savings to treat the tail as discarded.
+        included_indices = [
+            r.original_index
+            for r in sorted(
+                processed_results,
+                key=lambda r: (r.batch_rank if r.batch_rank != -1 else float("inf")),
+            )
+        ]
+        included_set = set(included_indices)
+        included_docs = [
+            processed_docs[i] for i in included_indices if 0 <= i < len(processed_docs)
+        ]
+        excluded_docs = [doc for i, doc in enumerate(processed_docs) if i not in included_set]
+        savings_ordered_docs = included_docs + excluded_docs
+
         await loop.run_in_executor(
-            None, self._report_token_savings, processed_results, transformed_docs
+            None, self._report_token_savings, processed_results, savings_ordered_docs
         )
+        self._chunk_store = None
         return processed_results
 
     @property
@@ -175,6 +193,11 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
     def provider(self) -> Provider:
         """Get the provider for the reranking provider."""
         return self._provider
+
+    @property
+    def model_name(self) -> str:
+        """Get the model name for the reranking provider."""
+        return self._caps.name
 
     @property
     def model_capabilities(self) -> RerankingModelCapabilities:
@@ -239,24 +262,17 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
         return [
             documents
             if isinstance(documents, CodeChunk) and documents
-            else CodeChunk.model_validate_json(documents)
+            else CodeChunk.model_validate_json(cast(str, documents))
         ]
 
     def _process_results(
-        self, results: Any, transformed_docs: Sequence[str]
+        self, results: Any, serialized_docs: Sequence[str]
     ) -> Sequence[RerankingResult]:
         """Process the results from the reranking."""
-        # voyage returns token count, others do not
-        if self.provider != Provider.VOYAGE:
-            self._update_token_stats(from_docs=transformed_docs)
-        chunks: list[CodeChunk] = []
-        for doc in transformed_docs:
-            chunk_result = self.to_code_chunk(doc)
-            if isinstance(chunk_result, CodeChunk):
-                chunks.append(chunk_result)
-            else:
-                # chunk_result is Sequence[CodeChunk]
-                chunks.extend(chunk_result)
+        # voyage and cohere return token count, others do not
+        if self.provider not in [Provider.VOYAGE, Provider.COHERE]:
+            self._update_token_stats(from_docs=serialized_docs)
+        chunks = self._chunk_store or self._process_documents(serialized_docs)
         return self._output_transformer(results, chunks)
 
     @staticmethod
@@ -266,7 +282,9 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
             return tuple(
                 t if isinstance(t, CodeChunk) else CodeChunk.model_validate_json(t) for t in text
             )  # type: ignore[return-value]
-        return text if isinstance(text, CodeChunk) else CodeChunk.model_validate_json(text)
+        return (
+            text if isinstance(text, CodeChunk) else CodeChunk.model_validate_json(cast(str, text))
+        )
 
     def _report_token_savings(
         self, results: Sequence[RerankingResult], processed_chunks: Sequence[str]
@@ -279,15 +297,16 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
     def _calculate_context_saved(
         self, results: Sequence[RerankingResult], processed_chunks: Sequence[str]
     ) -> int:
-        """Calculate the context saved by the reranking process."""
-        if len(results) == len(processed_chunks):
+        """Calculate the context saved by the reranking process.
+
+        Assumes processed_chunks are ordered with all included (kept) chunks first in reranked order,
+        followed by all excluded (discarded) chunks. Token savings equals the token count of the tail
+        after the number of kept results.
+        """
+        if not processed_chunks or not results or len(results) >= len(processed_chunks):
             return 0
-        result_indices = {res.original_index for res in results}
-        discarded_chunks = (
-            chunk for i, chunk in enumerate(processed_chunks) if i not in result_indices
-        )
-        # Because we are working in terms of context saved from the *user's agent*, we need calculate tokens for the user's tokenizer.
-        # To keep things simple, we default to `cl100k_base`, as this is the tokenizer used by most LLMs.
+        # All discarded chunks are in the tail after the kept results
+        discarded_chunks = processed_chunks[len(results) :]
         tokenizer = get_tokenizer("tiktoken", "cl100k_base")
         return tokenizer.estimate_batch(discarded_chunks)  # pyright: ignore[reportArgumentType]
 
@@ -322,11 +341,3 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
             fallback=fallback,
             serialize_as_any=serialize_as_any,
         )
-
-    def _store_value(self, key: str, value: Any) -> None:
-        """Store a value in the simple store."""
-        type(self)._store.set(key, value)
-
-    def _get_stored_value(self, key: str) -> Any | None:
-        """Get a value from the simple store."""
-        return type(self)._store.get(key)

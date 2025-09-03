@@ -10,6 +10,7 @@ import contextlib
 import copy
 import os
 import sys
+import textwrap
 
 from collections.abc import Callable, ItemsView, Iterable, Iterator, KeysView, Sequence, ValuesView
 from datetime import UTC, datetime
@@ -70,7 +71,7 @@ except ImportError:
 
 BlakeKey = NewType("BlakeKey", str)
 BlakeHashKey = Annotated[
-    BlakeKey, Field(description="A blake3 hash key string", min_length=64, max_length=64)
+    BlakeKey, Field(description="""A blake3 hash key string""", min_length=64, max_length=64)
 ]
 
 # ------------------------------------------------
@@ -104,38 +105,42 @@ class ChunkType(BaseEnum):
 class SemanticMetadata(TypedDict, total=False):
     """Metadata associated with the semantics of a code chunk."""
 
-    language: SemanticSearchLanguage | LiteralString | None
-    primary_node: SgNode | None
-    nodes: tuple[SgNode, ...] | None
+    language: Required[SemanticSearchLanguage | LiteralString | None]
+    primary_node: NotRequired[SgNode | None]
+    nodes: NotRequired[tuple[SgNode, ...] | None]
 
 
 class Metadata(TypedDict, total=False):
     """Metadata associated with a code chunk."""
 
-    chunk_id: Required[Annotated[UUID4, Field(description="Unique identifier for the code chunk")]]
+    chunk_id: Required[
+        Annotated[UUID4, Field(description="""Unique identifier for the code chunk""")]
+    ]
     created_at: Required[
-        Annotated[PositiveFloat, Field(description="Timestamp when the chunk was created")]
+        Annotated[PositiveFloat, Field(description="""Timestamp when the chunk was created""")]
     ]
     name: NotRequired[
-        Annotated[str | None, Field(description="Name of the code chunk, if applicable")]
+        Annotated[str | None, Field(description="""Name of the code chunk, if applicable""")]
     ]
     updated_at: NotRequired[
         Annotated[
             PositiveFloat | None,
-            Field(description="Timestamp when the chunk was last updated or checked for accuracy."),
+            Field(
+                description="""Timestamp when the chunk was last updated or checked for accuracy."""
+            ),
         ]
     ]
     tags: NotRequired[
         Annotated[
             tuple[str] | None,
-            Field(description="Tags associated with the code chunk, if applicable"),
+            Field(description="""Tags associated with the code chunk, if applicable"""),
         ]
     ]
     semantic_meta: NotRequired[
         Annotated[
             SemanticMetadata | None,
             Field(
-                description="Semantic metadata associated with the code chunk, if applicable. Should be included if the code chunk was from semantic chunking."
+                description="""Semantic metadata associated with the code chunk, if applicable. Should be included if the code chunk was from semantic chunking."""
             ),
         ]
     ]
@@ -186,7 +191,7 @@ class Span:
         UUID4,
         Field(
             default_factory=uuid4,
-            description="The identifier for the span's source, such as a file.",
+            description="""The identifier for the span's source, such as a file.""",
             repr=True,
             init=True,
             alias="source_id",
@@ -381,7 +386,8 @@ class SpanGroup:
     spans: Annotated[
         set[Span],
         Field(
-            default_factory=set, description="A set of spans that can be manipulated as a group."
+            default_factory=set,
+            description="""A set of spans that can be manipulated as a group.""",
         ),
     ]
 
@@ -498,66 +504,118 @@ class SearchResult(BaseModel):
 
     file_path: Path
     content: str | CodeChunk
-    score: Annotated[NonNegativeFloat, Field(description="Similarity score")]
+    score: Annotated[NonNegativeFloat, Field(description="""Similarity score""")]
     metadata: Annotated[
-        Metadata | None, Field(description="Additional metadata about the result")
+        Metadata | None, Field(description="""Additional metadata about the result""")
     ] = None
 
 
 class CodeChunkDict(TypedDict, total=False):
-    content: str
-    line_range: SpanTuple
-    file_path: Path | None
-    language: SemanticSearchLanguage | LiteralString | None
-    timestamp: PositiveFloat
-    chunk_id: UUID4
-    parent_id: UUID4 | None
-    metadata: Metadata | None
-    _embedding_batch: UUID4 | None
+    """Dictionary representation of a code chunk.
+
+    Essentially a serialized-to-python code chunk.
+    """
+
+    content: Required[str]
+    line_range: Required[SpanTuple | Span]
+    file_path: NotRequired[Path | None]
+    language: NotRequired[SemanticSearchLanguage | LiteralString | None]
+    chunk_type: NotRequired[ChunkType | None]
+    timestamp: NotRequired[PositiveFloat]
+    chunk_id: NotRequired[UUID4]
+    parent_id: NotRequired[UUID4 | None]
+    metadata: NotRequired[Metadata | None]
+    _embedding_batch: NotRequired[UUID4 | None]
+
+
+def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
+    """Determine the ExtKind based on the validated data."""
+    if "file_path" in validated_data:
+        return ExtKind.from_file(validated_data["file_path"])
+    chunk_type = validated_data.get("chunk_type", ChunkType.TEXT_BLOCK)
+    if (
+        chunk_type == ChunkType.SEMANTIC
+        and "metadata" in validated_data
+        and "semantic_meta" in validated_data["metadata"]
+        and (language := validated_data["metadata"]["semantic_meta"].get("language"))
+    ):
+        return ExtKind.from_string(language, "code")
+    if "language" in validated_data and chunk_type != chunk_type.TEXT_BLOCK:
+        if chunk_type == ChunkType.RESEARCH:
+            return ExtKind.from_string(validated_data["language"], ChunkKind.OTHER)
+        if chunk_type in (ChunkType.EXAMPLE, ChunkType.FILE):
+            return ExtKind.from_string(validated_data["language"], "docs")
+        return ExtKind.from_string(validated_data["language"], "code")
+    return None
+
+
+def validate_and_set_relative_path(path: Path | str | None) -> Path | None:
+    """Validate and set the file path to be relative if possible."""
+    if path is None:
+        return None
+    path_obj = Path(path)
+    if not path_obj.is_absolute():
+        return path_obj
+    from codeweaver._utils import get_project_root
+
+    base_path = get_project_root()
+    return path_obj.relative_to(base_path)
 
 
 class CodeChunk(BaseModel):
-    """Represents a chunk of code with metadata."""
+    """Represents a chunk of code or docs with metadata."""
 
     content: str
-    line_range: Annotated[Span, Field(description="Line range in the source file")]
+    line_range: Annotated[Span, Field(description="""Line range in the source file""")]
     file_path: Annotated[
         Path | None,
         Field(
-            description="Path to the source file. Not all chunks are from files, so this can be None."
+            description="""Path to the source file. Not all chunks are from files, so this can be None."""
         ),
     ] = None
     language: SemanticSearchLanguage | LiteralString | None = None
     chunk_type: ChunkType = ChunkType.TEXT_BLOCK  # For Phase 1, simple text blocks
+    ext_kind: Annotated[
+        ExtKind | None,
+        Field(
+            default_factory=determine_ext_kind,
+            description="""The extension kind of the source file""",
+        ),
+    ] = None
     timestamp: Annotated[
         PositiveFloat,
         Field(
             default_factory=datetime.now(UTC).timestamp,
             kw_only=True,
-            description="Timestamp of the code chunk creation or modification",
+            description="""Timestamp of the code chunk creation or modification""",
+            frozen=True,
         ),
     ] = datetime.now(UTC).timestamp()
     chunk_id: Annotated[
         UUID4,
         Field(
-            default_factory=uuid4, kw_only=True, description="Unique identifier for the code chunk"
+            default_factory=uuid4,
+            kw_only=True,
+            description="""Unique identifier for the code chunk""",
+            frozen=True,
         ),
     ] = uuid4()
     parent_id: Annotated[
-        UUID4 | None, Field(description="Parent chunk ID, such as the file ID, if applicable")
+        UUID4 | None, Field(description="""Parent chunk ID, such as the file ID, if applicable""")
     ] = None
     metadata: Annotated[
         Metadata | None,
         Field(
             default_factory=dict,
             kw_only=True,
-            description="Additional metadata about the code chunk",
+            description="""Additional metadata about the code chunk""",
         ),
     ] = None
     _embedding_batch: Annotated[
         UUID4 | None,
         Field(
-            repr=False, description="Batch ID for the embedding batch the chunk was processed in."
+            repr=False,
+            description="""Batch ID for the embedding batch the chunk was processed in.""",
         ),
     ] = None
 
@@ -567,22 +625,62 @@ class CodeChunk(BaseModel):
 
     def serialize_for_embedding(self) -> SerializedCodeChunk[CodeChunk]:
         """Serialize the CodeChunk for embedding."""
-        return self.model_dump_json(
-            round_trip=False, exclude_none=True, exclude={"chunk_id", "timestamp", "parent_id"}
+        self_map = self.model_dump(
+            round_trip=True,
+            exclude_unset=True,
+            exclude={"chunk_id", "timestamp", "parent_id", "_embedding_batch"},
         )
+        if metadata := self_map.get("metadata", {}):
+            metadata = {k: v for k, v in metadata.items() if k in ("name", "tags", "semantic_meta")}
+        ordered_self_map = {
+            "title": self_map.get("title"),
+            "content": self_map.get("content"),
+            "metadata": metadata,
+            "file_path": self_map.get("file_path"),
+            "line_range": self_map.get("line_range"),
+            "ext_kind": str(self_map.get("ext_kind")),
+            "language": self_map.get("language"),
+            "chunk_type": self_map.get("chunk_type"),
+        }
+        import json
+
+        return json.dumps({k: v for k, v in ordered_self_map.items() if v}, ensure_ascii=False)
 
     def set_batch_id(self, batch_id: UUID4) -> None:
         """Set the batch ID for the code chunk."""
         self._embedding_batch = batch_id
 
+    @computed_field
+    @cached_property
+    def title(self) -> str:
+        """Return a title for the code chunk, if possible."""
+        title_parts: list[str] = []
+        if self.metadata and (name := self.metadata.get("name")):
+            title_parts.append(f"Name: {name}")
+        elif self.file_path:
+            title_parts.append(f"Filename: {self.file_path.name}")
+        if self.language:
+            title_parts.append(f"Language: {str(self.language).capitalize()}")
+        if self.chunk_type:
+            title_parts.append(f"Category: {str(self.chunk_type).capitalize()}")
+        return "\n".join(textwrap.wrap(" | ".join(title_parts), width=80, subsequent_indent="    "))
+
+    @computed_field
+    @cached_property
+    def length(self) -> PositiveInt:
+        """Return the length of the serialized content in characters."""
+        return len(self.serialize_for_embedding())
+
 
 @dataclass(frozen=True, slots=True)
 class DiscoveredFile:
-    path: Annotated[Path, Field(description="Relative path to the discovered file")]
+    """Represents a file discovered during project scanning."""
+
+    path: Annotated[Path, Field(description="""Relative path to the discovered file""")]
     ext_kind: ExtKind
 
     file_hash: Annotated[
-        BlakeHashKey, Field(description="blake3 hash of the file contents", init=False)
+        BlakeHashKey, Field(description="""blake3 hash of the file contents""", init=False)
     ]
 
     @classmethod
@@ -632,13 +730,29 @@ class ExtKind(NamedTuple):
         cls, language: LiteralString | SemanticSearchLanguage, kind: str | ChunkKind
     ) -> ExtKind | None:
         """Create an ExtKind from a string representation."""
-        if not isinstance(language, SemanticSearchLanguage):
-            with contextlib.suppress(KeyError):
-                if semantic := SemanticSearchLanguage.from_string(language):
-                    language = semantic
-        if not isinstance(kind, ChunkKind):
-            kind = ChunkKind.from_string(kind)  # if this fails something is wrong...
-        return cls(language=language, kind=kind)
+        if isinstance(language, SemanticSearchLanguage):
+            if isinstance(kind, ChunkKind):
+                return cls(language=language, kind=kind)
+            return cls(
+                language=language,
+                kind=ChunkKind.CONFIG if language.is_config_language else ChunkKind.CODE,
+            )
+        with contextlib.suppress(KeyError):
+            if semantic := SemanticSearchLanguage.from_string(language):
+                return cls.from_string(cast(SemanticSearchLanguage, semantic), kind)
+        from codeweaver._constants import CODE_LANGUAGES, CONFIG_FILE_LANGUAGES, DOCS_LANGUAGES
+
+        if language in CONFIG_FILE_LANGUAGES:
+            return cls(language=language, kind=ChunkKind.CONFIG)
+        if language in CODE_LANGUAGES:
+            return cls(language=language, kind=ChunkKind.CODE)
+        if language in DOCS_LANGUAGES:
+            return cls(language=language, kind=ChunkKind.DOCS)
+        if isinstance(kind, ChunkKind):
+            return cls(language=language, kind=kind)
+        if found_kind := ChunkKind.from_string(kind):
+            return cls(language=language, kind=found_kind)  # pyright: ignore[reportArgumentType]
+        return cls(language=language, kind=ChunkKind.OTHER)  # pyright: ignore[reportArgumentType]
 
     @classmethod
     def from_file(cls, file: str | Path) -> ExtKind | None:
@@ -672,7 +786,7 @@ class ExtKind(NamedTuple):
 
         return next(
             (
-                cls(language=extpair.language, kind=ChunkKind.from_string(extpair.category))
+                cls(language=extpair.language, kind=ChunkKind.from_string(extpair.category))  # pyright: ignore[reportArgumentType]
                 for extpair in get_ext_lang_pairs()
                 if extpair.is_same(filename)
             ),
@@ -708,11 +822,13 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
 
     value_type: Annotated[
         type[T],
-        Field(init=True, kw_only=True, description="The type of values stored in the store."),
+        Field(init=True, kw_only=True, description="""The type of values stored in the store."""),
     ]
 
     # When specialized via subclasses below, this is narrowed to Literal[True] / Literal[False]
-    use_uuid: Annotated[Literal[False, True], Field(description="Whether to use UUID4 keys")] = True
+    use_uuid: Annotated[
+        Literal[False, True], Field(description="""Whether to use UUID4 keys""")
+    ] = True
 
     store: Annotated[
         dict[KeyT, T],
@@ -741,11 +857,13 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
     )  # 3 MB default limit
 
     # Per-instance trash heap; avoid shared default
-    _trash_heap: WeakValueDictionary[KeyT, T] = PrivateAttr(default_factory=WeakValueDictionary)
+    _trash_heap: WeakValueDictionary[KeyT, T] = PrivateAttr(
+        default_factory=lambda: WeakValueDictionary[KeyT, T]()
+    )
 
     _id: Annotated[
         UUID4,
-        Field(default_factory=uuid4, description="Unique identifier for the store", init=False),
+        Field(default_factory=uuid4, description="""Unique identifier for the store""", init=False),
     ] = to_uuid()
 
     # Track sub-value type at runtime when inferred lazily

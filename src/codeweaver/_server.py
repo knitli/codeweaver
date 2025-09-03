@@ -95,18 +95,18 @@ def get_health_info() -> HealthInfo:
 class StoredSettings:
     """A simple container for storing/caching."""
 
-    settings: Annotated[CodeWeaverSettings, Field(description="Resolved CodeWeaver settings")]
+    settings: Annotated[CodeWeaverSettings, Field(description="""Resolved CodeWeaver settings""")]
     server: Annotated[
-        FastMcpServerSettingsType, Field(description="Resolved FastMCP server settings")
+        FastMcpServerSettingsType, Field(description="""Resolved FastMCP server settings""")
     ]
     runargs: Annotated[
-        FastMcpHttpRunArgs | None, Field(description="Run arguments for the FastMCP server")
+        FastMcpHttpRunArgs | None, Field(description="""Run arguments for the FastMCP server""")
     ]
     lifespan_func: Annotated[
-        FunctionType, Field(description="Lifespan function for the application")
+        FunctionType, Field(description="""Lifespan function for the application""")
     ]
     app_start_func: Annotated[
-        FunctionType, Field(description="Function to start the FastMCP application")
+        FunctionType, Field(description="""Function to start the FastMCP application""")
     ]
 
     def __post_init__(self) -> None:
@@ -156,22 +156,24 @@ class HealthStatus(BaseEnum):
 class HealthInfo:
     """Health information for the CodeWeaver server."""
 
-    status: Annotated[HealthStatus, Field(description="Health status of the server")] = (
+    status: Annotated[HealthStatus, Field(description="""Health status of the server""")] = (
         HealthStatus.HEALTHY
     )
-    version: Annotated[str, Field(description="Version of the CodeWeaver server")] = version
-    startup_time: Annotated[float, Field(description="Startup time of the server")] = time.time()
+    version: Annotated[str, Field(description="""Version of the CodeWeaver server""")] = version
+    startup_time: Annotated[float, Field(description="""Startup time of the server""")] = (
+        time.time()
+    )
     # TODO: This should come from the registry, not hardcoded
     features: Annotated[
         tuple[Feature],
-        Field(default_factory=tuple, description="List of features supported by the server"),
+        Field(default_factory=tuple, description="""List of features supported by the server"""),
     ] = (
         Feature.BASIC_SEARCH,
         Feature.FILE_DISCOVERY,
         Feature.PROVIDER_REGISTRY,
         Feature.STATISTICS,
     )  # type: ignore
-    error: Annotated[str | None, Field(description="Error message if any")] = None
+    error: Annotated[str | None, Field(description="""Error message if any""")] = None
 
     @classmethod
     def initialize(cls) -> HealthInfo:
@@ -198,19 +200,21 @@ class AppState:
     """Application state for CodeWeaver server."""
 
     initialized: Annotated[
-        bool, Field(description="Indicates if the server has been initialized")
+        bool, Field(description="""Indicates if the server has been initialized""")
     ] = False
 
     settings: Annotated[
         CodeWeaverSettings | None,
-        Field(default_factory=CodeWeaverSettings, description="CodeWeaver configuration settings"),
+        Field(
+            default_factory=CodeWeaverSettings, description="""CodeWeaver configuration settings"""
+        ),
     ] = None
 
     config_path: Annotated[
         Path | None,
         Field(
             default_factory=lambda data: data["settings"].get("config_file", None),
-            description="Path to the configuration file, if any",
+            description="""Path to the configuration file, if any""",
         ),
     ] = None
     # Provider registry integration
@@ -218,7 +222,7 @@ class AppState:
         ProviderRegistry,
         Field(
             default_factory=ProviderRegistry.get_instance,
-            description="Provider registry for dynamic provider management",
+            description="""Provider registry for dynamic provider management""",
         ),
     ]
 
@@ -227,14 +231,14 @@ class AppState:
         SessionStatistics,
         Field(
             default_factory=SessionStatistics,
-            description="Session statistics and performance tracking",
+            description="""Session statistics and performance tracking""",
         ),
     ]
 
     # Health status
     health: Annotated[
         HealthInfo,
-        Field(default_factory=HealthInfo.initialize, description="Health status information"),
+        Field(default_factory=HealthInfo.initialize, description="""Health status information"""),
     ]
 
     # TODO: Future implementation
@@ -244,7 +248,7 @@ class AppState:
         tuple[Middleware, ...],
         Field(
             default_factory=lambda data: tuple(data["settings"]["middleware"]),
-            description="Loaded middleware stack",
+            description="""Loaded middleware stack""",
         ),
     ]
 

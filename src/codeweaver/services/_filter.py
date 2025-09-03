@@ -33,10 +33,12 @@ ArbitraryFilter = dict[str, Any]
 class FilterableField(BaseModel):
     """Represents a field that can be filtered."""
 
-    name: str = Field(description="The name of the field payload field to filter on")
-    description: str = Field(description="A description for the field used in the tool description")
+    name: str = Field(description="""The name of the field payload field to filter on""")
+    description: str = Field(
+        description="""A description for the field used in the tool description"""
+    )
     field_type: Literal["keyword", "integer", "float", "boolean"] = Field(
-        description="The type of the field"
+        description="""The type of the field"""
     )
     condition: Literal["==", "!=", ">", ">=", "<", "<=", "any", "except"] | None = Field(
         default=None,
@@ -46,7 +48,7 @@ class FilterableField(BaseModel):
         ),
     )
     required: bool = Field(
-        default=False, description="Whether the field is required for the filter."
+        default=False, description="""Whether the field is required for the filter."""
     )
 
 

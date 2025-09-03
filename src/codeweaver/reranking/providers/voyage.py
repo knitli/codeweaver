@@ -43,7 +43,7 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
         query: str,
         documents: Sequence[str],
         *,
-        top_k: int = 40,
+        top_n: int = 40,
         **kwargs: dict[str, Any] | None,
     ) -> Any:
         """Execute the reranking process."""
@@ -52,7 +52,7 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
                 query=query,
                 documents=documents,  # pyright: ignore[reportArgumentType]  # a list is a sequence...
                 model=self._caps.name,
-                **{"top_k": top_k, **(kwargs or {})},  # pyright: ignore[reportArgumentType]
+                **{"top_n": top_n, **(kwargs or {})},  # pyright: ignore[reportArgumentType]
             )
         except Exception as e:
             raise RuntimeError(f"Error during reranking with Voyage AI: {e}") from e

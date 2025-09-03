@@ -7,9 +7,13 @@
 
 from __future__ import annotations
 
+import sys as _sys
+
 from collections.abc import Callable, Generator, Iterator
 from enum import Enum, unique
-from typing import Self, cast
+from threading import Lock as _Lock
+from types import FrameType
+from typing import LiteralString, Self, cast
 
 from aenum import extend_enum  # pyright: ignore[reportMissingTypeStubs, reportUnknownVariableType]
 
@@ -208,3 +212,80 @@ class BaseEnum(Enum):
             value = name.lower()
         extend_enum(cls, name, value)  # pyright: ignore[reportCallIssue, reportUnknownVariableType]
         return cls(value)
+
+
+def _get_parent_frame() -> FrameType:
+    """Get the parent frame of the caller."""
+    return _sys._getframe(2)  # pyright: ignore[reportPrivateUsage]
+
+
+type Name = LiteralString
+
+
+class Sentinel:
+    """Create a unique sentinel object.
+
+    *name* should be the fully-qualified name of the variable to which the
+    return value shall be assigned.
+
+    *repr*, if supplied, will be used for the repr of the sentinel object.
+    If not provided, "<name>" will be used (with any leading class names
+    removed).
+
+    *module_name*, if supplied, will be used instead of inspecting the call
+    stack to find the name of the module from which
+    """
+
+    _name: Name
+    _repr: str
+    _module_name: str
+
+    def __new__(
+        cls,
+        name: LiteralString,
+        repr: str | None = None,  # noqa: A002
+        module_name: str | None = None,
+    ) -> Sentinel:
+        """Create a new sentinel."""
+        # sourcery skip: avoid-builtin-shadow
+        name = name.strip()
+        repr = str(repr) if repr else f"<Sentinel<{name.split('.')[-1]}>>"  # noqa: A001  # intentional shadowing
+        if not module_name:
+            parent_frame = _get_parent_frame()
+            module_name = (
+                parent_frame.f_globals.get("__name__", "__main__") if parent_frame else __name__
+            )
+
+        # Include the class's module and fully qualified name in the
+        # registry key to support sub-classing.
+        registry_key = _sys.intern(f"{cls.__module__}-{cls.__qualname__}-{module_name}-{name}")
+        sentinel: Sentinel | None = _registry.get(registry_key)
+        if sentinel is not None:
+            return sentinel
+        sentinel = super().__new__(cls)
+        sentinel._name = name
+        sentinel._repr = repr
+        sentinel._module_name = module_name or __name__
+        with _lock:
+            return _registry.setdefault(registry_key, sentinel)
+
+    def __init__(self, name: Name, repr: str | None = None, module_name: str | None = None) -> None:  # noqa: A002
+        self._name = name
+        self._repr = repr or f"<Sentinel<{name.split('.')[-1]}>>"
+        self._module_name = module_name  # pyright: ignore[reportAttributeAccessIssue]
+
+    @classmethod
+    def __call__(
+        cls, name: Name, repr: str | None = None, module_name: str | None = None
+    ) -> Sentinel:
+        return cls(name, repr, module_name)
+
+    def __repr__(self):
+        return self._repr
+
+    def __reduce__(self) -> tuple[type[Sentinel], tuple[str, str, str]]:
+        return (self.__class__, (self._name, self._repr, self._module_name))
+
+
+_lock = _Lock()
+_registry: dict[str, Sentinel] = {}

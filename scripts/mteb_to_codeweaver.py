@@ -305,14 +305,6 @@ def mteb_to_capabilities(model: SimplifiedModelMeta) -> PartialCapabilities:  # 
         "default_dtype": "float",
         "output_dtypes": ("float",),
         "version": attempt_to_get_version(model["name"]),
-        "supports_custom_prompts": model.get("use_instructions", False)
-        or model.get("supports_custom_prompts", False),
-        "custom_query_prompt": model.get(key_in_prompts(loader, "query") or "")  # pyright: ignore[reportArgumentType]
-        if loader is not None
-        else None,
-        "custom_document_prompt": model.get(key_in_prompts(loader, "document") or "")  # pyright: ignore[reportArgumentType]
-        if loader is not None
-        else None,
         "other": {
             k: v
             for k, v in model.items()
@@ -357,6 +349,13 @@ def mteb_to_capabilities(model: SimplifiedModelMeta) -> PartialCapabilities:  # 
         caps["name"] = aliased
     elif caps["name"] in FLATTENED_ALIASES and not caps.get("hf_name"):
         caps["hf_name"] = next((k for k in FLATTENED_ALIASES if k == caps["name"]), None)
+    if "Qwen3" in model["name"]:
+        caps["other"] = caps.get("other", {}) | {
+            "model": {
+                "instruction": "Given search results containing code snippets, tree-sitter parse trees, documentation and code comments from a codebase, retrieve relevant Documents that answer the Query."
+            }
+        }  # pyright: ignore[reportOperatorIssue]
+
     return cast(PartialCapabilities, caps)
 
 

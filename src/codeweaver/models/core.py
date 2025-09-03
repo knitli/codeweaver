@@ -74,28 +74,30 @@ class CodeMatch(BaseModel):
     )
 
     # File information
-    file: Annotated[DiscoveredFile, Field(description="File information")]
+    file: Annotated[DiscoveredFile, Field(description="""File information""")]
 
     # Content
-    content: Annotated[str, Field(description="Relevant code content")]
+    content: Annotated[str, Field(description="""Relevant code content""")]
 
-    span: Annotated[Span, Field(description="Start and end line numbers")]
+    span: Annotated[Span, Field(description="""Start and end line numbers""")]
 
     # Relevance scoring1
     relevance_score: Annotated[
         NonNegativeFloat, Field(le=1.0, description="Relevance score (0.0-1.0)")
     ]
 
-    match_type: Annotated[CodeMatchType, Field(description="The type of match for this code match")]
+    match_type: Annotated[
+        CodeMatchType, Field(description="""The type of match for this code match""")
+    ]
 
     # Context
     surrounding_context: Annotated[
-        str | None, Field(description="Additional context around the match")
+        str | None, Field(description="""Additional context around the match""")
     ] = None
 
     related_symbols: Annotated[
         tuple[str],
-        Field(default_factory=tuple, description="Related functions, classes, or symbols"),
+        Field(default_factory=tuple, description="""Related functions, classes, or symbols"""),
     ]
 
     @field_validator("file_path")
@@ -145,30 +147,32 @@ class FindCodeResponse(BaseModel):
 
     # Core results
     matches: Annotated[
-        list[CodeMatch], Field(description="Relevant code matches ranked by relevance")
+        list[CodeMatch], Field(description="""Relevant code matches ranked by relevance""")
     ]
 
     summary: Annotated[str, Field(description="High-level summary of findings", max_length=1000)]
 
     # TODO: query_intent should *not* be exposed to the user or user's agent. It needs to be created *from* the information available from them. We can expose the simpler `IntentType` instead, but we shouldn't be asking them to assess their intent.
     query_intent: Annotated[
-        QueryIntent | IntentType | None, Field(description="Detected or specified intent")
+        QueryIntent | IntentType | None, Field(description="""Detected or specified intent""")
     ]
 
     total_matches: Annotated[
-        NonNegativeInt, Field(description="Total matches found before ranking")
+        NonNegativeInt, Field(description="""Total matches found before ranking""")
     ]
 
-    token_count: Annotated[NonNegativeInt, Field(description="Actual tokens used in response")]
+    token_count: Annotated[NonNegativeInt, Field(description="""Actual tokens used in response""")]
 
-    execution_time_ms: Annotated[NonNegativeFloat, Field(description="Total processing time")]
+    execution_time_ms: Annotated[NonNegativeFloat, Field(description="""Total processing time""")]
 
     # Context information
-    search_strategy: Annotated[tuple[SearchStrategy, ...], Field(description="Search methods used")]
+    search_strategy: Annotated[
+        tuple[SearchStrategy, ...], Field(description="""Search methods used""")
+    ]
 
     languages_found: Annotated[
         tuple[SemanticSearchLanguage | LiteralString, ...],
         Field(
-            description="Programming languages in the results. If the language is supported for semantic search, it will be a `SemanticSearchLanguage`, otherwise a `LiteralString` from languages in `codeweaver._constants.py`"
+            description="""Programming languages in the results. If the language is supported for semantic search, it will be a `SemanticSearchLanguage`, otherwise a `LiteralString` from languages in `codeweaver._constants.py`"""
         ),
     ]

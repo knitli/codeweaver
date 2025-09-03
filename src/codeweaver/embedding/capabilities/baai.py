@@ -70,9 +70,6 @@ BAAI_BGE_BASE_EN_V1_5_CAPABILITIES: PartialCapabilities = {
     "default_dtype": "float",
     "output_dtypes": ("float",),
     "version": 1.5,
-    "supports_custom_prompts": True,
-    "custom_query_prompt": None,
-    "custom_document_prompt": None,
     "other": {
         "framework": ["Sentence Transformers", "PyTorch"],
         "license": "mit",
@@ -104,9 +101,6 @@ BGE_LARGE_EN_335M_CAPABILITIES: PartialCapabilities = {
     "default_dtype": "float",
     "output_dtypes": ("float",),
     "version": 1.5,
-    "supports_custom_prompts": True,
-    "custom_query_prompt": None,
-    "custom_document_prompt": None,
     "other": {
         "framework": ["Sentence Transformers", "PyTorch"],
         "license": "mit",
@@ -139,9 +133,6 @@ BAAI_BGE_SMALL_EN_V1_5_CAPABILITIES: PartialCapabilities = {
     "default_dtype": "float",
     "output_dtypes": ("float",),
     "version": 1.5,
-    "supports_custom_prompts": True,
-    "custom_query_prompt": None,
-    "custom_document_prompt": None,
     "other": {
         "framework": ["Sentence Transformers", "PyTorch"],
         "license": "mit",

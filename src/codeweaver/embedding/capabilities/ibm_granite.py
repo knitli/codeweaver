@@ -50,9 +50,6 @@ GRANITE_EMBEDDING_278M_CAPABILITIES: PartialCapabilities = {
     "default_dtype": "float",
     "output_dtypes": ("float",),
     "version": None,
-    "supports_custom_prompts": False,
-    "custom_query_prompt": None,
-    "custom_document_prompt": None,
     "other": {
         "framework": ["Sentence Transformers", "PyTorch"],
         "license": "apache-2.0",
@@ -83,9 +80,6 @@ GRANITE_EMBEDDING_30M_CAPABILITIES: PartialCapabilities = {
     "default_dtype": "float",
     "output_dtypes": ("float",),
     "version": None,
-    "supports_custom_prompts": False,
-    "custom_query_prompt": None,
-    "custom_document_prompt": None,
     "other": {
         "framework": ["Sentence Transformers", "PyTorch"],
         "license": "apache-2.0",

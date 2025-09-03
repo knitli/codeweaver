@@ -33,10 +33,6 @@ def ensure_v1(url: str) -> str:
 
 def try_for_heroku_endpoint(kwargs: dict[str, Any]) -> str:
     """Try to identify the Heroku endpoint."""
-
-    def ensure_v1(url: str) -> str:
-        return url if url.rstrip("/").endswith("/v1") else f"{url.rstrip('/')}/v1"
-
     if "base_url" in kwargs:
         return ensure_v1(kwargs["base_url"])
     if "api_base" in kwargs:
