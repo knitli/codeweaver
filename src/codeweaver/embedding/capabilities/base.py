@@ -6,11 +6,11 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, LiteralString, NotRequired, Required, Self, TypedDict
+from typing import Annotated, Any, Literal, NotRequired, Required, Self, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, PositiveFloat, PositiveInt
 
-from codeweaver._common import BaseEnum
+from codeweaver._common import UNSET, BaseEnum, LiteralStringT
 from codeweaver._settings import Provider
 
 
@@ -32,7 +32,7 @@ class TransformersEmbeddingTask(BaseEnum):
         return "query" if self in {self.QUERY, self.RETRIEVAL_QUERY, self.CODE_QUERY} else "passage"
 
     @property
-    def task_name(self) -> LiteralString:
+    def task_name(self) -> LiteralStringT:
         """Return the task name for the embedding task."""
         if self in {self.QUERY, self.PASSAGE}:
             return self.value
@@ -81,7 +81,7 @@ class PoolingMethod(BaseEnum):
                 return "Average of the last hidden layer."
 
     @classmethod
-    def by_model(cls, model_name: LiteralString) -> PoolingMethod | None:
+    def by_model(cls, model_name: str) -> PoolingMethod | None:
         """Return the default pooling method for a given model name, if known."""
         model_name = model_name.lower()
         if model_name in frozenset({
@@ -274,6 +274,13 @@ class EmbeddingModelCapabilities(BaseModel):
         ),
     ] = None
     other: Annotated[dict[str, Any], Field(description="Extra model-specific settings.")] = {}
+    _available: Annotated[
+        bool | UNSET,
+        Field(
+            init=False,
+            description="Whether the model is currently available with the required dependencies installed. Value set when the capability is registered for builtin capabilities. It may be unset for custom capabilities.",
+        ),
+    ] = UNSET
 
     @classmethod
     def default(cls) -> Self:
@@ -289,6 +296,11 @@ class EmbeddingModelCapabilities(BaseModel):
     def from_capabilities(cls, capabilities: EmbeddingCapabilities) -> Self:
         """Create an instance from a dictionary of capabilities."""
         return cls.model_validate(capabilities)
+
+    @property
+    def available(self) -> bool | UNSET:
+        """Check if the model is available."""
+        return self._available
 
 
 from importlib.util import find_spec
@@ -311,7 +323,7 @@ class SparseEmbeddingModelCapabilities(BaseModel):
         serialize_by_alias=True,
     )
 
-    name: Annotated[LiteralString, Field(description="""The name of the model.""")]
+    name: Annotated[str, Field(description="""The name of the model.""")]
     multilingual: bool = False
     provider: Annotated[
         Literal[Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS, Provider._UNSET],  # pyright: ignore[reportPrivateUsage]

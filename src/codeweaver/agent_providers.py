@@ -8,7 +8,7 @@
 # applies to new/modified code in this directory (`src/codeweaver/embedding_providers/`)
 """This module re-exports agentic model providers and associated utilities from Pydantic AI."""
 
-from typing import TYPE_CHECKING, LiteralString, Self
+from typing import TYPE_CHECKING, Self
 
 from pydantic_ai.providers import Provider as AgentProvider
 from pydantic_ai.toolsets import (
@@ -109,10 +109,10 @@ def get_agent_model_provider(provider: Provider) -> type[AgentProvider[Self]]:  
     raise ValueError(f"Unknown provider: {provider}")
 
 
-def infer_agent_provider_class(provider: LiteralString | Provider) -> AgentProvider[Provider]:
+def infer_agent_provider_class(provider: str | Provider) -> AgentProvider[Provider]:
     """Infer the provider from the provider name."""
     if not isinstance(provider, Provider):
-        provider = Provider.from_string(provider)
+        provider = Provider.from_string(provider)  # pyright: ignore[reportAssignmentType]
     provider_class: type[AgentProvider[Provider]] = get_agent_model_provider(provider)  # type: ignore
     return provider_class()
 

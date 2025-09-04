@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Annotated, Any, Literal, LiteralString
+from typing import Annotated, Any, Literal
 
 from fastmcp.server.auth.auth import OAuthProvider
 from fastmcp.server.middleware import Middleware
@@ -116,12 +116,11 @@ class FileFilterSettings(BaseModel):
         ),
     ] = DEFAULT_EXCLUDED_DIRS
     excluded_extensions: Annotated[
-        frozenset[LiteralString],
-        Field(description="""File extensions to exclude from search and indexing"""),
+        frozenset[str], Field(description="""File extensions to exclude from search and indexing""")
     ] = DEFAULT_EXCLUDED_EXTENSIONS
-    use_gitignore: Annotated[bool, Field(description="""Whether to use .gitignore for filtering""")] = (
-        True
-    )
+    use_gitignore: Annotated[
+        bool, Field(description="""Whether to use .gitignore for filtering""")
+    ] = True
     use_other_ignore_files: Annotated[
         bool,
         Field(
@@ -143,24 +142,28 @@ class ProviderSettings(BaseModel):
     """Settings for provider configuration."""
 
     data: Annotated[
-        tuple[DataProviderSettings, ...] | None, Field(description="""Data provider configuration""")
+        tuple[DataProviderSettings, ...] | None,
+        Field(description="""Data provider configuration"""),
     ] = DefaultDataProviderSettings
 
     embedding: Annotated[
-        tuple[EmbeddingProviderSettings, ...], Field(description="""Embedding provider configuration""")
+        tuple[EmbeddingProviderSettings, ...],
+        Field(description="""Embedding provider configuration"""),
     ] = DefaultEmbeddingProviderSettings
 
     reranking: Annotated[
-        tuple[RerankingProviderSettings, ...], Field(description="""Reranking provider configuration""")
+        tuple[RerankingProviderSettings, ...],
+        Field(description="""Reranking provider configuration"""),
     ] = DefaultRerankingProviderSettings
     """
     vector: Annotated[
         tuple[BaseVectorStoreConfig, ...],
-        Field(default_factory=QdrantVectorStore, description="""Vector store provider configuration"""),
+        Field(default_factory=QdrantVectorStore, description="Vector store provider configuration"),
     ] = QdrantConfig()
     """
     agent: Annotated[
-        tuple[AgentProviderSettings, ...] | None, Field(description="""Agent provider configuration""")
+        tuple[AgentProviderSettings, ...] | None,
+        Field(description="""Agent provider configuration"""),
     ] = DefaultAgentProviderSettings
 
 
@@ -279,7 +282,8 @@ class CodeWeaverSettings(BaseSettings):
         ),
     ] = 75
     server: Annotated[
-        FastMcpServerSettings, Field(description="""Optionally customize FastMCP server settings.""")
+        FastMcpServerSettings,
+        Field(description="""Optionally customize FastMCP server settings."""),
     ] = DefaultFastMcpServerSettings
 
     logging: Annotated[
@@ -290,18 +294,21 @@ class CodeWeaverSettings(BaseSettings):
         MiddlewareOptions | None, Field(description="""Middleware settings""")
     ] = None
 
-    filter_settings: Annotated[FileFilterSettings, Field(description="""File filtering settings""")] = (
-        FileFilterSettings()
-    )
+    filter_settings: Annotated[
+        FileFilterSettings, Field(description="""File filtering settings""")
+    ] = FileFilterSettings()
 
-    """ # Disabled while implementing...
+    # Disabled while implementing...
     # Provider configuration
     embedding: Annotated[
-        tuple[EmbeddingConfig, ...], Field(description="""Embedding provider configuration""")
-    ] = (VoyageConfig(),)
+        tuple[EmbeddingModelSettings, ...] | None,
+        Field(description="""Embedding provider configuration"""),
+    ] = None  # TODO: Add defaults
+
+    """
     vector_store: Annotated[
         BaseVectorStoreConfig,
-        Field(default_factory=QdrantConfig, description="""Vector store provider configuration"""),
+        Field(default_factory=QdrantConfig, description="Vector store provider configuration"),
     ] = QdrantConfig()
     """
     # Feature flags
@@ -314,7 +321,7 @@ class CodeWeaverSettings(BaseSettings):
     enable_telemetry: Annotated[
         bool,
         Field(
-            description="Enable privacy-friendly usage telemetry. On by default. We do not collect any identifying information -- we hash all file and directory paths, repository names, and other identifiers to ensure privacy while still gathering useful aggregate data for improving CodeWeaver. You can see exactly what we collect, and how we collect it [here](services/telemetry.py). You can disable this if you prefer not to send any data. You can also provide your own PostHog Project Key to collect your own telemetry data. We will not use this information for anything else -- it is only used to improve CodeWeaver."
+            description="""Enable privacy-friendly usage telemetry. On by default. We do not collect any identifying information -- we hash all file and directory paths, repository names, and other identifiers to ensure privacy while still gathering useful aggregate data for improving CodeWeaver. You can see exactly what we collect, and how we collect it [here](services/telemetry.py). You can disable this if you prefer not to send any data. You can also provide your own PostHog Project Key to collect your own telemetry data. We will not use this information for anything else -- it is only used to improve CodeWeaver."""
         ),
     ] = True
     enable_health_endpoint: Annotated[
@@ -332,16 +339,16 @@ class CodeWeaverSettings(BaseSettings):
     allow_identifying_telemetry: Annotated[
         bool,
         Field(
-            description="DISABLED BY DEFAULT. If you want to *really* help us improve CodeWeaver, you can allow us to collect potentially identifying telemetry data. It's not intrusive, it's more like what *most* telemetry collects. If it's enabled, we *won't hash file and repository names. We'll still try our best to screen out potential secrets, as well as names and emails, but we can't guarantee complete anonymity. This helps us by giving us real-world usage patterns and information on queries and results. We can use that to make everyone's results better. Like with the default telemetry, we **will not use it for anything else**."
+            description="""DISABLED BY DEFAULT. If you want to *really* help us improve CodeWeaver, you can allow us to collect potentially identifying telemetry data. It's not intrusive, it's more like what *most* telemetry collects. If it's enabled, we *won't hash file and repository names. We'll still try our best to screen out potential secrets, as well as names and emails, but we can't guarantee complete anonymity. This helps us by giving us real-world usage patterns and information on queries and results. We can use that to make everyone's results better. Like with the default telemetry, we **will not use it for anything else**."""
         ),
     ] = False
     enable_ai_intent_analysis: Annotated[
-        bool, Field(description="Enable AI-powered intent analysis via FastMCP sampling")
+        bool, Field(description="""Enable AI-powered intent analysis via FastMCP sampling""")
     ] = False  # ! Phase 2 feature, switch to True when implemented
     enable_precontext: Annotated[
         bool,
         Field(
-            description="Enable precontext code generation. Recommended, but requires you set up an agent model. This allows CodeWeaver to call an agent model outside of an MCP tool request (it still requires either a CLI call from you or a hook you setup). This is required for our recommended *precontext workflow*. This setting dictionary is a `pydantic_ai.settings.ModelSettings` object. If you already use `pydantic_ai.settings.ModelSettings`, then you can provide the same settings here."
+            description="""Enable precontext code generation. Recommended, but requires you set up an agent model. This allows CodeWeaver to call an agent model outside of an MCP tool request (it still requires either a CLI call from you or a hook you setup). This is required for our recommended *precontext workflow*. This setting dictionary is a `pydantic_ai.settings.ModelSettings` object. If you already use `pydantic_ai.settings.ModelSettings`, then you can provide the same settings here."""
         ),
     ] = False  # ! Phase 2 feature, switch to True when implemented
 
@@ -352,7 +359,9 @@ class CodeWeaverSettings(BaseSettings):
 
     uvicorn_settings: Annotated[
         UvicornServerSettings | None,
-        Field(default_factory=UvicornServerSettings, description="""Settings for the Uvicorn server"""),
+        Field(
+            default_factory=UvicornServerSettings, description="""Settings for the Uvicorn server"""
+        ),
     ] = None
 
     __version__: Annotated[
@@ -370,7 +379,7 @@ class CodeWeaverSettings(BaseSettings):
             raise ConfigurationError(
                 f"Project path does not exist: {self.project_path}",
                 suggestions=[
-                    "Check the project_path setting or CODEWEAVER_PROJECT_PATH environment variable or in your configuration file"
+                    "Check the project_path setting: you can set it either with the CODEWEAVER_PROJECT_PATH environment variable or in your configuration file"
                 ],
             )
 
@@ -410,7 +419,7 @@ def reload_settings() -> CodeWeaverSettings:
     return get_settings()
 
 
-def get_provider_settings(provider_kind: ProviderKind | LiteralString) -> Any:
+def get_provider_settings(provider_kind: ProviderKind | str) -> Any:
     """Check a setting value by a tuple of keys (the path to the setting)."""
     if isinstance(provider_kind, str):
         provider_kind = ProviderKind.from_string(provider_kind)

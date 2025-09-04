@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run -s
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["mteb", "black", "cyclopts", "pydantic>=2.11.0"]
+# dependencies = ["mteb", "black", "cyclopts", "pydantic>=2.11.0", "_typeshed", "pyperclip", "rich"]
 # ///
 # SPDX-FileCopyrightText: 2025 (c) 2025 Knitli Inc.
 # SPDX-License-Identifier: MIT OR Apache-2.0
@@ -15,15 +15,24 @@ import json
 import re
 import sys
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
-from typing import Annotated, Any, Literal, LiteralString, NotRequired, Required, TypedDict, cast
+from typing import Annotated, Any, ClassVar, Literal, NotRequired, Required, TypedDict, cast
 
 import black
 
 from cyclopts import App, Parameter
 from mteb import AbsTask, ModelMeta, get_model_meta, get_model_metas
-from pydantic import AnyUrl, PastDatetime
+from mteb.model_meta import sentence_transformers_loader
+from pydantic import (
+    AnyUrl,
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    PastDatetime,
+    field_serializer,
+)
 from rich.console import Console
 
 
@@ -49,12 +58,13 @@ VERSION_PATTERNS = (  # some special cases first
 )
 """A set of patterns for finding versions in model names. Rather than try to capture with one, we keep it simple and try a few. They're in order of certainty."""
 
-type ModelName = LiteralString
+type ModelName = str
 """The Hugging Face name for a model, in the HF format of organization/name. For models in `HF_NAMES`, this is the *value*"""
 
 
 console = Console(markup=True, soft_wrap=True)
 app = App(name="mteb-to-codeweaver")
+Names = Annotated[list[ModelName], Parameter(help="List of model names.")]
 
 Frameworks = Literal[
     "API",
@@ -106,7 +116,9 @@ def get_mteb_model_metadata(
         return get_model_metas(**(kwargs or {}))  # pyright: ignore[reportArgumentType]
     if isinstance(models, str) and not kwargs:
         return get_model_meta(models)
-    return get_model_metas(models, **(kwargs or {}))  # pyright: ignore[reportArgumentType]
+    return get_model_metas(
+        models if isinstance(models, list | set | tuple) else [models], **(kwargs or {})
+    )  # pyright: ignore[reportArgumentType]
 
 
 type DistanceMetrics = Literal["cosine", "max_sim", "dot"]
@@ -241,51 +253,126 @@ type HFModelProviders = Literal[
 ]
 
 type SparseMap = dict[
-    Literal[Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS],
-    list[ModelName | dict[Literal["Qdrant/Spade_PP_en_v1"], Literal["prithivida/Spade_PP_en_v1"]]],
+    Annotated[
+        Literal[Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS],
+        BeforeValidator(lambda v: Provider.from_string(v)),
+    ],
+    list[
+        ModelName | dict[Literal["Qdrant/Splade_PP_en_v1"], Literal["prithivida/Splade_PP_en_v1"]]
+    ],
 ]
 
-type AliasMap = dict[Provider, dict[ModelName, ModelName]]
+type AliasMap = dict[
+    Annotated[Provider, BeforeValidator(lambda v: Provider.from_string(v))],
+    dict[ModelName, ModelName],
+]
 """A mapping of providers to the Hugging Face names, as keys, and the provider equivalent as values."""
 
 type DataMap = dict[ModelName, SimplifiedModelMeta]
 
-type ModelMap = dict[ModelMaker, dict[ModelName, tuple[HFModelProviders, ...]]]
+type ModelMap = dict[
+    ModelMaker,
+    dict[
+        ModelName,
+        tuple[Annotated[HFModelProviders, BeforeValidator(lambda v: Provider.from_string(v))], ...],
+    ],
+]
 """A mapping of model makers to their models and the providers that support each model."""
 
 
-def build_map(mapping: dict[str, dict[str, list[str]]]) -> ModelMap:
-    """Build the model map from a raw dictionary."""
-    parsed_map: ModelMap = cast(ModelMap, dict.fromkeys(mapping.keys()))
-    for maker, values in mapping.items():
-        for model, providers in values.items():
-            if maker not in parsed_map or parsed_map[maker] is None:
-                parsed_map[cast(ModelMaker, maker)] = {}
-            parsed_map[maker][model] = tuple(Provider.from_string(p) for p in providers)  # pyright: ignore[reportArgumentType]
-    return parsed_map
+def dict_to_partial(v: dict[str, Any] | str | ModelMeta) -> Callable[..., Any]:
+    """Validator for ModelMeta, handling conversions."""
+    new_loader = None
+    if isinstance(v, str):
+        v = json.loads(v)
+    new_v = v.copy() if isinstance(v, dict) else v.model_copy(deep=True)
+    if isinstance(v, dict) and "loader" in v:
+        new_loader = (
+            functools.partial(sentence_transformers_loader, **v.get("loader", {}))
+            if isinstance(v.get("loader"), dict)
+            else lambda _: None
+        )
+        if v.get("license") and "jinaai" in v.get("name") and "qwen" in v.get("license"):
+            new_v["license"] = "cc-by-nc-4.0"
+        if v.get("name") and v.get("name").startswith("snowflake-arctic-embed2"):
+            new_v["name"] = "Snowflake/snowflake-arctic-embed-v2.0-ollama"
+        new_v = new_v | {"loader": new_loader}
+    elif isinstance(v, ModelMeta):
+        if v.loader and not hasattr(v.loader, "keywords"):
+            new_loader = functools.partial(sentence_transformers_loader, **v.loader)
+        elif not hasattr(v.loader, "keywords"):
+            new_loader = lambda _: None
+        else:
+            new_loader = v.loader
+        if v.license and v.name and "jinaai" in v.name and "qwen" in v.license:
+            new_v.license = "cc-by-nc-4.0"
+        new_v.loader = new_loader  # pyright: ignore[reportPrivateUsage]
+    return new_v
 
 
-def load_map() -> tuple[DataMap, ModelMap, AliasMap, SparseMap]:
-    """Load the model map from the JSON file."""
-    try:
-        path = Path(__file__).parent / "hf_models.json"
-        data, mapping, alias_mapping, sparse_models = json.loads(path.read_text())
-        sparse_models = {Provider.from_string(k): v for k, v in sparse_models.items()}  # pyright: ignore[reportArgumentType]
-        parsed_alias_map = cast(
-            AliasMap, {Provider.from_string(k): v for k, v in alias_mapping.items()}
-        )  # pyright: ignore[reportArgumentType]
-        parsed_map = build_map(mapping)
-    except Exception:
-        console.print_exception(show_locals=True)
-        return {}, {}, {}, {}
-    else:
-        return data, parsed_map, parsed_alias_map, cast(SparseMap, sparse_models)
+class RootJson(BaseModel):
+    """The root structure of the JSON file."""
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True, populate_by_name=True, use_enum_values=True
+    )
+
+    models: Annotated[
+        dict[ModelName, Annotated[ModelMeta, BeforeValidator(dict_to_partial)]],
+        Field(default_factory=dict, description="A mapping of model names to their metadata."),
+    ]
+    model_map: Annotated[
+        ModelMap,
+        Field(
+            default_factory=dict,
+            description="A mapping of model makers to their models and providers.",
+        ),
+    ]
+    aliases: Annotated[
+        AliasMap,
+        Field(default_factory=dict, description="A mapping of providers to their aliases."),
+    ]
+    sparse_models: Annotated[
+        SparseMap,
+        Field(default_factory=dict, description="A mapping of providers to their sparse models."),
+    ]
+
+    _json_path: ClassVar[Path] = Path(__file__).parent / "hf_models.json"
+
+    @field_serializer("models", mode="plain")
+    def serialize_models(self, value: dict[ModelName, ModelMeta]) -> dict[ModelName, ModelMeta]:
+        """Serialize the models for JSON output."""
+        for key, model in value.items():
+            if model.loader and hasattr(model.loader, "keywords"):
+                model.loader = model.loader.keywords  # pyright: ignore[reportAttributeAccessIssue]
+                value[key] = model
+            else:
+                model.loader = {}
+                value[key] = model
+        return value
+
+    @property
+    def flattened_aliases(self) -> dict[ModelName, ModelName]:
+        """A flattened mapping of all aliases."""
+        return {k: v for val in self.aliases.values() for k, v in val.items()}
+
+    def save(self) -> int:
+        """Save the JSON data to the file."""
+        return self._json_path.write_text(self.model_dump_json(indent=4))
+
+    @classmethod
+    def load(cls) -> RootJson:
+        """Load the JSON data from the file."""
+        return cls.model_validate_json(cls._json_path.read_text())
 
 
-DATA, MODEL_MAP_DATA, ALIAS_MAP_DATA, SPARSE_MODELS = load_map()
-FLATTENED_ALIASES: dict[ModelName, ModelName] = {
-    k: v for val in ALIAS_MAP_DATA.values() for k, v in val.items()
-}
+_ROOT = RootJson.load()
+DATA = _ROOT.models
+MODEL_MAP_DATA = _ROOT.model_map
+ALIAS_MAP_DATA = _ROOT.aliases
+SPARSE_MODELS = _ROOT.sparse_models
+
+FLATTENED_ALIASES = _ROOT.flattened_aliases
 
 
 def mteb_to_capabilities(model: SimplifiedModelMeta) -> PartialCapabilities:  # pyright: ignore[reportReturnType]
@@ -364,8 +451,10 @@ def from_mteb_to_simplified(obj: ModelMeta) -> SimplifiedModelMeta:
     Convert a Pydantic MTEB model metadata object to a SimplifiedModelMeta dictionary.
     """
     # loader is a functools.partial, we're going to grab its kwargs
-    mapped_obj = obj.model_copy(deep=True).to_dict()
-    mapped_obj["loader"] = {}
+    if isinstance(obj, ModelMeta) and isinstance(obj.loader, dict):
+        return SimplifiedModelMeta(dict(obj))
+    mapped_obj = obj.model_copy(deep=True).model_dump(mode="python")
+    mapped_obj["loader"] = mapped_obj["loader"] if isinstance(mapped_obj["loader"], dict) else {}
     if (loader := obj.loader) and hasattr(loader, "keywords"):
         mapped_obj = mapped_obj | {
             "loader": cast(dict[str, Any], cast(functools.partial, loader).keywords) or {}
@@ -503,7 +592,7 @@ def format_python_value(value: Any, indent_level: int = 0) -> str:
 def sanitize_name(name: str) -> str:
     """Convert model name to valid Python identifier."""
     if name.lower() in FLATTENED_ALIASES:
-        name = FLATTENED_ALIASES[cast(LiteralString, name.lower())]
+        name = FLATTENED_ALIASES[cast(str, name.lower())]
     return name.replace("-", "_").replace(".", "_").replace("/", "_").replace(":", "_").upper()
 
 
@@ -512,6 +601,9 @@ def write_capabilities_file(maker: ModelMaker, content: str) -> None:
     filename = Path("src/codeweaver/embedding/capabilities") / f"{sanitize_name(maker).lower()}.py"
     if not filename.exists():
         filename.touch()
+    existing_content = filename.read_text()
+    if existing_content == content:
+        return
     _ = filename.write_text(content)
 
 
@@ -538,6 +630,42 @@ def generate_with_simplified(simplified_data: Sequence[SimplifiedModelMeta]) -> 
         _ = filename.write_text(generate_capabilities_file(models, maker))
 
 
+@app.command(name="add-to-json")
+def add_to_json(
+    names: Names,
+    *,
+    alias_mapping: Annotated[
+        dict[Provider, dict[ModelName, ModelName]] | None,
+        Parameter(
+            accepts_keys=True,
+            json_dict=True,
+            help="A mapping of providers to the Hugging Face names, as keys, and the provider equivalent as values.",
+        ),
+    ] = None,
+    rewrite_cw_modules: Annotated[
+        bool,
+        Parameter(
+            name=["--rewrite-capabilities"],
+            help="Whether to regenerate the CodeWeaver capability modules. Default is False.",
+        ),
+    ] = False,
+) -> None:
+    """Get capabilities for a list of model names and add to JSON."""
+    if models := get_mteb_model_metadata(names):
+        if isinstance(models, ModelMeta):
+            _ROOT.models[cast(ModelName, models.name)] = models
+        else:
+            _ROOT.models.update({cast(ModelName, model.name): model for model in models})
+    else:
+        console.print(f"[red]No models found for names: {names}[/red]")
+        return
+    _ROOT.aliases.update(alias_mapping or {})
+    output = _ROOT.save()
+    console.print(f"[green]Saved {_ROOT._json_path!s} with {output} characters.[/green]")
+    if rewrite_cw_modules:
+        generate_with_simplified([from_mteb_to_simplified(m) for m in models])
+
+
 @app.command(name="from-data")
 def from_data() -> None:
     """Uses the existing json data to regenerate all capability files."""
@@ -550,11 +678,13 @@ def from_data() -> None:
             if mod_name in model_names or FLATTENED_ALIASES.get(mod_name, "SENTINEL") in model_names
         ]
         file = generate_capabilities_file(models, maker)
+        if not file.strip():
+            continue
         write_capabilities_file(maker, file)
 
 
 @app.default
-def get(names: Annotated[list[ModelName], Parameter(help="List of model names.")]) -> None:
+def get(names: Names) -> None:
     """Get capabilities for a list of model names."""
     models = get_mteb_model_metadata(names)
     simplified: Sequence[SimplifiedModelMeta] = [from_mteb_to_simplified(m) for m in models]

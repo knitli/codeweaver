@@ -18,17 +18,7 @@ import ssl
 
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import (
-    Annotated,
-    Any,
-    Literal,
-    LiteralString,
-    NotRequired,
-    Required,
-    TypedDict,
-    cast,
-    is_typeddict,
-)
+from typing import Annotated, Any, Literal, NotRequired, Required, TypedDict, cast, is_typeddict
 
 from fastmcp.contrib.bulk_tool_caller.bulk_tool_caller import BulkToolCaller
 from fastmcp.server.auth.auth import OAuthProvider
@@ -451,7 +441,7 @@ class BaseProviderSettings(TypedDict, total=False):
 
     provider: Required[Provider]
     enabled: Required[bool]
-    api_key: NotRequired[LiteralString | None]
+    api_key: NotRequired[str | None]
     connection: NotRequired[ConnectionConfiguration | None]
     other: NotRequired[dict[str, Any] | None]
 
@@ -936,6 +926,15 @@ class Provider(BaseEnum):
                         api_key=("INFERENCE_KEY", "API key for Heroku service"),
                         host=("INFERENCE_URL", "Host URL for Heroku service"),
                         other={"model_id": ("INFERENCE_MODEL_ID", "Model ID for Heroku service")},
+                        **httpx_env_vars,  # pyright: ignore[reportArgumentType]
+                    ),
+                    cast(ProviderEnvVars, self.OPENAI.other_env_vars),
+                )
+            case Provider.DEEPSEEK:
+                return (
+                    ProviderEnvVars(
+                        note="These variables are for the DeepSeek service.",
+                        api_key=("DEEPSEEK_API_KEY", "API key for DeepSeek service"),
                         **httpx_env_vars,  # pyright: ignore[reportArgumentType]
                     ),
                     cast(ProviderEnvVars, self.OPENAI.other_env_vars),

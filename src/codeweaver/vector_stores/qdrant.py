@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Qdrant provider for vector and hybrid search/store."""
 
+from mistralai import Any
+
 from codeweaver.embedding.providers import EmbeddingProvider
 from codeweaver.exceptions import ProviderError
 from codeweaver.reranking import RerankingProvider
@@ -21,11 +23,9 @@ except ImportError as e:
     ) from e
 
 
-class QdrantVectorStore(
-    VectorStoreProvider[AsyncQdrantClient, EmbeddingProvider[Embedder], RerankingProvider[Reranker]]
-):
+class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
     """Qdrant vector store provider."""
 
     _client: AsyncQdrantClient
-    _embedder: EmbeddingProvider[Embedder]
-    _reranker: RerankingProvider[Reranker] | None = None
+    _embedder: EmbeddingProvider[Any]
+    _reranker: RerankingProvider[Any] | None = None

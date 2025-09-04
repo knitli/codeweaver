@@ -6,23 +6,31 @@
 
 import contextlib
 
+from typing import TYPE_CHECKING
 
-DUCKDUCKGO_AVAILABLE = False
-TAVILY_AVAILABLE = False
 
-# TODO: replace these constants with registrations to the providers registry
-with contextlib.suppress(ImportError):
-    from pydantic_ai.common_tools import duckduckgo as duckduckgo_tool
+if TYPE_CHECKING:
+    from codeweaver._settings import Provider
 
-    DUCKDUCKGO_AVAILABLE = True  # type: ignore
 
-with contextlib.suppress(ImportError):
-    from pydantic_ai.common_tools import tavily as tavily_tool
+def get_data_provider(provider: Provider) -> type | None:
+    """Get available tools."""
+    from codeweaver._settings import Provider
 
-    TAVILY_AVAILABLE = True  # type: ignore
+    if provider == Provider.DUCKDUCKGO:
+        with contextlib.suppress(ImportError):
+            from pydantic_ai.common_tools.duckduckgo import DuckDuckGoSearchTool
+
+            return DuckDuckGoSearchTool
+    if provider == Provider.TAVILY:
+        with contextlib.suppress(ImportError):
+            from pydantic_ai.common_tools.tavily import TavilySearchTool
+
+            return TavilySearchTool
+    return None
 
 
 from codeweaver.tools.find_code import basic_text_search, find_code_implementation
 
 
-__all__ = ("basic_text_search", "duckduckgo_tool", "find_code_implementation", "tavily_tool")
+__all__ = ("basic_text_search", "find_code_implementation")

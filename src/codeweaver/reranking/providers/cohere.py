@@ -16,7 +16,8 @@ from codeweaver.reranking.providers.base import RerankingProvider, RerankingResu
 
 try:
     from cohere import AsyncClientV2 as CohereClient
-    from cohere.v2.types.v2rerank_response import V2RerankResponse, V2RerankResponseResultsItem
+    from cohere.v2.types.v2rerank_response import V2RerankResponse
+    from cohere.v2.types.v2rerank_response_results_item import V2RerankResponseResultsItem
 except ImportError as e:
     raise ConfigurationError(
         'Please install the `cohere` package to use the Cohere provider, \nyou can use the `cohere` optional group — `pip install "codeweaver[provider-cohere]"`'
@@ -91,7 +92,9 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
         ):
             _ = loop.run_in_executor(None, self._update_token_stats, token_count=int(tokens))  # type: ignore
         else:
-            _ = loop.run_in_executor(
-                None, self._update_token_stats, from_docs=self._input_transformer(chunks)
+            _ = loop.run_in_executor(  # type: ignore
+                None,
+                self._update_token_stats,
+                from_docs=self._input_transformer(chunks),  # type: ignore
             )  # type: ignore
         return processed_results

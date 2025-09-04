@@ -1,3 +1,4 @@
+"""The indexer service for managing and querying indexed data."""
 # import contextlib
 
 # with contextlib.suppress(ImportError):

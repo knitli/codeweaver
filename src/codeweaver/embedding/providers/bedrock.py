@@ -1,4 +1,4 @@
-# sourcery skip: avoid-single-character-names-variables, no-complex-if-expressions
+# sourcery skip: avoid-single-character-names-variables, lambdas-should-be-short, no-complex-if-expressions
 """Bedrock embedding provider."""
 
 # SPDX-FileCopyrightText: 2025 (c) 2025 Knitli Inc.
@@ -35,11 +35,13 @@ from pydantic import (
     model_validator,
 )
 from pydantic.alias_generators import to_camel, to_snake
+from types_boto3_bedrock_runtime import BedrockRuntimeClient
 
 from codeweaver._data_structures import CodeChunk
 from codeweaver._settings import Provider
 from codeweaver.embedding.capabilities import EmbeddingModelCapabilities
 from codeweaver.embedding.providers.base import EmbeddingProvider
+from codeweaver.exceptions import ConfigurationError
 
 
 logger = logging.getLogger(__name__)
@@ -420,22 +422,23 @@ class BedrockInvokeEmbeddingResponse(BaseBedrockModel):
 
 
 try:
-    from boto3 import client as bedrock_client
-    from botocore.client import BaseClient
+    from boto3 import client
 
-    bedrock_client = bedrock_client("bedrock-runtime")
+    bedrock_client: BedrockRuntimeClient = client("bedrock-runtime")
 
 except ImportError as e:
     logger.exception(
         "Failed to import boto3. Bedrock embedding provider will not work. You should install boto3."
     )
-    raise RuntimeError("Failed to import boto3.") from e
+    raise ConfigurationError(
+        "Failed to import boto3. You need to install the boto3 package, you can do this by running 'pip install codeweaver[provider-bedrock]'"
+    ) from e
 
 
-class BedrockEmbeddingProvider(EmbeddingProvider[BaseClient]):
+class BedrockEmbeddingProvider(EmbeddingProvider[bedrock_client]):
     """Bedrock embedding provider."""
 
-    _client: BaseClient = bedrock_client
+    _client: BedrockRuntimeClient = bedrock_client
     _provider: Provider = Provider.BEDROCK
     _caps: EmbeddingModelCapabilities
 
@@ -452,7 +455,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BaseClient]):
         return self._client.meta.endpoint_url
 
     @property
-    def dimension(self) -> int | None:
+    def dimension(self) -> int:
         """Get the dimension of the embeddings."""
         if "titan" in self.model_name.lower() and (
             "dimensions" in self.doc_kwargs or "dimensions" in self.doc_kwargs.get("body", {})
@@ -460,12 +463,11 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BaseClient]):
             return self.doc_kwargs.get("dimensions") or self.doc_kwargs.get("body", {}).get(
                 "dimensions"
             )
-
         return self._caps.default_dimension
 
     def _handle_response(
         self, response: dict[str, Any], doc: CodeChunk | None = None
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+    ) -> Sequence[float] | Sequence[int] | Sequence[Sequence[float]] | Sequence[Sequence[int]]:
         """Handle the response from Bedrock for embedding requests."""
         if "cohere" in self.model_name.lower():
             return self._handle_cohere_response(response, doc)
@@ -473,7 +475,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BaseClient]):
 
     def _handle_titan_response(
         self, response: dict[str, Any], doc: CodeChunk | None = None
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+    ) -> Sequence[float] | Sequence[int]:
         """Handle the response from Titan for embedding requests."""
         deserialized = BedrockInvokeEmbeddingResponse.from_boto3_response(response)
         if (
@@ -484,118 +486,149 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BaseClient]):
             self._fire_and_forget(lambda: self._update_token_stats(token_count=count))
         else:
             self._fire_and_forget(
-                lambda: self._update_token_stats(from_docs=[self.chunks_to_strings(doc)])
+                lambda: self._update_token_stats(
+                    from_docs=cast(
+                        Sequence[str], self.chunks_to_strings(cast(Sequence[CodeChunk], [doc]))
+                    )
+                )
             )
         return (
-            [deserialized.body.embedding]
+            deserialized.body.embedding
             if isinstance(deserialized.body, TitanEmbeddingV2Response)
             else []
         )
 
     def _handle_cohere_response(
-        self, response: dict[str, Any], doc: CodeChunk | None = None
+        self, response: BedrockInvokeEmbeddingResponse, doc: CodeChunk | None = None
     ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
         """Handle the response from Bedrock for embedding requests and normalize to Sequence[float]."""
         deserialized = BedrockInvokeEmbeddingResponse.from_boto3_response(response)
         if not isinstance(deserialized.body, CohereEmbeddingResponse):
             raise TypeError("Response body is not a CohereEmbeddingResponse.")
         self._fire_and_forget(
-            lambda: self._update_token_stats(from_docs=[self.chunks_to_strings(doc)])
+            lambda: self._update_token_stats(
+                from_docs=cast(
+                    Sequence[str], self.chunks_to_strings(cast(Sequence[CodeChunk], [doc]))
+                )
+            )
         )
         return (
-            cast(
-                "Sequence[Sequence[float]] | Sequence[Sequence[int]]", deserialized.body.embeddings
-            )
-            if deserialized.body
+            deserialized.body.embeddings
+            if deserialized.body and deserialized.body.embeddings
             else []
-        )
+        )  # pyright: ignore[reportReturnType]
 
-    def _create_request(
+    def _create_cohere_request(
         self,
-        inputs: Sequence[CodeChunk],
+        inputs: Sequence[CodeChunk] | Sequence[str],
+        kind: Literal["documents", "query"],
+        **kwargs: dict[str, Any],
+    ) -> InvokeRequestDict:
+        """Create the Cohere embedding request."""
+        body_kwargs = (
+            {k: v for k, v in kwargs.items() if k in {"truncate", "embedding_types", "images"}}
+            if kwargs
+            else {}
+        ) | (kwargs.get("body", {}) if kwargs else {})
+        if kind == "documents":
+            texts = [self._process_input(doc)[0] for doc in inputs]
+            texts = self.chunks_to_strings([subitem for item in texts for subitem in item])
+        else:
+            texts = inputs
+        body = {
+            "input_type": "search_document" if kind == "documents" else "search_query",
+            "texts": texts,
+            "embedding_types": ["float"],
+            **body_kwargs,
+        }
+        request: BedrockInvokeEmbeddingRequest = BedrockInvokeEmbeddingRequest.model_validate({
+            "body": body,
+            "model_id": self._caps.name,
+        })
+        return InvokeRequestDict(**dict(request.model_dump(by_alias=True)))
+
+    def _create_titan_request(
+        self,
+        inputs: Sequence[CodeChunk] | Sequence[str],
         kind: Literal["documents", "query"],
         **kwargs: dict[str, Any],
     ) -> list[InvokeRequestDict]:
-        """Create the Bedrock embedding request."""
+        """Create the Titan embedding request."""
+        body_kwargs = (
+            {k: v for k, v in kwargs.items() if k in {"dimensions", "normalize", "embedding_types"}}
+            if kwargs
+            else {}
+        ) | (kwargs.get("body", {}) if kwargs else {})
+        if kind == "documents":
+            text = self._process_input(inputs)
+            processed = self.chunks_to_strings(text[0])
+        else:
+            processed = cast(Sequence[str], inputs)
         requests: list[BedrockInvokeEmbeddingRequest] = []
-        if "cohere" in self._caps.name.lower():
-            body_kwargs = (
-                {k: v for k, v in kwargs.items() if k in {"truncate", "embedding_types", "images"}}
-                if kwargs
-                else {}
-            ) | (kwargs.get("body", {}) if kwargs else {})
-            texts = [self._process_input(doc) for doc in inputs]
-            texts = self.chunks_to_strings([subitem for item in texts for subitem in item])
-            body = {
-                "input_type": "search_document" if kind == "documents" else "search_query",
-                "texts": texts,
+        for doc in processed:
+            if len(doc) > 50_000:
+                raise ValueError(
+                    f"Input text is too long for Titan Embedding V2. Max length is 50,000 characters. Input length is {len(doc)} characters."
+                )
+            body = TitanEmbeddingV2RequestBody.model_validate({
+                "input_text": doc,
+                "dimensions": 1024,
+                "normalize": True,
                 "embedding_types": ["float"],
                 **body_kwargs,
-            }
-            requests.append(
+            })
+            requests.extend([
                 BedrockInvokeEmbeddingRequest.model_validate({
                     "body": body,
                     "model_id": self._caps.name,
                 })
-            )
-        else:
-            body_kwargs = (
-                {
-                    k: v
-                    for k, v in kwargs.items()
-                    if k in {"dimensions", "normalize", "embedding_types"}
-                }
-                if kwargs
-                else {}
-            ) | (kwargs.get("body", {}) if kwargs else {})
-            text = self._process_input(inputs)
-            processed = self.chunks_to_strings(text)
-            for doc in processed:
-                if len(doc) > 50_000:
-                    raise ValueError(
-                        f"Input text is too long for Titan Embedding V2. Max length is 50,000 characters. Input length is {len(doc)} characters."
-                    )
-                body = TitanEmbeddingV2RequestBody.model_validate({
-                    "input_text": doc,
-                    "dimensions": 1024,
-                    "normalize": True,
-                    "embedding_types": ["float"],
-                    **body_kwargs,
-                })
-                requests.append(
-                    BedrockInvokeEmbeddingRequest.model_validate({
-                        "body": body,
-                        "model_id": self._caps.name,
-                    })
-                )
-
+            ])
         return [InvokeRequestDict(**dict(req.model_dump(by_alias=True))) for req in requests]
 
-    async def _get_vectors(self, requests: list[InvokeRequestDict]) -> list[dict[str, Any]]:
+    def _create_request(
+        self,
+        inputs: Sequence[CodeChunk] | Sequence[str],
+        kind: Literal["documents", "query"],
+        **kwargs: dict[str, Any],
+    ) -> list[InvokeRequestDict] | InvokeRequestDict:
+        """Create the Bedrock embedding request."""
+        if "cohere" in self._caps.name.lower():
+            return self._create_cohere_request(inputs, kind, **kwargs)
+        return self._create_titan_request(inputs, kind, **kwargs)
+
+    async def _get_vectors(
+        self, requests: list[InvokeRequestDict]
+    ) -> list[BedrockInvokeEmbeddingResponse]:
         """Get vectors for a sequence of texts using the Bedrock API."""
-        responses = []
+        responses: list[BedrockInvokeEmbeddingResponse] = []
         for req in requests:
-            response = await self._client.invoke_model(**req)
-            responses.append(response)
+            response: BedrockInvokeEmbeddingResponse = await self._client.invoke_model(**req)  # type: ignore
+            responses.append(response)  # type: ignore
         return responses
 
     async def _embed_documents(
-        self, documents: Sequence[CodeChunk], kwargs: dict[str, Any]
-    ) -> Sequence[Sequence[float]]:
+        self, documents: Sequence[CodeChunk], **kwargs: dict[str, Any] | None
+    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
         """Embed a batch of documents using the Bedrock API."""
-        requests = self._create_request(documents, kind="documents", **kwargs)
-        responses = await self._get_vectors(requests)
+        kwargs = kwargs or {}
+        requests = self._create_request(documents, kind="documents", **kwargs)  # type: ignore
+        responses = await self._get_vectors(requests if isinstance(requests, list) else [requests])
+        if "cohere" in self.model_name.lower():
+            return self._postprocessor(
+                cast(BedrockInvokeEmbeddingResponse, responses[0]), documents
+            )  # type: ignore
         return [
-            self._postprocessor(response, doc)
-            for response, doc in zip((responses, documents), strict=True)
+            self._postprocessor(cast(list[BedrockInvokeEmbeddingResponse], response), doc)  # type: ignore
+            for (response, doc) in zip((responses, documents), strict=True)
         ]
 
     async def _embed_query(
-        self, query: Sequence[CodeChunk], kwargs: dict[str, Any]
-    ) -> Sequence[Sequence[float]]:
+        self, query: Sequence[str], **kwargs: dict[str, Any] | None
+    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
         """Embed a batch of queries using the Bedrock API."""
-        requests = self._create_request(query, kind="query", **kwargs)
-        responses = await self._get_vectors(requests)
+        kwargs = kwargs or {}
+        requests = self._create_request(query, kind="query", **kwargs)  # type: ignore
+        responses: list[BedrockInvokeEmbeddingResponse] = await self._get_vectors(requests)
         return [
             self._postprocessor(response, doc)
             for response, doc in zip((responses, query), strict=True)

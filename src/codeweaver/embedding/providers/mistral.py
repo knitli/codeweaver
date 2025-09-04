@@ -25,6 +25,7 @@ except ImportError as e:
     ) from e
 
 
+# TODO: Add support for batch jobs. Ideal for most usage, but becomes more difficult to manage state.
 class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
     """Mistral embedding provider."""
 

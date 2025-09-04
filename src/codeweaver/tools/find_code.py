@@ -10,7 +10,7 @@ import time
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, LiteralString, NamedTuple, cast
+from typing import TYPE_CHECKING, NamedTuple, cast
 from uuid import uuid4
 
 from pydantic import NonNegativeInt, PositiveInt
@@ -47,7 +47,7 @@ async def find_code_implementation(
     intent: QueryIntent | IntentType | None = None,
     token_limit: int = 10000,
     include_tests: bool = False,
-    focus_languages: tuple[SemanticSearchLanguage, ...] | LiteralString | None = None,
+    focus_languages: tuple[SemanticSearchLanguage, ...] | Sequence[str] | None = None,
     max_results: PositiveInt = 50,  # TODO: why isn't this used?
     statistics: SessionStatistics | None = None,
 ) -> FindCodeResponse:
@@ -116,7 +116,7 @@ async def find_code_implementation(
             execution_time_ms=execution_time_ms,
             search_strategy=(SearchStrategy.FILE_DISCOVERY, SearchStrategy.TEXT_SEARCH),
             languages_found=cast(
-                tuple[SemanticSearchLanguage | LiteralString, ...],
+                tuple[SemanticSearchLanguage | str, ...],
                 tuple(str(file.ext_kind.language) for file in discovered_files),
             ),
         )
@@ -229,12 +229,11 @@ def find_best_section(lines: list[str], query_terms: list[str]) -> MatchedSectio
             best_score = score
             best_start = start
             best_end = end
-
     if best_score == 0:
         # No matches found, return first section
         return MatchedSection(
             content="\n".join(lines[:window_size]),
-            span=Span(1, min(window_size, len(lines))),
+            span=Span(1, min(window_size, len(lines)), source_id),
             score=0,
         )
 

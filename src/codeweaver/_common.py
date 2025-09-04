@@ -13,11 +13,15 @@ from collections.abc import Callable, Generator, Iterator
 from enum import Enum, unique
 from threading import Lock as _Lock
 from types import FrameType
-from typing import LiteralString, Self, cast
+from typing import Annotated, LiteralString, Self, cast
 
 from aenum import extend_enum  # pyright: ignore[reportMissingTypeStubs, reportUnknownVariableType]
+from pydantic import GetPydanticSchema
 
 
+type LiteralStringT = Annotated[
+    LiteralString, GetPydanticSchema(lambda _schema, handle: handle(str))
+]
 type EnumExtend = Callable[[Enum, str], Enum]
 extend_enum: EnumExtend = extend_enum  # pyright: ignore[reportUnknownVariableType]
 
@@ -82,21 +86,21 @@ class BaseEnum(Enum):
         return self._decode_name(self.name) if self.value_type is str else self.name
 
     @classmethod
-    def aliases(cls) -> dict[str, BaseEnum] | dict[int, BaseEnum]:
+    def aliases(cls) -> dict[str, Self] | dict[int, Self]:
         """Provides a way to identify alternate names for a member, used in string conversion and identification."""
-        alias_map: dict[str | int, BaseEnum] = {}
+        alias_map: dict[str | int, Self] = {}
         if cls._value_type() is int:
             for member in cls:
                 alias_map[member.value] = member
-            return cast(dict[int, BaseEnum], alias_map)
+            return cast(dict[int, Self], alias_map)
         for member in cls:
             for alias in member.aka:
                 if alias not in alias_map:
                     alias_map[alias] = member
-        return cast(dict[str, BaseEnum], alias_map)
+        return cast(dict[str, Self], alias_map)
 
     @classmethod
-    def from_string(cls, value: str) -> BaseEnum:
+    def from_string(cls, value: str) -> Self:
         # sourcery skip: remove-unnecessary-cast
         """Convert a string to the corresponding enum member. Flexibly handles different cases, dashes vs underscores, and some common variations."""
         if cls._value_type() is int and str(value).isdigit():
@@ -107,7 +111,8 @@ class BaseEnum(Enum):
             (
                 member
                 for member in cls
-                if member.value.lower() == value.lower() or member.name.lower() == value.lower()
+                if member.value.lower() == str(value).lower()
+                or member.name.lower() == str(value).lower()
             ),
             None,
         ):
@@ -117,7 +122,7 @@ class BaseEnum(Enum):
                 (
                     member
                     for alias, member in aliases.items()
-                    if cast(str, alias).lower() == value.lower()
+                    if cast(str, alias).lower() == str(value).lower()
                 ),
                 None,
             )
@@ -158,6 +163,34 @@ class BaseEnum(Enum):
         raise TypeError(
             f"All members of {cls.__qualname__} must have the same value type and must be either str or int."
         )
+
+    def __lt__(self, other: Self) -> bool:
+        """Less than comparison for enum members."""
+        if not isinstance(other, self.__class__) and (
+            not isinstance(other, str | int)
+            or (isinstance(other, int) and self.value_type is str)
+            or (isinstance(other, str) and self.value_type is int)
+        ):
+            return NotImplemented
+        if self.value_type is str and isinstance(other, str):
+            return str(self).lower() < other.lower()
+        return self.value < other
+
+    def __le__(self, other: Self) -> bool:
+        """Less than or equal to comparison for enum members."""
+        if not isinstance(other, self.__class__) and (
+            not isinstance(other, str | int)
+            or (isinstance(other, int) and self.value_type is str)
+            or (isinstance(other, str) and self.value_type is int)
+        ):
+            return NotImplemented
+        if self.value_type is str and isinstance(other, str):
+            return str(self).lower() <= other.lower()
+        return self.value <= other
+
+    def __len__(self) -> int:
+        """Return the number of members in the enum."""
+        return len(self.__class__.__members__)
 
     @classmethod
     def __iter__(cls) -> Iterator[Self]:
@@ -219,37 +252,23 @@ def _get_parent_frame() -> FrameType:
     return _sys._getframe(2)  # pyright: ignore[reportPrivateUsage]
 
 
-type Name = LiteralString
+type Name = Annotated[LiteralString, GetPydanticSchema(lambda _schema, handle: handle(str))]
 
 
 class Sentinel:
     """Create a unique sentinel object.
-
-    *name* should be the fully-qualified name of the variable to which the
-    return value shall be assigned.
-
-    *repr*, if supplied, will be used for the repr of the sentinel object.
-    If not provided, "<name>" will be used (with any leading class names
-    removed).
-
-    *module_name*, if supplied, will be used instead of inspecting the call
-    stack to find the name of the module from which
+    ...
     """
 
     _name: Name
     _repr: str
     _module_name: str
 
-    def __new__(
-        cls,
-        name: LiteralString,
-        repr: str | None = None,  # noqa: A002
-        module_name: str | None = None,
-    ) -> Sentinel:
+    def __new__(cls, name: Name, repr_: str | None = None, module_name: str | None = None) -> Self:
         """Create a new sentinel."""
         # sourcery skip: avoid-builtin-shadow
         name = name.strip()
-        repr = str(repr) if repr else f"<Sentinel<{name.split('.')[-1]}>>"  # noqa: A001  # intentional shadowing
+        repr_ = str(repr_) if repr_ else f"<Sentinel<{name.split('.')[-1]}>>"
         if not module_name:
             parent_frame = _get_parent_frame()
             module_name = (
@@ -261,31 +280,44 @@ class Sentinel:
         registry_key = _sys.intern(f"{cls.__module__}-{cls.__qualname__}-{module_name}-{name}")
         sentinel: Sentinel | None = _registry.get(registry_key)
         if sentinel is not None:
-            return sentinel
+            return cast(Self, sentinel)
         sentinel = super().__new__(cls)
         sentinel._name = name
-        sentinel._repr = repr
+        sentinel._repr = repr_
         sentinel._module_name = module_name or __name__
         with _lock:
-            return _registry.setdefault(registry_key, sentinel)
+            return cast(Self, _registry.setdefault(registry_key, sentinel))
 
-    def __init__(self, name: Name, repr: str | None = None, module_name: str | None = None) -> None:  # noqa: A002
+    def __init__(
+        self, name: Name, repr_: str | None = None, module_name: str | None = None
+    ) -> None:
+        """Initialize a new sentinel."""
         self._name = name
-        self._repr = repr or f"<Sentinel<{name.split('.')[-1]}>>"
+        self._repr = repr_ or f"<Sentinel<{name.split('.')[-1]}>>"
         self._module_name = module_name  # pyright: ignore[reportAttributeAccessIssue]
 
     @classmethod
-    def __call__(
-        cls, name: Name, repr: str | None = None, module_name: str | None = None
-    ) -> Sentinel:
-        return cls(name, repr, module_name)
+    def __call__(cls, name: Name, repr_: str | None = None, module_name: str | None = None) -> Self:
+        """Create a new sentinel."""
+        return cls(name, repr_, module_name)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Return a string representation of the sentinel."""
         return self._repr
 
-    def __reduce__(self) -> tuple[type[Sentinel], tuple[str, str, str]]:
+    def __reduce__(self) -> tuple[type[Self], tuple[str, str, str]]:
+        """Return state information for pickling."""
         return (self.__class__, (self._name, self._repr, self._module_name))
 
 
 _lock = _Lock()
 _registry: dict[str, Sentinel] = {}
+
+
+class Unset(Sentinel):
+    """
+    A sentinel value to indicate that a value is unset.
+    """
+
+
+UNSET: Unset = Unset("UNSET")

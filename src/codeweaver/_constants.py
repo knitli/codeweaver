@@ -7,7 +7,9 @@ Constants used throughout the CodeWeaver project, primarily for default configur
 """
 
 from collections.abc import Generator
-from typing import Literal, LiteralString, NamedTuple
+from typing import Literal, NamedTuple
+
+from codeweaver._common import LiteralStringT
 
 
 METADATA_PATH = "metadata"
@@ -20,10 +22,10 @@ class ExtLangPair(NamedTuple):
     Not all 'extensions' are actually file extensions, some are file names or special cases, like `Makefile` or `Dockerfile`.
     """
 
-    ext: LiteralString
+    ext: LiteralStringT
     """The file extension, including leading dot if it's a file extension."""
 
-    language: LiteralString
+    language: LiteralStringT
     """The programming or config language associated with the file extension."""
 
     @property
@@ -69,7 +71,7 @@ class ExtLangPair(NamedTuple):
         return filename == self.ext if self.is_file_name else False
 
 
-DEFAULT_EXCLUDED_DIRS: frozenset[LiteralString] = frozenset({
+DEFAULT_EXCLUDED_DIRS: frozenset[LiteralStringT] = frozenset({
     ".DS_Store",
     ".cache",
     ".claude",
@@ -125,7 +127,7 @@ DEFAULT_EXCLUDED_DIRS: frozenset[LiteralString] = frozenset({
     "x86",
 })
 
-DEFAULT_EXCLUDED_EXTENSIONS: frozenset[LiteralString] = frozenset({
+DEFAULT_EXCLUDED_EXTENSIONS: frozenset[LiteralStringT] = frozenset({
     ".7z",
     ".avif",
     ".bmp",

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pydantic import UUID4, BaseModel, ConfigDict
 
@@ -57,14 +57,22 @@ class Entry(BaseModel):
 # SPDX-SnippetEnd
 
 
-class VectorStoreProvider[VectorStoreClient, EmbeddingProvider, RerankingProvider](BaseModel, ABC):
+class VectorStoreProvider[VectorStoreClient](BaseModel, ABC):
     """Abstract interface for vector storage providers."""
 
     model_config = ConfigDict(str_strip_whitespace=True, extra="allow")
 
     _client: VectorStoreClient
-    _embedder: EmbeddingProvider
-    _reranker: RerankingProvider | None = None
+    _provider: Provider
+
+    def __init__(self, client: Any = None, **kwargs: Any) -> None:
+        """Initialize the vector store provider."""
+        self._client = client
+        self.kwargs = kwargs
+        self._initialize()
+
+    def _initialize(self) -> None:
+        """Initialize the vector store provider."""
 
     @property
     def client(self) -> VectorStoreClient:
@@ -72,21 +80,11 @@ class VectorStoreProvider[VectorStoreClient, EmbeddingProvider, RerankingProvide
         return self._client
 
     @property
-    def embedder(self) -> EmbeddingProvider:
-        """Returns the embedder instance."""
-        return self._embedder
-
-    @property
-    def reranker(self) -> RerankingProvider | None:
-        """Returns the reranker instance if available, otherwise None."""
-        return self._reranker
-
-    @property
-    @abstractmethod
     def name(self) -> Provider:
         """
         The enum member representing the provider.
         """
+        return self._provider
 
     @property
     @abstractmethod

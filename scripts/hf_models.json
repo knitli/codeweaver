@@ -1,36 +1,31 @@
-[
-    {
+{
+    "models": {
         "Alibaba-NLP/gte-modernbert-base": {
-            "adapted_from": null,
-            "embed_dim": 768,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "Alibaba-NLP/gte-modernbert-base",
+            "revision": "7ca8b4ca700621b67618669f5378fe5f5820b8e4",
+            "release_date": "2025-01-21",
             "languages": [
                 "eng-Latn"
             ],
-            "license": "apache-2.0",
             "loader": {
                 "model_name": "Alibaba-NLP/gte-modernbert-base",
                 "revision": "7ca8b4ca700621b67618669f5378fe5f5820b8e4"
             },
-            "max_tokens": 8192.0,
-            "memory_usage_mb": 284.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 149000000,
-            "name": "Alibaba-NLP/gte-modernbert-base",
+            "memory_usage_mb": 284.0,
+            "max_tokens": 8192.0,
+            "embed_dim": 768,
+            "license": "apache-2.0",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/Alibaba-NLP/gte-modernbert-base",
-            "release_date": "2025-01-21",
-            "revision": "7ca8b4ca700621b67618669f5378fe5f5820b8e4",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": false,
             "training_datasets": {
                 "CMedQAv2-reranking": [
                     "train"
@@ -84,16 +79,17 @@
                     "train"
                 ]
             },
-            "use_instructions": false
+            "adapted_from": null,
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "Alibaba-NLP/gte-multilingual-base": {
-            "adapted_from": null,
-            "embed_dim": 768,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "Alibaba-NLP/gte-multilingual-base",
+            "revision": "ca1791e0bcc104f6db161f27de1340241b13c5a4",
+            "release_date": "2024-07-20",
             "languages": [
                 "afr-Latn",
                 "ara-Arab",
@@ -167,26 +163,25 @@
                 "yor-Latn",
                 "zho-Hans"
             ],
-            "license": "apache-2.0",
             "loader": {
                 "model_name": "Alibaba-NLP/gte-multilingual-base",
                 "revision": "ca1791e0bcc104f6db161f27de1340241b13c5a4"
             },
-            "max_tokens": 8192.0,
-            "memory_usage_mb": 582.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 305000000,
-            "name": "Alibaba-NLP/gte-multilingual-base",
+            "memory_usage_mb": 582.0,
+            "max_tokens": 8192.0,
+            "embed_dim": 768,
+            "license": "apache-2.0",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/Alibaba-NLP/gte-multilingual-base",
-            "release_date": "2024-07-20",
-            "revision": "ca1791e0bcc104f6db161f27de1340241b13c5a4",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": false,
             "training_datasets": {
                 "CMedQAv2-reranking": [
                     "train"
@@ -240,20 +235,20 @@
                     "train"
                 ]
             },
-            "use_instructions": false
+            "adapted_from": null,
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "BAAI/bge-base-en-v1.5": {
-            "adapted_from": null,
-            "embed_dim": 768,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "BAAI/bge-base-en-v1.5",
+            "revision": "a5beb1e3e68b9ab74eb54cfd186867f64f240e1a",
+            "release_date": "2023-09-11",
             "languages": [
                 "eng-Latn"
             ],
-            "license": "mit",
             "loader": {
                 "model_name": "BAAI/bge-base-en-v1.5",
                 "model_prompts": {
@@ -261,21 +256,21 @@
                 },
                 "revision": "a5beb1e3e68b9ab74eb54cfd186867f64f240e1a"
             },
-            "max_tokens": 512.0,
-            "memory_usage_mb": 390.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 109000000,
-            "name": "BAAI/bge-base-en-v1.5",
+            "memory_usage_mb": 390.0,
+            "max_tokens": 512.0,
+            "embed_dim": 768,
+            "license": "mit",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": "https://data.baai.ac.cn/details/BAAI-MTP",
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/BAAI/bge-base-en-v1.5",
-            "release_date": "2023-09-11",
-            "revision": "a5beb1e3e68b9ab74eb54cfd186867f64f240e1a",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": true,
             "training_datasets": {
                 "AmazonReviewsClassification": [
                     "validation",
@@ -298,20 +293,20 @@
                     "test"
                 ]
             },
-            "use_instructions": true
+            "adapted_from": null,
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "BAAI/bge-large-en-v1.5": {
-            "adapted_from": null,
-            "embed_dim": 1024,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "BAAI/bge-large-en-v1.5",
+            "revision": "d4aa6901d3a41ba39fb536a557fa166f842b0e09",
+            "release_date": "2023-09-12",
             "languages": [
                 "eng-Latn"
             ],
-            "license": "mit",
             "loader": {
                 "model_name": "BAAI/bge-large-en-v1.5",
                 "model_prompts": {
@@ -319,21 +314,21 @@
                 },
                 "revision": "d4aa6901d3a41ba39fb536a557fa166f842b0e09"
             },
-            "max_tokens": 512.0,
-            "memory_usage_mb": 1242.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 335000000,
-            "name": "BAAI/bge-large-en-v1.5",
+            "memory_usage_mb": 1242.0,
+            "max_tokens": 512.0,
+            "embed_dim": 1024,
+            "license": "mit",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": "https://data.baai.ac.cn/details/BAAI-MTP",
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/BAAI/bge-large-en-v1.5",
-            "release_date": "2023-09-12",
-            "revision": "d4aa6901d3a41ba39fb536a557fa166f842b0e09",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": true,
             "training_datasets": {
                 "AmazonReviewsClassification": [
                     "validation",
@@ -356,20 +351,20 @@
                     "test"
                 ]
             },
-            "use_instructions": true
+            "adapted_from": null,
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "BAAI/bge-small-en-v1.5": {
-            "adapted_from": null,
-            "embed_dim": 512,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "BAAI/bge-small-en-v1.5",
+            "revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+            "release_date": "2023-09-12",
             "languages": [
                 "eng-Latn"
             ],
-            "license": "mit",
             "loader": {
                 "model_name": "BAAI/bge-small-en-v1.5",
                 "model_prompts": {
@@ -377,21 +372,21 @@
                 },
                 "revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a"
             },
-            "max_tokens": 512.0,
-            "memory_usage_mb": 127.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 33400000,
-            "name": "BAAI/bge-small-en-v1.5",
+            "memory_usage_mb": 127.0,
+            "max_tokens": 512.0,
+            "embed_dim": 512,
+            "license": "mit",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": "https://data.baai.ac.cn/details/BAAI-MTP",
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/BAAI/bge-small-en-v1.5",
-            "release_date": "2023-09-12",
-            "revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": true,
             "training_datasets": {
                 "AmazonReviewsClassification": [
                     "validation",
@@ -414,16 +409,17 @@
                     "test"
                 ]
             },
-            "use_instructions": true
+            "adapted_from": null,
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "ibm-granite/granite-embedding-278m-multilingual": {
-            "adapted_from": null,
-            "embed_dim": 768,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "ibm-granite/granite-embedding-278m-multilingual",
+            "revision": "84e3546b88b0cb69f8078608a1df558020bcbf1f",
+            "release_date": "2024-12-18",
             "languages": [
                 "ara-Latn",
                 "ces-Latn",
@@ -439,26 +435,25 @@
                 "zho-Hant",
                 "zho-Hans"
             ],
-            "license": "apache-2.0",
             "loader": {
                 "model_name": "ibm-granite/granite-embedding-278m-multilingual",
                 "revision": "84e3546b88b0cb69f8078608a1df558020bcbf1f"
             },
-            "max_tokens": 512.0,
-            "memory_usage_mb": 530.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 278000000,
-            "name": "ibm-granite/granite-embedding-278m-multilingual",
+            "memory_usage_mb": 530.0,
+            "max_tokens": 512.0,
+            "embed_dim": 768,
+            "license": "apache-2.0",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/ibm-granite/granite-embedding-278m-multilingual",
-            "release_date": "2024-12-18",
-            "revision": "84e3546b88b0cb69f8078608a1df558020bcbf1f",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": false,
             "training_datasets": {
                 "AskUbuntuDupQuestions": [],
                 "DBPedia": [
@@ -517,39 +512,39 @@
                 "WikipediaRerankingMultilingual": [],
                 "WikipediaRetrievalMultilingual": []
             },
-            "use_instructions": false
+            "adapted_from": null,
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "ibm-granite/granite-embedding-30m-english": {
-            "adapted_from": null,
-            "embed_dim": 384,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "ibm-granite/granite-embedding-30m-english",
+            "revision": "eddbb57470f896b5f8e2bfcb823d8f0e2d2024a5",
+            "release_date": "2024-12-18",
             "languages": [
                 "eng-Latn"
             ],
-            "license": "apache-2.0",
             "loader": {
                 "model_name": "ibm-granite/granite-embedding-30m-english",
                 "revision": "eddbb57470f896b5f8e2bfcb823d8f0e2d2024a5"
             },
-            "max_tokens": 512.0,
-            "memory_usage_mb": 58.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 30000000,
-            "name": "ibm-granite/granite-embedding-30m-english",
+            "memory_usage_mb": 58.0,
+            "max_tokens": 512.0,
+            "embed_dim": 384,
+            "license": "apache-2.0",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/ibm-granite/granite-embedding-30m-english",
-            "release_date": "2024-12-18",
-            "revision": "eddbb57470f896b5f8e2bfcb823d8f0e2d2024a5",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": false,
             "training_datasets": {
                 "AskUbuntuDupQuestions": [],
                 "DBPedia": [
@@ -608,16 +603,193 @@
                 "WikipediaRerankingMultilingual": [],
                 "WikipediaRetrievalMultilingual": []
             },
-            "use_instructions": false
+            "adapted_from": null,
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
-        "intfloat/multilingual-e5-large": {
-            "adapted_from": "FacebookAI/xlm-roberta-large",
-            "embed_dim": 1024,
+        "ibm-granite/granite-embedding-english-r2": {
+            "name": "ibm-granite/granite-embedding-english-r2",
+            "revision": "6e7b8ce0e76270394ac4669ba4bbd7133b60b7f9",
+            "release_date": "2025-08-15",
+            "languages": [
+                "eng-Latn"
+            ],
+            "loader": {},
+            "n_parameters": 149000000,
+            "memory_usage_mb": 284.0,
+            "max_tokens": 8192.0,
+            "embed_dim": 768,
+            "license": "apache-2.0",
+            "open_weights": true,
+            "public_training_code": null,
+            "public_training_data": null,
             "framework": [
                 "Sentence Transformers",
                 "PyTorch"
             ],
+            "reference": "https://huggingface.co/ibm-granite/granite-embedding-english-r2",
+            "similarity_fn_name": "cosine",
+            "use_instructions": false,
+            "training_datasets": {
+                "WikipediaRetrievalMultilingual": [],
+                "WikipediaRerankingMultilingual": [],
+                "StackOverflowDupQuestions": [],
+                "AskUbuntuDupQuestions": [],
+                "StackExchangeClusteringP2P": [],
+                "StackExchangeClusteringP2P.v2": [],
+                "StackExchangeClustering": [],
+                "StackExchangeClustering.v2": [],
+                "NQ": [
+                    "test"
+                ],
+                "NQ-NL": [
+                    "test"
+                ],
+                "NQHardNegatives": [
+                    "test"
+                ],
+                "HotPotQA": [
+                    "test"
+                ],
+                "HotPotQAHardNegatives": [
+                    "test"
+                ],
+                "HotPotQA-PL": [
+                    "test"
+                ],
+                "HotpotQA-NL": [
+                    "test"
+                ],
+                "FEVER": [
+                    "test"
+                ],
+                "FEVERHardNegatives": [
+                    "test"
+                ],
+                "FEVER-NL": [
+                    "test"
+                ],
+                "MIRACLRetrieval": [
+                    "train"
+                ],
+                "MIRACLRetrievalHardNegatives": [
+                    "train"
+                ],
+                "MIRACLReranking": [
+                    "train"
+                ],
+                "MrTidyRetrieval": [
+                    "train"
+                ],
+                "DBPedia": [
+                    "train"
+                ],
+                "DBPedia-NL": [
+                    "train"
+                ]
+            },
+            "adapted_from": null,
+            "superseded_by": null,
             "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
+        },
+        "ibm-granite/granite-embedding-small-english-r2": {
+            "name": "ibm-granite/granite-embedding-small-english-r2",
+            "revision": "54a8d2616a0844355a5164432d3f6dafb37b17a3",
+            "release_date": "2025-08-15",
+            "languages": [
+                "eng-Latn"
+            ],
+            "loader": {},
+            "n_parameters": 47000000,
+            "memory_usage_mb": 91.0,
+            "max_tokens": 8192.0,
+            "embed_dim": 384,
+            "license": "apache-2.0",
+            "open_weights": true,
+            "public_training_code": null,
+            "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
+            "reference": "https://huggingface.co/ibm-granite/granite-embedding-small-english-r2",
+            "similarity_fn_name": "cosine",
+            "use_instructions": false,
+            "training_datasets": {
+                "WikipediaRetrievalMultilingual": [],
+                "WikipediaRerankingMultilingual": [],
+                "StackOverflowDupQuestions": [],
+                "AskUbuntuDupQuestions": [],
+                "StackExchangeClusteringP2P": [],
+                "StackExchangeClusteringP2P.v2": [],
+                "StackExchangeClustering": [],
+                "StackExchangeClustering.v2": [],
+                "NQ": [
+                    "test"
+                ],
+                "NQ-NL": [
+                    "test"
+                ],
+                "NQHardNegatives": [
+                    "test"
+                ],
+                "HotPotQA": [
+                    "test"
+                ],
+                "HotPotQAHardNegatives": [
+                    "test"
+                ],
+                "HotPotQA-PL": [
+                    "test"
+                ],
+                "HotpotQA-NL": [
+                    "test"
+                ],
+                "FEVER": [
+                    "test"
+                ],
+                "FEVERHardNegatives": [
+                    "test"
+                ],
+                "FEVER-NL": [
+                    "test"
+                ],
+                "MIRACLRetrieval": [
+                    "train"
+                ],
+                "MIRACLRetrievalHardNegatives": [
+                    "train"
+                ],
+                "MIRACLReranking": [
+                    "train"
+                ],
+                "MrTidyRetrieval": [
+                    "train"
+                ],
+                "DBPedia": [
+                    "train"
+                ],
+                "DBPedia-NL": [
+                    "train"
+                ]
+            },
+            "adapted_from": null,
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
+        },
+        "intfloat/multilingual-e5-large": {
+            "name": "intfloat/multilingual-e5-large",
+            "revision": "ab10c1a7f42e74530fe7ae5be82e6d4f11a719eb",
+            "release_date": "2024-02-08",
             "languages": [
                 "afr-Latn",
                 "amh-Latn",
@@ -719,7 +891,6 @@
                 "zho-Hant",
                 "zho-Hans"
             ],
-            "license": "mit",
             "loader": {
                 "model_name": "intfloat/multilingual-e5-large",
                 "model_prompts": {
@@ -728,21 +899,21 @@
                 },
                 "revision": "ab10c1a7f42e74530fe7ae5be82e6d4f11a719eb"
             },
-            "max_tokens": 512,
-            "memory_usage_mb": 2136.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 560000000,
-            "name": "intfloat/multilingual-e5-large",
+            "memory_usage_mb": 2136.0,
+            "max_tokens": 512.0,
+            "embed_dim": 1024,
+            "license": "mit",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/intfloat/multilingual-e5-large",
-            "release_date": "2024-02-08",
-            "revision": "ab10c1a7f42e74530fe7ae5be82e6d4f11a719eb",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": true,
             "training_datasets": {
                 "FEVER": [
                     "train"
@@ -811,17 +982,17 @@
                     "train"
                 ]
             },
-            "use_instructions": true
+            "adapted_from": "FacebookAI/xlm-roberta-large",
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "intfloat/multilingual-e5-large-instruct": {
-            "adapted_from": "FacebookAI/xlm-roberta-large",
-            "embed_dim": 1024,
-            "framework": [
-                "GritLM",
-                "PyTorch",
-                "Sentence Transformers"
-            ],
-            "is_cross_encoder": null,
+            "name": "intfloat/multilingual-e5-large-instruct",
+            "revision": "baa7be480a7de1539afce709c8f13f833a510e0a",
+            "release_date": "2024-02-08",
             "languages": [
                 "afr-Latn",
                 "amh-Latn",
@@ -923,7 +1094,6 @@
                 "zho-Hant",
                 "zho-Hans"
             ],
-            "license": "mit",
             "loader": {
                 "attn": "cccc",
                 "instruction_template": "Instruct: {instruction}\nQuery: ",
@@ -933,21 +1103,22 @@
                 "pooling_method": "mean",
                 "torch_dtype": "torch.float16"
             },
-            "max_tokens": 512,
-            "memory_usage_mb": 1068.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 560000000,
-            "name": "intfloat/multilingual-e5-large-instruct",
+            "memory_usage_mb": 1068.0,
+            "max_tokens": 512.0,
+            "embed_dim": 1024,
+            "license": "mit",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "GritLM",
+                "PyTorch",
+                "Sentence Transformers"
+            ],
             "reference": "https://huggingface.co/intfloat/multilingual-e5-large-instruct",
-            "release_date": "2024-02-08",
-            "revision": "baa7be480a7de1539afce709c8f13f833a510e0a",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": true,
             "training_datasets": {
                 "FEVER": [
                     "train"
@@ -1016,40 +1187,40 @@
                     "train"
                 ]
             },
-            "use_instructions": true
+            "adapted_from": "FacebookAI/xlm-roberta-large",
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "jinaai/jina-embeddings-v2-base-code": {
-            "adapted_from": "jina-bert-base-en-v1",
-            "embed_dim": 768,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "jinaai/jina-embeddings-v2-base-code",
+            "revision": "6e85f575bc273f1fd840a658067d0157933c83f0",
+            "release_date": "2023-09-27",
             "languages": [
                 "eng-Latn"
             ],
-            "license": "apache-2.0",
             "loader": {
                 "model": "jinaai/jina-embeddings-v2-base-en",
                 "revision": "6e85f575bc273f1fd840a658067d0157933c83f0",
                 "trust_remote_code": true
             },
-            "max_tokens": 8192.0,
-            "memory_usage_mb": 262.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 137000000,
-            "name": "jinaai/jina-embeddings-v2-base-code",
+            "memory_usage_mb": 262.0,
+            "max_tokens": 8192.0,
+            "embed_dim": 768,
+            "license": "apache-2.0",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/jinaai/jina-embeddings-v2-base-en",
-            "release_date": "2023-09-27",
-            "revision": "6e85f575bc273f1fd840a658067d0157933c83f0",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": false,
             "training_datasets": {
                 "AmazonQA": [
                     "train"
@@ -1126,16 +1297,17 @@
                 "Xmarket": [],
                 "YahooAnswers": []
             },
-            "use_instructions": false
+            "adapted_from": "jina-bert-base-en-v1",
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "jinaai/jina-embeddings-v3": {
-            "adapted_from": "XLM-RoBERTa",
-            "embed_dim": 1024,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "jinaai/jina-embeddings-v3",
+            "revision": "215a6e121fa0183376388ac6b1ae230326bfeaed",
+            "release_date": "2024-09-18",
             "languages": [
                 "afr-Latn",
                 "amh-Latn",
@@ -1237,7 +1409,6 @@
                 "zho-Hant",
                 "zho-Hans"
             ],
-            "license": "cc-by-nc-4.0",
             "loader": {
                 "model": "jinaai/jina-embeddings-v3",
                 "model_prompts": {
@@ -1255,21 +1426,21 @@
                 "revision": "215a6e121fa0183376388ac6b1ae230326bfeaed",
                 "trust_remote_code": true
             },
-            "max_tokens": 8194.0,
-            "memory_usage_mb": 1092.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 572000000,
-            "name": "jinaai/jina-embeddings-v3",
+            "memory_usage_mb": 1092.0,
+            "max_tokens": 8194.0,
+            "embed_dim": 1024,
+            "license": "cc-by-nc-4.0",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/jinaai/jina-embeddings-v3",
-            "release_date": "2024-09-18",
-            "revision": "215a6e121fa0183376388ac6b1ae230326bfeaed",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": true,
             "training_datasets": {
                 "mMARCO-NL": [
                     "train"
@@ -1300,16 +1471,17 @@
                 ],
                 "STS12": []
             },
-            "use_instructions": true
+            "adapted_from": "XLM-RoBERTa",
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "jinaai/jina-embeddings-v4": {
-            "adapted_from": "Qwen/Qwen2.5-VL-3B-Instruct",
-            "embed_dim": 2048,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "jinaai/jina-embeddings-v4",
+            "revision": "4a58ca57710c49f51896e4bc820e202fbf64904b",
+            "release_date": "2025-06-24",
             "languages": [
                 "afr-Latn",
                 "amh-Latn",
@@ -1411,7 +1583,6 @@
                 "zho-Hant",
                 "zho-Hans"
             ],
-            "license": "qwen-research-license",
             "loader": {
                 "model": "jinaai/jina-embeddings-v4",
                 "model_prompts": {
@@ -1423,22 +1594,21 @@
                 "revision": "4a58ca57710c49f51896e4bc820e202fbf64904b",
                 "trust_remote_code": true
             },
-            "max_tokens": 32768.0,
-            "memory_usage_mb": 7500.0,
-            "modalities": [
-                "image",
-                "text"
-            ],
             "n_parameters": 3800000000,
-            "name": "jinaai/jina-embeddings-v4",
+            "memory_usage_mb": 7500.0,
+            "max_tokens": 32768.0,
+            "embed_dim": 2048,
+            "license": "cc-by-nc-4.0",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/jinaai/jina-embeddings-v4",
-            "release_date": "2025-06-24",
-            "revision": "4a58ca57710c49f51896e4bc820e202fbf64904b",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": true,
             "training_datasets": {
                 "AppsRetrieval": [
                     "train"
@@ -1505,20 +1675,21 @@
                     "train"
                 ]
             },
-            "use_instructions": true
+            "adapted_from": "Qwen/Qwen2.5-VL-3B-Instruct",
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "image",
+                "text"
+            ]
         },
         "mixedbread-ai/mxbai-embed-large-v1": {
-            "adapted_from": null,
-            "embed_dim": 1024,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "mixedbread-ai/mxbai-embed-large-v1",
+            "revision": "990580e27d329c7408b3741ecff85876e128e203",
+            "release_date": "2024-03-07",
             "languages": [
                 "eng-Latn"
             ],
-            "license": "apache-2.0",
             "loader": {
                 "model_name": "mixedbread-ai/mxbai-embed-large-v1",
                 "model_prompts": {
@@ -1526,38 +1697,38 @@
                 },
                 "revision": "990580e27d329c7408b3741ecff85876e128e203"
             },
-            "max_tokens": 512.0,
-            "memory_usage_mb": 639.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 335000000,
-            "name": "mixedbread-ai/mxbai-embed-large-v1",
+            "memory_usage_mb": 639.0,
+            "max_tokens": 512.0,
+            "embed_dim": 1024,
+            "license": "apache-2.0",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
-            "reference": "https://huggingface.co/mixedbread-ai/mxbai-embed-large-v1",
-            "release_date": "2024-03-07",
-            "revision": "990580e27d329c7408b3741ecff85876e128e203",
-            "similarity_fn_name": "cosine",
-            "superseded_by": null,
-            "training_datasets": {
-                "MSMARCO": []
-            },
-            "use_instructions": true
-        },
-        "nomic-ai/modernbert-embed-base": {
-            "adapted_from": "answerdotai/ModernBERT-base",
-            "embed_dim": 768,
             "framework": [
                 "Sentence Transformers",
                 "PyTorch"
             ],
+            "reference": "https://huggingface.co/mixedbread-ai/mxbai-embed-large-v1",
+            "similarity_fn_name": "cosine",
+            "use_instructions": true,
+            "training_datasets": {
+                "MSMARCO": []
+            },
+            "adapted_from": null,
+            "superseded_by": null,
             "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
+        },
+        "nomic-ai/modernbert-embed-base": {
+            "name": "nomic-ai/modernbert-embed-base",
+            "revision": "5960f1566fb7cb1adf1eb6e816639cf4646d9b12",
+            "release_date": "2024-12-29",
             "languages": [
                 "eng-Latn"
             ],
-            "license": "apache-2.0",
             "loader": {
                 "model_kwargs": {
                     "torch_dtype": "torch.float16"
@@ -1576,21 +1747,21 @@
                 },
                 "revision": "5960f1566fb7cb1adf1eb6e816639cf4646d9b12"
             },
-            "max_tokens": 8192.0,
-            "memory_usage_mb": 568.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 149000000,
-            "name": "nomic-ai/modernbert-embed-base",
+            "memory_usage_mb": 568.0,
+            "max_tokens": 8192.0,
+            "embed_dim": 768,
+            "license": "apache-2.0",
             "open_weights": true,
             "public_training_code": "https://github.com/nomic-ai/contrastors/blob/5f7b461e5a13b5636692d1c9f1141b27232fe966/src/contrastors/configs/train/contrastive_pretrain_modernbert.yaml",
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/nomic-ai/modernbert-embed-base",
-            "release_date": "2024-12-29",
-            "revision": "5960f1566fb7cb1adf1eb6e816639cf4646d9b12",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": true,
             "training_datasets": {
                 "AmazonCounterfactualClassification": [],
                 "AmazonPolarityClassification": [],
@@ -1659,47 +1830,48 @@
                 "WikipediaRetrievalMultilingual": [],
                 "YahooAnswersTopicsClassification": []
             },
-            "use_instructions": true
+            "adapted_from": "answerdotai/ModernBERT-base",
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "nomic-ai/nomic-embed-text-v2-moe": {
-            "adapted_from": null,
+            "name": "nomic-ai/nomic-embed-text-v2-moe",
+            "revision": null,
+            "release_date": null,
+            "languages": null,
+            "loader": {
+                "trust_remote_code": true
+            },
+            "n_parameters": null,
+            "memory_usage_mb": null,
+            "max_tokens": 512.0,
             "embed_dim": 768,
+            "license": "apache-2.0",
+            "open_weights": true,
+            "public_training_code": null,
+            "public_training_data": null,
             "framework": [
                 "PyTorch",
                 "Sentence Transformers"
             ],
+            "reference": null,
+            "similarity_fn_name": null,
+            "use_instructions": null,
+            "training_datasets": null,
+            "adapted_from": null,
+            "superseded_by": null,
             "is_cross_encoder": null,
-            "languages": null,
-            "license": "apache-2.0",
-            "loader": {
-                "trust_remote_code": true
-            },
-            "max_tokens": 512,
-            "memory_usage_mb": null,
             "modalities": [
                 "text"
-            ],
-            "n_parameters": null,
-            "name": "nomic-ai/nomic-embed-text-v2-moe",
-            "open_weights": true,
-            "public_training_code": null,
-            "public_training_data": null,
-            "reference": null,
-            "release_date": null,
-            "revision": null,
-            "similarity_fn_name": null,
-            "superseded_by": null,
-            "training_datasets": null,
-            "use_instructions": null
+            ]
         },
         "Qwen/Qwen3-Embedding-0.6B": {
-            "adapted_from": null,
-            "embed_dim": 1024,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "Qwen/Qwen3-Embedding-0.6B",
+            "revision": "b22da495047858cce924d27d76261e96be6febc0",
+            "release_date": "2025-06-05",
             "languages": [
                 "afr-Latn",
                 "ara-Arab",
@@ -1773,25 +1945,24 @@
                 "yor-Latn",
                 "zho-Hans"
             ],
-            "license": "apache-2.0",
             "loader": {
                 "model_name_or_path": "Qwen/Qwen3-Embedding-0.6B"
             },
-            "max_tokens": 32768.0,
-            "memory_usage_mb": 2272.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 595776512,
-            "name": "Qwen/Qwen3-Embedding-0.6B",
+            "memory_usage_mb": 2272.0,
+            "max_tokens": 32768.0,
+            "embed_dim": 1024,
+            "license": "apache-2.0",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/Qwen/Qwen3-Embedding-0.6B",
-            "release_date": "2025-06-05",
-            "revision": "b22da495047858cce924d27d76261e96be6febc0",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": true,
             "training_datasets": {
                 "CMedQAv2-reranking": [
                     "train"
@@ -1827,16 +1998,17 @@
                     "train"
                 ]
             },
-            "use_instructions": true
+            "adapted_from": null,
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "Qwen/Qwen3-Embedding-4B": {
-            "adapted_from": null,
-            "embed_dim": 2560,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "Qwen/Qwen3-Embedding-4B",
+            "revision": "636cd9bf47d976946cdbb2b0c3ca0cb2f8eea5ff",
+            "release_date": "2025-06-05",
             "languages": [
                 "afr-Latn",
                 "ara-Arab",
@@ -1910,25 +2082,24 @@
                 "yor-Latn",
                 "zho-Hans"
             ],
-            "license": "apache-2.0",
             "loader": {
                 "model_name_or_path": "Qwen/Qwen3-Embedding-4B"
             },
-            "max_tokens": 32768.0,
-            "memory_usage_mb": 15341.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 4021774336,
-            "name": "Qwen/Qwen3-Embedding-4B",
+            "memory_usage_mb": 15341.0,
+            "max_tokens": 32768.0,
+            "embed_dim": 2560,
+            "license": "apache-2.0",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/Qwen/Qwen3-Embedding-4B",
-            "release_date": "2025-06-05",
-            "revision": "636cd9bf47d976946cdbb2b0c3ca0cb2f8eea5ff",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": true,
             "training_datasets": {
                 "CMedQAv2-reranking": [
                     "train"
@@ -1964,16 +2135,17 @@
                     "train"
                 ]
             },
-            "use_instructions": true
+            "adapted_from": null,
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "Qwen/Qwen3-Embedding-8B": {
-            "adapted_from": null,
-            "embed_dim": 4096,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "Qwen/Qwen3-Embedding-8B",
+            "revision": "4e423935c619ae4df87b646a3ce949610c66241c",
+            "release_date": "2025-06-05",
             "languages": [
                 "afr-Latn",
                 "ara-Arab",
@@ -2047,25 +2219,24 @@
                 "yor-Latn",
                 "zho-Hans"
             ],
-            "license": "apache-2.0",
             "loader": {
                 "model_name_or_path": "Qwen/Qwen3-Embedding-8B"
             },
-            "max_tokens": 32768.0,
-            "memory_usage_mb": 28866.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 7567295488,
-            "name": "Qwen/Qwen3-Embedding-8B",
+            "memory_usage_mb": 28866.0,
+            "max_tokens": 32768.0,
+            "embed_dim": 4096,
+            "license": "apache-2.0",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/Qwen/Qwen3-Embedding-8B",
-            "release_date": "2025-06-05",
-            "revision": "4e423935c619ae4df87b646a3ce949610c66241c",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": true,
             "training_datasets": {
                 "CMedQAv2-reranking": [
                     "train"
@@ -2101,36 +2272,36 @@
                     "train"
                 ]
             },
-            "use_instructions": true
+            "adapted_from": null,
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "sentence-transformers/all-MiniLM-L12-v2": {
-            "adapted_from": null,
+            "name": "sentence-transformers/all-MiniLM-L12-v2",
+            "revision": "364dd28d28dcd3359b537f3cf1f5348ba679da62",
+            "release_date": "2021-08-30",
+            "languages": [
+                "eng-Latn"
+            ],
+            "loader": {},
+            "n_parameters": 33400000,
+            "memory_usage_mb": 127.0,
+            "max_tokens": 256.0,
             "embed_dim": 384,
+            "license": "apache-2.0",
+            "open_weights": true,
+            "public_training_code": null,
+            "public_training_data": null,
             "framework": [
                 "Sentence Transformers",
                 "PyTorch"
             ],
-            "is_cross_encoder": null,
-            "languages": [
-                "eng-Latn"
-            ],
-            "license": "apache-2.0",
-            "loader": null,
-            "max_tokens": 256.0,
-            "memory_usage_mb": 127.0,
-            "modalities": [
-                "text"
-            ],
-            "n_parameters": 33400000,
-            "name": "sentence-transformers/all-MiniLM-L12-v2",
-            "open_weights": true,
-            "public_training_code": null,
-            "public_training_data": null,
             "reference": "https://huggingface.co/sentence-transformers/all-MiniLM-L12-v2",
-            "release_date": "2021-08-30",
-            "revision": "364dd28d28dcd3359b537f3cf1f5348ba679da62",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": false,
             "training_datasets": {
                 "mMARCO-NL": [
                     "train"
@@ -2163,36 +2334,36 @@
                     "train"
                 ]
             },
-            "use_instructions": false
+            "adapted_from": null,
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "sentence-transformers/all-mpnet-base-v2": {
-            "adapted_from": null,
+            "name": "sentence-transformers/all-mpnet-base-v2",
+            "revision": "9a3225965996d404b775526de6dbfe85d3368642",
+            "release_date": "2021-08-30",
+            "languages": [
+                "eng-Latn"
+            ],
+            "loader": {},
+            "n_parameters": 109000000,
+            "memory_usage_mb": 418.0,
+            "max_tokens": 384.0,
             "embed_dim": 768,
+            "license": "apache-2.0",
+            "open_weights": true,
+            "public_training_code": null,
+            "public_training_data": null,
             "framework": [
                 "Sentence Transformers",
                 "PyTorch"
             ],
-            "is_cross_encoder": null,
-            "languages": [
-                "eng-Latn"
-            ],
-            "license": "apache-2.0",
-            "loader": null,
-            "max_tokens": 384.0,
-            "memory_usage_mb": 418.0,
-            "modalities": [
-                "text"
-            ],
-            "n_parameters": 109000000,
-            "name": "sentence-transformers/all-mpnet-base-v2",
-            "open_weights": true,
-            "public_training_code": null,
-            "public_training_data": null,
             "reference": "https://huggingface.co/sentence-transformers/all-mpnet-base-v2",
-            "release_date": "2021-08-30",
-            "revision": "9a3225965996d404b775526de6dbfe85d3368642",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": false,
             "training_datasets": {
                 "mMARCO-NL": [
                     "train"
@@ -2225,36 +2396,36 @@
                     "train"
                 ]
             },
-            "use_instructions": false
+            "adapted_from": null,
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "sentence-transformers/gtr-t5-base": {
-            "adapted_from": null,
+            "name": "sentence-transformers/gtr-t5-base",
+            "revision": "7027e9594267928589816394bdd295273ddc0739",
+            "release_date": "2022-02-09",
+            "languages": [
+                "eng-Latn"
+            ],
+            "loader": {},
+            "n_parameters": 110000000,
+            "memory_usage_mb": 209.0,
+            "max_tokens": 512.0,
             "embed_dim": 768,
+            "license": "apache-2.0",
+            "open_weights": true,
+            "public_training_code": null,
+            "public_training_data": null,
             "framework": [
                 "Sentence Transformers",
                 "PyTorch"
             ],
-            "is_cross_encoder": null,
-            "languages": [
-                "eng-Latn"
-            ],
-            "license": "apache-2.0",
-            "loader": null,
-            "max_tokens": 512.0,
-            "memory_usage_mb": 209.0,
-            "modalities": [
-                "text"
-            ],
-            "n_parameters": 110000000,
-            "name": "sentence-transformers/gtr-t5-base",
-            "open_weights": true,
-            "public_training_code": null,
-            "public_training_data": null,
             "reference": "https://huggingface.co/sentence-transformers/gtr-t5-base",
-            "release_date": "2022-02-09",
-            "revision": "7027e9594267928589816394bdd295273ddc0739",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": false,
             "training_datasets": {
                 "Community QA": [
                     "train"
@@ -2290,16 +2461,17 @@
                     "train"
                 ]
             },
-            "use_instructions": false
+            "adapted_from": null,
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "sentence-transformers/LaBSE": {
-            "adapted_from": null,
-            "embed_dim": 768,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "sentence-transformers/LaBSE",
+            "revision": "e34fab64a3011d2176c99545a93d5cbddc9a91b7",
+            "release_date": "2019-11-01",
             "languages": [
                 "ara-Arab",
                 "bul-Cyrl",
@@ -2355,54 +2527,53 @@
                 "zho-Hans",
                 "zho-Hant"
             ],
-            "license": "apache-2.0",
-            "loader": null,
-            "max_tokens": 512.0,
-            "memory_usage_mb": 1796.0,
-            "modalities": [
-                "text"
-            ],
+            "loader": {},
             "n_parameters": 471000000,
-            "name": "sentence-transformers/LaBSE",
+            "memory_usage_mb": 1796.0,
+            "max_tokens": 512.0,
+            "embed_dim": 768,
+            "license": "apache-2.0",
             "open_weights": true,
             "public_training_code": "https://www.kaggle.com/models/google/labse/tensorFlow2/labse/2?tfhub-redirect=true",
             "public_training_data": null,
-            "reference": "https://huggingface.co/sentence-transformers/LaBSE",
-            "release_date": "2019-11-01",
-            "revision": "e34fab64a3011d2176c99545a93d5cbddc9a91b7",
-            "similarity_fn_name": "cosine",
-            "superseded_by": null,
-            "training_datasets": {},
-            "use_instructions": false
-        },
-        "sentence-transformers/multi-qa-MiniLM-L6-cos-v1": {
-            "adapted_from": "nreimers/MiniLM-L6-H384-uncased",
-            "embed_dim": 384,
             "framework": [
                 "Sentence Transformers",
                 "PyTorch"
             ],
+            "reference": "https://huggingface.co/sentence-transformers/LaBSE",
+            "similarity_fn_name": "cosine",
+            "use_instructions": false,
+            "training_datasets": {},
+            "adapted_from": null,
+            "superseded_by": null,
             "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
+        },
+        "sentence-transformers/multi-qa-MiniLM-L6-cos-v1": {
+            "name": "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
+            "revision": "b207367332321f8e44f96e224ef15bc607f4dbf0",
+            "release_date": "2021-08-30",
             "languages": [
                 "eng-Latn"
             ],
-            "license": "apache-2.0",
-            "loader": null,
-            "max_tokens": 512.0,
-            "memory_usage_mb": 87.0,
-            "modalities": [
-                "text"
-            ],
+            "loader": {},
             "n_parameters": 22700000,
-            "name": "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
+            "memory_usage_mb": 87.0,
+            "max_tokens": 512.0,
+            "embed_dim": 384,
+            "license": "apache-2.0",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
-            "release_date": "2021-08-30",
-            "revision": "b207367332321f8e44f96e224ef15bc607f4dbf0",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": false,
             "training_datasets": {
                 "mMARCO-NL": [
                     "train"
@@ -2435,16 +2606,17 @@
                     "train"
                 ]
             },
-            "use_instructions": false
+            "adapted_from": "nreimers/MiniLM-L6-H384-uncased",
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2": {
-            "adapted_from": null,
-            "embed_dim": 768,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+            "revision": "bf3bf13ab40c3157080a7ab344c831b9ad18b5eb",
+            "release_date": "2019-11-01",
             "languages": [
                 "ara-Arab",
                 "bul-Cyrl",
@@ -2500,23 +2672,22 @@
                 "zho-Hans",
                 "zho-Hant"
             ],
-            "license": "apache-2.0",
-            "loader": null,
-            "max_tokens": 512.0,
-            "memory_usage_mb": 449.0,
-            "modalities": [
-                "text"
-            ],
+            "loader": {},
             "n_parameters": 118000000,
-            "name": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+            "memory_usage_mb": 449.0,
+            "max_tokens": 512.0,
+            "embed_dim": 768,
+            "license": "apache-2.0",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
-            "release_date": "2019-11-01",
-            "revision": "bf3bf13ab40c3157080a7ab344c831b9ad18b5eb",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": false,
             "training_datasets": {
                 "mMARCO-NL": [
                     "train"
@@ -2549,16 +2720,17 @@
                     "train"
                 ]
             },
-            "use_instructions": false
+            "adapted_from": null,
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "sentence-transformers/paraphrase-multilingual-mpnet-base-v2": {
-            "adapted_from": null,
-            "embed_dim": 768,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
+            "revision": "79f2382ceacceacdf38563d7c5d16b9ff8d725d6",
+            "release_date": "2019-11-01",
             "languages": [
                 "ara-Arab",
                 "bul-Cyrl",
@@ -2614,23 +2786,22 @@
                 "zho-Hans",
                 "zho-Hant"
             ],
-            "license": "apache-2.0",
-            "loader": null,
-            "max_tokens": 512.0,
-            "memory_usage_mb": 1061.0,
-            "modalities": [
-                "text"
-            ],
+            "loader": {},
             "n_parameters": 278000000,
-            "name": "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
+            "memory_usage_mb": 1061.0,
+            "max_tokens": 512.0,
+            "embed_dim": 768,
+            "license": "apache-2.0",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
-            "release_date": "2019-11-01",
-            "revision": "79f2382ceacceacdf38563d7c5d16b9ff8d725d6",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": false,
             "training_datasets": {
                 "mMARCO-NL": [
                     "train"
@@ -2663,16 +2834,17 @@
                     "train"
                 ]
             },
-            "use_instructions": false
+            "adapted_from": null,
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "snowflake-arctic-embed2:568m": {
-            "adapted_from": "BAAI/bge-m3-retromae",
-            "embed_dim": 1024,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "Snowflake/snowflake-arctic-embed-v2.0-ollama",
+            "revision": "edc2df7b6c25794b340229ca082e7c78782e6374",
+            "release_date": "2024-12-04",
             "languages": [
                 "afr-Latn",
                 "ara-Arab",
@@ -2749,26 +2921,25 @@
                 "yor-Latn",
                 "zho-Hans"
             ],
-            "license": "apache-2.0",
             "loader": {
                 "model_name": "Snowflake/snowflake-arctic-embed-l-v2.0",
                 "revision": "edc2df7b6c25794b340229ca082e7c78782e6374"
             },
-            "max_tokens": 8192.0,
-            "memory_usage_mb": 2166.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 568000000,
-            "name": "snowflake-arctic-embed2:568m",
+            "memory_usage_mb": 2166.0,
+            "max_tokens": 8192.0,
+            "embed_dim": 1024,
+            "license": "apache-2.0",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/Snowflake/snowflake-arctic-embed-l-v2.0",
-            "release_date": "2024-12-04",
-            "revision": "edc2df7b6c25794b340229ca082e7c78782e6374",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": true,
             "training_datasets": {
                 "FEVER": [
                     "test"
@@ -2813,39 +2984,39 @@
                     "test"
                 ]
             },
-            "use_instructions": true
+            "adapted_from": "BAAI/bge-m3-retromae",
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "Snowflake/snowflake-arctic-embed-l": {
-            "adapted_from": "intfloat/e5-base-unsupervised",
-            "embed_dim": 1024,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "Snowflake/snowflake-arctic-embed-l",
+            "revision": "9a9e5834d2e89cdd8bb72b64111dde496e4fe78c",
+            "release_date": "2024-04-12",
             "languages": [
                 "eng-Latn"
             ],
-            "license": "apache-2.0",
             "loader": {
                 "model_name": "Snowflake/snowflake-arctic-embed-l",
                 "revision": "9a9e5834d2e89cdd8bb72b64111dde496e4fe78c"
             },
-            "max_tokens": 512.0,
-            "memory_usage_mb": 1274.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 335000000,
-            "name": "Snowflake/snowflake-arctic-embed-l",
+            "memory_usage_mb": 1274.0,
+            "max_tokens": 512.0,
+            "embed_dim": 1024,
+            "license": "apache-2.0",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/Snowflake/snowflake-arctic-embed-l",
-            "release_date": "2024-04-12",
-            "revision": "9a9e5834d2e89cdd8bb72b64111dde496e4fe78c",
             "similarity_fn_name": "cosine",
-            "superseded_by": "Snowflake/snowflake-arctic-embed-l-v2.0",
+            "use_instructions": true,
             "training_datasets": {
                 "FEVER": [
                     "test"
@@ -2881,16 +3052,17 @@
                     "test"
                 ]
             },
-            "use_instructions": true
+            "adapted_from": "intfloat/e5-base-unsupervised",
+            "superseded_by": "Snowflake/snowflake-arctic-embed-l-v2.0",
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "Snowflake/snowflake-arctic-embed-l-v2.0": {
-            "adapted_from": "BAAI/bge-m3-retromae",
-            "embed_dim": 1024,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "Snowflake/snowflake-arctic-embed-l-v2.0",
+            "revision": "edc2df7b6c25794b340229ca082e7c78782e6374",
+            "release_date": "2024-12-04",
             "languages": [
                 "afr-Latn",
                 "ara-Arab",
@@ -2967,26 +3139,25 @@
                 "yor-Latn",
                 "zho-Hans"
             ],
-            "license": "apache-2.0",
             "loader": {
                 "model_name": "Snowflake/snowflake-arctic-embed-l-v2.0",
                 "revision": "edc2df7b6c25794b340229ca082e7c78782e6374"
             },
-            "max_tokens": 8192.0,
-            "memory_usage_mb": 2166.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 568000000,
-            "name": "Snowflake/snowflake-arctic-embed-l-v2.0",
+            "memory_usage_mb": 2166.0,
+            "max_tokens": 8192.0,
+            "embed_dim": 1024,
+            "license": "apache-2.0",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/Snowflake/snowflake-arctic-embed-l-v2.0",
-            "release_date": "2024-12-04",
-            "revision": "edc2df7b6c25794b340229ca082e7c78782e6374",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": true,
             "training_datasets": {
                 "FEVER": [
                     "test"
@@ -3031,39 +3202,39 @@
                     "test"
                 ]
             },
-            "use_instructions": true
+            "adapted_from": "BAAI/bge-m3-retromae",
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "Snowflake/snowflake-arctic-embed-m": {
-            "adapted_from": "intfloat/e5-base-unsupervised",
-            "embed_dim": 768,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "Snowflake/snowflake-arctic-embed-m",
+            "revision": "cc17beacbac32366782584c8752220405a0f3f40",
+            "release_date": "2024-04-12",
             "languages": [
                 "eng-Latn"
             ],
-            "license": "apache-2.0",
             "loader": {
                 "model_name": "Snowflake/snowflake-arctic-embed-m",
                 "revision": "cc17beacbac32366782584c8752220405a0f3f40"
             },
-            "max_tokens": 512.0,
-            "memory_usage_mb": 415.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 109000000,
-            "name": "Snowflake/snowflake-arctic-embed-m",
+            "memory_usage_mb": 415.0,
+            "max_tokens": 512.0,
+            "embed_dim": 768,
+            "license": "apache-2.0",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/Snowflake/snowflake-arctic-embed-m",
-            "release_date": "2024-04-12",
-            "revision": "cc17beacbac32366782584c8752220405a0f3f40",
             "similarity_fn_name": "cosine",
-            "superseded_by": "Snowflake/snowflake-arctic-embed-m-v1.5",
+            "use_instructions": true,
             "training_datasets": {
                 "FEVER": [
                     "test"
@@ -3099,40 +3270,40 @@
                     "test"
                 ]
             },
-            "use_instructions": true
+            "adapted_from": "intfloat/e5-base-unsupervised",
+            "superseded_by": "Snowflake/snowflake-arctic-embed-m-v1.5",
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "Snowflake/snowflake-arctic-embed-m-long": {
-            "adapted_from": "nomic-ai/nomic-embed-text-v1-unsupervised",
-            "embed_dim": 768,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "Snowflake/snowflake-arctic-embed-m-long",
+            "revision": "89d0f6ab196eead40b90cb6f9fefec01a908d2d1",
+            "release_date": "2024-04-12",
             "languages": [
                 "eng-Latn"
             ],
-            "license": "apache-2.0",
             "loader": {
                 "model_name": "Snowflake/snowflake-arctic-embed-m-long",
                 "revision": "89d0f6ab196eead40b90cb6f9fefec01a908d2d1",
                 "trust_remote_code": true
             },
-            "max_tokens": 2048.0,
-            "memory_usage_mb": 522.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 137000000,
-            "name": "Snowflake/snowflake-arctic-embed-m-long",
+            "memory_usage_mb": 522.0,
+            "max_tokens": 2048.0,
+            "embed_dim": 768,
+            "license": "apache-2.0",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/Snowflake/snowflake-arctic-embed-m-long",
-            "release_date": "2024-04-12",
-            "revision": "89d0f6ab196eead40b90cb6f9fefec01a908d2d1",
             "similarity_fn_name": "cosine",
-            "superseded_by": "Snowflake/snowflake-arctic-embed-m-v2.0",
+            "use_instructions": true,
             "training_datasets": {
                 "FEVER": [
                     "test"
@@ -3168,16 +3339,17 @@
                     "test"
                 ]
             },
-            "use_instructions": true
+            "adapted_from": "nomic-ai/nomic-embed-text-v1-unsupervised",
+            "superseded_by": "Snowflake/snowflake-arctic-embed-m-v2.0",
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "Snowflake/snowflake-arctic-embed-m-v2.0": {
-            "adapted_from": "Alibaba-NLP/gte-multilingual-base",
-            "embed_dim": 768,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "Snowflake/snowflake-arctic-embed-m-v2.0",
+            "revision": "f2a7d59d80dfda5b1d14f096f3ce88bb6bf9ebdc",
+            "release_date": "2024-12-04",
             "languages": [
                 "afr-Latn",
                 "ara-Arab",
@@ -3254,27 +3426,26 @@
                 "yor-Latn",
                 "zho-Hans"
             ],
-            "license": "apache-2.0",
             "loader": {
                 "model_name": "Snowflake/snowflake-arctic-embed-m-v2.0",
                 "revision": "f2a7d59d80dfda5b1d14f096f3ce88bb6bf9ebdc",
                 "trust_remote_code": true
             },
-            "max_tokens": 8192.0,
-            "memory_usage_mb": 1165.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 305000000,
-            "name": "Snowflake/snowflake-arctic-embed-m-v2.0",
+            "memory_usage_mb": 1165.0,
+            "max_tokens": 8192.0,
+            "embed_dim": 768,
+            "license": "apache-2.0",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/Snowflake/snowflake-arctic-embed-m-v2.0",
-            "release_date": "2024-12-04",
-            "revision": "f2a7d59d80dfda5b1d14f096f3ce88bb6bf9ebdc",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": true,
             "training_datasets": {
                 "FEVER": [
                     "test"
@@ -3319,39 +3490,39 @@
                     "test"
                 ]
             },
-            "use_instructions": true
+            "adapted_from": "Alibaba-NLP/gte-multilingual-base",
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "Snowflake/snowflake-arctic-embed-s": {
-            "adapted_from": "intfloat/e5-small-unsupervised",
-            "embed_dim": 384,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "Snowflake/snowflake-arctic-embed-s",
+            "revision": "d3c1d2d433dd0fdc8e9ca01331a5f225639e798f",
+            "release_date": "2024-04-12",
             "languages": [
                 "eng-Latn"
             ],
-            "license": "apache-2.0",
             "loader": {
                 "model_name": "Snowflake/snowflake-arctic-embed-s",
                 "revision": "d3c1d2d433dd0fdc8e9ca01331a5f225639e798f"
             },
-            "max_tokens": 512.0,
-            "memory_usage_mb": 127.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 32200000,
-            "name": "Snowflake/snowflake-arctic-embed-s",
+            "memory_usage_mb": 127.0,
+            "max_tokens": 512.0,
+            "embed_dim": 384,
+            "license": "apache-2.0",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/Snowflake/snowflake-arctic-embed-s",
-            "release_date": "2024-04-12",
-            "revision": "d3c1d2d433dd0fdc8e9ca01331a5f225639e798f",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": true,
             "training_datasets": {
                 "FEVER": [
                     "test"
@@ -3387,39 +3558,39 @@
                     "test"
                 ]
             },
-            "use_instructions": true
+            "adapted_from": "intfloat/e5-small-unsupervised",
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "Snowflake/snowflake-arctic-embed-xs": {
-            "adapted_from": "sentence-transformers/all-MiniLM-L6-v2",
-            "embed_dim": 384,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "Snowflake/snowflake-arctic-embed-xs",
+            "revision": "742da4f66e1823b5b4dbe6c320a1375a1fd85f9e",
+            "release_date": "2024-07-08",
             "languages": [
                 "eng-Latn"
             ],
-            "license": "apache-2.0",
             "loader": {
                 "model_name": "Snowflake/snowflake-arctic-embed-xs",
                 "revision": "742da4f66e1823b5b4dbe6c320a1375a1fd85f9e"
             },
-            "max_tokens": 512.0,
-            "memory_usage_mb": 86.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 22600000,
-            "name": "Snowflake/snowflake-arctic-embed-xs",
+            "memory_usage_mb": 86.0,
+            "max_tokens": 512.0,
+            "embed_dim": 384,
+            "license": "apache-2.0",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/Snowflake/snowflake-arctic-embed-xs",
-            "release_date": "2024-07-08",
-            "revision": "742da4f66e1823b5b4dbe6c320a1375a1fd85f9e",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": true,
             "training_datasets": {
                 "FEVER": [
                     "test"
@@ -3455,80 +3626,80 @@
                     "test"
                 ]
             },
-            "use_instructions": true
+            "adapted_from": "sentence-transformers/all-MiniLM-L6-v2",
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "thenlper/gte-base": {
-            "adapted_from": null,
-            "embed_dim": 768,
-            "framework": [
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "thenlper/gte-base",
+            "revision": "c078288308d8dee004ab72c6191778064285ec0c",
+            "release_date": "2023-07-27",
             "languages": [
                 "eng-Latn"
             ],
-            "license": "mit",
             "loader": {},
-            "max_tokens": 512.0,
-            "memory_usage_mb": 209.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 109482752,
-            "name": "thenlper/gte-base",
+            "memory_usage_mb": 209.0,
+            "max_tokens": 512.0,
+            "embed_dim": 768,
+            "license": "mit",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/thenlper/gte-base",
-            "release_date": "2023-07-27",
-            "revision": "c078288308d8dee004ab72c6191778064285ec0c",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": null,
             "training_datasets": null,
-            "use_instructions": null
+            "adapted_from": null,
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "thenlper/gte-large": {
-            "adapted_from": null,
-            "embed_dim": 1024,
-            "framework": [
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "thenlper/gte-large",
+            "revision": "4bef63f39fcc5e2d6b0aae83089f307af4970164",
+            "release_date": "2023-07-27",
             "languages": [
                 "eng-Latn"
             ],
-            "license": "mit",
             "loader": {},
-            "max_tokens": 512.0,
-            "memory_usage_mb": 639.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 335122400,
-            "name": "thenlper/gte-large",
+            "memory_usage_mb": 639.0,
+            "max_tokens": 512.0,
+            "embed_dim": 1024,
+            "license": "mit",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
-            "reference": "https://huggingface.co/thenlper/gte-large",
-            "release_date": "2023-07-27",
-            "revision": "4bef63f39fcc5e2d6b0aae83089f307af4970164",
-            "similarity_fn_name": "cosine",
-            "superseded_by": null,
-            "training_datasets": null,
-            "use_instructions": null
-        },
-        "WhereIsAI/UAE-Code-Large-V1": {
-            "adapted_from": null,
-            "embed_dim": 1024,
             "framework": [
-                "Sentence Transformers",
                 "PyTorch"
             ],
+            "reference": "https://huggingface.co/thenlper/gte-large",
+            "similarity_fn_name": "cosine",
+            "use_instructions": null,
+            "training_datasets": null,
+            "adapted_from": null,
+            "superseded_by": null,
             "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
+        },
+        "WhereIsAI/UAE-Code-Large-V1": {
+            "name": "WhereIsAI/UAE-Code-Large-V1",
+            "revision": "c601ffcfd22c0956a0f97eeada84b27634a7afc8",
+            "release_date": "2023-12-04",
             "languages": [
                 "eng-Latn"
             ],
-            "license": "mit",
             "loader": {
                 "model": "WhereIsAI/UAE-Code-Large-V1",
                 "model_prompts": {
@@ -3537,40 +3708,40 @@
                 },
                 "revision": "369c368f70f16a613f19f5598d4f12d9f44235d4"
             },
-            "max_tokens": 512.0,
-            "memory_usage_mb": 1278.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 335000000,
-            "name": "WhereIsAI/UAE-Code-Large-V1",
+            "memory_usage_mb": 1278.0,
+            "max_tokens": 512.0,
+            "embed_dim": 1024,
+            "license": "mit",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/WhereIsAI/UAE-Code-Large-V1",
-            "release_date": "2023-12-04",
-            "revision": "c601ffcfd22c0956a0f97eeada84b27634a7afc8",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": true,
             "training_datasets": {
                 "MNLI": [],
                 "NLI": [],
                 "SNLI": []
             },
-            "use_instructions": true
+            "adapted_from": null,
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         },
         "WhereIsAI/UAE-Large-V1": {
-            "adapted_from": null,
-            "embed_dim": 1024,
-            "framework": [
-                "Sentence Transformers",
-                "PyTorch"
-            ],
-            "is_cross_encoder": null,
+            "name": "WhereIsAI/UAE-Large-V1",
+            "revision": "369c368f70f16a613f19f5598d4f12d9f44235d4",
+            "release_date": "2023-12-04",
             "languages": [
                 "eng-Latn"
             ],
-            "license": "mit",
             "loader": {
                 "model": "WhereIsAI/UAE-Large-V1",
                 "model_prompts": {
@@ -3579,30 +3750,35 @@
                 },
                 "revision": "369c368f70f16a613f19f5598d4f12d9f44235d4"
             },
-            "max_tokens": 512.0,
-            "memory_usage_mb": 1278.0,
-            "modalities": [
-                "text"
-            ],
             "n_parameters": 335000000,
-            "name": "WhereIsAI/UAE-Large-V1",
+            "memory_usage_mb": 1278.0,
+            "max_tokens": 512.0,
+            "embed_dim": 1024,
+            "license": "mit",
             "open_weights": true,
             "public_training_code": null,
             "public_training_data": null,
+            "framework": [
+                "Sentence Transformers",
+                "PyTorch"
+            ],
             "reference": "https://huggingface.co/WhereIsAI/UAE-Large-V1",
-            "release_date": "2023-12-04",
-            "revision": "369c368f70f16a613f19f5598d4f12d9f44235d4",
             "similarity_fn_name": "cosine",
-            "superseded_by": null,
+            "use_instructions": true,
             "training_datasets": {
                 "MNLI": [],
                 "NLI": [],
                 "SNLI": []
             },
-            "use_instructions": true
+            "adapted_from": null,
+            "superseded_by": null,
+            "is_cross_encoder": null,
+            "modalities": [
+                "text"
+            ]
         }
     },
-    {
+    "model_map": {
         "Alibaba-NLP": {
             "Alibaba-NLP/gte-modernbert-base": [
                 "groq",
@@ -3705,7 +3881,7 @@
         },
         "Qwen": {
             "Qwen/Qwen3-Embedding-0.6B": [
-                "sentence transformers"
+                "sentence-transformers"
             ],
             "Qwen/Qwen3-Embedding-4B": [
                 "sentence-transformers"
@@ -3801,7 +3977,7 @@
             ]
         }
     },
-    {
+    "aliases": {
         "fastembed": {
             "nomic-ai/nomic-embed-text-v1.5-GGUF": "nomic-ai/nomic-embed-text-v1.5-Q"
         },
@@ -3816,7 +3992,7 @@
             "Snowflake/snowflake-arctic-embed-l-v2.0": "snowflake-arctic-embed2:568m"
         }
     },
-    {
+    "sparse_models": {
         "fastembed": [
             "Qdrant/bm25",
             "Qdrant/bm42-all-minilm-l6-v2-attentions",
@@ -3831,4 +4007,4 @@
             "opensearch-project/opensearch-neural-sparse-encoding-doc-v2-mini"
         ]
     }
-]
+}

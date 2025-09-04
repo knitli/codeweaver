@@ -26,6 +26,35 @@ except ImportError as e:
     ) from e
 
 
+def default_client_args(model: str, *, query: bool = False) -> dict[str, Any]:
+    """Get default client arguments for a specific model."""
+    extra: dict[str, Any] = {}
+    float16 = {"model_kwargs": {"torch_dtype": "torch.float16"}}
+    if "qwen3" in model.lower():
+        extra = {
+            "instruction": "Given search results containing code snippets, tree-sitter parse trees, documentation and code comments from a codebase, retrieve relevant Documents that answer the Query.",
+            "tokenizer_kwargs": {"padding_side": "left"},
+            **float16,
+        }
+    if "bge" in model.lower() and "m3" not in model.lower() and query:
+        extra = {
+            "prompt_name": "query",
+            "prompts": {
+                "query": {"text": "Represent this sentence for searching relevant passages:"}
+            },
+            **float16,
+        }
+    if "snowflake" in model.lower() and "v2.0" in model.lower():
+        extra = {"prompt_name": "query"}  # only for query embeddings
+
+    return {
+        "model_name_or_path": model,
+        "normalize_embeddings": True,
+        "trust_remote_code": True,
+        **extra,
+    }
+
+
 def process_for_instruction_model(queries: Sequence[str], instruction: str) -> list[str]:
     """Process documents for instruction models."""
 
@@ -151,8 +180,6 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
             and (instruction := model.get("instruction"))
         ):
             self.preprocess = rpartial(process_for_instruction_model, instruction=instruction)
-            self.doc_kwargs["client"]["model_kwargs"] = {"torch_dtype": "torch.float16"}
-            self.query_kwargs["client"]["model_kwargs"] = {"torch_dtype": "torch.float16"}
         if has_flash_attention:
             self.doc_kwargs["client"]["model_kwargs"]["attention_implementation"] = (
                 "flash_attention_2"

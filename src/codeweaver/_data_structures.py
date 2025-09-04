@@ -15,13 +15,13 @@ import textwrap
 from collections.abc import Callable, ItemsView, Iterable, Iterator, KeysView, Sequence, ValuesView
 from datetime import UTC, datetime
 from functools import cache, cached_property
+from io import BufferedReader
 from pathlib import Path
 from types import MappingProxyType
 from typing import (
     Annotated,
     Any,
     Literal,
-    LiteralString,
     NamedTuple,
     NewType,
     NotRequired,
@@ -38,17 +38,18 @@ from typing import (
 from uuid import uuid4
 from weakref import WeakValueDictionary
 
-from _typeshed import ReadableBuffer
 from ast_grep_py import SgNode
 from pydantic import (
     UUID4,
     BaseModel,
+    Discriminator,
     Field,
     NonNegativeFloat,
     NonNegativeInt,
     PositiveFloat,
     PositiveInt,
     PrivateAttr,
+    Tag,
     computed_field,
     model_validator,
 )
@@ -105,7 +106,7 @@ class ChunkType(BaseEnum):
 class SemanticMetadata(TypedDict, total=False):
     """Metadata associated with the semantics of a code chunk."""
 
-    language: Required[SemanticSearchLanguage | LiteralString | None]
+    language: Required[SemanticSearchLanguage | str | None]
     primary_node: NotRequired[SgNode | None]
     nodes: NotRequired[tuple[SgNode, ...] | None]
 
@@ -519,7 +520,7 @@ class CodeChunkDict(TypedDict, total=False):
     content: Required[str]
     line_range: Required[SpanTuple | Span]
     file_path: NotRequired[Path | None]
-    language: NotRequired[SemanticSearchLanguage | LiteralString | None]
+    language: NotRequired[SemanticSearchLanguage | str | None]
     chunk_type: NotRequired[ChunkType | None]
     timestamp: NotRequired[PositiveFloat]
     chunk_id: NotRequired[UUID4]
@@ -573,7 +574,7 @@ class CodeChunk(BaseModel):
             description="""Path to the source file. Not all chunks are from files, so this can be None."""
         ),
     ] = None
-    language: SemanticSearchLanguage | LiteralString | None = None
+    language: SemanticSearchLanguage | str | None = None
     chunk_type: ChunkType = ChunkType.TEXT_BLOCK  # For Phase 1, simple text blocks
     ext_kind: Annotated[
         ExtKind | None,
@@ -718,7 +719,7 @@ def _has_semantic_extension(ext: str) -> SemanticSearchLanguage | None:
 class ExtKind(NamedTuple):
     """Represents a file extension and its associated kind."""
 
-    language: LiteralString | SemanticSearchLanguage | ConfigLanguage
+    language: str | SemanticSearchLanguage | ConfigLanguage
     kind: ChunkKind
 
     def __str__(self) -> str:
@@ -727,7 +728,7 @@ class ExtKind(NamedTuple):
 
     @classmethod
     def from_string(
-        cls, language: LiteralString | SemanticSearchLanguage, kind: str | ChunkKind
+        cls, language: str | SemanticSearchLanguage, kind: str | ChunkKind
     ) -> ExtKind | None:
         """Create an ExtKind from a string representation."""
         if isinstance(language, SemanticSearchLanguage):
@@ -739,7 +740,7 @@ class ExtKind(NamedTuple):
             )
         with contextlib.suppress(KeyError):
             if semantic := SemanticSearchLanguage.from_string(language):
-                return cls.from_string(cast(SemanticSearchLanguage, semantic), kind)
+                return cls.from_string(semantic, kind)
         from codeweaver._constants import CODE_LANGUAGES, CONFIG_FILE_LANGUAGES, DOCS_LANGUAGES
 
         if language in CONFIG_FILE_LANGUAGES:
@@ -794,7 +795,9 @@ class ExtKind(NamedTuple):
         )
 
 
-HashKeyKind = TypeVar("HashKeyKind", UUID4, BlakeHashKey)
+HashKeyKind = TypeVar(
+    "HashKeyKind", Annotated[UUID4, Tag("uuid")], Annotated[BlakeHashKey, Tag("blake")]
+)
 # General sub-value type for container-like value types.
 SubT = TypeVar("SubT")
 
@@ -809,6 +812,21 @@ def to_uuid() -> UUID4:
     return uuid4()
 
 
+def discriminate_sub_value_type(v: Any) -> Literal["container", "none"]:
+    """Discriminate the sub-value type for a given value."""
+    if (isinstance(v, dict) and v.get("use_uuid") is False) or (
+        not isinstance(v, dict) and getattr(v, "use_uuid", True) is False
+    ):
+        return "none"
+    # we need to examine the `value_type`
+    if (value_type := getattr(v, "value_type", None)) and (
+        value_type in (list, set, tuple, dict)
+        or (hasattr(value_type, "__contains__") and hasattr(value_type, "__iter__"))
+    ):
+        return "container"
+    return "none"
+
+
 class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](BaseModel):
     """A key-value store with precise typing for keys, values, and optional sub-values.
 
@@ -818,6 +836,8 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
 
     The store protects data integrity by copying data on get, pushes removed items to a trash heap for
     potential recovery, and can optionally limit the total size (default is 3MB).
+
+    Hey, it started simple!
     """
 
     value_type: Annotated[
@@ -840,11 +860,11 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
     ]
 
     sub_value_type: Annotated[
-        type[SubT] | None,
+        Annotated[type[SubT], Tag("container")] | Annotated[None, Tag("none")],
         Field(
-            description="If value_type is a container, this is the type of its elements; otherwise None.",
-            discriminator="sub_value_type",
+            description="If value_type is a container, this is the type of its elements; otherwise None."
         ),
+        Discriminator(discriminate_sub_value_type),
     ] = None
 
     # Key generator is derived from use_uuid at runtime; keep it private to the model
@@ -1064,7 +1084,7 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
                 if isinstance(hash_value, bytes)
                 else get_blake_hash(bytes(hash_value))
             )
-        elif isinstance(value, SupportsIndex | SupportsBytes | ReadableBuffer) or (
+        elif isinstance(value, SupportsIndex | SupportsBytes | BufferedReader) or (
             isinstance(value, Iterable) and all(v for v in value if isinstance(v, SupportsIndex))  # pyright: ignore[reportUnknownVariableType]
         ):  # pyright: ignore[reportUnknownVariableType]
             blake_key: BlakeHashKey = get_blake_hash(bytes(value))  # pyright: ignore[reportUnknownArgumentType]
@@ -1138,12 +1158,14 @@ class UUIDStore[T, SubT: object | None](SimpleTypedStore[UUID4, T, SubT]):
     """Typed store specialized for UUID keys."""
 
     use_uuid: Literal[True] = True  # pyright: ignore[reportIncompatibleVariableOverride]
+    """UUID store always uses UUID keys (clearly)."""
 
 
 class BlakeStore[T, SubT: object | None](SimpleTypedStore[BlakeHashKey, T, SubT]):
     """Typed store specialized for Blake3-hash keys."""
 
     use_uuid: Literal[False] = False  # pyright: ignore[reportIncompatibleVariableOverride]
+    """Blake store always uses Blake3 hash keys (obviously), and never UUID keys."""
 
 
 @overload

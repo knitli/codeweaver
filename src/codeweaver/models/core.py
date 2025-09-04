@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, LiteralString
+from typing import TYPE_CHECKING, Annotated
 
 from pydantic import (
     BaseModel,
@@ -171,8 +171,8 @@ class FindCodeResponse(BaseModel):
     ]
 
     languages_found: Annotated[
-        tuple[SemanticSearchLanguage | LiteralString, ...],
+        tuple[SemanticSearchLanguage | str, ...],
         Field(
-            description="""Programming languages in the results. If the language is supported for semantic search, it will be a `SemanticSearchLanguage`, otherwise a `LiteralString` from languages in `codeweaver._constants.py`"""
+            description="""Programming languages in the results. If the language is supported for semantic search, it will be a `SemanticSearchLanguage`, otherwise a `str` from languages in `codeweaver._constants.py`"""
         ),
     ]

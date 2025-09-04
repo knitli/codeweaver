@@ -21,7 +21,6 @@ from pydantic import AnyHttpUrl, create_model
 
 from codeweaver._data_structures import CodeChunk
 from codeweaver._settings import Provider
-from codeweaver.embedding.capabilities import get_capabilities_by_model_and_provider
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.embedding.providers.base import EmbeddingProvider
 
@@ -101,6 +100,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         cls,
         model_name: str,
         provider: Provider,
+        capabilities: EmbeddingModelCapabilities,
         *,
         base_url: str | None = None,
         provider_kwargs: dict[str, Any] | None = None,
@@ -110,9 +110,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         Create a new embedding provider class for the specified model and provider.
         """
         name = f"{str(provider).title()}EmbeddingProvider"
-        capabilities: EmbeddingModelCapabilities = get_capabilities_by_model_and_provider(
-            model_name, provider
-        )
+        caps: EmbeddingModelCapabilities = capabilities
 
         def make_init(
             base: type,
@@ -131,7 +129,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
                 Initialize the embedding provider.
                 """
                 self._provider = provider
-                self._caps = capabilities
+                self._caps = caps
                 if client is not None:
                     self._client = client
                 kwargs.setdefault("model", model_name)
@@ -160,7 +158,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         )
         return create_model(
             name,
-            __doc__=f"An embedding provider class for {str(provider).title()}.\n\nI was proudly made in the `codeweaver.embedding.providers.openai_base` module by hardworking electrons.",
+            __doc__=f"An embedding provider class for {str(provider).title()}.\n\nI was proudly made in the `codeweaver.embedding.providers.openai_factory` module by hardworking electrons.",
             __base__=parent_cls,
             __module__="codeweaver.embedding.providers.openai_factory",
             __validators__=None,

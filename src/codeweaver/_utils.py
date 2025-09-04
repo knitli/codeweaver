@@ -24,7 +24,12 @@ from codeweaver._common import Sentinel
 
 logger = logging.getLogger(__name__)
 
-MISSING = Sentinel("MISSING", "Sentinel<MISSING>", __name__)
+
+class Missing(Sentinel):
+    pass
+
+
+MISSING: Missing = Missing("MISSING", "Sentinel<MISSING>", __name__)
 
 
 # Even Python's latest and greatest typing (as of 3.12+) can't properly express this.
@@ -100,9 +105,9 @@ def walk_down_to_git_root(path: Path | None = None) -> Path:
 
 def get_project_root() -> Path:
     """Get the root directory of the project."""
-    from codeweaver._server import get_settings
+    from codeweaver.main import get_app_settings
 
-    settings = get_settings()
+    settings = get_app_settings()
     return settings.project_root or walk_down_to_git_root()
 
 
@@ -117,7 +122,7 @@ def has_git() -> bool:
     return False
 
 
-def get_git_revision(directory: Path) -> str | MISSING:  # pyright: ignore[reportUnknownParameterType]
+def get_git_revision(directory: Path) -> str | Missing:  # pyright: ignore[reportInvalidTypeForm, reportUnknownParameterType]
     """Get the SHA-1 of the HEAD of a git repository."""
     if not is_git_repo(directory):
         with contextlib.suppress(FileNotFoundError):
