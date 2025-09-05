@@ -20,7 +20,7 @@ from codeweaver._statistics import SessionStatistics
 from codeweaver._utils import estimate_tokens
 from codeweaver.exceptions import QueryError
 from codeweaver.language import SemanticSearchLanguage
-from codeweaver.models.core import CodeMatch, CodeMatchType, FindCodeResponse, SearchStrategy
+from codeweaver.models.core import CodeMatch, CodeMatchType, FindCodeResponseSummary, SearchStrategy
 from codeweaver.services.discovery import FileDiscoveryService
 
 
@@ -50,7 +50,7 @@ async def find_code_implementation(
     focus_languages: tuple[SemanticSearchLanguage, ...] | Sequence[str] | None = None,
     max_results: PositiveInt = 50,  # TODO: why isn't this used?
     statistics: SessionStatistics | None = None,
-) -> FindCodeResponse:
+) -> FindCodeResponseSummary:
     """Phase 1 implementation of find_code tool.
 
     Uses basic keyword-based text search with file discovery.
@@ -107,7 +107,7 @@ async def find_code_implementation(
             statistics.add_token_usage(search_results=total_tokens)
 
         # Create response
-        return FindCodeResponse(
+        return FindCodeResponseSummary(
             matches=matches,
             summary=f"Found {len(matches)} matches for '{query}'",
             query_intent=intent,

@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Reranking model capabilities and settings."""
 
 from collections.abc import Callable, Sequence
@@ -95,7 +100,7 @@ class RerankingModelCapabilities(BaseModel):
 
     name: Annotated[str, Field(description="""The name of the model.""")] = ""
     provider: Annotated[Provider, Field(description="""The provider of the model.""")] = (
-        Provider._UNSET  # pyright: ignore[reportPrivateUsage]
+        Provider.UNSET  # pyright: ignore[reportPrivateUsage]
     )
     max_query: Annotated[
         PositiveInt | None,

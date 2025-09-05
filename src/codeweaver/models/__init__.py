@@ -8,7 +8,7 @@
 
 from functools import cache
 
-from codeweaver.models.core import CodeMatch, FindCodeResponse
+from codeweaver.models.core import CodeMatch, FindCodeResponseSummary
 from codeweaver.models.intent import IntentResult, QueryIntent
 
 
@@ -20,4 +20,4 @@ def get_user_agent() -> str:
     return f"CodeWeaver/{__version__}"
 
 
-__all__ = ("CodeMatch", "FindCodeResponse", "IntentResult", "QueryIntent", "get_user_agent")
+__all__ = ("CodeMatch", "FindCodeResponseSummary", "IntentResult", "QueryIntent", "get_user_agent")

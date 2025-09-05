@@ -1,17 +1,16 @@
 #!/usr/bin/env -S uv run -s
-# /// script
-# requires-python = ">=3.12"
-# dependencies = ["mteb", "black", "cyclopts", "pydantic>=2.11.0", "_typeshed", "pyperclip", "rich"]
-# ///
+
 # SPDX-FileCopyrightText: 2025 (c) 2025 Knitli Inc.
-# SPDX-License-Identifier: MIT OR Apache-2.0
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """A helper script for converting MTEB model metadata to CodeWeaver capabilities."""
 
 from __future__ import annotations
 
 import functools
-import json
 import re
 import sys
 
@@ -23,7 +22,7 @@ import black
 
 from cyclopts import App, Parameter
 from mteb import AbsTask, ModelMeta, get_model_meta, get_model_metas
-from mteb.model_meta import sentence_transformers_loader
+from mteb.model_meta import SentenceTransformerWrapper, sentence_transformers_loader
 from pydantic import (
     AnyUrl,
     BaseModel,
@@ -33,7 +32,9 @@ from pydantic import (
     PastDatetime,
     field_serializer,
 )
+from pydantic_core import from_json
 from rich.console import Console
+from typing_extensions import TypeIs
 
 
 # make sure codeweaver is importable
@@ -280,34 +281,60 @@ type ModelMap = dict[
 """A mapping of model makers to their models and the providers that support each model."""
 
 
+def is_a_dictionary_really_pyright(value: Any) -> TypeIs[dict[str, Any]]:
+    """A type guard to convince pyright that something is a dictionary."""
+    return isinstance(value, dict) and all(isinstance(k, str) for k in value)
+
+
+def is_a_modelmeta(value: Any) -> TypeIs[ModelMeta]:
+    """A type guard to convince pyright that something is a ModelMeta."""
+    return isinstance(value, ModelMeta) and hasattr(value, "model_dump")
+
+
+def do_nothing(value: Any) -> None:
+    """A no-op function."""
+
+
 def dict_to_partial(v: dict[str, Any] | str | ModelMeta) -> Callable[..., Any]:
     """Validator for ModelMeta, handling conversions."""
-    new_loader = None
+    new_loader: Callable[..., Any] = do_nothing  # pyright: ignore[reportRedeclaration, reportAssignmentType]
     if isinstance(v, str):
-        v = json.loads(v)
+        v = from_json(v)
+        v: dict[str, Any] | ModelMeta
     new_v = v.copy() if isinstance(v, dict) else v.model_copy(deep=True)
-    if isinstance(v, dict) and "loader" in v:
+    if isinstance(v, dict) and v.get("loader") and is_a_dictionary_really_pyright(v):
         new_loader = (
             functools.partial(sentence_transformers_loader, **v.get("loader", {}))
             if isinstance(v.get("loader"), dict)
             else lambda _: None
-        )
-        if v.get("license") and "jinaai" in v.get("name") and "qwen" in v.get("license"):
-            new_v["license"] = "cc-by-nc-4.0"
-        if v.get("name") and v.get("name").startswith("snowflake-arctic-embed2"):
-            new_v["name"] = "Snowflake/snowflake-arctic-embed-v2.0-ollama"
-        new_v = new_v | {"loader": new_loader}
+        )  # type: ignore
+        if (
+            cast(dict, v).get("license")
+            and "jinaai" in v.get("name", "")
+            and "qwen" in v.get("license", "")
+        ):  # type: ignore
+            cast(dict, new_v)["license"] = "cc-by-nc-4.0"
+        if v.get("name") and v.get("name", "").startswith("snowflake-arctic-embed2"):
+            cast(dict, new_v)["name"] = "Snowflake/snowflake-arctic-embed-v2.0-ollama"
+        new_v = cast(dict, new_v) | {"loader": new_loader}
     elif isinstance(v, ModelMeta):
-        if v.loader and not hasattr(v.loader, "keywords"):
-            new_loader = functools.partial(sentence_transformers_loader, **v.loader)
-        elif not hasattr(v.loader, "keywords"):
-            new_loader = lambda _: None
+        if (
+            v.loader
+            and not hasattr(v.loader, "keywords")
+            and is_a_dictionary_really_pyright(v.loader)
+        ):
+            if is_a_dictionary_really_pyright(v.loader):
+                new_loader: Callable[..., SentenceTransformerWrapper] = functools.partial(
+                    sentence_transformers_loader, **v.loader
+                )
+        elif not hasattr(v.loader, "keywords") and callable(v.loader):
+            new_loader = v.loader  # pyright: ignore[reportAssignmentType]
         else:
-            new_loader = v.loader
+            new_loader = v.loader  # pyright: ignore[reportAssignmentType]
         if v.license and v.name and "jinaai" in v.name and "qwen" in v.license:
-            new_v.license = "cc-by-nc-4.0"
-        new_v.loader = new_loader  # pyright: ignore[reportPrivateUsage]
-    return new_v
+            cast(ModelMeta, new_v).license = "cc-by-nc-4.0"
+        cast(ModelMeta, new_v).loader = new_loader  # pyright: ignore[reportAttributeAccessIssue, reportPrivateUsage]
+    return new_v  # pyright: ignore[reportReturnType]
 
 
 class RootJson(BaseModel):
@@ -344,11 +371,10 @@ class RootJson(BaseModel):
         """Serialize the models for JSON output."""
         for key, model in value.items():
             if model.loader and hasattr(model.loader, "keywords"):
-                model.loader = model.loader.keywords  # pyright: ignore[reportAttributeAccessIssue]
-                value[key] = model
+                model.loader = model.loader.keywords  # pyright: ignore[reportFunctionMemberAccess, reportAttributeAccessIssue]
             else:
-                model.loader = {}
-                value[key] = model
+                model.loader = {}  # type: ignore
+            value[key] = model
         return value
 
     @property

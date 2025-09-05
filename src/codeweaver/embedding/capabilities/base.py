@@ -10,127 +10,8 @@ from typing import Annotated, Any, Literal, NotRequired, Required, Self, TypedDi
 
 from pydantic import BaseModel, ConfigDict, Field, PositiveFloat, PositiveInt
 
-from codeweaver._common import UNSET, BaseEnum, LiteralStringT
+from codeweaver._common import UNSET, Unset
 from codeweaver._settings import Provider
-
-
-class TransformersEmbeddingTask(BaseEnum):
-    """An enum representing the different types of embedding tasks supported by Hugging Face Transformers models."""
-
-    QUERY = "query"
-    PASSAGE = "passage"
-
-    # These are hybrids that are used by jinaai/jina-embeddings-v4
-    RETRIEVAL_QUERY = "retrieval.query"
-    RETRIEVAL_PASSAGE = "retrieval.passage"
-    CODE_QUERY = "code.query"
-    CODE_PASSAGE = "code.passage"
-
-    @property
-    def prompt_name(self) -> Literal["query", "passage"]:
-        """Return the prompt name for the embedding task."""
-        return "query" if self in {self.QUERY, self.RETRIEVAL_QUERY, self.CODE_QUERY} else "passage"
-
-    @property
-    def task_name(self) -> LiteralStringT:
-        """Return the task name for the embedding task."""
-        if self in {self.QUERY, self.PASSAGE}:
-            return self.value
-        return "code" if self in {self.CODE_QUERY, self.CODE_PASSAGE} else "retrieval"
-
-
-class PoolingMethod(BaseEnum):
-    """An enum representing the different types of pooling methods supported by Hugging Face Transformers models."""
-
-    CLS = "cls"
-    """Use the embedding of the [CLS] token."""
-    MEAN = "mean"
-    """Mean pooling over the token embeddings."""
-    MAX = "max"
-    """Max pooling over the token embeddings."""
-    MIN = "min"
-    """Min pooling over the token embeddings."""
-    SUM = "sum"
-    """Sum pooling over the token embeddings."""
-    MEDIAN = "median"
-    """Median pooling over the token embeddings."""
-    FIRST_LAST_AVG = "first_last_avg"
-    """Average of the first and last hidden layers."""
-    LAST_AVG = "last_avg"
-    """Average of the last hidden layer."""
-
-    @property
-    def description(self) -> str:
-        """Return a description of the pooling method."""
-        match self:
-            case PoolingMethod.CLS:
-                return "Use the embedding of the [CLS] token."
-            case PoolingMethod.MEAN:
-                return "Mean pooling over the token embeddings."
-            case PoolingMethod.MAX:
-                return "Max pooling over the token embeddings."
-            case PoolingMethod.MIN:
-                return "Min pooling over the token embeddings."
-            case PoolingMethod.SUM:
-                return "Sum pooling over the token embeddings."
-            case PoolingMethod.MEDIAN:
-                return "Median pooling over the token embeddings."
-            case PoolingMethod.FIRST_LAST_AVG:
-                return "Average of the first and last hidden layers."
-            case PoolingMethod.LAST_AVG:
-                return "Average of the last hidden layer."
-
-    @classmethod
-    def by_model(cls, model_name: str) -> PoolingMethod | None:
-        """Return the default pooling method for a given model name, if known."""
-        model_name = model_name.lower()
-        if model_name in frozenset({
-            "intfloat/multilingual-e5-large",
-            "intfloat/multilingual-e5-large-instruct",
-            "jinaai/jina-embeddings-v2-base-code",
-            "jinaai/jina-embeddings-v4",
-            "jinai/jina-embeddings-v3",
-            "nomic-ai/modernbert-embed-base",
-            "nomic-ai/nomic-embed-text-v1.5",
-            "nomic-ai/nomic-embed-text-v1.5-gguf",
-            "nomic-ai/nomic-embed-text-v2-moe",
-            "sentence-transformers/all-MiniLM-L12-v2",
-            "sentence-transformers/all-MiniLM-L6-v2",
-            "sentence-transformers/all-mpnet-base-v2",
-            "sentence-transformers/gtr-t5-base",
-            "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
-            "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
-            "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
-            "thenlper/gte-base",
-            "thenlper/gte-large",
-        }):
-            return cls.MEAN
-        if model_name in frozenset({
-            "alibaba-nlp/gte-modernbert-base",
-            "alibaba-nlp/gte-multilingual-base",
-            "baai/bge-base-en-v1.5",
-            "baai/bge-large-en-v1.5",
-            "baai/bge-m3",
-            "baai/bge-small-en-v1.5",
-            "ibm-granite/granite-embedding-278m-multilingual",
-            "ibm-granite/granite-embedding-30m-english",
-            "mixedbread-ai/mxbai-embed-large",
-            "snowflake/snowflake-arctic-embed-l",
-            "snowflake/snowflake-arctic-embed-l-v2.0",
-            "snowflake/snowflake-arctic-embed-m",
-            "snowflake/snowflake-arctic-embed-m-long",
-            "snowflake/snowflake-arctic-embed-m-v2.0",
-            "snowflake/snowflake-arctic-embed-s",
-            "snowflake/snowflake-arctic-embed-xs",
-        }):
-            return cls.CLS
-        if model_name in frozenset({
-            "qwen/qwen3-embedding-0.6b",
-            "qwen/qwen3-embedding-4b",
-            "qwen/qwen3-embedding-8b",
-        }):
-            return cls.LAST_AVG
-        return None
 
 
 type PartialCapabilities = dict[
@@ -209,7 +90,7 @@ class EmbeddingModelCapabilities(BaseModel):
         Field(
             description="""The provider of the model. Since available settings vary across providers, each capabilities instance is tied to a provider."""
         ),
-    ] = Provider._UNSET  # type: ignore
+    ] = Provider.UNSET  # type: ignore
     version: Annotated[
         str | int | None,
         Field(
@@ -275,7 +156,7 @@ class EmbeddingModelCapabilities(BaseModel):
     ] = None
     other: Annotated[dict[str, Any], Field(description="Extra model-specific settings.")] = {}
     _available: Annotated[
-        bool | UNSET,
+        bool | Unset,
         Field(
             init=False,
             description="Whether the model is currently available with the required dependencies installed. Value set when the capability is registered for builtin capabilities. It may be unset for custom capabilities.",
@@ -298,7 +179,7 @@ class EmbeddingModelCapabilities(BaseModel):
         return cls.model_validate(capabilities)
 
     @property
-    def available(self) -> bool | UNSET:
+    def available(self) -> bool | Unset:
         """Check if the model is available."""
         return self._available
 
@@ -326,7 +207,7 @@ class SparseEmbeddingModelCapabilities(BaseModel):
     name: Annotated[str, Field(description="""The name of the model.""")]
     multilingual: bool = False
     provider: Annotated[
-        Literal[Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS, Provider._UNSET],  # pyright: ignore[reportPrivateUsage]
+        Literal[Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS, Provider.UNSET],  # pyright: ignore[reportPrivateUsage]
         Field(
             default_factory=lambda data: Provider.FASTEMBED
             if HAS_FASTEMBED and data["name"].lower().startswith("qdrant")
@@ -337,7 +218,7 @@ class SparseEmbeddingModelCapabilities(BaseModel):
                     data["name"].startswith("opensearch") or data["name"].startswith("ibm-granite")
                 )
             )
-            else Provider._UNSET,  # pyright: ignore[reportPrivateUsage]
+            else Provider.UNSET,  # pyright: ignore[reportPrivateUsage]
             description="The provider of the model. We currently only support local providers for sparse embeddings. Since Sparse embedding tend to be very efficient and low resource, they are well-suited for deployment in resource-constrained environments.",
         ),
     ] = (
@@ -345,7 +226,7 @@ class SparseEmbeddingModelCapabilities(BaseModel):
         if HAS_FASTEMBED
         else Provider.SENTENCE_TRANSFORMERS
         if HAS_ST
-        else Provider._UNSET  # pyright: ignore[reportPrivateUsage]
+        else Provider.UNSET  # pyright: ignore[reportPrivateUsage]
     )
     hf_name: Annotated[
         str | None,

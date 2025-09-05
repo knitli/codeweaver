@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # Pydantic-AI v0.62+ - Complete API Research Report
 
 *Expert API Analyst Research - Foundation for CodeWeaver Clean Rebuild*

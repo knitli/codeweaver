@@ -29,7 +29,7 @@ from codeweaver._server import (
 from codeweaver._server import get_settings as get_app_settings
 from codeweaver._statistics import SessionStatistics
 from codeweaver.exceptions import CodeWeaverError
-from codeweaver.models.core import FindCodeResponse
+from codeweaver.models.core import FindCodeResponseSummary
 from codeweaver.tools.find_code import find_code_implementation
 
 
@@ -60,7 +60,7 @@ async def find_code(
     include_tests: bool = False,
     focus_languages: tuple[SemanticSearchLanguage, ...] | None = None,
     context: Context | None = None,
-) -> FindCodeResponse:
+) -> FindCodeResponseSummary:
     """Intelligently discover and retrieve relevant codebase context.
 
     Phase 1 implementation provides basic file discovery and keyword-based search.

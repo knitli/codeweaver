@@ -1,12 +1,10 @@
-# Copyright (c) 2024 to present Pydantic Services Inc
-# SPDX-License-Identifier: MIT
-# Applies to original code in this directory (`src/codeweaver/embedding/`) from `pydantic_ai`.
-#
 # SPDX-FileCopyrightText: (c) 2025 Knitli Inc.
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-# applies to new/modified code in this directory (`src/codeweaver/embedding/`)
-"""Entrypoint for CodeWeaver's heavily-pydantic-ai-inspired embedding model system."""
+"""Entrypoint for CodeWeaver's embedding model system.
+
+We wanted to mirror `pydantic-ai`'s handling of LLM models, but we had to make a lot of adjustments to fit the embedding use case.
+"""
 
 # sourcery skip: avoid-global-variables
 from __future__ import annotations

@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # FastMCP v2.10.6 - Complete API Research Report
 
 *Expert API Analyst Research - Foundation for CodeWeaver Clean Rebuild*
@@ -449,7 +456,7 @@ class CodeSearchResult(BaseModel):
     confidence: float = Field(description="Relevance confidence score")
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
-class FindCodeResponse(BaseModel):
+class FindCodeResponseSummary(BaseModel):
     results: List[CodeSearchResult]
     total_tokens: int
     search_strategy: str
@@ -462,7 +469,7 @@ async def find_code(
     token_limit: int = Field(10000, description="Maximum tokens in response"),
     file_types: Optional[List[str]] = Field(None, description="Restrict to specific file types"),
     context: Context = None
-) -> FindCodeResponse:
+) -> FindCodeResponseSummary:
     """
     Single interface for intelligent codebase context discovery.
     

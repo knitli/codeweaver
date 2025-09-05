@@ -4,14 +4,6 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 # applies to new/modified code in this directory (`src/codeweaver/embedding_providers/`)
 
-"""
-for Azure implementation, see: https://github.com/Azure/azureml-examples/blob/main/sdk/python/foundation-models/cohere/cohere-embed.ipynb
-
-We'll need to make the provider flexible to handle both cohere.com, Azure, and Heroku endpoints. Bedrock uses the AWS API, but Azure uses Cohere for Cohere models.
-
-
-"""
-
 import os
 
 from collections.abc import Sequence
@@ -108,7 +100,7 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
         self._caps = caps
         self._provider = caps.provider or self._provider
         kwargs = kwargs or {}
-        self.client_kwargs = kwargs.get("client", {}) or kwargs
+        self.client_kwargs = kwargs.get("client_kwargs", {}) or kwargs
         self.client_kwargs["client_name"] = "codeweaver"
         if not self.client_kwargs.get("api_key"):
             if self._provider == Provider.COHERE:
@@ -180,15 +172,27 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
             self._fire_and_forget(lambda: self._update_token_stats(from_docs=texts))
         return embeddings or [[]]
 
-    async def _embed_documents(self, documents: Sequence[CodeChunk], **kwargs):
+    async def _embed_documents(
+        self, documents: Sequence[CodeChunk], **kwargs: dict[str, Any]
+    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
         """Embed a list of documents."""
-        kwargs = self.doc_kwargs.get("client", {}) | self.doc_kwargs.get("model", {}) | kwargs
+        kwargs = (
+            self.doc_kwargs.get("client_kwargs", {})
+            | self.doc_kwargs.get("model_kwargs", {})
+            | kwargs
+        )
         readied_texts = self.chunks_to_strings(documents)
         return await self._fetch_embeddings(
             cast(list[str], readied_texts), is_query=False, **kwargs
         )
 
-    async def _embed_query(self, query: Sequence[str], **kwargs):
+    async def _embed_query(
+        self, query: Sequence[str], **kwargs: dict[str, Any]
+    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
         """Embed a query or list of queries."""
-        kwargs = self.query_kwargs.get("client", {}) | self.query_kwargs.get("model", {}) | kwargs
+        kwargs = (
+            self.query_kwargs.get("client_kwargs", {})
+            | self.query_kwargs.get("model_kwargs", {})
+            | kwargs
+        )
         return await self._fetch_embeddings(cast(list[str], query), is_query=True, **kwargs)

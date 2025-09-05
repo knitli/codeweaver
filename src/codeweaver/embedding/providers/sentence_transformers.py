@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 # sourcery skip: avoid-single-character-names-variables
 """Provider for Sentence Transformers models."""
 
@@ -46,7 +51,23 @@ def default_client_args(model: str, *, query: bool = False) -> dict[str, Any]:
         }
     if "snowflake" in model.lower() and "v2.0" in model.lower():
         extra = {"prompt_name": "query"}  # only for query embeddings
-
+    if "intfloat" in model.lower() and "instruct" not in model.lower():
+        extra = {"prompt_name": "query"} if query else {"prompt_name": "document"}
+    if "jina" in model.lower() and "v2" not in model.lower():
+        if "v4" in model.lower():
+            extra = (
+                {"prompt_name": "query", "task": "code"}
+                if query
+                else {"task": "code", "prompt_name": "passage"}
+            )
+        else:
+            extra = (
+                {"task": "retrieval.query", "prompt_name": "query"}
+                if query
+                else {"task": "retrieval.passage"}
+            )
+    if "nomic" in model.lower():
+        extra = {"tokenizer_kwargs": {"padding": True}}
     return {
         "model_name_or_path": model,
         "normalize_embeddings": True,
@@ -72,12 +93,8 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
     _provider: Provider = Provider.SENTENCE_TRANSFORMERS
     _caps: EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities  # pyright: ignore[reportIncompatibleVariableOverride]
 
-    _doc_kwargs: ClassVar[dict[str, Any]] = {
-        "client": {"normalize_embeddings": True, "trust_remote_code": True}
-    }
-    _query_kwargs: ClassVar[dict[str, Any]] = {
-        "client": {"normalize_embeddings": True, "trust_remote_code": True}
-    }
+    _doc_kwargs: ClassVar[dict[str, Any]] = {"client_kwargs": {"trust_remote_code": True}}
+    _query_kwargs: ClassVar[dict[str, Any]] = {"client_kwargs": {"trust_remote_code": True}}
 
     def __init__(
         self,
@@ -96,7 +113,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
                 else SparseEncoder
             )
             self._client = _client(
-                model_name_or_path=capabilities.name, **self.doc_kwargs["client"]
+                model_name_or_path=capabilities.name, **self.doc_kwargs["client_kwargs"]
             )
         else:
             self._client = client
@@ -105,19 +122,26 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
     def _initialize(self) -> None:
         """Initialize the Sentence Transformers embedding provider."""
         for keyword_args in (self.doc_kwargs, self.query_kwargs):
-            keyword_args.setdefault("client", {})
-            if "normalize_embeddings" not in keyword_args["client"]:
-                keyword_args["client"]["normalize_embeddings"] = True
-            if "trust_remote_code" not in keyword_args["client"]:
-                keyword_args["client"]["trust_remote_code"] = True
+            keyword_args.setdefault("client_kwargs", {})
+            if "normalize_embeddings" not in keyword_args["client_kwargs"]:
+                keyword_args["client_kwargs"]["normalize_embeddings"] = True
+            if "trust_remote_code" not in keyword_args["client_kwargs"]:
+                keyword_args["client_kwargs"]["trust_remote_code"] = True
             if (
-                "model_name" not in keyword_args["client"]
-                and "model_name_or_path" not in keyword_args["client"]
+                "model_name" not in keyword_args["client_kwargs"]
+                and "model_name_or_path" not in keyword_args["client_kwargs"]
             ):
-                keyword_args["client"]["model_name_or_path"] = self._caps.name
+                keyword_args["client_kwargs"]["model_name_or_path"] = self._caps.name
         name = self.doc_kwargs.pop("model_name", self.doc_kwargs.pop("model_name_or_path"))
         self.query_kwargs.pop("model_name", self.query_kwargs.pop("model_name_or_path", None))
         self._client = self._client(name, **(self.doc_kwargs or {}))
+        if (
+            (other := self._caps.other)
+            and (model := other.get("model_kwargs", {}))
+            and (instruction := model.get("instruction"))
+        ):
+            self.preprocess = rpartial(process_for_instruction_model, instruction=instruction)
+
         if "Qwen3" in name:
             self._setup_qwen3()
 
@@ -126,11 +150,13 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
     ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
         """Embed a sequence of documents."""
         preprocessed = cast(list[str], self.chunks_to_strings(documents))
+        if "nomic" in self.model_name:
+            preprocessed = [f"search_document: {doc}" for doc in preprocessed]
         embed_partial = rpartial(  # type: ignore
             self._client.encode,  # type: ignore
             **(
-                self.doc_kwargs.get("client", {})
-                | {"model_kwargs": self.doc_kwargs.get("model", {})}
+                self.doc_kwargs.get("client_kwargs", {})
+                | {"model_kwargs": self.doc_kwargs.get("model_kwargs", {})}
                 | {**kwargs, "convert_to_numpy": True}
             ),
         )
@@ -144,13 +170,15 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
     ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
         """Embed a sequence of queries."""
         preprocessed = cast(list[str], query)
-        if "Qwen3" in self._caps.name:
+        if "qwen3" in self.model_name.lower() or "instruct" in self.model_name.lower():
             preprocessed = self.preprocess(preprocessed)  # type: ignore
+        elif "nomic" in self.model_name:
+            preprocessed = [f"search_query: {query}" for query in preprocessed]
         embed_partial = rpartial(  # type: ignore
             self._client.encode,  # type: ignore
             **(
-                self.query_kwargs.get("client", {})
-                | {"model_kwargs": self.query_kwargs.get("model", {})}
+                self.query_kwargs.get("client_kwargs", {})
+                | {"model_kwargs": self.query_kwargs.get("model_kwargs", {})}
                 | {**kwargs, "convert_to_numpy": True}
             ),
         )
@@ -160,6 +188,21 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
             lambda: self._update_token_stats(from_docs=cast(list[str], preprocessed))
         )
         return results.tolist()
+
+    @property
+    def st_pooling_config(self) -> dict[str, Any]:
+        """The pooling configuration for the SentenceTransformer."""
+        # pyright doesn't like these because the model doesn't exist statically
+        if isinstance(self._client, SentenceTransformer) and callable(self._client[1]):  # type: ignore
+            return self._client[1].get_config_dict()  # type: ignore
+        return {}
+
+    @property
+    def transformer_config(self) -> dict[str, Any]:
+        """Returns the transformer configuration for the SentenceTransformer."""
+        if isinstance(self._client, SentenceTransformer) and callable(self._client[0]):  # type: ignore
+            return self._client[0].get_config_dict()  # type: ignore
+        return {}
 
     def _setup_qwen3(self) -> None:
         """Sets up Qwen3 specific parameters."""
@@ -174,14 +217,8 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
             has_flash_attention = metadata.version("flash_attn")
         except Exception:
             has_flash_attention = None
-        if (
-            (other := self._caps.other)
-            and (model := other.get("model", {}))
-            and (instruction := model.get("instruction"))
-        ):
-            self.preprocess = rpartial(process_for_instruction_model, instruction=instruction)
         if has_flash_attention:
-            self.doc_kwargs["client"]["model_kwargs"]["attention_implementation"] = (
+            self.doc_kwargs["client_kwargs"]["model_kwargs"]["attention_implementation"] = (
                 "flash_attention_2"
             )
 

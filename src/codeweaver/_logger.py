@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Set up a logger with optional rich formatting."""
 
 import logging
@@ -6,6 +11,7 @@ from logging.config import dictConfig
 from typing import Any, Literal
 
 from fastmcp import Context
+from pydantic_core import to_json
 from rich.console import Console
 from rich.logging import RichHandler
 
@@ -75,10 +81,8 @@ def log_to_client_or_fallback(
 ) -> None:
     """Log a message to the client or fallback to standard logging."""
     if ctx and hasattr(ctx, level):
-        import json
-
         log_obj = getattr(ctx, level)
-        log_obj(f"{message}\n\n{json.dumps(extra, indent=2) if extra else ''}", logger.name)
+        log_obj(f"{message}\n\n{to_json(extra, indent=2) if extra else ''}", logger.name)
     else:
         match level:
             case "debug":

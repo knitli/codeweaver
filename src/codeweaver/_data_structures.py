@@ -54,6 +54,7 @@ from pydantic import (
     model_validator,
 )
 from pydantic.dataclasses import dataclass
+from pydantic_core import to_json
 from typing_extensions import TypeIs
 
 from codeweaver._common import BaseEnum
@@ -643,9 +644,8 @@ class CodeChunk(BaseModel):
             "language": self_map.get("language"),
             "chunk_type": self_map.get("chunk_type"),
         }
-        import json
 
-        return json.dumps({k: v for k, v in ordered_self_map.items() if v}, ensure_ascii=False)
+        return to_json({k: v for k, v in ordered_self_map.items() if v}, round_trip=True)
 
     def set_batch_id(self, batch_id: UUID4) -> None:
         """Set the batch ID for the code chunk."""

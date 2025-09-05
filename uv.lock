@@ -589,7 +589,8 @@ all = [
     { name = "qdrant-client" },
     { name = "rich" },
     { name = "rignore" },
-    { name = "sentence-transformers", extra = ["onnx"] },
+    { name = "sentence-transformers" },
+    { name = "textcase" },
     { name = "tiktoken" },
     { name = "tokenizers" },
     { name = "tomli-w" },
@@ -619,7 +620,7 @@ all-gpu = [
     { name = "qdrant-client" },
     { name = "rich" },
     { name = "rignore" },
-    { name = "sentence-transformers", extra = ["onnx-gpu"] },
+    { name = "sentence-transformers" },
     { name = "tiktoken" },
     { name = "tokenizers" },
     { name = "tomli-w" },
@@ -670,7 +671,7 @@ provider-huggingface = [
     { name = "pydantic-ai-slim", extra = ["huggingface"] },
 ]
 provider-in-memory = [
-    { name = "langchain-text-splitters" },
+    { name = "qdrant-client" },
     { name = "tokenizers" },
 ]
 provider-mistral = [
@@ -684,9 +685,6 @@ provider-qdrant = [
 ]
 provider-sentence-transformers = [
     { name = "sentence-transformers" },
-]
-provider-sentence-transformers-gpu = [
-    { name = "sentence-transformers", extra = ["onnx-gpu"] },
 ]
 provider-voyageai = [
     { name = "voyageai" },
@@ -707,6 +705,7 @@ recommended = [
     { name = "qdrant-client" },
     { name = "rich" },
     { name = "rignore" },
+    { name = "textcase" },
     { name = "tiktoken" },
     { name = "tokenizers" },
     { name = "tomli-w" },
@@ -731,6 +730,7 @@ recommended-local-only = [
     { name = "qdrant-client" },
     { name = "rich" },
     { name = "rignore" },
+    { name = "textcase" },
     { name = "tiktoken" },
     { name = "tokenizers" },
     { name = "tomli-w" },
@@ -754,6 +754,7 @@ recommended-no-telemetry = [
     { name = "qdrant-client" },
     { name = "rich" },
     { name = "rignore" },
+    { name = "textcase" },
     { name = "tiktoken" },
     { name = "tokenizers" },
     { name = "tomli-w" },
@@ -773,6 +774,7 @@ required-core = [
     { name = "pydantic-graph" },
     { name = "pydantic-settings" },
     { name = "rignore" },
+    { name = "textcase" },
     { name = "tiktoken" },
     { name = "typing-extensions" },
     { name = "uvicorn", extra = ["standard"] },
@@ -921,7 +923,6 @@ requires-dist = [
     { name = "langchain-text-splitters", specifier = ">=0.3.9" },
     { name = "langchain-text-splitters", marker = "extra == 'all'", specifier = ">=0.3.9" },
     { name = "langchain-text-splitters", marker = "extra == 'all-gpu'", specifier = ">=0.3.9" },
-    { name = "langchain-text-splitters", marker = "extra == 'provider-in-memory'", specifier = ">=0.3.9" },
     { name = "langchain-text-splitters", marker = "extra == 'recommended'", specifier = ">=0.3.9" },
     { name = "langchain-text-splitters", marker = "extra == 'recommended-local-only'", specifier = ">=0.3.9" },
     { name = "langchain-text-splitters", marker = "extra == 'recommended-no-telemetry'", specifier = ">=0.3.9" },
@@ -991,6 +992,7 @@ requires-dist = [
     { name = "qdrant-client", specifier = ">=1.15.0" },
     { name = "qdrant-client", marker = "extra == 'all'", specifier = ">=1.15.0" },
     { name = "qdrant-client", marker = "extra == 'all-gpu'", specifier = ">=1.15.0" },
+    { name = "qdrant-client", marker = "extra == 'provider-in-memory'", specifier = ">=1.15.0" },
     { name = "qdrant-client", marker = "extra == 'provider-qdrant'", specifier = ">=1.15.0" },
     { name = "qdrant-client", marker = "extra == 'recommended'", specifier = ">=1.15.0" },
     { name = "qdrant-client", marker = "extra == 'recommended-local-only'", specifier = ">=1.15.0" },
@@ -1010,10 +1012,14 @@ requires-dist = [
     { name = "rignore", marker = "extra == 'recommended-local-only'", specifier = ">=0.6.4" },
     { name = "rignore", marker = "extra == 'recommended-no-telemetry'", specifier = ">=0.6.4" },
     { name = "rignore", marker = "extra == 'required-core'", specifier = ">=0.6.4" },
+    { name = "sentence-transformers", marker = "extra == 'all'", specifier = ">=5.1.0" },
+    { name = "sentence-transformers", marker = "extra == 'all-gpu'", specifier = ">=5.1.0" },
     { name = "sentence-transformers", marker = "extra == 'provider-sentence-transformers'", specifier = ">=5.1.0" },
-    { name = "sentence-transformers", extras = ["onnx"], marker = "extra == 'all'", specifier = ">=5.1.0" },
-    { name = "sentence-transformers", extras = ["onnx-gpu"], marker = "extra == 'all-gpu'", specifier = ">=5.1.0" },
-    { name = "sentence-transformers", extras = ["onnx-gpu"], marker = "extra == 'provider-sentence-transformers-gpu'", specifier = ">=5.1.0" },
+    { name = "textcase", marker = "extra == 'all'", specifier = ">=0.4.3" },
+    { name = "textcase", marker = "extra == 'recommended'", specifier = ">=0.4.3" },
+    { name = "textcase", marker = "extra == 'recommended-local-only'", specifier = ">=0.4.3" },
+    { name = "textcase", marker = "extra == 'recommended-no-telemetry'", specifier = ">=0.4.3" },
+    { name = "textcase", marker = "extra == 'required-core'", specifier = ">=0.4.3" },
     { name = "tiktoken", specifier = ">=0.1.0" },
     { name = "tiktoken", marker = "extra == 'all'", specifier = ">=0.1.0" },
     { name = "tiktoken", marker = "extra == 'all-gpu'", specifier = ">=0.1.0" },
@@ -1064,7 +1070,7 @@ requires-dist = [
     { name = "watchfiles", marker = "extra == 'recommended-no-telemetry'", specifier = ">=1.1.0" },
     { name = "watchfiles", marker = "extra == 'source-filesystem'", specifier = ">=1.1.0" },
 ]
-provides-extras = ["all", "all-gpu", "auth-eunomia", "auth-permitio", "cli", "pre-context", "provider-anthropic", "provider-bedrock", "provider-cohere", "provider-fastembed", "provider-fastembed-gpu", "provider-google", "provider-groq", "provider-huggingface", "provider-in-memory", "provider-mistral", "provider-openai", "provider-qdrant", "provider-sentence-transformers", "provider-sentence-transformers-gpu", "provider-voyageai", "recommended", "recommended-local-only", "recommended-no-telemetry", "required-core", "source-duckduckgo", "source-filesystem", "source-tavily"]
+provides-extras = ["all", "all-gpu", "auth-eunomia", "auth-permitio", "cli", "pre-context", "provider-anthropic", "provider-bedrock", "provider-cohere", "provider-fastembed", "provider-fastembed-gpu", "provider-google", "provider-groq", "provider-huggingface", "provider-in-memory", "provider-mistral", "provider-openai", "provider-qdrant", "provider-sentence-transformers", "provider-voyageai", "recommended", "recommended-local-only", "recommended-no-telemetry", "required-core", "source-duckduckgo", "source-filesystem", "source-tavily"]
 
 [package.metadata.requires-dev]
 all-dev = [
@@ -3380,39 +3386,6 @@ wheels = [
 ]
 
 [[package]]
-name = "onnx"
-version = "1.18.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-    { name = "protobuf" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/3d/60/e56e8ec44ed34006e6d4a73c92a04d9eea6163cc12440e35045aec069175/onnx-1.18.0.tar.gz", hash = "sha256:3d8dbf9e996629131ba3aa1afd1d8239b660d1f830c6688dd7e03157cccd6b9c", size = 12563009, upload-time = "2025-05-12T22:03:09.626Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ed/3a/a336dac4db1eddba2bf577191e5b7d3e4c26fcee5ec518a5a5b11d13540d/onnx-1.18.0-cp311-cp311-macosx_12_0_universal2.whl", hash = "sha256:735e06d8d0cf250dc498f54038831401063c655a8d6e5975b2527a4e7d24be3e", size = 18281831, upload-time = "2025-05-12T22:02:06.429Z" },
-    { url = "https://files.pythonhosted.org/packages/02/3a/56475a111120d1e5d11939acbcbb17c92198c8e64a205cd68e00bdfd8a1f/onnx-1.18.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:73160799472e1a86083f786fecdf864cf43d55325492a9b5a1cfa64d8a523ecc", size = 17424359, upload-time = "2025-05-12T22:02:09.866Z" },
-    { url = "https://files.pythonhosted.org/packages/cf/03/5eb5e9ef446ed9e78c4627faf3c1bc25e0f707116dd00e9811de232a8df5/onnx-1.18.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6acafb3823238bbe8f4340c7ac32fb218689442e074d797bee1c5c9a02fdae75", size = 17586006, upload-time = "2025-05-12T22:02:13.217Z" },
-    { url = "https://files.pythonhosted.org/packages/b0/4e/70943125729ce453271a6e46bb847b4a612496f64db6cbc6cb1f49f41ce1/onnx-1.18.0-cp311-cp311-win32.whl", hash = "sha256:4c8c4bbda760c654e65eaffddb1a7de71ec02e60092d33f9000521f897c99be9", size = 15734988, upload-time = "2025-05-12T22:02:16.561Z" },
-    { url = "https://files.pythonhosted.org/packages/44/b0/435fd764011911e8f599e3361f0f33425b1004662c1ea33a0ad22e43db2d/onnx-1.18.0-cp311-cp311-win_amd64.whl", hash = "sha256:a5810194f0f6be2e58c8d6dedc6119510df7a14280dd07ed5f0f0a85bd74816a", size = 15849576, upload-time = "2025-05-12T22:02:19.569Z" },
-    { url = "https://files.pythonhosted.org/packages/6c/f0/9e31f4b4626d60f1c034f71b411810bc9fafe31f4e7dd3598effd1b50e05/onnx-1.18.0-cp311-cp311-win_arm64.whl", hash = "sha256:aa1b7483fac6cdec26922174fc4433f8f5c2f239b1133c5625063bb3b35957d0", size = 15822961, upload-time = "2025-05-12T22:02:22.735Z" },
-    { url = "https://files.pythonhosted.org/packages/a7/fe/16228aca685392a7114625b89aae98b2dc4058a47f0f467a376745efe8d0/onnx-1.18.0-cp312-cp312-macosx_12_0_universal2.whl", hash = "sha256:521bac578448667cbb37c50bf05b53c301243ede8233029555239930996a625b", size = 18285770, upload-time = "2025-05-12T22:02:26.116Z" },
-    { url = "https://files.pythonhosted.org/packages/1e/77/ba50a903a9b5e6f9be0fa50f59eb2fca4a26ee653375408fbc72c3acbf9f/onnx-1.18.0-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:e4da451bf1c5ae381f32d430004a89f0405bc57a8471b0bddb6325a5b334aa40", size = 17421291, upload-time = "2025-05-12T22:02:29.645Z" },
-    { url = "https://files.pythonhosted.org/packages/11/23/25ec2ba723ac62b99e8fed6d7b59094dadb15e38d4c007331cc9ae3dfa5f/onnx-1.18.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:99afac90b4cdb1471432203c3c1f74e16549c526df27056d39f41a9a47cfb4af", size = 17584084, upload-time = "2025-05-12T22:02:32.789Z" },
-    { url = "https://files.pythonhosted.org/packages/6a/4d/2c253a36070fb43f340ff1d2c450df6a9ef50b938adcd105693fee43c4ee/onnx-1.18.0-cp312-cp312-win32.whl", hash = "sha256:ee159b41a3ae58d9c7341cf432fc74b96aaf50bd7bb1160029f657b40dc69715", size = 15734892, upload-time = "2025-05-12T22:02:35.527Z" },
-    { url = "https://files.pythonhosted.org/packages/e8/92/048ba8fafe6b2b9a268ec2fb80def7e66c0b32ab2cae74de886981f05a27/onnx-1.18.0-cp312-cp312-win_amd64.whl", hash = "sha256:102c04edc76b16e9dfeda5a64c1fccd7d3d2913b1544750c01d38f1ac3c04e05", size = 15850336, upload-time = "2025-05-12T22:02:38.545Z" },
-    { url = "https://files.pythonhosted.org/packages/a1/66/bbc4ffedd44165dcc407a51ea4c592802a5391ce3dc94aa5045350f64635/onnx-1.18.0-cp312-cp312-win_arm64.whl", hash = "sha256:911b37d724a5d97396f3c2ef9ea25361c55cbc9aa18d75b12a52b620b67145af", size = 15823802, upload-time = "2025-05-12T22:02:42.037Z" },
-    { url = "https://files.pythonhosted.org/packages/45/da/9fb8824513fae836239276870bfcc433fa2298d34ed282c3a47d3962561b/onnx-1.18.0-cp313-cp313-macosx_12_0_universal2.whl", hash = "sha256:030d9f5f878c5f4c0ff70a4545b90d7812cd6bfe511de2f3e469d3669c8cff95", size = 18285906, upload-time = "2025-05-12T22:02:45.01Z" },
-    { url = "https://files.pythonhosted.org/packages/05/e8/762b5fb5ed1a2b8e9a4bc5e668c82723b1b789c23b74e6b5a3356731ae4e/onnx-1.18.0-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8521544987d713941ee1e591520044d35e702f73dc87e91e6d4b15a064ae813d", size = 17421486, upload-time = "2025-05-12T22:02:48.467Z" },
-    { url = "https://files.pythonhosted.org/packages/12/bb/471da68df0364f22296456c7f6becebe0a3da1ba435cdb371099f516da6e/onnx-1.18.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:3c137eecf6bc618c2f9398bcc381474b55c817237992b169dfe728e169549e8f", size = 17583581, upload-time = "2025-05-12T22:02:51.784Z" },
-    { url = "https://files.pythonhosted.org/packages/76/0d/01a95edc2cef6ad916e04e8e1267a9286f15b55c90cce5d3cdeb359d75d6/onnx-1.18.0-cp313-cp313-win32.whl", hash = "sha256:6c093ffc593e07f7e33862824eab9225f86aa189c048dd43ffde207d7041a55f", size = 15734621, upload-time = "2025-05-12T22:02:54.62Z" },
-    { url = "https://files.pythonhosted.org/packages/64/95/253451a751be32b6173a648b68f407188009afa45cd6388780c330ff5d5d/onnx-1.18.0-cp313-cp313-win_amd64.whl", hash = "sha256:230b0fb615e5b798dc4a3718999ec1828360bc71274abd14f915135eab0255f1", size = 15850472, upload-time = "2025-05-12T22:02:57.54Z" },
-    { url = "https://files.pythonhosted.org/packages/0a/b1/6fd41b026836df480a21687076e0f559bc3ceeac90f2be8c64b4a7a1f332/onnx-1.18.0-cp313-cp313-win_arm64.whl", hash = "sha256:6f91930c1a284135db0f891695a263fc876466bf2afbd2215834ac08f600cfca", size = 15823808, upload-time = "2025-05-12T22:03:00.305Z" },
-    { url = "https://files.pythonhosted.org/packages/70/f3/499e53dd41fa7302f914dd18543da01e0786a58b9a9d347497231192001f/onnx-1.18.0-cp313-cp313t-macosx_12_0_universal2.whl", hash = "sha256:2f4d37b0b5c96a873887652d1cbf3f3c70821b8c66302d84b0f0d89dd6e47653", size = 18316526, upload-time = "2025-05-12T22:03:03.691Z" },
-    { url = "https://files.pythonhosted.org/packages/84/dd/6abe5d7bd23f5ed3ade8352abf30dff1c7a9e97fc1b0a17b5d7c726e98a9/onnx-1.18.0-cp313-cp313t-win_amd64.whl", hash = "sha256:a69afd0baa372162948b52c13f3aa2730123381edf926d7ef3f68ca7cec6d0d0", size = 15865055, upload-time = "2025-05-12T22:03:06.663Z" },
-]
-
-[[package]]
 name = "onnxruntime"
 version = "1.22.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3505,38 +3478,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/27/d2/c782c88b8afbf961d6972428821c302bd1e9e7bc361352172f0ca31296e2/opentelemetry_api-1.36.0.tar.gz", hash = "sha256:9a72572b9c416d004d492cbc6e61962c0501eaf945ece9b5a0f56597d8348aa0", size = 64780, upload-time = "2025-07-29T15:12:06.02Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bb/ee/6b08dde0a022c463b88f55ae81149584b125a42183407dc1045c486cc870/opentelemetry_api-1.36.0-py3-none-any.whl", hash = "sha256:02f20bcacf666e1333b6b1f04e647dc1d5111f86b8e510238fcc56d7762cda8c", size = 65564, upload-time = "2025-07-29T15:11:47.998Z" },
-]
-
-[[package]]
-name = "optimum"
-version = "1.27.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "huggingface-hub" },
-    { name = "numpy" },
-    { name = "packaging" },
-    { name = "torch" },
-    { name = "transformers" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/f9/58/fd6c82021697ae2f1de710af65fa177ad46a620a10c16974546085d1e7a8/optimum-1.27.0.tar.gz", hash = "sha256:ad80d80de336ca5e1e6b4f5ade824da731a945846208871acd2e2ada91002a7b", size = 344027, upload-time = "2025-07-30T16:40:44.659Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/98/2d/4978f9b0ddb6a6af12ff71831f78f84e9dd488f401367290d11a92870b97/optimum-1.27.0-py3-none-any.whl", hash = "sha256:11efa8934860d7456704456405a4bd2d3007bcce098c4430d95840dfdb80e16d", size = 425787, upload-time = "2025-07-30T16:40:42.776Z" },
-]
-
-[package.optional-dependencies]
-onnxruntime = [
-    { name = "datasets" },
-    { name = "onnx" },
-    { name = "onnxruntime" },
-    { name = "protobuf" },
-    { name = "transformers" },
-]
-onnxruntime-gpu = [
-    { name = "datasets" },
-    { name = "onnx" },
-    { name = "onnxruntime-gpu" },
-    { name = "protobuf" },
-    { name = "transformers" },
 ]
 
 [[package]]
@@ -5171,14 +5112,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/6d/70/2b5b76e98191ec3b8b0d1dde52d00ddcc3806799149a9ce987b0d2d31015/sentence_transformers-5.1.0-py3-none-any.whl", hash = "sha256:fc803929f6a3ce82e2b2c06e0efed7a36de535c633d5ce55efac0b710ea5643e", size = 483377, upload-time = "2025-08-06T13:48:53.627Z" },
 ]
 
-[package.optional-dependencies]
-onnx = [
-    { name = "optimum", extra = ["onnxruntime"] },
-]
-onnx-gpu = [
-    { name = "optimum", extra = ["onnxruntime-gpu"] },
-]
-
 [[package]]
 name = "sentry-sdk"
 version = "2.34.1"
@@ -5358,6 +5291,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/0a/d4/2b0cd0fe285e14b36db076e78c93766ff1d529d70408bd1d2a5a84f1d929/tenacity-9.1.2.tar.gz", hash = "sha256:1169d376c297e7de388d18b4481760d478b0e99a777cad3a9c86e556f4b697cb", size = 48036, upload-time = "2025-04-02T08:25:09.966Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e5/30/643397144bfbfec6f6ef821f36f33e57d35946c44a2352d3c9f0ae847619/tenacity-9.1.2-py3-none-any.whl", hash = "sha256:f77bf36710d8b73a50b2dd155c97b870017ad21afe6ab300326b0371b3b05138", size = 28248, upload-time = "2025-04-02T08:25:07.678Z" },
+]
+
+[[package]]
+name = "textcase"
+version = "0.4.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/75/e6/5499333512a7008cfe795c4e2db404c34c61da3446727b31bfd2fcf79783/textcase-0.4.3.tar.gz", hash = "sha256:1900dda7d5fc8cf44c414677b9be8b66b2354d9ff4107934ed577f11c1d1210a", size = 6946, upload-time = "2025-04-18T16:13:21.712Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a0/a3/7e8d624362ca16a51df435d14c08e07adf266c27d16fad422f954a3abbbd/textcase-0.4.3-py3-none-any.whl", hash = "sha256:2f1a1c069ba60e224455ae6d45ca35344ad6a2ffffd05d6bd8161c0c34515f30", size = 6474, upload-time = "2025-04-18T16:13:20.621Z" },
 ]
 
 [[package]]

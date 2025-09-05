@@ -45,7 +45,7 @@ CAP_MAP: dict[
 
 NOMIC_AI_MODERNBERT_EMBED_BASE_CAPABILITIES: PartialCapabilities = {
     "name": "nomic-ai/modernbert-embed-base",
-    "default_dimension": 768,
+    "default_dimension": 256,
     "context_window": 8192,
     "preferred_metrics": ("cosine", "dot", "euclidean"),
     "supports_context_chunk_embedding": False,

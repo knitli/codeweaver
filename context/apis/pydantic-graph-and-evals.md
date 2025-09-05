@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # Pydantic-Graph and Pydantic-Evals - Complete API Research Report
 
 *Expert API Analyst Research - Foundation for CodeWeaver Clean Rebuild*
@@ -191,8 +198,8 @@ class AnalyzeIntent(BaseNode[CodeSearchState, CodeWeaverDeps, ContentMatch]):
 
 **Type Information**:
 ```python
-class CodeWeaverRelevanceEvaluator(Evaluator[str, FindCodeResponse]):
-    def evaluate(self, ctx: EvaluatorContext[str, FindCodeResponse]) -> Dict[str, Any]:
+class CodeWeaverRelevanceEvaluator(Evaluator[str, FindCodeResponseSummary]):
+    def evaluate(self, ctx: EvaluatorContext[str, FindCodeResponseSummary]) -> Dict[str, Any]:
         response = ctx.output
         query = ctx.inputs
         
@@ -347,7 +354,7 @@ EvaluationReport {
         {
             "case_id": "auth_implementation_query",
             "inputs": "how to implement JWT authentication?",
-            "outputs": "FindCodeResponse(...)",
+            "outputs": "FindCodeResponseSummary(...)",
             "scores": {
                 "RelevanceEvaluator": 0.87,
                 "TokenEfficiencyEvaluator": 0.94,
@@ -462,7 +469,7 @@ codeweaver_cases = [
 
 # Global evaluators applied to all cases
 global_evaluators = [
-    IsInstance(type_name="FindCodeResponse"),  # Type checking
+    IsInstance(type_name="FindCodeResponseSummary"),  # Type checking
     ResponseTimeEvaluator(max_duration_ms=2000),  # Performance requirement
     CodeQualityEvaluator()  # Custom quality assessment
 ]

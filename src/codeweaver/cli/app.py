@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-import json
+import asyncio
 import sys
 
 from collections.abc import Sequence
@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Annotated, Literal
 
 import cyclopts
 
+from pydantic_core import to_json
 from rich import print as rich_print
 from rich.console import Console
 from rich.table import Table
@@ -26,7 +27,7 @@ from codeweaver.tools.find_code import find_code_implementation
 
 
 if TYPE_CHECKING:
-    from codeweaver.models.core import CodeMatch, FindCodeResponse
+    from codeweaver.models.core import CodeMatch, FindCodeResponseSummary
     from codeweaver.models.intent import IntentType
 
 
@@ -35,7 +36,8 @@ console = Console(markup=True, emoji=True)
 
 # Create the main CLI application
 app = cyclopts.App(
-    name="codeweaver", help="CodeWeaver: Extensible MCP server for semantic code search"
+    name="codeweaver",
+    help="CodeWeaver: A tool that gives AI agents exactly what you need them to have.",
 )
 
 
@@ -45,12 +47,13 @@ async def server(
     config_file: Annotated[Path | None, cyclopts.Parameter(name=["--config", "-c"])] = None,
     project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
     host: str = "localhost",
-    port: int = 8080,
+    port: int = 9328,
     debug: bool = False,
 ) -> None:
     """Start CodeWeaver MCP server."""
     try:
-        from codeweaver.main import start_server
+        from codeweaver.main import app as mcp_app
+        from codeweaver.main import run_method
 
         # Load settings with overrides
         settings = get_settings(config_file) if config_file else get_settings()
@@ -60,7 +63,8 @@ async def server(
         console.print("[green]Starting CodeWeaver MCP server...[/green]")
         console.print(f"[blue]Project: {settings.project_path}[/blue]")
         console.print(f"[blue]Server: http://{host}:{port}[/blue]")
-        await start_server(host=host, port=port, debug=debug)
+        await asyncio.run(run_method(mcp_app))  # type: ignore
+        await asyncio.run(mcp_app.run_http_async(host=host, port=port, debug=debug))  # type: ignore
 
     except CodeWeaverError as e:
         console.print(f"[red]Error: {e.message}[/red]")
@@ -130,7 +134,7 @@ async def search(
                     for match in limited_matches
                 ],
             }
-            rich_print(json.dumps(output, indent=2))
+            rich_print(to_json(output, indent=2))
 
         elif output_format == "table":
             _display_table_results(query, response, limited_matches)
@@ -180,7 +184,7 @@ async def config(
 
 
 def _display_table_results(
-    query: str, response: FindCodeResponse, matches: Sequence[CodeMatch]
+    query: str, response: FindCodeResponseSummary, matches: Sequence[CodeMatch]
 ) -> None:
     """Display search results as a table."""
     console.print(f"\n[bold green]Search Results for: '{query}'[/bold green]")
@@ -218,7 +222,7 @@ def _display_table_results(
 
 
 def _display_markdown_results(
-    query: str, response: FindCodeResponse, matches: Sequence[CodeMatch]
+    query: str, response: FindCodeResponseSummary, matches: Sequence[CodeMatch]
 ) -> None:
     """Display search results as markdown."""
     console.print(f"# Search Results for: '{query}'\n")
@@ -229,11 +233,11 @@ def _display_markdown_results(
         return
 
     for i, match in enumerate(matches, 1):
-        console.print(f"## {i}. {match.file_path}")
+        console.print(f"## {i}. {match.file.path}")
         console.print(
-            f"**Language:** {match.language or 'unknown'} | **Score:** {match.relevance_score:.2f} | {match.span!s}"
+            f"**Language:** {match.file.ext_kind.language or 'unknown'} | **Score:** {match.relevance_score:.2f} | {match.span!s}"
         )
-        console.print(f"```{match.language or ''}")
+        console.print(f"```{match.file.ext_kind.language or ''}")
         console.print(f"{match.content[:300]}..." if len(match.content) > 300 else match.content)
         console.print("```\n")
 
@@ -274,7 +278,7 @@ def _validate_config(settings: CodeWeaverSettings) -> None:
         issues.append(f"Project path is not a directory: {settings.project_path}")
 
     # Check token limits
-    if settings.token_limit > 500000:  # 500k tokens
+    if settings.token_limit > 500_000:  # 500k tokens
         issues.append(
             "Token limit is very high and may cause performance issues or set your wallet on fire."
         )

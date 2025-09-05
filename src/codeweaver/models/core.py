@@ -121,7 +121,7 @@ class CodeMatch(BaseModel):
         return self
 
 
-class FindCodeResponse(BaseModel):
+class FindCodeResponseSummary(BaseModel):
     """Structured response from find_code tool."""
 
     model_config = ConfigDict(

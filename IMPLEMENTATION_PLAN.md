@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # CodeWeaver Implementation Plan
 ## Revised Architecture-Driven Roadmap
 
@@ -199,7 +206,7 @@ async def find_code(
     include_tests: bool = True,
     context: Context = None,
     **dynamic_filters  # Generated from filterable fields
-) -> FindCodeResponse:
+) -> FindCodeResponseSummary:
     
     # Convert filters to query_filter for vector store
     query_filter = make_filter(dynamic_filters) if dynamic_filters else None
@@ -216,7 +223,7 @@ async def find_code(
     # Apply span-based result assembly
     code_matches = assemble_code_matches(semantic_matches, token_limit)
     
-    return FindCodeResponse(
+    return FindCodeResponseSummary(
         matches=code_matches,
         metadata=ExecutionMetadata(
             query=query,

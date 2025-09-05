@@ -423,7 +423,7 @@ def get_provider_settings(provider_kind: ProviderKind | str) -> Any:
     """Check a setting value by a tuple of keys (the path to the setting)."""
     if isinstance(provider_kind, str):
         provider_kind = ProviderKind.from_string(provider_kind)
-    if provider_kind == ProviderKind._UNSET:  # type: ignore
+    if provider_kind == ProviderKind.UNSET:  # type: ignore
         raise MissingValueError(
             "Provider kind cannot be _UNSET",
             "settings.get_provider_settings: `provider_kind` is _UNSET",

@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 # sourcery skip: avoid-single-character-names-variables
 """Cohere reranking provider implementation."""
 
@@ -38,7 +43,7 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
         self._caps = caps
         self._provider = caps.provider or self._provider
         kwargs = kwargs or {}
-        self.client_kwargs = kwargs.get("client", {}) or kwargs
+        self.client_kwargs = kwargs.get("client_kwargs", {}) or kwargs
         self.client_kwargs["client_name"] = "codeweaver"
         if not self.client_kwargs.get("api_key"):
             if self._provider == Provider.COHERE:

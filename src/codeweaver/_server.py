@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 # sourcery skip: snake-case-variable-declarations
 """Initialize the FastMCP application with default middleware and settings."""
 
@@ -20,6 +25,7 @@ from fastmcp.server.middleware.middleware import Middleware
 from fastmcp.server.middleware.rate_limiting import RateLimitingMiddleware
 from pydantic import ConfigDict, Field, NonNegativeInt, computed_field
 from pydantic.dataclasses import dataclass
+from pydantic_core import to_json
 
 from codeweaver import __version__ as version
 from codeweaver._common import BaseEnum
@@ -320,9 +326,8 @@ async def lifespan(
     except Exception as e:
         # Handle initialization errors
         state.health.status = HealthStatus.UNHEALTHY  # type: ignore
-        import json
 
-        state.health.error = json.dumps({"error": e})  # type: ignore
+        state.health.error = to_json({"error": e})  # type: ignore
         state.initialized = False
         raise
 

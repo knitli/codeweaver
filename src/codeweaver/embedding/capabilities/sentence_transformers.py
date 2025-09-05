@@ -152,34 +152,6 @@ SENTENCE_TRANSFORMERS_GTR_T5_BASE_CAPABILITIES: PartialCapabilities = {
     },
 }
 
-SENTENCE_TRANSFORMERS_LABSE_CAPABILITIES: PartialCapabilities = {
-    "name": "sentence-transformers/LaBSE",
-    "default_dimension": 768,
-    "context_window": 512,
-    "preferred_metrics": ("cosine", "dot", "euclidean"),
-    "supports_context_chunk_embedding": False,
-    "tokenizer": "tokenizers",
-    "tokenizer_model": "sentence-transformers/LaBSE",
-    "default_dtype": "float",
-    "output_dtypes": ("float",),
-    "version": None,
-    "supports_custom_prompts": False,
-    "custom_query_prompt": None,
-    "custom_document_prompt": None,
-    "other": {
-        "framework": ["Sentence Transformers", "PyTorch"],
-        "license": "apache-2.0",
-        "memory_usage_mb": 1796,
-        "modalities": ["text"],
-        "n_parameters": 471000000,
-        "open_weights": True,
-        "public_training_code": "https://www.kaggle.com/models/google/labse/tensorFlow2/labse/2?tfhub-redirect=true",
-        "reference": "https://huggingface.co/sentence-transformers/LaBSE",
-        "release_date": "2019-11-01",
-        "revision": "e34fab64a3011d2176c99545a93d5cbddc9a91b7",
-        "memory_usage_gb": 1.75,
-    },
-}
 
 SENTENCE_TRANSFORMERS_MULTI_QA_MINILM_L6_COS_V1_CAPABILITIES: PartialCapabilities = {
     "name": "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
@@ -271,7 +243,6 @@ ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (
     SENTENCE_TRANSFORMERS_ALL_MINILM_L12_V2_CAPABILITIES,
     SENTENCE_TRANSFORMERS_ALL_MPNET_BASE_V2_CAPABILITIES,
     SENTENCE_TRANSFORMERS_GTR_T5_BASE_CAPABILITIES,
-    SENTENCE_TRANSFORMERS_LABSE_CAPABILITIES,
     SENTENCE_TRANSFORMERS_MULTI_QA_MINILM_L6_COS_V1_CAPABILITIES,
     SENTENCE_TRANSFORMERS_PARAPHRASE_MULTILINGUAL_MINILM_L12_V2_CAPABILITIES,
     SENTENCE_TRANSFORMERS_PARAPHRASE_MULTILINGUAL_MPNET_BASE_V2_CAPABILITIES,

@@ -443,6 +443,8 @@ class BaseProviderSettings(TypedDict, total=False):
     enabled: Required[bool]
     api_key: NotRequired[str | None]
     connection: NotRequired[ConnectionConfiguration | None]
+    client_kwargs: NotRequired[dict[str, Any] | None]
+    model_kwargs: NotRequired[dict[str, Any] | None]
     other: NotRequired[dict[str, Any] | None]
 
 
@@ -564,9 +566,8 @@ class RerankingProviderSettings(BaseProviderSettings):
 
     model_settings: Required[RerankingModelSettings | tuple[RerankingModelSettings, ...] | None]
     """Settings for the re-ranking model(s)."""
+    provider_settings: NotRequired[ProviderSpecificSettings | None]
     top_n: NotRequired[PositiveInt | None]
-    fastembed_gpu: NotRequired[FastembedGPUProviderSettings | None]
-    """Optional settings specific to the Fastembed-GPU provider."""
 
 
 # Agent model settings are imported/defined from `pydantic_ai`
@@ -599,7 +600,7 @@ class FastMcpServerSettingsType(TypedDict, total=False):
     name: str
     instructions: str | None
     version: str | None
-    lifespan: LifespanResultT | None  # type: ignore  # it's purely for context
+    lifespan: LifespanResultT | None  # type: ignore  # it's just for clarity
     include_tags: set[str] | None
     exclude_tags: set[str] | None
     transport: Literal["stdio", "http"] | None
@@ -803,7 +804,6 @@ class Provider(BaseEnum):
     FASTEMBED = "fastembed"
 
     QDRANT = "qdrant"
-    FASTEMBED_VECTORSTORE = "fastembed-vectorstore"
 
     ANTHROPIC = "anthropic"
     BEDROCK = "bedrock"
@@ -832,7 +832,7 @@ class Provider(BaseEnum):
     DUCKDUCKGO = "duckduckgo"
     TAVILY = "tavily"
 
-    _UNSET = "unset"
+    UNSET = "unset"
 
     @classmethod
     def validate(cls, value: str) -> BaseEnum:
@@ -941,7 +941,6 @@ class Provider(BaseEnum):
                 )
             case (
                 Provider.OPENAI
-                | Provider.DEEPSEEK
                 | Provider.FIREWORKS
                 | Provider.GITHUB
                 | Provider.X_AI
@@ -1084,15 +1083,20 @@ class ProviderKind(BaseEnum):
     EMBEDDING = "embedding"
     """Provider for text embedding (e.g. Voyage)"""
     SPARSE_EMBEDDING = "sparse_embedding"
-    """Provider for sparse text embedding (traditional indexed search, more-or-less)."""
+    """Provider for sparse text embedding (traditional indexed search, more-or-less).
+
+    Sparse embeddings tend to be very fast and lightweight. We only support local providers (currently Fastembed and Sentence Transformers), because you probably won't know they're running.
+    While vector embeddings are more powerful and flexible, sparse embeddings can be a force multiplier that improves overall results when used in combination with vector embeddings.
+    Our default vectorstore, Qdrant, supports storing multiple vectors on a "point", which allows you to combine sparse and dense embeddings in a single search.
+    """
     RERANKING = "reranking"
     """Provider for re-ranking (e.g. Voyage)"""
-    VECTOR_STORE = "vector_store"
+    VECTOR_STORE = "vector-store"
     """Provider for vector storage (e.g. Qdrant)"""
     AGENT = "agent"
     """Provider for agents (e.g. OpenAI or Anthropic)"""
 
-    _UNSET = "unset"
+    UNSET = "unset"
     """A sentinel setting to identify when a `ProviderKind` is not set or is configured."""
 
     @property
