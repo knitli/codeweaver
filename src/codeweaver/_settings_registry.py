@@ -29,7 +29,6 @@ from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_pascal
 
 from codeweaver._common import LiteralStringT
-from codeweaver._settings import Provider, ProviderKind
 from codeweaver.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
@@ -37,6 +36,7 @@ from codeweaver.embedding.capabilities.base import (
 from codeweaver.embedding.providers import EmbeddingProvider
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.main import get_app_settings
+from codeweaver.provider import Provider, ProviderKind
 from codeweaver.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.reranking.providers.base import RerankingProvider
 from codeweaver.vector_stores.base import VectorStoreProvider

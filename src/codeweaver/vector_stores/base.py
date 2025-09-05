@@ -14,7 +14,7 @@ from pydantic import UUID4, BaseModel, ConfigDict
 
 from codeweaver._common import BaseEnum
 from codeweaver._data_structures import CodeChunk, Metadata, SearchResult
-from codeweaver._settings import Provider
+from codeweaver.provider import Provider
 
 
 if TYPE_CHECKING:

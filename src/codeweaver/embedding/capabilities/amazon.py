@@ -5,8 +5,8 @@
 
 """Capabilities for Amazon embedding models."""
 
-from codeweaver._settings import Provider
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities
+from codeweaver.provider import Provider
 
 
 def get_amazon_embedding_capabilities() -> tuple[EmbeddingModelCapabilities]:

@@ -9,7 +9,7 @@ import re
 
 from collections.abc import Sequence
 
-from codeweaver._settings import Provider
+from codeweaver.provider import Provider
 from codeweaver.reranking.capabilities.base import (
     PartialRerankingCapabilities,
     RerankingModelCapabilities,

@@ -3,8 +3,8 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 """Settings for Google embedding models."""
 
-from codeweaver._settings import Provider
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities
+from codeweaver.provider import Provider
 
 
 def get_google_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:

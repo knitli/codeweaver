@@ -5,7 +5,7 @@
 
 """Cohere reranking model capabilities."""
 
-from codeweaver._settings import Provider
+from codeweaver.provider import Provider
 from codeweaver.reranking.capabilities.base import RerankingModelCapabilities
 
 

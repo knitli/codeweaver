@@ -5,8 +5,8 @@
 
 """Mistral embedding capabilities."""
 
-from codeweaver._settings import Provider
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities, PartialCapabilities
+from codeweaver.provider import Provider
 
 
 def get_mistral_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:

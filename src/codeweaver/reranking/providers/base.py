@@ -16,7 +16,7 @@ from pydantic.main import IncEx
 
 from codeweaver._data_structures import CodeChunk, StructuredDataInput
 from codeweaver._server import get_statistics
-from codeweaver._settings import Provider
+from codeweaver.provider import Provider
 from codeweaver.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.tokenizers import Tokenizer, get_tokenizer
 

@@ -24,8 +24,8 @@ from codeweaver._data_structures import (
     UUIDStore,
 )
 from codeweaver._server import get_statistics
-from codeweaver._settings import Provider
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities
+from codeweaver.provider import Provider
 from codeweaver.tokenizers import Tokenizer, get_tokenizer
 
 

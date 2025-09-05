@@ -10,12 +10,12 @@ from typing import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    from codeweaver._settings import Provider
+    from codeweaver.provider import Provider
 
 
 def get_data_provider(provider: Provider) -> type | None:
     """Get available tools."""
-    from codeweaver._settings import Provider
+    from codeweaver.provider import Provider
 
     if provider == Provider.DUCKDUCKGO:
         with contextlib.suppress(ImportError):

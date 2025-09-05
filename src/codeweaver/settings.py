@@ -14,17 +14,18 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, TypedDict
 
 from fastmcp.server.auth.auth import OAuthProvider
 from fastmcp.server.middleware import Middleware
 from fastmcp.server.server import DuplicateBehavior
 from fastmcp.tools.tool import Tool
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, model_serializer
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
 from pydantic_ai.settings import merge_model_settings
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from codeweaver._common import UNSET, Unset
 from codeweaver._constants import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_EXTENSIONS
 from codeweaver._settings import (
     AgentProviderSettings,
@@ -33,8 +34,6 @@ from codeweaver._settings import (
     EmbeddingProviderSettings,
     LoggingSettings,
     MiddlewareOptions,
-    Provider,
-    ProviderKind,
     RerankingModelSettings,
     RerankingProviderSettings,
     UvicornServerSettings,
@@ -42,7 +41,7 @@ from codeweaver._settings import (
 )
 from codeweaver._utils import walk_down_to_git_root
 from codeweaver.exceptions import ConfigurationError, MissingValueError
-
+from codeweaver.provider import Provider, ProviderKind
 
 DefaultDataProviderSettings = (
     DataProviderSettings(provider=Provider.TAVILY, enabled=False, api_key=None, other=None),
@@ -136,7 +135,33 @@ class FileFilterSettings(BaseModel):
             description="Whether to include the .github directory in search and indexing. Because the .github directory is hidden, it would be otherwise discluded from default settings. Most people want to include it for work on GitHub Actions, workflows, and other GitHub-related files."
         ),
     ] = True
+    other_ignore_kwargs: Annotated[
+        dict[str, Any] | Unset,
+        Field(default_factory=dict, description="""Other kwargs to pass to `rignore`. See <https://pypi.org/project/rignore/>. By default we set max_file_size to 5MB and same_file_system to True."""),
+    ] = UNSET
+    
+    @property
+    def default_rignore_settings(self) -> dict[str, Any]:
+        """Returns CodeWeaver's default rignore settings. This does not include any user overrides."""
+        return {
+            "max_file_size": 5 * 1024 * 1024,
+            "same_file_system": True,
+        }
+    def _adjust_settings(
+        self, other: FileFilterSettings | dict[str, Any] | None
+    ) -> dict[str, Any]:
+        """Adjusts a few settings, primarily to reform keywords. `rignore`'s choice of keywords is a bit odd, so we wrapped them in clearer alternatives."""
+        kwarg_map = {
+            "forced_includes": None,
+            "excludes": "additional_ignores",
+            "excluded_extensions": "additional_ignores",
+            "use_gitignore": "read_git_ignore",
+            "use_other_ignore_files": "read_ignore_files",
+            "ignore_hidden": "ignore_hidden",
+        }
 
+    @model_serializer(when_used="always")
+    def serialize(self) -> dict[str, Any]:
 
 class ProviderSettings(BaseModel):
     """Settings for provider configuration."""

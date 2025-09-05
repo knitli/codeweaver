@@ -6,7 +6,7 @@
 
 from typing import Literal
 
-from codeweaver._settings import Provider
+from codeweaver.provider import Provider
 from codeweaver.reranking.providers.base import RerankingProvider
 
 

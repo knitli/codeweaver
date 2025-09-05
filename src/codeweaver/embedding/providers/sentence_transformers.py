@@ -14,13 +14,13 @@ from typing import Any, ClassVar, cast
 import numpy as np
 
 from codeweaver._data_structures import CodeChunk
-from codeweaver._settings import Provider
 from codeweaver._utils import rpartial
 from codeweaver.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
 )
 from codeweaver.embedding.providers.base import EmbeddingProvider
+from codeweaver.provider import Provider
 
 
 try:

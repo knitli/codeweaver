@@ -7,8 +7,8 @@
 
 from types import MappingProxyType
 
-from codeweaver._settings import Provider
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities, PartialCapabilities
+from codeweaver.provider import Provider
 
 
 MODEL_MAP: MappingProxyType[Provider, tuple[str, ...]] = MappingProxyType({

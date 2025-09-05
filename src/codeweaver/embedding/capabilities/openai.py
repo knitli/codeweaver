@@ -7,8 +7,8 @@
 
 from typing import Literal
 
-from codeweaver._settings import Provider
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities, PartialCapabilities
+from codeweaver.provider import Provider
 
 
 def _get_openai_models(

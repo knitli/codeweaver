@@ -20,8 +20,8 @@ Nevertheless, because we use semantic chunking for most code, you're not likely 
 
 """
 
-from codeweaver._settings import Provider
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities, PartialCapabilities
+from codeweaver.provider import Provider
 
 
 def _get_shared_capabilities() -> PartialCapabilities:

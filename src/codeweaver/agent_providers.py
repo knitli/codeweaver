@@ -26,7 +26,7 @@ from pydantic_ai.toolsets import (
 
 
 if TYPE_CHECKING:
-    from codeweaver._settings import Provider
+    from codeweaver.provider import Provider
 
 
 def get_agent_model_provider(provider: Provider) -> type[AgentProvider[Self]]:  # type: ignore  # noqa: C901

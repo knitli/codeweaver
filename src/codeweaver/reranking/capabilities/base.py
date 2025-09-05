@@ -11,7 +11,7 @@ from typing import Annotated, Any, Literal, NotRequired, Required, TypedDict
 from pydantic import BaseModel, Field, NonNegativeInt, PositiveInt
 
 from codeweaver._data_structures import CodeChunk, SerializedCodeChunk
-from codeweaver._settings import Provider
+from codeweaver.provider import Provider
 from codeweaver.tokenizers.base import Tokenizer
 
 

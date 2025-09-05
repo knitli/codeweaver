@@ -11,7 +11,7 @@ from typing import Annotated, Any, Literal, NotRequired, Required, Self, TypedDi
 from pydantic import BaseModel, ConfigDict, Field, PositiveFloat, PositiveInt
 
 from codeweaver._common import UNSET, Unset
-from codeweaver._settings import Provider
+from codeweaver.provider import Provider
 
 
 type PartialCapabilities = dict[

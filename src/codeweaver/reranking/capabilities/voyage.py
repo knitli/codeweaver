@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from pydantic import NonNegativeInt
 
 from codeweaver._data_structures import CodeChunk
-from codeweaver._settings import Provider
+from codeweaver.provider import Provider
 from codeweaver.reranking.capabilities.base import (
     PartialRerankingCapabilities,
     RerankingModelCapabilities,

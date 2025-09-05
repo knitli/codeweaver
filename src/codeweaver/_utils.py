@@ -165,7 +165,7 @@ def _check_env_var(var_name: str) -> str | None:
 
 def get_possible_env_vars() -> tuple[tuple[str, str], ...] | None:
     """Get a tuple of any resolved environment variables for all providers and provider environment variables. If none are set, returns None."""
-    from codeweaver._settings import Provider
+    from codeweaver.provider import Provider
 
     env_vars = sorted({item[1][0] for item in Provider.all_envs()})
     found_vars = tuple(

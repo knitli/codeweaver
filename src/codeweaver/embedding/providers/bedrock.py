@@ -38,10 +38,10 @@ from pydantic.alias_generators import to_camel, to_snake
 from types_boto3_bedrock_runtime import BedrockRuntimeClient
 
 from codeweaver._data_structures import CodeChunk
-from codeweaver._settings import Provider
 from codeweaver.embedding.capabilities import EmbeddingModelCapabilities
 from codeweaver.embedding.providers.base import EmbeddingProvider
 from codeweaver.exceptions import ConfigurationError
+from codeweaver.provider import Provider
 
 
 logger = logging.getLogger(__name__)

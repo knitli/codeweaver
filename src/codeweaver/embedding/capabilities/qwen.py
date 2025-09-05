@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from typing import Literal
 
-from codeweaver._settings import Provider
 from codeweaver.embedding.capabilities.base import (
     EmbeddingCapabilities,
     EmbeddingModelCapabilities,
     PartialCapabilities,
 )
+from codeweaver.provider import Provider
 
 
 type QwenProvider = Literal[Provider.SENTENCE_TRANSFORMERS]
