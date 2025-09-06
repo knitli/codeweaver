@@ -29,10 +29,12 @@ if TYPE_CHECKING:
     from codeweaver.provider import Provider
 
 
-def get_agent_model_provider(provider: Provider) -> type[AgentProvider[Self]]:  # type: ignore  # noqa: C901
+def get_agent_model_provider(provider: "Provider") -> type[AgentProvider[Self]]:  # type: ignore  # noqa: C901
     # It's long, but it's not complex.
     # sourcery skip: low-code-quality, no-long-functions
     """Get the agent model provider."""
+    from codeweaver.provider import Provider
+
     if provider == Provider.OPENAI:
         from pydantic_ai.providers.openai import OpenAIProvider as OpenAIAgentProvider
 
@@ -109,8 +111,10 @@ def get_agent_model_provider(provider: Provider) -> type[AgentProvider[Self]]:  
     raise ValueError(f"Unknown provider: {provider}")
 
 
-def infer_agent_provider_class(provider: str | Provider) -> AgentProvider[Provider]:
+def infer_agent_provider_class(provider: "str | Provider") -> AgentProvider["Provider"]:
     """Infer the provider from the provider name."""
+    from codeweaver.provider import Provider
+
     if not isinstance(provider, Provider):
         provider = Provider.from_string(provider)  # pyright: ignore[reportAssignmentType]
     provider_class: type[AgentProvider[Provider]] = get_agent_model_provider(provider)  # type: ignore

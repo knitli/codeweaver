@@ -6,12 +6,24 @@
 """Base class for embedding providers."""
 
 import asyncio
+import importlib
 import logging
 import uuid
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
-from typing import Any, ClassVar, Literal, NotRequired, Required, TypedDict, cast, overload
+from functools import cache
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Literal,
+    NotRequired,
+    Required,
+    TypedDict,
+    cast,
+    overload,
+)
 
 from pydantic import UUID4, BaseModel, ConfigDict
 from pydantic.main import IncEx
@@ -23,13 +35,22 @@ from codeweaver._data_structures import (
     StructuredDataInput,
     UUIDStore,
 )
-from codeweaver._server import get_statistics
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.provider import Provider
 from codeweaver.tokenizers import Tokenizer, get_tokenizer
 
 
+if TYPE_CHECKING:
+    from codeweaver._statistics import SessionStatistics
+
 logger = logging.getLogger(__name__)
+
+
+@cache
+def _get_statistics() -> "SessionStatistics":
+    """Set the statistics source for the embedding provider."""
+    statistics_module = importlib.import_module("codeweaver._statistics")
+    return statistics_module.get_session_statistics()
 
 
 class EmbeddingErrorInfo(TypedDict):
@@ -103,9 +124,7 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
     _doc_kwargs: ClassVar[dict[str, Any]] = {}
     _query_kwargs: ClassVar[dict[str, Any]] = {}
 
-    _store: ClassVar[UUIDStore[Sequence[CodeChunk], CodeChunk]] = UUIDStore(
-        value_type=Sequence, store={}, use_uuid=True, sub_value_type=CodeChunk
-    )
+    _store: UUIDStore[Sequence, CodeChunk] | None = None  # type: ignore  # pydantic doesn't support parameterizing parameterized types
 
     """The store for embedding documents, keyed by batch ID and stored as a batch of CodeChunks."""
     _hash_store: ClassVar[BlakeStore[UUID4, None]] = BlakeStore(
@@ -133,6 +152,10 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
         self.query_kwargs = type(self)._query_kwargs.copy() or {}
         self._add_kwargs(kwargs or {})
         """Add any user-provided kwargs to the embedding provider, after we merge the defaults together."""
+        if self._store is None:
+            self._store = UUIDStore(
+                value_type=Sequence, store={}, use_uuid=True, sub_value_type=CodeChunk
+            )
         self._initialize()
 
     def _add_kwargs(self, kwargs: dict[str, Any]) -> None:
@@ -283,7 +306,7 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
         from_docs: Sequence[str] | Sequence[Sequence[str]] | None = None,
     ) -> None:
         """Update token statistics for the embedding provider."""
-        statistics = get_statistics()
+        statistics = _get_statistics()
         if token_count is not None:
             statistics.add_token_usage(embedding_generated=token_count)
         elif from_docs and all(isinstance(doc, str) for doc in from_docs):

@@ -13,10 +13,13 @@ from collections.abc import Callable, Generator, Iterator
 from enum import Enum, unique
 from threading import Lock as _Lock
 from types import FrameType
-from typing import Annotated, LiteralString, Self, cast
+from typing import Annotated, Any, LiteralString, Self, cast
+
+import textcase
 
 from aenum import extend_enum  # pyright: ignore[reportMissingTypeStubs, reportUnknownVariableType]
-from pydantic import GetPydanticSchema
+from pydantic import GetCoreSchemaHandler, GetPydanticSchema
+from pydantic_core import core_schema
 
 
 type LiteralStringT = Annotated[
@@ -43,26 +46,32 @@ class BaseEnum(Enum):
             value = value.replace("_" * underscore_length, "_")
         return [v for v in value.split("_") if v]
 
+    def _multiply_variations(self, s: str) -> set[str]:
+        """Generate multiple variations of a string."""
+        return {
+            s,
+            textcase.snake(s),
+            textcase.kebab(s),
+            textcase.sentence(s),
+            textcase.middot(s),
+            textcase.camel(s),
+            *self._encode_name(s),
+        }
+
     @property
     def aka(self) -> tuple[str, ...] | tuple[int, ...]:
         """Return the alias for the enum member, if one exists."""
         if isinstance(self.value, str):
-            baseline_variations = {
-                val.lower()
-                for val in (
-                    self.value,
-                    self.name,
-                    self.name.replace("_", " "),
-                    self.value.replace("_", " "),
-                    self.name.replace("_", "-"),
-                    self.value.replace("_", "-"),
-                    self.name.replace("-", "_"),
-                    self.value.replace("-", "_"),
-                    self.name.replace(" ", "-"),
-                    self.value.replace(" ", "-"),
-                )
-            }
-            return tuple(baseline_variations | {self._encode_name(v) for v in baseline_variations})
+            return tuple(
+                sorted({
+                    v.lower()
+                    for v in set(  # type: ignore
+                        *(self._multiply_variations(self.name)),
+                        *(self._multiply_variations(self.value)),
+                    )
+                    if v and isinstance(v, str)
+                })
+            )
         return (self.value,)
 
     @property
@@ -252,7 +261,7 @@ def _get_parent_frame() -> FrameType:
     return _sys._getframe(2)  # pyright: ignore[reportPrivateUsage]
 
 
-type Name = Annotated[LiteralString, GetPydanticSchema(lambda _schema, handle: handle(str))]
+type Name = LiteralStringT
 
 
 class Sentinel:
@@ -301,6 +310,10 @@ class Sentinel:
         """Create a new sentinel."""
         return cls(name, repr_, module_name)
 
+    def __str__(self) -> str:
+        """Return a string representation of the sentinel."""
+        return self._name
+
     def __repr__(self) -> str:
         """Return a string representation of the sentinel."""
         return self._repr
@@ -308,6 +321,30 @@ class Sentinel:
     def __reduce__(self) -> tuple[type[Self], tuple[str, str, str]]:
         """Return state information for pickling."""
         return (self.__class__, (self._name, self._repr, self._module_name))
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, _source_type: Any, _handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        """Return the Pydantic core schema for the sentinel."""
+        return core_schema.with_info_after_validator_function(
+            cls._validate,
+            core_schema.str_schema(),
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                cls._serialize, when_used="json"
+            ),
+        )
+
+    @staticmethod
+    def _validate(value: str, _info: core_schema.ValidationInfo) -> Sentinel:
+        """Validate that a value is a sentinel."""
+        name, repr_, module_name = value.split(" ")
+        return Sentinel(name.strip(), repr_, module_name.strip())
+
+    @staticmethod
+    def _serialize(sentinel: Sentinel) -> str:
+        """Serialize a sentinel to a string."""
+        return f"{sentinel._name} {sentinel._repr} {sentinel._module_name}"
 
 
 _lock = _Lock()

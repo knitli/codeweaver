@@ -111,7 +111,7 @@ class RerankingModelCapabilities(BaseModel):
     max_input: Annotated[
         Callable[[Sequence[CodeChunk], str], tuple[bool, NonNegativeInt]] | PositiveInt | None,
         Field(
-            description="In the simple case, takes an integer for the maximum number of tokens the model can handle. A function that returns a tuple where the first value is a boolean indicating if the passed input exceeds the model's maximum input length, and the second value is an integer -- if the returned boolean is True (within limits), will be 0, but if it exceeds limits, the integer will be the maximum safe index of the input that can be provided. Callable receives a list of CodeChunks and the query string."
+            description="""In the simple case, takes an integer for the maximum number of tokens the model can handle. A function that returns a tuple where the first value is a boolean indicating if the passed input exceeds the model's maximum input length, and the second value is an integer -- if the returned boolean is True (within limits), will be 0, but if it exceeds limits, the integer will be the maximum safe index of the input that can be provided. Callable receives a list of CodeChunks and the query string."""
         ),
     ] = None
     input_transformer: Callable[[Sequence[CodeChunk]], Any] | None = None
@@ -134,7 +134,7 @@ class RerankingModelCapabilities(BaseModel):
     tokenizer_model: Annotated[
         str | None, Field(description="""The tokenizer model to use for the model.""")
     ] = None
-    other: Annotated[dict[str, Any], Field(description="Extra model-specific settings.")] = {}
+    other: Annotated[dict[str, Any], Field(description="""Extra model-specific settings.""")] = {}
 
     @property
     def token_processor(self) -> Tokenizer[Any]:

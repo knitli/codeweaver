@@ -1212,7 +1212,7 @@ LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
-FileName: ./src/codeweaver/_settings.py
+FileName: ./src/codeweaver/settings_types.py
 SPDXID: SPDXRef-e149d05431ffc652e3387a8af11ec663
 FileChecksum: SHA1: 2ad03955be42975503d78accecb1872fd2bcd37c
 LicenseConcluded: Apache-2.0 OR MIT
@@ -1220,7 +1220,7 @@ LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
-FileName: ./src/codeweaver/_settings_registry.py
+FileName: ./src/codeweaver/_registry.py
 SPDXID: SPDXRef-1be0c18d5d2bad642fdc21791aa28285
 FileChecksum: SHA1: f49e59d755cbe3d753d02d93933825f05428e6aa
 LicenseConcluded: Apache-2.0 OR MIT

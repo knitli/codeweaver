@@ -60,7 +60,7 @@ CodeWeaver has evolved beyond its original architectural vision into a sophistic
 
 **Core Integration**:
 - ✅ CLI implementation (comprehensive with server, search, config commands)
-- Provider registry system (`_settings_registry.py`)
+- Provider registry system (`_registry.py`)
 - FastMCP middleware and application state management
 - Vector store implementations (Qdrant incomplete, memory store basic)
 - Integration of vendored search system into `find_code` tool interface
@@ -86,7 +86,7 @@ CodeWeaver has evolved beyond its original architectural vision into a sophistic
 
 #### Week 1: Foundation Integration
 - ✅ **CLI Implementation**: Already completed with comprehensive server, search, and config commands
-- **Provider Registry**: Implement `_settings_registry.py` for dynamic provider registration
+- **Provider Registry**: Implement `_registry.py` for dynamic provider registration
 - **Sophisticated statistics tracking system** in `_statistics.py` -- needs integration into architecture for continuous updating
 - **FastMCP Middleware**: Complete application state management and context handling
    - Need to consider FastMCP server's lifespan handling. The indexer should run as a background service, so we need to ensure the lifespan for certain services can continue beyond the start and end of an MCP session.
@@ -149,7 +149,7 @@ The CLI is already comprehensively implemented with:
 
 ### Provider Registry Implementation
 ```python
-# src/codeweaver/_settings_registry.py
+# src/codeweaver/_registry.py
 from typing import Any
 from codeweaver.embedding.base import EmbeddingProvider
 from codeweaver.vector_stores.base import VectorStoreProvider

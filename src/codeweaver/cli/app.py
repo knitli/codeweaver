@@ -61,22 +61,22 @@ async def server(
             settings.project_path = project_path
 
         console.print("[green]Starting CodeWeaver MCP server...[/green]")
-        console.print(f"[blue]Project: {settings.project_path}[/blue]")
+        console.print(f"[blue]Project: {settings.project_root}[/blue]")
         console.print(f"[blue]Server: http://{host}:{port}[/blue]")
         await asyncio.run(run_method(mcp_app))  # type: ignore
         await asyncio.run(mcp_app.run_http_async(host=host, port=port, debug=debug))  # type: ignore
 
     except CodeWeaverError as e:
-        console.print(f"[red]Error: {e.message}[/red]")
+        console.print_exception(show_locals=True)
         if e.suggestions:
             console.print("[yellow]Suggestions:[/yellow]")
             for suggestion in e.suggestions:
                 console.print(f"  • {suggestion}")
         sys.exit(1)
     except KeyboardInterrupt:
-        console.print("[yellow]Server stopped by user[/yellow]")
-    except Exception as e:
-        console.print(f"[red]Unexpected error: {e}[/red]")
+        console.print_exception(show_locals=False)
+    except Exception:
+        console.print_exception(show_locals=True)
         sys.exit(1)
 
 
@@ -97,7 +97,7 @@ async def search(
         if project_path:
             settings.project_path = project_path
 
-        console.print(f"[blue]Searching in: {settings.project_path}[/blue]")
+        console.print(f"[blue]Searching in: {settings.project_root}[/blue]")
         console.print(f"[blue]Query: {query}[/blue]")
 
         # Execute search
@@ -251,7 +251,7 @@ def _show_config(settings: CodeWeaverSettings) -> None:
     table.add_column("Value", style="white")
 
     # Core settings
-    table.add_row("Project Path", str(settings.project_path))
+    table.add_row("Project Path", str(settings.project_root))
     table.add_row("Project Name", settings.project_name or "auto-detected")
     table.add_row("Token Limit", str(settings.token_limit))
     table.add_row("Max File Size", f"{settings.max_file_size:,} bytes")
@@ -271,11 +271,11 @@ def _validate_config(settings: CodeWeaverSettings) -> None:
 
     issues: list[str] = []
 
-    # Check project path
-    if not settings.project_path.exists():
-        issues.append(f"Project path does not exist: {settings.project_path}")
-    elif not settings.project_path.is_dir():
-        issues.append(f"Project path is not a directory: {settings.project_path}")
+    # Check project root
+    if not settings.project_root.exists():
+        issues.append(f"Project root does not exist: {settings.project_root}")
+    elif not settings.project_root.is_dir():
+        issues.append(f"Project root is not a directory: {settings.project_root}")
 
     # Check token limits
     if settings.token_limit > 500_000:  # 500k tokens

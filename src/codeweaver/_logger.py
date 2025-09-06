@@ -15,7 +15,7 @@ from pydantic_core import to_json
 from rich.console import Console
 from rich.logging import RichHandler
 
-from codeweaver._settings import LoggingConfigDict
+from codeweaver.settings_types import LoggingConfigDict
 
 
 def get_rich_handler(rich_kwargs: dict[str, Any]) -> RichHandler:

@@ -8,33 +8,26 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
+import logging
 
 from types import FunctionType
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NoReturn
 
 from fastmcp import Context, FastMCP
 from pydantic import TypeAdapter
 from typing_extensions import TypeIs
 
 from codeweaver import __version__ as version
-from codeweaver._server import (
-    Feature,
-    HealthInfo,
-    HealthStatus,
-    get_health_info,
-    get_state,
-    get_statistics,
-    initialize_app,
-)
-from codeweaver._server import get_settings as get_app_settings
-from codeweaver._statistics import SessionStatistics
+from codeweaver._server import initialize_app
 from codeweaver.exceptions import CodeWeaverError
 from codeweaver.models.core import FindCodeResponseSummary
 from codeweaver.tools.find_code import find_code_implementation
 
 
 if TYPE_CHECKING:
-    from codeweaver._server import AppState
+    from codeweaver._server import AppState, HealthInfo, HealthStatus
+    from codeweaver._statistics import SessionStatistics
     from codeweaver.language import SemanticSearchLanguage
     from codeweaver.models.intent import IntentType
 
@@ -81,7 +74,9 @@ async def find_code(
         query="database connection pooling configuration"
         query="user registration validation logic"
     """
-    statistics = get_statistics()
+    from codeweaver._statistics import get_session_statistics
+
+    statistics = get_session_statistics()
     settings = get_app_settings()
     try:
         # Execute the find_code implementation
@@ -120,7 +115,7 @@ async def find_code(
 @app.custom_route("/stats", methods=["GET"], tags={"system", "stats"}, include_in_schema=True)  # type: ignore
 async def stats_info() -> bytes:
     """Get the current statistics information."""
-    statistics = get_statistics()
+    statistics = get_session_statistics()
     return TypeAdapter(statistics).dump_json(statistics, indent=2)  # pyright: ignore[reportUnknownMemberType, reportReturnType,reportOptionalMemberAccess]  # we establish it exists down in the initialization
 
 
@@ -147,11 +142,9 @@ async def health() -> bytes:
         # Return existing health info if available
         dumped_health: bytes = TypeAdapter(health).dump_json(health, indent=2)  # type: ignore
         return dumped_health
-    unhealthy_status: HealthInfo = HealthInfo(
-        status=HealthStatus.UNHEALTHY,
-        version=version,
-        features=(Feature._UNKNOWN,),  # pyright: ignore[reportPrivateUsage]
-    )
+    from codeweaver._server import HealthInfo, HealthStatus
+
+    unhealthy_status: HealthInfo = HealthInfo(status=HealthStatus.UNHEALTHY, version=version)
     return TypeAdapter(unhealthy_status).dump_json(unhealthy_status, indent=2)  # type: ignore
 
 
@@ -170,13 +163,34 @@ def is_statistics_instance(statistics: Any) -> TypeIs[SessionStatistics]:
     return isinstance(statistics, SessionStatistics)
 
 
+def raise_if_missing_service(e: Exception) -> NoReturn:
+    """Raise an error if a required service is missing."""
+    logger = getattr(app, "logger", None) or logging.getLogger(__name__)
+    logger.exception("Critical error in CodeWeaver server startup: ")
+    raise CodeWeaverError("A required service failed to start during initialization.") from e
+
+
 if __name__ == "__main__":
     # Main entry point for MCP
-    asyncio.run(run_method(app))  # type: ignore
-    asyncio.run(app.run_http_async())
-    if not is_appstate_instance(get_state()):
-        raise TypeError("Expected get_state() to be an instance of AppState")
-    if not is_health_instance(get_health_info()):
-        raise TypeError("Expected get_health_info() to be an instance of HealthInfo")
-    if not is_statistics_instance(get_statistics()):
-        raise TypeError("Expected get_statistics() to be an instance of SessionStatistics")
+    try:
+        asyncio.run(run_method(app))  # type: ignore
+        asyncio.run(app.run_http_async())
+        app_state = importlib.import_module("codeweaver._server").get_state()
+        if not is_appstate_instance(app_state):
+            raise_if_missing_service(
+                TypeError("Expected get_state() to be an instance of AppState")
+            )
+        health_info = importlib.import_module("codeweaver._server").get_health_info()
+        if not is_health_instance(health_info):
+            raise_if_missing_service(
+                TypeError("Expected get_health_info() to be an instance of HealthInfo")
+            )
+        statistics = importlib.import_module("codeweaver._statistics")
+        if not is_statistics_instance(statistics.get_session_statistics()):
+            raise_if_missing_service(
+                TypeError("Expected get_statistics() to be an instance of SessionStatistics")
+            )
+    except Exception:
+        if not (logger := getattr(app, "logger", None)):
+            logger = logging.getLogger(__name__)
+        logger.exception("Failed to start CodeWeaver server: ")

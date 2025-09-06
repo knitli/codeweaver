@@ -65,6 +65,14 @@ class ProviderError(CodeWeaverError):
     """
 
 
+class RerankingProviderError(ProviderError):
+    """Reranking provider errors.
+
+    Raised when there are issues specific to the reranking provider, such as
+    invalid input formats, failed API calls, or unexpected response structures.
+    """
+
+
 class IndexingError(CodeWeaverError):
     """File indexing and processing errors.
 

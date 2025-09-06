@@ -16,10 +16,9 @@ from collections.abc import Sequence
 from functools import cache
 from pathlib import Path
 from types import MappingProxyType
-from typing import Annotated, Any, ClassVar, Literal, TypedDict, cast
+from typing import Annotated, ClassVar, Literal, TypedDict, cast
 
 from fastmcp import Context
-from mcp.shared.context import RequestContext
 from pydantic import (
     AnyUrl,
     ConfigDict,
@@ -374,14 +373,14 @@ class _CategoryStatistics:
     category: Annotated[
         ChunkKind,
         Field(
-            description="The category of the files, e.g. 'code', 'config', 'docs', 'other'. A [`_data_structures.ChunkKind`] member."
+            description="""The category of the files, e.g. 'code', 'config', 'docs', 'other'. A [`_data_structures.ChunkKind`] member."""
         ),
     ]
     languages: Annotated[
         dict[str | SemanticSearchLanguage | ConfigLanguage, _LanguageStatistics],
         Field(
             default_factory=dict,
-            description="Language statistics in this category. Keys are language names, SemanticSearchLanguage members, or ConfigLanguage members; values are _LanguageStatistics objects.",
+            description="""Language statistics in this category. Keys are language names, SemanticSearchLanguage members, or ConfigLanguage members; values are _LanguageStatistics objects.""",
         ),
     ]
 
@@ -694,14 +693,14 @@ class SessionStatistics:
             default_factory=FileStatistics,
             description="""Comprehensive file statistics tracking categories, languages, and operations.""",
         ),
-    ] = None
+    ]
     token_statistics: Annotated[
         TokenCounter | None,
         Field(
             default_factory=TokenCounter,
             description="""A typed Counter that tracks token usage statistics.""",
         ),
-    ] = None
+    ]
 
     _successful_request_log: list[str | int] = Field(default_factory=list, init=False, repr=False)  # pyright: ignore[reportUnknownVariableType]
     _failed_request_log: list[str | int] = Field(default_factory=list, init=False, repr=False)  # pyright: ignore[reportUnknownVariableType]
@@ -871,16 +870,27 @@ class SessionStatistics:
 
         Note: This is fastmcp.Context, *not* fastmcp.middleware.MiddlewareContext
         """
-        if context is None:
-            return
-
-        from typing import TYPE_CHECKING, cast
+        from typing import TYPE_CHECKING, Any
 
         if TYPE_CHECKING:
+            from mcp.shared.context import RequestContext
+
             from codeweaver._server import AppState
+
+        if context is None:
+            return
+        ctx: RequestContext[Any, AppState, Any] | None = None
         try:
-            ctx = cast(RequestContext[Any, AppState, Any], context.request_context)
-        except LookupError:
+            if (
+                context
+                and hasattr(context, "request_context")
+                and (request_ctx := getattr(context, "request_context", None))
+                and request_ctx is not None
+            ):
+                ctx = request_ctx
+            else:
+                ctx = None
+        except (LookupError, ValueError):
             return
 
         if (
@@ -892,3 +902,13 @@ class SessionStatistics:
                 self.add_successful_request(request_id=request_id)
             else:
                 self.add_failed_request(request_id=request_id)
+
+
+_statistics: SessionStatistics = SessionStatistics(
+    index_statistics=FileStatistics(), token_statistics=TokenCounter()
+)
+
+
+def get_session_statistics() -> SessionStatistics:
+    """Get the current session statistics."""
+    return _statistics

@@ -19,23 +19,24 @@ Both are process-singletons via module-level globals and accessors.
 from __future__ import annotations
 
 import contextlib
+import importlib
 
 from collections.abc import Callable, Iterable, MutableMapping, Sequence
+from enum import IntFlag, auto
 from fnmatch import fnmatch
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, NotRequired, Required, TypedDict
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 from pydantic.alias_generators import to_pascal
 
-from codeweaver._common import LiteralStringT
+from codeweaver._common import BaseEnum, LiteralStringT
 from codeweaver.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
 )
 from codeweaver.embedding.providers import EmbeddingProvider
 from codeweaver.exceptions import ConfigurationError
-from codeweaver.main import get_app_settings
 from codeweaver.provider import Provider, ProviderKind
 from codeweaver.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.reranking.providers.base import RerankingProvider
@@ -52,6 +53,176 @@ if TYPE_CHECKING:
 
 # I think I've defined this in like four places, but it's just for clarity
 type ModelName = str
+
+
+class Feature(BaseEnum, IntFlag):
+    """Enum for features supported by the CodeWeaver server."""
+
+    BASIC_SEARCH = auto()  # simple keyword search across the codebase
+    SEMANTIC_SEARCH = auto()  # ast-grep AST search
+    VECTOR_SEARCH = auto()  # embedding-based search
+    HYBRID_SEARCH = auto()  # combination of sparse and vector search
+    RERANKING = auto()  # reranking of search results
+
+    AGENT = auto()  # agentic LLMs
+
+    WEB_SEARCH = auto()  # tavily, duckduckgo
+
+    SPARSE_INDEXING = auto()  # sparse indexing
+    VECTOR_INDEXING = auto()  # vector indexing
+
+    FILE_DISCOVERY = auto()  # file discovery
+    AUTOMATIC_INDEXING = auto()  # indexing on file changes
+    FILE_WATCHER = auto()  # file watcher service
+    FILE_FILTER = auto()  # file filtering
+
+    MCP_CONTEXT_AGENT = auto()  # mcp_context_agent
+    PRECONTEXT_AGENT = auto()  # precontext_agent
+
+    HEALTH = auto()  # health
+    LOGGING = auto()  # logging
+    ERROR_HANDLING = auto()  # error_handling
+    RATE_LIMITING = auto()  # rate_limiting
+    STATISTICS = auto()  # statistics
+
+    UNKNOWN = auto()  # unknown
+
+    @property
+    def dependencies(self) -> Feature:
+        """Get the flag dependencies for a feature."""
+        deps: dict[Feature, Feature] = {
+            Feature.BASIC_SEARCH: Feature.FILE_DISCOVERY,
+            Feature.SEMANTIC_SEARCH: Feature.BASIC_SEARCH,
+            Feature.VECTOR_SEARCH: Feature.BASIC_SEARCH,
+            Feature.HYBRID_SEARCH: Feature.SPARSE_INDEXING & Feature.VECTOR_INDEXING,
+            Feature.RERANKING: Feature.BASIC_SEARCH & Feature.VECTOR_SEARCH,
+            Feature.AUTOMATIC_INDEXING: Feature.FILE_DISCOVERY & Feature.FILE_WATCHER,
+            Feature.FILE_WATCHER: Feature.FILE_DISCOVERY & Feature.FILE_FILTER,
+            Feature.MCP_CONTEXT_AGENT: Feature.VECTOR_SEARCH & Feature.RERANKING,
+            Feature.PRECONTEXT_AGENT: Feature.VECTOR_SEARCH & Feature.RERANKING & Feature.AGENT,
+            Feature.WEB_SEARCH: Feature.AGENT,
+        }
+        return deps.get(self, Feature(0))
+
+
+type ServiceName = Annotated[
+    str,
+    Field(description="""The name of the service", max_length=100, pattern=r"^[a-zA-Z0-9_]+$"""),
+]
+
+
+class ServiceCardDict(TypedDict, total=False):
+    """Dictionary representing a service and its status."""
+
+    name: Required[ServiceName]
+    feature: Required[Feature | str]
+    base_class: Required[type]
+    import_path: Required[str]
+    enabled: Required[bool]
+    dependencies: NotRequired[list[Feature] | None]
+
+    status_hook: NotRequired[Callable[..., Any] | None]
+    instance: NotRequired[Any | None]
+
+
+class ServiceCard(BaseModel):
+    """Card representing a service and its status."""
+
+    model_config = ConfigDict(validate_assignment=True, defer_build=True, str_strip_whitespace=True)
+
+    name: ServiceName
+    feature: Annotated[Feature, Field(description="""The feature enum identifier""")]
+    base_class: type
+    import_path: str
+    enabled: bool
+    dependencies: list[Feature]
+
+    status_hook: Annotated[
+        Callable[..., Any] | None, Field(description="""Hook to call for status updates""")
+    ] = None
+    instance: Annotated[Any | None, Field(description="""The service instance""")] = None
+
+    @classmethod
+    def from_dict(cls, data: ServiceCardDict) -> ServiceCard:
+        """Create a ServiceCard from a dictionary."""
+        if isinstance(data["feature"], str):
+            data["feature"] = Feature.from_string(data["feature"])
+        dependencies = data.get("dependencies", [])
+        return cls(**{**data, "dependencies": dependencies})  # pyright: ignore[reportArgumentType]
+
+    @computed_field
+    @property
+    def fully_available(self) -> bool:
+        """Check if the service is fully available (enabled and dependencies met)."""
+        return self.enabled and all(
+            dep in Feature(0) or dep in self.dependencies for dep in self.dependencies
+        )
+
+
+class ServicesRegistry(BaseModel):
+    """Registry for managing available services."""
+
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        validate_assignment=True,
+        defer_build=True,
+        str_strip_whitespace=True,
+    )
+
+    _services: MutableMapping[Feature, list[ServiceCard]] = {
+        feature: [] for feature in Feature if feature != Feature.UNKNOWN
+    }
+
+    _instance: ServicesRegistry | None = None
+
+    def __init__(self) -> None:
+        """Initialize the services registry."""
+        # TODO register default services
+
+    @classmethod
+    def get_instance(cls) -> ServicesRegistry:
+        """Get or create the global services registry instance."""
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def register_service(self, card: ServiceCard | ServiceCardDict) -> None:
+        """Register a service feature as enabled or disabled.
+
+        Args:
+            card: The service card to register
+        """
+        if isinstance(card, dict):
+            card = ServiceCard.from_dict(card)
+        self._services[card.feature].append(card)
+
+    def is_service_enabled(self, feature: Feature) -> bool:
+        """Check if a service feature is enabled.
+
+        Args:
+            feature: The feature enum identifier
+
+        Returns:
+            True if the feature is enabled, False otherwise
+        """
+        cards = self._services.get(feature, ())
+        return len(cards) > 0 and any(card.enabled for card in cards)
+
+    def list_available_services(self) -> MappingProxyType[Feature, list[ServiceCard]]:
+        """List all available services.
+
+        Returns:
+            Returns a read-only mapping of features to lists of ServiceCard instances
+        """
+        return MappingProxyType(self._services)
+
+    def get_service_status(self) -> tuple[ServiceCard, ...]:
+        """Get the status of all registered services.
+
+        Returns:
+            A tuple of ServiceCard instances representing the status of each service
+        """
+        raise NotImplementedError("Service status tracking is not implemented yet.")
 
 
 class ModelRegistry(BaseModel):
@@ -272,7 +443,7 @@ class ProviderRegistry(BaseModel):
     )
 
     _instance: ProviderRegistry | None = None
-    _settings: CodeWeaverSettings | None = get_app_settings()
+    _settings: CodeWeaverSettings | None = None
     _embedding_prefix: ClassVar[LiteralStringT] = "codeweaver.embedding.providers."
     _sparse_prefix: ClassVar[LiteralStringT] = "codeweaver.embedding.providers."
     _rerank_prefix: ClassVar[LiteralStringT] = "codeweaver.reranking.providers."
@@ -373,6 +544,13 @@ class ProviderRegistry(BaseModel):
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
+
+    @property
+    def settings(self) -> CodeWeaverSettings | None:
+        """Get the CodeWeaver settings."""
+        if self._settings is None:
+            self._settings = importlib.import_module("codeweaver.settings").get_settings()
+        return self._settings
 
     def register(
         self, provider: Provider, provider_kind: ProviderKind, provider_class: type
@@ -931,8 +1109,11 @@ class ProviderRegistry(BaseModel):
         self._data_instances.clear()
 
 
-# Global registry instance
-_registry = ProviderRegistry()
+# global services registry instance
+_services_registry = ServicesRegistry()
+
+# Global provider registry instance
+_provider_registry = ProviderRegistry()
 
 # Global model registry instance
 _model_registry = ModelRegistry()
@@ -940,17 +1121,31 @@ _model_registry = ModelRegistry()
 
 def update_settings(settings: CodeWeaverSettings) -> None:
     """Update the global settings registry instance."""
-    return _registry.add_settings(settings)
+    return _provider_registry.add_settings(settings)
 
 
 def get_provider_registry() -> ProviderRegistry:
     """Get the global provider registry instance."""
-    return _registry
+    return _provider_registry
 
 
 def get_model_registry() -> ModelRegistry:
     """Get the global model registry instance."""
     return _model_registry
+
+
+def get_services_registry() -> ServicesRegistry:
+    """Get the global services registry instance."""
+    return _services_registry
+
+
+def register_service(service: ServiceCard | ServiceCardDict) -> None:
+    """Register a service with the global registry.
+
+    Args:
+        service: The service card or dictionary to register
+    """
+    _services_registry.register_service(service)
 
 
 def register_embedding_provider(
@@ -962,7 +1157,7 @@ def register_embedding_provider(
         provider: The provider enum identifier
         provider_class: The provider implementation class
     """
-    _registry.register_embedding_provider(provider, provider_class)
+    _provider_registry.register_embedding_provider(provider, provider_class)
 
 
 def register_sparse_embedding_provider(
@@ -974,7 +1169,7 @@ def register_sparse_embedding_provider(
         provider: The provider enum identifier
         provider_class: The provider implementation class
     """
-    _registry.register_sparse_embedding_provider(provider, provider_class)
+    _provider_registry.register_sparse_embedding_provider(provider, provider_class)
 
 
 def register_reranking_provider(
@@ -986,7 +1181,7 @@ def register_reranking_provider(
         provider: The provider enum identifier
         provider_class: The provider implementation class
     """
-    _registry.register_reranking_provider(provider, provider_class)
+    _provider_registry.register_reranking_provider(provider, provider_class)
 
 
 def register_vector_store_provider(
@@ -998,7 +1193,7 @@ def register_vector_store_provider(
         provider: The provider enum identifier
         provider_class: The provider implementation class
     """
-    _registry.register_vector_store_provider(provider, provider_class)
+    _provider_registry.register_vector_store_provider(provider, provider_class)
 
 
 def register_agent_provider(provider: Provider, provider_class: type[AgentProvider[Any]]) -> None:
@@ -1008,7 +1203,7 @@ def register_agent_provider(provider: Provider, provider_class: type[AgentProvid
         provider: The provider enum identifier
         provider_class: The provider implementation class
     """
-    _registry.register_agent_provider(provider, provider_class)
+    _provider_registry.register_agent_provider(provider, provider_class)
 
 
 def register_data_provider(provider: Provider, provider_class: type[Any]) -> None:
@@ -1018,7 +1213,7 @@ def register_data_provider(provider: Provider, provider_class: type[Any]) -> Non
         provider: The provider enum identifier
         provider_class: The provider implementation class
     """
-    _registry.register_data_provider(provider, provider_class)
+    _provider_registry.register_data_provider(provider, provider_class)
 
 
 # --- Convenience helpers for model capability registration ---

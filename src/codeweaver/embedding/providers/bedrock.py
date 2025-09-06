@@ -127,7 +127,7 @@ class CohereEmbeddingRequestBody(BaseBedrockModel):
     images: Annotated[
         list[str] | None,
         Field(
-            description="The input image (as base64-encoded strings) to generate embeddings for.",
+            description="""The input image (as base64-encoded strings) to generate embeddings for.""",
             max_length=1,  # your read that right, only one image at a time... even if you give it as a list...
         ),
     ] = None
@@ -178,7 +178,7 @@ class TitanEmbeddingV2RequestBody(BaseBedrockModel):
     embedding_types: Annotated[
         list[Literal["float", "binary"]] | None,
         Field(
-            description="The type of embeddings to generate. You can specify one or both types. In this context, 'binary' means 'integer' -- likely 'uint8'. Default is ['float']."
+            description="""The type of embeddings to generate. You can specify one or both types. In this context, 'binary' means 'integer' -- likely 'uint8'. Default is ['float']."""
         ),
     ] = None
 
@@ -285,16 +285,16 @@ class BedrockInvokeEmbeddingRequest(BaseBedrockModel):
     ]
     content_type: Annotated[
         Literal["application/json"],
-        Field(description="The content type of the body. This must be 'application/json'."),
+        Field(description="""The content type of the body. This must be 'application/json'."""),
     ] = "application/json"
     accept: Annotated[
         Literal["application/json"],
-        Field(description="The accept header. This must be 'application/json'."),
+        Field(description="""The accept header. This must be 'application/json'."""),
     ] = "application/json"
     model_id: Annotated[
         str,
         Field(
-            description="The model ID to use for generating embeddings. The value for this depends on the model, your account, and other factors. [See the Bedrock docs](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-runtime/client/invoke_model.html) for more information. tl;dr use the model ARN if you aren't sure."
+            description="""The model ID to use for generating embeddings. The value for this depends on the model, your account, and other factors. [See the Bedrock docs](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-runtime/client/invoke_model.html) for more information. tl;dr use the model ARN if you aren't sure."""
         ),
     ]
     trace: Annotated[
@@ -306,7 +306,7 @@ class BedrockInvokeEmbeddingRequest(BaseBedrockModel):
     guardrail_identifier: Annotated[
         str | None,
         Field(
-            description="The guardrail identifier to use for the request. This is used to enforce safety and compliance policies. We'll default to null/None. If you need this, you'll know."
+            description="""The guardrail identifier to use for the request. This is used to enforce safety and compliance policies. We'll default to null/None. If you need this, you'll know."""
         ),
     ] = None
     guardrail_version: Annotated[
@@ -405,13 +405,13 @@ class BedrockInvokeEmbeddingResponse(BaseBedrockModel):
     body: Annotated[
         TitanEmbeddingV2Response | CohereEmbeddingResponse,
         Field(
-            description="The body of the response. This is what AWS calls a `StreamingBody` response -- a bytestream. It will contain a UTF-8 encoded JSON string that will be either be the JSON-serialized form of TitanEmbeddingV2Response or CohereEmbeddingResponse, depending on which model you used."
+            description="""The body of the response. This is what AWS calls a `StreamingBody` response -- a bytestream. It will contain a UTF-8 encoded JSON string that will be either be the JSON-serialized form of TitanEmbeddingV2Response or CohereEmbeddingResponse, depending on which model you used."""
         ),
     ]
     content_type: Annotated[
         str,
         Field(
-            description="The mimetype of the response body. Most likely 'application/json', but AWS isn't clear on this."
+            description="""The mimetype of the response body. Most likely 'application/json', but AWS isn't clear on this."""
         ),
     ] = "application/json"
 

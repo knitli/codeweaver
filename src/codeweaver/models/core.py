@@ -83,7 +83,7 @@ class CodeMatch(BaseModel):
 
     # Relevance scoring1
     relevance_score: Annotated[
-        NonNegativeFloat, Field(le=1.0, description="Relevance score (0.0-1.0)")
+        NonNegativeFloat, Field(le=1.0, description="""Relevance score (0.0-1.0)""")
     ]
 
     match_type: Annotated[
@@ -150,7 +150,9 @@ class FindCodeResponseSummary(BaseModel):
         list[CodeMatch], Field(description="""Relevant code matches ranked by relevance""")
     ]
 
-    summary: Annotated[str, Field(description="High-level summary of findings", max_length=1000)]
+    summary: Annotated[
+        str, Field(description="""High-level summary of findings""", max_length=1000)
+    ]
 
     # TODO: query_intent should *not* be exposed to the user or user's agent. It needs to be created *from* the information available from them. We can expose the simpler `IntentType` instead, but we shouldn't be asking them to assess their intent.
     query_intent: Annotated[

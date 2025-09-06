@@ -5,9 +5,7 @@ from __future__ import annotations
 
 import contextlib
 
-from typing import Literal, NotRequired, TypedDict, cast
-
-from pydantic.dataclasses import is_typeddict
+from typing import Literal, NotRequired, TypedDict, cast, is_typeddict
 
 from codeweaver._common import BaseEnum
 from codeweaver.exceptions import ConfigurationError

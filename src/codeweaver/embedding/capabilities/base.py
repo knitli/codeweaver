@@ -108,13 +108,13 @@ class EmbeddingModelCapabilities(BaseModel):
     default_dtype: Annotated[
         str | None,
         Field(
-            description="A string representing the default data type of the model, such as `float`, if the provider/model accepts different data types. If not specified, defaults to `None`."
+            description="""A string representing the default data type of the model, such as `float`, if the provider/model accepts different data types. If not specified, defaults to `None`."""
         ),
     ] = None
     output_dtypes: Annotated[
         tuple[str, ...] | None,
         Field(
-            description="A list of accepted values for output data types, if the model/provider allows different output data types. When available, you can use this to reduce the size of the returned vectors, at the cost of some accuracy (depending on which you choose).",
+            description="""A list of accepted values for output data types, if the model/provider allows different output data types. When available, you can use this to reduce the size of the returned vectors, at the cost of some accuracy (depending on which you choose).""",
             examples=[
                 "VoyageAI: `('float', 'uint8', 'int8', 'binary', 'ubinary')` for the voyage 3-series models."
             ],
@@ -128,7 +128,7 @@ class EmbeddingModelCapabilities(BaseModel):
         str | None,
         Field(
             min_length=3,
-            description="The tokenizer model used by the embedding model. If the tokenizer is `tokenizers`, this should be the full name of the tokenizer or model (if it's listed by its model name), *including the organization*. Like: `voyageai/voyage-code-3`",
+            description="""The tokenizer model used by the embedding model. If the tokenizer is `tokenizers`, this should be the full name of the tokenizer or model (if it's listed by its model name), *including the organization*. Like: `voyageai/voyage-code-3`""",
         ),
     ] = None
     preferred_metrics: Annotated[
@@ -151,15 +151,15 @@ class EmbeddingModelCapabilities(BaseModel):
     hf_name: Annotated[
         str | None,
         Field(
-            description="The Hugging Face model name, if it applies *and* is different from the model name. Currently only applies to some models from `fastembed` and `ollama`"
+            description="""The Hugging Face model name, if it applies *and* is different from the model name. Currently only applies to some models from `fastembed` and `ollama`"""
         ),
     ] = None
-    other: Annotated[dict[str, Any], Field(description="Extra model-specific settings.")] = {}
+    other: Annotated[dict[str, Any], Field(description="""Extra model-specific settings.""")] = {}
     _available: Annotated[
         bool | Unset,
         Field(
             init=False,
-            description="Whether the model is currently available with the required dependencies installed. Value set when the capability is registered for builtin capabilities. It may be unset for custom capabilities.",
+            description="""Whether the model is currently available with the required dependencies installed. Value set when the capability is registered for builtin capabilities. It may be unset for custom capabilities.""",
         ),
     ] = UNSET
 
@@ -219,7 +219,7 @@ class SparseEmbeddingModelCapabilities(BaseModel):
                 )
             )
             else Provider.UNSET,  # pyright: ignore[reportPrivateUsage]
-            description="The provider of the model. We currently only support local providers for sparse embeddings. Since Sparse embedding tend to be very efficient and low resource, they are well-suited for deployment in resource-constrained environments.",
+            description="""The provider of the model. We currently only support local providers for sparse embeddings. Since Sparse embedding tend to be very efficient and low resource, they are well-suited for deployment in resource-constrained environments.""",
         ),
     ] = (
         Provider.FASTEMBED
@@ -231,10 +231,10 @@ class SparseEmbeddingModelCapabilities(BaseModel):
     hf_name: Annotated[
         str | None,
         Field(
-            description="The Hugging Face model name, if it applies *and* is different from the model name. Currently only applies to some models from `fastembed` and `ollama`"
+            description="""The Hugging Face model name, if it applies *and* is different from the model name. Currently only applies to some models from `fastembed` and `ollama`"""
         ),
     ] = None
-    other: Annotated[dict[str, Any], Field(description="Extra model-specific settings.")] = {}
+    other: Annotated[dict[str, Any], Field(description="""Extra model-specific settings.""")] = {}
 
 
 def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:

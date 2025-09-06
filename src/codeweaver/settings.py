@@ -12,36 +12,58 @@ clear precedence hierarchy and validation.
 
 from __future__ import annotations
 
+import contextlib
+import inspect
+
 from collections.abc import Callable
+from functools import cached_property
 from pathlib import Path
-from typing import Annotated, Any, Literal, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
 from fastmcp.server.auth.auth import OAuthProvider
 from fastmcp.server.middleware import Middleware
 from fastmcp.server.server import DuplicateBehavior
 from fastmcp.tools.tool import Tool
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt, model_serializer
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    FieldSerializationInfo,
+    GetPydanticSchema,
+    PositiveInt,
+    ValidationInfo,
+    computed_field,
+    field_serializer,
+    field_validator,
+)
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
 from pydantic_ai.settings import merge_model_settings
+from pydantic_core import from_json, to_json
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from codeweaver._common import UNSET, Unset
 from codeweaver._constants import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_EXTENSIONS
-from codeweaver._settings import (
+from codeweaver._utils import walk_down_to_git_root
+from codeweaver.exceptions import MissingValueError
+from codeweaver.provider import Provider, ProviderKind
+from codeweaver.settings_types import (
+    AVAILABLE_MIDDLEWARE,
     AgentProviderSettings,
     DataProviderSettings,
     EmbeddingModelSettings,
     EmbeddingProviderSettings,
-    LoggingSettings,
-    MiddlewareOptions,
+    FileFilterSettingsDict,
     RerankingModelSettings,
     RerankingProviderSettings,
+    RignoreSettings,
     UvicornServerSettings,
     default_config_file_locations,
 )
-from codeweaver._utils import walk_down_to_git_root
-from codeweaver.exceptions import ConfigurationError, MissingValueError
-from codeweaver.provider import Provider, ProviderKind
+
+
+if TYPE_CHECKING:
+    from codeweaver.settings_types import LoggingSettings, MiddlewareOptions
+
 
 DefaultDataProviderSettings = (
     DataProviderSettings(provider=Provider.TAVILY, enabled=False, api_key=None, other=None),
@@ -69,7 +91,7 @@ DefaultAgentProviderSettings = (
     AgentProviderSettings(
         provider=Provider.ANTHROPIC,
         enabled=True,
-        models=("claude-sonnet-4-latest",),
+        model="claude-sonnet-4-latest",
         model_settings=AgentModelSettings(),
     ),
 )
@@ -105,13 +127,13 @@ class FileFilterSettings(BaseModel):
     forced_includes: Annotated[
         frozenset[str | Path],
         Field(
-            description="Directories, files, or [glob patterns](https://docs.python.org/3/library/pathlib.html#pathlib-pattern-language) to include in search and indexing. This is a set of strings, so you can use glob patterns like `**/src/**` or `**/*.py` to include directories or files."
+            description="""Directories, files, or [glob patterns](https://docs.python.org/3/library/pathlib.html#pathlib-pattern-language) to include in search and indexing. This is a set of strings, so you can use glob patterns like `**/src/**` or `**/*.py` to include directories or files."""
         ),
     ] = frozenset()
     excludes: Annotated[
         frozenset[str | Path],
         Field(
-            description="Directories, files, or [glob patterns](https://docs.python.org/3/library/pathlib.html#pathlib-pattern-language) to exclude from search and indexing. This is a set of strings, so you can use glob patterns like `**/node_modules/**` or `**/*.log` to exclude directories or files."
+            description="""Directories, files, or [glob patterns](https://docs.python.org/3/library/pathlib.html#pathlib-pattern-language) to exclude from search and indexing. This is a set of strings, so you can use glob patterns like `**/node_modules/**` or `**/*.log` to exclude directories or files."""
         ),
     ] = DEFAULT_EXCLUDED_DIRS
     excluded_extensions: Annotated[
@@ -123,61 +145,114 @@ class FileFilterSettings(BaseModel):
     use_other_ignore_files: Annotated[
         bool,
         Field(
-            description="Whether to read *other* ignore files (besides .gitignore) for filtering"
+            description="""Whether to read *other* ignore files (besides .gitignore) for filtering"""
         ),
     ] = False
     ignore_hidden: Annotated[
-        bool, Field(description="Whether to ignore hidden files (starting with .) for filtering")
+        bool,
+        Field(description="""Whether to ignore hidden files (starting with .) for filtering"""),
     ] = True
     include_github_dir: Annotated[
         bool,
         Field(
-            description="Whether to include the .github directory in search and indexing. Because the .github directory is hidden, it would be otherwise discluded from default settings. Most people want to include it for work on GitHub Actions, workflows, and other GitHub-related files."
+            description="""Whether to include the .github directory in search and indexing. Because the .github directory is hidden, it would be otherwise discluded from default settings. Most people want to include it for work on GitHub Actions, workflows, and other GitHub-related files."""
         ),
     ] = True
     other_ignore_kwargs: Annotated[
-        dict[str, Any] | Unset,
-        Field(default_factory=dict, description="""Other kwargs to pass to `rignore`. See <https://pypi.org/project/rignore/>. By default we set max_file_size to 5MB and same_file_system to True."""),
+        RignoreSettings | Unset,
+        Field(
+            default_factory=dict,
+            description="""Other kwargs to pass to `rignore`. See <https://pypi.org/project/rignore/>. By default we set max_filesize to 5MB and same_file_system to True.""",
+        ),
     ] = UNSET
-    
-    @property
-    def default_rignore_settings(self) -> dict[str, Any]:
-        """Returns CodeWeaver's default rignore settings. This does not include any user overrides."""
-        return {
-            "max_file_size": 5 * 1024 * 1024,
-            "same_file_system": True,
-        }
-    def _adjust_settings(
-        self, other: FileFilterSettings | dict[str, Any] | None
-    ) -> dict[str, Any]:
-        """Adjusts a few settings, primarily to reform keywords. `rignore`'s choice of keywords is a bit odd, so we wrapped them in clearer alternatives."""
-        kwarg_map = {
-            "forced_includes": None,
-            "excludes": "additional_ignores",
-            "excluded_extensions": "additional_ignores",
-            "use_gitignore": "read_git_ignore",
-            "use_other_ignore_files": "read_ignore_files",
-            "ignore_hidden": "ignore_hidden",
-        }
 
-    @model_serializer(when_used="always")
-    def serialize(self) -> dict[str, Any]:
+    default_rignore_settings: Annotated[
+        RignoreSettings,
+        Field(
+            description="""Default settings for rignore. These are used if not overridden by user settings."""
+        ),
+    ] = RignoreSettings({"max_filesize": 5 * 1024 * 1024, "same_file_system": True})
+
+    def model_post_init(self, __context: Any, /) -> None:
+        """Post-initialization processing."""
+        if self.include_github_dir:
+            self.forced_includes = self.forced_includes.union(frozenset({"**/.github/**"}))
+
+    @staticmethod
+    def _self_to_kwargs(self_kind: FileFilterSettings | FileFilterSettingsDict) -> RignoreSettings:
+        """Convert self, either as an instance or as a serialized python dictionary, to kwargs for rignore."""
+        if isinstance(self_kind, FileFilterSettings):
+            self_kind = FileFilterSettingsDict(**self_kind.model_dump())
+        return RignoreSettings(
+            **cast(
+                RignoreSettings,
+                {
+                    "additional_ignores": [
+                        *(
+                            f"*.{ext}"
+                            if not ext.startswith("*") or ext.startswith(".")
+                            else (ext if ext.startswith("*") else f"*{ext}")
+                            for ext in self_kind.get("excluded_extensions", [])
+                        ),
+                        *self_kind.get("excludes", []),
+                    ],
+                    "read_git_ignore": self_kind.get("use_gitignore", True),
+                    "read_ignore_files": self_kind.get("use_other_ignore_files", False),
+                    "ignore_hidden": self_kind.get("ignore_hidden", True),
+                    **self_kind.get("default_rignore_settings", {}),
+                    **(
+                        cast(
+                            RignoreSettings,
+                            {}
+                            if isinstance(self_kind.get("other_ignore_kwargs", {}), Unset)
+                            else self_kind.get("other_ignore_kwargs", {}),
+                        )
+                    ),
+                },
+            )
+        )
+
+    def construct_filter(self) -> Callable[[Path], bool]:
+        """Constructs the filter function for rignore."""
+
+        def filter_func(path: Path | str) -> bool:
+            """Filter function that respects forced includes."""
+            path_obj = Path(path) if isinstance(path, str) else path
+            return any(path_obj.match(str(include)) for include in self.forced_includes)
+
+        return filter_func
+
+    @cached_property
+    def filter(self) -> Callable[[Path], bool]:
+        """Cached property for the filter function."""
+        return self.construct_filter()
+
+    def _adjust_settings(self) -> RignoreSettings:
+        """Adjusts a few settings, primarily to reform keywords. `rignore`'s choice of keywords is a bit odd, so we wrapped them in clearer alternatives."""
+        base_kwargs = self._self_to_kwargs(self)
+        base_kwargs["filter"] = self.filter
+        return base_kwargs
+
+    def to_kwargs(self) -> RignoreSettings:
+        """Serialize to kwargs for rignore."""
+        return self._adjust_settings()
+
 
 class ProviderSettings(BaseModel):
     """Settings for provider configuration."""
 
     data: Annotated[
-        tuple[DataProviderSettings, ...] | None,
+        tuple[DataProviderSettings, ...] | Unset,
         Field(description="""Data provider configuration"""),
     ] = DefaultDataProviderSettings
 
     embedding: Annotated[
-        tuple[EmbeddingProviderSettings, ...],
+        tuple[EmbeddingProviderSettings, ...] | Unset,
         Field(description="""Embedding provider configuration"""),
     ] = DefaultEmbeddingProviderSettings
 
     reranking: Annotated[
-        tuple[RerankingProviderSettings, ...],
+        tuple[RerankingProviderSettings, ...] | Unset,
         Field(description="""Reranking provider configuration"""),
     ] = DefaultRerankingProviderSettings
     """
@@ -187,17 +262,20 @@ class ProviderSettings(BaseModel):
     ] = QdrantConfig()
     """
     agent: Annotated[
-        tuple[AgentProviderSettings, ...] | None,
+        tuple[AgentProviderSettings, ...] | Unset,
         Field(description="""Agent provider configuration"""),
     ] = DefaultAgentProviderSettings
 
 
 class FastMcpServerSettings(BaseModel):
-    """Settings for the FastMCP server."""
+    """Settings for the FastMCP server.
+
+    These settings don't represent the complete set of FastMCP server settings, but the ones users can configure. The remaining settings, if changed, could break functionality or cause unexpected behavior.
+    """
 
     model_config = ConfigDict(
         json_schema_extra={
-            "TelemetryBoolProps": [
+            "TelemetryBoolProps": [  # properties to convert to bool for telemetry -- just 'property is set' or 'property is not set'
                 "host",
                 "port",
                 "path",
@@ -211,7 +289,7 @@ class FastMcpServerSettings(BaseModel):
     transport: Annotated[
         Literal["stdio", "http"] | None,
         Field(
-            description="Transport protocol to use for the FastMCP server. Stdio is for local use and cannot support concurrent requests. HTTP (streamable HTTP) can be used for local or remote use and supports concurrent requests. Unlike many MCP servers, CodeWeaver **defaults to http**."
+            description="""Transport protocol to use for the FastMCP server. Stdio is for local use and cannot support concurrent requests. HTTP (streamable HTTP) can be used for local or remote use and supports concurrent requests. Unlike many MCP servers, CodeWeaver **defaults to http**."""
         ),
     ] = "http"
     host: Annotated[str | None, Field(description="""Host address for the FastMCP server.""")] = (
@@ -219,35 +297,198 @@ class FastMcpServerSettings(BaseModel):
     )
     port: Annotated[
         PositiveInt | None,
-        Field(description="Port number for the FastMCP server. Default is 9328 ('WEAV')"),
+        Field(description="""Port number for the FastMCP server. Default is 9328 ('WEAV')"""),
     ] = 9328
     path: Annotated[
         str | None,
-        Field(description="Route path for the FastMCP server. Defaults to '/codeweaver/'"),
+        Field(description="""Route path for the FastMCP server. Defaults to '/codeweaver/'"""),
     ] = "/codeweaver/"
-    auth: OAuthProvider | None = None
+    auth: Annotated[
+        OAuthProvider | None,
+        Field(description="""OAuth provider configuration"""),
+        GetPydanticSchema(lambda _schema, handler: handler(Any)),
+    ] = None
     cache_expiration_seconds: float | None = None
     on_duplicate_tools: DuplicateBehavior | None = None
     on_duplicate_resources: DuplicateBehavior | None = None
     on_duplicate_prompts: DuplicateBehavior | None = None
     resource_prefix_format: Literal["protocol", "path"] | None = None
-    additional_middleware: list[Middleware | Callable[..., Any]] | None = None
-    additional_tools: list[Tool | Callable[..., Any]] | None = None
-    additional_dependencies: list[str] | None = None
+    # these are each "middleware", "tools", and "dependencies" for FastMCP. But we prefix them with "additional_" to make it clear these are *in addition to* the ones we provide by default.
+    additional_middleware: Annotated[
+        list[
+            Annotated[Middleware, GetPydanticSchema(lambda _s, handler: handler(Any))]
+            | Callable[..., Any]
+        ]
+        | None,
+        Field(
+            description="""Additional middleware to add to the FastMCP server.""",
+            serialization_alias="middleware",
+        ),
+    ] = None
+    additional_tools: Annotated[
+        list[Tool | Callable[..., Any]] | None,
+        Field(
+            description="""Additional tools to add to the FastMCP server.""",
+            serialization_alias="tools",
+        ),
+    ] = None
+    additional_dependencies: Annotated[
+        list[str] | None,
+        Field(
+            description="""Additional dependencies to add to the FastMCP server.""",
+            serialization_alias="dependencies",
+        ),
+    ] = None
+
+    def _serialize_additional_for_json(self, _v: Any, info: FieldSerializationInfo) -> bytes:
+        """Helper to serialize additional fields for JSON output."""
+        if info.field_name == "additional_middleware":
+            return to_json({
+                "additional_middleware": [
+                    mw.__class__.__qualname__ if isinstance(mw, Middleware) else str(mw)
+                    for mw in (self.additional_middleware or [])
+                ]
+            })
+        if info.field_name == "additional_tools":
+            return to_json({
+                "additional_tools": [
+                    tool.name if isinstance(tool, Tool) else str(tool)
+                    for tool in (self.additional_tools or [])
+                ]
+            })
+        if info.field_name == "additional_dependencies":
+            return to_json({"additional_dependencies": self.additional_dependencies or []})
+        return b"{}"
+
+    def _serialize_additional_for_python(
+        self, _v: Any, info: FieldSerializationInfo
+    ) -> dict[Literal["middleware", "tools", "dependencies"], list[Any]]:
+        """Helper to serialize additional fields for Python output."""
+        if info.field_name == "additional_middleware":
+            return {"middleware": self.additional_middleware or []}
+        if info.field_name == "additional_tools":
+            return {"tools": self.additional_tools or []}
+        if info.field_name == "additional_dependencies":
+            return {"dependencies": self.additional_dependencies or []}
+        return {}
+
+    @field_serializer(
+        *("additional_middleware", "additional_tools", "additional_dependencies"),
+        mode="plain",
+        when_used="always",
+    )
+    def serialize_additional_fields(
+        self, _v: Any, info: FieldSerializationInfo
+    ) -> dict[Literal["middleware", "tools", "dependencies"], list[Any]] | bytes:
+        """
+        Serialize additional fields for the FastMCP server settings.
+        """
+        if info.mode == "json":
+            return self._serialize_additional_for_json(_v, info)
+        return self._serialize_additional_for_python(_v, info)
+
+    @classmethod
+    def _validate_additional_from_python(cls, value: list[Any], info: ValidationInfo) -> list[Any]:
+        """Validate additional fields from Python input."""
+        if info.field_name and info.field_name.startswith("additional_"):
+            if "middleware" in info.field_name and isinstance(value, str) and "." in value:
+                return [cls._try_to_find_middleware(v) or v for v in (value or []) if value and v]
+            if "tools" in info.field_name:
+                return [cls._try_to_find_tool(v) or v for v in (value or []) if value and v]
+            if "dependencies" in info.field_name:
+                return [v for v in (value or []) if value and isinstance(v, str)]
+        return value
+
+    @staticmethod
+    def _attempt_import(suspected_path: str) -> Any | None:
+        """Attempt to import a class or callable."""
+        module_path, class_name = suspected_path.rsplit(".", 1)
+        with contextlib.suppress(ImportError, AttributeError):
+            module = __import__(module_path, fromlist=[class_name])
+            cls = getattr(module, class_name, None)
+            if cls and (inspect.isclass(cls) or callable(cls)):
+                return cls
+        return None
+
+    @staticmethod
+    def _return_if_subclass(value: str, cls: type[Tool | Middleware]) -> type | str | None:
+        """Return the value if it is a subclass of the given class."""
+        common_name = "Middleware" if cls is Middleware else "Tool"
+        return next(
+            (
+                subclass
+                for subclass in cls.__subclasses__()
+                if subclass.__name__ == value
+                or subclass.__qualname__ == value
+                or (str(subclass) in value and str(subclass) != common_name)
+            ),
+            value,
+        )
+
+    @classmethod
+    def _try_to_find_middleware(cls, value: Any) -> Middleware | Callable[..., Any] | str | None:
+        """Try to find a middleware class or callable from a string or other input."""
+        if isinstance(value, Middleware) or callable(value):
+            return value
+        if not value:
+            return None
+        if isinstance(value, str) and any(
+            mw.__name__ == value or mw.__qualname__ == value for mw in AVAILABLE_MIDDLEWARE
+        ):
+            return next(
+                (
+                    mw
+                    for mw in AVAILABLE_MIDDLEWARE
+                    if mw.__name__ == value or mw.__qualname__ == value
+                ),
+                value,
+            )
+        if isinstance(value, str) and "." in value and (imported := cls._attempt_import(value)):
+            return imported
+        return cls._return_if_subclass(value, Middleware)
+
+    @classmethod
+    def _try_to_find_tool(cls, value: Any) -> Tool | Callable[..., Any] | str | None:
+        """Try to find a tool class or callable from a string or other input."""
+        if isinstance(value, Tool) or callable(value):
+            return value
+        if not value:
+            return None
+        if isinstance(value, str) and "." in value and (imported := cls._attempt_import(value)):
+            return imported
+        return cls._return_if_subclass(value, Tool)
+
+    @classmethod
+    @field_validator(
+        *("additional_middleware", "additional_tools", "additional_dependencies"), mode="plain"
+    )
+    def validate_additional_fields(
+        cls,
+        value: str | bytes | bytearray | list[str | Middleware | Tool | Callable[..., Any]] | None,
+        info: ValidationInfo,
+    ) -> Any:
+        """
+        Validate additional fields for the FastMCP server settings.
+        """
+        if not value:
+            return []
+        if isinstance(value, str | bytes | bytearray):
+            return cls.validate_additional_fields(from_json(value), info=info)
+        return cls._validate_additional_from_python(value, info=info)
 
 
-DefaultFastMcpServerSettings = FastMcpServerSettings(
-    transport="stdio",
-    auth=None,
-    cache_expiration_seconds=None,
-    on_duplicate_tools="warn",
-    on_duplicate_resources="warn",
-    on_duplicate_prompts="warn",
-    resource_prefix_format="path",
-    additional_middleware=None,
-    additional_tools=None,
-    additional_dependencies=None,
-)
+DefaultFastMcpServerSettings = FastMcpServerSettings.model_validate({
+    "transport": "stdio",
+    "auth": None,
+    "cache_expiration_seconds": None,
+    "on_duplicate_tools": "warn",
+    "on_duplicate_resources": "warn",
+    "on_duplicate_prompts": "warn",
+    "resource_prefix_format": "path",
+    "middleware": None,
+    "tools": None,
+    "dependencies": None,
+})
 
 
 class CodeWeaverSettings(BaseSettings):
@@ -273,7 +514,9 @@ class CodeWeaverSettings(BaseSettings):
         validate_assignment=True,
         cli_kebab_case=True,
         extra="allow",  # Allow extra fields in the configuration for plugins/extensions
-        json_schema_extra={"NoTelemetryProps": ["project_path", "project_name", "config_file"]},
+        json_schema_extra={
+            "NoTelemetryProps": ["project_path", "project_root", "project_name", "config_file"]
+        },
     )
 
     # Core settings
@@ -285,7 +528,7 @@ class CodeWeaverSettings(BaseSettings):
     ] = walk_down_to_git_root()
 
     project_name: Annotated[
-        str | None, Field(description="Project name (auto-detected from directory if None)")
+        str | None, Field(description="""Project name (auto-detected from directory if None)""")
     ] = None
 
     config_file: Annotated[
@@ -303,7 +546,7 @@ class CodeWeaverSettings(BaseSettings):
         PositiveInt,
         Field(
             le=500,
-            description="Maximum code matches to return. Because CodeWeaver primarily indexes ast-nodes, a page can return multiple matches per file, so this is not the same as the number of files returned. This is the maximum number of code matches returned in a single response.",
+            description="""Maximum code matches to return. Because CodeWeaver primarily indexes ast-nodes, a page can return multiple matches per file, so this is not the same as the number of files returned. This is the maximum number of code matches returned in a single response.""",
         ),
     ] = 75
     server: Annotated[
@@ -323,8 +566,6 @@ class CodeWeaverSettings(BaseSettings):
         FileFilterSettings, Field(description="""File filtering settings""")
     ] = FileFilterSettings()
 
-    # Disabled while implementing...
-    # Provider configuration
     embedding: Annotated[
         tuple[EmbeddingModelSettings, ...] | None,
         Field(description="""Embedding provider configuration"""),
@@ -340,7 +581,7 @@ class CodeWeaverSettings(BaseSettings):
     enable_background_indexing: Annotated[
         bool,
         Field(
-            description="Enable automatic background indexing (default behavior and recommended)"
+            description="""Enable automatic background indexing (default behavior and recommended)"""
         ),
     ] = True
     enable_telemetry: Annotated[
@@ -400,24 +641,11 @@ class CodeWeaverSettings(BaseSettings):
     def model_post_init(self, __context: Any, /) -> None:
         """Post-initialization validation."""
         # Ensure project path exists and is readable
-        if not self.project_path.exists():
-            raise ConfigurationError(
-                f"Project path does not exist: {self.project_path}",
-                suggestions=[
-                    "Check the project_path setting: you can set it either with the CODEWEAVER_PROJECT_PATH environment variable or in your configuration file"
-                ],
-            )
-
-        if not self.project_path.is_dir():
-            raise ConfigurationError(
-                f"Project path is not a directory: {self.project_path}",
-                suggestions=["Ensure project_path points to a directory"],
-            )
-
         if not self.project_name:
-            self.project_name = self.project_path.name
+            self.project_name = self.project_root.name
 
-    @property
+    @computed_field
+    @cached_property
     def project_root(self) -> Path:
         """Get the project root directory."""
         if not self.project_path:
@@ -432,6 +660,8 @@ _settings: CodeWeaverSettings | None = None
 def get_settings(path: Path | None = None) -> CodeWeaverSettings:
     """Get the global settings instance."""
     global _settings
+    if path:
+        return CodeWeaverSettings(config_file=path)
     if _settings is None:
         _settings = CodeWeaverSettings()
     return _settings

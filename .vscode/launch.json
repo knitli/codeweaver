@@ -17,7 +17,10 @@
             "name": "Debug CodeWeaver CLI",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/codeweaver/cli/__init__.py",
+            "program": "${workspaceFolder}/src/codeweaver/cli/app.py",
+            "args": [
+                "server"
+            ],
             "console": "integratedTerminal"
         },
         {

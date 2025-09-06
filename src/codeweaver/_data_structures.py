@@ -15,10 +15,10 @@ import textwrap
 from collections.abc import Callable, ItemsView, Iterable, Iterator, KeysView, Sequence, ValuesView
 from datetime import UTC, datetime
 from functools import cache, cached_property
-from io import BufferedReader
 from pathlib import Path
 from types import MappingProxyType
 from typing import (
+    TYPE_CHECKING,
     Annotated,
     Any,
     Literal,
@@ -33,16 +33,17 @@ from typing import (
     TypeGuard,
     TypeVar,
     cast,
+    is_typeddict,
     overload,
 )
 from uuid import uuid4
 from weakref import WeakValueDictionary
 
-from ast_grep_py import SgNode
 from pydantic import (
     UUID4,
+    AfterValidator,
     BaseModel,
-    Discriminator,
+    ConfigDict,
     Field,
     NonNegativeFloat,
     NonNegativeInt,
@@ -59,8 +60,13 @@ from typing_extensions import TypeIs
 
 from codeweaver._common import BaseEnum
 from codeweaver._constants import get_ext_lang_pairs
-from codeweaver._utils import normalize_ext
+from codeweaver._utils import ensure_iterable, normalize_ext, set_relative_path
 from codeweaver.language import ConfigLanguage, SemanticSearchLanguage
+
+
+if TYPE_CHECKING:
+    from _typeshed import ReadableBuffer
+    from ast_grep_py import SgNode
 
 
 try:
@@ -81,8 +87,17 @@ BlakeHashKey = Annotated[
 # ------------------------------------------------
 
 type SerializedCodeChunk[CodeChunk] = str | bytes | bytearray
-type ChunkSequence = Sequence[CodeChunk] | Sequence[SerializedCodeChunk[CodeChunk]]
-type StructuredDataInput = CodeChunk | SerializedCodeChunk[CodeChunk] | ChunkSequence
+type ChunkSequence = (
+    Sequence[CodeChunk]
+    | Sequence[SerializedCodeChunk[CodeChunk]]
+    | Sequence[CodeChunkDict]
+    | Iterator[CodeChunk]
+    | Iterator[SerializedCodeChunk[CodeChunk]]
+    | Iterator[CodeChunkDict]
+)
+type StructuredDataInput = (
+    CodeChunk | SerializedCodeChunk[CodeChunk] | ChunkSequence | CodeChunkDict
+)
 
 
 class ChunkKind(BaseEnum):
@@ -153,8 +168,11 @@ class Metadata(TypedDict, total=False):
 # ===========================================================================
 
 SpanTuple = tuple[
-    NonNegativeInt, NonNegativeInt, UUID4
+    PositiveInt, PositiveInt, UUID4
 ]  # Type alias for a span tuple (start, end, source_id)
+
+ONE_LINE = 1
+"""Represents a single line span."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,10 +202,12 @@ class Span:
             - `intersection` (`&`) operation will return a new span that is the overlap of both spans, or None if they do not overlap.
             - `symmetric_difference` (`^`) operation will return a tuple of spans that are the parts of each span that do not overlap with the other, or None if they do not overlap.
             - `equals` (`==`) operation will return True if the spans are equal, and False otherwise. Spans are only equal if they have the same start, end, **and** source identifier.
+
+    Why immutable? Because we don't want to accidentally modify a span that is being used elsewhere, and we want to ensure that spans are always in a valid state. It also allows us to comfortably use them as keys, and in sets, and supports our data-safe set-like operations here.
     """
 
-    start: NonNegativeInt
-    end: NonNegativeInt
+    start: PositiveInt
+    end: PositiveInt
 
     _source_id: Annotated[
         UUID4,
@@ -237,13 +257,19 @@ class Span:
             return None  # Fully covered
         if other.start > self.start and other.end < self.end:
             return (
-                Span(self.start, other.start - 1, self._source_id),
-                Span(other.end + 1, self.end, self._source_id),
+                Span(self.start, other.start - ONE_LINE, self._source_id),
+                Span(other.end + ONE_LINE, self.end, self._source_id),
             )
         if other.start <= self.start:
-            return Span(other.end + 1, self.end, self._source_id) if other.end < self.end else None
+            return (
+                Span(other.end + ONE_LINE, self.end, self._source_id)
+                if other.end < self.end
+                else None
+            )
         return (
-            Span(self.start, other.start - 1, self._source_id) if other.start > self.start else None
+            Span(self.start, other.start - ONE_LINE, self._source_id)
+            if other.start > self.start
+            else None
         )
 
     def __xor__(self, other: Span) -> tuple[Span, ...] | None:  # Symmetric Difference
@@ -274,34 +300,73 @@ class Span:
             return False
         return self.start == other.start and self.end == other.end
 
-    def __iter__(self) -> Iterator[NonNegativeInt]:
+    def __iter__(self) -> Iterator[PositiveInt]:
         """Return an iterator *over the lines* in the span."""
         current = self.start
         while current <= self.end:
             yield current
-            current += 1
+            current += ONE_LINE
 
     def __len__(self) -> NonNegativeInt:
         """Return the number of lines in the span."""
-        return self.end - self.start + 1
+        return self.end - self.start + ONE_LINE
 
-    def __contains__(self, span: Span | SpanTuple | tuple[int, int] | int) -> bool:
+    @staticmethod
+    def _is_span_tuple(
+        span: Span
+        | SpanTuple
+        | tuple[PositiveInt, PositiveInt]
+        | tuple[PositiveInt, PositiveInt, None]
+        | int,
+    ) -> TypeGuard[SpanTuple]:
+        """Check if the given span is a SpanTuple."""
+        return isinstance(span, tuple) and len(span) == 3 and hasattr(span[2], "hex")
+
+    @staticmethod
+    def _is_start_end_tuple(
+        span: Span
+        | SpanTuple
+        | tuple[PositiveInt, PositiveInt]
+        | tuple[PositiveInt, PositiveInt, None]
+        | int,
+    ) -> TypeGuard[tuple[PositiveInt, PositiveInt] | tuple[PositiveInt, PositiveInt, None]]:
+        """Check if the given span is a (start, end) tuple."""
+        return (
+            isinstance(span, tuple)
+            and (len(span) == 2 or (len(span) == 3 and span[2] is None))
+            and span[1] >= span[0]
+        )  # type: ignore
+
+    def _is_contained(self, number: int) -> bool:
+        """Check if the given number is contained in the span."""
+        return self.start <= number <= self.end
+
+    def __contains__(
+        self,
+        span: Span
+        | SpanTuple
+        | tuple[PositiveInt, PositiveInt]
+        | tuple[PositiveInt, PositiveInt, None]
+        | int,
+    ) -> bool:
         """
         Check if the span contains a line number or another span or a tuple of (start, end).
 
         This is naive for tuples and line numbers, but does consider the source for span comparisons.
         """
-        if isinstance(span, tuple):
-            if len(span) == 2 or (len(span) == 3 and span[2] is None):  # type: ignore
-                start, end = span
-                return self.start <= start <= self.end or self.start <= end <= self.end
+        if isinstance(span, int):
+            return self._is_contained(span)
+        if isinstance(span, tuple) and len(span) == 3 and self._is_span_tuple(span):
             return bool(self & Span.from_tuple(span))
-        if isinstance(span, Span):
-            return bool(self & span)
-        return self.start <= span <= self.end
+        if self._is_start_end_tuple(span):
+            start, end = span[:2]
+            return self._is_contained(start) or self._is_contained(end)
+        return bool(self & span) if isinstance(span, Span) else False
 
     @classmethod
-    def __call__(cls, span: SpanTuple | Span | tuple[int, int, UUID4 | None]) -> Span:
+    def __call__(
+        cls, span: SpanTuple | Span | tuple[PositiveInt, PositiveInt, UUID4 | None]
+    ) -> Span:
         """Create a Span from a tuple of (start, end, source_id)."""
         if isinstance(span, Span):
             return cls(*span.as_tuple)
@@ -376,14 +441,19 @@ class Span:
         return (
             self.end == other.start
             or self.start == other.end
-            or self.end + 1 == other.start
-            or self.start - 1 == other.end
+            or self.end + ONE_LINE == other.start
+            or self.start - ONE_LINE == other.end
         )
 
 
 @dataclass
 class SpanGroup:
-    """A group of spans that can be manipulated as a single unit."""
+    """A group of spans that can be manipulated as a single unit.
+
+    SpanGroups allow for set-like operations on groups of spans, including union, intersection, difference, and symmetric difference.
+
+    SpanGroups normalize spans on creation and when spans are added, merging overlapping or adjacent spans with the same source_id. This ensures that the spans in a SpanGroup are always non-overlapping and non-adjacent within the same source.
+    """
 
     spans: Annotated[
         set[Span],
@@ -399,7 +469,7 @@ class SpanGroup:
 
     @computed_field
     @property
-    def is_unform(self) -> bool:
+    def is_uniform(self) -> bool:
         """Check if the span group is uniform, meaning all spans have the same source_id."""
         if not self.spans:
             return True
@@ -410,7 +480,7 @@ class SpanGroup:
     @property
     def source_id(self) -> str | None:
         """Get the source_id of the span group."""
-        if not self.spans or not self.is_unform:
+        if not self.spans or not self.is_uniform:
             return None
         return next(iter(self.spans)).source_id
 
@@ -421,7 +491,9 @@ class SpanGroup:
         return frozenset(span.source_id for span in self.spans)
 
     @classmethod
-    def from_simple_spans(cls, simple_spans: Sequence[tuple[int, int]]) -> SpanGroup:
+    def from_simple_spans(
+        cls, simple_spans: Sequence[tuple[PositiveInt, PositiveInt]]
+    ) -> SpanGroup:
         """
         Create a SpanGroup from a sequence of simple spans. Assumes all input spans are from the same source.
 
@@ -504,8 +576,12 @@ class SpanGroup:
 class SearchResult(BaseModel):
     """Result from vector search operations."""
 
-    file_path: Path
     content: str | CodeChunk
+    file_path: Annotated[
+        Path | None,
+        Field(description="""Path to the source file"""),
+        AfterValidator(set_relative_path),
+    ]
     score: Annotated[NonNegativeFloat, Field(description="""Similarity score""")]
     metadata: Annotated[
         Metadata | None, Field(description="""Additional metadata about the result""")
@@ -513,9 +589,9 @@ class SearchResult(BaseModel):
 
 
 class CodeChunkDict(TypedDict, total=False):
-    """Dictionary representation of a code chunk.
+    """A python dictionary of a CodeChunk.
 
-    Essentially a serialized-to-python code chunk.
+    Primarily provides type hints and documentation for the expected structure of a CodeChunk when represented as a dictionary.
     """
 
     content: Required[str]
@@ -551,19 +627,6 @@ def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
     return None
 
 
-def validate_and_set_relative_path(path: Path | str | None) -> Path | None:
-    """Validate and set the file path to be relative if possible."""
-    if path is None:
-        return None
-    path_obj = Path(path)
-    if not path_obj.is_absolute():
-        return path_obj
-    from codeweaver._utils import get_project_root
-
-    base_path = get_project_root()
-    return path_obj.relative_to(base_path)
-
-
 class CodeChunk(BaseModel):
     """Represents a chunk of code or docs with metadata."""
 
@@ -574,6 +637,7 @@ class CodeChunk(BaseModel):
         Field(
             description="""Path to the source file. Not all chunks are from files, so this can be None."""
         ),
+        AfterValidator(set_relative_path),
     ] = None
     language: SemanticSearchLanguage | str | None = None
     chunk_type: ChunkType = ChunkType.TEXT_BLOCK  # For Phase 1, simple text blocks
@@ -672,12 +736,57 @@ class CodeChunk(BaseModel):
         """Return the length of the serialized content in characters."""
         return len(self.serialize_for_embedding())
 
+    @classmethod
+    def chunkify(cls, text: StructuredDataInput) -> Iterator[CodeChunk]:
+        """Convert text to a CodeChunk."""
+        from codeweaver._utils import ensure_iterable
+
+        yield from (
+            item
+            if isinstance(item, cls)
+            else (
+                cls.model_validate_json(item)
+                if isinstance(item, str | bytes | bytearray)
+                else cls.model_validate(item)
+            )
+            for item in ensure_iterable(text)
+        )
+
+    @staticmethod
+    def dechunkify(chunks: StructuredDataInput, *, for_embedding: bool = False) -> Iterator[str]:
+        """Convert a sequence of CodeChunks or mixed serialized and deserialized chunks back to json strings."""
+        for chunk in ensure_iterable(chunks):
+            if isinstance(chunk, str | bytes | bytearray):
+                yield chunk.decode("utf-8") if isinstance(chunk, bytes | bytearray) else chunk
+            elif is_typeddict(chunk):
+                result = (
+                    CodeChunk.model_validate(chunk).serialize_for_embedding()
+                    if for_embedding
+                    else CodeChunk.model_validate(chunk).serialize()
+                )
+                yield result.decode("utf-8") if isinstance(result, bytes | bytearray) else result
+            else:
+                result = (
+                    cast(CodeChunk, chunk).serialize_for_embedding()
+                    if for_embedding
+                    else chunk.serialize()
+                )
+                yield result.decode("utf-8") if isinstance(result, bytes | bytearray) else result
+
 
 @dataclass(frozen=True, slots=True)
 class DiscoveredFile:
-    """Represents a file discovered during project scanning."""
+    """Represents a file discovered during project scanning.
 
-    path: Annotated[Path, Field(description="""Relative path to the discovered file""")]
+    `DiscoveredFile` instances are immutable and hashable, making them suitable for use in sets and as dictionary keys, and ensuring that their state cannot be altered after creation.
+    In CodeWeaver operations, they are created using the `from_path` method when scanning and indexing a codebase.
+    """
+
+    path: Annotated[
+        Path,
+        Field(description="""Relative path to the discovered file from the project root."""),
+        AfterValidator(set_relative_path),
+    ]
     ext_kind: ExtKind
 
     file_hash: Annotated[
@@ -812,19 +921,15 @@ def to_uuid() -> UUID4:
     return uuid4()
 
 
-def discriminate_sub_value_type(v: Any) -> Literal["container", "none"]:
-    """Discriminate the sub-value type for a given value."""
-    if (isinstance(v, dict) and v.get("use_uuid") is False) or (
-        not isinstance(v, dict) and getattr(v, "use_uuid", True) is False
-    ):
-        return "none"
-    # we need to examine the `value_type`
-    if (value_type := getattr(v, "value_type", None)) and (
-        value_type in (list, set, tuple, dict)
-        or (hasattr(value_type, "__contains__") and hasattr(value_type, "__iter__"))
-    ):
-        return "container"
-    return "none"
+class StoreDict(TypedDict, total=False):
+    """Dictionary representation of a SimpleTypedStore."""
+
+    value_type: Required[type]
+    use_uuid: NotRequired[bool]
+    store: NotRequired[dict[UUID4 | BlakeHashKey, Any]]
+    sub_value_type: NotRequired[type | None]
+    _size_limit: NotRequired[PositiveInt | None]
+    _id: NotRequired[UUID4]
 
 
 class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](BaseModel):
@@ -837,8 +942,17 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
     The store protects data integrity by copying data on get, pushes removed items to a trash heap for
     potential recovery, and can optionally limit the total size (default is 3MB).
 
+    Example:
+    ```python
+    # We would typically use the `UUIDStore` subclass in practice, but for illustration:
+    store = SimpleTypedStore[UUID4, list, str](value_type=list, sub_value_type=str)
+    store["item1"] = ["value1"]
+    ```
+
     Hey, it started simple!
     """
+
+    model_config = ConfigDict(validate_assignment=True)
 
     value_type: Annotated[
         type[T],
@@ -855,22 +969,21 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
         Field(
             init=False,
             default_factory=dict,
-            description="The key-value store. Keys are UUID4 or Blake3 hash keys depending on configuration.",
+            description="""The key-value store. Keys are UUID4 or Blake3 hash keys depending on configuration.""",
         ),
     ]
 
     sub_value_type: Annotated[
-        Annotated[type[SubT], Tag("container")] | Annotated[None, Tag("none")],
+        SubT | None,
         Field(
-            description="If value_type is a container, this is the type of its elements; otherwise None."
+            description="""If value_type is a container, this is the type of its elements; otherwise None."""
         ),
-        Discriminator(discriminate_sub_value_type),
-    ] = None
+    ]
 
-    # Key generator is derived from use_uuid at runtime; keep it private to the model
-    _keygen: Callable[[], UUID4] | Callable[[str | bytes], BlakeHashKey] = PrivateAttr(
-        default=to_uuid
-    )
+    _keygen: Annotated[
+        Callable[[], UUID4] | Callable[[str | bytes], BlakeHashKey],
+        Field(default_factory=lambda data: to_uuid if data["use_uuid"] else get_blake_hash),
+    ] = to_uuid
 
     _size_limit: Annotated[PositiveInt | None, Field(repr=False, kw_only=True)] = (
         3 * 1024 * 1024
@@ -887,7 +1000,7 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
     ] = to_uuid()
 
     # Track sub-value type at runtime when inferred lazily
-    _sub_value_type: type[SubT] | None = PrivateAttr(default=None)
+    _sub_value_type: Annotated[type[SubT] | None, PrivateAttr()] = None
 
     def __model_post_init__(self) -> None:
         """Post-initialization processing."""
@@ -895,7 +1008,7 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
     @model_validator(mode="after")
     def check_store(self) -> Self:
         """Ensure the store is initialized and keygen is set from use_uuid."""
-        if not self.store:
+        if self.store is None:  # pyright: ignore[reportUnnecessaryComparison]  # says you, but I know better
             self.store = {}
         if not self.value_type:
             raise ValueError("value_type must be specified")
@@ -1084,7 +1197,7 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
                 if isinstance(hash_value, bytes)
                 else get_blake_hash(bytes(hash_value))
             )
-        elif isinstance(value, SupportsIndex | SupportsBytes | BufferedReader) or (
+        elif isinstance(value, SupportsIndex | SupportsBytes | ReadableBuffer) or (
             isinstance(value, Iterable) and all(v for v in value if isinstance(v, SupportsIndex))  # pyright: ignore[reportUnknownVariableType]
         ):  # pyright: ignore[reportUnknownVariableType]
             blake_key: BlakeHashKey = get_blake_hash(bytes(value))  # pyright: ignore[reportUnknownArgumentType]
@@ -1160,12 +1273,16 @@ class UUIDStore[T, SubT: object | None](SimpleTypedStore[UUID4, T, SubT]):
     use_uuid: Literal[True] = True  # pyright: ignore[reportIncompatibleVariableOverride]
     """UUID store always uses UUID keys (clearly)."""
 
+    sub_value_type: SubT | None = None  # pyright: ignore[reportIncompatibleVariableOverride]
+
 
 class BlakeStore[T, SubT: object | None](SimpleTypedStore[BlakeHashKey, T, SubT]):
     """Typed store specialized for Blake3-hash keys."""
 
     use_uuid: Literal[False] = False  # pyright: ignore[reportIncompatibleVariableOverride]
     """Blake store always uses Blake3 hash keys (obviously), and never UUID keys."""
+
+    sub_value_type: None = None  # pyright: ignore[reportIncompatibleVariableOverride]
 
 
 @overload
@@ -1205,9 +1322,5 @@ def make_store[T, SubT: object | None](
             _size_limit=size_limit,
         )
     return BlakeStore[T, SubT](
-        value_type=value_type,
-        store={},
-        use_uuid=False,
-        sub_value_type=sub_value_type,
-        _size_limit=size_limit,
+        value_type=value_type, store={}, use_uuid=False, sub_value_type=None, _size_limit=size_limit
     )

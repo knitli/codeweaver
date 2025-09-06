@@ -40,8 +40,8 @@ from typing_extensions import TypeIs
 # make sure codeweaver is importable
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from codeweaver._settings import Provider
 from codeweaver.embedding.capabilities.base import PartialCapabilities
+from codeweaver.settings_types import Provider
 
 
 VERSION_PATTERNS = (  # some special cases first
@@ -346,22 +346,24 @@ class RootJson(BaseModel):
 
     models: Annotated[
         dict[ModelName, Annotated[ModelMeta, BeforeValidator(dict_to_partial)]],
-        Field(default_factory=dict, description="A mapping of model names to their metadata."),
+        Field(default_factory=dict, description="""A mapping of model names to their metadata."""),
     ]
     model_map: Annotated[
         ModelMap,
         Field(
             default_factory=dict,
-            description="A mapping of model makers to their models and providers.",
+            description="""A mapping of model makers to their models and providers.""",
         ),
     ]
     aliases: Annotated[
         AliasMap,
-        Field(default_factory=dict, description="A mapping of providers to their aliases."),
+        Field(default_factory=dict, description="""A mapping of providers to their aliases."""),
     ]
     sparse_models: Annotated[
         SparseMap,
-        Field(default_factory=dict, description="A mapping of providers to their sparse models."),
+        Field(
+            default_factory=dict, description="""A mapping of providers to their sparse models."""
+        ),
     ]
 
     _json_path: ClassVar[Path] = Path(__file__).parent / "hf_models.json"
@@ -520,7 +522,7 @@ def generate_capabilities_file(models: list[SimplifiedModelMeta], model_maker: M
         "",
         "from typing import Literal",
         "",
-        "from codeweaver._settings import Provider",
+        "from codeweaver.provider import Provider",
         "from codeweaver.embedding.capabilities.base import EmbeddingCapabilities, EmbeddingModelCapabilities, PartialCapabilities",
         "",
         "",

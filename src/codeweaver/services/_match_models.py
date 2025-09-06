@@ -119,7 +119,9 @@ class HasIdCondition(BaseModel, extra="forbid"):
     ID-based filtering condition.
     """
 
-    has_id: Annotated[Sequence[ExtendedPointId], Field(description="ID-based filtering condition")]
+    has_id: Annotated[
+        Sequence[ExtendedPointId], Field(description="""ID-based filtering condition""")
+    ]
 
 
 class HasVectorCondition(BaseModel, extra="forbid"):
@@ -138,16 +140,16 @@ class DatetimeRange(BaseModel, extra="forbid"):
     """
 
     lt: Annotated[
-        datetime | date | None, Field(default=None, description="point.key &lt; range.lt")
+        datetime | date | None, Field(default=None, description="""point.key &lt; range.lt""")
     ] = None
     gt: Annotated[
-        datetime | date | None, Field(default=None, description="point.key &gt; range.gt")
+        datetime | date | None, Field(default=None, description="""point.key &gt; range.gt""")
     ] = None
     gte: Annotated[
-        datetime | date | None, Field(default=None, description="point.key &gt;= range.gte")
+        datetime | date | None, Field(default=None, description="""point.key &gt;= range.gte""")
     ] = None
     lte: Annotated[
-        datetime | date | None, Field(default=None, description="point.key &lt;= range.lte")
+        datetime | date | None, Field(default=None, description="""point.key &lt;= range.lte""")
     ] = None
 
 
@@ -156,14 +158,18 @@ class Range(BaseModel, extra="forbid"):
     Range filter request.
     """
 
-    lt: Annotated[float | None, Field(default=None, description="point.key &lt; range.lt")] = None
-    gt: Annotated[float | None, Field(default=None, description="point.key &gt; range.gt")] = None
-    gte: Annotated[float | None, Field(default=None, description="point.key &gt;= range.gte")] = (
+    lt: Annotated[float | None, Field(default=None, description="""point.key &lt; range.lt""")] = (
         None
     )
-    lte: Annotated[float | None, Field(default=None, description="point.key &lt;= range.lte")] = (
+    gt: Annotated[float | None, Field(default=None, description="""point.key &gt; range.gt""")] = (
         None
     )
+    gte: Annotated[
+        float | None, Field(default=None, description="""point.key &gt;= range.gte""")
+    ] = None
+    lte: Annotated[
+        float | None, Field(default=None, description="""point.key &lt;= range.lte""")
+    ] = None
 
 
 class MatchAny(BaseModel, extra="forbid"):
@@ -196,7 +202,9 @@ class MatchPhrase(BaseModel, extra="forbid"):
     Full-text phrase match of the string.
     """
 
-    phrase: Annotated[str | None, Field(description="Full-text phrase match of the string.")] = None
+    phrase: Annotated[
+        str | None, Field(description="""Full-text phrase match of the string.""")
+    ] = None
 
 
 class MatchText(BaseModel, extra="forbid"):
@@ -204,7 +212,7 @@ class MatchText(BaseModel, extra="forbid"):
     Full-text match of the strings.
     """
 
-    text: Annotated[str | None, Field(description="Full-text match of the strings.")] = None
+    text: Annotated[str | None, Field(description="""Full-text match of the strings.""")] = None
 
 
 class MatchValue(BaseModel, extra="forbid"):
@@ -223,16 +231,16 @@ class ValuesCount(BaseModel, extra="forbid"):
     """
 
     lt: Annotated[
-        int | None, Field(default=None, description="point.key.length() &lt; values_count.lt")
+        int | None, Field(default=None, description="""point.key.length() &lt; values_count.lt""")
     ] = None
     gt: Annotated[
-        int | None, Field(default=None, description="point.key.length() &gt; values_count.gt")
+        int | None, Field(default=None, description="""point.key.length() &gt; values_count.gt""")
     ] = None
     gte: Annotated[
-        int | None, Field(default=None, description="point.key.length() &gt;= values_count.gte")
+        int | None, Field(default=None, description="""point.key.length() &gt;= values_count.gte""")
     ] = None
     lte: Annotated[
-        int | None, Field(default=None, description="point.key.length() &lt;= values_count.lte")
+        int | None, Field(default=None, description="""point.key.length() &lt;= values_count.lte""")
     ] = None
 
 
@@ -254,14 +262,14 @@ class GeoBoundingBox(BaseModel, extra="forbid"):
         GeoPoint,
         Field(
             ...,
-            description="Geo filter request  Matches coordinates inside the rectangle, described by coordinates of lop-left and bottom-right edges",
+            description="""Geo filter request  Matches coordinates inside the rectangle, described by coordinates of lop-left and bottom-right edges""",
         ),
     ]
     bottom_right: Annotated[
         GeoPoint,
         Field(
             ...,
-            description="Geo filter request  Matches coordinates inside the rectangle, described by coordinates of lop-left and bottom-right edges",
+            description="""Geo filter request  Matches coordinates inside the rectangle, described by coordinates of lop-left and bottom-right edges""",
         ),
     ]
 
@@ -293,7 +301,7 @@ class GeoPolygon(BaseModel, extra="forbid"):
         Sequence[GeoLineString] | None,
         Field(
             default=None,
-            description="Interior lines (if present) bound holes within the surface each GeoLineString must consist of a minimum of 4 points, and the first and last points must be the same.",
+            description="""Interior lines (if present) bound holes within the surface each GeoLineString must consist of a minimum of 4 points, and the first and last points must be the same.""",
         ),
     ] = None
 
@@ -347,13 +355,13 @@ class FieldCondition(BaseModel, extra="forbid"):
         bool | None,
         Field(
             default=None,
-            description="Check that the field is empty, alternative syntax for `is_empty: 'field_name'`",
+            description="""Check that the field is empty, alternative syntax for `is_empty: 'field_name'`""",
         ),
     ] = None
     is_null: Annotated[
         bool | None,
         Field(
             default=None,
-            description="Check that the field is null, alternative syntax for `is_null: 'field_name'`",
+            description="""Check that the field is null, alternative syntax for `is_null: 'field_name'`""",
         ),
     ] = None

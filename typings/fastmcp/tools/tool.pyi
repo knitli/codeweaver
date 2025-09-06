@@ -39,16 +39,16 @@ class ToolResult:
 class Tool(FastMCPComponent):
 
 
-    parameters: Annotated[dict[str, Any], Field(description="JSON schema for tool parameters")]
+    parameters: Annotated[dict[str, Any], Field(description="""JSON schema for tool parameters""")]
     output_schema: Annotated[
-        dict[str, Any] | None, Field(description="JSON schema for tool output")
+        dict[str, Any] | None, Field(description="""JSON schema for tool output""")
     ] = ...
     annotations: Annotated[
-        ToolAnnotations | None, Field(description="Additional annotations about the tool")
+        ToolAnnotations | None, Field(description="""Additional annotations about the tool""")
     ] = ...
     serializer: Annotated[
         Callable[[Any], str] | None,
-        Field(description="Optional custom serializer for tool results"),
+        Field(description="""Optional custom serializer for tool results"""),
     ] = ...
     def enable(self) -> None: ...
     def disable(self) -> None: ...

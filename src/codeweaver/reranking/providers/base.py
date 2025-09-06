@@ -4,22 +4,32 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Base class for reranking providers."""
 
+from __future__ import annotations
+
 import asyncio
+import importlib
 import logging
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Sequence
-from typing import Any, Literal, NamedTuple, cast, overload
+from collections.abc import Callable, Iterator, Sequence
+from functools import cache
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, cast, overload
 
-from pydantic import BaseModel, ConfigDict, PositiveInt
+from pydantic import BaseModel, ConfigDict, PositiveInt, TypeAdapter
+from pydantic import ValidationError as PydanticValidationError
 from pydantic.main import IncEx
+from pydantic_core import from_json
 
 from codeweaver._data_structures import CodeChunk, StructuredDataInput
-from codeweaver._server import get_statistics
+from codeweaver.exceptions import RerankingProviderError, ValidationError
 from codeweaver.provider import Provider
 from codeweaver.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.tokenizers import Tokenizer, get_tokenizer
 
+
+if TYPE_CHECKING:
+    from codeweaver._statistics import SessionStatistics
 
 logger = logging.getLogger(__name__)
 
@@ -33,22 +43,28 @@ class RerankingResult(NamedTuple):
     chunk: CodeChunk
 
 
-def default_reranking_input_transformer(documents: StructuredDataInput) -> Sequence[str]:
+@cache
+def _get_statistics() -> SessionStatistics:
+    """Get the statistics source for the reranking provider."""
+    statistics_module = importlib.import_module("codeweaver._statistics")
+    return statistics_module.get_session_statistics()
+
+
+def default_reranking_input_transformer(documents: StructuredDataInput) -> Iterator[str]:
     """Default input transformer that converts documents to strings."""
-    if isinstance(documents, list | tuple | set):
-        return [
-            cast(str, doc.serialize_for_embedding()) if isinstance(doc, CodeChunk) else str(doc)
-            for doc in documents
-        ]
-    return (
-        [cast(str, documents.serialize_for_embedding())]
-        if isinstance(documents, CodeChunk)
-        else [str(documents)]
-    )
+    try:
+        yield from CodeChunk.dechunkify(documents, for_embedding=True)
+    except (PydanticValidationError, ValueError) as e:
+        logger.exception("Error in default_reranking_input_transformer: ")
+        raise RerankingProviderError(
+            "Error in default_reranking_input_transformer",
+            details={"input": documents},
+            suggestions=["Check input format", "Validate document structure"],
+        ) from e
 
 
 def default_reranking_output_transformer(
-    results: Sequence[float], chunks: Sequence[CodeChunk]
+    results: Sequence[float], chunks: Iterator[CodeChunk]
 ) -> Sequence[RerankingResult]:
     """Default output transformer that converts results and chunks to RerankingResult.
 
@@ -88,18 +104,22 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
     _caps: RerankingModelCapabilities
     _prompt: str | None = None
 
-    _rerank_kwargs: dict[str, Any]
+    _rerank_kwargs: MappingProxyType[str, Any]
     # transforms the input documents into a format suitable for the provider
     _input_transformer: Callable[[StructuredDataInput], Any] = staticmethod(
         default_reranking_input_transformer
     )
-    _output_transformer: Callable[[Any, Sequence[CodeChunk]], Sequence[RerankingResult]] = (
+    """The input transformer is a function that takes the input documents and returns them in a format suitable for the provider.
+
+    The `StructuredDataInput` type is a CodeChunk or iterable of CodeChunks, but they can be in string, bytes, bytearray, python dictionary, or CodeChunk format.
+    """
+    _output_transformer: Callable[[Any, Iterator[CodeChunk]], Sequence[RerankingResult]] = (
         staticmethod(default_reranking_output_transformer)
     )
     """The output transformer is a function that takes the raw results from the provider and returns a Sequence of RerankingResult."""
 
-    _chunk_store: Sequence[CodeChunk] | None = None
-    """Stores the chunks while they are processed. We do this because we don't send the whole chunk to the provider, so we want to reassemble it later."""
+    _chunk_store: tuple[CodeChunk, ...] | None = None
+    """Stores the chunks while they are processed. We do this because we don't send the whole chunk to the provider, so we save them for later, like squirrels."""
 
     def __init__(
         self,
@@ -151,7 +171,7 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
         """Rerank the given documents based on the query."""
         processed_kwargs = self._set_kwargs(**kwargs)
         transformed_docs = self._process_documents(documents)
-        self._chunk_store = transformed_docs
+        self._chunk_store = tuple(transformed_docs)
         processed_docs = self._input_transformer(transformed_docs)
         reranked = await self._execute_rerank(
             query, processed_docs, top_n=self.top_n, **processed_kwargs
@@ -239,7 +259,7 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
         from_docs: Sequence[str] | Sequence[Sequence[str]] | None = None,
     ) -> None:
         """Update token statistics for the embedding provider."""
-        statistics = get_statistics()
+        statistics = _get_statistics()
         if token_count is not None:
             statistics.add_token_usage(reranking_generated=token_count)
         elif from_docs and all(isinstance(doc, str) for doc in from_docs):
@@ -250,48 +270,29 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
             )
             statistics.add_token_usage(reranking_generated=token_count)
 
-    def _process_documents(self, documents: StructuredDataInput) -> Sequence[CodeChunk]:
+    def _process_documents(self, documents: StructuredDataInput) -> Iterator[CodeChunk]:
         """Process the input documents into a uniform format."""
-        if isinstance(documents, list | tuple | set):
-            return [
-                item
-                if isinstance(item, CodeChunk) and item
-                else CodeChunk.model_validate_json(item)
-                for item in documents
-            ]
-        return [
-            documents
-            if isinstance(documents, CodeChunk) and documents
-            else CodeChunk.model_validate_json(cast(str, documents))
-        ]
+        yield from ()
 
-    def _process_results(
-        self, results: Any, serialized_docs: Sequence[str]
-    ) -> Sequence[RerankingResult]:
+    def _process_results(self, results: Any, raw_docs: Sequence[str]) -> Sequence[RerankingResult]:
         """Process the results from the reranking."""
         # voyage and cohere return token count, others do not
         if self.provider not in [Provider.VOYAGE, Provider.COHERE]:
-            self._update_token_stats(from_docs=serialized_docs)
-        chunks = self._chunk_store or self._process_documents(serialized_docs)
-        return self._output_transformer(results, chunks)
+            self._update_token_stats(from_docs=raw_docs)
+        chunks = self._chunk_store or self._process_documents(raw_docs)
+        return self._output_transformer(results, iter(chunks))
 
     @staticmethod
-    def to_code_chunk(text: StructuredDataInput) -> CodeChunk | Sequence[CodeChunk]:
-        """Convert text to a CodeChunk."""
-        if isinstance(text, list | tuple | set):
-            return tuple(
-                t if isinstance(t, CodeChunk) else CodeChunk.model_validate_json(t) for t in text
-            )  # type: ignore[return-value]
-        return (
-            text if isinstance(text, CodeChunk) else CodeChunk.model_validate_json(cast(str, text))
-        )
+    def to_code_chunk(text: StructuredDataInput) -> Sequence[CodeChunk]:
+        """Convenience wrapper around `CodeChunk.chunkify`."""
+        return tuple(CodeChunk.chunkify(text))
 
     def _report_token_savings(
         self, results: Sequence[RerankingResult], processed_chunks: Sequence[str]
     ) -> None:
         """Report token savings from the reranking process."""
         if (context_saved := self._calculate_context_saved(results, processed_chunks)) > 0:
-            statistics = get_statistics()
+            statistics = _get_statistics()
             statistics.add_token_usage(saved_by_reranking=context_saved)
 
     def _calculate_context_saved(
@@ -302,6 +303,8 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
         Assumes processed_chunks are ordered with all included (kept) chunks first in reranked order,
         followed by all excluded (discarded) chunks. Token savings equals the token count of the tail
         after the number of kept results.
+
+        We use `tiktoken` with `cl100k_base` as a reasonable default tokenizer for estimating the user LLM's token usage (we're not estimating based on the reranking model's tokenizer).
         """
         if not processed_chunks or not results or len(results) >= len(processed_chunks):
             return 0
@@ -309,6 +312,25 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
         discarded_chunks = processed_chunks[len(results) :]
         tokenizer = get_tokenizer("tiktoken", "cl100k_base")
         return tokenizer.estimate_batch(discarded_chunks)  # pyright: ignore[reportArgumentType]
+
+    @classmethod
+    def from_json(
+        cls, input_data: str | bytes | bytearray, client: RerankingClient, kwargs: dict[str, Any]
+    ) -> RerankingProvider[RerankingClient]:
+        """Create a RerankingProvider from JSON."""
+        adapter = TypeAdapter(cls)
+        python_obj = from_json(input_data)
+        try:
+            return adapter.validate_python({**python_obj, "_client": client, **kwargs})
+        except PydanticValidationError as e:
+            logger.exception("Error in RerankingProvider.from_json: ")
+            raise ValidationError(
+                "RerankingProvider received invalid JSON input that it couldn't deserialize.",
+                details={"json_input": input_data, "client": client, "kwargs": kwargs},
+                suggestions=[
+                    "Make sure the JSON validates as JSON, and matches the expected schema for the RerankingProvider."
+                ],
+            ) from e
 
     def model_dump_json(
         self,

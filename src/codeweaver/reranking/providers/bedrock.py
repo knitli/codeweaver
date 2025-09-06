@@ -27,7 +27,6 @@ from pydantic import (
 from pydantic.alias_generators import to_camel, to_snake
 
 from codeweaver._data_structures import CodeChunk
-from codeweaver._settings import AWSProviderSettings, Provider
 from codeweaver.reranking.capabilities.amazon import get_amazon_reranking_capabilities
 from codeweaver.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.reranking.providers.base import (
@@ -35,6 +34,7 @@ from codeweaver.reranking.providers.base import (
     RerankingResult,
     StructuredDataInput,
 )
+from codeweaver.settings_types import AWSProviderSettings, Provider
 
 
 class BaseBedrockModel(BaseModel):
@@ -99,7 +99,7 @@ class BedrockRerankConfiguration(BaseBedrockModel):
         BedrockRerankModelConfiguration, Field(description="""The model configuration.""")
     ]
     number_of_results: Annotated[
-        PositiveInt, Field(description="Number of results to return -- this is `top_n`.")
+        PositiveInt, Field(description="""Number of results to return -- this is `top_n`.""")
     ] = 40
 
 
@@ -187,7 +187,7 @@ class BedrockRerankResultItem(BaseBedrockModel):
     document: Annotated[DocumentSource, Field(description="""The document that was reranked.""")]
     index: Annotated[
         PositiveInt,
-        Field(description="The ranking of the document in the results. (Lower is better.)"),
+        Field(description="""The ranking of the document in the results. (Lower is better.)"""),
     ]
     relevance_score: Annotated[
         float,

@@ -8,16 +8,18 @@ Helper functions for CodeWeaver utilities.
 """
 
 import contextlib
+import importlib
 import logging
 import os
 import shutil
 import subprocess
+import sys
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from functools import cache
 from importlib import metadata
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from codeweaver._common import Sentinel
 
@@ -83,6 +85,18 @@ def rpartial[**P, R](func: Callable[P, R], *args: object, **kwargs: object) -> C
     return partial_right
 
 
+type NotIterableT = Any
+type IterableT = Iterable[Any]
+
+
+def ensure_iterable(value: NotIterableT | IterableT) -> IterableT:
+    """Ensure the value is iterable."""
+    if isinstance(value, set | list | tuple):
+        yield from value
+    else:
+        yield value
+
+
 def is_git_repo(directory: Path | None = None) -> bool:
     """Is the given directory version-controlled with git?"""
     directory = directory or Path.cwd()
@@ -105,10 +119,22 @@ def walk_down_to_git_root(path: Path | None = None) -> Path:
 
 def get_project_root() -> Path:
     """Get the root directory of the project."""
-    from codeweaver.main import get_app_settings
+    main = importlib.import_module("codeweaver.main")
 
-    settings = get_app_settings()
+    settings = main.get_app_settings()
     return settings.project_root or walk_down_to_git_root()
+
+
+def set_relative_path(path: Path | str | None) -> Path | None:
+    """Validates a path and makes it relative to the project root if the path is absolute."""
+    if path is None:
+        return None
+    path_obj = Path(path)
+    if not path_obj.is_absolute():
+        return path_obj
+
+    base_path = get_project_root()
+    return path_obj.relative_to(base_path)
 
 
 def has_git() -> bool:
@@ -117,7 +143,7 @@ def has_git() -> bool:
     if not git:
         return False
     with contextlib.suppress(subprocess.CalledProcessError):
-        subprocess.run(["--version"], executable=git, stderr=subprocess.STDOUT)  # pyright: ignore[reportUnusedCallResult]  # noqa: S607
+        subprocess.run(["--version"], executable=git, stderr=subprocess.STDOUT, capture_output=True)  # pyright: ignore[reportUnusedCallResult]  # noqa: S607
         return True
     return False
 
@@ -132,7 +158,9 @@ def get_git_revision(directory: Path) -> str | Missing:  # pyright: ignore[repor
     if has_git():
         git = shutil.which("git")
         with contextlib.suppress(subprocess.CalledProcessError):
-            output = subprocess.run(["rev-parse", "--short", "HEAD"], executable=git, cwd=directory)  # noqa: S607
+            output = subprocess.run(
+                ["rev-parse", "--short", "HEAD"], executable=git, cwd=directory, capture_output=True
+            )  # noqa: S607
             return output.stdout.decode("utf-8").strip()
     return MISSING
 
@@ -140,6 +168,22 @@ def get_git_revision(directory: Path) -> str | Missing:  # pyright: ignore[repor
 def in_codeweaver_clone(path: Path) -> bool:
     """Check if the current repo is CodeWeaver."""
     return "codeweaver" in str(path).lower() or "code-weaver" in str(path).lower()
+
+
+# src/codeweaver/_utils.py
+def is_debug() -> bool:
+    """Check if the application is running in debug mode."""
+    env = os.getenv("CODEWEAVER_DEBUG")
+
+    explicit_true = (env in ("1", "true", "True", "TRUE")) if env is not None else False
+    explicit_false = os.getenv("CODEWEAVER_DEBUG", "1") in ("false", "0", "", "False", "FALSE")
+
+    has_debugger = (
+        hasattr(sys, "gettrace") and callable(sys.gettrace) and (sys.gettrace() is not None)
+    )
+    repo_heuristic = in_codeweaver_clone(Path.cwd()) and not explicit_false
+
+    return explicit_true or has_debugger or repo_heuristic
 
 
 def estimate_tokens(text: str | bytes, encoder: str = "cl100k_base") -> int:
@@ -154,7 +198,7 @@ def estimate_tokens(text: str | bytes, encoder: str = "cl100k_base") -> int:
 
 @cache
 def normalize_ext(ext: str) -> str:
-    """Normalize a file extension to a standard format."""
+    """Normalize a file extension to a standard format. Cached because of hot/repetitive use."""
     return ext.lower().strip() if ext.startswith(".") else f".{ext.lower().strip()}"
 
 

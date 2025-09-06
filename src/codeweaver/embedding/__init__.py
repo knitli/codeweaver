@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from codeweaver._settings import EmbeddingModelSettings, EmbeddingProviderSettings
 from codeweaver.provider import Provider
+from codeweaver.settings_types import EmbeddingModelSettings, EmbeddingProviderSettings
 
 
 def _add_compatible_keys(

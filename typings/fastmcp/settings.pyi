@@ -99,7 +99,7 @@ class Settings(BaseSettings):
     client_init_timeout: Annotated[
         float | None,
         Field(
-            description="The timeout for the client's initialization handshake, in seconds. Set to None or 0 to disable."
+            description="""The timeout for the client's initialization handshake, in seconds. Set to None or 0 to disable."""
         ),
     ] = ...
     host: str = ...
@@ -125,7 +125,7 @@ class Settings(BaseSettings):
         list[str],
         Field(
             default_factory=list,
-            description="List of dependencies to install in the server environment",
+            description="""List of dependencies to install in the server environment""",
         ),
     ] = ...
     json_response: bool = ...

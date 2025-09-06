@@ -69,7 +69,7 @@ class FileDiscoveryService:
 
             # Use rignore for gitignore support
             walker = rignore.walk(
-                self.settings.project_path,
+                self.settings.project_root,
                 max_filesize=max_file_size or self.settings.max_file_size,
                 case_insensitive=True,
                 read_git_ignore=read_git_ignore or self.settings.filter_settings.use_gitignore,
@@ -84,7 +84,7 @@ class FileDiscoveryService:
                 if file_path.is_file():
                     # Convert to relative path from project root
                     try:
-                        relative_path = file_path.relative_to(self.settings.project_path)
+                        relative_path = file_path.relative_to(self.settings.project_root)
                         discovered.append(relative_path)
                     except ValueError:
                         # File is outside project root, skip
@@ -94,10 +94,10 @@ class FileDiscoveryService:
 
         except Exception as e:
             raise IndexingError(
-                f"Failed to discover files in {self.settings.project_path}",
+                f"Failed to discover files in {self.settings.project_root}",
                 details={"error": str(e)},
                 suggestions=[
-                    "Check that the project path exists and is readable",
+                    "Check that the project root exists and is readable",
                     "Verify that rignore can access the directory",
                 ],
             ) from e

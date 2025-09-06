@@ -119,7 +119,7 @@ def _load_default_capabilities() -> Generator[EmbeddingModelCapabilities]:
 
 def ensure_default_capabilities_registered() -> None:
     """Populate the global registry with built-in capabilities if empty."""
-    from codeweaver._settings_registry import get_model_registry, register_embedding_capabilities
+    from codeweaver._registry import get_model_registry, register_embedding_capabilities
 
     registry = get_model_registry()
     if registry.is_empty():

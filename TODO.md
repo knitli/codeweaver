@@ -31,7 +31,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
    │  │     └─ line 9: TODO : We should consider a few things to improve this implementation:
    │  ├─ _capabilities.py
    │  │  └─ line 8: TODO : The vector provider capabilities aren't what they need to be.... it needs to be things like sparse vectors, quantization, etc.
-   │  ├─ _settings.py
+   │  ├─ settings_types.py
    │  │  ├─ line 112: TODO : We need to allow for dynamic providers in the future, we would check if there's a provider class registered for the value, then register the provider here with `cls.add_member("NEW_PROVIDER", "new_provider")`.
    │  │  └─ line 113: TODO : We need to allow for dynamic providers in the future, we would check if there's a provider class registered for the value, then register the provider here with `cls.add_member("NEW_PROVIDER", "new_provider")`.
    │  ├─ _statistics.py
@@ -43,7 +43,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
    │  │  └─ line 704: TODO : Integrate into indexing and search services to use these languages.
    │  ├─ main.py
    │  │  ├─ line 53: TODO : Integrate fastmcp middleware here -- error handling, logging, timing, rate_limiting, etc.
-   │  │  ├─ line 57: TODO : This is a placeholder. We need to implement the provider registry in _settings_registry.py
+   │  │  ├─ line 57: TODO : This is a placeholder. We need to implement the provider registry in _registry.py
    │  │  ├─ line 70: TODO : We need a proper health check system -- this doesn't do anything
    │  │  ├─ line 74: TODO : We need a proper health check system -- this doesn't do anything
    │  │  ├─ line 80: TODO : setup application state
