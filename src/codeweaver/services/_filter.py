@@ -131,7 +131,7 @@ def _handle_float(
     condition: str,
     v: Any,
     must_conditions: list[FieldCondition],
-    must_not_conditions: list[FieldCondition],
+    _must_not_conditions: list[FieldCondition],
 ) -> None:
     """Handle float field conditions."""
     range_actions = {

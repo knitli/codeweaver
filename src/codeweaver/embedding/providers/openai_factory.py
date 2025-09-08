@@ -14,7 +14,7 @@ from __future__ import annotations as _annotations
 import asyncio
 import os
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Self, cast
 
 from pydantic import AnyHttpUrl, create_model
@@ -30,7 +30,7 @@ def ensure_v1(url: str) -> str:
     return url if url.rstrip("/").endswith("/v1") else f"{url.rstrip('/')}/v1"
 
 
-def try_for_heroku_endpoint(kwargs: dict[str, Any]) -> str:
+def try_for_heroku_endpoint(kwargs: Mapping[str, Any]) -> str:
     """Try to identify the Heroku endpoint."""
     if "base_url" in kwargs:
         return ensure_v1(kwargs["base_url"])
@@ -58,7 +58,7 @@ def parse_endpoint(endpoint: str, region: str | None = None) -> str:
     return f"https://{endpoint}.{region}.inference.ai.azure.com/v1"
 
 
-def try_for_azure_endpoint(kwargs: dict[str, Any]) -> str:
+def try_for_azure_endpoint(kwargs: Mapping[str, Any]) -> str:
     """Try to identify the Azure endpoint.
 
     Azure uses this format: `https://<endpoint>.<region_name>.inference.ai.azure.com/v1`,
@@ -103,7 +103,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         capabilities: EmbeddingModelCapabilities,
         *,
         base_url: str | None = None,
-        provider_kwargs: dict[str, Any] | None = None,
+        provider_kwargs: Mapping[str, Any] | None = None,
         client: AsyncOpenAI | None = None,
     ) -> type[Self]:
         """
@@ -117,7 +117,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
             model_name: str,
             provider: Provider,
             base_url: str | None,
-            provider_kwargs: dict[str, Any] | None,
+            provider_kwargs: Mapping[str, Any] | None,
             client: AsyncOpenAI | None = None,
         ) -> Callable[..., None]:
             """
@@ -217,8 +217,8 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
             _ = loop.run_in_executor(None, lambda: self._update_token_stats(from_docs=texts))
 
     async def _get_vectors(
-        self, texts: Sequence[str], **kwargs: dict[str, Any] | None
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+        self, texts: Sequence[str], **kwargs: Mapping[str, Any] | None
+    ) -> list[list[float]] | list[list[int]]:
         """Get vectors for a sequence of texts."""
         response = await self._client.embeddings.create(
             input=cast(list[str], texts),
@@ -238,8 +238,8 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         return [result.embedding for result in results]
 
     async def _embed_documents(
-        self, documents: Sequence[CodeChunk], **kwargs: dict[str, Any]
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+        self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any]
+    ) -> list[list[float]] | list[list[int]]:
         """Embed a sequence of documents."""
         if not isinstance(next(iter(documents), CodeChunk), CodeChunk):
             raise TypeError("Expected a sequence of CodeChunk instances")
@@ -247,8 +247,8 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         return await self._get_vectors(cast(list[str], texts), **kwargs)
 
     async def _embed_query(
-        self, query: Sequence[str], **kwargs: dict[str, Any] | None
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+        self, query: Sequence[str], **kwargs: Mapping[str, Any] | None
+    ) -> list[list[float]] | list[list[int]]:
         return await self._get_vectors(query, **kwargs)
 
     def _base_urls(self) -> dict[Provider, AnyHttpUrl | str]:

@@ -14,7 +14,7 @@ FastEmbed is a lightweight and efficient library for generating embeddings local
 import asyncio
 import multiprocessing
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import Any, ClassVar, cast
 
 import numpy as np
@@ -40,9 +40,9 @@ _TextEmbedding = get_text_embedder()
 _SparseTextEmbedding = get_sparse_embedder()
 
 
-def fastembed_all_kwargs(**kwargs: dict[str, Any] | None) -> dict[str, Any]:
+def fastembed_all_kwargs(**kwargs: Mapping[str, Any] | None) -> dict[str, Any]:
     """Get all possible kwargs for FastEmbed embedding methods."""
-    default_kwargs: dict[str, Any] = {"threads": multiprocessing.cpu_count(), "lazy_load": True}
+    default_kwargs: Mapping[str, Any] = {"threads": multiprocessing.cpu_count(), "lazy_load": True}
     if kwargs:
         device_ids: list[int] | None = kwargs.get("device_ids")  # pyright: ignore[reportAssignmentType]
         cuda: bool | None = kwargs.get("cuda")  # pyright: ignore[reportAssignmentType]
@@ -68,9 +68,7 @@ def fastembed_all_kwargs(**kwargs: dict[str, Any] | None) -> dict[str, Any]:
     return default_kwargs
 
 
-def fastembed_output_transformer(
-    output: list[np.ndarray],
-) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+def fastembed_output_transformer(output: list[np.ndarray]) -> list[list[float]] | list[list[int]]:
     """Transform the output of FastEmbed into a more usable format."""
     return [emb.tolist() for emb in output]
 
@@ -88,9 +86,9 @@ class FastEmbedProvider(EmbeddingProvider[TextEmbedding]):
 
     _doc_kwargs: ClassVar[dict[str, Any]] = fastembed_all_kwargs()
     _query_kwargs: ClassVar[dict[str, Any]] = fastembed_all_kwargs()
-    _output_transformer: ClassVar[
-        Callable[[Any], Sequence[Sequence[float]] | Sequence[Sequence[int]]]
-    ] = fastembed_output_transformer
+    _output_transformer: ClassVar[Callable[[Any], list[list[float]] | list[list[int]]]] = (
+        fastembed_output_transformer
+    )
 
     def _initialize(self) -> None:
         """Initialize the FastEmbed client."""
@@ -106,21 +104,24 @@ class FastEmbedProvider(EmbeddingProvider[TextEmbedding]):
         return None
 
     async def _embed_documents(
-        self, documents: Sequence[CodeChunk], **kwargs: dict[str, Any] | None
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+        self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any] | None
+    ) -> list[list[float]] | list[list[int]]:
         """Embed a list of documents into vectors."""
         ready_documents = self.chunks_to_strings(documents)
         loop = asyncio.get_event_loop()
         embeddings = await loop.run_in_executor(
-            None, lambda: self._client.passage_embed(cast(Sequence[str], ready_documents), **kwargs)
+            None,
+            lambda: list(
+                self._client.passage_embed(cast(Iterable[str], ready_documents), **kwargs)
+            ),
         )
         partial_tokens = rpartial(self._update_token_stats, from_docs=ready_documents)
         self._fire_and_forget(partial_tokens)  # pyright: ignore[reportArgumentType]
-        return await loop.run_in_executor(None, lambda: list(self._process_output(embeddings)))
+        return await loop.run_in_executor(None, lambda: self._process_output(embeddings))
 
     async def _embed_query(
-        self, query: Sequence[str], **kwargs: dict[str, Any] | None
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+        self, query: Sequence[str], **kwargs: Mapping[str, Any] | None
+    ) -> list[list[float]] | list[list[int]]:
         """Embed a query into a vector."""
         loop = asyncio.get_event_loop()
         embeddings = await loop.run_in_executor(
@@ -151,20 +152,20 @@ class FastEmbedSparseProvider(FastEmbedProvider):
         self._client = _SparseTextEmbedding(**self._doc_kwargs)  # pyright: ignore[reportIncompatibleVariableOverride]
 
     async def _embed_documents(
-        self, documents: Sequence[CodeChunk], **kwargs: dict[str, Any] | None
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+        self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any] | None
+    ) -> list[list[float]] | list[list[int]]:
         """Embed a list of documents into vectors."""
         ready_documents = self.chunks_to_strings(documents)
         loop = asyncio.get_event_loop()
         embeddings = await loop.run_in_executor(
             None,
-            lambda: self._client.embed(cast(Sequence[str], ready_documents), **kwargs),  # type: ignore
+            lambda: list(self._client.embed(cast(Sequence[str], ready_documents), **kwargs)),  # pyright: ignore[reportArgumentType]
         )
-        return await loop.run_in_executor(None, lambda: list(self._process_output(embeddings)))
+        return await loop.run_in_executor(None, lambda: self._process_output(embeddings))  # type: ignore
 
     async def _embed_query(
-        self, query: Sequence[str], **kwargs: dict[str, Any] | None
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+        self, query: Sequence[str], **kwargs: Mapping[str, Any] | None
+    ) -> list[list[float]] | list[list[int]]:
         """Embed a query into a vector."""
         loop = asyncio.get_event_loop()
         embeddings = await loop.run_in_executor(

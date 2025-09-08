@@ -20,9 +20,9 @@ import watchfiles
 type WatchfilesAwatch = watchfiles.awatch | None
 
 
-class IgnoreFilter[rignore.Walker](watchfiles.Def):
-    
-    
+class IgnoreFilter[Walker](watchfiles.DefaultFilter):
+    pass
+
 
 class FileWatcher[WatchfilesAwatch]:
     """Main file watcher class. Wraps watchfiles.awatch."""

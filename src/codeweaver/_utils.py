@@ -17,11 +17,16 @@ import sys
 
 from collections.abc import Callable, Iterable
 from functools import cache
-from importlib import metadata
+from importlib import metadata, util
 from pathlib import Path
-from typing import Any, Literal
+from types import ModuleType
+from typing import TYPE_CHECKING, Literal, NotRequired, Required, TypedDict, cast
 
 from codeweaver._common import Sentinel
+
+
+if TYPE_CHECKING:
+    pass
 
 
 logger = logging.getLogger(__name__)
@@ -34,8 +39,27 @@ class Missing(Sentinel):
 MISSING: Missing = Missing("MISSING", "Sentinel<MISSING>", __name__)
 
 
-# Even Python's latest and greatest typing (as of 3.12+) can't properly express this.
-# You can't combine TypeVarTuple with ParamSpec, or use concatenate to
+@cache
+def lazy_importer(module_name: str) -> ModuleType:
+    """Return a lazy importer for the given module."""
+    spec = util.find_spec(module_name)
+    if spec is None or not spec.loader:
+        raise ImportError(f"Module {module_name} not found")
+    loader = util.LazyLoader(spec.loader)
+    spec.loader = loader
+    module = util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    loader.exec_module(module)
+    return module
+
+
+def codeweaver_settings(path: Path | None = None):
+    """Lazily fetch CodeWeaver settings without importing at module import time."""
+    return importlib.import_module("codeweaver.settings").get_settings(path)
+
+
+# Even Python's latest and greatest typing (as of 3.12+), Python can't properly express this function.
+# You can't combine `TypeVarTuple` with `ParamSpec`, or use `Concatenate` to
 # express combining some args and some kwargs, particularly from the right.
 def rpartial[**P, R](func: Callable[P, R], *args: object, **kwargs: object) -> Callable[P, R]:
     """Return a new function that behaves like func called with the given arguments.
@@ -80,21 +104,20 @@ def rpartial[**P, R](func: Callable[P, R], *args: object, **kwargs: object) -> C
         """Return a new partial object which when called will behave like func called with the
         given arguments.
         """
-        return func(*(fargs + args), **{**fkwargs, **kwargs})  # pyright: ignore[reportCallIssue]
+        return func(*(fargs + args), **dict(fkwargs | kwargs))  # pyright: ignore[reportCallIssue]
 
     return partial_right
 
 
-type NotIterableT = Any
-type IterableT = Iterable[Any]
+def ensure_iterable[T](value: Iterable[T] | T) -> Iterable[T]:
+    """Ensure the value is iterable.
 
-
-def ensure_iterable(value: NotIterableT | IterableT) -> IterableT:
-    """Ensure the value is iterable."""
-    if isinstance(value, set | list | tuple):
-        yield from value
+    Note: If you pass `ensure_iterable` a `Mapping` (like a `dict`), it will yield the keys of the mapping, not its items/values.
+    """
+    if isinstance(value, Iterable) and not isinstance(value, (bytes | bytearray | str)):
+        yield from cast(Iterable[T], value)
     else:
-        yield value
+        yield cast(T, value)
 
 
 def is_git_repo(directory: Path | None = None) -> bool:
@@ -105,7 +128,7 @@ def is_git_repo(directory: Path | None = None) -> bool:
     return False
 
 
-def walk_down_to_git_root(path: Path | None = None) -> Path:
+def _walk_down_to_git_root(path: Path | None = None) -> Path:
     """Walk up the directory tree until a .git directory is found."""
     path = path or Path.cwd()
     if path.is_file():
@@ -117,12 +140,18 @@ def walk_down_to_git_root(path: Path | None = None) -> Path:
     raise FileNotFoundError("No .git directory found in the path hierarchy.")
 
 
-def get_project_root() -> Path:
-    """Get the root directory of the project."""
-    main = importlib.import_module("codeweaver.main")
+def _root_path_checks_out(root_path: Path) -> bool:
+    """Check if the root path is valid."""
+    return root_path.exists() and root_path.is_dir() and root_path / ".git" in root_path.iterdir()
 
-    settings = main.get_app_settings()
-    return settings.project_root or walk_down_to_git_root()
+
+def get_project_root(root_path: Path | None = None) -> Path:
+    """Get the root directory of the project."""
+    return (
+        root_path
+        if isinstance(root_path, Path) and _root_path_checks_out(root_path)
+        else _walk_down_to_git_root(root_path)
+    )  # pyright: ignore[reportOptionalMemberAccess, reportUnknownMemberType]
 
 
 def set_relative_path(path: Path | str | None) -> Path | None:
@@ -152,15 +181,18 @@ def get_git_revision(directory: Path) -> str | Missing:  # pyright: ignore[repor
     """Get the SHA-1 of the HEAD of a git repository."""
     if not is_git_repo(directory):
         with contextlib.suppress(FileNotFoundError):
-            directory = walk_down_to_git_root(directory)
+            directory = get_project_root() or Path.cwd()
         if not directory or not is_git_repo(directory):
             return MISSING
     if has_git():
         git = shutil.which("git")
         with contextlib.suppress(subprocess.CalledProcessError):
             output = subprocess.run(
-                ["rev-parse", "--short", "HEAD"], executable=git, cwd=directory, capture_output=True
-            )  # noqa: S607
+                ["rev-parse", "--short", "HEAD"],  # noqa: S607
+                executable=git,
+                cwd=directory,
+                capture_output=True,
+            )
             return output.stdout.decode("utf-8").strip()
     return MISSING
 
@@ -216,6 +248,16 @@ def get_possible_env_vars() -> tuple[tuple[str, str], ...] | None:
         (var, value) for var in env_vars if (value := _check_env_var(var)) is not None
     )
     return found_vars or None
+
+
+def has_package(package_name: str) -> bool:
+    """Check if a package is installed."""
+    try:
+        if util.find_spec(package_name):
+            return True
+    except metadata.PackageNotFoundError:
+        return False
+    return False
 
 
 # ===========================================================================
@@ -331,3 +373,151 @@ def decide_fastembed_runtime(
             return "cpu"
         case _:
             return "cpu"
+
+
+# ===========================================================================
+#  todo                             TODO
+# These optimizations aren't yet tied into the provider executions
+# We need to:
+#    - integrate and combine them with user settings/choices
+#    - ensure they are integrated with `Fastembed` and `SentenceTransformers` (Fastembed will always use onnx, however)
+#    - account for any potential conflicts or limitations in the chosen execution environment
+# ===========================================================================
+
+type SimdExtensions = Literal["arm64", "avx2", "avx512", "avx512_vnni"]
+
+
+class AvailableOptimizations(TypedDict):
+    onnx: bool
+    onnx_gpu: bool
+    open_vino: bool
+    intel_cpu: bool
+    simd_available: bool
+    simd_exts: tuple[SimdExtensions, ...]
+
+
+class OptimizationDecisions(TypedDict, total=False):
+    backend: Required[Literal["onnx", "onnx_gpu", "open_vino", "torch"]]
+    dtype: Required[Literal["float16", "bfloat16", "qint8"]]
+    onnx_optset: NotRequired[Literal[3, 4] | None]
+    simd_ext: NotRequired[Literal["arm64", "avx2", "avx512", "avx512_vnni"] | None]
+    use_small_chunks_for_dense: NotRequired[bool | None]
+    chunk_func: NotRequired[Callable[[int], int]]
+    """A callable that takes the model's max_seq_length and returns the max chunk size to use."""
+    use_small_batch_for_sparse: NotRequired[bool | None]
+
+
+def _set_dense_optimization(opts: AvailableOptimizations) -> OptimizationDecisions:
+    """Set optimization decisions for dense models."""
+    match opts:
+        case {"onnx_gpu": True, **_other}:
+            return OptimizationDecisions(
+                backend="onnx_gpu",
+                dtype="bfloat16",
+                onnx_optset=4,
+                use_small_chunks_for_dense=True,
+                chunk_func=lambda max_seq_length: min(512, max_seq_length),
+            )
+        case {"intel_cpu": True, "simd_available": True, "onnx": True, **_other} if (
+            len(opts["simd_exts"]) > 0
+        ):
+            return OptimizationDecisions(
+                backend="onnx",
+                dtype="float16",
+                onnx_optset=3,
+                simd_ext=opts["simd_exts"][0],
+                use_small_chunks_for_dense=False,
+            )
+        case {"intel_cpu": True, "open_vino": True, **_other}:
+            return OptimizationDecisions(
+                backend="open_vino", dtype="qint8", use_small_chunks_for_dense=False
+            )
+        case {"onnx": True, **_other}:
+            return OptimizationDecisions(
+                backend="onnx", dtype="float16", onnx_optset=3, use_small_chunks_for_dense=False
+            )
+        case {"open_vino": True, **_other}:
+            return OptimizationDecisions(
+                backend="open_vino", dtype="qint8", use_small_chunks_for_dense=False
+            )
+        case _:
+            return OptimizationDecisions(
+                backend="torch", dtype="float16", use_small_chunks_for_dense=False
+            )
+
+
+def _get_general_optimizations_available() -> AvailableOptimizations:
+    """Assess the current environment for available optimizations."""
+    optimizations = AvailableOptimizations(
+        onnx=False,
+        onnx_gpu=False,
+        open_vino=False,
+        intel_cpu=False,
+        simd_available=False,
+        simd_exts=(),
+    )
+    with contextlib.suppress(ImportError):
+        optimizations = AvailableOptimizations(**optimizations, **(_set_cpu_optimizations()))
+    return {
+        **optimizations,
+        "onnx_gpu": _onnx_cuda_available(),
+        "onnx": has_package("onnxruntime"),
+        "open_vino": has_package("optimum-intel"),
+    }
+
+
+def _set_cpu_optimizations() -> dict[
+    Literal["intel_cpu", "simd_available", "simd_exts"], bool | tuple[str, ...]
+]:
+    cpuinfo = lazy_importer("cpuinfo")
+    info = cpuinfo.get_cpu_info()
+    simd_exts = tuple(
+        flag for flag in ("avx512_vnni", "avx512", "avx2", "arm64") if flag in info.get("flags", [])
+    )
+    return {
+        "intel_cpu": "intel" in info.get("vendor_id_raw", "").lower()
+        or "intel" in info.get("brand_raw", "").lower(),
+        "simd_available": len(simd_exts) > 0,
+        "simd_exts": simd_exts,
+    }
+
+
+def get_optimizations(model_kind: Literal["dense", "sparse", "both"]) -> OptimizationDecisions:
+    """Determine the optimization strategy based on input parameters."""
+    opts = _get_general_optimizations_available()
+    dense_opts = _set_dense_optimization(opts)
+    sparse_opts = dense_opts
+    for key in ("use_small_chunks_for_dense", "chunk_func"):
+        _ = sparse_opts.pop(key, None)
+    sparse_opts = OptimizationDecisions(
+        **(sparse_opts | {"use_small_batch_for_sparse": sparse_opts["backend"] == "onnx_gpu"})  # pyright: ignore[reportArgumentType]
+    )
+    return (
+        dense_opts
+        if model_kind == "dense"
+        else sparse_opts
+        if model_kind == "sparse"
+        else OptimizationDecisions(**(dense_opts | sparse_opts))
+    )
+
+
+__all__ = (
+    "AvailableOptimizations",
+    "OptimizationDecisions",
+    "SimdExtensions",
+    "decide_fastembed_runtime",
+    "ensure_iterable",
+    "get_git_revision",
+    "get_optimizations",
+    "get_possible_env_vars",
+    "get_project_root",
+    "get_project_root",
+    "has_git",
+    "has_package",
+    "in_codeweaver_clone",
+    "is_debug",
+    "is_git_repo",
+    "lazy_importer",
+    "normalize_ext",
+    "rpartial",
+)

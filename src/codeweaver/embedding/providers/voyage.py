@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, ClassVar, cast
 
 from voyageai.object.embeddings import EmbeddingsObject
@@ -35,17 +35,17 @@ except ImportError as _import_error:
 
 def voyage_context_output_transformer(
     result: ContextualizedEmbeddingsObject,
-) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+) -> list[list[float]] | list[list[int]]:
     """Transform the output of the Voyage AI context chunk embedding model."""
-    embeddings: list[list[float] | list[int]] = []
-    for res in result.results:
-        embeddings.extend(res.embeddings)
-    return embeddings
+    results = result.results
+    embeddings = [res.embeddings for res in results if res and res.embeddings]
+    if embeddings and isinstance(embeddings[0][0][0], list):
+        # if we have three levels of lists, flatten to two levels
+        embeddings = cast(list[list[float]], [emb for sublist in embeddings for emb in sublist])
+    return embeddings  # type: ignore
 
 
-def voyage_output_transformer(
-    result: EmbeddingsObject,
-) -> Sequence[Sequence[float] | Sequence[int]]:
+def voyage_output_transformer(result: EmbeddingsObject) -> list[list[float]] | list[list[int]]:
     """Transform the output of the Voyage AI model."""
     return result.embeddings
 
@@ -59,7 +59,7 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
 
     _doc_kwargs: ClassVar[dict[str, Any]] = {"input_type": "document"}
     _query_kwargs: ClassVar[dict[str, Any]] = {"input_type": "query"}
-    _output_transformer: Callable[[Any], Sequence[Sequence[float]] | Sequence[Sequence[int]]] = (
+    _output_transformer: Callable[[Any], list[list[float]] | list[list[int]]] = (
         default_output_transformer
     )
 
@@ -93,21 +93,21 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
         return self._client
 
     async def _embed_documents(
-        self, documents: Sequence[CodeChunk], **kwargs: dict[str, Any]
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:  # pyright: ignore[reportReturnType]
+        self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any]
+    ) -> list[list[float]] | list[list[int]]:  # pyright: ignore[reportReturnType]
         """Embed a list of documents into vectors."""
         ready_documents = cast(list[str], self.chunks_to_strings(documents))
         results: EmbeddingsObject = await self._client.embed(texts=ready_documents, **kwargs)  # pyright: ignore[reportArgumentType]
         self._fire_and_forget(lambda: self._update_token_stats(token_count=results.total_tokens))
-        return await self._process_output(results)
+        return self._process_output(results)
 
     async def _embed_query(
-        self, query: Sequence[str], **kwargs: dict[str, Any]
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+        self, query: Sequence[str], **kwargs: Mapping[str, Any]
+    ) -> list[list[float]] | list[list[int]]:
         """Embed a query or group of queries into vectors."""
         results: EmbeddingsObject = await self._client.embed(texts=query, **kwargs)  # pyright: ignore[reportArgumentType]
         self._fire_and_forget(lambda: self._update_token_stats(token_count=results.total_tokens))
-        return await self._process_output(results)
+        return self._process_output(results)
 
     @property
     def dimension(self) -> int:

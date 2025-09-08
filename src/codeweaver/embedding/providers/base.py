@@ -11,7 +11,7 @@ import logging
 import uuid
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from functools import cache
 from typing import (
     TYPE_CHECKING,
@@ -24,6 +24,7 @@ from typing import (
     cast,
     overload,
 )
+from uuid import UUID
 
 from pydantic import UUID4, BaseModel, ConfigDict
 from pydantic.main import IncEx
@@ -34,6 +35,8 @@ from codeweaver._data_structures import (
     SerializedCodeChunk,
     StructuredDataInput,
     UUIDStore,
+    make_blake_store,
+    make_uuid_store,
 )
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.provider import Provider
@@ -66,22 +69,12 @@ class EmbeddingErrorInfo(TypedDict):
     queries: NotRequired[Sequence[str] | None]
 
 
-def default_input_transformer(chunks: StructuredDataInput) -> Sequence[CodeChunk]:
+def default_input_transformer(chunks: StructuredDataInput) -> Iterator[CodeChunk]:
     """Default input transformer that serializes CodeChunks to strings."""
-    if isinstance(chunks, list | tuple | set):
-        return [
-            chunk if isinstance(chunk, CodeChunk) else CodeChunk.model_validate_json(chunk)
-            for chunk in chunks
-            if chunk
-        ]
-    return (
-        [chunks]
-        if isinstance(chunks, CodeChunk)
-        else [CodeChunk.model_validate_json(cast(str | bytes | bytearray, chunks))]
-    )
+    return CodeChunk.chunkify(chunks)
 
 
-def default_output_transformer(output: Any) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+def default_output_transformer(output: Any) -> list[list[float]] | list[list[int]]:
     """Default output transformer that ensures the output is in the correct format."""
     if isinstance(output, list | tuple | set) and (
         all(isinstance(i, list | set | tuple) for i in output)  # type: ignore
@@ -118,23 +111,24 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
     _caps: EmbeddingModelCapabilities
 
     _input_transformer: ClassVar[Callable[[StructuredDataInput], Any]] = default_input_transformer
-    _output_transformer: ClassVar[
-        Callable[[Any], Sequence[Sequence[float]] | Sequence[Sequence[int]]]
-    ] = default_output_transformer
+    _output_transformer: ClassVar[Callable[[Any], list[list[float]] | list[list[int]]]] = (
+        default_output_transformer
+    )
     _doc_kwargs: ClassVar[dict[str, Any]] = {}
     _query_kwargs: ClassVar[dict[str, Any]] = {}
 
-    _store: UUIDStore[Sequence, CodeChunk] | None = None  # type: ignore  # pydantic doesn't support parameterizing parameterized types
+    _store: UUIDStore[list[CodeChunk]] = make_uuid_store(
+        value_type=list[CodeChunk], size_limit=1024 * 1024 * 3
+    )
 
-    """The store for embedding documents, keyed by batch ID and stored as a batch of CodeChunks."""
-    _hash_store: ClassVar[BlakeStore[UUID4, None]] = BlakeStore(
-        value_type=uuid.UUID,
-        store={},
-        use_uuid=False,
-        _size_limit=1024 * 256,
-        sub_value_type=None,  # pyright: ignore[reportArgumentType]
+    """The store for embedding documents, keyed by batch ID (UUID4) and stored as a batch of CodeChunks."""
+    _hash_store: ClassVar[BlakeStore[UUID4]] = make_blake_store(
+        value_type=UUID, size_limit=1024 * 256
     )  # 256kb limit -- we're just storing hashes
-    """A store for deduplicating CodeChunks based on their content hash. The keys are their hashes, the values are their batch IDs."""
+    """A store for deduplicating CodeChunks based on their content hash. The keys are each CodeChunk's content hash, the values are their batch IDs.
+
+    Note that we're only storing the hash keys and batch ID values, not the full CodeChunk objects. This keeps the store size small. We can lookup by batch ID in the main `_store` if needed, or if it has been ejected, in the `_store`'s `_trash_heap`. `SimpleTypedStore`, the parent class, handles that for us with a simple "get" method.
+    """
 
     def __init__(
         self,
@@ -152,10 +146,9 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
         self.query_kwargs = type(self)._query_kwargs.copy() or {}
         self._add_kwargs(kwargs or {})
         """Add any user-provided kwargs to the embedding provider, after we merge the defaults together."""
-        if self._store is None:
-            self._store = UUIDStore(
-                value_type=Sequence, store={}, use_uuid=True, sub_value_type=CodeChunk
-            )
+        self._store = make_uuid_store(
+            value_type=list[CodeChunk], size_limit=1024 * 1024 * 3
+        )  # 3mb limit
         self._initialize()
 
     def _add_kwargs(self, kwargs: dict[str, Any]) -> None:
@@ -185,8 +178,8 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
 
     @abstractmethod
     async def _embed_documents(
-        self, documents: Sequence[CodeChunk], **kwargs: dict[str, Any] | None
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+        self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any] | None
+    ) -> list[list[float]] | list[list[int]]:
         """Abstract method to implement document embedding logic."""
 
     def _handle_embedding_error(
@@ -211,21 +204,21 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
         documents: Sequence[CodeChunk],
         *,
         batch_id: UUID4 | None = None,
-        **kwargs: dict[str, Any] | None,
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]] | EmbeddingErrorInfo:
+        **kwargs: Mapping[str, Any] | None,
+    ) -> list[list[float]] | list[list[int]] | EmbeddingErrorInfo:
         """Embed a list of documents into vectors.
 
         Optionally takes a `batch_id` parameter to reprocess a specific batch of documents.
         """
         is_old_batch = False
-        if batch_id and batch_id in type(self)._store:
-            documents = type(self)._store[batch_id]
+        if batch_id and self._store and batch_id in self._store:
+            documents = self._store[batch_id]
             is_old_batch = True
         chunks, cache_key = self._process_input(documents, is_old_batch=is_old_batch)
         try:
             results: (
                 Sequence[Sequence[float]] | Sequence[Sequence[int]]
-            ) = await self._embed_documents(chunks, **kwargs)
+            ) = await self._embed_documents(tuple(chunks), **kwargs)
         except Exception as e:
             return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)
         else:
@@ -233,15 +226,15 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
 
     @abstractmethod
     async def _embed_query(
-        self, query: Sequence[str], **kwargs: dict[str, Any] | None
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+        self, query: Sequence[str], **kwargs: Mapping[str, Any] | None
+    ) -> list[list[float]] | list[list[int]]:
         """Abstract method to implement query embedding logic."""
 
     async def embed_query(
-        self, query: str | Sequence[str], **kwargs: dict[str, Any] | None
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]] | EmbeddingErrorInfo:
+        self, query: str | Sequence[str], **kwargs: Mapping[str, Any] | None
+    ) -> list[list[float]] | list[list[int]] | EmbeddingErrorInfo:
         """Embed a query into a vector."""
-        processed_kwargs: dict[str, Any] = self._set_kwargs(self.query_kwargs, kwargs or {})
+        processed_kwargs: Mapping[str, Any] = self._set_kwargs(self.query_kwargs, kwargs or {})
         queries: Sequence[str] = query if isinstance(query, list | tuple | set) else [query]  # pyright: ignore[reportAssignmentType]
         try:
             results: Sequence[Sequence[float]] | Sequence[Sequence[int]] = await self._embed_query(
@@ -318,7 +311,7 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
             statistics.add_token_usage(embedding_generated=token_count)
 
     @staticmethod
-    def normalize(embedding: Sequence[float] | Sequence[int]) -> Sequence[float]:
+    def normalize(embedding: Sequence[float] | Sequence[int]) -> list[float]:
         """Normalize an embedding vector to unit L2 length.
 
         Returns the input as floats if the vector is empty or has zero norm.
@@ -352,15 +345,15 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
 
     @staticmethod
     def _set_kwargs(
-        instance_kwargs: dict[str, Any], passed_kwargs: dict[str, Any]
-    ) -> dict[str, Any]:
+        instance_kwargs: Mapping[str, Any], passed_kwargs: Mapping[str, Any]
+    ) -> Mapping[str, Any]:
         """Set keyword arguments for the embedding provider."""
         passed_kwargs = passed_kwargs or {}
-        return instance_kwargs | passed_kwargs
+        return cast(dict[str, Any], instance_kwargs) | cast(dict[str, Any], passed_kwargs)
 
     def _process_input(
         self, input_data: StructuredDataInput, *, is_old_batch: bool = False
-    ) -> tuple[Sequence[CodeChunk], UUID4 | None]:
+    ) -> tuple[Iterator[CodeChunk], UUID4 | None]:
         """Process input data for embedding."""
         processed_chunks = default_input_transformer(input_data)
         if is_old_batch:
@@ -374,23 +367,13 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
             else:
                 chunk = None
         final_chunks = [chunk for chunk in processed_chunks if chunk]
-        self._store[key] = final_chunks
-        return final_chunks, key
+        if self._store:
+            self._store[key] = final_chunks
+        return iter(final_chunks), key
 
-    def _process_output(
-        self, output_data: Any
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+    def _process_output(self, output_data: Any) -> list[list[float]] | list[list[int]]:
         """Handle output data from embedding."""
-        transformed_output = self._output_transformer(output_data)
-        if not isinstance(transformed_output, list | tuple | set) or not all(
-            isinstance(i, list | tuple | set) for i in transformed_output
-        ):
-            logger.error(
-                ("Transformed output is not in the expected format."),
-                extra={"output_data": output_data},  # pyright: ignore[reportUnknownArgumentType]
-            )
-            raise ValueError("Transformed output is not in the expected format.")
-        return transformed_output
+        return self._output_transformer(output_data)
 
     def _fire_and_forget(self, task: Callable[..., Any]) -> None:
         """Execute a fire-and-forget task."""

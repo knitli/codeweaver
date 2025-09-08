@@ -38,6 +38,7 @@ from codeweaver._statistics import (
     SessionStatistics,
     TimingStatistics,
     TimingStatisticsDict,
+    get_session_statistics,
 )
 from codeweaver.exceptions import ProviderError
 
@@ -58,11 +59,9 @@ class StatisticsMiddleware(Middleware):
             logger: Logger instance to use for logging
             log_level: Logging level to use
         """
-        self.statistics = statistics or SessionStatistics()
-        self.timing_statistics = self.timing_statistics or TimingStatistics(
-            {}, {}, {}, [], [], [], []
-        )
-        self.logger = logger or logging.getLogger("codeweaver.middleware.statistics")
+        self.statistics = statistics or get_session_statistics()
+        self.timing_statistics = self.timing_statistics or self.statistics.timing_statistics
+        self.logger = logger or logging.getLogger(__name__)
         self.log_level = log_level or logging.INFO
         self._we_are_not_none()
 
@@ -252,6 +251,8 @@ class StatisticsMiddleware(Middleware):
         Returns:
             Current timing statistics
         """
+        if not self.timing_statistics:
+            raise ProviderError("Timing statistics not initialized.")
         return self.timing_statistics.timing_summary
 
     def reset_statistics(self) -> None:

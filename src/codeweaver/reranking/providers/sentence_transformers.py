@@ -9,7 +9,8 @@
 import asyncio
 import logging
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from types import MappingProxyType
 from typing import Any, cast
 
 import numpy as np
@@ -57,7 +58,7 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
     _provider: Provider = Provider.SENTENCE_TRANSFORMERS
     _caps: RerankingModelCapabilities
 
-    _rerank_kwargs: dict[str, Any] = {"trust_remote_code": True}  # noqa: RUF012
+    _rerank_kwargs: MappingProxyType[str, Any] = MappingProxyType({"trust_remote_code": True})
 
     def __init__(
         self,
@@ -69,7 +70,7 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
     ) -> None:
         """Initialize the SentenceTransformersRerankingProvider."""
         self._caps = capabilities
-        self._rerank_kwargs = {**type(self)._rerank_kwargs, **kwargs}
+        self._rerank_kwargs = MappingProxyType({**type(self)._rerank_kwargs, **kwargs})
         self._client = client or CrossEncoder(self._caps.name, **self._rerank_kwargs)
         self._prompt = prompt
         self._top_n = top_n
@@ -100,7 +101,7 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
         documents: Sequence[str],
         *,
         top_n: int = 40,
-        **kwargs: dict[str, Any] | None,
+        **kwargs: Mapping[str, Any] | None,
     ) -> Any:
         """Execute the reranking process."""
         preprocessed = (

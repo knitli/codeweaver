@@ -5,21 +5,30 @@
 
 """Set up a logger with optional rich formatting."""
 
+import importlib
 import logging
 
 from logging.config import dictConfig
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from fastmcp import Context
 from pydantic_core import to_json
-from rich.console import Console
-from rich.logging import RichHandler
 
 from codeweaver.settings_types import LoggingConfigDict
 
 
-def get_rich_handler(rich_kwargs: dict[str, Any]) -> RichHandler:
+lazy_importer = importlib.import_module("codeweaver._utils").lazy_importer
+
+if TYPE_CHECKING:
+    from rich.logging import RichHandler
+else:
+    RichHandler = lazy_importer("rich.logging").RichHandler
+
+
+def get_rich_handler(rich_kwargs: dict[str, Any]) -> "RichHandler":
     """Get a RichHandler instance."""
+    RichHandler = lazy_importer("rich.logging").RichHandler  # noqa: N806
+    Console = lazy_importer("rich.console").Console  # noqa: N806
     console = Console(markup=True, soft_wrap=True, emoji=True)
     return RichHandler(console=console, markup=True, **rich_kwargs)
 

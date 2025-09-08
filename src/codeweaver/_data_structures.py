@@ -12,7 +12,7 @@ import os
 import sys
 import textwrap
 
-from collections.abc import Callable, ItemsView, Iterable, Iterator, KeysView, Sequence, ValuesView
+from collections.abc import Callable, ItemsView, Iterator, KeysView, Sequence, ValuesView
 from datetime import UTC, datetime
 from functools import cache, cached_property
 from pathlib import Path
@@ -27,14 +27,11 @@ from typing import (
     NotRequired,
     Required,
     Self,
-    SupportsBytes,
-    SupportsIndex,
     TypedDict,
     TypeGuard,
     TypeVar,
     cast,
     is_typeddict,
-    overload,
 )
 from uuid import uuid4
 from weakref import WeakValueDictionary
@@ -65,7 +62,6 @@ from codeweaver.language import ConfigLanguage, SemanticSearchLanguage
 
 
 if TYPE_CHECKING:
-    from _typeshed import ReadableBuffer
     from ast_grep_py import SgNode
 
 
@@ -766,11 +762,8 @@ class CodeChunk(BaseModel):
                 )
                 yield result.decode("utf-8") if isinstance(result, bytes | bytearray) else result
             else:
-                result = (
-                    cast(CodeChunk, chunk).serialize_for_embedding()
-                    if for_embedding
-                    else chunk.serialize()
-                )
+                chunk = cast(CodeChunk, chunk)
+                result = chunk.serialize_for_embedding() if for_embedding else chunk.serialize()
                 yield result.decode("utf-8") if isinstance(result, bytes | bytearray) else result
 
 
@@ -907,12 +900,15 @@ class ExtKind(NamedTuple):
 HashKeyKind = TypeVar(
     "HashKeyKind", Annotated[UUID4, Tag("uuid")], Annotated[BlakeHashKey, Tag("blake")]
 )
-# General sub-value type for container-like value types.
-SubT = TypeVar("SubT")
 
 
 def get_blake_hash[AnyStr: (str, bytes)](value: AnyStr) -> BlakeHashKey:
     """Hash a value using blake3 and return the hex digest."""
+    return BlakeKey(blake3(value.encode("utf-8") if isinstance(value, str) else value).hexdigest())
+
+
+def get_blake_hash_generic(value: str | bytes) -> BlakeHashKey:
+    """Hash a value using blake3 and return the hex digest - generic version."""
     return BlakeKey(blake3(value.encode("utf-8") if isinstance(value, str) else value).hexdigest())
 
 
@@ -922,30 +918,38 @@ def to_uuid() -> UUID4:
 
 
 class StoreDict(TypedDict, total=False):
-    """Dictionary representation of a SimpleTypedStore."""
+    """Dictionary representation of a SimpleTypedStore.
+
+    Note: This schema was simplified in the 2025 refactor.
+    Legacy fields like 'use_uuid' and 'sub_value_type' are no longer supported.
+    Use make_uuid_store() or make_blake_store() factory functions instead.
+    """
 
     value_type: Required[type]
-    use_uuid: NotRequired[bool]
     store: NotRequired[dict[UUID4 | BlakeHashKey, Any]]
-    sub_value_type: NotRequired[type | None]
     _size_limit: NotRequired[PositiveInt | None]
     _id: NotRequired[UUID4]
 
 
-class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](BaseModel):
-    """A key-value store with precise typing for keys, values, and optional sub-values.
+class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T](BaseModel):
+    """A key-value store with precise typing for keys and values.
 
-    - KeyT is either UUID4 or BlakeHashKey, determined by use_uuid.
+    - KeyT is either UUID4 or BlakeHashKey, determined by the concrete subclass.
     - T is the value type for all items in the store.
-    - SubT is the type of elements within T if T is a container; otherwise None.
 
     The store protects data integrity by copying data on get, pushes removed items to a trash heap for
     potential recovery, and can optionally limit the total size (default is 3MB).
 
+    As an added bonus, the store itself is:
+
+        1. Entirely serializable. You can save and load it as JSON. Weakrefs are *not serialized*.
+        2. Supports complex data types. You can store any picklable Python object, including nested structures.
+        3. Has an API that mimics a standard Python dictionary, making it easy to use.
+
     Example:
     ```python
-    # We would typically use the `UUIDStore` subclass in practice, but for illustration:
-    store = SimpleTypedStore[UUID4, list, str](value_type=list, sub_value_type=str)
+    # Use concrete subclasses for type safety:
+    store = UUIDStore[list[str]](value_type=list)
     store["item1"] = ["value1"]
     ```
 
@@ -953,16 +957,6 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
     """
 
     model_config = ConfigDict(validate_assignment=True)
-
-    value_type: Annotated[
-        type[T],
-        Field(init=True, kw_only=True, description="""The type of values stored in the store."""),
-    ]
-
-    # When specialized via subclasses below, this is narrowed to Literal[True] / Literal[False]
-    use_uuid: Annotated[
-        Literal[False, True], Field(description="""Whether to use UUID4 keys""")
-    ] = True
 
     store: Annotated[
         dict[KeyT, T],
@@ -973,23 +967,15 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
         ),
     ]
 
-    sub_value_type: Annotated[
-        SubT | None,
-        Field(
-            description="""If value_type is a container, this is the type of its elements; otherwise None."""
-        ),
-    ]
+    _value_type: Annotated[type[T], PrivateAttr(init=False)]
 
-    _keygen: Annotated[
-        Callable[[], UUID4] | Callable[[str | bytes], BlakeHashKey],
-        Field(default_factory=lambda data: to_uuid if data["use_uuid"] else get_blake_hash),
-    ] = to_uuid
+    _keygen: Callable[[], UUID4] | Callable[[str | bytes], BlakeHashKey] = to_uuid
 
     _size_limit: Annotated[PositiveInt | None, Field(repr=False, kw_only=True)] = (
         3 * 1024 * 1024
     )  # 3 MB default limit
 
-    # Per-instance trash heap; avoid shared default
+    # Per-instance trash heap; avoid sharing weakrefs across instances (don't want to accidentally maintain pointers across instances)
     _trash_heap: WeakValueDictionary[KeyT, T] = PrivateAttr(
         default_factory=lambda: WeakValueDictionary[KeyT, T]()
     )
@@ -999,22 +985,46 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
         Field(default_factory=uuid4, description="""Unique identifier for the store""", init=False),
     ] = to_uuid()
 
-    # Track sub-value type at runtime when inferred lazily
-    _sub_value_type: Annotated[type[SubT] | None, PrivateAttr()] = None
+    def __init__(self, **data: Any) -> None:
+        """Initialize the store with type checks and post-init processing."""
+        if data.get("store") is not None:
+            self.store = data.pop("store")
+        if data.get("value_type"):
+            self._value_type = data.pop("value_type")
+        if data.get("_value_type"):
+            self._value_type = data.pop("_value_type")
+        elif not self._value_type and data:
+            self._value_type = next(iter(data.values())).__class__  # type: ignore
+        if not hasattr(self, "_value_type") or not self._value_type:
+            raise ValueError(
+                "`You must either provide `_value_type` or provide values to infer it from.`"
+            )
 
     def __model_post_init__(self) -> None:
-        """Post-initialization processing."""
+        """Post-initialization processing.
 
-    @model_validator(mode="after")
-    def check_store(self) -> Self:
-        """Ensure the store is initialized and keygen is set from use_uuid."""
-        if self.store is None:  # pyright: ignore[reportUnnecessaryComparison]  # says you, but I know better
-            self.store = {}
-        if not self.value_type:
-            raise ValueError("value_type must be specified")
-        # Initialize key generator based on use_uuid
-        self._keygen = to_uuid if self.use_uuid else get_blake_hash  # pyright: ignore[reportAttributeAccessIssue]
-        return self
+        Override this to customize initialization behavior.
+        """
+
+    def __pydantic_extra__(self, name: str, value: Any) -> dict[str, Any]:  # type: ignore
+        """This is to prevent a pydantic bug that tries to set extra fields, when this method is deprecated.
+        We'll remove once I get around to submitting a PR for it.
+        """
+        return {}
+
+    @computed_field
+    @property
+    def value_type(self) -> type[T]:
+        """Return the type of values stored in the store."""
+        if not hasattr(self, "_value_type"):
+            raise ValueError("No value_type set! You must provide it on initialization.")
+        return self._value_type
+
+    @computed_field
+    @property
+    def data_size(self) -> NonNegativeInt:
+        """Return the size of the store in bytes."""
+        return sum(sys.getsizeof(key) + sys.getsizeof(value) for key, value in self.store.items())
 
     @property
     def id(self) -> UUID4:
@@ -1022,7 +1032,7 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
         return self._id
 
     @staticmethod
-    def _trial_and_error_copy(item: T) -> Literal["deepcopy", "copy", "iter"] | None:
+    def _trial_and_error_copy(item: T) -> Literal["deepcopy", "copy", "constructor", "iter"] | None:
         """Attempt to copy an item, falling back to a simpler method on failure."""
         with contextlib.suppress(Exception):
             if copy.deepcopy(item):
@@ -1030,6 +1040,10 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
         with contextlib.suppress(Exception):
             if copy.copy(item):
                 return "copy"
+        with contextlib.suppress(Exception):
+            # does it have a constructor that returns itself?
+            if callable(item) and item(item) is item:
+                return "constructor"
         if hasattr(item, "__iter__") and callable(item):
             with contextlib.suppress(Exception):
                 if item(iter(item)):  # pyright: ignore[reportCallIssue, reportArgumentType]
@@ -1047,27 +1061,41 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
                 sample_item = self.value_type()
         if not sample_item:
             return lambda item: item  # no-op copy
-        if isinstance(sample_item, (list | dict | set)):
+        if isinstance(sample_item, list | set | tuple):
             return lambda item: item.copy()  # pyright: ignore[reportUnknownMemberType, reportUnknownLambdaType, reportAttributeAccessIssue]
         if copy_strategy := self._trial_and_error_copy(sample_item):
-            if copy_strategy in ("deepcopy", "copy"):
-                return copy.deepcopy if copy_strategy == "deepcopy" else copy.copy
+            if copy_strategy == "deepcopy":
+                return copy.deepcopy
+            if copy_strategy == "copy":
+                return copy.copy
+            if copy_strategy == "constructor":
+                return lambda item: type(item)(item)  # type: ignore  # we know it's callable from trial_and_error_copy
+            # copy_strategy == "iter"
             return lambda item: type(item)(iter(item))  # type: ignore
         return lambda item: item  # no-op copy
 
-    def get(self, key: KeyT, default: T | None = None) -> T | None:
+    def get(self, key: KeyT, default: Any = None) -> T | None:
         """Get a value from the store."""
-        if item := self.store.get(key):  # pyright: ignore[reportArgumentType]
+        if item := self.store.get(key):
             return self._get_copy_strategy(item) if self._get_copy_strategy else item
-        return self.get(key) if self.recover(key) else self.store.get(key, default)
+        # Try to recover from trash first, then return default
+        return self.store.get(key, default) if self.recover(key) else default
 
     def __iter__(self) -> Iterator[KeyT]:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Return an iterator over the keys in the store."""
         return iter(self.store)
 
+    def __delitem__(self, key: KeyT) -> None:
+        """Delete a value from the store."""
+        if key in self:
+            self.delete(key)
+        raise KeyError(key)
+
     def __getitem__(self, key: KeyT) -> T:
         """Get an item from the store by key."""
-        return self.store[key]
+        if key in self:
+            return cast(T, self.get(key))
+        raise KeyError(key)
 
     def __contains__(self, key: KeyT) -> bool:
         """Check if a key is in the store."""
@@ -1076,19 +1104,15 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
     def __len__(self) -> int:
         return len(self.store)
 
-    def __setitem__(self, key: KeyT, value: T) -> None:
-        self.store[key] = value
+    def __setitem__(self, key: KeyT, value: Any) -> None:
+        """Set an item in the store by key."""
+        self.set(key, value)
 
-    def __and__(self, other: SimpleTypedStore[KeyT, T, SubT]) -> SimpleTypedStore[KeyT, T, SubT]:
+    def __and__(self, other: SimpleTypedStore[KeyT, T]) -> SimpleTypedStore[KeyT, T]:
         """Return a new store with items from both stores."""
-        if self.value_type != other.value_type or self.use_uuid != other.use_uuid:
+        if self.value_type != other.value_type or type(self) is not type(other):
             return self
-        new_store = SimpleTypedStore[KeyT, T, SubT](  # type: ignore[call-arg]
-            value_type=self.value_type,
-            use_uuid=self.use_uuid,
-            sub_value_type=self.sub_value_type,
-            _size_limit=self._size_limit,
-        )
+        new_store = type(self)(value_type=self.value_type, store={}, _size_limit=self._size_limit)
         new_store.store = self.store.copy()
         new_store.store |= other.store
         return new_store
@@ -1097,47 +1121,25 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
         """Ensure the item is of the correct type."""
         return isinstance(item, self.value_type)
 
-    def _guard_subtype(self, item: Any) -> TypeIs[SubT]:
-        if not self._sub_value_type:
-            self._set_sub_value_type(item)
-            return True
-        return isinstance(item, self._sub_value_type)
-
-    def _set_sub_value_type(self, item: Any) -> None:
-        if self._sub_value_type or not item:
-            return
-        self._sub_value_type = type(item)
-
     @property
     def keygen(self) -> Callable[[], UUID4] | Callable[[str | bytes], BlakeHashKey]:
         """Return the key generator function."""
         return self._keygen
 
+    @property
+    def view(self) -> MappingProxyType[KeyT, T]:
+        """Return a read-only view of the store."""
+        return MappingProxyType(self.store)
+
     def generate(self, value: str | bytes | None = None) -> KeyT:
         """Generate a new key for the store."""
-        if self.use_uuid and self._keygen == to_uuid:
+        if self._keygen == to_uuid:
             return cast(KeyT, to_uuid())
         # we're dealing with BlakeHashKey:
         if not value:
             rand = os.urandom(16)
             value = rand
         return cast(KeyT, self._keygen(value))  # pyright: ignore[reportCallIssue]
-
-    @property
-    def item_type(self) -> type[T]:
-        """Return the type of items stored."""
-        return self.value_type
-
-    @property
-    def sub_item_type(self) -> type[SubT] | None:
-        """Return the type of sub-items stored, if any."""
-        return self._sub_value_type
-
-    @computed_field
-    @property
-    def data_size(self) -> NonNegativeInt:
-        """Return the size of the store in bytes."""
-        return sum(sys.getsizeof(key) + sys.getsizeof(value) for key, value in self.store.items())
 
     def keys(self) -> KeysView[KeyT]:
         """Return the keys in the store."""
@@ -1151,28 +1153,9 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
         """Return the items in the store."""
         return self.store.items()
 
-    @property
-    def view(self) -> MappingProxyType[KeyT, T]:
-        """Return a read-only view of the store."""
-        return MappingProxyType(self.store)
-
     def _validate_value(self, value: Any) -> TypeGuard[T]:
         """Validate that the value is of the correct type."""
-        if not self._guard(value):
-            return False
-        if self._sub_value_type and not all(self._guard_subtype(v) for v in value):  # pyright: ignore[reportUnknownArgumentType, reportGeneralTypeIssues, reportUnknownVariableType]
-            return False
-        if (
-            value
-            and not self._sub_value_type
-            and hasattr(value, "__iter__")
-            and not isinstance(value, (str | bytes | bytearray))
-        ):
-            first_elem: SubT = next(iter(value), None)  # pyright: ignore[reportGeneralTypeIssues, reportCallIssue, reportUnknownVariableType, reportUnknownArgumentType, reportArgumentType, reportAssignmentType]
-            if first_elem is not None:
-                self._set_sub_value_type(first_elem)
-                return all(self._guard_subtype(v) for v in value)  # pyright: ignore[reportUnknownArgumentType, reportGeneralTypeIssues, reportUnknownVariableType]
-        return True
+        return self._guard(value)
 
     def _check_and_set(self, key: KeyT, value: T) -> KeyT:
         """Check the value type and set the sub-value type if needed."""
@@ -1181,6 +1164,15 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
         self.set(key, value)
         return key
 
+    def update(self, values: dict[KeyT, T]) -> Iterator[KeyT]:
+        """Update multiple items in the store."""
+        if values and type(next(iter(values.keys()))) is type(next(iter(self.store.keys()))):
+            for key, value in values.items():
+                self[key] = value
+            yield from values.keys()
+        else:
+            yield from (self.add(value) for value in values.values())
+
     def add(self, value: Any, *, hash_value: bytes | bytearray | None = None) -> KeyT:
         """Add a value to the store and return its key.
 
@@ -1188,7 +1180,7 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
         """
         if not self._validate_value(value):
             raise TypeError(f"Invalid value: {value}")
-        key: UUID4 | None = to_uuid() if self.use_uuid and self.keygen == to_uuid else None  # pyright: ignore[reportAssignmentType]
+        key: UUID4 | None = to_uuid() if self.keygen == to_uuid else None  # pyright: ignore[reportAssignmentType]
         if key:
             return self._check_and_set(cast(KeyT, key), value)
         if hash_value:
@@ -1197,14 +1189,11 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
                 if isinstance(hash_value, bytes)
                 else get_blake_hash(bytes(hash_value))
             )
-        elif isinstance(value, SupportsIndex | SupportsBytes | ReadableBuffer) or (
-            isinstance(value, Iterable) and all(v for v in value if isinstance(v, SupportsIndex))  # pyright: ignore[reportUnknownVariableType]
-        ):  # pyright: ignore[reportUnknownVariableType]
-            blake_key: BlakeHashKey = get_blake_hash(bytes(value))  # pyright: ignore[reportUnknownArgumentType]
         else:
-            value = os.urandom(16)
-            blake_key = get_blake_hash(value)
-        return self._check_and_set(cast(KeyT, blake_key), value)  # pyright: ignore[reportCallIssue, reportArgumentType]
+            # For Blake stores, generate a random value to hash if the value can't be hashed directly
+            rand_value = os.urandom(16)
+            blake_key = get_blake_hash_generic(rand_value)
+        return self._check_and_set(cast(KeyT, blake_key), value)
 
     def _make_room(self, required_space: int) -> None:
         """Make room in the store by removing the least recently used items."""
@@ -1230,7 +1219,9 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
         if not self.has_room(sys.getsizeof(value) + sys.getsizeof(key)):
             self._make_room(sys.getsizeof(value) + sys.getsizeof(key))
         if key in self.store:
-            return
+            if value == self.store[key]:
+                return
+            _ = self._check_and_set(key, value)
         if key in self._trash_heap and self._trash_heap[key] is not None:
             del self._trash_heap[key]
         self.store[key] = value
@@ -1267,60 +1258,31 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T, SubT: object | None](Base
         return False
 
 
-class UUIDStore[T, SubT: object | None](SimpleTypedStore[UUID4, T, SubT]):
+class UUIDStore[T](SimpleTypedStore[UUID4, T]):
     """Typed store specialized for UUID keys."""
 
-    use_uuid: Literal[True] = True  # pyright: ignore[reportIncompatibleVariableOverride]
-    """UUID store always uses UUID keys (clearly)."""
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._keygen = to_uuid
 
-    sub_value_type: SubT | None = None  # pyright: ignore[reportIncompatibleVariableOverride]
 
-
-class BlakeStore[T, SubT: object | None](SimpleTypedStore[BlakeHashKey, T, SubT]):
+class BlakeStore[T](SimpleTypedStore[BlakeHashKey, T]):
     """Typed store specialized for Blake3-hash keys."""
 
-    use_uuid: Literal[False] = False  # pyright: ignore[reportIncompatibleVariableOverride]
-    """Blake store always uses Blake3 hash keys (obviously), and never UUID keys."""
-
-    sub_value_type: None = None  # pyright: ignore[reportIncompatibleVariableOverride]
-
-
-@overload
-def make_store[T, SubT: object | None](
-    *,
-    value_type: type[T],
-    use_uuid: Literal[True] = True,
-    sub_value_type: type[SubT] | None = None,
-    size_limit: PositiveInt | None = ...,
-) -> UUIDStore[T, SubT]: ...
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._keygen = get_blake_hash_generic
 
 
-@overload
-def make_store[T, SubT: object | None](
-    *,
-    value_type: type[T],
-    use_uuid: Literal[False],
-    sub_value_type: type[SubT] | None = None,
-    size_limit: PositiveInt | None = ...,
-) -> BlakeStore[T, SubT]: ...
+def make_uuid_store[T](
+    *, value_type: type[T], size_limit: PositiveInt | None = None
+) -> UUIDStore[T]:
+    """Create a UUIDStore with the specified value type."""
+    return UUIDStore[T](_value_type=value_type, store={}, _size_limit=size_limit)
 
 
-def make_store[T, SubT: object | None](
-    *,
-    value_type: type[T],
-    use_uuid: bool = True,
-    sub_value_type: type[SubT] | None = None,
-    size_limit: PositiveInt | None = None,
-) -> UUIDStore[T, SubT] | BlakeStore[T, SubT]:
-    """Factory with overloads to construct a precisely-typed store based on use_uuid."""
-    if use_uuid:
-        return UUIDStore[T, SubT](
-            value_type=value_type,
-            store={},
-            use_uuid=True,
-            sub_value_type=sub_value_type,
-            _size_limit=size_limit,
-        )
-    return BlakeStore[T, SubT](
-        value_type=value_type, store={}, use_uuid=False, sub_value_type=None, _size_limit=size_limit
-    )
+def make_blake_store[T](
+    *, value_type: type[T], size_limit: PositiveInt | None = None
+) -> BlakeStore[T]:
+    """Create a BlakeStore with the specified value type."""
+    return BlakeStore[T](_value_type=value_type, store={}, _size_limit=size_limit)

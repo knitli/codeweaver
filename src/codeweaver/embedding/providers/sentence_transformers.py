@@ -147,7 +147,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
 
     async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Any
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+    ) -> list[list[float]] | list[list[int]]:
         """Embed a sequence of documents."""
         preprocessed = cast(list[str], self.chunks_to_strings(documents))
         if "nomic" in self.model_name:
@@ -167,7 +167,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
 
     async def _embed_query(
         self, query: Sequence[str], **kwargs: Any
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+    ) -> list[list[float]] | list[list[int]]:
         """Embed a sequence of queries."""
         preprocessed = cast(list[str], query)
         if "qwen3" in self.model_name.lower() or "instruct" in self.model_name.lower():

@@ -5,7 +5,6 @@
 """FastMCP middleware for CodeWeaver."""
 
 from codeweaver.middleware.statistics import StatisticsMiddleware
-from codeweaver.middleware.timing import TimingMiddleware
 
 
-__all__ = ["StatisticsMiddleware", "TimingMiddleware"]
+__all__ = ["StatisticsMiddleware"]

@@ -5,7 +5,8 @@
 
 """Voyage AI reranking provider implementation."""
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
+from types import MappingProxyType
 from typing import Any, cast
 
 from pydantic import ConfigDict
@@ -35,10 +36,10 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
     _prompt: str | None = None  # custom prompts not supported
     _caps: RerankingModelCapabilities
 
-    _rerank_kwargs: dict[str, Any]
-    _output_transformer: Callable[[Any, Sequence[CodeChunk]], Sequence[RerankingResult]] = (
-        lambda x, y: x
-    )  # placeholder, actually set in _initialize()
+    _rerank_kwargs: MappingProxyType[str, Any]
+    _output_transformer: Callable[
+        [Any, Iterator[CodeChunk] | tuple[CodeChunk, ...]], list[RerankingResult]
+    ] = lambda x, y: x  # placeholder, actually set in _initialize()
 
     def _initialize(self) -> None:
         self._output_transformer = self.voyage_reranking_output_transformer
@@ -65,9 +66,14 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
             return response
 
     def voyage_reranking_output_transformer(
-        self, returned_result: RerankingObject, _original_chunks: Sequence[CodeChunk]
-    ) -> Sequence[RerankingResult]:
+        self,
+        returned_result: RerankingObject,
+        _original_chunks: Iterator[CodeChunk] | tuple[CodeChunk, ...],
+    ) -> list[RerankingResult]:
         """Transform the output of the Voyage AI reranking model."""
+        original_chunks = (
+            tuple(_original_chunks) if isinstance(_original_chunks, Iterator) else _original_chunks
+        )
 
         def map_result(voyage_result: VoyageRerankingResult, new_index: int) -> RerankingResult:
             """Maps a VoyageRerankingResult to a CodeWeaver RerankingResult."""
@@ -75,8 +81,8 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
                 original_index=voyage_result[0],
                 batch_rank=new_index,
                 score=voyage_result[2],
-                chunk=CodeChunk.model_validate_json(voyage_result[1]),  # pyright: ignore[reportUnknownArgumentType]
-            )  # pyright: ignore[reportUnknownArgumentType]
+                chunk=original_chunks[voyage_result[0]],
+            )
 
         results, token_count = returned_result.results, returned_result.total_tokens
         self._update_token_stats(token_count=token_count)

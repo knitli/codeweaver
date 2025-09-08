@@ -6,7 +6,7 @@
 
 import os
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
 from codeweaver._data_structures import CodeChunk
@@ -16,7 +16,7 @@ from codeweaver.exceptions import ConfigurationError
 from codeweaver.provider import Provider
 
 
-def try_for_heroku_endpoint(kwargs: dict[str, Any]) -> str:
+def try_for_heroku_endpoint(kwargs: Mapping[str, Any]) -> str:
     """Try to identify the Heroku endpoint."""
     if kwargs.get("base_url"):
         return kwargs["base_url"]
@@ -46,7 +46,7 @@ def parse_endpoint(endpoint: str, region: str | None = None) -> str:
     return f"https://{endpoint}.{region}.inference.ai.azure.com"
 
 
-def try_for_azure_endpoint(kwargs: dict[str, Any]) -> str:
+def try_for_azure_endpoint(kwargs: Mapping[str, Any]) -> str:
     """Try to identify the Azure endpoint.
 
     Azure uses this format: `https://<endpoint>.<region_name>.inference.ai.azure.com`,
@@ -141,7 +141,7 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
         }
 
     async def _fetch_embeddings(
-        self, texts: list[str], *, is_query: bool, **kwargs: dict[str, Any]
+        self, texts: list[str], *, is_query: bool, **kwargs: Mapping[str, Any]
     ) -> list[list[float]] | list[list[int]]:
         """Fetch embeddings from the Cohere API."""
         embed_kwargs = {
@@ -173,8 +173,8 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
         return embeddings or [[]]
 
     async def _embed_documents(
-        self, documents: Sequence[CodeChunk], **kwargs: dict[str, Any]
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+        self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any]
+    ) -> list[list[float]] | list[list[int]]:
         """Embed a list of documents."""
         kwargs = (
             self.doc_kwargs.get("client_kwargs", {})
@@ -187,8 +187,8 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
         )
 
     async def _embed_query(
-        self, query: Sequence[str], **kwargs: dict[str, Any]
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+        self, query: Sequence[str], **kwargs: Mapping[str, Any]
+    ) -> list[list[float]] | list[list[int]]:
         """Embed a query or list of queries."""
         kwargs = (
             self.query_kwargs.get("client_kwargs", {})

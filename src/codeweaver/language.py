@@ -15,10 +15,10 @@ from types import MappingProxyType
 from typing import NamedTuple
 
 from codeweaver._common import BaseEnum
-from codeweaver._utils import walk_down_to_git_root
+from codeweaver._utils import get_project_root
 
 
-PROJECT_ROOT = walk_down_to_git_root(Path.cwd()) or Path.cwd().resolve()
+PROJECT_ROOT = get_project_root() or Path.cwd().resolve()
 
 ConfigPathPair = NamedTuple(
     "ConfigPathPair", (("path", Path), ("language", "SemanticSearchLanguage"))

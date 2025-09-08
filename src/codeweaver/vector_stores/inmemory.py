@@ -5,8 +5,11 @@
 """In-memory vector store implementation loosely based on langchain-core's `InMemoryVectorStore`."""
 
 from __future__ import annotations
+
 from typing import Any
+
 from pydantic import BaseModel
+
 from codeweaver.embedding.providers.base import EmbeddingProvider
 from codeweaver.vector_stores.base import VectorStoreProvider
 
@@ -14,7 +17,6 @@ from codeweaver.vector_stores.base import VectorStoreProvider
 class MemoryVectorClient(BaseModel):
     """An in-memory vector store 'client'. Uses a Pydantic model for structure and serialization/deserialization."""
 
-    vectors:
 
 class MemoryVectorStoreProvider(VectorStoreProvider[None]):
     """In-memory vector store implementation using langchain-core."""

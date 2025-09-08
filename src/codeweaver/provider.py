@@ -1,3 +1,15 @@
+"""Provider enum and related functionality.
+
+The `Provider` enum defines the available providers across the CodeWeaver project,
+and includes methods for validating providers, checking capabilities, and retrieving
+provider-specific settings.
+
+A companion enum, `ProviderKind`, categorizes providers by their capabilities,
+such as `embedding`, `sparse_embedding`, `reranking`, `vector_store`, `agent`, and `data`.
+
+The `Provider` enum also includes methods for retrieving some provider-specific information, such as environment variables used by the provider's client that are not part of CodeWeaver's settings.
+"""
+
 # ===========================================================================
 # *     PROVIDER ENUM - main provider enum for all CodeWeaver providers
 # ===========================================================================

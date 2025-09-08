@@ -3,194 +3,42 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-"""Main FastMCP server implementation for CodeWeaver."""
+"""Main FastMCP server entrypoint for CodeWeaver with linear bootstrap."""
 
 from __future__ import annotations
 
 import asyncio
-import importlib
 import logging
 
-from types import FunctionType
-from typing import TYPE_CHECKING, Any, NoReturn
+from typing import TYPE_CHECKING
 
-from fastmcp import Context, FastMCP
-from pydantic import TypeAdapter
-from typing_extensions import TypeIs
-
-from codeweaver import __version__ as version
-from codeweaver._server import initialize_app
-from codeweaver.exceptions import CodeWeaverError
-from codeweaver.models.core import FindCodeResponseSummary
-from codeweaver.tools.find_code import find_code_implementation
+from codeweaver._server import build_app
+from codeweaver.app_bindings import register_app_bindings
 
 
 if TYPE_CHECKING:
-    from codeweaver._server import AppState, HealthInfo, HealthStatus
-    from codeweaver._statistics import SessionStatistics
-    from codeweaver.language import SemanticSearchLanguage
-    from codeweaver.models.intent import IntentType
+    from fastmcp import FastMCP
+
+    from codeweaver._server import AppState
 
 
-def is_fastmcp_instance(app: Any) -> TypeIs[FastMCP[AppState]]:
-    """Validate if the given app is an instance of FastMCP."""
-    return isinstance(app, FastMCP)
+async def start_server(
+    app: "FastMCP[AppState]", *, host: str = "127.0.0.1", port: int = 9328
+) -> None:  # noqa: UP037
+    """Start CodeWeaver's FastMCP server."""
+    await app.run_http_async(host=host, port=port)
 
 
-# Create FastMCP application
-app, run_method = asyncio.run(initialize_app())  # type: ignore  # the types are just below :arrow_lower_left:
-if not is_fastmcp_instance(app):
-    raise TypeError("Expected app to be an instance of FastMCP")
-run_method: FunctionType
-
-
-@app.tool(tags={"user", "external", "code"})
-async def find_code(
-    query: str,
-    intent: IntentType | None = None,
-    *,
-    token_limit: int = 10000,
-    include_tests: bool = False,
-    focus_languages: tuple[SemanticSearchLanguage, ...] | None = None,
-    context: Context | None = None,
-) -> FindCodeResponseSummary:
-    """Intelligently discover and retrieve relevant codebase context.
-
-    Phase 1 implementation provides basic file discovery and keyword-based search.
-    Future phases will add semantic embeddings and AI-powered intent analysis.
-
-    Args:
-        query: Natural language description of the information you need
-        intent: An optional hint about the type of information you need based on the user's task to you. One of "understand", "implement", "debug", "optimize", "test", "configure", or "document".
-        include_tests: Whether to include test files in results
-        focus_languages: Limit search to specific programming languages
-        context: FastMCP context (injected automatically)
-
-    Returns:
-        Structured response with relevant code matches and metadata
-
-    Examples:
-        query="authentication middleware setup"
-        query="database connection pooling configuration"
-        query="user registration validation logic"
-    """
-    from codeweaver._statistics import get_session_statistics
-
-    statistics = get_session_statistics()
-    settings = get_app_settings()
-    try:
-        # Execute the find_code implementation
-        response = await find_code_implementation(
-            query=query,
-            settings=settings,
-            intent=intent,
-            token_limit=token_limit,
-            include_tests=include_tests,
-            focus_languages=focus_languages,
-            statistics=statistics,
-        )
-
-        # Record successful request
-        if statistics:
-            statistics.add_successful_request()
-
-    except CodeWeaverError:
-        if statistics:
-            statistics.log_request_from_context(context, successful=False)
-        raise
-    except Exception as e:
-        if statistics:
-            statistics.log_request_from_context(context, successful=False)
-
-        from codeweaver.exceptions import QueryError
-
-        raise QueryError(
-            f"Unexpected error in `find_code`: {e!s}",
-            suggestions=["Try a simpler query", "Check server logs for details"],
-        ) from e
-    else:
-        return response
-
-
-@app.custom_route("/stats", methods=["GET"], tags={"system", "stats"}, include_in_schema=True)  # type: ignore
-async def stats_info() -> bytes:
-    """Get the current statistics information."""
-    statistics = get_session_statistics()
-    return TypeAdapter(statistics).dump_json(statistics, indent=2)  # pyright: ignore[reportUnknownMemberType, reportReturnType,reportOptionalMemberAccess]  # we establish it exists down in the initialization
-
-
-@app.custom_route("/settings", methods=["GET"], tags={"system", "settings"}, include_in_schema=True)  # type: ignore
-async def settings_info() -> bytes:
-    """Get the current settings information."""
-    return get_state().settings.model_dump_json(indent=2)  # pyright: ignore[reportReturnType,reportOptionalMemberAccess]  # we establish it exists down in the initialization
-
-
-@app.custom_route("/version", methods=["GET"], tags={"system", "version"}, include_in_schema=True)  # type: ignore
-async def version_info() -> bytes:
-    """Get the current version information."""
-    return f"CodeWeaver version: {version}".encode()
-
-
-@app.custom_route("/health", methods=["GET"], tags={"system", "health"}, include_in_schema=True)  # type: ignore
-async def health() -> bytes:
-    """Health check endpoint for monitoring server status.
-
-    Returns:
-        Health status information with statistics
-    """
-    if health := get_health_info():
-        # Return existing health info if available
-        dumped_health: bytes = TypeAdapter(health).dump_json(health, indent=2)  # type: ignore
-        return dumped_health
-    from codeweaver._server import HealthInfo, HealthStatus
-
-    unhealthy_status: HealthInfo = HealthInfo(status=HealthStatus.UNHEALTHY, version=version)
-    return TypeAdapter(unhealthy_status).dump_json(unhealthy_status, indent=2)  # type: ignore
-
-
-def is_health_instance(health_info: Any) -> TypeIs[HealthInfo]:
-    """Check if the provided health_info is a valid HealthInfo instance."""
-    return isinstance(health_info, HealthInfo) and health_info.status in HealthStatus
-
-
-def is_appstate_instance(state: Any) -> TypeIs[AppState]:
-    """Check if the provided state is a valid AppState instance."""
-    return isinstance(state, AppState)
-
-
-def is_statistics_instance(statistics: Any) -> TypeIs[SessionStatistics]:
-    """Check if the provided statistics is a valid Statistics instance."""
-    return isinstance(statistics, SessionStatistics)
-
-
-def raise_if_missing_service(e: Exception) -> NoReturn:
-    """Raise an error if a required service is missing."""
-    logger = getattr(app, "logger", None) or logging.getLogger(__name__)
-    logger.exception("Critical error in CodeWeaver server startup: ")
-    raise CodeWeaverError("A required service failed to start during initialization.") from e
+async def run() -> None:
+    """Run the CodeWeaver server."""
+    app = build_app()
+    register_app_bindings(app)
+    await start_server(app)
 
 
 if __name__ == "__main__":
-    # Main entry point for MCP
     try:
-        asyncio.run(run_method(app))  # type: ignore
-        asyncio.run(app.run_http_async())
-        app_state = importlib.import_module("codeweaver._server").get_state()
-        if not is_appstate_instance(app_state):
-            raise_if_missing_service(
-                TypeError("Expected get_state() to be an instance of AppState")
-            )
-        health_info = importlib.import_module("codeweaver._server").get_health_info()
-        if not is_health_instance(health_info):
-            raise_if_missing_service(
-                TypeError("Expected get_health_info() to be an instance of HealthInfo")
-            )
-        statistics = importlib.import_module("codeweaver._statistics")
-        if not is_statistics_instance(statistics.get_session_statistics()):
-            raise_if_missing_service(
-                TypeError("Expected get_statistics() to be an instance of SessionStatistics")
-            )
-    except Exception:
-        if not (logger := getattr(app, "logger", None)):
-            logger = logging.getLogger(__name__)
-        logger.exception("Failed to start CodeWeaver server: ")
+        asyncio.run(run())
+    except Exception as e:
+        logging.getLogger(__name__).exception("Failed to start CodeWeaver server: ")
+        raise RuntimeError("Failed to start CodeWeaver server.") from e

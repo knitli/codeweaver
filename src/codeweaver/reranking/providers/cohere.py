@@ -9,7 +9,7 @@
 import asyncio
 import os
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from codeweaver._data_structures import CodeChunk
@@ -62,7 +62,7 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
         return "https://api.cohere.com"
 
     async def _execute_rerank(
-        self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: dict[str, Any]
+        self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: Mapping[str, Any]
     ) -> V2RerankResponse:
         return await self._client.rerank(
             model=self.model_name or self._caps.name,
@@ -73,8 +73,8 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
         )
 
     def process_cohere_output(
-        self, response: V2RerankResponse, chunks: Sequence[CodeChunk]
-    ) -> Sequence[RerankingResult]:
+        self, response: V2RerankResponse, chunks: tuple[CodeChunk]
+    ) -> list[RerankingResult]:
         """Process the output from the Cohere API.
 
         Cohere returns the raranked results *in order from highest score to lowest*, with their original indices in the results.index field.

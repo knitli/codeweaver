@@ -78,13 +78,13 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
 
     async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Any
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+    ) -> list[list[float]] | list[list[int]]:
         readied_documents = self.chunks_to_strings(documents)
         kwargs = (kwargs or {}) | self.doc_kwargs.get("client_kwargs", {})
         return await self._fetch_embeddings(cast(list[str], readied_documents), **kwargs)
 
     async def _embed_query(
         self, query: Sequence[str], **kwargs: Any
-    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
+    ) -> list[list[float]] | list[list[int]]:
         kwargs = (kwargs or {}) | self.query_kwargs.get("client_kwargs", {})
         return await self._fetch_embeddings(cast(list[str], query), **kwargs)

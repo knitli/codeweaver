@@ -12,7 +12,7 @@ Pydantic models and provider class for Bedrock reranking. Excuse the many pyrigh
 import asyncio
 import logging
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from typing import Annotated, Any, Literal, Self, cast
 
 from pydantic import (
@@ -332,8 +332,10 @@ class BedrockRerankingProvider(RerankingProvider[boto3_client]):
         return self._to_doc_sources(docs)
 
     def bedrock_reranking_output_transformer(
-        self, response: BedrockRerankingResult, original_chunks: Sequence[CodeChunk]
-    ) -> Sequence[RerankingResult]:
+        self,
+        response: BedrockRerankingResult,
+        original_chunks: tuple[CodeChunk, ...] | Iterator[CodeChunk],
+    ) -> list[RerankingResult]:
         """Transform the Bedrock API response into the format expected by the reranking provider."""
         parsed_response = BedrockRerankingResult.model_validate_json(cast(bytes, response))
         results: list[RerankingResult] = []
@@ -342,7 +344,9 @@ class BedrockRerankingProvider(RerankingProvider[boto3_client]):
             chunk = CodeChunk.model_validate_json(item.document.json_document)  # pyright: ignore[reportUnknownArgumentType, reportArgumentType]
             results.append(
                 RerankingResult(
-                    original_index=original_chunks.index(chunk),
+                    original_index=original_chunks.index(chunk)
+                    if isinstance(original_chunks, tuple)
+                    else tuple(original_chunks).index(chunk),  # pyright: ignore[reportUnknownMemberType]
                     score=item.relevance_score,
                     batch_rank=item.index,
                     chunk=chunk,

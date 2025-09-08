@@ -7,12 +7,11 @@
 
 from __future__ import annotations
 
-import asyncio
 import sys
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
 import cyclopts
 
@@ -22,14 +21,19 @@ from rich.console import Console
 from rich.table import Table
 
 from codeweaver.exceptions import CodeWeaverError
-from codeweaver.settings import CodeWeaverSettings, get_settings
 from codeweaver.tools.find_code import find_code_implementation
 
 
 if TYPE_CHECKING:
     from codeweaver.models.core import CodeMatch, FindCodeResponseSummary
     from codeweaver.models.intent import IntentType
+    from codeweaver.settings import CodeWeaverSettings
 
+from codeweaver._utils import lazy_importer
+
+
+# Lazy import for performance
+get_settings: Any = lazy_importer("codeweaver.settings", "get_settings")
 
 # Initialize console for rich output
 console = Console(markup=True, emoji=True)
@@ -52,19 +56,23 @@ async def server(
 ) -> None:
     """Start CodeWeaver MCP server."""
     try:
-        from codeweaver.main import app as mcp_app
-        from codeweaver.main import run_method
+        from codeweaver._server import build_app
+        from codeweaver.app_bindings import register_app_bindings
+        from codeweaver.main import start_server
 
         # Load settings with overrides
-        settings = get_settings(config_file) if config_file else get_settings()
+        settings = cast(
+            CodeWeaverSettings, get_settings(config_file) if config_file else get_settings()
+        )
         if project_path:
             settings.project_path = project_path
 
         console.print("[green]Starting CodeWeaver MCP server...[/green]")
         console.print(f"[blue]Project: {settings.project_root}[/blue]")
         console.print(f"[blue]Server: http://{host}:{port}[/blue]")
-        await asyncio.run(run_method(mcp_app))  # type: ignore
-        await asyncio.run(mcp_app.run_http_async(host=host, port=port, debug=debug))  # type: ignore
+        app = build_app(settings)
+        register_app_bindings(app)
+        await start_server(app, host=host, port=port)
 
     except CodeWeaverError as e:
         console.print_exception(show_locals=True)
@@ -93,7 +101,7 @@ async def search(
     """Search codebase from command line (Phase 1: local only)."""
     try:
         # Load settings with overrides
-        settings = get_settings()
+        settings = cast(CodeWeaverSettings, get_settings())
         if project_path:
             settings.project_path = project_path
 
@@ -163,7 +171,7 @@ async def config(
 ) -> None:
     """Manage CodeWeaver configuration."""
     try:
-        settings = get_settings()
+        settings = cast(CodeWeaverSettings, get_settings())
         if project_path:
             settings.project_path = project_path
 

@@ -13,6 +13,7 @@ clear precedence hierarchy and validation.
 from __future__ import annotations
 
 import contextlib
+import importlib
 import inspect
 
 from collections.abc import Callable
@@ -43,7 +44,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from codeweaver._common import UNSET, Unset
 from codeweaver._constants import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_EXTENSIONS
-from codeweaver._utils import walk_down_to_git_root
 from codeweaver.exceptions import MissingValueError
 from codeweaver.provider import Provider, ProviderKind
 from codeweaver.settings_types import (
@@ -61,8 +61,7 @@ from codeweaver.settings_types import (
 )
 
 
-if TYPE_CHECKING:
-    from codeweaver.settings_types import LoggingSettings, MiddlewareOptions
+from codeweaver.settings_types import LoggingSettings, MiddlewareOptions
 
 
 DefaultDataProviderSettings = (
@@ -391,12 +390,12 @@ class FastMcpServerSettings(BaseModel):
     def _validate_additional_from_python(cls, value: list[Any], info: ValidationInfo) -> list[Any]:
         """Validate additional fields from Python input."""
         if info.field_name and info.field_name.startswith("additional_"):
-            if "middleware" in info.field_name and isinstance(value, str) and "." in value:
-                return [cls._try_to_find_middleware(v) or v for v in (value or []) if value and v]
+            if "middleware" in info.field_name:
+                return [cls._try_to_find_middleware(v) or v for v in value if v]
             if "tools" in info.field_name:
-                return [cls._try_to_find_tool(v) or v for v in (value or []) if value and v]
+                return [cls._try_to_find_tool(v) or v for v in value if v]
             if "dependencies" in info.field_name:
-                return [v for v in (value or []) if value and isinstance(v, str)]
+                return [v for v in value if isinstance(v, str)]
         return value
 
     @staticmethod
@@ -478,7 +477,7 @@ class FastMcpServerSettings(BaseModel):
 
 
 DefaultFastMcpServerSettings = FastMcpServerSettings.model_validate({
-    "transport": "stdio",
+    "transport": "http",
     "auth": None,
     "cache_expiration_seconds": None,
     "on_duplicate_tools": "warn",
@@ -523,9 +522,10 @@ class CodeWeaverSettings(BaseSettings):
     project_path: Annotated[
         Path,
         Field(
-            description="""Root path of the codebase to analyze. CodeWeaver will try to detect the project root automatically if you don't provide one."""
+            default_factory=lambda: importlib.import_module("codeweaver._utils").get_project_root(),
+            description="""Root path of the codebase to analyze. CodeWeaver will try to detect the project root automatically if you don't provide one.""",
         ),
-    ] = walk_down_to_git_root()
+    ]
 
     project_name: Annotated[
         str | None, Field(description="""Project name (auto-detected from directory if None)""")
@@ -649,7 +649,7 @@ class CodeWeaverSettings(BaseSettings):
     def project_root(self) -> Path:
         """Get the project root directory."""
         if not self.project_path:
-            self.project_path = walk_down_to_git_root()
+            self.project_path = importlib.import_module("codeweaver._utils").get_project_root()
         return self.project_path.resolve()
 
 
@@ -660,6 +660,7 @@ _settings: CodeWeaverSettings | None = None
 def get_settings(path: Path | None = None) -> CodeWeaverSettings:
     """Get the global settings instance."""
     global _settings
+
     if path:
         return CodeWeaverSettings(config_file=path)
     if _settings is None:

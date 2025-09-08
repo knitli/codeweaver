@@ -8,7 +8,7 @@
 import logging
 import multiprocessing
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, ClassVar
 
 from codeweaver.provider import Provider
@@ -28,9 +28,9 @@ except ImportError as e:
     ) from e
 
 
-def fastembed_kwargs(**kwargs: dict[str, Any] | None) -> dict[str, Any]:
+def fastembed_kwargs(**kwargs: Mapping[str, Any] | None) -> dict[str, Any]:
     """Get all possible kwargs for FastEmbed embedding methods."""
-    default_kwargs: dict[str, Any] = {"threads": multiprocessing.cpu_count(), "lazy_load": True}
+    default_kwargs: Mapping[str, Any] = {"threads": multiprocessing.cpu_count(), "lazy_load": True}
     if kwargs:
         device_ids: list[int] | None = kwargs.get("device_ids")  # pyright: ignore[reportAssignmentType]
         cuda: bool | None = kwargs.get("cuda")  # pyright: ignore[reportAssignmentType]
@@ -82,14 +82,14 @@ class FastEmbedRerankingProvider(RerankingProvider[TextCrossEncoder]):
         documents: Sequence[str],
         *,
         top_n: int = 40,
-        **kwargs: dict[str, Any] | None,
+        **kwargs: Mapping[str, Any] | None,
     ) -> Any:
         """Execute the reranking process."""
         try:
             # our batch_size needs to be the number of documents because we only get back the scores.
             # If we set it to a lower number, we wouldn't know what documents the scores correspond to without some extra setup.
             response = self.client.rerank(
-                query=query, documents=documents, batch_size=len(documents)
+                query=query, documents=documents, batch_size=len(documents), **(kwargs or {})
             )
         except Exception as e:
             raise RuntimeError(f"Error during reranking with FastEmbed: {e}") from e

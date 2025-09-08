@@ -10,35 +10,28 @@ from __future__ import annotations
 
 import importlib
 import logging
+import os
 import re
 import time
 
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from types import FunctionType
-from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
+from typing import TYPE_CHECKING, cast
 
 from fastmcp import FastMCP
 from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware, RetryMiddleware
 from fastmcp.server.middleware.logging import LoggingMiddleware, StructuredLoggingMiddleware
 from fastmcp.server.middleware.middleware import Middleware
 from fastmcp.server.middleware.rate_limiting import RateLimitingMiddleware
-from pydantic import ConfigDict, Field, NonNegativeInt, computed_field
+from pydantic import ConfigDict, Field, computed_field
 from pydantic.dataclasses import dataclass
 from pydantic_core import to_json
 
 from codeweaver import __version__ as version
 from codeweaver._common import BaseEnum
 from codeweaver._logger import setup_logger
-from codeweaver._registry import (
-    ModelRegistry,
-    ProviderRegistry,
-    ServicesRegistry,
-    get_model_registry,
-    get_provider_registry,
-    get_services_registry,
-)
+from codeweaver._registry import get_model_registry, get_provider_registry, get_services_registry
 from codeweaver._utils import rpartial
 from codeweaver.exceptions import InitializationError
 from codeweaver.middleware import StatisticsMiddleware
@@ -50,18 +43,18 @@ from codeweaver.settings import (
 )
 from codeweaver.settings_types import (
     ErrorHandlingMiddlewareSettings,
-    FastMcpHttpRunArgs,
-    FastMcpServerSettingsDict,
     LoggingMiddlewareSettings,
     MiddlewareOptions,
     RateLimitingMiddlewareSettings,
     RetryMiddlewareSettings,
-    UvicornServerSettings,
-    UvicornServerSettingsDict,
 )
 
 
 if TYPE_CHECKING:
+    from typing import Annotated, Any, Literal, cast
+
+    from pydantic import NonNegativeInt
+
     from codeweaver._registry import (
         Feature,
         ModelRegistry,
@@ -70,11 +63,13 @@ if TYPE_CHECKING:
         ServicesRegistry,
     )
     from codeweaver._statistics import SessionStatistics
+    from codeweaver.settings_types import FastMcpServerSettingsDict
+
 
 # this is initialized after we setup logging.
 logger: logging.Logger
 
-_STORE: dict[Literal["settings", "runargs", "server", "lifespan_func", "app_start_func"], Any]
+_STORE: dict[Literal["settings", "server", "lifespan_func"], Any]
 _STATE: AppState | None = None
 
 BRACKET_PATTERN: re.Pattern[str] = re.compile(r"\[.+\]")
@@ -95,9 +90,7 @@ def get_state() -> AppState:
     return _STATE
 
 
-def get_store() -> dict[
-    Literal["settings", "runargs", "server", "lifespan_func", "app_start_func"], Any
-]:
+def get_store() -> dict[Literal["settings", "server", "lifespan_func"], Any]:
     """Get the current application store."""
     global _STORE
     if _STORE is None:  # type: ignore  # we're going to check anyway
@@ -113,14 +106,9 @@ class StoredSettings:
     server: Annotated[
         FastMcpServerSettingsDict, Field(description="""Resolved FastMCP server settings""")
     ]
-    runargs: Annotated[
-        FastMcpHttpRunArgs | None, Field(description="""Run arguments for the FastMCP server""")
-    ]
     lifespan_func: Annotated[
-        FunctionType, Field(description="""Lifespan function for the application""")
-    ]
-    app_start_func: Annotated[
-        FunctionType, Field(description="""Function to start the FastMCP application""")
+        Callable[..., Awaitable[None]],
+        Field(description="""Lifespan function for the application"""),
     ]
 
     def __post_init__(self) -> None:
@@ -193,12 +181,12 @@ class HealthInfo:
         return tuple((feature, card) for feature, card in _get_available_features_and_services())
 
 
-_health_info = HealthInfo.initialize()
+_health_info = lambda: HealthInfo.initialize()  # noqa: E731
 
 
 def get_health_info() -> HealthInfo:
     """Get the current health information."""
-    return _health_info
+    return _health_info()
 
 
 @dataclass(
@@ -216,19 +204,16 @@ class AppState:
     ] = False
 
     settings: Annotated[
-        CodeWeaverSettings | None,
-        Field(
-            default_factory=CodeWeaverSettings, description="""CodeWeaver configuration settings"""
-        ),
+        CodeWeaverSettings | None, Field(description="""CodeWeaver configuration settings""")
     ] = None
 
     config_path: Annotated[
         Path | None,
         Field(
-            default_factory=lambda data: data["settings"].get("config_file", None),
+            default_factory=lambda data: data["settings"].get("config_file"),
             description="""Path to the configuration file, if any""",
         ),
-    ] = None
+    ]
     # Provider registry integration
     provider_registry: Annotated[
         ProviderRegistry,
@@ -430,6 +415,22 @@ def setup_local_logger(level: int = logging.INFO) -> None:
     logger.setLevel(level)
 
 
+def __setup_interim_logger() -> tuple[logging.Logger, int]:
+    """Set up the initial logger for the application.
+
+    Because we need to fully resolve settings before we can set up logging properly,
+    we set up a basic logger first, then reconfigure it later.
+
+    Returns:
+        tuple of (logger, log_level)
+    """
+    level = int(os.environ.get("CODEWEAVER_LOG_LEVEL", "20"))
+    setup_local_logger(level)
+    return setup_logger(
+        name="codeweaver", level=level, rich=True, rich_kwargs={}, logging_kwargs=None
+    ), level
+
+
 def _setup_logger(settings: CodeWeaverSettings) -> tuple[logging.Logger, int]:
     """Set up the logger from settings.
 
@@ -448,7 +449,6 @@ def _setup_logger(settings: CodeWeaverSettings) -> tuple[logging.Logger, int]:
         rich_kwargs=rich_kwargs,
         logging_kwargs=logging_kwargs,
     )
-    setup_local_logger(level)
     return app_logger, level
 
 
@@ -528,7 +528,7 @@ def _integrate_user_settings(
                 base_fast_mcp_settings[settings_key].extend(value)  # pyright: ignore[reportUnknownArgumentType, reportTypedDictNotRequiredAccess,reportOptionalMemberAccess] # we established the types right above it
                 continue
             if key == "additional_middleware" and (
-                all(isinstance(item, Middleware) and callable(item) for item in value)
+                all(isinstance(item, Middleware) and callable(item) for item in value)  # pyright: ignore[reportUnknownVariableType]
             ):
                 base_fast_mcp_settings["middleware"].extend(value)  # pyright: ignore[reportUnknownArgumentType, reportTypedDictNotRequiredAccess,reportOptionalMemberAccess]
 
@@ -566,76 +566,17 @@ def _filter_server_settings(server_settings: FastMcpServerSettings) -> FastMcpSe
     return cast(FastMcpServerSettingsDict, filtered_settings)
 
 
-def _get_start_method_name(transport_setting: Literal["http", "stdio"]) -> str:
-    """Create the start method for the FastMCP application.
-
-    Args:
-        settings: CodeWeaver settings
-        app_state: Application state instance
-
-    Returns:
-        Function to start the FastMCP application
-    """
-    return "run_http_async" if transport_setting == "http" else "run_async"
-
-
-def _get_fastmcp_run_args(
-    server_settings: FastMcpServerSettings, uvicorn_config: UvicornServerSettings, log_level: int
-) -> FastMcpHttpRunArgs | None:
-    """Get the FastMCP run arguments from the server settings.
-
-    Args:
-        server_settings: The server settings to extract run arguments from.
-
-    Returns:
-        The FastMCP run arguments, or None if not found.
-    """
-    if not server_settings:
-        return None
-    # We only need runargs for http transport, as other transports do not use it.
-    if server_settings.transport != "http":
-        return None
-
-    match log_level:
-        case 0:
-            stringified_log_level = "debug"
-        case 10:
-            stringified_log_level = "debug"
-        case 20:
-            stringified_log_level = "info"
-        case 30:
-            stringified_log_level = "warning"
-        case 40:
-            stringified_log_level = "error"
-        case 50:
-            stringified_log_level = "error"
-        case _:
-            stringified_log_level = "info"
-
-    return FastMcpHttpRunArgs(
-        transport=server_settings.transport,
-        host=server_settings.host,
-        port=server_settings.port,
-        log_level=stringified_log_level,
-        path=server_settings.path,
-        uvicorn_config=cast(
-            UvicornServerSettingsDict, uvicorn_config.model_dump(mode="python", exclude_none=True)
-        ),
-        # TODO: Allow for custom uvicorn middleware
-    )
-
-
-async def initialize_app() -> tuple[FastMCP[AppState], FunctionType]:
-    """Initialize the FastMCP application."""
+def build_app(settings: CodeWeaverSettings | None = None) -> FastMCP[AppState]:
+    """Build and configure the FastMCP application without starting it."""
     session_statistics = _get_session_statistics()
-    settings = get_settings()
-    app_logger, level = _setup_logger(settings)
-    local_logger: logging.Logger = globals()["logger"]  # type: ignore  # we set it in setup_local_logger
+    app_logger, level = __setup_interim_logger()
+    local_logger: logging.Logger = globals()["logger"]  # type: ignore
     local_logger.info("Initializing CodeWeaver server. Initial settings retrieved. Logging setup.")
-    local_logger.debug("Settings dump \n", extra=settings.model_dump())
+    settings = settings or get_settings()
     middleware_settings, logging_middleware = _configure_middleware(settings, app_logger, level)
+    rebuilt_outcome = settings.model_rebuild()
+    local_logger.debug("Settings rebuilt: %s", rebuilt_outcome)
     filtered_server_settings = _filter_server_settings(settings.server or {})
-    settings.model_rebuild()
     base_fast_mcp_settings = _create_base_fastmcp_settings(
         session_statistics, app_logger, level, middleware_settings, logging_middleware
     )
@@ -645,29 +586,27 @@ async def initialize_app() -> tuple[FastMCP[AppState], FunctionType]:
     lifespan_fn = _setup_file_filters_and_lifespan(settings, session_statistics)
     base_fast_mcp_settings["lifespan"] = lifespan_fn
 
-    runargs = _get_fastmcp_run_args(
-        settings.server, settings.uvicorn_settings or UvicornServerSettings(), level
-    )
-    run_method: FunctionType = getattr(  # type: ignore
-        FastMCP,
-        _get_start_method_name(
-            cast(Literal["http", "stdio"], base_fast_mcp_settings.pop("transport", "http"))
-        ),
-        FastMCP.run_http_async,  # type: ignore
-    )  # type: ignore
-    if runargs:
-        run_method = rpartial(run_method, **runargs)  # type: ignore  # good luck typing this
-        for key in runargs:
-            _ = base_fast_mcp_settings.pop(key, None)
-    local_logger.info("FastMCP run arguments extracted and stored.")
-    local_logger.debug("FastMCP run arguments dump \n", extra=runargs or {})
-    local_logger.debug("Lifespan function: ", extra={"lifespan_fn": lifespan_fn})
-    local_logger.debug("Run method: ", extra={"run_method": run_method})
+    # Transport selection is handled by the caller; remove from constructor kwargs.
+    _ = base_fast_mcp_settings.pop("transport", "http")
+
+    final_app_logger, _final_level = _setup_logger(settings)
+    # Rebind loggers for any logging middleware safely
+    for mware in cast(list[Middleware] | None, base_fast_mcp_settings.get("middleware")) or []:  # pyright: ignore[reportTypedDictNotRequiredAccess]
+        if isinstance(mware, LoggingMiddleware | StructuredLoggingMiddleware):
+            mware.logger = final_app_logger  # type: ignore[attr-defined]
+
     _ = StoredSettings(
-        settings=settings,
-        server=filtered_server_settings,
-        runargs=runargs,
-        lifespan_func=lifespan_fn,
-        app_start_func=run_method,
+        settings=settings, server=filtered_server_settings, lifespan_func=lifespan_fn
     )
-    return FastMCP[AppState](**base_fast_mcp_settings), run_method  # pyright: ignore[reportCallIssue]  # we popped those keys a few lines up
+
+    server = FastMCP[AppState](**base_fast_mcp_settings)  # pyright: ignore[reportCallIssue]
+    local_logger.info("FastMCP application initialized successfully.")
+    final_build = settings.model_rebuild()
+    local_logger.debug("Final settings rebuild: %s", final_build)
+    return server
+
+
+async def initialize_app() -> tuple[FastMCP[AppState], Callable[..., Awaitable[None]]]:
+    """Deprecated: use build_app() and app.run_http_async()."""
+    app = build_app()
+    return app, app.run_http_async

@@ -6,7 +6,7 @@
 
 import logging
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, Literal, cast
 
 from google.genai.types import HttpOptions
@@ -97,8 +97,8 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
             )
 
     async def _embed_documents(  # pyright: ignore[reportIncompatibleMethodOverride]
-        self, documents: Sequence[CodeChunk], **kwargs: dict[str, Any]
-    ) -> Sequence[Sequence[float]]:
+        self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any]
+    ) -> list[list[float]]:
         """
         Embed the documents using the Google embedding provider.
         """
@@ -122,8 +122,8 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
         return embeddings  # pyright: ignore[reportReturnType]
 
     async def _embed_query(
-        self, query: Sequence[str], **kwargs: dict[str, Any]
-    ) -> Sequence[Sequence[float]]:
+        self, query: Sequence[str], **kwargs: Mapping[str, Any]
+    ) -> list[list[float]]:
         """
         Embed the query using the Google embedding provider.
         """

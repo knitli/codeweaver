@@ -11,7 +11,7 @@ import importlib
 import logging
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from functools import cache
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, cast, overload
@@ -64,7 +64,7 @@ def default_reranking_input_transformer(documents: StructuredDataInput) -> Itera
 
 
 def default_reranking_output_transformer(
-    results: Sequence[float], chunks: Iterator[CodeChunk]
+    results: Sequence[float], chunks: Iterator[CodeChunk] | tuple[CodeChunk, ...]
 ) -> Sequence[RerankingResult]:
     """Default output transformer that converts results and chunks to RerankingResult.
 
@@ -127,7 +127,7 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
         capabilities: RerankingModelCapabilities,
         prompt: str | None = None,
         top_n: PositiveInt = 40,
-        **kwargs: dict[str, Any] | None,
+        **kwargs: Mapping[str, Any] | None,
     ) -> None:
         """Initialize the RerankingProvider."""
         self._model_dump_json = super().model_dump_json
@@ -156,7 +156,7 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
         documents: Sequence[str],
         *,
         top_n: int = 40,
-        **kwargs: dict[str, Any] | None,
+        **kwargs: Mapping[str, Any] | None,
     ) -> Any:
         """Execute the reranking process.
 
@@ -166,11 +166,11 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
         raise NotImplementedError
 
     async def rerank(
-        self, query: str, documents: StructuredDataInput, **kwargs: dict[str, Any] | None
+        self, query: str, documents: StructuredDataInput, **kwargs: Mapping[str, Any] | None
     ) -> Sequence[RerankingResult]:
         """Rerank the given documents based on the query."""
         processed_kwargs = self._set_kwargs(**kwargs)
-        transformed_docs = self._process_documents(documents)
+        transformed_docs = CodeChunk.chunkify(documents)
         self._chunk_store = tuple(transformed_docs)
         processed_docs = self._input_transformer(transformed_docs)
         reranked = await self._execute_rerank(
@@ -242,7 +242,7 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
         """Get the tokenizer for the reranking provider."""
         return self._tokenizer()
 
-    def _set_kwargs(self, **kwargs: dict[str, Any] | None) -> dict[str, Any]:
+    def _set_kwargs(self, **kwargs: Mapping[str, Any] | None) -> Mapping[str, Any]:
         """Set the keyword arguments for the reranking provider."""
         return self.kwargs | (kwargs or {})
 
@@ -270,16 +270,13 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
             )
             statistics.add_token_usage(reranking_generated=token_count)
 
-    def _process_documents(self, documents: StructuredDataInput) -> Iterator[CodeChunk]:
-        """Process the input documents into a uniform format."""
-        yield from ()
-
     def _process_results(self, results: Any, raw_docs: Sequence[str]) -> Sequence[RerankingResult]:
         """Process the results from the reranking."""
         # voyage and cohere return token count, others do not
         if self.provider not in [Provider.VOYAGE, Provider.COHERE]:
-            self._update_token_stats(from_docs=raw_docs)
-        chunks = self._chunk_store or self._process_documents(raw_docs)
+            loop = asyncio.get_event_loop()
+            _ = loop.run_in_executor(None, lambda: self._update_token_stats(from_docs=raw_docs))
+        chunks = self._chunk_store or CodeChunk.chunkify(raw_docs)
         return self._output_transformer(results, iter(chunks))
 
     @staticmethod
@@ -293,6 +290,9 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
         """Report token savings from the reranking process."""
         if (context_saved := self._calculate_context_saved(results, processed_chunks)) > 0:
             statistics = _get_statistics()
+            # * Note: We aren't double counting tokens between here and `self.rerank`.
+            # * This is for `saved_by_reranking`, while the other count in the pipeline is for `reranking_generated`.
+            # * Put differently, `self.rerank` counts *spending* while this counts *savings*.
             statistics.add_token_usage(saved_by_reranking=context_saved)
 
     def _calculate_context_saved(
