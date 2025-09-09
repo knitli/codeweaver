@@ -29,3 +29,6 @@ class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
     _client: AsyncQdrantClient
     _embedder: EmbeddingProvider[Any]
     _reranker: RerankingProvider[Any] | None = None
+
+
+__all__ = ("QdrantVectorStore",)

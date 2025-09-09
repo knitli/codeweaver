@@ -14,6 +14,7 @@ from google.genai.types import HttpOptions
 from codeweaver._common import BaseEnum
 from codeweaver._data_structures import CodeChunk
 from codeweaver.embedding.providers.base import EmbeddingProvider
+from codeweaver.exceptions import ConfigurationError
 
 
 logger = logging.getLogger(__name__)
@@ -63,8 +64,8 @@ try:
 
 
 except ImportError as e:
-    raise ImportError(
-        "The 'google-genai' package is required to use the Google embedding provider. Please install it with 'pip install google-genai'."
+    raise ConfigurationError(
+        "The 'google-genai' package is required to use the Google embedding provider. Please install it with 'pip install codeweaver[provider-google]'."
     ) from e
 
 

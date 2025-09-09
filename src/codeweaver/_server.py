@@ -17,14 +17,24 @@ import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Literal,
+    NotRequired,
+    Required,
+    Self,
+    TypedDict,
+    cast,
+)
 
 from fastmcp import FastMCP
 from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware, RetryMiddleware
 from fastmcp.server.middleware.logging import LoggingMiddleware, StructuredLoggingMiddleware
 from fastmcp.server.middleware.middleware import Middleware
 from fastmcp.server.middleware.rate_limiting import RateLimitingMiddleware
-from pydantic import ConfigDict, Field, computed_field
+from pydantic import ConfigDict, Field, NonNegativeInt, computed_field
 from pydantic.dataclasses import dataclass
 from pydantic_core import to_json
 
@@ -32,9 +42,9 @@ from codeweaver import __version__ as version
 from codeweaver._common import BaseEnum
 from codeweaver._logger import setup_logger
 from codeweaver._registry import get_model_registry, get_provider_registry, get_services_registry
-from codeweaver._utils import rpartial
+from codeweaver._statistics import SessionStatistics
+from codeweaver._utils import get_project_root, rpartial
 from codeweaver.exceptions import InitializationError
-from codeweaver.middleware import StatisticsMiddleware
 from codeweaver.settings import (
     CodeWeaverSettings,
     FastMcpServerSettings,
@@ -43,6 +53,7 @@ from codeweaver.settings import (
 )
 from codeweaver.settings_types import (
     ErrorHandlingMiddlewareSettings,
+    FastMcpServerSettingsDict,
     LoggingMiddlewareSettings,
     MiddlewareOptions,
     RateLimitingMiddlewareSettings,
@@ -51,10 +62,6 @@ from codeweaver.settings_types import (
 
 
 if TYPE_CHECKING:
-    from typing import Annotated, Any, Literal, cast
-
-    from pydantic import NonNegativeInt
-
     from codeweaver._registry import (
         Feature,
         ModelRegistry,
@@ -62,8 +69,6 @@ if TYPE_CHECKING:
         ServiceCard,
         ServicesRegistry,
     )
-    from codeweaver._statistics import SessionStatistics
-    from codeweaver.settings_types import FastMcpServerSettingsDict
 
 
 # this is initialized after we setup logging.
@@ -71,6 +76,7 @@ logger: logging.Logger
 
 _STORE: dict[Literal["settings", "server", "lifespan_func"], Any]
 _STATE: AppState | None = None
+_logger: logging.Logger | None = None
 
 BRACKET_PATTERN: re.Pattern[str] = re.compile(r"\[.+\]")
 
@@ -98,7 +104,11 @@ def get_store() -> dict[Literal["settings", "server", "lifespan_func"], Any]:
     return _STORE
 
 
-@dataclass(order=True, kw_only=True, config=ConfigDict(extra="forbid", str_strip_whitespace=True))
+@dataclass(
+    order=True,
+    kw_only=True,
+    config=ConfigDict(arbitrary_types_allowed=True, extra="forbid", str_strip_whitespace=True),
+)
 class StoredSettings:
     """A simple container for storing/caching."""
 
@@ -111,12 +121,39 @@ class StoredSettings:
         Field(description="""Lifespan function for the application"""),
     ]
 
+    _initialized = False
+
     def __post_init__(self) -> None:
+        _ = self.settings.model_rebuild()
+        if not _STORE and not self._initialized:
+            self.dump_to_global_store()
+            self._initialized = True
+
+    def dump_to_global_store(self) -> None:
+        """Dump the stored settings to a dictionary."""
         from pydantic import TypeAdapter
 
-        _ = self.settings.model_rebuild()
         global _STORE
-        _STORE = TypeAdapter(self).dump_python(mode="python")  # type: ignore
+        temp_server = self.server.copy()
+        if middleware := getattr(temp_server, "middleware", None) or getattr(
+            temp_server, "additional_middleware", None
+        ):
+            self.server["middleware"] = [  # type: ignore
+                self.settings.server._validate_additional_middleware(middleware)  # type: ignore
+            ]  # type: ignore
+        if tools := getattr(temp_server, "tools", None) or getattr(
+            temp_server, "additional_tools", None
+        ):
+            self.server["tools"] = [  # type: ignore
+                self.settings.server._validate_additional_tools(tools)  # type: ignore
+            ]
+        for key in ("additional_middleware", "additional_tools", "additional_dependencies"):
+            _ = temp_server.pop(key, None)
+        self._initialized = True
+        temp_self = type(self)(
+            settings=self.settings, server=temp_server, lifespan_func=self.lifespan_func
+        )
+        _STORE = TypeAdapter(temp_self).dump_python(mode="python")  # type: ignore
 
 
 class HealthStatus(BaseEnum):
@@ -139,13 +176,14 @@ def _get_available_features_and_services() -> Iterator[tuple[Feature, ServiceCar
     )
 
 
-@dataclass(
-    order=True,
-    kw_only=True,
-    config=ConfigDict(extra="forbid", defer_build=True, str_strip_whitespace=True),
-)
+@dataclass(order=True, kw_only=True, config=ConfigDict(extra="forbid", str_strip_whitespace=True))
 class HealthInfo:
-    """Health information for the CodeWeaver server."""
+    """Health information for the CodeWeaver server.
+
+    TODO: Expand to be more dynamic, computing health based on service status, etc.
+    """
+
+    from codeweaver._registry import Feature, ServiceCard
 
     status: Annotated[HealthStatus, Field(description="""Health status of the server""")] = (
         HealthStatus.HEALTHY
@@ -180,6 +218,18 @@ class HealthInfo:
         """Computed field for available service features based on the services registry."""
         return tuple((feature, card) for feature, card in _get_available_features_and_services())
 
+    def update_status(
+        self,
+        new_status: HealthStatus | Literal["healthy", "unhealthy", "degraded"],
+        error: str | None = None,
+    ) -> Self:
+        """Update the health status of the server."""
+        if not isinstance(new_status, HealthStatus):
+            new_status = HealthStatus.from_string(new_status)
+        self.status = new_status
+        self.error = error
+        return self
+
 
 _health_info = lambda: HealthInfo.initialize()  # noqa: E731
 
@@ -192,9 +242,7 @@ def get_health_info() -> HealthInfo:
 @dataclass(
     order=True,
     kw_only=True,
-    config=ConfigDict(
-        extra="forbid", str_strip_whitespace=True, defer_build=True, arbitrary_types_allowed=True
-    ),
+    config=ConfigDict(extra="forbid", str_strip_whitespace=True, arbitrary_types_allowed=True),
 )
 class AppState:
     """Application state for CodeWeaver server."""
@@ -212,6 +260,13 @@ class AppState:
         Field(
             default_factory=lambda data: data["settings"].get("config_file"),
             description="""Path to the configuration file, if any""",
+        ),
+    ]
+    project_root: Annotated[
+        Path,
+        Field(
+            default_factory=lambda data: data["settings"].get("project_root") or get_project_root(),
+            description="""Path to the project root""",
         ),
     ]
     # Provider registry integration
@@ -273,11 +328,9 @@ class AppState:
     @property
     def request_count(self) -> NonNegativeInt:
         """Computed field for the number of requests handled by the server."""
-        return (
-            self.statistics.total_requests
-            if self.statistics and self.statistics.total_requests is not None
-            else 0
-        )
+        if self.statistics:
+            return self.statistics._total_requests + (self.statistics._total_http_requests or 0)  # type: ignore
+        return 0
 
 
 @asynccontextmanager
@@ -298,6 +351,7 @@ async def lifespan(
                 settings=settings,
                 health=get_health_info(),
                 statistics=statistics,
+                project_root=settings.project_root or get_project_root(),
                 config_path=settings.config_file if settings else None,
                 provider_registry=get_provider_registry(),
                 services_registry=get_services_registry(),
@@ -431,7 +485,14 @@ def __setup_interim_logger() -> tuple[logging.Logger, int]:
     ), level
 
 
-def _setup_logger(settings: CodeWeaverSettings) -> tuple[logging.Logger, int]:
+LEVEL_MAP: dict[
+    Literal[0, 10, 20, 30, 40, 50], Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+] = {0: "DEBUG", 10: "DEBUG", 20: "INFO", 30: "WARNING", 40: "ERROR", 50: "CRITICAL"}
+
+
+def _setup_logger(
+    settings: CodeWeaverSettings,
+) -> tuple[logging.Logger, Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]]:
     """Set up the logger from settings.
 
     Returns:
@@ -449,7 +510,8 @@ def _setup_logger(settings: CodeWeaverSettings) -> tuple[logging.Logger, int]:
         rich_kwargs=rich_kwargs,
         logging_kwargs=logging_kwargs,
     )
-    return app_logger, level
+    fast_mcp_log_level = LEVEL_MAP.get(level, "INFO")
+    return app_logger, fast_mcp_log_level
 
 
 def _configure_middleware(
@@ -473,13 +535,12 @@ def _configure_middleware(
     return middleware_settings, logging_middleware
 
 
-def _create_base_fastmcp_settings(
-    session_statistics: SessionStatistics,
-    app_logger: logging.Logger,
-    level: int,
-    middleware_settings: MiddlewareOptions,
-    logging_middleware: type[LoggingMiddleware | StructuredLoggingMiddleware],
-) -> FastMcpServerSettingsDict:
+def get_default_middleware() -> list[type[Middleware]]:
+    """Get the default middleware settings."""
+    return [ErrorHandlingMiddleware, RetryMiddleware, RateLimitingMiddleware]
+
+
+def _create_base_fastmcp_settings() -> FastMcpServerSettingsDict:
     """Create the base FastMCP settings dictionary.
 
     Returns:
@@ -491,18 +552,10 @@ def _create_base_fastmcp_settings(
         "lifespan": lifespan,
         "include_tags": {"external", "user", "context"},
         "exclude_tags": {"internal", "system", "admin"},
-        "middleware": [
-            StatisticsMiddleware(session_statistics, logger=app_logger, log_level=level),
-            logging_middleware(**middleware_settings["logging"]),  # pyright: ignore[reportTypedDictNotRequiredAccess,reportCallIssue]
-            ErrorHandlingMiddleware(**middleware_settings["error_handling"]),  # pyright: ignore[reportTypedDictNotRequiredAccess,reportCallIssue]
-            RetryMiddleware(**middleware_settings["retry"]),  # pyright: ignore[reportTypedDictNotRequiredAccess,reportCallIssue]
-            RateLimitingMiddleware(**middleware_settings["rate_limiting"]),  # pyright: ignore[reportTypedDictNotRequiredAccess,reportCallIssue]
-        ],
-        "tools": [],
     }
 
 
-type SettingsKey = Literal["dependencies", "middleware", "tools"]
+type SettingsKey = Literal["middleware", "tools"]
 
 
 def _integrate_user_settings(
@@ -517,26 +570,32 @@ def _integrate_user_settings(
     Returns:
         Updated FastMCP settings dictionary
     """
-    additional_keys = ("additional_dependencies", "additional_middleware", "additional_tools")
+    additional_keys = ("additional_middleware", "additional_tools")
+    # Excuse the many type: ignore comments. It's because we're amending the TypedDict structure before passing it to the server.
     for key in additional_keys:
+        replacement_key = key.replace("additional_", "")
+        if not base_fast_mcp_settings.get(replacement_key):
+            base_fast_mcp_settings[replacement_key] = []  # type: ignore
+        if not base_fast_mcp_settings[replacement_key] and base_fast_mcp_settings.get(key):  # type: ignore
+            base_fast_mcp_settings[replacement_key] = [  # type: ignore
+                string_to_class(s) if isinstance(s, str) else s
+                for s in base_fast_mcp_settings[key]  # type: ignore
+                if s
+            ]  # type: ignore
+        if key in base_fast_mcp_settings:
+            _ = base_fast_mcp_settings.pop(key, None)
         if (value := getattr(settings, key, None)) and isinstance(value, list):
-            if key in {"additional_dependencies", "additional_tools"} and (
-                all(isinstance(item, str) for item in value)  # pyright: ignore[reportUnknownVariableType]  # the type of `item` doesn't matter, because we filter for strings
-            ):
-                # If it's a list of strings, we can directly append it
-                settings_key: SettingsKey = cast(SettingsKey, key.replace("additional_", ""))
-                base_fast_mcp_settings[settings_key].extend(value)  # pyright: ignore[reportUnknownArgumentType, reportTypedDictNotRequiredAccess,reportOptionalMemberAccess] # we established the types right above it
-                continue
-            if key == "additional_middleware" and (
-                all(isinstance(item, Middleware) and callable(item) for item in value)  # pyright: ignore[reportUnknownVariableType]
-            ):
-                base_fast_mcp_settings["middleware"].extend(value)  # pyright: ignore[reportUnknownArgumentType, reportTypedDictNotRequiredAccess,reportOptionalMemberAccess]
-
-    server_settings = settings.model_dump(
-        mode="python", exclude_defaults=True, exclude_unset=True, exclude_none=True
-    )
-
-    return {**base_fast_mcp_settings, **cast(FastMcpServerSettingsDict, server_settings)}
+            base_fast_mcp_settings[replacement_key].extend(  # type: ignore
+                string_to_class(item) if isinstance(item, str) else item
+                for item in value  # type: ignore
+                if item and item not in base_fast_mcp_settings[replacement_key]  # type: ignore
+            )
+        base_fast_mcp_settings[replacement_key] = (  # type: ignore
+            list(set(base_fast_mcp_settings[replacement_key]))  # type: ignore
+            if base_fast_mcp_settings[replacement_key]  # type: ignore
+            else []
+        )  # type: ignore
+    return base_fast_mcp_settings
 
 
 def _setup_file_filters_and_lifespan(
@@ -566,7 +625,30 @@ def _filter_server_settings(server_settings: FastMcpServerSettings) -> FastMcpSe
     return cast(FastMcpServerSettingsDict, filtered_settings)
 
 
-def build_app(settings: CodeWeaverSettings | None = None) -> FastMCP[AppState]:
+def string_to_class(s: str) -> type[Any] | None:
+    """Convert a string representation of a class to the actual class."""
+    components = s.split(".")
+    module_name = ".".join(components[:-1])
+    class_name = components[-1]
+    try:
+        module = __import__(module_name, fromlist=[class_name])
+        return getattr(module, class_name, None)
+    except (ImportError, AttributeError):
+        return None
+
+
+class ServerSetup(TypedDict):
+    app: Required[FastMCP[AppState]]
+    settings: Required[CodeWeaverSettings]
+    middleware_settings: NotRequired[MiddlewareOptions]
+    host: NotRequired[str | None]
+    port: NotRequired[int | None]
+    streamable_http_path: NotRequired[str | None]
+    log_level: NotRequired[Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]]
+    middleware: NotRequired[set[Middleware] | set[type[Middleware]]]
+
+
+def build_app(settings: CodeWeaverSettings | None = None) -> ServerSetup:
     """Build and configure the FastMCP application without starting it."""
     session_statistics = _get_session_statistics()
     app_logger, level = __setup_interim_logger()
@@ -577,9 +659,8 @@ def build_app(settings: CodeWeaverSettings | None = None) -> FastMCP[AppState]:
     rebuilt_outcome = settings.model_rebuild()
     local_logger.debug("Settings rebuilt: %s", rebuilt_outcome)
     filtered_server_settings = _filter_server_settings(settings.server or {})
-    base_fast_mcp_settings = _create_base_fastmcp_settings(
-        session_statistics, app_logger, level, middleware_settings, logging_middleware
-    )
+    middleware = {logging_middleware, *get_default_middleware()}
+    base_fast_mcp_settings = _create_base_fastmcp_settings()
     base_fast_mcp_settings = _integrate_user_settings(settings.server, filtered_server_settings)
     local_logger.info("Base FastMCP settings created and merged with user settings.")
     local_logger.debug("Base FastMCP settings dump \n", extra=base_fast_mcp_settings)
@@ -590,23 +671,45 @@ def build_app(settings: CodeWeaverSettings | None = None) -> FastMCP[AppState]:
     _ = base_fast_mcp_settings.pop("transport", "http")
 
     final_app_logger, _final_level = _setup_logger(settings)
+    int_level = next((k for k, v in LEVEL_MAP.items() if v == _final_level), "INFO")
+    for key, middleware_setting in middleware_settings.items():
+        if "logger" in cast(dict[str, Any], middleware_setting):
+            middleware_settings[key]["logger"] = final_app_logger
+        if "log_level" in cast(dict[str, Any], middleware_setting):
+            middleware_settings[key]["log_level"] = int_level
     # Rebind loggers for any logging middleware safely
-    for mware in cast(list[Middleware] | None, base_fast_mcp_settings.get("middleware")) or []:  # pyright: ignore[reportTypedDictNotRequiredAccess]
-        if isinstance(mware, LoggingMiddleware | StructuredLoggingMiddleware):
-            mware.logger = final_app_logger  # type: ignore[attr-defined]
-
-    _ = StoredSettings(
-        settings=settings, server=filtered_server_settings, lifespan_func=lifespan_fn
-    )
-
-    server = FastMCP[AppState](**base_fast_mcp_settings)  # pyright: ignore[reportCallIssue]
+    global _logger
+    _logger = final_app_logger
+    host = base_fast_mcp_settings.pop("host", "127.0.0.1")
+    port = base_fast_mcp_settings.pop("port", 9328)
+    http_path = base_fast_mcp_settings.pop("streamable_http_path", "/codeweaver")
+    server = FastMCP[AppState](
+        name="CodeWeaver",
+        **base_fast_mcp_settings,  # type: ignore
+    )  # pyright: ignore[reportCallIssue]
     local_logger.info("FastMCP application initialized successfully.")
     final_build = settings.model_rebuild()
     local_logger.debug("Final settings rebuild: %s", final_build)
-    return server
+    return ServerSetup(
+        app=server,
+        settings=settings,
+        middleware_settings=middleware_settings,
+        host=host or "127.0.0.1",
+        port=port or 9328,
+        streamable_http_path=cast(str, http_path or "/codeweaver"),
+        log_level=_final_level or "INFO",
+        middleware={*middleware},
+    )
 
 
-async def initialize_app() -> tuple[FastMCP[AppState], Callable[..., Awaitable[None]]]:
-    """Deprecated: use build_app() and app.run_http_async()."""
-    app = build_app()
-    return app, app.run_http_async
+__all__ = (
+    "AppState",
+    "HealthInfo",
+    "HealthStatus",
+    "ServerSetup",
+    "StoredSettings",
+    "build_app",
+    "get_state",
+    "get_store",
+    "lifespan",
+)

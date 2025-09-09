@@ -18,11 +18,11 @@ from codeweaver.exceptions import (
 
 __version__: Final[str] = "0.1.0"
 
-__all__ = [
+__all__ = (
     "CodeWeaverError",
     "ConfigurationError",
     "IndexingError",
     "ProviderError",
     "QueryError",
     "ValidationError",
-]
+)

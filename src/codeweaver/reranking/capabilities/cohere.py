@@ -63,3 +63,6 @@ def get_cohere_reranking_capabilities() -> tuple[RerankingModelCapabilities, ...
             "tokenizer_model": "Cohere/rerank-v3.5",
         }),
     )
+
+
+__all__ = ("get_cohere_reranking_capabilities",)

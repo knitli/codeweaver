@@ -7,4 +7,4 @@
 from codeweaver.vector_stores.base import SearchResult, VectorStoreProvider
 
 
-__all__ = ["SearchResult", "VectorStoreProvider"]
+__all__ = ("SearchResult", "VectorStoreProvider")

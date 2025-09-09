@@ -33,3 +33,6 @@ def get_baai_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
         })
         for model in models
     ]
+
+
+__all__ = ("get_baai_reranking_capabilities",)

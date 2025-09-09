@@ -89,3 +89,6 @@ def get_cohere_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...
                     })
                 )
     return tuple(EmbeddingModelCapabilities.model_validate(m) for m in output_models)
+
+
+__all__ = ("get_cohere_embedding_capabilities",)

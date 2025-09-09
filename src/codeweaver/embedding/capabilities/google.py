@@ -34,3 +34,6 @@ def get_google_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...
             other={},
         ),
     )
+
+
+__all__ = ("get_google_embedding_capabilities",)

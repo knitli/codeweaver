@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2024-2025 Qdrant Solutions GmbH
 # SPDX-License-Identifier: Apache-2.0
 # This file was adapted from Qdrant's example MCP server, [mcp-server-qdrant](https://github.com/qdrant/mcp-server-qdrant/)
+#
 # Modification/changes:
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-License-Identifier: MIT OR Apache-2.0
@@ -233,3 +234,6 @@ def make_indexes(filterable_fields: dict[str, FilterableField]) -> dict[str, Pay
             raise ValueError(f"Unsupported field type {field.field_type} for field {field_name}")
 
     return indexes
+
+
+__all__ = ("FilterableField", "make_filter", "make_indexes")

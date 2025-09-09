@@ -103,3 +103,6 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
                 from_docs=self._input_transformer(chunks),  # type: ignore
             )  # type: ignore
         return processed_results
+
+
+__all__ = ("CohereRerankingProvider",)

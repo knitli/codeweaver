@@ -353,3 +353,6 @@ class BedrockRerankingProvider(RerankingProvider[boto3_client]):
                 )
             )
         return results
+
+
+__all__ = ("BedrockRerankingProvider", "BedrockRerankingResult")

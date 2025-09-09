@@ -26,3 +26,6 @@ def get_alibaba_reranking_capabilities() -> Sequence[RerankingModelCapabilities]
             "provider": Provider.SENTENCE_TRANSFORMERS,
         })
     ]
+
+
+__all__ = ("get_alibaba_reranking_capabilities",)

@@ -16,6 +16,7 @@ from typing import Any, cast
 import numpy as np
 
 from codeweaver._utils import rpartial
+from codeweaver.exceptions import ConfigurationError
 from codeweaver.provider import Provider
 from codeweaver.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.reranking.providers.base import RerankingProvider
@@ -28,8 +29,8 @@ try:
 
 except ImportError as e:
     logger.exception("Failed to import CrossEncoder from sentence_transformers")
-    raise ImportError(
-        "SentenceTransformers is not installed. Please install it with `pip install sentence-transformers`."
+    raise ConfigurationError(
+        "SentenceTransformers is not installed. Please install it with `pip install codeweaver[provider-sentence-transformers]` or `codeweaver[provider-sentence-transformers-gpu]`."
     ) from e
 
 
@@ -140,3 +141,6 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
         self.kwargs["model_kwargs"] = {"torch_dtype": "torch.float16"}
         if has_flash_attention:
             self.kwargs["model_kwargs"]["attention_implementation"] = "flash_attention_2"
+
+
+__all__ = ("SentenceTransformersRerankingProvider",)

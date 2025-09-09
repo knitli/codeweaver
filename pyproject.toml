@@ -162,7 +162,7 @@ dev = [
 ]
 all-dev = [
     "copychat>=0.7.2",
-    "cpuinfo>=9.0.0",
+    "py-cpuinfo>=9.0.0",
     "dirty-equals>=0.9.0",
     "hatchling>=1.14.1",
     "httpx>=0.28.1",
@@ -207,7 +207,7 @@ recommended = [
     "aenum>=3.1.16",
     "ast-grep-py>=0.39.1",
     "cyclopts>=3.22.5",
-    "cpuinfo>=9.0.0",
+    "py-cpuinfo>=9.0.0",
     "fastmcp>=2.10.6",
     "langchain-text-splitters>=0.3.9",
     "mcp>=1.13.0",
@@ -234,7 +234,7 @@ recommended-no-telemetry = [
     "aenum>=3.1.16",
     "ast-grep-py>=0.39.1",
     "cyclopts>=3.22.5",
-    "cpuinfo>=9.0.0",
+    "py-cpuinfo>=9.0.0",
     "fastmcp>=2.10.6",
     "langchain-text-splitters>=0.3.9",
     "mcp>=1.13.0",
@@ -261,7 +261,7 @@ recommended-local-only = [
     "aenum>=3.1.16",
     "ast-grep-py>=0.39.1",
     "cyclopts>=3.22.5",
-    "cpuinfo>=9.0.0",
+    "py-cpuinfo>=9.0.0",
     "fastembed>=0.7.1",
     "fastmcp>=2.10.6",
     "langchain-text-splitters>=0.3.9",
@@ -346,20 +346,23 @@ provider-bedrock = ["pydantic-ai-slim[bedrock]>=0.6.2"]
 provider-cohere = ["pydantic-ai-slim[cohere]>=0.6.2"]
 
 #    --- Embedding and Rerank Only --- (no agent)
-provider-fastembed = ["fastembed>=0.7.1", "cpuinfo>=9.0.0"]
-provider-fastembed-gpu = ["fastembed-gpu>=0.7.1", "cpuinfo>=9.0.0"]
+provider-fastembed = ["fastembed>=0.7.1", "py-cpuinfo>=9.0.0"]
+provider-fastembed-gpu = ["fastembed-gpu>=0.7.1", "py-cpuinfo>=9.0.0"]
 provider-sentence-transformers = [
     "sentence-transformers>=5.1.0",
-    "cpuinfo>=9.0.0",
+    "py-cpuinfo>=9.0.0",
 ]
 provider-sentence-transformers-gpu = [
     "sentence-transformers[onnx-gpu]>=5.1.0",
-    "cpuinfo>=9.0.0",
+    "py-cpuinfo>=9.0.0",
 ]
-provider-sentence-transformers-openvino = [
-    "sentence-transformers[openvino]>=5.1.0",
-    "cpuinfo>=9.0.0",
-]
+
+# disabled until we can fully integrate and resolve dependency conflicts
+# provider-sentence-transformers-openvino = [
+#     "sentence-transformers[openvino]>=5.1.0",
+#     "py-cpuinfo>=9.0.0",
+# ]
+
 provider-voyageai = ["voyageai>=0.3.4"]
 # Requires additional setup, see https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/
 
@@ -400,7 +403,7 @@ auth-eunomia = ["eunomia-mcp>=0.3.9"]
 all = [
     "aenum>=3.1.16",
     "ast-grep-py>=0.39.1",
-    "cpuinfo>=9.0.0",
+    "py-cpuinfo>=9.0.0",
     "cyclopts>=3.22.5",
     "eunomia-mcp>=0.3.9",
     "fastembed>=0.7.1",
@@ -433,7 +436,7 @@ all = [
 all-gpu = [
     "aenum>=3.1.16",
     "ast-grep-py>=0.39.1",
-    "cpuinfo>=9.0.0",
+    "py-cpuinfo>=9.0.0",
     "cyclopts>=3.22.5",
     "eunomia-mcp>=0.3.9",
     "fastembed-gpu>=0.7.1",

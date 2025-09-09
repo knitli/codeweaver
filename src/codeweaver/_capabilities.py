@@ -66,3 +66,6 @@ PROVIDER_CAPABILITIES: MappingProxyType[LiteralProvider, frozenset[LiteralProvid
 def get_provider_kinds(provider: LiteralProvider) -> frozenset[LiteralProviderKind]:
     """Get capabilities for a provider."""
     return PROVIDER_CAPABILITIES.get(provider, frozenset()).union({ProviderKind.DATA})
+
+
+__all__ = ("PROVIDER_CAPABILITIES", "VECTOR_PROVIDER_CAPABILITIES", "get_provider_kinds")

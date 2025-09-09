@@ -258,3 +258,6 @@ def get_sentence_transformers_embedding_capabilities() -> tuple[EmbeddingModelCa
             for provider in CAP_MAP[cap["name"]]  # pyright: ignore[reportArgumentType]
         ])
     return tuple(EmbeddingModelCapabilities.model_validate(cap) for cap in capabilities)
+
+
+__all__ = ("get_sentence_transformers_embedding_capabilities",)

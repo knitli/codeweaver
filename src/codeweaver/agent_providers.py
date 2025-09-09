@@ -14,7 +14,7 @@ from pydantic_ai.providers import Provider as AgentProvider
 from pydantic_ai.toolsets import (
     AbstractToolset,
     CombinedToolset,
-    DeferredToolset,
+    ExternalToolset,
     FilteredToolset,
     FunctionToolset,
     PrefixedToolset,
@@ -125,7 +125,7 @@ __all__ = (
     "AbstractToolset",
     "AgentProvider",
     "CombinedToolset",
-    "DeferredToolset",
+    "ExternalToolset",
     "FilteredToolset",
     "FunctionToolset",
     "PrefixedToolset",

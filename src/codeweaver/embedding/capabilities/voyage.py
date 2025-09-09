@@ -50,3 +50,6 @@ def get_voyage_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...
         settings[i]["version"] = "3" if "3.5" not in model else "3.5"
         settings[i]["tokenizer_model"] = f"{settings[i]['tokenizer_model']}{model}"
     return tuple(EmbeddingModelCapabilities.model_validate({**s}) for s in settings)
+
+
+__all__ = ("get_voyage_embedding_capabilities",)

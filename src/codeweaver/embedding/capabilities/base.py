@@ -290,3 +290,12 @@ def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:
         for cap in list(caps.values())[3:]  # type: ignore
     )
     return fastembed_caps + st_caps
+
+
+__all__ = (
+    "EmbeddingCapabilities",
+    "EmbeddingModelCapabilities",
+    "PartialCapabilities",
+    "SparseEmbeddingModelCapabilities",
+    "get_sparse_caps",
+)

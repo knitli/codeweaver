@@ -6,28 +6,14 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    NonNegativeFloat,
-    NonNegativeInt,
-    field_validator,
-    model_validator,
-)
+from pydantic import BaseModel, ConfigDict, Field, NonNegativeFloat, NonNegativeInt, model_validator
 
 from codeweaver._common import BaseEnum
-from codeweaver._data_structures import DiscoveredFile
+from codeweaver._data_structures import DiscoveredFile, Span
+from codeweaver.language import SemanticSearchLanguage
 from codeweaver.models.intent import IntentType
-
-
-if TYPE_CHECKING:
-    from codeweaver._data_structures import Span
-    from codeweaver.language import SemanticSearchLanguage
-    from codeweaver.models.intent import QueryIntent
 
 
 class SearchStrategy(BaseEnum):
@@ -100,16 +86,6 @@ class CodeMatch(BaseModel):
         Field(default_factory=tuple, description="""Related functions, classes, or symbols"""),
     ]
 
-    @field_validator("file_path")
-    @classmethod
-    def validate_file_path(cls, v: Path) -> Path:
-        """Validate file path format."""
-        if v.is_absolute():
-            # Convert absolute paths to relative for consistency
-            # This will be handled by the service layer
-            pass
-        return v
-
     @model_validator(mode="after")
     def validate_span(self) -> CodeMatch:
         """Validate span consistency."""
@@ -154,9 +130,8 @@ class FindCodeResponseSummary(BaseModel):
         str, Field(description="""High-level summary of findings""", max_length=1000)
     ]
 
-    # TODO: query_intent should *not* be exposed to the user or user's agent. It needs to be created *from* the information available from them. We can expose the simpler `IntentType` instead, but we shouldn't be asking them to assess their intent.
     query_intent: Annotated[
-        QueryIntent | IntentType | None, Field(description="""Detected or specified intent""")
+        IntentType | None, Field(description="""Detected or specified intent""")
     ]
 
     total_matches: Annotated[
@@ -178,3 +153,6 @@ class FindCodeResponseSummary(BaseModel):
             description="""Programming languages in the results. If the language is supported for semantic search, it will be a `SemanticSearchLanguage`, otherwise a `str` from languages in `codeweaver._constants.py`"""
         ),
     ]
+
+
+__all__ = ("CodeMatch", "CodeMatchType", "FindCodeResponseSummary", "SearchStrategy")

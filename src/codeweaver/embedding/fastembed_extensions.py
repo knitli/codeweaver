@@ -22,7 +22,7 @@ try:
 
 except ImportError as e:
     raise ConfigurationError(
-        "fastembed is not installed. Please install it with `pip install codeweaver[provider-fastembed]`."
+        "fastembed is not installed. Please install it with `pip install codeweaver[provider-fastembed]` or `codeweaver[provider-fastembed-gpu]`."
     ) from e
 
 SPARSE_MODELS = (
@@ -112,3 +112,6 @@ def get_text_embedder() -> type[TextEmbedding]:
         params = model_as_dict | additional_params[model.model] | {"size_in_gb": gb_size}
         embedder.add_custom_model(**params)
     return embedder
+
+
+__all__ = ("get_sparse_embedder", "get_text_embedder")

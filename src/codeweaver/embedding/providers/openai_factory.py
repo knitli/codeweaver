@@ -22,6 +22,7 @@ from pydantic import AnyHttpUrl, create_model
 from codeweaver._data_structures import CodeChunk
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.embedding.providers.base import EmbeddingProvider
+from codeweaver.exceptions import ConfigurationError
 from codeweaver.provider import Provider
 
 
@@ -87,7 +88,7 @@ try:
     from openai import AsyncOpenAI
     from openai.types.create_embedding_response import CreateEmbeddingResponse
 except ImportError as _import_error:
-    raise ImportError(
+    raise ConfigurationError(
         'Please install the `openai` package to use the OpenAI provider, \nyou can use the `openai` optional group — `pip install "codeweaver[openai]"`'
     ) from _import_error
 
@@ -263,3 +264,6 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
             Provider.HEROKU: try_for_heroku_endpoint(self.doc_kwargs or {}),  # pyright: ignore[reportUnknownArgumentType,reportUnknownMemberType,reportUnknownAssignmentType]
             Provider.AZURE: try_for_azure_endpoint(self.doc_kwargs or {}),
         }
+
+
+__all__ = ("OpenAIEmbeddingBase",)

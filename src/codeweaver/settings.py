@@ -19,27 +19,16 @@ import inspect
 from collections.abc import Callable
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
+from typing import Annotated, Any, Literal, cast
 
-from fastmcp.server.auth.auth import OAuthProvider
-from fastmcp.server.middleware import Middleware
+from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.server.server import DuplicateBehavior
 from fastmcp.tools.tool import Tool
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    FieldSerializationInfo,
-    GetPydanticSchema,
-    PositiveInt,
-    ValidationInfo,
-    computed_field,
-    field_serializer,
-    field_validator,
-)
+from mcp.server.auth.settings import AuthSettings
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, computed_field, field_validator
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
 from pydantic_ai.settings import merge_model_settings
-from pydantic_core import from_json, to_json
+from pydantic_core import from_json
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from codeweaver._common import UNSET, Unset
@@ -53,15 +42,14 @@ from codeweaver.settings_types import (
     EmbeddingModelSettings,
     EmbeddingProviderSettings,
     FileFilterSettingsDict,
+    LoggingSettings,
+    MiddlewareOptions,
     RerankingModelSettings,
     RerankingProviderSettings,
     RignoreSettings,
     UvicornServerSettings,
     default_config_file_locations,
 )
-
-
-from codeweaver.settings_types import LoggingSettings, MiddlewareOptions
 
 
 DefaultDataProviderSettings = (
@@ -172,7 +160,7 @@ class FileFilterSettings(BaseModel):
         ),
     ] = RignoreSettings({"max_filesize": 5 * 1024 * 1024, "same_file_system": True})
 
-    def model_post_init(self, __context: Any, /) -> None:
+    def model_post_init(self, _context: MiddlewareContext[Any] | None = None, /) -> None:
         """Post-initialization processing."""
         if self.include_github_dir:
             self.forced_includes = self.forced_includes.union(frozenset({"**/.github/**"}))
@@ -286,7 +274,7 @@ class FastMcpServerSettings(BaseModel):
     )
 
     transport: Annotated[
-        Literal["stdio", "http"] | None,
+        Literal["stdio", "http", "streamable-http"] | None,
         Field(
             description="""Transport protocol to use for the FastMCP server. Stdio is for local use and cannot support concurrent requests. HTTP (streamable HTTP) can be used for local or remote use and supports concurrent requests. Unlike many MCP servers, CodeWeaver **defaults to http**."""
         ),
@@ -298,105 +286,31 @@ class FastMcpServerSettings(BaseModel):
         PositiveInt | None,
         Field(description="""Port number for the FastMCP server. Default is 9328 ('WEAV')"""),
     ] = 9328
-    path: Annotated[
-        str | None,
-        Field(description="""Route path for the FastMCP server. Defaults to '/codeweaver/'"""),
-    ] = "/codeweaver/"
-    auth: Annotated[
-        OAuthProvider | None,
-        Field(description="""OAuth provider configuration"""),
-        GetPydanticSchema(lambda _schema, handler: handler(Any)),
-    ] = None
-    cache_expiration_seconds: float | None = None
+
+    auth: Annotated[AuthSettings | None, Field(description="""OAuth provider configuration""")] = (
+        None
+    )
     on_duplicate_tools: DuplicateBehavior | None = None
     on_duplicate_resources: DuplicateBehavior | None = None
     on_duplicate_prompts: DuplicateBehavior | None = None
     resource_prefix_format: Literal["protocol", "path"] | None = None
     # these are each "middleware", "tools", and "dependencies" for FastMCP. But we prefix them with "additional_" to make it clear these are *in addition to* the ones we provide by default.
     additional_middleware: Annotated[
-        list[
-            Annotated[Middleware, GetPydanticSchema(lambda _s, handler: handler(Any))]
-            | Callable[..., Any]
-        ]
-        | None,
+        list[str] | None,
         Field(
-            description="""Additional middleware to add to the FastMCP server.""",
+            description="Additional middleware to add to the FastMCP server. Values should be full path import strings, like `codeweaver.middleware.statistics.StatisticsMiddleware`.",
+            validation_alias="middleware",
             serialization_alias="middleware",
         ),
     ] = None
     additional_tools: Annotated[
-        list[Tool | Callable[..., Any]] | None,
+        list[str] | None,
         Field(
-            description="""Additional tools to add to the FastMCP server.""",
+            description="Additional tools to add to the FastMCP server. Values can be either full path import strings, like `codeweaver.tools.git.GitTool`, or just the tool name, like `GitTool`.",
+            validation_alias="tools",
             serialization_alias="tools",
         ),
     ] = None
-    additional_dependencies: Annotated[
-        list[str] | None,
-        Field(
-            description="""Additional dependencies to add to the FastMCP server.""",
-            serialization_alias="dependencies",
-        ),
-    ] = None
-
-    def _serialize_additional_for_json(self, _v: Any, info: FieldSerializationInfo) -> bytes:
-        """Helper to serialize additional fields for JSON output."""
-        if info.field_name == "additional_middleware":
-            return to_json({
-                "additional_middleware": [
-                    mw.__class__.__qualname__ if isinstance(mw, Middleware) else str(mw)
-                    for mw in (self.additional_middleware or [])
-                ]
-            })
-        if info.field_name == "additional_tools":
-            return to_json({
-                "additional_tools": [
-                    tool.name if isinstance(tool, Tool) else str(tool)
-                    for tool in (self.additional_tools or [])
-                ]
-            })
-        if info.field_name == "additional_dependencies":
-            return to_json({"additional_dependencies": self.additional_dependencies or []})
-        return b"{}"
-
-    def _serialize_additional_for_python(
-        self, _v: Any, info: FieldSerializationInfo
-    ) -> dict[Literal["middleware", "tools", "dependencies"], list[Any]]:
-        """Helper to serialize additional fields for Python output."""
-        if info.field_name == "additional_middleware":
-            return {"middleware": self.additional_middleware or []}
-        if info.field_name == "additional_tools":
-            return {"tools": self.additional_tools or []}
-        if info.field_name == "additional_dependencies":
-            return {"dependencies": self.additional_dependencies or []}
-        return {}
-
-    @field_serializer(
-        *("additional_middleware", "additional_tools", "additional_dependencies"),
-        mode="plain",
-        when_used="always",
-    )
-    def serialize_additional_fields(
-        self, _v: Any, info: FieldSerializationInfo
-    ) -> dict[Literal["middleware", "tools", "dependencies"], list[Any]] | bytes:
-        """
-        Serialize additional fields for the FastMCP server settings.
-        """
-        if info.mode == "json":
-            return self._serialize_additional_for_json(_v, info)
-        return self._serialize_additional_for_python(_v, info)
-
-    @classmethod
-    def _validate_additional_from_python(cls, value: list[Any], info: ValidationInfo) -> list[Any]:
-        """Validate additional fields from Python input."""
-        if info.field_name and info.field_name.startswith("additional_"):
-            if "middleware" in info.field_name:
-                return [cls._try_to_find_middleware(v) or v for v in value if v]
-            if "tools" in info.field_name:
-                return [cls._try_to_find_tool(v) or v for v in value if v]
-            if "dependencies" in info.field_name:
-                return [v for v in value if isinstance(v, str)]
-        return value
 
     @staticmethod
     def _attempt_import(suspected_path: str) -> Any | None:
@@ -410,83 +324,80 @@ class FastMcpServerSettings(BaseModel):
         return None
 
     @staticmethod
-    def _return_if_subclass(value: str, cls: type[Tool | Middleware]) -> type | str | None:
-        """Return the value if it is a subclass of the given class."""
-        common_name = "Middleware" if cls is Middleware else "Tool"
-        return next(
-            (
-                subclass
-                for subclass in cls.__subclasses__()
-                if subclass.__name__ == value
-                or subclass.__qualname__ == value
-                or (str(subclass) in value and str(subclass) != common_name)
-            ),
-            value,
-        )
+    def _dotted_name(obj: Any) -> str | None:
+        """Return a stable 'module.qualname' for a class/callable/instance when possible."""
+        with contextlib.suppress(ImportError, AttributeError):
+            if inspect.isclass(obj) or inspect.isfunction(obj) or inspect.ismethod(obj):
+                module = getattr(obj, "__module__", None)
+                qual = getattr(obj, "__qualname__", None)
+                if module and qual:
+                    return f"{module}.{qual}"
+            # Instance -> use its class
+            cls_obj = getattr(obj, "__class__", None)
+            module = getattr(cls_obj, "__module__", None)
+            qual = getattr(cls_obj, "__qualname__", None)
+            if module and qual:
+                return f"{module}.{qual}"
+        return None
 
     @classmethod
-    def _try_to_find_middleware(cls, value: Any) -> Middleware | Callable[..., Any] | str | None:
-        """Try to find a middleware class or callable from a string or other input."""
-        if isinstance(value, Middleware) or callable(value):
-            return value
+    def _callable_to_path(cls, value: Any, field: Literal["middleware", "tools"]) -> str | None:
+        """Normalize middleware inputs (class/instance/callable/str) into 'module.qualname' strings."""
         if not value:
             return None
-        if isinstance(value, str) and any(
-            mw.__name__ == value or mw.__qualname__ == value for mw in AVAILABLE_MIDDLEWARE
+        if isinstance(value, str) and field == "tools":
+            return value
+        # Strings
+        if isinstance(value, str) and field == "middleware":
+            # If it matches a known middleware class name, expand to dotted path
+            for mw in AVAILABLE_MIDDLEWARE:
+                if value in (mw.__name__, mw.__qualname__, str(mw)):
+                    return f"{mw.__module__}.{mw.__qualname__}"
+            # If dotted import path, keep as-is
+            return value
+        # Known class/instance/callable
+        if (isinstance(value, Middleware | Tool) or inspect.isclass(value) or callable(value)) and (
+            dotted := cls._dotted_name(value)
         ):
-            return next(
-                (
-                    mw
-                    for mw in AVAILABLE_MIDDLEWARE
-                    if mw.__name__ == value or mw.__qualname__ == value
-                ),
-                value,
-            )
-        if isinstance(value, str) and "." in value and (imported := cls._attempt_import(value)):
-            return imported
-        return cls._return_if_subclass(value, Middleware)
+            return dotted
+        return None
 
     @classmethod
-    def _try_to_find_tool(cls, value: Any) -> Tool | Callable[..., Any] | str | None:
-        """Try to find a tool class or callable from a string or other input."""
-        if isinstance(value, Tool) or callable(value):
-            return value
-        if not value:
+    @field_validator("additional_middleware", mode="before")
+    def _validate_additional_middleware(cls, value: Any) -> list[str] | None:
+        """Validate and normalize additional middleware inputs."""
+        if value is None or value is UNSET:
             return None
-        if isinstance(value, str) and "." in value and (imported := cls._attempt_import(value)):
-            return imported
-        return cls._return_if_subclass(value, Tool)
+        if isinstance(value, str | bytes | bytearray):
+            try:
+                value = from_json(value)
+            except Exception:
+                value = [value]
+        return [s for s in (cls._callable_to_path(v, "middleware") for v in value) if s]
 
     @classmethod
-    @field_validator(
-        *("additional_middleware", "additional_tools", "additional_dependencies"), mode="plain"
-    )
-    def validate_additional_fields(
-        cls,
-        value: str | bytes | bytearray | list[str | Middleware | Tool | Callable[..., Any]] | None,
-        info: ValidationInfo,
-    ) -> Any:
-        """
-        Validate additional fields for the FastMCP server settings.
-        """
-        if not value:
-            return []
+    @field_validator("additional_tools", mode="before")
+    def _validate_additional_tools(cls, value: Any) -> list[str] | None:
+        """Validate and normalize additional tool inputs."""
+        if value is None or value is UNSET:
+            return None
         if isinstance(value, str | bytes | bytearray):
-            return cls.validate_additional_fields(from_json(value), info=info)
-        return cls._validate_additional_from_python(value, info=info)
+            try:
+                value = from_json(value)
+            except Exception:
+                value = [value]
+        return [s for s in (cls._callable_to_path(v, "tools") for v in value) if s]
 
 
 DefaultFastMcpServerSettings = FastMcpServerSettings.model_validate({
     "transport": "http",
     "auth": None,
-    "cache_expiration_seconds": None,
     "on_duplicate_tools": "warn",
     "on_duplicate_resources": "warn",
     "on_duplicate_prompts": "warn",
     "resource_prefix_format": "path",
-    "middleware": None,
-    "tools": None,
-    "dependencies": None,
+    "middleware": [],
+    "tools": [],
 })
 
 
@@ -662,9 +573,9 @@ def get_settings(path: Path | None = None) -> CodeWeaverSettings:
     global _settings
 
     if path:
-        return CodeWeaverSettings(config_file=path)
+        return CodeWeaverSettings(project_path=path)
     if _settings is None:
-        _settings = CodeWeaverSettings()
+        _settings = CodeWeaverSettings(project_path=Path.cwd())
     return _settings
 
 
@@ -686,3 +597,20 @@ def get_provider_settings(provider_kind: ProviderKind | str) -> Any:
             None,
             ["This may be a bug in CodeWeaver, please report it."],
         )
+
+
+__all__ = (
+    "CodeWeaverSettings",
+    "DefaultAgentProviderSettings",
+    "DefaultDataProviderSettings",
+    "DefaultEmbeddingProviderSettings",
+    "DefaultFastMcpServerSettings",
+    "DefaultRerankingProviderSettings",
+    "FastMcpServerSettings",
+    "FileFilterSettings",
+    "FileFilterSettingsDict",
+    "get_provider_settings",
+    "get_settings",
+    "merge_agent_model_settings",
+    "reload_settings",
+)

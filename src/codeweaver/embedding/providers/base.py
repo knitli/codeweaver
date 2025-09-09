@@ -53,6 +53,8 @@ logger = logging.getLogger(__name__)
 def _get_statistics() -> "SessionStatistics":
     """Set the statistics source for the embedding provider."""
     statistics_module = importlib.import_module("codeweaver._statistics")
+    # we need SessionStatistics in this namespace for pydantic at runtime:
+    SessionStatistics = statistics_module.SessionStatistics  # pyright: ignore[reportUnusedVariable, reportUnusedExpression]  # noqa: F841, N806
     return statistics_module.get_session_statistics()
 
 
@@ -414,3 +416,6 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
             fallback=fallback,
             serialize_as_any=serialize_as_any,
         )
+
+
+__all__ = ("EmbeddingErrorInfo", "EmbeddingProvider")

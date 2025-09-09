@@ -196,3 +196,6 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
             | kwargs
         )
         return await self._fetch_embeddings(cast(list[str], query), is_query=True, **kwargs)
+
+
+__all__ = ("CohereEmbeddingProvider",)

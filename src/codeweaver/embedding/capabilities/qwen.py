@@ -145,3 +145,6 @@ def get_qwen_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
         )
         for cap in capabilities
     )
+
+
+__all__ = ("get_qwen_embedding_capabilities",)

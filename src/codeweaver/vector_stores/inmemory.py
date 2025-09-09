@@ -24,3 +24,6 @@ class MemoryVectorStoreProvider(VectorStoreProvider[None]):
     client: Any = None
     embedder: EmbeddingProvider[Any]
     sparse_embedder: EmbeddingProvider[Any] | None = None
+
+
+__all__ = ("MemoryVectorStoreProvider",)

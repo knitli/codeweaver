@@ -107,7 +107,7 @@ class Feature(BaseEnum, IntFlag):
 
 type ServiceName = Annotated[
     str,
-    Field(description="""The name of the service", max_length=100, pattern=r"^[a-zA-Z0-9_]+$"""),
+    Field(description="""The name of the service""", max_length=100, pattern=r"^[a-zA-Z0-9_]+$"),
 ]
 
 
@@ -1262,3 +1262,29 @@ def resolve_agentic_profile(provider: Provider, model_name: str) -> AgenticProfi
     Resolve an agentic profile for a given provider and model name.
     """
     return _model_registry.resolve_agentic_profile(provider, model_name)
+
+
+__all__ = (
+    "Feature",
+    "ModelRegistry",
+    "ProviderRegistry",
+    "ServiceCard",
+    "ServiceCardDict",
+    "ServicesRegistry",
+    "get_model_registry",
+    "get_provider_registry",
+    "get_services_registry",
+    "register_agent_provider",
+    "register_agentic_profile",
+    "register_data_provider",
+    "register_embedding_capabilities",
+    "register_embedding_provider",
+    "register_reranking_capabilities",
+    "register_reranking_provider",
+    "register_service",
+    "register_sparse_embedding_capabilities",
+    "register_sparse_embedding_provider",
+    "register_vector_store_provider",
+    "resolve_agentic_profile",
+    "update_settings",
+)

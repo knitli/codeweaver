@@ -64,3 +64,6 @@ class Tokenizer[Encoder](ABC):
     def estimate_batch(self, texts: Sequence[str] | Sequence[bytes], **kwargs: Any) -> int:
         """Estimate the number of tokens in a batch of texts."""
         return sum(len(batch) for batch in self.encode_batch(texts, **kwargs))
+
+
+__all__ = ("Tokenizer",)

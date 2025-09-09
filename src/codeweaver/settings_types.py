@@ -27,14 +27,14 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Annotated, Any, Literal, NotRequired, Required, TypedDict
 
 from fastmcp.contrib.bulk_tool_caller.bulk_tool_caller import BulkToolCaller
-from fastmcp.server.auth.auth import OAuthProvider
 from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware, RetryMiddleware
 from fastmcp.server.middleware.logging import LoggingMiddleware, StructuredLoggingMiddleware
 from fastmcp.server.middleware.rate_limiting import RateLimitingMiddleware
 from fastmcp.server.middleware.timing import DetailedTimingMiddleware
 from fastmcp.server.server import DuplicateBehavior
-from fastmcp.tools.tool import Tool
+from fastmcp.tools import Tool
+from mcp.server.auth.settings import AuthSettings
 from mcp.server.lowlevel.server import LifespanResultT
 from pydantic import (
     BaseModel,
@@ -85,7 +85,7 @@ AVAILABLE_MIDDLEWARE = (
 class FastMcpHttpRunArgs(TypedDict, total=False):
     """Arguments for running FastMCP over HTTP."""
 
-    transport: NotRequired[Literal["http"]]
+    transport: NotRequired[Literal["http", "streamable-http"]]
     host: NotRequired[str | None]
     port: NotRequired[PositiveInt | None]
     log_level: NotRequired[Literal["debug", "info", "warning", "error"] | None]
@@ -107,18 +107,17 @@ class FastMcpServerSettingsDict(TypedDict, total=False):
     include_tags: NotRequired[set[str] | None]
     exclude_tags: NotRequired[set[str] | None]
     transport: NotRequired[Literal["stdio", "http"] | None]
-    host: NotRequired[str | None]
-    port: NotRequired[PositiveInt | None]
-    path: NotRequired[str | None]
-    auth: NotRequired[OAuthProvider | None]
-    cache_expiration_seconds: NotRequired[float | None]
+    host: NotRequired[str | None]  # not a valid setting for FastMCP Settings
+    port: NotRequired[
+        PositiveInt | None
+    ]  # host/port need to be popped and used when initiating server
+    auth: NotRequired[AuthSettings | None]
     on_duplicate_tools: NotRequired[DuplicateBehavior | None]
     on_duplicate_resources: NotRequired[DuplicateBehavior | None]
     on_duplicate_prompts: NotRequired[DuplicateBehavior | None]
     resource_prefix_format: NotRequired[Literal["protocol", "path"] | None]
-    middleware: NotRequired[list[Middleware | Callable[..., Any]] | None]
-    tools: NotRequired[list[Tool | Callable[..., Any]] | None]
-    dependencies: NotRequired[list[str] | None]
+    middleware: NotRequired[list[str | Middleware] | None]
+    tools: NotRequired[list[str | Tool] | None]
 
 
 # ===========================================================================
@@ -851,3 +850,39 @@ def default_config_file_locations(
     ]
 
     return tuple(file_paths)
+
+
+__all__ = (
+    "AWSProviderSettings",
+    "AgentProviderSettings",
+    "AzureCohereProviderSettings",
+    "AzureOpenAIProviderSettings",
+    "BaseProviderSettings",
+    "ConnectionConfiguration",
+    "ConnectionRateLimitConfig",
+    "DataProviderSettings",
+    "EmbeddingProviderSettings",
+    "ErrorHandlingMiddlewareSettings",
+    "FastMcpHttpRunArgs",
+    "FastembedGPUProviderSettings",
+    "FileFilterSettingsDict",
+    "FiltersDict",
+    "FormattersDict",
+    "HandlersDict",
+    "LoggersDict",
+    "LoggingConfigDict",
+    "LoggingMiddlewareSettings",
+    "LoggingSettings",
+    "MiddlewareOptions",
+    "ModelString",
+    "ProviderSpecificSettings",
+    "RateLimitingMiddlewareSettings",
+    "RerankingProviderSettings",
+    "RetryMiddlewareSettings",
+    "RignoreSettings",
+    "SerializableLoggingFilter",
+    "UvicornServerSettings",
+    "UvicornServerSettings",
+    "UvicornServerSettingsDict",
+    "default_config_file_locations",
+)

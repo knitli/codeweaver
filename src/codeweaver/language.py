@@ -135,7 +135,7 @@ class ConfigLanguage(BaseEnum):
         return None
 
 
-class SemanticSearchLanguage(BaseEnum):
+class SemanticSearchLanguage(str, BaseEnum):
     """
     Enum representing supported languages for semantic (AST) search.
 
@@ -168,6 +168,8 @@ class SemanticSearchLanguage(BaseEnum):
     TYPESCRIPT = "typescript"
     TSX = "tsx"
     YAML = "yaml"
+
+    __slots__ = ()
 
     @classmethod
     def extension_map(cls) -> MappingProxyType[SemanticSearchLanguage, tuple[str, ...]]:
@@ -737,3 +739,16 @@ def languages_present_from_configs() -> tuple[SemanticSearchLanguage, ...] | Non
     ):
         return tuple(lang for lang in associated_languages if lang)
     return None
+
+
+__all__ = (
+    "ConfigLanguage",
+    "ConfigNamePair",
+    "ConfigPathPair",
+    "ExtPair",
+    "LanguageConfigFile",
+    "SemanticSearchLanguage",
+    "find_config_paths",
+    "language_from_config_file",
+    "languages_present_from_configs",
+)

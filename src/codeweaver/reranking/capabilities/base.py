@@ -199,3 +199,6 @@ class RerankingModelCapabilities(BaseModel):
                 for chunk in input_chunks  # pyright: ignore[reportOperatorIssue]
             ])
         return self.max_input(input_chunks, query) if callable(self.max_input) else (True, 0)
+
+
+__all__ = ("PartialRerankingCapabilities", "RerankingCapabilities", "RerankingModelCapabilities")

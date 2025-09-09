@@ -26,7 +26,7 @@ class QueryComplexity(BaseEnum):
         return cls.MODERATE
 
 
-class IntentType(BaseEnum):
+class IntentType(str, BaseEnum):
     """Enumeration of intent types."""
 
     UNDERSTAND = "understand"
@@ -36,6 +36,8 @@ class IntentType(BaseEnum):
     TEST = "test"
     CONFIGURE = "configure"
     DOCUMENT = "document"
+
+    __slots__ = ()
 
 
 class QueryIntent(BaseModel):
@@ -91,3 +93,6 @@ class IntentResult(BaseModel):
     prioritize_entry_points: Annotated[
         bool, Field(description="""Whether to prioritize entry points in results""")
     ] = False
+
+
+__all__ = ("IntentResult", "IntentType", "QueryComplexity", "QueryIntent")

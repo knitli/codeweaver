@@ -1,7 +1,3 @@
-# Copyright (c) 2024 to present Pydantic Services Inc
-# SPDX-License-Identifier: MIT
-# Applies to original code in this directory (`src/codeweaver/embedding_providers/`) from `pydantic_ai`.
-#
 # SPDX-FileCopyrightText: 2025 (c) 2025 Knitli Inc.
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
@@ -19,6 +15,7 @@ from codeweaver._data_structures import CodeChunk
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.embedding.providers import EmbeddingProvider
 from codeweaver.embedding.providers.base import default_output_transformer
+from codeweaver.exceptions import ConfigurationError
 from codeweaver.provider import Provider
 
 
@@ -28,7 +25,7 @@ try:
     from voyageai.object.embeddings import EmbeddingsObject
 
 except ImportError as _import_error:
-    raise ImportError(
+    raise ConfigurationError(
         'Please install the `voyageai` package to use the Voyage provider, you can use the `voyage` optional group — `pip install "codeweaver[voyage]"`'
     ) from _import_error
 
@@ -113,3 +110,6 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
     def dimension(self) -> int:
         """Get the size of the vector for the collection."""
         return self.doc_kwargs.get("output_dimension", self._caps.default_dimension)  # type: ignore
+
+
+__all__ = ("VoyageEmbeddingProvider",)

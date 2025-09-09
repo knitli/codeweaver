@@ -119,3 +119,6 @@ class FileDiscoveryService:
                 filtered_files.append(file_path)
 
         return tuple(discovered_files), tuple(filtered_files)
+
+
+__all__ = ("FileDiscoveryService",)

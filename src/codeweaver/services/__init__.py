@@ -7,4 +7,4 @@
 from codeweaver.services.discovery import FileDiscoveryService
 
 
-__all__ = ["FileDiscoveryService"]
+__all__ = ("FileDiscoveryService",)

@@ -47,3 +47,6 @@ class TiktokenTokenizer(Tokenizer[tiktoken.Encoding]):
     def encoders() -> Sequence[str]:
         """List all available encoder names."""
         return tiktoken.list_encoding_names()
+
+
+__all__ = ("TiktokenTokenizer",)

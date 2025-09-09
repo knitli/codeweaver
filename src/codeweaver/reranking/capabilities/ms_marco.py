@@ -48,3 +48,6 @@ def get_marco_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
         for model in fastembed_models + sentence_transformers_models
     )
     return assembled_capabilities
+
+
+__all__ = ("get_marco_reranking_capabilities",)

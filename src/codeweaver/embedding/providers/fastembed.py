@@ -23,6 +23,7 @@ from codeweaver._data_structures import CodeChunk
 from codeweaver._utils import rpartial
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.embedding.providers import EmbeddingProvider
+from codeweaver.exceptions import ConfigurationError
 from codeweaver.provider import Provider
 
 
@@ -32,8 +33,8 @@ try:
 
     from codeweaver.embedding.fastembed_extensions import get_sparse_embedder, get_text_embedder
 except ImportError as e:
-    raise ImportError(
-        "FastEmbed is not installed. Please install it with `pip install fastembed`."
+    raise ConfigurationError(
+        "FastEmbed is not installed. Please install it with `pip install codeweaver[provider-fastembed]` or `codeweaver[provider-fastembed-gpu]`."
     ) from e
 
 _TextEmbedding = get_text_embedder()
@@ -172,3 +173,6 @@ class FastEmbedSparseProvider(FastEmbedProvider):
             None, lambda: list(self._client.query_embed(query, **kwargs))
         )
         return await loop.run_in_executor(None, lambda: self._process_output(embeddings))
+
+
+__all__ = ("FastEmbedProvider", "FastEmbedSparseProvider")

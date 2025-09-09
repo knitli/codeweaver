@@ -103,3 +103,6 @@ def log_to_client_or_fallback(
             case "error":
                 int_level: int = logging.ERROR
         logger.log(int_level, message, extra=extra)
+
+
+__all__ = ("log_to_client_or_fallback", "setup_logger")

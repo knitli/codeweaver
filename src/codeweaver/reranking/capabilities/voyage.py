@@ -10,6 +10,7 @@ from collections.abc import Sequence
 from pydantic import NonNegativeInt
 
 from codeweaver._data_structures import CodeChunk
+from codeweaver.exceptions import ConfigurationError
 from codeweaver.provider import Provider
 from codeweaver.reranking.capabilities.base import (
     PartialRerankingCapabilities,
@@ -21,8 +22,8 @@ try:
     from codeweaver.tokenizers import get_tokenizer
 
 except ImportError as e:
-    raise ImportError(
-        "Voyage AI SDK is not installed. Use `pip install voyageai` to install it."
+    raise ConfigurationError(
+        "The `tokenizers` package is required for Voyage capabilities. Please install it with `pip install codeweaver[provider-voyage]` or `pip install tokenizers`."
     ) from e
 
 
@@ -96,3 +97,6 @@ def get_voyage_reranking_capabilities() -> tuple[
     return RerankingModelCapabilities.model_validate(
         **base_capabilities
     ), RerankingModelCapabilities.model_validate(**lite_capabilities)
+
+
+__all__ = ("get_voyage_reranking_capabilities",)

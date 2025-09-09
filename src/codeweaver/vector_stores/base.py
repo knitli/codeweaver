@@ -8,17 +8,14 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from pydantic import UUID4, BaseModel, ConfigDict
 
 from codeweaver._common import BaseEnum
 from codeweaver._data_structures import CodeChunk, Metadata, SearchResult
 from codeweaver.provider import Provider
-
-
-if TYPE_CHECKING:
-    from codeweaver.services._filter import Filter
+from codeweaver.services._filter import Filter
 
 
 # SPDX-SnippetBegin
@@ -148,3 +145,6 @@ class VectorStoreProvider[VectorStoreClient](BaseModel, ABC):
         """
         Delete specific code chunks by their unique names.
         """
+
+
+__all__ = ("Entry", "PayloadSchemaType", "VectorStoreProvider")

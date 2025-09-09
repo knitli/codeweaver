@@ -50,3 +50,6 @@ def get_mistral_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ..
         EmbeddingModelCapabilities.model_validate({**shared, **d})
         for d in (base_mistral, codestral_caps)
     )
+
+
+__all__ = ("get_mistral_embedding_capabilities",)

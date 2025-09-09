@@ -10,9 +10,11 @@ Statistics tracking for CodeWeaver, including file indexing, retrieval, and sess
 from __future__ import annotations
 
 import statistics
+import uuid
 
 from collections import Counter, defaultdict
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from functools import cache
 from pathlib import Path
 from types import MappingProxyType
@@ -64,6 +66,13 @@ class McpComponentTimingDict(TypedDict):
     on_get_prompt_requests: McpTimingDict
 
 
+class HttpRequestsDict(TypedDict):
+    version: NonNegativeFloat
+    health: NonNegativeFloat
+    statistics: NonNegativeFloat
+    settings: NonNegativeFloat
+
+
 class CallHookTimingDict(TypedDict):
     """Typed dictionary for MCP timing statistics."""
 
@@ -74,6 +83,7 @@ class CallHookTimingDict(TypedDict):
     on_list_resources_requests: NonNegativeFloat
     on_list_resource_templates_requests: NonNegativeFloat
     on_list_prompts_requests: NonNegativeFloat
+    http_requests: HttpRequestsDict
 
 
 class TimingStatisticsDict(TypedDict):
@@ -94,6 +104,7 @@ type RequestKind = Literal[
     "on_list_resources",
     "on_list_resource_templates",
     "on_list_prompts",
+    "http_requests",
 ]
 
 type OperationsKey = Literal["indexed", "retrieved", "processed", "reindexed", "skipped"]
@@ -154,6 +165,34 @@ class TimingStatistics:
             description="""Time taken for on_list_prompts requests in milliseconds.""",
         ),
     ]
+    health_http: Annotated[
+        list[PositiveFloat],
+        Field(
+            default_factory=list,
+            description="""Time taken for health status http requests in milliseconds.""",
+        ),
+    ]
+    version_http: Annotated[
+        list[PositiveFloat],
+        Field(
+            default_factory=list,
+            description="""Time taken for version check http requests in milliseconds.""",
+        ),
+    ]
+    statistics_http: Annotated[
+        list[PositiveFloat],
+        Field(
+            default_factory=list,
+            description="""Time taken for statistics http requests in milliseconds.""",
+        ),
+    ]
+    settings_http: Annotated[
+        list[PositiveFloat],
+        Field(
+            default_factory=list,
+            description="""Time taken for settings http requests in milliseconds.""",
+        ),
+    ]
 
     def update(
         self,
@@ -174,6 +213,19 @@ class TimingStatistics:
             request_dict[tool_or_resource_name].append(response_time)
         if (request_list := getattr(self, key)) and isinstance(request_list, list):
             self.__setattr__(key, [*request_list, response_time])
+
+    def update_http_requests(
+        self,
+        response_time: PositiveFloat,
+        component: Literal["health", "version", "statistics", "settings"],
+    ) -> None:
+        """Update the timing statistics for a specific HTTP request type."""
+        key = f"{component}_http"
+        requests_list = getattr(self, key)
+        if requests_list is not None and isinstance(requests_list, list):
+            self.__setattr__(key, [*requests_list, response_time])
+        else:
+            self.__setattr__(key, [response_time])
 
     def _compute_for_mcp_timing_dict(
         self, key: McpComponentRequests
@@ -242,6 +294,12 @@ class TimingStatistics:
                     self.on_list_resource_templates_requests
                 ),
                 "on_list_prompts_requests": safe_mean(self.on_list_prompts_requests),
+                "http_requests": {
+                    "health": safe_mean(self.health_http),
+                    "version": safe_mean(self.version_http),
+                    "statistics": safe_mean(self.statistics_http),
+                    "settings": safe_mean(self.settings_http),
+                },
             },
             "counts": {
                 "on_call_tool_requests": tool_stats["counts"],
@@ -253,6 +311,12 @@ class TimingStatistics:
                     self.on_list_resource_templates_requests
                 ),
                 "on_list_prompts_requests": len(self.on_list_prompts_requests),
+                "http_requests": {
+                    "health": len(self.health_http),
+                    "version": len(self.version_http),
+                    "statistics": len(self.statistics_http),
+                    "settings": len(self.settings_http),
+                },
             },
             "lows": {
                 "on_call_tool_requests": tool_stats["lows"],
@@ -264,6 +328,12 @@ class TimingStatistics:
                     self.on_list_resource_templates_requests
                 ),
                 "on_list_prompts_requests": safe_min(self.on_list_prompts_requests),
+                "http_requests": {
+                    "health": safe_min(self.health_http),
+                    "version": safe_min(self.version_http),
+                    "statistics": safe_min(self.statistics_http),
+                    "settings": safe_min(self.settings_http),
+                },
             },
             "medians": {
                 "on_call_tool_requests": tool_stats["medians"],
@@ -275,6 +345,12 @@ class TimingStatistics:
                     self.on_list_resource_templates_requests
                 ),
                 "on_list_prompts_requests": safe_median(self.on_list_prompts_requests),
+                "http_requests": {
+                    "health": safe_median(self.health_http),
+                    "version": safe_median(self.version_http),
+                    "statistics": safe_median(self.statistics_http),
+                    "settings": safe_median(self.settings_http),
+                },
             },
             "highs": {
                 "on_call_tool_requests": tool_stats["highs"],
@@ -286,6 +362,12 @@ class TimingStatistics:
                     self.on_list_resource_templates_requests
                 ),
                 "on_list_prompts_requests": safe_max(self.on_list_prompts_requests),
+                "http_requests": {
+                    "health": safe_max(self.health_http),
+                    "version": safe_max(self.version_http),
+                    "statistics": safe_max(self.statistics_http),
+                    "settings": safe_max(self.settings_http),
+                },
             },
         }
 
@@ -673,16 +755,6 @@ class TokenCounter(Counter[TokenCategory]):
 class SessionStatistics:
     """Statistics for tracking session performance and usage."""
 
-    total_requests: Annotated[
-        NonNegativeInt | None, Field(description="""Total requests made during the session.""")
-    ] = None
-    successful_requests: Annotated[
-        NonNegativeInt | None,
-        Field(description="""Total successful requests during the session."""),
-    ] = None
-    failed_requests: Annotated[
-        NonNegativeInt | None, Field(description="""Total failed requests during the session.""")
-    ] = None
     timing_statistics: Annotated[
         TimingStatistics | None, Field(description="""Timing statistics for the session.""")
     ] = None
@@ -704,6 +776,10 @@ class SessionStatistics:
 
     _successful_request_log: list[str | int] = Field(default_factory=list, init=False, repr=False)  # pyright: ignore[reportUnknownVariableType]
     _failed_request_log: list[str | int] = Field(default_factory=list, init=False, repr=False)  # pyright: ignore[reportUnknownVariableType]
+    _successful_http_request_log: list[str | int] = Field(  # pyright: ignore[reportUnknownVariableType]
+        default_factory=list, init=False, repr=False
+    )
+    _failed_http_request_log: list[str | int] = Field(default_factory=list, init=False, repr=False)  # pyright: ignore[reportUnknownVariableType]
 
     def __post_init__(self) -> None:
         """Post-initialization processing."""
@@ -719,12 +795,55 @@ class SessionStatistics:
             on_list_resources_requests=[],
             on_list_resource_templates_requests=[],
             on_list_prompts_requests=[],
+            health_http=[],
+            version_http=[],
+            settings_http=[],
+            statistics_http=[],
         )
-        self._successful_request_log = self._successful_request_log or []
-        self._failed_request_log = self._failed_request_log or []
-        self.successful_requests = self.successful_requests or 0
-        self.failed_requests = self.failed_requests or 0
-        self.total_requests = self.total_requests or 0
+        for attr in (
+            "_successful_http_request_log",
+            "_failed_http_request_log",
+            "_successful_request_log",
+            "_failed_request_log",
+        ):
+            if (hasattr(self, attr) and getattr(self, attr)) is None or (not hasattr(self, attr)):
+                setattr(self, attr, [])
+
+    @computed_field
+    @property
+    def total_requests(self) -> NonNegativeInt:
+        """Total requests made during the session."""
+        return len(self._successful_request_log) + len(self._failed_request_log)
+
+    @computed_field
+    @property
+    def total_http_requests(self) -> NonNegativeInt:
+        """Total HTTP requests made during the session."""
+        return len(self._successful_http_request_log) + len(self._failed_http_request_log)
+
+    @computed_field
+    @property
+    def successful_requests(self) -> NonNegativeInt:
+        """Total successful requests during the session."""
+        return len(self._successful_request_log)
+
+    @computed_field
+    @property
+    def failed_requests(self) -> NonNegativeInt:
+        """Total failed requests during the session."""
+        return len(self._failed_request_log)
+
+    @computed_field
+    @property
+    def successful_http_requests(self) -> NonNegativeInt:
+        """Total successful HTTP requests during the session."""
+        return len(self._successful_http_request_log)
+
+    @computed_field
+    @property
+    def failed_http_requests(self) -> NonNegativeInt:
+        """Total failed HTTP requests during the session."""
+        return len(self._failed_http_request_log)
 
     @field_serializer("token_statistics")
     def serialize_token_statistics(
@@ -745,35 +864,41 @@ class SessionStatistics:
             on_list_resources_requests=[],
             on_list_resource_templates_requests=[],
             on_list_prompts_requests=[],
+            health_http=[],
+            version_http=[],
+            settings_http=[],
+            statistics_http=[],
         )
         return self.timing_statistics.timing_summary
 
-    def add_successful_request(self, request_id: str | int | None = None) -> None:
+    def add_successful_request(
+        self, request_id: str | int | None = None, *, is_http: bool = False
+    ) -> None:
         """Add a successful request count."""
-        self._add_request(successful=True, request_id=request_id)
+        request_id = request_id or datetime.now(UTC).isoformat("T", "microseconds")
+        self._add_request(successful=True, request_id=request_id, is_http=is_http)
 
-    def add_failed_request(self, request_id: str | int | None = None) -> None:
+    def add_failed_request(
+        self, request_id: str | int | None = None, *, is_http: bool = False
+    ) -> None:
         """Add a failed request count."""
-        self._add_request(successful=False, request_id=request_id)
+        request_id = request_id or datetime.now(UTC).isoformat("T", "microseconds")
+        self._add_request(successful=False, request_id=request_id, is_http=is_http)
 
-    def _add_request(self, *, successful: bool, request_id: str | int | None = None) -> None:
+    def _add_request(
+        self, *, successful: bool, request_id: str | int | None = None, is_http: bool = False
+    ) -> None:
         """Internal method to add a request count."""
-        if self.total_requests is None:
-            self.total_requests = 0
-        if self.successful_requests is None:
-            self.successful_requests = 0
-        if self.failed_requests is None:
-            self.failed_requests = 0
-        if request_id and successful:
-            self._successful_request_log.append(request_id)
+        if is_http:
+            if successful:
+                self._successful_http_request_log.append(request_id or uuid.uuid4().hex)
+            else:
+                self._failed_http_request_log.append(request_id or uuid.uuid4().hex)
         elif request_id:
-            self._failed_request_log.append(request_id)
-
-        self.total_requests += 1
-        if successful:
-            self.successful_requests += 1
-        else:
-            self.failed_requests += 1
+            if successful:
+                self._successful_request_log.append(request_id or uuid.uuid4().hex)
+            else:
+                self._failed_request_log.append(request_id or uuid.uuid4().hex)
 
     def request_in_log(self, request_id: str | int) -> bool:
         """Check if a request ID is in the successful or failed request logs."""
@@ -781,19 +906,35 @@ class SessionStatistics:
 
     @computed_field
     @property
-    def success_rate(self) -> NonNegativeFloat | None:
+    def success_rate(self) -> NonNegativeFloat:
         """Calculate the success rate of requests."""
         if self.total_requests and self.total_requests > 0:
             return (self.successful_requests or 0) / self.total_requests
-        return None
+        return 0
 
     @computed_field
     @property
-    def failure_rate(self) -> NonNegativeFloat | None:
+    def failure_rate(self) -> NonNegativeFloat:
         """Calculate the failure rate of requests."""
         if self.total_requests and self.total_requests > 0:
             return (self.failed_requests or 0) / self.total_requests
-        return None
+        return 0
+
+    @computed_field
+    @property
+    def http_success_rate(self) -> NonNegativeFloat:
+        """Calculate the HTTP success rate of requests."""
+        if self.total_http_requests and self.total_http_requests > 0:
+            return (self.successful_http_requests or 0) / self.total_http_requests
+        return 0
+
+    @computed_field
+    @property
+    def http_failure_rate(self) -> NonNegativeFloat:
+        """Calculate the HTTP failure rate of requests."""
+        if self.total_http_requests and self.total_http_requests > 0:
+            return (self.failed_http_requests or 0) / self.total_http_requests
+        return 0
 
     def add_token_usage(
         self,
@@ -848,9 +989,6 @@ class SessionStatistics:
 
     def reset(self) -> None:
         """Reset all statistics to their initial state."""
-        self.total_requests = None
-        self.successful_requests = None
-        self.failed_requests = None
         self.timing_statistics = TimingStatistics(
             on_call_tool_requests={},
             on_read_resource_requests={},
@@ -859,6 +997,10 @@ class SessionStatistics:
             on_list_resources_requests=[],
             on_list_resource_templates_requests=[],
             on_list_prompts_requests=[],
+            health_http=[],
+            version_http=[],
+            settings_http=[],
+            statistics_http=[],
         )
         self.index_statistics = FileStatistics()
         self.token_statistics = TokenCounter()
@@ -907,6 +1049,14 @@ class SessionStatistics:
 _statistics: SessionStatistics = SessionStatistics(
     index_statistics=FileStatistics(), token_statistics=TokenCounter()
 )
+
+
+def record_timed_http_request(
+    request_type: Literal["health", "version", "settings", "statistics"], time_taken: PositiveFloat
+) -> None:
+    """Record the time taken for an HTTP request of a given type."""
+    if _statistics and _statistics.timing_statistics:
+        _statistics.timing_statistics.update_http_requests(time_taken, request_type)
 
 
 def get_session_statistics() -> SessionStatistics:

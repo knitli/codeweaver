@@ -12,6 +12,7 @@ from typing import Any, cast
 from pydantic import ConfigDict
 
 from codeweaver._data_structures import CodeChunk
+from codeweaver.exceptions import ConfigurationError
 from codeweaver.provider import Provider
 from codeweaver.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.reranking.providers.base import RerankingProvider, RerankingResult
@@ -23,7 +24,9 @@ try:
     from voyageai.object.reranking import RerankingResult as VoyageRerankingResult
 
 except ImportError as e:
-    raise ImportError("Voyage AI SDK is not installed.") from e
+    raise ConfigurationError(
+        "Voyage AI SDK is not installed. Please install it with `pip install codeweaver[provider-voyage]`."
+    ) from e
 
 
 class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
@@ -88,3 +91,6 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
         self._update_token_stats(token_count=token_count)
         results.sort(key=lambda x: cast(float, x[2]), reverse=True)
         return [map_result(res, i) for i, res in enumerate(results, 1)]
+
+
+__all__ = ("VoyageRerankingProvider",)

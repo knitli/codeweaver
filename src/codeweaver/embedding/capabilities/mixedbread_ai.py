@@ -70,3 +70,6 @@ def get_mixedbread_ai_embedding_capabilities() -> tuple[EmbeddingModelCapabiliti
             for provider in [cap["name"]]  # pyright: ignore[reportArgumentType]
         ])
     return tuple(EmbeddingModelCapabilities.model_validate(cap) for cap in capabilities)
+
+
+__all__ = ("get_mixedbread_ai_embedding_capabilities",)

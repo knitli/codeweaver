@@ -18,6 +18,7 @@ import numpy as np
 from codeweaver._data_structures import CodeChunk
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.embedding.providers.base import EmbeddingProvider
+from codeweaver.exceptions import ConfigurationError
 from codeweaver.provider import Provider
 
 
@@ -54,7 +55,7 @@ try:
 
 except ImportError as e:
     logger.debug("HuggingFace Hub is not installed.")
-    raise ImportError(
+    raise ConfigurationError(
         'Please install the `huggingface_hub` package to use the HuggingFace provider, you can use the `huggingface` optional group — `pip install "codeweaver[huggingface]"`'
     ) from e
 """
@@ -145,3 +146,6 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
         While some models may support multiple dimensions, the HF Inference API does not.
         """
         return self._caps.default_dimension or 1024
+
+
+__all__ = ("HuggingFaceEmbeddingProvider",)

@@ -60,7 +60,7 @@ class StatisticsMiddleware(Middleware):
             log_level: Logging level to use
         """
         self.statistics = statistics or get_session_statistics()
-        self.timing_statistics = self.timing_statistics or self.statistics.timing_statistics
+        self.timing_statistics = self.statistics.timing_statistics
         self.logger = logger or logging.getLogger(__name__)
         self.log_level = log_level or logging.INFO
         self._we_are_not_none()
@@ -258,3 +258,6 @@ class StatisticsMiddleware(Middleware):
     def reset_statistics(self) -> None:
         """Reset all statistics to initial state."""
         self.statistics.reset()
+
+
+__all__ = ("StatisticsMiddleware",)

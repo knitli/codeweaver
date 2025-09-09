@@ -638,3 +638,6 @@ class BedrockEmbeddingProvider(EmbeddingProvider[bedrock_client]):
             self._postprocessor(response, doc)  # type: ignore
             for (response, doc) in zip(responses, query, strict=True)
         ]
+
+
+__all__ = ("BedrockEmbeddingProvider",)

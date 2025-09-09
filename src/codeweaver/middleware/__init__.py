@@ -7,4 +7,4 @@
 from codeweaver.middleware.statistics import StatisticsMiddleware
 
 
-__all__ = ["StatisticsMiddleware"]
+__all__ = ("StatisticsMiddleware",)

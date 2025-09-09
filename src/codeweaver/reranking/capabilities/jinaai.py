@@ -36,3 +36,6 @@ def get_jinaai_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
         RerankingModelCapabilities.model_validate({**cap, "name": name})
         for name, cap in capabilities.items()
     ]
+
+
+__all__ = ("get_jinaai_reranking_capabilities",)

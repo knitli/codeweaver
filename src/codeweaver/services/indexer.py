@@ -43,3 +43,6 @@ class FileWatcher[WatchfilesAwatch]:
 
     def default_filter(self, path: Path) -> bool:
         """Default filter function to exclude unwanted files."""
+
+
+__all__ = ("FileWatcher",)

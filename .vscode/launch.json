@@ -21,7 +21,8 @@
             "args": [
                 "server"
             ],
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "justMyCode": false
         },
         {
             "name": "Debug Fetch Grammars Script",

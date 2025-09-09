@@ -18,7 +18,6 @@ from functools import cache, cached_property
 from pathlib import Path
 from types import MappingProxyType
 from typing import (
-    TYPE_CHECKING,
     Annotated,
     Any,
     Literal,
@@ -36,6 +35,7 @@ from typing import (
 from uuid import uuid4
 from weakref import WeakValueDictionary
 
+from ast_grep_py import SgNode
 from pydantic import (
     UUID4,
     AfterValidator,
@@ -59,10 +59,6 @@ from codeweaver._common import BaseEnum
 from codeweaver._constants import get_ext_lang_pairs
 from codeweaver._utils import ensure_iterable, normalize_ext, set_relative_path
 from codeweaver.language import ConfigLanguage, SemanticSearchLanguage
-
-
-if TYPE_CHECKING:
-    from ast_grep_py import SgNode
 
 
 try:
@@ -1286,3 +1282,16 @@ def make_blake_store[T](
 ) -> BlakeStore[T]:
     """Create a BlakeStore with the specified value type."""
     return BlakeStore[T](_value_type=value_type, store={}, _size_limit=size_limit)
+
+
+__all__ = (
+    "BlakeStore",
+    "CodeChunk",
+    "DiscoveredFile",
+    "SearchResult",
+    "Span",
+    "SpanGroup",
+    "UUIDStore",
+    "make_blake_store",
+    "make_uuid_store",
+)

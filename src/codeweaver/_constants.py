@@ -448,3 +448,13 @@ DOCS_LANGUAGES = frozenset({ext.language for ext in DOC_FILES_EXTENSIONS})
 def get_ext_lang_pairs() -> Generator[ExtLangPair]:
     """Yield all `ExtLangPair` instances for code, config, and docs files."""
     yield from (*CODE_FILES_EXTENSIONS, *DOC_FILES_EXTENSIONS)
+
+
+__all__ = (
+    "CODE_FILES_EXTENSIONS",
+    "CODE_LANGUAGES",
+    "CONFIG_FILE_LANGUAGES",
+    "DOCS_LANGUAGES",
+    "DOC_FILES_EXTENSIONS",
+    "get_ext_lang_pairs",
+)

@@ -170,3 +170,6 @@ def get_baai_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
             for provider in CAP_MAP[cap["name"]]  # pyright: ignore[reportArgumentType]
         ])
     return tuple(EmbeddingModelCapabilities.model_validate(cap) for cap in capabilities)
+
+
+__all__ = ("get_baai_embedding_capabilities",)

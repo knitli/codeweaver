@@ -11,6 +11,7 @@ import multiprocessing
 from collections.abc import Mapping, Sequence
 from typing import Any, ClassVar
 
+from codeweaver.exceptions import ConfigurationError
 from codeweaver.provider import Provider
 from codeweaver.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.reranking.providers.base import RerankingProvider
@@ -23,8 +24,8 @@ try:
 
 except ImportError as e:
     logger.exception("Failed to import TextCrossEncoder from fastembed.rerank.cross_encoder")
-    raise ImportError(
-        "FastEmbed is not installed. Please install it with `pip install fastembed`."
+    raise ConfigurationError(
+        "FastEmbed is not installed. Please install it with `pip install codeweaver[provider-fastembed]` or `codeweaver[provider-fastembed-gpu]`."
     ) from e
 
 
@@ -95,3 +96,6 @@ class FastEmbedRerankingProvider(RerankingProvider[TextCrossEncoder]):
             raise RuntimeError(f"Error during reranking with FastEmbed: {e}") from e
         else:
             return response
+
+
+__all__ = ("FastEmbedRerankingProvider",)

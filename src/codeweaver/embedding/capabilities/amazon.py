@@ -36,3 +36,6 @@ def get_amazon_embedding_capabilities() -> tuple[EmbeddingModelCapabilities]:
             ),  # we normalize by default, so dot and cosine are equivalent
         }),
     )
+
+
+__all__ = ("get_amazon_embedding_capabilities",)

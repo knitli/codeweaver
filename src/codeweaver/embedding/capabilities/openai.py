@@ -57,3 +57,6 @@ def get_openai_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...
         for provider in _get_providers()
         for model_name in _get_openai_models(provider)
     )
+
+
+__all__ = ("get_openai_embedding_capabilities",)

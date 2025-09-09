@@ -8,7 +8,7 @@ Helper functions for CodeWeaver utilities.
 """
 
 import contextlib
-import importlib
+import inspect
 import logging
 import os
 import shutil
@@ -20,13 +20,12 @@ from functools import cache
 from importlib import metadata, util
 from pathlib import Path
 from types import ModuleType
-from typing import TYPE_CHECKING, Literal, NotRequired, Required, TypedDict, cast
+from typing import Any, Literal, NotRequired, Required, TypedDict, cast
+
+from pydantic import BaseModel, TypeAdapter
+from typing_extensions import TypeIs
 
 from codeweaver._common import Sentinel
-
-
-if TYPE_CHECKING:
-    pass
 
 
 logger = logging.getLogger(__name__)
@@ -53,9 +52,21 @@ def lazy_importer(module_name: str) -> ModuleType:
     return module
 
 
-def codeweaver_settings(path: Path | None = None):
-    """Lazily fetch CodeWeaver settings without importing at module import time."""
-    return importlib.import_module("codeweaver.settings").get_settings(path)
+def is_pydantic_basemodel(model: Any) -> TypeIs[type[BaseModel] | BaseModel]:
+    """Check if a model is a Pydantic BaseModel."""
+    return isinstance(model, type) and (
+        issubclass(model, BaseModel) or isinstance(model, BaseModel)
+    )
+
+
+def is_class(obj: Any) -> TypeIs[type[Any]]:
+    """Check if an object is a class."""
+    return inspect.isclass(obj)
+
+
+def is_typeadapter(adapter: Any) -> TypeIs[TypeAdapter[Any] | type[TypeAdapter[Any]]]:
+    """Check if an object is a Pydantic TypeAdapter."""
+    return hasattr(adapter, "pydantic_complete") and hasattr(adapter, "validate_python")
 
 
 # Even Python's latest and greatest typing (as of 3.12+), Python can't properly express this function.
@@ -120,7 +131,23 @@ def ensure_iterable[T](value: Iterable[T] | T) -> Iterable[T]:
         yield cast(T, value)
 
 
-def is_git_repo(directory: Path | None = None) -> bool:
+def try_git_rev_parse() -> Path | None:
+    """Attempt to use git to get the root directory of the current git repository."""
+    if not has_git():
+        return None
+    git = shutil.which("git")
+    with contextlib.suppress(subprocess.CalledProcessError):
+        output = subprocess.run(
+            ["rev-parse", "--show-superproject-working-tree", "--show-toplevel", "|", "head", "-1"],  # noqa: S607
+            executable=git,
+            capture_output=True,
+            text=True,
+        )
+        return Path(output.stdout.strip())
+    return None
+
+
+def is_git_dir(directory: Path | None = None) -> bool:
     """Is the given directory version-controlled with git?"""
     directory = directory or Path.cwd()
     if (git_dir := (directory / ".git")) and git_dir.exists():
@@ -134,7 +161,7 @@ def _walk_down_to_git_root(path: Path | None = None) -> Path:
     if path.is_file():
         path = path.parent
     while path != path.parent:
-        if is_git_repo(path):
+        if is_git_dir(path):
             return path
         path = path.parent
     raise FileNotFoundError("No .git directory found in the path hierarchy.")
@@ -142,7 +169,7 @@ def _walk_down_to_git_root(path: Path | None = None) -> Path:
 
 def _root_path_checks_out(root_path: Path) -> bool:
     """Check if the root path is valid."""
-    return root_path.exists() and root_path.is_dir() and root_path / ".git" in root_path.iterdir()
+    return root_path.exists() and root_path.is_dir() and is_git_dir(root_path)
 
 
 def get_project_root(root_path: Path | None = None) -> Path:
@@ -172,17 +199,22 @@ def has_git() -> bool:
     if not git:
         return False
     with contextlib.suppress(subprocess.CalledProcessError):
-        subprocess.run(["--version"], executable=git, stderr=subprocess.STDOUT, capture_output=True)  # pyright: ignore[reportUnusedCallResult]  # noqa: S607
-        return True
+        output = subprocess.run(
+            ["--version"], executable=git, stderr=subprocess.STDOUT, capture_output=True
+        )  # pyright: ignore[reportUnusedCallResult]
+        return output.returncode == 0
     return False
 
 
 def get_git_revision(directory: Path) -> str | Missing:  # pyright: ignore[reportInvalidTypeForm, reportUnknownParameterType]
-    """Get the SHA-1 of the HEAD of a git repository."""
-    if not is_git_repo(directory):
+    """Get the SHA-1 of the HEAD of a git repository.
+
+    This is a precursor for future functionality. We'd like to be able to associate indexes and other artifacts with a specific git commit. Because there's nothing worse than an Agent working from a totally different context than the one you expect.
+    """
+    if not is_git_dir(directory):
         with contextlib.suppress(FileNotFoundError):
             directory = get_project_root() or Path.cwd()
-        if not directory or not is_git_repo(directory):
+        if not directory or not is_git_dir(directory):
             return MISSING
     if has_git():
         git = shutil.which("git")
@@ -192,14 +224,19 @@ def get_git_revision(directory: Path) -> str | Missing:  # pyright: ignore[repor
                 executable=git,
                 cwd=directory,
                 capture_output=True,
+                text=True,
             )
-            return output.stdout.decode("utf-8").strip()
+            return output.stdout.strip()
     return MISSING
 
 
 def in_codeweaver_clone(path: Path) -> bool:
     """Check if the current repo is CodeWeaver."""
-    return "codeweaver" in str(path).lower() or "code-weaver" in str(path).lower()
+    return (
+        "codeweaver" in str(path).lower()
+        or "code-weaver" in str(path).lower()
+        or bool((rev_dir := try_git_rev_parse()) and "codeweaver" in rev_dir.name.lower())
+    )  # pyright: ignore[reportOptionalMemberAccess, reportUnknownMemberType]
 
 
 # src/codeweaver/_utils.py
@@ -266,6 +303,8 @@ def has_package(package_name: str) -> bool:
 """This section conducts a series of checks to determine if Fastembed-GPU can be used.
 
 It is only called if the user requests a Fastembed provider.
+
+There is also a separate set of optimizations that can be used with Fastembed and SentenceTransformers. These aren't yet fully implemented.
 """
 
 
@@ -516,7 +555,7 @@ __all__ = (
     "has_package",
     "in_codeweaver_clone",
     "is_debug",
-    "is_git_repo",
+    "is_git_dir",
     "lazy_importer",
     "normalize_ext",
     "rpartial",

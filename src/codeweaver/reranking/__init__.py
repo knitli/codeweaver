@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Base class for reranking providers."""
 
-from typing import Literal
+from typing import Any, Literal
 
 from codeweaver.provider import Provider
 from codeweaver.reranking.providers.base import RerankingProvider
@@ -38,7 +38,7 @@ type KnownRerankModelName = Literal[
 ]
 
 
-def get_rerank_model_provider(provider: Provider) -> type[RerankingProvider]:
+def get_rerank_model_provider(provider: Provider) -> type[RerankingProvider[Any]]:
     """Get rerank model provider."""
     if provider in {Provider.VOYAGE}:
         from codeweaver.reranking.providers.voyage import VoyageRerankingProvider

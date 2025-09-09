@@ -69,3 +69,6 @@ class Tokenizers(Tokenizer[TokenizersTokenizer]):
         The Tokenizers library can load any Hugging Face tokenizer, but they're all based on four models, so we return those.
         """
         return ["BPE", "WordPiece", "WordLevel", "Unigram"]
+
+
+__all__ = ("Tokenizers",)

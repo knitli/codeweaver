@@ -21,11 +21,11 @@ from codeweaver._utils import estimate_tokens
 from codeweaver.exceptions import QueryError
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.models.core import CodeMatch, CodeMatchType, FindCodeResponseSummary, SearchStrategy
+from codeweaver.models.intent import IntentType, QueryIntent
 from codeweaver.services.discovery import FileDiscoveryService
 
 
 if TYPE_CHECKING:
-    from codeweaver.models.intent import IntentType, QueryIntent
     from codeweaver.settings import CodeWeaverSettings
 
 
@@ -273,3 +273,6 @@ def get_surrounding_context(lines: list[str], span: Span, context_lines: int = 5
             result_lines.append(f"  {line_num:4d}: {line}")
 
     return "\n".join(result_lines)
+
+
+__all__ = ("find_best_section", "find_code_implementation", "get_surrounding_context")

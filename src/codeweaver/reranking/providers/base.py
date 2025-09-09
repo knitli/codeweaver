@@ -47,6 +47,8 @@ class RerankingResult(NamedTuple):
 def _get_statistics() -> SessionStatistics:
     """Get the statistics source for the reranking provider."""
     statistics_module = importlib.import_module("codeweaver._statistics")
+    # we need SessionStatistics in this namespace at runtime for pydantic to find it
+    SessionStatistics = statistics_module.SessionStatistics  # type: ignore # noqa: F841, N806
     return statistics_module.get_session_statistics()
 
 
@@ -363,3 +365,6 @@ class RerankingProvider[RerankingClient](BaseModel, ABC):
             fallback=fallback,
             serialize_as_any=serialize_as_any,
         )
+
+
+__all__ = ("RerankingProvider", "RerankingResult")

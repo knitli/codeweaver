@@ -23,7 +23,7 @@ from pydantic_core import core_schema
 
 
 type LiteralStringT = Annotated[
-    LiteralString, GetPydanticSchema(lambda _schema, handle: handle(str))
+    LiteralString, GetPydanticSchema(lambda _schema, handler: handler(str))
 ]
 type EnumExtend = Callable[[Enum, str], Enum]
 extend_enum: EnumExtend = extend_enum  # pyright: ignore[reportUnknownVariableType]
@@ -330,8 +330,11 @@ class Sentinel:
         return core_schema.with_info_after_validator_function(
             cls._validate,
             core_schema.str_schema(),
+            # spellchecker:off
             serialization=core_schema.plain_serializer_function_ser_schema(
-                cls._serialize, when_used="json"
+                # spellchecker:on
+                cls._serialize,
+                when_used="json",
             ),
         )
 
@@ -339,7 +342,7 @@ class Sentinel:
     def _validate(value: str, _info: core_schema.ValidationInfo) -> Sentinel:
         """Validate that a value is a sentinel."""
         name, repr_, module_name = value.split(" ")
-        return Sentinel(name.strip(), repr_, module_name.strip())
+        return Sentinel(cast(LiteralString, name.strip()), repr_, module_name.strip())
 
     @staticmethod
     def _serialize(sentinel: Sentinel) -> str:
@@ -358,3 +361,6 @@ class Unset(Sentinel):
 
 
 UNSET: Unset = Unset("UNSET")
+
+
+__all__ = ("UNSET", "BaseEnum", "LiteralStringT", "Sentinel")

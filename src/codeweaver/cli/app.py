@@ -11,7 +11,7 @@ import sys
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
+from typing import Annotated, Any, Literal, cast
 
 import cyclopts
 
@@ -20,20 +20,16 @@ from rich import print as rich_print
 from rich.console import Console
 from rich.table import Table
 
+from codeweaver._utils import lazy_importer
 from codeweaver.exceptions import CodeWeaverError
+from codeweaver.models.core import CodeMatch, FindCodeResponseSummary
+from codeweaver.models.intent import IntentType
+from codeweaver.settings import CodeWeaverSettings
 from codeweaver.tools.find_code import find_code_implementation
 
 
-if TYPE_CHECKING:
-    from codeweaver.models.core import CodeMatch, FindCodeResponseSummary
-    from codeweaver.models.intent import IntentType
-    from codeweaver.settings import CodeWeaverSettings
-
-from codeweaver._utils import lazy_importer
-
-
 # Lazy import for performance
-get_settings: Any = lazy_importer("codeweaver.settings", "get_settings")
+get_settings: Any = lazy_importer("codeweaver.settings").get_settings
 
 # Initialize console for rich output
 console = Console(markup=True, emoji=True)
@@ -50,7 +46,7 @@ async def server(
     *,
     config_file: Annotated[Path | None, cyclopts.Parameter(name=["--config", "-c"])] = None,
     project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
-    host: str = "localhost",
+    host: str = "127.0.0.1",
     port: int = 9328,
     debug: bool = False,
 ) -> None:
@@ -70,9 +66,13 @@ async def server(
         console.print("[green]Starting CodeWeaver MCP server...[/green]")
         console.print(f"[blue]Project: {settings.project_root}[/blue]")
         console.print(f"[blue]Server: http://{host}:{port}[/blue]")
-        app = build_app(settings)
-        register_app_bindings(app)
-        await start_server(app, host=host, port=port)
+        server_setup = build_app(settings)
+        server_setup["app"], server_setup["middleware"] = register_app_bindings(  # type: ignore
+            server_setup["app"],
+            server_setup.get("middleware", set()),  # type: ignore
+            server_setup.get("middleware_settings", {}),
+        )
+        await start_server(server_setup, **{"host": host, "port": port})  # type: ignore # noqa: PIE804
 
     except CodeWeaverError as e:
         console.print_exception(show_locals=True)
@@ -318,3 +318,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+__all__ = ["app", "main"]

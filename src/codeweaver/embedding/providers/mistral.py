@@ -13,6 +13,7 @@ from typing import Any, cast
 from codeweaver._data_structures import CodeChunk
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.embedding.providers.base import EmbeddingProvider
+from codeweaver.exceptions import ConfigurationError
 from codeweaver.provider import Provider
 
 
@@ -20,7 +21,7 @@ try:
     from mistralai import Mistral
     from mistralai.models import EmbeddingDtype
 except ImportError as e:
-    raise ImportError(
+    raise ConfigurationError(
         'Please install the `mistralai` package to use the Mistral provider, \nyou can use the `mistral` optional group — `pip install "codeweaver[provider-mistral]"`'
     ) from e
 
@@ -88,3 +89,6 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
     ) -> list[list[float]] | list[list[int]]:
         kwargs = (kwargs or {}) | self.query_kwargs.get("client_kwargs", {})
         return await self._fetch_embeddings(cast(list[str], query), **kwargs)
+
+
+__all__ = ("MistralEmbeddingProvider",)

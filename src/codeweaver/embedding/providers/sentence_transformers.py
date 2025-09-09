@@ -20,14 +20,15 @@ from codeweaver.embedding.capabilities.base import (
     SparseEmbeddingModelCapabilities,
 )
 from codeweaver.embedding.providers.base import EmbeddingProvider
+from codeweaver.exceptions import ConfigurationError
 from codeweaver.provider import Provider
 
 
 try:
     from sentence_transformers import SentenceTransformer, SparseEncoder
 except ImportError as e:
-    raise ImportError(
-        'Please install the `sentence-transformers` package to use the Sentence Transformers provider, \nyou can use the `sentence-transformers` optional group — `pip install "codeweaver[sentence-transformers]"`'
+    raise ConfigurationError(
+        'Please install the `sentence-transformers` package to use the Sentence Transformers provider, \nyou can use the `sentence-transformers` optional group — `pip install "codeweaver[sentence-transformers]"` or `codeweaver[sentence-transformers-gpu]`'
     ) from e
 
 
@@ -229,3 +230,6 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         if not isinstance(self._client, SparseEncoder):
             raise TypeError("The model is not a SparseEncoder.")
         return cast(list[list[tuple[str, float]]], self._client.decode(vectors))  # type: ignore
+
+
+__all__ = ("SentenceTransformersEmbeddingProvider",)
