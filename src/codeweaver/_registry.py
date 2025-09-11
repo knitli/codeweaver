@@ -27,10 +27,10 @@ from fnmatch import fnmatch
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Annotated, Any, ClassVar, NotRequired, Required, TypedDict
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import ConfigDict, Field, computed_field
 from pydantic.alias_generators import to_pascal
 
-from codeweaver._common import BaseEnum, LiteralStringT
+from codeweaver._common import BasedModel, BaseEnum, LiteralStringT
 from codeweaver.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
@@ -50,6 +50,13 @@ if TYPE_CHECKING:
     from pydantic_ai.providers import Provider as AgentProvider
 
     from codeweaver.settings import CodeWeaverSettings
+
+else:
+    # We need these in the environment at runtime for pydantic, but only when needed
+    from codeweaver._utils import lazy_importer
+
+    AgentProvider = lazy_importer("pydantic_ai.providers").Provider
+    CodeWeaverSettings = lazy_importer("codeweaver.settings").CodeWeaverSettings
 
 # I think I've defined this in like four places, but it's just for clarity
 type ModelName = str
@@ -125,10 +132,10 @@ class ServiceCardDict(TypedDict, total=False):
     instance: NotRequired[Any | None]
 
 
-class ServiceCard(BaseModel):
+class ServiceCard(BasedModel):
     """Card representing a service and its status."""
 
-    model_config = ConfigDict(validate_assignment=True, defer_build=True, str_strip_whitespace=True)
+    model_config = BasedModel.model_config | ConfigDict(validate_assignment=True, defer_build=True)
 
     name: ServiceName
     feature: Annotated[Feature, Field(description="""The feature enum identifier""")]
@@ -159,17 +166,14 @@ class ServiceCard(BaseModel):
         )
 
 
-class ServicesRegistry(BaseModel):
+class ServicesRegistry(BasedModel):
     """Registry for managing available services."""
 
-    model_config = ConfigDict(
-        arbitrary_types_allowed=True,
-        validate_assignment=True,
-        defer_build=True,
-        str_strip_whitespace=True,
+    model_config = BasedModel.model_config | ConfigDict(
+        arbitrary_types_allowed=True, validate_assignment=True, defer_build=True
     )
 
-    _services: MutableMapping[Feature, list[ServiceCard]] = {
+    _services: ClassVar[MutableMapping[Feature, list[ServiceCard]]] = {
         feature: [] for feature in Feature if feature != Feature.UNKNOWN
     }
 
@@ -225,14 +229,11 @@ class ServicesRegistry(BaseModel):
         raise NotImplementedError("Service status tracking is not implemented yet.")
 
 
-class ModelRegistry(BaseModel):
+class ModelRegistry(BasedModel):
     """Registry for managing available embedding, reranking, and sparse embedding models."""
 
-    model_config = ConfigDict(
-        arbitrary_types_allowed=True,
-        validate_assignment=True,
-        defer_build=True,
-        str_strip_whitespace=True,
+    model_config = BasedModel.model_config | ConfigDict(
+        arbitrary_types_allowed=True, validate_assignment=True, defer_build=True
     )
 
     def __init__(self) -> None:
@@ -432,14 +433,11 @@ class ModelRegistry(BaseModel):
         )
 
 
-class ProviderRegistry(BaseModel):
+class ProviderRegistry(BasedModel):
     """Registry for managing provider implementations and settings."""
 
-    model_config = ConfigDict(
-        arbitrary_types_allowed=True,
-        validate_assignment=True,
-        defer_build=True,
-        str_strip_whitespace=True,
+    model_config = BasedModel.model_config | ConfigDict(
+        arbitrary_types_allowed=True, validate_assignment=True, defer_build=True
     )
 
     _instance: ProviderRegistry | None = None
@@ -534,9 +532,6 @@ class ProviderRegistry(BaseModel):
         self._reranking_instances: MutableMapping[Provider, RerankingProvider[Any]] = {}
         self._agent_instances: MutableMapping[Provider, Any] = {}
         self._data_instances: MutableMapping[Provider, Any] = {}
-
-        # Initialize with built-in providers
-        self._register_builtin_providers()
 
     @classmethod
     def get_instance(cls) -> ProviderRegistry:
@@ -1262,6 +1257,11 @@ def resolve_agentic_profile(provider: Provider, model_name: str) -> AgenticProfi
     Resolve an agentic profile for a given provider and model name.
     """
     return _model_registry.resolve_agentic_profile(provider, model_name)
+
+
+def initialize_registries() -> None:
+    """Initialize the global registries."""
+    _provider_registry._register_builtin_providers()  # type: ignore
 
 
 __all__ = (

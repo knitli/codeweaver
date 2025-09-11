@@ -24,7 +24,6 @@ from typing import (
 
 from pydantic import (
     AliasGenerator,
-    BaseModel,
     ConfigDict,
     Field,
     Json,
@@ -37,6 +36,7 @@ from pydantic import (
 from pydantic.alias_generators import to_camel, to_snake
 from types_boto3_bedrock_runtime import BedrockRuntimeClient
 
+from codeweaver._common import BasedModel
 from codeweaver._data_structures import CodeChunk
 from codeweaver.embedding.capabilities import EmbeddingModelCapabilities
 from codeweaver.embedding.providers.base import EmbeddingProvider
@@ -47,10 +47,10 @@ from codeweaver.provider import Provider
 logger = logging.getLogger(__name__)
 
 
-class BaseBedrockModel(BaseModel):
+class BaseBedrockModel(BasedModel):
     """Base model for Bedrock-related Pydantic models."""
 
-    model_config = ConfigDict(
+    model_config = BasedModel.model_config | ConfigDict(
         alias_generator=AliasGenerator(validation_alias=to_snake, serialization_alias=to_camel),
         str_strip_whitespace=True,
         # spellchecker:off

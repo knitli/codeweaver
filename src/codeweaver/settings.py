@@ -25,13 +25,14 @@ from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.server.server import DuplicateBehavior
 from fastmcp.tools.tool import Tool
 from mcp.server.auth.settings import AuthSettings
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt, computed_field, field_validator
+from pydantic import ConfigDict, Field, PositiveInt, computed_field, field_validator
+from pydantic.fields import ComputedFieldInfo, FieldInfo
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
 from pydantic_ai.settings import merge_model_settings
 from pydantic_core import from_json
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
-from codeweaver._common import UNSET, Unset
+from codeweaver._common import UNSET, BasedModel, Unset
 from codeweaver._constants import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_EXTENSIONS
 from codeweaver.exceptions import MissingValueError
 from codeweaver.provider import Provider, ProviderKind
@@ -91,7 +92,7 @@ def merge_agent_model_settings(
     return merge_model_settings(base, override)
 
 
-class FileFilterSettings(BaseModel):
+class FileFilterSettings(BasedModel):
     """Settings for file filtering.
 
     ## Path Resolution and Deconfliction
@@ -107,8 +108,12 @@ class FileFilterSettings(BaseModel):
     - if `include_github_dir` is True (default), the glob `**/.github/**` will be added to `forced_includes`.
     """
 
-    model_config = ConfigDict(
-        json_schema_extra={"NoTelemetryProps": ["forced_includes", "excludes"]}
+    model_config = (
+        ConfigDict(
+            json_schema_extra={"NoTelemetryProps": ["forced_includes", "excludes"]},
+            defer_build=True,
+        )
+        | BasedModel.model_config
     )
 
     forced_includes: Annotated[
@@ -225,7 +230,7 @@ class FileFilterSettings(BaseModel):
         return self._adjust_settings()
 
 
-class ProviderSettings(BaseModel):
+class ProviderSettings(BasedModel):
     """Settings for provider configuration."""
 
     data: Annotated[
@@ -254,23 +259,26 @@ class ProviderSettings(BaseModel):
     ] = DefaultAgentProviderSettings
 
 
-class FastMcpServerSettings(BaseModel):
+class FastMcpServerSettings(BasedModel):
     """Settings for the FastMCP server.
 
     These settings don't represent the complete set of FastMCP server settings, but the ones users can configure. The remaining settings, if changed, could break functionality or cause unexpected behavior.
     """
 
-    model_config = ConfigDict(
-        json_schema_extra={
-            "TelemetryBoolProps": [  # properties to convert to bool for telemetry -- just 'property is set' or 'property is not set'
-                "host",
-                "port",
-                "path",
-                "additional_dependencies",
-                "additional_middleware",
-                "additional_tools",
-            ]
-        }
+    model_config = (
+        ConfigDict(
+            json_schema_extra={
+                "TelemetryBoolProps": [  # properties to convert to bool for telemetry -- just 'property is set' or 'property is not set'
+                    "host",
+                    "port",
+                    "path",
+                    "additional_dependencies",
+                    "additional_middleware",
+                    "additional_tools",
+                ]
+            }
+        )
+        | BasedModel.model_config
     )
 
     transport: Annotated[
@@ -414,19 +422,30 @@ class CodeWeaverSettings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_prefix="CODEWEAVER_",
-        env_nested_delimiter="__",
-        env_file=(".codeweaver.local.env", ".env", ".codeweaver.env"),
-        toml_file=default_config_file_locations(),
-        yaml_file=default_config_file_locations(as_yaml=True),
-        json_file=default_config_file_locations(as_json=True),
         case_sensitive=False,
-        validate_assignment=True,
         cli_kebab_case=True,
+        env_file=(".codeweaver.local.env", ".env", ".codeweaver.env"),
+        env_ignore_empty=True,
+        env_nested_delimiter="__",
+        env_parse_enums=True,
+        env_prefix="CODEWEAVER_",
         extra="allow",  # Allow extra fields in the configuration for plugins/extensions
+        field_title_generator=cast(
+            Callable[[str, FieldInfo | ComputedFieldInfo], str],
+            BasedModel.model_config["field_title_generator"],  # type: ignore
+        ),
+        json_file=default_config_file_locations(as_json=True),
         json_schema_extra={
             "NoTelemetryProps": ["project_path", "project_root", "project_name", "config_file"]
         },
+        nested_model_default_partial_update=True,
+        str_strip_whitespace=True,
+        title="CodeWeaver Settings",
+        toml_file=default_config_file_locations(),
+        use_attribute_docstrings=True,
+        use_enum_values=True,
+        validate_assignment=True,
+        yaml_file=default_config_file_locations(as_yaml=True),
     )
 
     # Core settings
@@ -562,6 +581,23 @@ class CodeWeaverSettings(BaseSettings):
         if not self.project_path:
             self.project_path = importlib.import_module("codeweaver._utils").get_project_root()
         return self.project_path.resolve()
+
+    @classmethod  # spellchecker:off
+    def settings_customise_sources(
+        # spellchecker:on
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Customize the sources of settings for a specific settings class."""
+        # spellchecker:off
+        return super().settings_customise_sources(
+            settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings
+        )
+        # spellchecker:on
 
 
 # Global settings instance

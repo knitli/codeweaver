@@ -215,6 +215,17 @@ class SemanticSearchLanguage(str, BaseEnum):
             cls.YAML: (".yaml", ".yml"),
         })
 
+    @classmethod
+    def from_extension(cls, ext: str) -> SemanticSearchLanguage | None:
+        """
+        Returns the SemanticSearchLanguage associated with the given file extension.
+        """
+        ext = ext.lower() if ext.startswith(".") else f".{ext.lower()}"
+        return next(
+            (language for language, extensions in cls.extension_map().items() if ext in extensions),
+            None,
+        )
+
     @property
     def extensions(self) -> tuple[str, ...] | None:
         """

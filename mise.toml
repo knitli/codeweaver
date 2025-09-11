@@ -63,6 +63,12 @@ echo "Syncing dependencies..."
 uv sync --extra all --group all-dev
 """
 
+update-dependencies = """
+#!/bin/bash
+echo "Updating dependencies..."
+uv sync --extra all --group all-dev -U
+"""
+
 source = """
 #!/bin/
 cdroot || true && source .venv/bin/activate

@@ -37,7 +37,6 @@ from fastmcp.tools import Tool
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.lowlevel.server import LifespanResultT
 from pydantic import (
-    BaseModel,
     BeforeValidator,
     ConfigDict,
     Field,
@@ -59,6 +58,7 @@ from uvicorn.config import (
     WSProtocolType,
 )
 
+from codeweaver._common import BasedModel
 from codeweaver.exceptions import ConfigurationError
 
 
@@ -268,7 +268,7 @@ def validate_regex_pattern(value: re.Pattern[str] | str | None) -> re.Pattern[st
         raise ConfigurationError(f"Invalid regex pattern: {e.args[0]}") from e
 
 
-class SerializableLoggingFilter(BaseModel, logging.Filter):
+class SerializableLoggingFilter(BasedModel, logging.Filter):
     """A logging.Filter object that implements a custom pydantic serializer.
     The filter can be serialized and deserialized using Pydantic.
 
@@ -568,7 +568,7 @@ class AWSProviderSettings(TypedDict, total=False):
 
     region_name: Required[str]
     model_arn: Required[str]
-    aws_access_key_id: NotRequired[str | None]
+    aws_access_key_id: NotRequired[SecretStr | None]
     """Optional AWS access key ID. If not provided, we'll assume you have you have your AWS credentials configured in another way, such as environment variables, AWS config files, or IAM roles."""
     aws_secret_access_key: NotRequired[SecretStr | None]
     """Optional AWS secret access key. If not provided, we'll assume you have you have your AWS credentials configured in another way, such as environment variables, AWS config files, or IAM roles."""
@@ -585,7 +585,7 @@ class AzureCohereProviderSettings(TypedDict, total=False):
 
     model_deployment: NotRequired[str]
     """The deployment name of the model you want to use. Important: While the OpenAI API uses the model name to identify the model, you must separately provide a codeweaver-compatible name for the model, as well as your Azure resource name here. We're open to PRs if you want to add a parser for model names that can extract the deployment name from them."""
-    api_key: NotRequired[str | None]
+    api_key: NotRequired[SecretStr | None]
     """Your Azure API key. If not provided, we'll assume you have your Azure credentials configured in another way, such as environment variables."""
     azure_resource_name: NotRequired[str]
     """The name of your Azure resource. This is used to identify your resource in Azure."""
@@ -615,7 +615,7 @@ class AzureOpenAIProviderSettings(TypedDict, total=False):
     """The endpoint for your Azure resource. This is used to send requests to your resource. Only provide the endpoint, not the full URL. For example, if your endpoint is `https://your-cool-resource.<region_name>.inference.ai.azure.com/v1`, you would only provide "your-cool-resource" here."""
     region_name: NotRequired[str]
     """The Azure region where your resource is located. This is used to route requests to the correct regional endpoint."""
-    api_key: NotRequired[str | None]
+    api_key: NotRequired[SecretStr | None]
     """Your Azure API key. If not provided, we'll assume you have your Azure credentials configured in another way, such as environment variables."""
 
 
@@ -681,7 +681,7 @@ class AgentProviderSettings(BaseProviderSettings):
 # ===========================================================================
 
 
-class UvicornServerSettings(BaseModel):
+class UvicornServerSettings(BasedModel):
     """
     Uvicorn server settings. Besides the port, these are all defaults for uvicorn.
 
@@ -689,28 +689,30 @@ class UvicornServerSettings(BaseModel):
     """
 
     # For the following, we just want to track if it's the default value or not (True/False), not the actual value.
-    model_config = ConfigDict(
-        str_strip_whitespace=True,
-        json_schema_extra={
-            "TelemetryBoolProps": [
-                "host",
-                "name",
-                "ssl_keyfile",
-                "ssl_certfile",
-                "ssl_keyfile_password",
-                "ssl_version",
-                "ssl_cert_reqs",
-                "ssl_ca_certs",
-                "ssl_ciphers",
-                "root_path",
-                "headers",
-                "server_header",
-                "data_header",
-                "forwarded_allow_ips",
-                "env_file",
-                "log_config",
-            ]
-        },
+    model_config = (
+        ConfigDict(
+            json_schema_extra={
+                "TelemetryBoolProps": [
+                    "host",
+                    "name",
+                    "ssl_keyfile",
+                    "ssl_certfile",
+                    "ssl_keyfile_password",
+                    "ssl_version",
+                    "ssl_cert_reqs",
+                    "ssl_ca_certs",
+                    "ssl_ciphers",
+                    "root_path",
+                    "headers",
+                    "server_header",
+                    "data_header",
+                    "forwarded_allow_ips",
+                    "env_file",
+                    "log_config",
+                ]
+            }
+        )
+        | BasedModel.model_config
     )
 
     name: Annotated[str, Field(exclude=True)] = "CodeWeaver_http"

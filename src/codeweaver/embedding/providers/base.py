@@ -8,7 +8,6 @@
 import asyncio
 import importlib
 import logging
-import uuid
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -26,9 +25,10 @@ from typing import (
 )
 from uuid import UUID
 
-from pydantic import UUID4, BaseModel, ConfigDict
+from pydantic import UUID7, ConfigDict
 from pydantic.main import IncEx
 
+from codeweaver._common import BasedModel
 from codeweaver._data_structures import (
     BlakeStore,
     CodeChunk,
@@ -38,6 +38,7 @@ from codeweaver._data_structures import (
     make_blake_store,
     make_uuid_store,
 )
+from codeweaver._utils import uuid7
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.provider import Provider
 from codeweaver.tokenizers import Tokenizer, get_tokenizer
@@ -45,6 +46,7 @@ from codeweaver.tokenizers import Tokenizer, get_tokenizer
 
 if TYPE_CHECKING:
     from codeweaver._statistics import SessionStatistics
+
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +68,7 @@ class EmbeddingErrorInfo(TypedDict):
     """
 
     error: Required[str]
-    batch_id: NotRequired[UUID4 | None]
+    batch_id: NotRequired[UUID7 | None]
     documents: NotRequired[Sequence[CodeChunk] | None]
     queries: NotRequired[Sequence[str] | None]
 
@@ -90,7 +92,7 @@ def default_output_transformer(output: Any) -> list[list[float]] | list[list[int
     raise ValueError("Unexpected output format from embedding provider.")
 
 
-class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
+class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     """
     Abstract class for an embedding provider. You must pass in a client and capabilities.
 
@@ -106,7 +108,7 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
     The primary example of this one-to-many relationship is the OpenAI provider, which supports any OpenAI-compatible provider (Azure, Ollama, Fireworks, Heroku, Together, Github).
     """
 
-    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
+    model_config = BasedModel.model_config | ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
     _client: EmbeddingClient
     _provider: Provider
@@ -119,12 +121,12 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
     _doc_kwargs: ClassVar[dict[str, Any]] = {}
     _query_kwargs: ClassVar[dict[str, Any]] = {}
 
-    _store: UUIDStore[list[CodeChunk]] = make_uuid_store(
-        value_type=list[CodeChunk], size_limit=1024 * 1024 * 3
+    _store: UUIDStore[list] = make_uuid_store(  # type: ignore
+        value_type=list, size_limit=1024 * 1024 * 3
     )
 
-    """The store for embedding documents, keyed by batch ID (UUID4) and stored as a batch of CodeChunks."""
-    _hash_store: ClassVar[BlakeStore[UUID4]] = make_blake_store(
+    """The store for embedding documents, keyed by batch ID (UUID7) and stored as a batch of CodeChunks."""
+    _hash_store: ClassVar[BlakeStore[UUID7]] = make_blake_store(
         value_type=UUID, size_limit=1024 * 256
     )  # 256kb limit -- we're just storing hashes
     """A store for deduplicating CodeChunks based on their content hash. The keys are each CodeChunk's content hash, the values are their batch IDs.
@@ -187,7 +189,7 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
     def _handle_embedding_error(
         self,
         error: Exception,
-        batch_id: UUID4 | None,
+        batch_id: UUID7 | None,
         documents: Sequence[CodeChunk] | None,
         queries: Sequence[str] | None,
     ) -> EmbeddingErrorInfo:
@@ -205,7 +207,7 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
         self,
         documents: Sequence[CodeChunk],
         *,
-        batch_id: UUID4 | None = None,
+        batch_id: UUID7 | None = None,
         **kwargs: Mapping[str, Any] | None,
     ) -> list[list[float]] | list[list[int]] | EmbeddingErrorInfo:
         """Embed a list of documents into vectors.
@@ -355,12 +357,12 @@ class EmbeddingProvider[EmbeddingClient](BaseModel, ABC):
 
     def _process_input(
         self, input_data: StructuredDataInput, *, is_old_batch: bool = False
-    ) -> tuple[Iterator[CodeChunk], UUID4 | None]:
+    ) -> tuple[Iterator[CodeChunk], UUID7 | None]:
         """Process input data for embedding."""
         processed_chunks = default_input_transformer(input_data)
         if is_old_batch:
             return processed_chunks, None
-        key = uuid.uuid4()
+        key = uuid7()
         hashes = [self._hash_store.keygen.__call__(chunk.content) for chunk in processed_chunks]
         for i, chunk in enumerate(processed_chunks):
             chunk.set_batch_id(key)

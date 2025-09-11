@@ -67,7 +67,7 @@ async def server(
         console.print(f"[blue]Project: {settings.project_root}[/blue]")
         console.print(f"[blue]Server: http://{host}:{port}[/blue]")
         server_setup = build_app(settings)
-        server_setup["app"], server_setup["middleware"] = register_app_bindings(  # type: ignore
+        server_setup["app"], server_setup["middleware"] = await register_app_bindings(  # type: ignore
             server_setup["app"],
             server_setup.get("middleware", set()),  # type: ignore
             server_setup.get("middleware_settings", {}),

@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, NonNegativeFloat, NonNegativeInt, model_validator
+from pydantic import ConfigDict, Field, NonNegativeFloat, NonNegativeInt, model_validator
 
-from codeweaver._common import BaseEnum
+from codeweaver._common import BasedModel, BaseEnum
 from codeweaver._data_structures import DiscoveredFile, Span
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.models.intent import IntentType
@@ -35,10 +35,10 @@ class CodeMatchType(BaseEnum):
     FILE_PATTERN = "file_pattern"
 
 
-class CodeMatch(BaseModel):
+class CodeMatch(BasedModel):
     """Individual code match with context and metadata."""
 
-    model_config = ConfigDict(
+    model_config = BasedModel.model_config | ConfigDict(
         json_schema_extra={
             "example": {
                 "file": {
@@ -56,7 +56,8 @@ class CodeMatch(BaseModel):
                 "relevance_score": 0.92,
                 "match_type": "text_search",
             }
-        }
+        },
+        defer_build=True,
     )
 
     # File information
@@ -97,10 +98,10 @@ class CodeMatch(BaseModel):
         return self
 
 
-class FindCodeResponseSummary(BaseModel):
+class FindCodeResponseSummary(BasedModel):
     """Structured response from find_code tool."""
 
-    model_config = ConfigDict(
+    model_config = BasedModel.model_config | ConfigDict(
         json_schema_extra={
             "example": {
                 "matches": [],
@@ -118,7 +119,8 @@ class FindCodeResponseSummary(BaseModel):
                 "search_strategy": ["file_discovery", "text_search"],
                 "languages_found": ["python", "typescript"],
             }
-        }
+        },
+        defer_build=True,
     )
 
     # Core results

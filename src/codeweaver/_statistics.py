@@ -10,7 +10,6 @@ Statistics tracking for CodeWeaver, including file indexing, retrieval, and sess
 from __future__ import annotations
 
 import statistics
-import uuid
 
 from collections import Counter, defaultdict
 from collections.abc import Sequence
@@ -18,23 +17,28 @@ from datetime import UTC, datetime
 from functools import cache
 from pathlib import Path
 from types import MappingProxyType
-from typing import Annotated, ClassVar, Literal, TypedDict, cast
+from typing import Annotated, Any, ClassVar, Literal, NamedTuple, TypedDict, cast
 
 from fastmcp import Context
 from pydantic import (
     AnyUrl,
     ConfigDict,
     Field,
+    FieldSerializationInfo,
     NonNegativeFloat,
     NonNegativeInt,
     PositiveFloat,
+    SerializerFunctionWrapHandler,
+    ValidatorFunctionWrapHandler,
     computed_field,
     field_serializer,
+    field_validator,
 )
 from pydantic.dataclasses import dataclass
 
-from codeweaver._common import BaseEnum
+from codeweaver._common import BasedModel, BaseEnum, DataclassSerializationMixin
 from codeweaver._data_structures import ChunkKind, ExtKind
+from codeweaver._utils import uuid7
 from codeweaver.language import ConfigLanguage, SemanticSearchLanguage
 
 
@@ -112,8 +116,8 @@ type SummaryKey = Literal["total_operations", "unique_files"]
 type CategoryKey = Literal["code", "config", "docs", "other"]
 
 
-@dataclass(config=ConfigDict(extra="forbid"))
-class TimingStatistics:
+@dataclass(config=BasedModel.model_config | ConfigDict(extra="forbid", defer_build=True))
+class TimingStatistics(DataclassSerializationMixin):
     """By-operation timing statistics for CodeWeaver operations."""
 
     on_call_tool_requests: Annotated[
@@ -373,9 +377,12 @@ class TimingStatistics:
 
 
 @dataclass(
-    config=ConfigDict(extra="forbid", json_schema_extra={"noTelemetryProps": ["unique_files"]})
+    config=BasedModel.model_config
+    | ConfigDict(
+        extra="forbid", json_schema_extra={"noTelemetryProps": ["unique_files"]}, defer_build=True
+    )
 )
-class _LanguageStatistics:
+class _LanguageStatistics(DataclassSerializationMixin):
     """Statistics for a specific language within a category."""
 
     language: Annotated[
@@ -447,9 +454,12 @@ def normalize_language(language: str) -> str | SemanticSearchLanguage | ConfigLa
 
 
 @dataclass(
-    config=ConfigDict(extra="forbid", json_schema_extra={"noTelemetryProps": ["unique_files"]})
+    config=BasedModel.model_config
+    | ConfigDict(
+        extra="forbid", json_schema_extra={"noTelemetryProps": ["unique_files"]}, defer_build=True
+    )
 )
-class _CategoryStatistics:
+class _CategoryStatistics(DataclassSerializationMixin):
     """Statistics for a file category (code, config, docs, other)."""
 
     category: Annotated[
@@ -510,6 +520,39 @@ class _CategoryStatistics:
                 )
         return MappingProxyType(mapped_languages)
 
+    @field_serializer(
+        "semantic_languages",
+        mode="wrap",
+        when_used="json",
+        return_type=dict[SemanticSearchLanguage, _LanguageStatistics],
+    )
+    def _serialize_semantic_languages(
+        self,
+        value: MappingProxyType[SemanticSearchLanguage, _LanguageStatistics],
+        nxt: SerializerFunctionWrapHandler,
+        _info: FieldSerializationInfo,
+    ) -> str:
+        """Serialize semantic languages for JSON output."""
+        return nxt(dict(value))  # type: ignore
+
+    @field_validator("semantic_languages", mode="wrap")
+    @classmethod
+    def _validate_semantic_languages(
+        cls, value: Any, nxt: ValidatorFunctionWrapHandler
+    ) -> MappingProxyType[SemanticSearchLanguage, _LanguageStatistics]:
+        """Validate semantic languages for JSON input."""
+        if isinstance(value, MappingProxyType) and all(
+            isinstance(k, SemanticSearchLanguage) and isinstance(v, _LanguageStatistics)
+            for k, v in value.items()  # type: ignore
+            if k and v  # type: ignore
+        ):
+            return value  # type: ignore
+        if isinstance(value, MappingProxyType | dict):
+            return MappingProxyType({nxt(k): nxt(v) for k, v in value.items()})  # type: ignore
+        if isinstance(value, str | bytes | bytearray):
+            return cls._validate_semantic_languages(nxt(value), nxt)
+        raise ValueError("Invalid type for semantic_languages")
+
     @property
     def _semantic_language_values(self) -> frozenset[str]:
         """Get the string values of all semantic search languages in this category."""
@@ -553,9 +596,12 @@ class _CategoryStatistics:
 
 
 @dataclass(
-    config=ConfigDict(extra="forbid", json_schema_extra={"noTelemetryProps": ["_other_files"]})
+    config=BasedModel.model_config
+    | ConfigDict(
+        extra="forbid", json_schema_extra={"noTelemetryProps": ["_other_files"]}, defer_build=True
+    )
 )
-class FileStatistics:
+class FileStatistics(DataclassSerializationMixin):
     """Comprehensive file statistics tracking categories, languages, and operations."""
 
     categories: dict[ChunkKind, _CategoryStatistics] = Field(
@@ -677,6 +723,9 @@ class TokenCategory(BaseEnum):
     SAVED_BY_RERANKING = "saved_by_reranking"
     """Tokens that were saved by reranking the results."""
 
+    SAVED_BY_CONTEXT_AGENT = "saved_by_context_agent"
+    """Tokens that were saved by the context agent."""
+
     @property
     def is_agent_token(self) -> bool:
         """Check if the token category is related to agent usage."""
@@ -691,6 +740,29 @@ class TokenCategory(BaseEnum):
     def is_embedding_type_token(self) -> bool:
         """Represents tokens generated for embedding operations."""
         return self in (TokenCategory.EMBEDDING, TokenCategory.RERANKING)
+
+    @property
+    def is_cost_token(self) -> bool:
+        """Check if the token category represents a cost for the user."""
+        return self in (
+            TokenCategory.CONTEXT_AGENT,
+            TokenCategory.EMBEDDING,
+            TokenCategory.RERANKING,
+        )
+
+    @property
+    def is_value_token(self) -> bool:
+        """Check if the token category represents value for the user."""
+        return self in (
+            TokenCategory.USER_AGENT,
+            TokenCategory.SEARCH_RESULTS,
+            TokenCategory.SAVED_BY_RERANKING,
+        )
+
+    @property
+    def is_context_agent_token(self) -> bool:
+        """Check if the token category represents a context agent token."""
+        return self in (TokenCategory.CONTEXT_AGENT, TokenCategory.SAVED_BY_CONTEXT_AGENT)
 
 
 class TokenCounter(Counter[TokenCategory]):
@@ -738,21 +810,77 @@ class TokenCounter(Counter[TokenCategory]):
             TokenCategory.SAVED_BY_RERANKING
         ]
 
+    @computed_field
     @property
-    def money_saved(self) -> NonNegativeFloat:
+    def money_saved(self) -> float:
         """
         Estimate the money saved by using CodeWeaver based on token savings.
 
-        TODO: To implement this correctly, we need to pull the model name from the fastmcp.Context object and use the pricing for that model. We could use [`genai_prices`](https://github.com/pydantic/genai-prices) to get the pricing information, either remotely or as a dependency.
+        This is a work in progress, and currently uses a simple heuristic to approximate savings.  Longter term we'd like to make it more accurate by pulling actual prices for models used, and ideally getting actual token counts from the user's agent (with their permission of course).
+
+
+        For now we're using simple 'back-of-the-envelope' calculations. We assume:
+        - The average cost per 1,000 tokens for embedding models is $0.00018 (Voyage AI as of September 2025)
+        - The average cost per 1,000 tokens for reranking models is $0.00005 (Voyage AI as of September 2025)
+        - Sparse models we consider `free` for this calculation, as compared to everything else, the costs to run them are miniscule.
+        - CodeWeaver itself doesn't have control over what model is used for the context agent, but CodeWeaver does *recommend* models to the user's client. We choose light-weight, low-cost models because we don't need frontline models for the context agent to do its job well, and we want it to be fast.
+            - Assuming the user's client chooses to listen to our recommendation (a big assumption), we assume the selected model is GPT-5-mini. As of September 2025, GPT-5-mini is priced at $0.25/million tokens, or $0.00025/1,000 tokens for input, and $2/M tokens for output, or $0.002/1,000 tokens.
+        - We assume the user's agent is using a frontline model. As of September 2025, by far the most used model for coding is Anthropic's Claude 4 Sonnet. The costs for Sonnet are complex because they vary heavily based on context length and caching (for example, if the message is over 200,000 tokens, output cost jumps from $15/M to $22.5/M tokens).
+            - We assume the lower end of the pricing, which is $3/M input and $15/M output. Which is $0.003/1,000 tokens for input and $0.015/1,000 tokens for output.
+            - Generally, about 80% of token use is for input, and 20% is for output, so we use that ratio to calculate an average cost per 1,000 tokens.
+            - Any "savings" are calculated against this assumed cost.
+          - You can probably tell from the pricing that it is *much* more expensive to use an LLM, especially a front-line model, than it is to use embedding, reranking, and sparse models paired with lower cost agents (about two orders of magnitude less if my math is right).
         """
-        raise NotImplementedError("Money saved estimation is not implemented yet.")
+        embedding_cost_per_1k = 0.00018
+        reranking_cost_per_1k = 0.00005
+        _sparse_cost_per_1k = 0.0  # we don't track sparse token use because it's effectively free but it's here for clarity
+        context_agent_cost_per_1k = 0.00025
+        user_agent_cost_per_1k = (0.8 * 0.003) + (0.2 * 0.015)
+
+        # costs incurred by CodeWeaver
+        embedding_cost: float = self[TokenCategory.EMBEDDING] / 1000 * embedding_cost_per_1k
+        reranking_cost: float = self[TokenCategory.RERANKING] / 1000 * reranking_cost_per_1k
+        context_agent_cost: float = (
+            self[TokenCategory.CONTEXT_AGENT] / 1000 * context_agent_cost_per_1k
+        )
+
+        user_agent_received: float = self[TokenCategory.USER_AGENT] / 1000 * user_agent_cost_per_1k
+        user_agent_savings: float = self.context_saved / 1000 * user_agent_cost_per_1k
+
+        return user_agent_savings - (
+            embedding_cost + reranking_cost + context_agent_cost + user_agent_received
+        )
+
+
+type UUID7_STR = Annotated[
+    str, Field(pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+]
+
+
+class Identifier(NamedTuple):
+    """A named tuple for request identifiers."""
+
+    request_id: str | int | None = None
+    uuid: UUID7_STR | None = str(uuid7())
+
+    @property
+    def timestamp(self) -> int:
+        """Get the timestamp from the UUID7."""
+        int_uuid = int(str(self.uuid).replace("-", ""), base=16)
+        x = int.to_bytes(int_uuid, length=16, byteorder="big")
+        return int.from_bytes(x[:6])
+
+    @property
+    def as_datetime(self) -> datetime:
+        """Get the datetime from the timestamp."""
+        return datetime.fromtimestamp(self.timestamp / 1_000, tz=UTC)
 
 
 @dataclass(
     kw_only=True,
-    config=ConfigDict(extra="forbid", str_strip_whitespace=True, arbitrary_types_allowed=True),
+    config=BasedModel.model_config | ConfigDict(arbitrary_types_allowed=True, defer_build=True),
 )
-class SessionStatistics:
+class SessionStatistics(DataclassSerializationMixin):
     """Statistics for tracking session performance and usage."""
 
     timing_statistics: Annotated[
@@ -774,12 +902,18 @@ class SessionStatistics:
         ),
     ]
 
-    _successful_request_log: list[str | int] = Field(default_factory=list, init=False, repr=False)  # pyright: ignore[reportUnknownVariableType]
-    _failed_request_log: list[str | int] = Field(default_factory=list, init=False, repr=False)  # pyright: ignore[reportUnknownVariableType]
-    _successful_http_request_log: list[str | int] = Field(  # pyright: ignore[reportUnknownVariableType]
-        default_factory=list, init=False, repr=False
-    )
-    _failed_http_request_log: list[str | int] = Field(default_factory=list, init=False, repr=False)  # pyright: ignore[reportUnknownVariableType]
+    _successful_request_log: Annotated[
+        list[Identifier], Field(default_factory=list, init=False, repr=False)
+    ]
+    _failed_request_log: Annotated[
+        list[Identifier], Field(default_factory=list, init=False, repr=False)
+    ]
+    _successful_http_request_log: Annotated[
+        list[Identifier], Field(default_factory=list, init=False, repr=False)
+    ]
+    _failed_http_request_log: Annotated[
+        list[Identifier], Field(default_factory=list, init=False, repr=False)
+    ]
 
     def __post_init__(self) -> None:
         """Post-initialization processing."""
@@ -871,36 +1005,43 @@ class SessionStatistics:
         )
         return self.timing_statistics.timing_summary
 
+    @staticmethod
+    def _set_id(request_id: str | int | None | Identifier) -> Identifier:
+        """Set the request ID to a consistent Identifier type."""
+        if isinstance(request_id, Identifier):
+            return request_id
+        return Identifier(request_id=request_id)
+
     def add_successful_request(
-        self, request_id: str | int | None = None, *, is_http: bool = False
+        self, request_id: str | int | None | Identifier = None, *, is_http: bool = False
     ) -> None:
         """Add a successful request count."""
-        request_id = request_id or datetime.now(UTC).isoformat("T", "microseconds")
-        self._add_request(successful=True, request_id=request_id, is_http=is_http)
+        iden = self._set_id(request_id)
+        self._add_request(successful=True, request_id=iden, is_http=is_http)
 
     def add_failed_request(
-        self, request_id: str | int | None = None, *, is_http: bool = False
+        self, request_id: str | int | None | Identifier = None, *, is_http: bool = False
     ) -> None:
         """Add a failed request count."""
-        request_id = request_id or datetime.now(UTC).isoformat("T", "microseconds")
-        self._add_request(successful=False, request_id=request_id, is_http=is_http)
+        iden = self._set_id(request_id)
+        self._add_request(successful=False, request_id=iden, is_http=is_http)
 
     def _add_request(
-        self, *, successful: bool, request_id: str | int | None = None, is_http: bool = False
+        self, *, successful: bool, request_id: Identifier, is_http: bool = False
     ) -> None:
         """Internal method to add a request count."""
         if is_http:
             if successful:
-                self._successful_http_request_log.append(request_id or uuid.uuid4().hex)
+                self._successful_http_request_log.append(request_id)
             else:
-                self._failed_http_request_log.append(request_id or uuid.uuid4().hex)
+                self._failed_http_request_log.append(request_id)
         elif request_id:
             if successful:
-                self._successful_request_log.append(request_id or uuid.uuid4().hex)
+                self._successful_request_log.append(request_id)
             else:
-                self._failed_request_log.append(request_id or uuid.uuid4().hex)
+                self._failed_request_log.append(request_id)
 
-    def request_in_log(self, request_id: str | int) -> bool:
+    def request_in_log(self, request_id: Identifier) -> bool:
         """Check if a request ID is in the successful or failed request logs."""
         return request_id in self._successful_request_log or request_id in self._failed_request_log
 
@@ -1005,6 +1146,19 @@ class SessionStatistics:
         self.index_statistics = FileStatistics()
         self.token_statistics = TokenCounter()
 
+    def report(self) -> bytes:
+        """Generate a report of the current statistics."""
+        return self.dump_json(
+            exclude_unset=True,
+            exclude_none=True,
+            exclude={
+                "_successful_request_log",
+                "_failed_request_log",
+                "_successful_http_request_log",
+                "_failed_http_request_log",
+            },
+        )
+
     def log_request_from_context(
         self, context: Context | None = None, *, successful: bool = True
     ) -> None:
@@ -1012,7 +1166,7 @@ class SessionStatistics:
 
         Note: This is fastmcp.Context, *not* fastmcp.middleware.MiddlewareContext
         """
-        from typing import TYPE_CHECKING, Any
+        from typing import TYPE_CHECKING
 
         if TYPE_CHECKING:
             from mcp.shared.context import RequestContext
@@ -1038,17 +1192,43 @@ class SessionStatistics:
         if (
             ctx
             and (request_id := ctx.request_id)
-            and not self.request_in_log(request_id=request_id)
+            and (identifier := Identifier(request_id=request_id))
+            and not self.request_in_log(request_id=identifier)
         ):
             if successful:
-                self.add_successful_request(request_id=request_id)
+                self.add_successful_request(request_id=identifier)
             else:
-                self.add_failed_request(request_id=request_id)
+                self.add_failed_request(request_id=identifier)
+        elif successful:
+            self.add_successful_request(request_id=None)
+        else:
+            self.add_failed_request(request_id=None)
 
 
 _statistics: SessionStatistics = SessionStatistics(
-    index_statistics=FileStatistics(), token_statistics=TokenCounter()
+    index_statistics=FileStatistics(),
+    token_statistics=TokenCounter(),
+    _successful_request_log=[],
+    _failed_request_log=[],
+    _successful_http_request_log=[],
+    _failed_http_request_log=[],
 )
+
+
+def add_failed_request(
+    request_id: str | int | Identifier | None = None, *, is_http: bool = False
+) -> None:
+    """Add a failed request to the log."""
+    if _statistics:
+        _statistics.add_failed_request(request_id=request_id, is_http=is_http)
+
+
+def add_successful_request(
+    request_id: str | int | Identifier | None = None, *, is_http: bool = False
+) -> None:
+    """Add a successful request to the log."""
+    if _statistics:
+        _statistics.add_successful_request(request_id=request_id, is_http=is_http)
 
 
 def record_timed_http_request(

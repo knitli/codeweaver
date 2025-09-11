@@ -11,14 +11,34 @@ import sys as _sys
 
 from collections.abc import Callable, Generator, Iterator
 from enum import Enum, unique
+from functools import cached_property
 from threading import Lock as _Lock
 from types import FrameType
-from typing import Annotated, Any, LiteralString, Self, cast
+from typing import (
+    Annotated,
+    Any,
+    Literal,
+    LiteralString,
+    NotRequired,
+    Self,
+    TypedDict,
+    Unpack,
+    cast,
+)
 
 import textcase
 
 from aenum import extend_enum  # pyright: ignore[reportMissingTypeStubs, reportUnknownVariableType]
-from pydantic import GetCoreSchemaHandler, GetPydanticSchema
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    GetCoreSchemaHandler,
+    GetPydanticSchema,
+    PrivateAttr,
+    TypeAdapter,
+)
+from pydantic.fields import ComputedFieldInfo, FieldInfo
+from pydantic.main import IncEx
 from pydantic_core import core_schema
 
 
@@ -27,6 +47,125 @@ type LiteralStringT = Annotated[
 ]
 type EnumExtend = Callable[[Enum, str], Enum]
 extend_enum: EnumExtend = extend_enum  # pyright: ignore[reportUnknownVariableType]
+
+
+class SerializationKwargs(TypedDict, total=False):
+    """A TypedDict for TypeAdapter serialization keyword arguments."""
+
+    by_alias: NotRequired[bool | None]
+    context: NotRequired[dict[str, Any] | None]
+    exclude: NotRequired[IncEx | None]
+    exclude_defaults: NotRequired[bool]
+    exclude_none: NotRequired[bool]
+    exclude_unset: NotRequired[bool]
+    fallback: NotRequired[Callable[[Any], Any] | None]
+    include: NotRequired[IncEx | None]
+    indent: NotRequired[int | None]
+    round_trip: NotRequired[bool]
+    serialize_as_any: NotRequired[bool]
+    warnings: NotRequired[bool | Literal["none", "warn", "error"]]
+
+
+class DeserializationKwargs(TypedDict, total=False):
+    """A TypedDict for TypeAdapter deserialization keyword arguments."""
+
+    by_alias: NotRequired[bool | None]
+    by_name: NotRequired[bool | None]
+    context: NotRequired[dict[str, Any] | None]
+    experimental_allow_partial: NotRequired[bool | Literal["off", "on", "trailing-strings"]]
+    strict: NotRequired[bool | None]
+
+
+class DataclassSerializationMixin:
+    """A mixin class that provides serialization and deserialization methods for dataclasses using Pydantic's TypeAdapter."""
+
+    _module: Annotated[str | None, PrivateAttr()] = None
+    _adapter: Annotated[TypeAdapter[Self] | None, PrivateAttr()] = None
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize the mixin and set the module name and adapter."""
+        import sys
+
+        self._module = (
+            self.__module__
+            if hasattr(self, "__module__")
+            else self.__class__.__module__ or sys.modules[__name__].__name__
+        )
+        self._adapter = TypeAdapter(type(self), module=self._module)
+
+    @cached_property
+    def _adapted_self(self) -> TypeAdapter[Self]:
+        """Get a Pydantic TypeAdapter for the SessionStatistics instance."""
+        self._adapter = self._adapter or TypeAdapter(type(self), module=self._module)
+        if self._adapter.pydantic_complete:
+            return self._adapter
+        try:
+            _ = self._adapter.rebuild()
+        except Exception as e:
+            raise RuntimeError("Failed to rebuild the TypeAdapter.") from e
+        else:
+            return self._adapter
+
+    def dump_json(self, **kwargs: Unpack[SerializationKwargs]) -> bytes:
+        """Serialize the session statistics to JSON bytes."""
+        return self._adapted_self.dump_json(self, **kwargs)
+
+    def dump_python(self, **kwargs: Unpack[SerializationKwargs]) -> dict[str, Any]:
+        """Serialize the session statistics to a Python dictionary."""
+        return self._adapted_self.dump_python(self, **kwargs)
+
+    def validate_json(self, data: bytes, **kwargs: Unpack[DeserializationKwargs]) -> Self:
+        """Deserialize the session statistics from JSON bytes."""
+        return self._adapted_self.validate_json(data, **kwargs)
+
+    def validate_python(
+        self, data: dict[str, Any], **kwargs: Unpack[DeserializationKwargs]
+    ) -> Self:
+        """Deserialize the session statistics from a Python dictionary."""
+        return self._adapted_self.validate_python(data, **kwargs)
+
+
+def _generate_title(model: type[Any]) -> str:
+    """Generate a title for a model."""
+    model_name = (
+        model.__name__
+        if hasattr(model, "__name__")
+        else (
+            model.__class__.__name__
+            if hasattr(model, "__class__") and hasattr(model.__class__, "__name__")
+            else str(model)
+        )
+    )
+    return textcase.title(model_name.replace("Model", ""))
+
+
+def _generate_field_title(name: str, info: FieldInfo | ComputedFieldInfo) -> str:
+    """Generate a title for a model field."""
+    if titled := info.title:
+        return titled
+    if (
+        aliased := info.alias or cast(FieldInfo, info).serialization_alias
+        if hasattr(info, "serialization_alias")
+        else None
+    ):
+        return textcase.sentence(aliased)
+    return textcase.sentence(name)
+
+
+class BasedModel(BaseModel):
+    """A baser `BaseModel` for all models in the CodeWeaver project."""
+
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        cache_strings="all",
+        field_title_generator=_generate_field_title,
+        model_title_generator=_generate_title,
+        serialize_by_alias=True,
+        str_strip_whitespace=True,
+        use_attribute_docstrings=True,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
 
 
 @unique
@@ -264,6 +403,10 @@ def _get_parent_frame() -> FrameType:
 type Name = LiteralStringT
 
 
+_lock = _Lock()
+_registry: dict[str, Sentinel] = {}
+
+
 class Sentinel:
     """Create a unique sentinel object.
     ...
@@ -350,10 +493,6 @@ class Sentinel:
         return f"{sentinel._name} {sentinel._repr} {sentinel._module_name}"
 
 
-_lock = _Lock()
-_registry: dict[str, Sentinel] = {}
-
-
 class Unset(Sentinel):
     """
     A sentinel value to indicate that a value is unset.
@@ -363,4 +502,14 @@ class Unset(Sentinel):
 UNSET: Unset = Unset("UNSET")
 
 
-__all__ = ("UNSET", "BaseEnum", "LiteralStringT", "Sentinel")
+__all__ = (
+    "UNSET",
+    "BaseEnum",
+    "BasedModel",
+    "DataclassSerializationMixin",
+    "DeserializationKwargs",
+    "LiteralStringT",
+    "Sentinel",
+    "SerializationKwargs",
+    "Unset",
+)

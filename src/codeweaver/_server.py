@@ -39,11 +39,10 @@ from pydantic.dataclasses import dataclass
 from pydantic_core import to_json
 
 from codeweaver import __version__ as version
-from codeweaver._common import BaseEnum
+from codeweaver._common import BasedModel, BaseEnum, DataclassSerializationMixin
 from codeweaver._logger import setup_logger
-from codeweaver._registry import get_model_registry, get_provider_registry, get_services_registry
 from codeweaver._statistics import SessionStatistics
-from codeweaver._utils import get_project_root, rpartial
+from codeweaver._utils import get_project_root, lazy_importer, rpartial
 from codeweaver.exceptions import InitializationError
 from codeweaver.settings import (
     CodeWeaverSettings,
@@ -69,6 +68,19 @@ if TYPE_CHECKING:
         ServiceCard,
         ServicesRegistry,
     )
+else:
+    # Pydantic needs these at runtime, but we want to lazy load them until needed.
+    codeweaver_registry = lazy_importer("codeweaver._registry")
+    Feature = codeweaver_registry.Feature
+    ModelRegistry = codeweaver_registry.ModelRegistry
+    ProviderRegistry = codeweaver_registry.ProviderRegistry
+    ServiceCard = codeweaver_registry.ServiceCard
+    ServicesRegistry = codeweaver_registry.ServicesRegistry
+
+# Lazy import of registries to delay until needed
+get_model_registry = lazy_importer("codeweaver._registry").get_model_registry
+get_provider_registry = lazy_importer("codeweaver._registry").get_provider_registry
+get_services_registry = lazy_importer("codeweaver._registry").get_services_registry
 
 
 # this is initialized after we setup logging.
@@ -107,9 +119,9 @@ def get_store() -> dict[Literal["settings", "server", "lifespan_func"], Any]:
 @dataclass(
     order=True,
     kw_only=True,
-    config=ConfigDict(arbitrary_types_allowed=True, extra="forbid", str_strip_whitespace=True),
+    config=BasedModel.model_config | ConfigDict(arbitrary_types_allowed=True, extra="forbid"),
 )
-class StoredSettings:
+class StoredSettings(DataclassSerializationMixin):
     """A simple container for storing/caching."""
 
     settings: Annotated[CodeWeaverSettings, Field(description="""Resolved CodeWeaver settings""")]
@@ -153,7 +165,7 @@ class StoredSettings:
         temp_self = type(self)(
             settings=self.settings, server=temp_server, lifespan_func=self.lifespan_func
         )
-        _STORE = TypeAdapter(temp_self).dump_python(mode="python")  # type: ignore
+        _STORE = TypeAdapter(type(self)).dump_python(temp_self, mode="python")  # type: ignore
 
 
 class HealthStatus(BaseEnum):
@@ -176,8 +188,8 @@ def _get_available_features_and_services() -> Iterator[tuple[Feature, ServiceCar
     )
 
 
-@dataclass(order=True, kw_only=True, config=ConfigDict(extra="forbid", str_strip_whitespace=True))
-class HealthInfo:
+@dataclass(order=True, kw_only=True, config=BasedModel.model_config | ConfigDict(extra="forbid"))
+class HealthInfo(DataclassSerializationMixin):
     """Health information for the CodeWeaver server.
 
     TODO: Expand to be more dynamic, computing health based on service status, etc.
@@ -195,10 +207,13 @@ class HealthInfo:
 
     error: Annotated[str | None, Field(description="""Error message if any""")] = None
 
+    def __post_init__(self) -> None:
+        print(self._module)
+
     @classmethod
     def initialize(cls) -> HealthInfo:
         """Initialize health information with default values."""
-        return cls(status=HealthStatus.HEALTHY, version=version, startup_time=time.time())
+        return cls()
 
     @computed_field
     @property
@@ -230,21 +245,30 @@ class HealthInfo:
         self.error = error
         return self
 
+    def report(self) -> bytes:
+        """Generate a health report in JSON format."""
+        return self.dump_json(
+            exclude_none=True,
+            exclude_unset=True,
+            exclude={"_module", "_adapter", "available_features_and_services"},
+        )
 
-_health_info = lambda: HealthInfo.initialize()  # noqa: E731
+
+_health_info: HealthInfo = HealthInfo.initialize()
 
 
 def get_health_info() -> HealthInfo:
     """Get the current health information."""
-    return _health_info()
+    return _health_info
 
 
 @dataclass(
     order=True,
     kw_only=True,
-    config=ConfigDict(extra="forbid", str_strip_whitespace=True, arbitrary_types_allowed=True),
+    config=BasedModel.model_config
+    | ConfigDict(extra="forbid", arbitrary_types_allowed=True, defer_build=True),
 )
-class AppState:
+class AppState(DataclassSerializationMixin):
     """Application state for CodeWeaver server."""
 
     initialized: Annotated[

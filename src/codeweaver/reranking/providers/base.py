@@ -16,11 +16,12 @@ from functools import cache
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, cast, overload
 
-from pydantic import BaseModel, ConfigDict, PositiveInt, TypeAdapter
+from pydantic import ConfigDict, PositiveInt, TypeAdapter
 from pydantic import ValidationError as PydanticValidationError
 from pydantic.main import IncEx
 from pydantic_core import from_json
 
+from codeweaver._common import BasedModel
 from codeweaver._data_structures import CodeChunk, StructuredDataInput
 from codeweaver.exceptions import RerankingProviderError, ValidationError
 from codeweaver.provider import Provider
@@ -96,10 +97,12 @@ class QueryType(NamedTuple):
     docs: Sequence[CodeChunk]
 
 
-class RerankingProvider[RerankingClient](BaseModel, ABC):
+class RerankingProvider[RerankingClient](BasedModel, ABC):
     """Base class for reranking providers."""
 
-    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True, serialize_by_alias=True)
+    model_config = BasedModel.model_config | ConfigDict(
+        extra="allow", arbitrary_types_allowed=True, defer_build=True
+    )
 
     _client: RerankingClient
     _provider: Provider

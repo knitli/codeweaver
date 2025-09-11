@@ -20,6 +20,7 @@ from types import MappingProxyType
 from typing import (
     Annotated,
     Any,
+    ClassVar,
     Literal,
     NamedTuple,
     NewType,
@@ -32,14 +33,12 @@ from typing import (
     cast,
     is_typeddict,
 )
-from uuid import uuid4
 from weakref import WeakValueDictionary
 
 from ast_grep_py import SgNode
 from pydantic import (
-    UUID4,
+    UUID7,
     AfterValidator,
-    BaseModel,
     ConfigDict,
     Field,
     NonNegativeFloat,
@@ -55,9 +54,10 @@ from pydantic.dataclasses import dataclass
 from pydantic_core import to_json
 from typing_extensions import TypeIs
 
-from codeweaver._common import BaseEnum
+from codeweaver._ast_grep import AstNode
+from codeweaver._common import BasedModel, BaseEnum, DataclassSerializationMixin
 from codeweaver._constants import get_ext_lang_pairs
-from codeweaver._utils import ensure_iterable, normalize_ext, set_relative_path
+from codeweaver._utils import ensure_iterable, normalize_ext, set_relative_path, uuid7
 from codeweaver.language import ConfigLanguage, SemanticSearchLanguage
 
 
@@ -111,19 +111,24 @@ class ChunkType(BaseEnum):
     RESEARCH = "research"  # from internet or similar research sources, not from code files
 
 
-class SemanticMetadata(TypedDict, total=False):
+class SemanticMetadata(BasedModel):
     """Metadata associated with the semantics of a code chunk."""
 
-    language: Required[SemanticSearchLanguage | str | None]
-    primary_node: NotRequired[SgNode | None]
-    nodes: NotRequired[tuple[SgNode, ...] | None]
+    model_config = BasedModel.model_config | ConfigDict(frozen=True, validate_assignment=True)
+
+    language: Annotated[
+        SemanticSearchLanguage | str,
+        Field(description="""The programming language of the code chunk"""),
+    ]
+    primary_node: AstNode[SgNode] | None
+    nodes: tuple[AstNode[SgNode], ...] = ()
 
 
 class Metadata(TypedDict, total=False):
     """Metadata associated with a code chunk."""
 
     chunk_id: Required[
-        Annotated[UUID4, Field(description="""Unique identifier for the code chunk""")]
+        Annotated[UUID7, Field(description="""Unique identifier for the code chunk""")]
     ]
     created_at: Required[
         Annotated[PositiveFloat, Field(description="""Timestamp when the chunk was created""")]
@@ -160,15 +165,15 @@ class Metadata(TypedDict, total=False):
 # ===========================================================================
 
 SpanTuple = tuple[
-    PositiveInt, PositiveInt, UUID4
+    PositiveInt, PositiveInt, UUID7
 ]  # Type alias for a span tuple (start, end, source_id)
 
 ONE_LINE = 1
 """Represents a single line span."""
 
 
-@dataclass(frozen=True, slots=True)
-class Span:
+@dataclass(frozen=True, slots=True, config=BasedModel.model_config)
+class Span(DataclassSerializationMixin):
     """
     An immutable span of lines in a file, defined by a start and end line number, and a source identifier.
 
@@ -202,9 +207,9 @@ class Span:
     end: PositiveInt
 
     _source_id: Annotated[
-        UUID4,
+        UUID7,
         Field(
-            default_factory=uuid4,
+            default_factory=uuid7,
             description="""The identifier for the span's source, such as a file.""",
             repr=True,
             init=True,
@@ -212,6 +217,8 @@ class Span:
             exclude=False,
         ),
     ]  # Unique identifier for the source of the span, usually a `chunk_id` or `file_id`.
+
+    __match_args__: ClassVar[tuple[str, str]] = ("start", "end")
 
     def __hash__(self):
         return hash((self.start, self.end, self._source_id))
@@ -357,13 +364,13 @@ class Span:
 
     @classmethod
     def __call__(
-        cls, span: SpanTuple | Span | tuple[PositiveInt, PositiveInt, UUID4 | None]
+        cls, span: SpanTuple | Span | tuple[PositiveInt, PositiveInt, UUID7 | None]
     ) -> Span:
         """Create a Span from a tuple of (start, end, source_id)."""
         if isinstance(span, Span):
             return cls(*span.as_tuple)
         start, end, source_id = span
-        return cls(start=start, end=end, _source_id=source_id or uuid4())
+        return cls(start=start, end=end, _source_id=source_id or uuid7())
 
     @classmethod
     def from_tuple(cls, span: SpanTuple) -> Span:
@@ -438,8 +445,8 @@ class Span:
         )
 
 
-@dataclass
-class SpanGroup:
+@dataclass(slots=True, config=BasedModel.model_config)
+class SpanGroup(DataclassSerializationMixin):
     """A group of spans that can be manipulated as a single unit.
 
     SpanGroups allow for set-like operations on groups of spans, including union, intersection, difference, and symmetric difference.
@@ -491,7 +498,7 @@ class SpanGroup:
 
         Intended for ingestion, where a parser identifies spans as simple tuples of (start, end) from a single source/file, and passes them for grouping into a SpanGroup.
         """
-        source_id = uuid4()  # Default source_id for the group
+        source_id = uuid7()  # Default source_id for the group
         spans = {Span(start, end, source_id) for start, end in simple_spans}
         return cls(spans)
 
@@ -565,7 +572,7 @@ class SpanGroup:
 # ---------------------------------------------------------------------------
 
 
-class SearchResult(BaseModel):
+class SearchResult(BasedModel):
     """Result from vector search operations."""
 
     content: str | CodeChunk
@@ -592,10 +599,10 @@ class CodeChunkDict(TypedDict, total=False):
     language: NotRequired[SemanticSearchLanguage | str | None]
     chunk_type: NotRequired[ChunkType | None]
     timestamp: NotRequired[PositiveFloat]
-    chunk_id: NotRequired[UUID4]
-    parent_id: NotRequired[UUID4 | None]
+    chunk_id: NotRequired[UUID7]
+    parent_id: NotRequired[UUID7 | None]
     metadata: NotRequired[Metadata | None]
-    _embedding_batch: NotRequired[UUID4 | None]
+    _embedding_batch: NotRequired[UUID7 | None]
 
 
 def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
@@ -619,7 +626,7 @@ def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
     return None
 
 
-class CodeChunk(BaseModel):
+class CodeChunk(BasedModel):
     """Represents a chunk of code or docs with metadata."""
 
     content: str
@@ -650,16 +657,16 @@ class CodeChunk(BaseModel):
         ),
     ] = datetime.now(UTC).timestamp()
     chunk_id: Annotated[
-        UUID4,
+        UUID7,
         Field(
-            default_factory=uuid4,
+            default_factory=uuid7,
             kw_only=True,
             description="""Unique identifier for the code chunk""",
             frozen=True,
         ),
-    ] = uuid4()
+    ] = uuid7()
     parent_id: Annotated[
-        UUID4 | None, Field(description="""Parent chunk ID, such as the file ID, if applicable""")
+        UUID7 | None, Field(description="""Parent chunk ID, such as the file ID, if applicable""")
     ] = None
     metadata: Annotated[
         Metadata | None,
@@ -670,7 +677,7 @@ class CodeChunk(BaseModel):
         ),
     ] = None
     _embedding_batch: Annotated[
-        UUID4 | None,
+        UUID7 | None,
         Field(
             repr=False,
             description="""Batch ID for the embedding batch the chunk was processed in.""",
@@ -703,7 +710,7 @@ class CodeChunk(BaseModel):
 
         return to_json({k: v for k, v in ordered_self_map.items() if v}, round_trip=True)
 
-    def set_batch_id(self, batch_id: UUID4) -> None:
+    def set_batch_id(self, batch_id: UUID7) -> None:
         """Set the batch ID for the code chunk."""
         self._embedding_batch = batch_id
 
@@ -763,8 +770,8 @@ class CodeChunk(BaseModel):
                 yield result.decode("utf-8") if isinstance(result, bytes | bytearray) else result
 
 
-@dataclass(frozen=True, slots=True)
-class DiscoveredFile:
+@dataclass(frozen=True, slots=True, config=BasedModel.model_config)
+class DiscoveredFile(DataclassSerializationMixin):
     """Represents a file discovered during project scanning.
 
     `DiscoveredFile` instances are immutable and hashable, making them suitable for use in sets and as dictionary keys, and ensuring that their state cannot be altered after creation.
@@ -894,7 +901,7 @@ class ExtKind(NamedTuple):
 
 
 HashKeyKind = TypeVar(
-    "HashKeyKind", Annotated[UUID4, Tag("uuid")], Annotated[BlakeHashKey, Tag("blake")]
+    "HashKeyKind", Annotated[UUID7, Tag("uuid")], Annotated[BlakeHashKey, Tag("blake")]
 )
 
 
@@ -908,9 +915,9 @@ def get_blake_hash_generic(value: str | bytes) -> BlakeHashKey:
     return BlakeKey(blake3(value.encode("utf-8") if isinstance(value, str) else value).hexdigest())
 
 
-def to_uuid() -> UUID4:
-    """Generate a new UUID4."""
-    return uuid4()
+def to_uuid() -> UUID7:
+    """Generate a new UUID7."""
+    return uuid7()
 
 
 class StoreDict(TypedDict, total=False):
@@ -922,15 +929,15 @@ class StoreDict(TypedDict, total=False):
     """
 
     value_type: Required[type]
-    store: NotRequired[dict[UUID4 | BlakeHashKey, Any]]
+    store: NotRequired[dict[UUID7 | BlakeHashKey, Any]]
     _size_limit: NotRequired[PositiveInt | None]
-    _id: NotRequired[UUID4]
+    _id: NotRequired[UUID7]
 
 
-class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T](BaseModel):
+class SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
     """A key-value store with precise typing for keys and values.
 
-    - KeyT is either UUID4 or BlakeHashKey, determined by the concrete subclass.
+    - KeyT is either UUID7 or BlakeHashKey, determined by the concrete subclass.
     - T is the value type for all items in the store.
 
     The store protects data integrity by copying data on get, pushes removed items to a trash heap for
@@ -952,20 +959,20 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T](BaseModel):
     Hey, it started simple!
     """
 
-    model_config = ConfigDict(validate_assignment=True)
+    model_config = BasedModel.model_config | ConfigDict(validate_assignment=True)
 
     store: Annotated[
         dict[KeyT, T],
         Field(
             init=False,
             default_factory=dict,
-            description="""The key-value store. Keys are UUID4 or Blake3 hash keys depending on configuration.""",
+            description="""The key-value store. Keys are UUID7 or Blake3 hash keys depending on configuration.""",
         ),
     ]
 
     _value_type: Annotated[type[T], PrivateAttr(init=False)]
 
-    _keygen: Callable[[], UUID4] | Callable[[str | bytes], BlakeHashKey] = to_uuid
+    _keygen: Callable[[], UUID7] | Callable[[str | bytes], BlakeHashKey] = to_uuid
 
     _size_limit: Annotated[PositiveInt | None, Field(repr=False, kw_only=True)] = (
         3 * 1024 * 1024
@@ -977,8 +984,8 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T](BaseModel):
     )
 
     _id: Annotated[
-        UUID4,
-        Field(default_factory=uuid4, description="""Unique identifier for the store""", init=False),
+        UUID7,
+        Field(default_factory=uuid7, description="""Unique identifier for the store""", init=False),
     ] = to_uuid()
 
     def __init__(self, **data: Any) -> None:
@@ -1023,7 +1030,7 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T](BaseModel):
         return sum(sys.getsizeof(key) + sys.getsizeof(value) for key, value in self.store.items())
 
     @property
-    def id(self) -> UUID4:
+    def id(self) -> UUID7:
         """Return the unique identifier for the store."""
         return self._id
 
@@ -1118,7 +1125,7 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T](BaseModel):
         return isinstance(item, self.value_type)
 
     @property
-    def keygen(self) -> Callable[[], UUID4] | Callable[[str | bytes], BlakeHashKey]:
+    def keygen(self) -> Callable[[], UUID7] | Callable[[str | bytes], BlakeHashKey]:
         """Return the key generator function."""
         return self._keygen
 
@@ -1176,7 +1183,7 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T](BaseModel):
         """
         if not self._validate_value(value):
             raise TypeError(f"Invalid value: {value}")
-        key: UUID4 | None = to_uuid() if self.keygen == to_uuid else None  # pyright: ignore[reportAssignmentType]
+        key: UUID7 | None = to_uuid() if self.keygen == to_uuid else None  # pyright: ignore[reportAssignmentType]
         if key:
             return self._check_and_set(cast(KeyT, key), value)
         if hash_value:
@@ -1254,7 +1261,7 @@ class SimpleTypedStore[KeyT: (UUID4, BlakeHashKey), T](BaseModel):
         return False
 
 
-class UUIDStore[T](SimpleTypedStore[UUID4, T]):
+class UUIDStore[T](SimpleTypedStore[UUID7, T]):
     """Typed store specialized for UUID keys."""
 
     def __init__(self, **kwargs: Any) -> None:

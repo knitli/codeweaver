@@ -11,17 +11,16 @@ import time
 from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple, cast
-from uuid import uuid4
 
 from pydantic import NonNegativeInt, PositiveInt
 
 from codeweaver._data_structures import DiscoveredFile, Span
 from codeweaver._statistics import SessionStatistics
-from codeweaver._utils import estimate_tokens
+from codeweaver._utils import estimate_tokens, uuid7
 from codeweaver.exceptions import QueryError
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.models.core import CodeMatch, CodeMatchType, FindCodeResponseSummary, SearchStrategy
-from codeweaver.models.intent import IntentType, QueryIntent
+from codeweaver.models.intent import IntentType
 from codeweaver.services.discovery import FileDiscoveryService
 
 
@@ -44,7 +43,7 @@ async def find_code_implementation(
     query: str,
     settings: CodeWeaverSettings,
     *,
-    intent: QueryIntent | IntentType | None = None,
+    intent: IntentType | None = None,
     token_limit: int = 10000,
     include_tests: bool = False,
     focus_languages: tuple[SemanticSearchLanguage, ...] | Sequence[str] | None = None,
@@ -216,7 +215,7 @@ def find_best_section(lines: list[str], query_terms: list[str]) -> MatchedSectio
 
     # Sliding window approach to find best matching section
     window_size = 50  # Lines per window
-    source_id = uuid4()
+    source_id = uuid7()
     for start in range(0, len(lines), 25):  # 50% overlap
         end = min(start + window_size, len(lines))
         section_lines = lines[start:end]
@@ -275,4 +274,9 @@ def get_surrounding_context(lines: list[str], span: Span, context_lines: int = 5
     return "\n".join(result_lines)
 
 
-__all__ = ("find_best_section", "find_code_implementation", "get_surrounding_context")
+__all__ = (
+    "MatchedSection",
+    "find_best_section",
+    "find_code_implementation",
+    "get_surrounding_context",
+)

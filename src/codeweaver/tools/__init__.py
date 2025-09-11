@@ -27,4 +27,4 @@ def get_data_provider(provider: Provider) -> type | None:
 from codeweaver.tools.find_code import basic_text_search, find_code_implementation
 
 
-__all__ = ("basic_text_search", "find_code_implementation")
+__all__ = ("basic_text_search", "find_code_implementation", "get_data_provider")

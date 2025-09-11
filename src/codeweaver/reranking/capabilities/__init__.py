@@ -7,18 +7,39 @@
 
 from __future__ import annotations
 
+import contextlib
+
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
-from codeweaver.reranking.capabilities.alibaba_nlp import get_alibaba_reranking_capabilities
-from codeweaver.reranking.capabilities.amazon import get_amazon_reranking_capabilities
-from codeweaver.reranking.capabilities.baai import get_baai_reranking_capabilities
-from codeweaver.reranking.capabilities.cohere import get_cohere_reranking_capabilities
-from codeweaver.reranking.capabilities.jinaai import get_jinaai_reranking_capabilities
-from codeweaver.reranking.capabilities.ms_marco import get_marco_reranking_capabilities
-from codeweaver.reranking.capabilities.qwen import get_qwen_reranking_capabilities
-from codeweaver.reranking.capabilities.voyage import get_voyage_reranking_capabilities
+from codeweaver._utils import lazy_importer
 
+
+get_alibaba_reranking_capabilities = lazy_importer(
+    "codeweaver.reranking.capabilities.alibaba_nlp"
+).get_alibaba_reranking_capabilities
+get_amazon_reranking_capabilities = lazy_importer(
+    "codeweaver.reranking.capabilities.amazon"
+).get_amazon_reranking_capabilities
+get_baai_reranking_capabilities = lazy_importer(
+    "codeweaver.reranking.capabilities.baai"
+).get_baai_reranking_capabilities
+get_cohere_reranking_capabilities = lazy_importer(
+    "codeweaver.reranking.capabilities.cohere"
+).get_cohere_reranking_capabilities
+get_jinaai_reranking_capabilities = lazy_importer(
+    "codeweaver.reranking.capabilities.jinaai"
+).get_jinaai_reranking_capabilities
+get_marco_reranking_capabilities = lazy_importer(
+    "codeweaver.reranking.capabilities.ms_marco"
+).get_marco_reranking_capabilities
+get_qwen_reranking_capabilities = lazy_importer(
+    "codeweaver.reranking.capabilities.qwen"
+).get_qwen_reranking_capabilities
+with contextlib.suppress(ImportError):
+    get_voyage_reranking_capabilities = lazy_importer(
+        "codeweaver.reranking.capabilities.voyage"
+    ).get_voyage_reranking_capabilities
 
 if TYPE_CHECKING:
     from codeweaver.reranking.capabilities.base import RerankingModelCapabilities

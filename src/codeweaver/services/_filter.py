@@ -6,7 +6,10 @@
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-"""Filter related functionality for searching and processing data, primarily with vector stores, but also for other data providers."""
+"""Filter related functionality for searching and processing data, primarily with vector stores, but also for other data providers.
+
+Nearly all of this file and its contents were adapted from Qdrant's example MCP server, [mcp-server-qdrant](https://github.com/qdrant/mcp-server-qdrant/), and fall under Qdrant's copyright and Apache 2.0 license. Any modifications or changes made to the original code are copyrighted by Knitli Inc. and are licensed under MIT OR Apache-2.0, whichever you want.
+"""
 
 from __future__ import annotations
 
@@ -15,6 +18,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from codeweaver._common import BaseEnum
 from codeweaver._constants import METADATA_PATH
 from codeweaver.services._match_models import (
     FieldCondition,
@@ -24,17 +28,42 @@ from codeweaver.services._match_models import (
     MatchValue,
     Range,
 )
-from codeweaver.vector_stores.base import PayloadSchemaType
 
 
 Metadata = dict[str, Any]
 ArbitraryFilter = dict[str, Any]
 
 
+class PayloadSchemaType(str, BaseEnum):
+    """
+    The types of payload fields that can be indexed.
+    """
+
+    KEYWORD = "keyword"
+    INTEGER = "integer"
+    FLOAT = "float"
+    GEO = "geo"
+    TEXT = "text"
+    BOOL = "bool"
+    DATETIME = "datetime"
+    UUID = "uuid"
+
+    __slots__ = ()
+
+
+class Entry(BaseModel):
+    """
+    A single entry in the Qdrant collection.
+    """
+
+    content: str
+    metadata: Metadata | None = None
+
+
 class FilterableField(BaseModel):
     """Represents a field that can be filtered."""
 
-    name: str = Field(description="""The name of the field payload field to filter on""")
+    name: str = Field(description="""The name of the payload field to filter on""")
     description: str = Field(
         description="""A description for the field used in the tool description"""
     )
@@ -236,4 +265,4 @@ def make_indexes(filterable_fields: dict[str, FilterableField]) -> dict[str, Pay
     return indexes
 
 
-__all__ = ("FilterableField", "make_filter", "make_indexes")
+__all__ = ("Entry", "FilterableField", "PayloadSchemaType", "make_filter", "make_indexes")

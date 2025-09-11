@@ -8,8 +8,9 @@
 from collections.abc import Callable, Sequence
 from typing import Annotated, Any, Literal, NotRequired, Required, TypedDict
 
-from pydantic import BaseModel, Field, NonNegativeInt, PositiveInt
+from pydantic import Field, NonNegativeInt, PositiveInt
 
+from codeweaver._common import BasedModel
 from codeweaver._data_structures import CodeChunk, SerializedCodeChunk
 from codeweaver.provider import Provider
 from codeweaver.tokenizers.base import Tokenizer
@@ -95,7 +96,7 @@ class RerankingCapabilities(TypedDict, total=False):
     other: NotRequired[dict[str, Any]]
 
 
-class RerankingModelCapabilities(BaseModel):
+class RerankingModelCapabilities(BasedModel):
     """Capabilities of a reranking model."""
 
     name: Annotated[str, Field(description="""The name of the model.""")] = ""

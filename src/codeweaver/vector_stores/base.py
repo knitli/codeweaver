@@ -10,54 +10,18 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
-from pydantic import UUID4, BaseModel, ConfigDict
+from pydantic import UUID4, ConfigDict
 
-from codeweaver._common import BaseEnum
-from codeweaver._data_structures import CodeChunk, Metadata, SearchResult
+from codeweaver._common import BasedModel
+from codeweaver._data_structures import CodeChunk, SearchResult
 from codeweaver.provider import Provider
 from codeweaver.services._filter import Filter
 
 
-# SPDX-SnippetBegin
-# SPDX-FileCopyrightText: 2022-2025 Qdrant Solutions GmbH
-# SPDX-License-Identifier: Apache-2.0
-
-# From Qdrant's python client, [`qdrant-client`](https://github.com/qdrant/qdrant-client/tree/master/qdrant_client/http/models/models.py#L1803-L1820)
-
-
-class PayloadSchemaType(str, BaseEnum):
-    """
-    The types of payload fields that can be indexed.
-    """
-
-    KEYWORD = "keyword"
-    INTEGER = "integer"
-    FLOAT = "float"
-    GEO = "geo"
-    TEXT = "text"
-    BOOL = "bool"
-    DATETIME = "datetime"
-    UUID = "uuid"
-
-    __slots__ = ()
-
-
-class Entry(BaseModel):
-    """
-    A single entry in the Qdrant collection.
-    """
-
-    content: str
-    metadata: Metadata | None = None
-
-
-# SPDX-SnippetEnd
-
-
-class VectorStoreProvider[VectorStoreClient](BaseModel, ABC):
+class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
     """Abstract interface for vector storage providers."""
 
-    model_config = ConfigDict(str_strip_whitespace=True, extra="allow")
+    model_config = BasedModel.model_config | ConfigDict(extra="allow")
 
     _client: VectorStoreClient
     _provider: Provider
@@ -147,4 +111,4 @@ class VectorStoreProvider[VectorStoreClient](BaseModel, ABC):
         """
 
 
-__all__ = ("Entry", "PayloadSchemaType", "VectorStoreProvider")
+__all__ = ("VectorStoreProvider",)

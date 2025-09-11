@@ -22,7 +22,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, Literal, NotRequired, Required, TypedDict, cast
 
-from pydantic import BaseModel, TypeAdapter
+from pydantic import UUID7, BaseModel, TypeAdapter
 from typing_extensions import TypeIs
 
 from codeweaver._common import Sentinel
@@ -36,6 +36,18 @@ class Missing(Sentinel):
 
 
 MISSING: Missing = Missing("MISSING", "Sentinel<MISSING>", __name__)
+
+if sys.version_info < (3, 14):
+    from uuid_extensions import uuid7 as uuid7_gen
+else:
+    from uuid import uuid7 as uuid7_gen
+
+
+def uuid7() -> UUID7:
+    """Generate a new UUID7."""
+    return cast(
+        UUID7, uuid7_gen()
+    )  # it's always UUID7 and not str | int | bytes because we don't take kwargs
 
 
 @cache
@@ -200,13 +212,16 @@ def has_git() -> bool:
         return False
     with contextlib.suppress(subprocess.CalledProcessError):
         output = subprocess.run(
-            ["--version"], executable=git, stderr=subprocess.STDOUT, capture_output=True
-        )  # pyright: ignore[reportUnusedCallResult]
+            ["--version"],
+            executable=git,
+            stderr=subprocess.STDOUT,
+            capture_output=True,  # noqa: S607
+        )
         return output.returncode == 0
     return False
 
 
-def get_git_revision(directory: Path) -> str | Missing:  # pyright: ignore[reportInvalidTypeForm, reportUnknownParameterType]
+def get_git_revision(directory: Path) -> str | Missing:
     """Get the SHA-1 of the HEAD of a git repository.
 
     This is a precursor for future functionality. We'd like to be able to associate indexes and other artifacts with a specific git commit. Because there's nothing worse than an Agent working from a totally different context than the one you expect.

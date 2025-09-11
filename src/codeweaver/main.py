@@ -1,4 +1,4 @@
-# sourcery skip: avoid-global-variables
+# sourcery skip: avoid-global-variables, snake-case-variable-declarations
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -13,6 +13,7 @@ import logging
 from typing import TYPE_CHECKING, Any, is_typeddict
 
 from codeweaver._server import build_app
+from codeweaver._utils import lazy_importer
 from codeweaver.app_bindings import register_app_bindings
 
 
@@ -29,14 +30,18 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: dict[s
     """
     from fastmcp import FastMCP
 
+    # Pydantic will need these at runtime
+    ServerSetup: ServerSetup = lazy_importer("codeweaver._server").ServerSetup  # pyright: ignore[reportUnusedVariable] # noqa: F841, N806
+    AppState: AppState = lazy_importer("codeweaver._server").AppState  # pyright: ignore[reportUnusedVariable] # noqa: F841, N806
+
     app = server if isinstance(server, FastMCP) else server["app"]
     kwargs = kwargs or {}
     server_setup: ServerSetup = ...  # type: ignore
     if is_typeddict(server):
-        server_setup: ServerSetup = server
+        server_setup: ServerSetup = server  # type: ignore
     if server_setup and hasattr(server_setup, "get"):
         settings = server_setup["settings"]
-        new_kwargs = {
+        new_kwargs = {  # type: ignore
             "transport": settings.server.transport or "streamable-http",
             "host": server_setup.pop("host", "127.0.0.1"),
             "port": server_setup.pop("port", 9328),
@@ -49,9 +54,9 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: dict[s
             if settings.uvicorn_settings
             else {},
         }
-        kwargs = new_kwargs | kwargs  # pyright: ignore[reportAssignmentType]
+        kwargs = new_kwargs | kwargs  # pyright: ignore[reportUnknownVariableType, reportAssignmentType]
     else:
-        kwargs = {
+        kwargs = {  # type: ignore
             "transport": "streamable-http",
             "host": "127.0.0.1",
             "port": 9328,
@@ -67,9 +72,9 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: dict[s
 async def run() -> None:
     """Run the CodeWeaver server."""
     server_setup = build_app()
-    server_setup["app"], server_setup["middleware"] = register_app_bindings(
+    server_setup["app"], server_setup["middleware"] = await register_app_bindings(  # type: ignore
         server_setup["app"],
-        server_setup.get("middleware", set()),
+        server_setup.get("middleware", set()),  # pyright: ignore[reportArgumentType]
         server_setup.get("middleware_settings", {}),
     )
     await start_server(server_setup)

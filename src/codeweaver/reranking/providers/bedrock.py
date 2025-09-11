@@ -15,17 +15,10 @@ import logging
 from collections.abc import Iterator, Sequence
 from typing import Annotated, Any, Literal, Self, cast
 
-from pydantic import (
-    AliasGenerator,
-    BaseModel,
-    ConfigDict,
-    Field,
-    JsonValue,
-    PositiveInt,
-    model_validator,
-)
+from pydantic import AliasGenerator, ConfigDict, Field, JsonValue, PositiveInt, model_validator
 from pydantic.alias_generators import to_camel, to_snake
 
+from codeweaver._common import BasedModel
 from codeweaver._data_structures import CodeChunk
 from codeweaver.reranking.capabilities.amazon import get_amazon_reranking_capabilities
 from codeweaver.reranking.capabilities.base import RerankingModelCapabilities
@@ -37,13 +30,12 @@ from codeweaver.reranking.providers.base import (
 from codeweaver.settings_types import AWSProviderSettings, Provider
 
 
-class BaseBedrockModel(BaseModel):
+class BaseBedrockModel(BasedModel):
     """Base model for Bedrock-related Pydantic models."""
 
-    model_config = ConfigDict(
+    model_config = BasedModel.model_config | ConfigDict(
         alias_generator=AliasGenerator(validation_alias=to_snake, serialization_alias=to_camel),
         from_attributes=True,
-        str_strip_whitespace=True,
         # spellchecker:off
         ser_json_inf_nan="null",
         # spellchecker:on

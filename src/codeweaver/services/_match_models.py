@@ -8,7 +8,7 @@
 """
 This module defines the models used for filtering and matching in vector stores.  It defines various conditions and filters that can be applied to payloads in a vector store, such as Qdrant. Some can also be used for other filtering operations, such as in a search engine.
 
-It is mostly copied from [qdrant-client](https://github.com/qdrant/qdrant-client/blob/master/qdrant_client/http/models/models.py)
+Nearly all of this file and its contents were adapted from Qdrant's example MCP server, [mcp-server-qdrant](https://github.com/qdrant/mcp-server-qdrant/), and fall under Qdrant's copyright and Apache 2.0 license. Any modifications or changes made to the original code are copyrighted by Knitli Inc. and are licensed under MIT OR Apache-2.0, whichever you want.
 """
 
 from __future__ import annotations

@@ -1,7 +1,14 @@
 # SPDX-CopyrightText: 2024-2025 Qdrant Solutions GmbH
 # SPDX-License-Identifier: Apache-2.0
 # from https://github.com/qdrant/mcp-server-qdrant/blob/master/src/mcp_server_qdrant/common/wrap_filters.py
-"""Filter wrapping utility for result and query functions. Replaces a single `query_filter` parameter with multiple parameters defined by `filterable_fields`."""
+#
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+"""Filter wrapping utility for result and query functions. Replaces a single `query_filter` parameter with multiple parameters defined by `filterable_fields`.
+
+Nearly all of this file and its contents were adapted from Qdrant's example MCP server, [mcp-server-qdrant](https://github.com/qdrant/mcp-server-qdrant/), and fall under Qdrant's copyright and Apache 2.0 license. Any modifications or changes made to the original code are copyrighted by Knitli Inc. and are licensed under MIT OR Apache-2.0, whichever you want.
+"""
 
 import inspect
 

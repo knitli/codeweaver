@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, NonNegativeFloat, NonNegativeInt
+from pydantic import Field, NonNegativeFloat, NonNegativeInt
 
-from codeweaver._common import BaseEnum
+from codeweaver._common import BasedModel, BaseEnum
 
 
 class QueryComplexity(BaseEnum):
@@ -40,8 +40,10 @@ class IntentType(str, BaseEnum):
     __slots__ = ()
 
 
-class QueryIntent(BaseModel):
+class QueryIntent(BasedModel):
     """Classified query intent with confidence scoring."""
+
+    model_config = BasedModel.model_config | {"defer_build": True}
 
     intent_type: IntentType
 
@@ -59,8 +61,10 @@ class QueryIntent(BaseModel):
     ]
 
 
-class IntentResult(BaseModel):
+class IntentResult(BasedModel):
     """Result of intent analysis with strategy recommendations."""
+
+    model_config = BasedModel.model_config | {"defer_build": True}
 
     intent: QueryIntent
 
