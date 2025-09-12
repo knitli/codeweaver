@@ -36,7 +36,7 @@ dependencies = [
     "ast-grep-py>=0.39.1",
     "blake3>=1.0.5",
     "cyclopts>=3.22.5",
-    "fastmcp>=2.10.6",
+    "fastmcp[websockets]>=2.10.6",
     "httpx>=0.28.1",
     "langchain-text-splitters>=0.3.9",
     "mcp>=1.13.0",
@@ -115,6 +115,10 @@ Repository = "https://github.com/knitli/codeweaver-mcp"
 [build-system]
 requires = ["hatchling>=1.14.1", "uv-dynamic-versioning>=0.7.0"]
 build-backend = "hatchling.build"
+
+
+# TODO: Integrate hatch plugins for:
+#  - readme: https://github.com/hynek/hatch-fancy-pypi-readme
 
 [dependency-groups]
 build = ["hatchling>=1.14.1", "uv-dynamic-versioning>=0.7.0"]
@@ -208,7 +212,7 @@ recommended = [
     "ast-grep-py>=0.39.1",
     "cyclopts>=3.22.5",
     "py-cpuinfo>=9.0.0",
-    "fastmcp>=2.10.6",
+    "fastmcp[websockets]>=2.10.6",
     "langchain-text-splitters>=0.3.9",
     "mcp>=1.13.0",
     "numpy>=2.3.0",
@@ -236,7 +240,7 @@ recommended-no-telemetry = [
     "ast-grep-py>=0.39.1",
     "cyclopts>=3.22.5",
     "py-cpuinfo>=9.0.0",
-    "fastmcp>=2.10.6",
+    "fastmcp[websockets]>=2.10.6",
     "langchain-text-splitters>=0.3.9",
     "mcp>=1.13.0",
     "numpy>=2.3.0",
@@ -265,7 +269,7 @@ recommended-local-only = [
     "cyclopts>=3.22.5",
     "py-cpuinfo>=9.0.0",
     "fastembed>=0.7.1",
-    "fastmcp>=2.10.6",
+    "fastmcp[websockets]>=2.10.6",
     "langchain-text-splitters>=0.3.9",
     "mcp>=1.13.0",
     "numpy>=2.3.0",
@@ -304,7 +308,7 @@ recommended-local-only = [
 required-core = [
     "aenum>=3.1.16",
     "ast-grep-py>=0.39.1",
-    "fastmcp>=2.10.6",
+    "fastmcp[websockets]>=2.10.6",
     "langchain-text-splitters>=0.3.9",
     "mcp>=1.13.0",
     "numpy>=2.3.0",
@@ -411,7 +415,7 @@ all = [
     "cyclopts>=3.22.5",
     "eunomia-mcp>=0.3.9",
     "fastembed>=0.7.1",
-    "fastmcp>=2.10.6",
+    "fastmcp[websockets]>=2.10.6",
     "httpx>=0.28.1",
     "langchain-text-splitters>=0.3.9",
     "mcp>=1.13.0",
@@ -445,7 +449,7 @@ all-gpu = [
     "cyclopts>=3.22.5",
     "eunomia-mcp>=0.3.9",
     "fastembed-gpu>=0.7.1",
-    "fastmcp>=2.10.6",
+    "fastmcp[websockets]>=2.10.6",
     "httpx>=0.28.1",
     "langchain-text-splitters>=0.3.9",
     "mcp>=1.13.0",
@@ -475,7 +479,20 @@ all-gpu = [
 vcs = "git"
 style = "semver"
 bump = true
-fallback-version = "0.0.0"
+tag-branch = "main"
+commit-prefix = "g"
+
+[tool.hatch.build.hooks.version]
+path = "src/codeweaver/_version.py"
+template = '''# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-License-Identifier: MIT OR Apache-2.0
+"""Version information for CodeWeaver."""
+from typing import Final
+
+__version__: Final[str] = "{version}"
+
+__all__ = ("__version__",)
+'''
 
 [tool.hatch.version]
 source = "uv-dynamic-versioning"
@@ -486,13 +503,22 @@ packages = ["src/codeweaver"]
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "src/**",
-    "pyproject.toml",
-    "README.md",
+    ".gitignore",
     "CHANGELOG.md",
-    "LICENSE-MIT",
-    "LICENSE-APACHE-2.0",
+    "CONTRIBUTORS_LICENSE_AGREEMENT.py",
     "LICENSE",
+    "LICENSE-APACHE-2.0",
+    "LICENSE-MIT",
+    "README.md",
+    "context7.json",
+    "context7.json.license",
+    "pyproject.toml",
+    "sbom.spdx",
+    "src/**",
+    "typings/**",
+    "uv.lock",
+    "uv.lock.license",
+    "vendored/**",
 ]
 
 [tool.pytest.ini_options]

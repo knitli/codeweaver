@@ -10,8 +10,15 @@ from typing import Annotated, Any, Literal, NotRequired, Required, Self, TypedDi
 
 from pydantic import BaseModel, ConfigDict, Field, PositiveFloat, PositiveInt
 
-from codeweaver._common import UNSET, Unset
 from codeweaver.provider import Provider
+
+
+class EmbeddingSettingsDict(TypedDict, total=False):
+    """A dictionary representing the settings for an embedding client, embedding model, and the embedding call itself. If any."""
+
+    client_kwargs: dict[str, Any]
+    model_kwargs: dict[str, Any]
+    call_kwargs: dict[str, Any]
 
 
 type PartialCapabilities = dict[
@@ -101,8 +108,7 @@ class EmbeddingModelCapabilities(BaseModel):
     output_dimensions: Annotated[
         tuple[PositiveInt, ...] | None,
         Field(
-            multiple_of=8,
-            description="""Supported output dimensions, if the model and provider support multiple output dimensions. If not specified, defaults to `None`.""",
+            description="""Supported output dimensions, if the model and provider support multiple output dimensions. If not specified, defaults to `None`."""
         ),
     ] = None
     default_dtype: Annotated[
@@ -156,12 +162,12 @@ class EmbeddingModelCapabilities(BaseModel):
     ] = None
     other: Annotated[dict[str, Any], Field(description="""Extra model-specific settings.""")] = {}
     _available: Annotated[
-        bool | Unset,
+        bool,
         Field(
             init=False,
             description="""Whether the model is currently available with the required dependencies installed. Value set when the capability is registered for builtin capabilities. It may be unset for custom capabilities.""",
         ),
-    ] = UNSET
+    ] = False
 
     @classmethod
     def default(cls) -> Self:
@@ -179,7 +185,7 @@ class EmbeddingModelCapabilities(BaseModel):
         return cls.model_validate(capabilities)
 
     @property
-    def available(self) -> bool | Unset:
+    def available(self) -> bool:
         """Check if the model is available."""
         return self._available
 
@@ -236,6 +242,15 @@ class SparseEmbeddingModelCapabilities(BaseModel):
     ] = None
     other: Annotated[dict[str, Any], Field(description="""Extra model-specific settings.""")] = {}
 
+    _available: Annotated[
+        bool, Field(description="""Whether the model is available for use.""")
+    ] = False
+
+    @property
+    def available(self) -> bool:
+        """Check if the model is available."""
+        return self._available
+
 
 def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:
     """Get sparse embedding model capabilities."""
@@ -245,38 +260,45 @@ def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:
             "name": "Qdrant/bm42-all-minilm-l6-v2-attentions",
             "multilingual": False,
             "other": {},
+            "_available": HAS_FASTEMBED,
         },
         "prithivida/Splade-PP_en_v1": {
             "name": "prithivida/Splade-PP_en_v1",
             "multilingual": False,
             "hf_name": "Qdrant/Splade-PP_en_v1",
             "other": {},
+            "_available": HAS_FASTEMBED,
         },
         "prithivida/Splade-PP_en_v2": {
             "name": "prithivida/Splade-PP_en_v2",
             "multilingual": False,
             "hf_name": None,
             "other": {},
+            "_available": HAS_FASTEMBED or HAS_ST,
         },
         "ibm-granite/granite-embedding-30m-sparse": {
             "name": "ibm-granite/granite-embedding-30m-sparse",
             "multilingual": False,
             "other": {},
+            "_available": HAS_ST,
         },
         "opensearch-project/opensearch-neural-sparse-encoding-doc-v2-mini": {
             "name": "opensearch-project/opensearch-neural-sparse-encoding-doc-v2-mini",
             "multilingual": False,
             "other": {},
+            "_available": HAS_ST,
         },
         "opensearch-project/opensearch-neural-sparse-encoding-doc-v3-distill": {
             "name": "opensearch-project/opensearch-neural-sparse-encoding-doc-v3-distill",
             "multilingual": False,
             "other": {},
+            "_available": HAS_ST,
         },
         "opensearch-project/opensearch-neural-sparse-encoding-doc-v3-gte": {
             "name": "opensearch-project/opensearch-neural-sparse-encoding-doc-v3-gte",
             "multilingual": False,
             "other": {},
+            "_available": HAS_ST,
         },
     }
     fastembed_caps = tuple(

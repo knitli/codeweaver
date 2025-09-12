@@ -8,6 +8,9 @@
 # applies to new/modified code in this directory (`src/codeweaver/embedding_providers/`)
 """This module re-exports agentic model providers and associated utilities from Pydantic AI."""
 
+import contextlib
+
+from collections.abc import Generator
 from typing import TYPE_CHECKING, Self
 
 from pydantic_ai.providers import Provider as AgentProvider
@@ -111,14 +114,27 @@ def get_agent_model_provider(provider: "Provider") -> type[AgentProvider[Self]]:
     raise ValueError(f"Unknown provider: {provider}")
 
 
-def infer_agent_provider_class(provider: "str | Provider") -> AgentProvider["Provider"]:
+def infer_agent_provider_class(provider: "str | Provider") -> type[AgentProvider["Provider"]]:
     """Infer the provider from the provider name."""
     from codeweaver.provider import Provider
 
     if not isinstance(provider, Provider):
         provider = Provider.from_string(provider)  # pyright: ignore[reportAssignmentType]
     provider_class: type[AgentProvider[Provider]] = get_agent_model_provider(provider)  # type: ignore
-    return provider_class()
+    return provider_class
+
+
+def load_default_agent_providers() -> Generator[type[AgentProvider["Provider"]], None, None]:
+    """Load the default providers."""
+    from codeweaver._capabilities import get_provider_kinds
+    from codeweaver.provider import Provider, ProviderKind
+
+    for prov in Provider:
+        kinds = get_provider_kinds(prov)  # type: ignore
+        if ProviderKind.AGENT in kinds:
+            with contextlib.suppress(ValueError, AttributeError, ImportError):
+                if agent_provider := get_agent_model_provider(prov):  # type: ignore
+                    yield agent_provider
 
 
 __all__ = (
@@ -135,4 +151,5 @@ __all__ = (
     "WrapperToolset",
     "get_agent_model_provider",
     "infer_agent_provider_class",
+    "load_default_agent_providers",
 )

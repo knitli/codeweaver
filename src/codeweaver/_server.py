@@ -574,7 +574,7 @@ def _create_base_fastmcp_settings() -> FastMcpServerSettingsDict:
         "instructions": "Ask a question, describe what you're trying to do, and get the exact context you need. CodeWeaver is an advanced code search and code context tool. It keeps an updated vector, AST, and text index of your codebase, and uses intelligent intent analysis to provide the most relevant context for AI Agents to complete tasks. It's just one easy-to-use tool - the `find_code` tool. To use it, you only need to provide a plain language description of what you want to find, and what you are trying to do. CodeWeaver will return the most relevant code matches, along with their context and precise locations.",
         "version": version,
         "lifespan": lifespan,
-        "include_tags": {"external", "user", "context"},
+        "include_tags": {"external", "user", "code-context"},
         "exclude_tags": {"internal", "system", "admin"},
     }
 

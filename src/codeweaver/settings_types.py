@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # We need to override our generic models with specific types, and type overrides for narrower values is a good thing.
-# pyright: reportIncompatibleMethodOverride=false,reportIncompatibleVariableOverride=false
+
 """Supporting types for CodeWeaver settings and configuration.
 
 This module primarily consists of a series of TypedDict classes that define the structure of various configuration options for CodeWeaver, including logging settings, middleware settings, provider settings, and more.
@@ -41,6 +41,7 @@ from pydantic import (
     ConfigDict,
     Field,
     FieldSerializationInfo,
+    FilePath,
     PositiveFloat,
     PositiveInt,
     PrivateAttr,
@@ -534,7 +535,6 @@ class BaseProviderSettings(TypedDict, total=False):
     api_key: NotRequired[str | None]
     connection: NotRequired[ConnectionConfiguration | None]
     client_kwargs: NotRequired[dict[str, Any] | None]
-    model_kwargs: NotRequired[dict[str, Any] | None]
     other: NotRequired[dict[str, Any] | None]
 
 
@@ -543,13 +543,26 @@ class DataProviderSettings(BaseProviderSettings):
 
 
 class EmbeddingModelSettings(TypedDict, total=False):
-    """Embedding model settings."""
+    """Embedding model settings. Use this class for dense (vector) models."""
 
     model: Required[str]
     dimension: NotRequired[PositiveInt | None]
     data_type: NotRequired[str | None]
     custom_prompt: NotRequired[str | None]
-    client_kwargs: NotRequired[dict[str, Any] | None]
+    call_kwargs: NotRequired[dict[str, Any] | None]
+    """Keyword arguments to pass to the client model's `embed` method."""
+    model_kwargs: NotRequired[dict[str, Any] | None]
+    """Keyword arguments to pass to the model's constructor."""
+
+
+class SparseEmbeddingModelSettings(TypedDict, total=False):
+    """Sparse embedding model settings. Use this class for sparse (e.g. bag-of-words) models."""
+
+    model: Required[str]
+    call_kwargs: NotRequired[dict[str, Any] | None]
+    """Keyword arguments to pass to the client model's `embed` method."""
+    model_kwargs: NotRequired[dict[str, Any] | None]
+    """Keyword arguments to pass to the model's constructor."""
 
 
 class RerankingModelSettings(TypedDict, total=False):
@@ -557,7 +570,10 @@ class RerankingModelSettings(TypedDict, total=False):
 
     model: Required[str]
     custom_prompt: NotRequired[str | None]
+    call_kwargs: NotRequired[dict[str, Any] | None]
+    """Keyword arguments to pass to the client model's `rerank` method."""
     client_kwargs: NotRequired[dict[str, Any] | None]
+    """Keyword arguments to pass to the client model's constructor."""
 
 
 class AWSProviderSettings(TypedDict, total=False):
@@ -641,10 +657,15 @@ type ProviderSpecificSettings = (
 
 
 class EmbeddingProviderSettings(BaseProviderSettings):
-    """Settings for embedding models, including sparse embedding models. It validates that the model and provider settings are compatible and complete, reconciling environment variables and config file settings as needed."""
+    """Settings for embedding models, including sparse embedding models. It validates that the model and provider settings are compatible and complete, reconciling environment variables and config file settings as needed.
 
-    model_settings: Required[EmbeddingModelSettings]
+    You must provide either `model_settings` or `sparse_model_settings`, but not both. To configure both, use two EmbeddingProviderSettings entries in your config.
+    """
+
+    model_settings: NotRequired[EmbeddingModelSettings | None]
     """Settings for the embedding model(s)."""
+    sparse_model_settings: NotRequired[SparseEmbeddingModelSettings | None]
+    """Settings for sparse embedding model(s)."""
     provider_settings: NotRequired[ProviderSpecificSettings | None]
     """Settings for specific providers, if any. Some providers have special settings that are required for them to work properly, but you may provide them by environment variables as well as in your config, or both."""
 
@@ -854,12 +875,108 @@ def default_config_file_locations(
     return tuple(file_paths)
 
 
+# ===========================================================================
+# *                    More TypedDict versions of Models
+# ===========================================================================
+
+
+class ProviderSettingsDict(TypedDict, total=False):
+    """A dictionary representation of provider settings."""
+
+    data: NotRequired[tuple[DataProviderSettings, ...] | None]
+    embedding: NotRequired[tuple[EmbeddingProviderSettings, ...] | None]
+    reranking: NotRequired[tuple[RerankingProviderSettings, ...] | None]
+    # vector: NotRequired[tuple[VectorProviderSettings, ...] | None]
+    agent: NotRequired[tuple[AgentProviderSettings, ...] | None]
+
+
+type ProviderSettingsView = MappingProxyType[
+    Literal["data", "embedding", "reranking", "agent"],
+    tuple[DataProviderSettings, ...]
+    | tuple[EmbeddingProviderSettings, ...]
+    | tuple[RerankingProviderSettings, ...]
+    | tuple[AgentProviderSettings, ...]
+    | None,
+]
+"""An immutable view of a `ProviderSettingsDict`."""
+
+
+class CodeWeaverSettingsDict(TypedDict, total=False):
+    """A serialized `CodeWeaverSettings` object."""
+
+    project_path: NotRequired[Path | None]
+    project_name: NotRequired[str | None]
+    provider: NotRequired[ProviderSettingsDict | None]
+    config_file: NotRequired[FilePath | None]
+    token_limit: NotRequired[PositiveInt]
+    max_file_size: NotRequired[PositiveInt]
+    max_results: NotRequired[PositiveInt]
+    server: NotRequired[FastMcpServerSettingsDict]
+    logging: NotRequired[LoggingSettings]
+    middleware_settings: NotRequired[MiddlewareOptions]
+    project_root: NotRequired[Path | None]
+    uvicorn_settings: NotRequired[UvicornServerSettingsDict]
+    filter_settings: NotRequired[FileFilterSettingsDict]
+    enable_background_indexing: NotRequired[bool]
+    enable_telemetry: NotRequired[bool]
+    enable_health_endpoint: NotRequired[bool]
+    enable_statistics_endpoint: NotRequired[bool]
+    enable_settings_endpoint: NotRequired[bool]
+    enable_version_endpoint: NotRequired[bool]
+    allow_identifying_telemetry: NotRequired[bool]
+    enable_ai_intent_analysis: NotRequired[bool]
+    enable_precontext: NotRequired[bool]
+
+
+type CodeWeaverSettingsView = MappingProxyType[
+    Literal[
+        "project_path",
+        "project_name",
+        "provider",
+        "config_file",
+        "token_limit",
+        "max_file_size",
+        "max_results",
+        "server",
+        "logging",
+        "middleware_settings",
+        "project_root",
+        "uvicorn_settings",
+        "filter_settings",
+        "enable_background_indexing",
+        "enable_telemetry",
+        "enable_health_endpoint",
+        "enable_statistics_endpoint",
+        "enable_settings_endpoint",
+        "enable_version_endpoint",
+        "allow_identifying_telemetry",
+        "enable_ai_intent_analysis",
+        "enable_precontext",
+    ],
+    Path
+    | str
+    | ProviderSettingsDict
+    | FilePath
+    | PositiveInt
+    | FastMcpServerSettingsDict
+    | LoggingSettings
+    | MiddlewareOptions
+    | UvicornServerSettingsDict
+    | FileFilterSettingsDict
+    | bool
+    | None,
+]
+"""An immutable view of a `CodeWeaverSettingsDict`."""
+
+
 __all__ = (
     "AWSProviderSettings",
     "AgentProviderSettings",
     "AzureCohereProviderSettings",
     "AzureOpenAIProviderSettings",
     "BaseProviderSettings",
+    "CodeWeaverSettingsDict",
+    "CodeWeaverSettingsView",
     "ConnectionConfiguration",
     "ConnectionRateLimitConfig",
     "DataProviderSettings",
@@ -877,12 +994,15 @@ __all__ = (
     "LoggingSettings",
     "MiddlewareOptions",
     "ModelString",
+    "ProviderSettingsDict",
+    "ProviderSettingsView",
     "ProviderSpecificSettings",
     "RateLimitingMiddlewareSettings",
     "RerankingProviderSettings",
     "RetryMiddlewareSettings",
     "RignoreSettings",
     "SerializableLoggingFilter",
+    "SparseEmbeddingModelSettings",
     "UvicornServerSettings",
     "UvicornServerSettings",
     "UvicornServerSettingsDict",

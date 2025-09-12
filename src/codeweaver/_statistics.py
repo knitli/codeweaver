@@ -9,10 +9,12 @@ Statistics tracking for CodeWeaver, including file indexing, retrieval, and sess
 
 from __future__ import annotations
 
+import contextlib
 import statistics
+import time
 
 from collections import Counter, defaultdict
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 from functools import cache
 from pathlib import Path
@@ -35,6 +37,7 @@ from pydantic import (
     field_validator,
 )
 from pydantic.dataclasses import dataclass
+from starlette.responses import PlainTextResponse
 
 from codeweaver._common import BasedModel, BaseEnum, DataclassSerializationMixin
 from codeweaver._data_structures import ChunkKind, ExtKind
@@ -1242,3 +1245,73 @@ def record_timed_http_request(
 def get_session_statistics() -> SessionStatistics:
     """Get the current session statistics."""
     return _statistics
+
+
+# ===========================================================================
+# *                            HTTP Timing Decorator
+# ===========================================================================
+
+
+def timed_http(
+    request_type: Literal["health", "version", "settings", "statistics"],
+) -> Callable[
+    [Callable[..., Awaitable[PlainTextResponse]]], Callable[..., Awaitable[PlainTextResponse]]
+]:
+    """Decorator to time HTTP endpoints and record success/failure counts.
+
+    Measures end-to-end handler execution time, records duration in milliseconds,
+    and increments HTTP success/failed counters based on response status.
+    """
+
+    def decorator(
+        func: Callable[..., Awaitable[PlainTextResponse]],
+    ) -> Callable[..., Awaitable[PlainTextResponse]]:
+        async def wrapper(*args: Any, **kwargs: Any) -> PlainTextResponse:
+            start = time.perf_counter()
+            success: bool | None = None
+            try:
+                response = await func(*args, **kwargs)
+                status = getattr(response, "status_code", 500)
+                success = 200 <= int(status) < 400
+            except Exception:
+                success = False
+                raise
+            else:
+                return response
+            finally:
+                duration_ms = (time.perf_counter() - start) * 1000
+                # Record timing, suppressing any metric errors
+                with contextlib.suppress(Exception):
+                    record_timed_http_request(request_type, duration_ms)
+                # Record HTTP success/failure
+                with contextlib.suppress(Exception):
+                    if success:
+                        add_successful_request(is_http=True)
+                    else:
+                        add_failed_request(is_http=True)
+
+        return wrapper
+
+    return decorator
+
+
+__all__ = (
+    "FileStatistics",
+    "Identifier",
+    "LanguageSummary",
+    "McpComponentRequests",
+    "McpComponentTimingDict",
+    "McpOperationRequests",
+    "McpTimingDict",
+    "OperationsKey",
+    "SessionStatistics",
+    "TimingStatistics",
+    "TimingStatisticsDict",
+    "TokenCategory",
+    "TokenCounter",
+    "add_failed_request",
+    "add_successful_request",
+    "get_session_statistics",
+    "record_timed_http_request",
+    "timed_http",
+)

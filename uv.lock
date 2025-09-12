@@ -576,7 +576,7 @@ dependencies = [
     { name = "ast-grep-py" },
     { name = "blake3" },
     { name = "cyclopts" },
-    { name = "fastmcp" },
+    { name = "fastmcp", extra = ["websockets"] },
     { name = "httpx" },
     { name = "langchain-text-splitters" },
     { name = "mcp" },
@@ -605,7 +605,7 @@ all = [
     { name = "cyclopts" },
     { name = "eunomia-mcp" },
     { name = "fastembed" },
-    { name = "fastmcp" },
+    { name = "fastmcp", extra = ["websockets"] },
     { name = "httpx" },
     { name = "langchain-text-splitters" },
     { name = "mcp" },
@@ -638,7 +638,7 @@ all-gpu = [
     { name = "cyclopts" },
     { name = "eunomia-mcp" },
     { name = "fastembed-gpu" },
-    { name = "fastmcp" },
+    { name = "fastmcp", extra = ["websockets"] },
     { name = "httpx" },
     { name = "langchain-text-splitters" },
     { name = "mcp" },
@@ -735,7 +735,7 @@ recommended = [
     { name = "aenum" },
     { name = "ast-grep-py" },
     { name = "cyclopts" },
-    { name = "fastmcp" },
+    { name = "fastmcp", extra = ["websockets"] },
     { name = "langchain-text-splitters" },
     { name = "mcp" },
     { name = "numpy" },
@@ -763,7 +763,7 @@ recommended-local-only = [
     { name = "ast-grep-py" },
     { name = "cyclopts" },
     { name = "fastembed" },
-    { name = "fastmcp" },
+    { name = "fastmcp", extra = ["websockets"] },
     { name = "langchain-text-splitters" },
     { name = "mcp" },
     { name = "numpy" },
@@ -788,7 +788,7 @@ recommended-no-telemetry = [
     { name = "aenum" },
     { name = "ast-grep-py" },
     { name = "cyclopts" },
-    { name = "fastmcp" },
+    { name = "fastmcp", extra = ["websockets"] },
     { name = "langchain-text-splitters" },
     { name = "mcp" },
     { name = "numpy" },
@@ -814,7 +814,7 @@ recommended-no-telemetry = [
 required-core = [
     { name = "aenum" },
     { name = "ast-grep-py" },
-    { name = "fastmcp" },
+    { name = "fastmcp", extra = ["websockets"] },
     { name = "langchain-text-splitters" },
     { name = "mcp" },
     { name = "numpy" },
@@ -960,13 +960,13 @@ requires-dist = [
     { name = "fastembed", marker = "extra == 'recommended-local-only'", specifier = ">=0.7.1" },
     { name = "fastembed-gpu", marker = "extra == 'all-gpu'", specifier = ">=0.7.1" },
     { name = "fastembed-gpu", marker = "extra == 'provider-fastembed-gpu'", specifier = ">=0.7.1" },
-    { name = "fastmcp", specifier = ">=2.10.6" },
-    { name = "fastmcp", marker = "extra == 'all'", specifier = ">=2.10.6" },
-    { name = "fastmcp", marker = "extra == 'all-gpu'", specifier = ">=2.10.6" },
-    { name = "fastmcp", marker = "extra == 'recommended'", specifier = ">=2.10.6" },
-    { name = "fastmcp", marker = "extra == 'recommended-local-only'", specifier = ">=2.10.6" },
-    { name = "fastmcp", marker = "extra == 'recommended-no-telemetry'", specifier = ">=2.10.6" },
-    { name = "fastmcp", marker = "extra == 'required-core'", specifier = ">=2.10.6" },
+    { name = "fastmcp", extras = ["websockets"], specifier = ">=2.10.6" },
+    { name = "fastmcp", extras = ["websockets"], marker = "extra == 'all'", specifier = ">=2.10.6" },
+    { name = "fastmcp", extras = ["websockets"], marker = "extra == 'all-gpu'", specifier = ">=2.10.6" },
+    { name = "fastmcp", extras = ["websockets"], marker = "extra == 'recommended'", specifier = ">=2.10.6" },
+    { name = "fastmcp", extras = ["websockets"], marker = "extra == 'recommended-local-only'", specifier = ">=2.10.6" },
+    { name = "fastmcp", extras = ["websockets"], marker = "extra == 'recommended-no-telemetry'", specifier = ">=2.10.6" },
+    { name = "fastmcp", extras = ["websockets"], marker = "extra == 'required-core'", specifier = ">=2.10.6" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "httpx", marker = "extra == 'all'", specifier = ">=0.28.1" },
     { name = "httpx", marker = "extra == 'all-gpu'", specifier = ">=0.28.1" },
@@ -1822,6 +1822,11 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/35/8a/c46759bb41a53187191e5b3d963c0bde54783ecc89186a93c4947607b8e4/fastmcp-2.12.2.tar.gz", hash = "sha256:6d13e2f9be57b99763fc22485f9f603daa23bfbca35a8172baa43b283d6fc1ff", size = 5244547, upload-time = "2025-09-03T21:28:09.869Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5c/0a/7a8d564b1b9909dbfc36eb93d76410a4acfada6b1e13ee451a753bb6dbc2/fastmcp-2.12.2-py3-none-any.whl", hash = "sha256:0b58d68e819c82078d1fd51989d3d81f2be7382d527308b06df55f4d0a4ec94f", size = 312029, upload-time = "2025-09-03T21:28:08.62Z" },
+]
+
+[package.optional-dependencies]
+websockets = [
+    { name = "websockets" },
 ]
 
 [[package]]

@@ -9,26 +9,22 @@ from __future__ import annotations
 import contextlib
 import datetime
 import logging
-import time
 
-from collections.abc import Awaitable, Callable, Container
+from collections.abc import Container
 from functools import cache
 from typing import TYPE_CHECKING, Any, cast
 
 from fastapi.middleware import Middleware
 from fastmcp import Context
 from fastmcp.tools import Tool
+from mcp.types import ToolAnnotations
 from pydantic import BaseModel, TypeAdapter
 from pydantic_core import to_json
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
 from codeweaver._server import AppState, HealthInfo, get_health_info
-from codeweaver._statistics import (
-    SessionStatistics,
-    get_session_statistics,
-    record_timed_http_request,
-)
+from codeweaver._statistics import SessionStatistics, get_session_statistics, timed_http
 from codeweaver.exceptions import CodeWeaverError
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.middleware.statistics import StatisticsMiddleware
@@ -65,7 +61,7 @@ def health_info() -> HealthInfo:
 
 
 # -------------------------
-# Plain tool implementation
+# * `find_code` tool entrypoint
 # -------------------------
 async def find_code_tool(
     query: str,
@@ -110,20 +106,10 @@ async def find_code_tool(
         return response
 
 
-async def time_http_response(
-    request: Request, call_next: Callable[[Request], Awaitable[PlainTextResponse]]
-) -> PlainTextResponse:
-    """Time the response of a request."""
-    start_time = time.perf_counter()
-    response = await call_next(request)
-    duration = time.perf_counter() - start_time
-    record_timed_http_request(request_name, duration)
-    return response
-
-
 # -------------------------
 # Plain route handlers
 # -------------------------
+@timed_http("statistics")
 async def stats_info(_request: Request) -> PlainTextResponse:
     """Return current session statistics as JSON."""
     global statistics
@@ -139,6 +125,7 @@ async def stats_info(_request: Request) -> PlainTextResponse:
         )
 
 
+@timed_http("settings")
 async def settings_info(_request: Request) -> PlainTextResponse:
     """Return current settings as JSON."""
     settings_model: CodeWeaverSettings = settings()
@@ -155,6 +142,7 @@ async def settings_info(_request: Request) -> PlainTextResponse:
         )
 
 
+@timed_http("version")
 async def version_info(_request: Request) -> PlainTextResponse:
     """Return current version information as JSON."""
     from codeweaver import __version__ as version
@@ -162,6 +150,7 @@ async def version_info(_request: Request) -> PlainTextResponse:
     return PlainTextResponse(content=to_json({"version": version}), media_type="application/json")
 
 
+@timed_http("health")
 async def health(_request: Request) -> PlainTextResponse:
     """Return current health information as JSON."""
     info = health_info()
@@ -193,7 +182,7 @@ def setup_middleware(
                 mw = mw(**middleware_settings.get("rate_limiting", {}))  # type: ignore[reportCallIssue]
             case "LoggingMiddleware" | "StructuredLoggingMiddleware":
                 mw = mw(**middleware_settings.get("logging", {}))  # type: ignore[reportCallIssue]
-            case _:
+            case _:  # pyright: ignore[reportUnknownVariableType]
                 if any_settings := middleware_settings.get(mw.__name__.lower()):  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
                     mw = mw(**any_settings)  # type: ignore[reportCallIssue, reportUnknownVariableType]
                 else:
@@ -210,9 +199,18 @@ def register_tool(app: FastMCP[AppState]) -> FastMCP[AppState]:
             name="find_code",
             description="Find code in the codebase",
             enabled=True,
-            tags={"user", "external", "search"},
-            annotations=ToolAnnotations(),
-        )
+            exclude_args=["context"],
+            tags={"user", "external", "code-context"},
+            annotations=ToolAnnotations(
+                title="find_code",
+                readOnlyHint=True,
+                destructiveHint=False,
+                idempotentHint=True,
+                openWorldHint=True,
+            ),
+            output_schema=FindCodeResponseSummary.get_schema(),
+            serializer=FindCodeResponseSummary.model_dump_json,
+        )  # type: ignore
     )
     return app
 
@@ -250,4 +248,4 @@ async def register_app_bindings(
     return app, middleware
 
 
-__all__ = ("find_code_tool", "register_app_bindings")
+__all__ = ("find_code_tool", "register_app_bindings", "register_tool")

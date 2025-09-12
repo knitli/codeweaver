@@ -10,13 +10,16 @@ to query by name/provider.
 
 from __future__ import annotations
 
-from collections.abc import Generator, Sequence
+from collections.abc import Callable, Generator, Sequence
 from importlib.util import find_spec
 from typing import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities
+    from codeweaver.embedding.capabilities.base import (
+        EmbeddingModelCapabilities,
+        SparseEmbeddingModelCapabilities,
+    )
 
 
 dependency_map = {
@@ -52,33 +55,32 @@ def is_available(model: EmbeddingModelCapabilities) -> bool:
 
 
 def filter_unimplemented(
-    models: Sequence[EmbeddingModelCapabilities],
+    models: tuple[EmbeddingModelCapabilities, ...],
 ) -> Generator[EmbeddingModelCapabilities]:
     """Removes models that are not yet implemented. Currently these are models that require the full `transformers` library."""
-    unimplemented = {
+    _unimplemented = {
         "heroku:cohere-embed-multilingual",
         "github:cohere/Cohere-embed-v3-english",
         "github:cohere/Cohere-embed-v3-multilingual",
     }
     for model in models:
-        if f"{model.provider!s}:{model.name}" in unimplemented:
-            model._available = False  # pyright: ignore[reportPrivateUsage]
-        elif is_available(model):
-            model._available = True  # pyright: ignore[reportPrivateUsage]
-        else:
-            model._available = False  # pyright: ignore[reportPrivateUsage]
+        if is_available(model) and f"{model.provider!s}:{model.name}" not in _unimplemented:
+            model._available = True  # type: ignore[attr-defined]
+        # models are False by default so we don't need to set that
         yield model
 
 
-def _load_default_capabilities() -> Generator[EmbeddingModelCapabilities]:
+def load_default_capabilities() -> Generator[EmbeddingModelCapabilities]:
     """Import and collect all built-in capabilities (once)."""
     from codeweaver.embedding.capabilities.alibaba_nlp import get_alibaba_nlp_embedding_capabilities
     from codeweaver.embedding.capabilities.amazon import get_amazon_embedding_capabilities
     from codeweaver.embedding.capabilities.baai import get_baai_embedding_capabilities
     from codeweaver.embedding.capabilities.cohere import get_cohere_embedding_capabilities
+    from codeweaver.embedding.capabilities.google import get_google_embedding_capabilities
     from codeweaver.embedding.capabilities.ibm_granite import get_ibm_granite_embedding_capabilities
     from codeweaver.embedding.capabilities.intfloat import get_intfloat_embedding_capabilities
     from codeweaver.embedding.capabilities.jinaai import get_jinaai_embedding_capabilities
+    from codeweaver.embedding.capabilities.mistral import get_mistral_embedding_capabilities
     from codeweaver.embedding.capabilities.mixedbread_ai import (
         get_mixedbread_ai_embedding_capabilities,
     )
@@ -93,38 +95,41 @@ def _load_default_capabilities() -> Generator[EmbeddingModelCapabilities]:
     from codeweaver.embedding.capabilities.voyage import get_voyage_embedding_capabilities
     from codeweaver.embedding.capabilities.whereisai import get_whereisai_embedding_capabilities
 
-    yield from (
-        item
-        for item in (
-            *filter_unimplemented(get_alibaba_nlp_embedding_capabilities()),
-            *filter_unimplemented(get_amazon_embedding_capabilities()),
-            *filter_unimplemented(get_baai_embedding_capabilities()),
-            *filter_unimplemented(get_cohere_embedding_capabilities()),
-            *filter_unimplemented(get_ibm_granite_embedding_capabilities()),
-            *filter_unimplemented(get_intfloat_embedding_capabilities()),
-            *filter_unimplemented(get_jinaai_embedding_capabilities()),
-            *filter_unimplemented(get_mixedbread_ai_embedding_capabilities()),
-            *filter_unimplemented(get_nomic_ai_embedding_capabilities()),
-            *filter_unimplemented(get_openai_embedding_capabilities()),
-            *filter_unimplemented(get_qwen_embedding_capabilities()),
-            *filter_unimplemented(get_sentence_transformers_embedding_capabilities()),
-            *filter_unimplemented(get_snowflake_embedding_capabilities()),
-            *filter_unimplemented(get_thenlper_embedding_capabilities()),
-            *filter_unimplemented(get_voyage_embedding_capabilities()),
-            *filter_unimplemented(get_whereisai_embedding_capabilities()),
-        )
-        if item
-    )
+    def fetch_caps(
+        caller: Callable[..., tuple[EmbeddingModelCapabilities, ...]],
+    ) -> Generator[EmbeddingModelCapabilities, None, None]:
+        yield from filter_unimplemented(caller())
+
+    for item in (
+        get_alibaba_nlp_embedding_capabilities,
+        get_amazon_embedding_capabilities,
+        get_baai_embedding_capabilities,
+        get_cohere_embedding_capabilities,
+        get_google_embedding_capabilities,
+        get_ibm_granite_embedding_capabilities,
+        get_intfloat_embedding_capabilities,
+        get_jinaai_embedding_capabilities,
+        get_mistral_embedding_capabilities,
+        get_mixedbread_ai_embedding_capabilities,
+        get_nomic_ai_embedding_capabilities,
+        get_openai_embedding_capabilities,
+        get_qwen_embedding_capabilities,
+        get_sentence_transformers_embedding_capabilities,
+        get_snowflake_embedding_capabilities,
+        get_thenlper_embedding_capabilities,
+        get_voyage_embedding_capabilities,
+        get_whereisai_embedding_capabilities,
+    ):
+        if item is None:
+            continue
+        yield from fetch_caps(item)
 
 
-def ensure_default_capabilities_registered() -> None:
-    """Populate the global registry with built-in capabilities if empty."""
-    from codeweaver._registry import get_model_registry, register_embedding_capabilities
+def load_sparse_capabilities() -> Generator[SparseEmbeddingModelCapabilities]:
+    """Load all sparse embedding model capabilities."""
+    from codeweaver.embedding.capabilities.base import get_sparse_caps
 
-    registry = get_model_registry()
-    if registry.is_empty():
-        register_embedding_capabilities(_load_default_capabilities())
-        registry.mark_defaults_populated()
+    yield from (get_sparse_caps())
 
 
-__all__ = ("ensure_default_capabilities_registered",)
+__all__ = ("load_default_capabilities", "load_sparse_capabilities")

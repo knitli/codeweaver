@@ -30,12 +30,19 @@ class IntentType(str, BaseEnum):
     """Enumeration of intent types."""
 
     UNDERSTAND = "understand"
+    """You want to understand the codebase structure, a specific feature or functionality, or how different components interact."""
     IMPLEMENT = "implement"
+    """You want to implement a new feature or functionality in the codebase."""
     DEBUG = "debug"
+    """You want to debug an issue or error in the codebase."""
     OPTIMIZE = "optimize"
+    """You want to optimize the performance or efficiency of the codebase."""
     TEST = "test"
+    """You want to write or modify tests for the codebase."""
     CONFIGURE = "configure"
+    """You want to update, change, or implement configuration settings (like, `package.json`, `pyproject.toml`) and need to understand the current configuration."""
     DOCUMENT = "document"
+    """You want to write or update documentation for the codebase or understand the structure and organization of the documentation."""
 
     __slots__ = ()
 

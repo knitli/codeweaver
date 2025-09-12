@@ -6,7 +6,6 @@
 """Base class for embedding providers."""
 
 import asyncio
-import importlib
 import logging
 
 from abc import ABC, abstractmethod
@@ -38,7 +37,7 @@ from codeweaver._data_structures import (
     make_blake_store,
     make_uuid_store,
 )
-from codeweaver._utils import uuid7
+from codeweaver._utils import lazy_importer, uuid7
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.provider import Provider
 from codeweaver.tokenizers import Tokenizer, get_tokenizer
@@ -54,7 +53,7 @@ logger = logging.getLogger(__name__)
 @cache
 def _get_statistics() -> "SessionStatistics":
     """Set the statistics source for the embedding provider."""
-    statistics_module = importlib.import_module("codeweaver._statistics")
+    statistics_module = lazy_importer("codeweaver._statistics")
     # we need SessionStatistics in this namespace for pydantic at runtime:
     SessionStatistics = statistics_module.SessionStatistics  # pyright: ignore[reportUnusedVariable, reportUnusedExpression]  # noqa: F841, N806
     return statistics_module.get_session_statistics()
@@ -121,7 +120,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     _doc_kwargs: ClassVar[dict[str, Any]] = {}
     _query_kwargs: ClassVar[dict[str, Any]] = {}
 
-    _store: UUIDStore[list] = make_uuid_store(  # type: ignore
+    _store: UUIDStore[list[CodeChunk]] = make_uuid_store(  # type: ignore
         value_type=list, size_limit=1024 * 1024 * 3
     )
 

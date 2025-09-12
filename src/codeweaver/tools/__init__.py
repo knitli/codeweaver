@@ -24,7 +24,22 @@ def get_data_provider(provider: Provider) -> type | None:
     return None
 
 
+def load_default_data_providers() -> tuple[type, ...]:
+    """Load all available data providers."""
+    providers: list[type] = []
+    for provider in (Provider.DUCKDUCKGO, Provider.TAVILY):
+        data_provider = get_data_provider(provider)
+        if data_provider is not None:
+            providers.append(data_provider)
+    return tuple(providers)
+
+
 from codeweaver.tools.find_code import basic_text_search, find_code_implementation
 
 
-__all__ = ("basic_text_search", "find_code_implementation", "get_data_provider")
+__all__ = (
+    "basic_text_search",
+    "find_code_implementation",
+    "get_data_provider",
+    "load_default_data_providers",
+)

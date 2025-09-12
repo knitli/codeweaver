@@ -10,6 +10,7 @@ such as `embedding`, `sparse_embedding`, `reranking`, `vector_store`, `agent`, a
 The `Provider` enum also includes methods for retrieving some provider-specific information, such as environment variables used by the provider's client that are not part of CodeWeaver's settings.
 """
 
+# pyright: reportArgumentType=false
 # ===========================================================================
 # *     PROVIDER ENUM - main provider enum for all CodeWeaver providers
 # ===========================================================================

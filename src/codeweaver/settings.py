@@ -15,17 +15,29 @@ from __future__ import annotations
 import contextlib
 import importlib
 import inspect
+import logging
 
 from collections.abc import Callable
 from functools import cached_property
+from importlib import util
 from pathlib import Path
-from typing import Annotated, Any, Literal, cast
+from types import MappingProxyType
+from typing import Annotated, Any, Literal, Self, TypeGuard, cast
 
 from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.server.server import DuplicateBehavior
 from fastmcp.tools.tool import Tool
 from mcp.server.auth.settings import AuthSettings
-from pydantic import ConfigDict, Field, PositiveInt, computed_field, field_validator
+from pydantic import (
+    ConfigDict,
+    Field,
+    FilePath,
+    PositiveInt,
+    PrivateAttr,
+    ValidationError,
+    computed_field,
+    field_validator,
+)
 from pydantic.fields import ComputedFieldInfo, FieldInfo
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
 from pydantic_ai.settings import merge_model_settings
@@ -34,23 +46,29 @@ from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, Settings
 
 from codeweaver._common import UNSET, BasedModel, Unset
 from codeweaver._constants import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_EXTENSIONS
-from codeweaver.exceptions import MissingValueError
-from codeweaver.provider import Provider, ProviderKind
+from codeweaver.provider import Provider
 from codeweaver.settings_types import (
     AVAILABLE_MIDDLEWARE,
     AgentProviderSettings,
+    CodeWeaverSettingsDict,
+    CodeWeaverSettingsView,
     DataProviderSettings,
     EmbeddingModelSettings,
     EmbeddingProviderSettings,
     FileFilterSettingsDict,
     LoggingSettings,
     MiddlewareOptions,
+    ProviderSettingsView,
     RerankingModelSettings,
     RerankingProviderSettings,
     RignoreSettings,
+    SparseEmbeddingModelSettings,
     UvicornServerSettings,
     default_config_file_locations,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 DefaultDataProviderSettings = (
@@ -63,7 +81,17 @@ DefaultEmbeddingProviderSettings = (
     EmbeddingProviderSettings(
         provider=Provider.VOYAGE,
         enabled=True,
-        model_settings=EmbeddingModelSettings(model="voyage-code-3"),
+        model_settings=EmbeddingModelSettings(model="voyage:voyage-code-3"),
+    ),
+)
+HAS_ST = util.find_spec("sentence_transformers") is not None
+DefaultSparseEmbeddingProviderSettings = (
+    EmbeddingProviderSettings(
+        provider=Provider.SENTENCE_TRANSFORMERS,
+        enabled=HAS_ST,
+        sparse_model_settings=SparseEmbeddingModelSettings(
+            model="opensearch:opensearch-neural-sparse-encoding-doc-v3-gte"
+        ),
     ),
 )
 
@@ -71,14 +99,14 @@ DefaultRerankingProviderSettings = (
     RerankingProviderSettings(
         provider=Provider.VOYAGE,
         enabled=True,
-        model_settings=RerankingModelSettings(model="rerank-2.5"),
+        model_settings=RerankingModelSettings(model="voyage:rerank-2.5"),
     ),
 )
-
+HAS_ANTHROPIC = util.find_spec("anthropic") is not None
 DefaultAgentProviderSettings = (
     AgentProviderSettings(
         provider=Provider.ANTHROPIC,
-        enabled=True,
+        enabled=HAS_ANTHROPIC,
         model="claude-sonnet-4-latest",
         model_settings=AgentModelSettings(),
     ),
@@ -259,6 +287,14 @@ class ProviderSettings(BasedModel):
     ] = DefaultAgentProviderSettings
 
 
+AllDefaultProviderSettings = ProviderSettings.model_construct(
+    data=DefaultDataProviderSettings,
+    embedding=DefaultEmbeddingProviderSettings,
+    reranking=DefaultRerankingProviderSettings,
+    agent=DefaultAgentProviderSettings,
+)
+
+
 class FastMcpServerSettings(BasedModel):
     """Settings for the FastMCP server.
 
@@ -409,6 +445,15 @@ DefaultFastMcpServerSettings = FastMcpServerSettings.model_validate({
 })
 
 
+def _is_settings_view(obj: Any) -> TypeGuard[CodeWeaverSettingsView]:
+    """Check if the object is a valid settings view."""
+    return (
+        isinstance(obj, MappingProxyType)
+        and all(k for k in CodeWeaverSettingsView.__value__.__args__[0].__args__ if k in obj)
+        and all(k for k in obj if k in CodeWeaverSettings.model_fields)  # type: ignore
+    )
+
+
 class CodeWeaverSettings(BaseSettings):
     """Main configuration model following pydantic-settings patterns.
 
@@ -461,8 +506,17 @@ class CodeWeaverSettings(BaseSettings):
         str | None, Field(description="""Project name (auto-detected from directory if None)""")
     ] = None
 
+    provider: Annotated[
+        ProviderSettings,
+        Field(
+            default_factory=ProviderSettings,
+            description="""Provider and model configurations for agents, data, embedding, reranking, sparse embedding, and vector store providers. Will default to default profile if not provided.""",
+        ),
+    ] = AllDefaultProviderSettings
+
     config_file: Annotated[
-        Path | None, Field(description="""Path to the configuration file, if any""", exclude=True)
+        FilePath | None,
+        Field(description="""Path to the configuration file, if any""", exclude=True),
     ] = None
 
     # Performance settings
@@ -496,18 +550,6 @@ class CodeWeaverSettings(BaseSettings):
         FileFilterSettings, Field(description="""File filtering settings""")
     ] = FileFilterSettings()
 
-    embedding: Annotated[
-        tuple[EmbeddingModelSettings, ...] | None,
-        Field(description="""Embedding provider configuration"""),
-    ] = None  # TODO: Add defaults
-
-    """
-    vector_store: Annotated[
-        BaseVectorStoreConfig,
-        Field(default_factory=QdrantConfig, description="Vector store provider configuration"),
-    ] = QdrantConfig()
-    """
-    # Feature flags
     enable_background_indexing: Annotated[
         bool,
         Field(
@@ -517,21 +559,21 @@ class CodeWeaverSettings(BaseSettings):
     enable_telemetry: Annotated[
         bool,
         Field(
-            description="""Enable privacy-friendly usage telemetry. On by default. We do not collect any identifying information -- we hash all file and directory paths, repository names, and other identifiers to ensure privacy while still gathering useful aggregate data for improving CodeWeaver. You can see exactly what we collect, and how we collect it [here](services/telemetry.py). You can disable this if you prefer not to send any data. You can also provide your own PostHog Project Key to collect your own telemetry data. We will not use this information for anything else -- it is only used to improve CodeWeaver."""
+            description="""Enable privacy-friendly usage telemetry. ON by default. We do not collect any identifying information -- we hash all file and directory paths, repository names, and other identifiers to ensure privacy while still gathering useful aggregate data for improving CodeWeaver. You can see exactly what we collect, and how we collect it [here](services/telemetry.py). You can disable this if you prefer not to send any data. You can also provide your own PostHog Project Key to collect your own telemetry data. We will not use this information for anything else -- it is only used to improve CodeWeaver."""
         ),
     ] = True
     enable_health_endpoint: Annotated[
         bool, Field(description="""Enable the health check endpoint""")
     ] = True
-    health_endpoint_path: Annotated[
-        str | None, Field(description="""Path for the health check endpoint""")
-    ] = "/health/"
     enable_statistics_endpoint: Annotated[
         bool, Field(description="""Enable the statistics endpoint""")
     ] = True
-    statistics_endpoint_path: Annotated[
-        str | None, Field(description="""Path for the statistics endpoint""")
-    ] = "/statistics/"
+    enable_settings_endpoint: Annotated[
+        bool, Field(description="""Enable the settings endpoint""")
+    ] = True
+    enable_version_endpoint: Annotated[
+        bool, Field(description="""Enable the version endpoint""")
+    ] = True
     allow_identifying_telemetry: Annotated[
         bool,
         Field(
@@ -548,11 +590,6 @@ class CodeWeaverSettings(BaseSettings):
         ),
     ] = False  # ! Phase 2 feature, switch to True when implemented
 
-    agent_settings: Annotated[
-        AgentModelSettings | None,
-        Field(description="""Model settings for ai agents. Required for `enable_precontext`"""),
-    ] = None
-
     uvicorn_settings: Annotated[
         UvicornServerSettings | None,
         Field(
@@ -568,10 +605,12 @@ class CodeWeaverSettings(BaseSettings):
         ),
     ] = "1.0.0"
 
+    _map: Annotated[CodeWeaverSettingsView | None, PrivateAttr()] = None
+
     def model_post_init(self, __context: Any, /) -> None:
         """Post-initialization validation."""
         # Ensure project path exists and is readable
-        if not self.project_name:
+        if not self.project_name and self.project_root:
             self.project_name = self.project_root.name
 
     @computed_field
@@ -599,9 +638,54 @@ class CodeWeaverSettings(BaseSettings):
         )
         # spellchecker:on
 
+    def update_settings(self, **kwargs: CodeWeaverSettingsDict) -> Self:
+        """Update settings, validating a new CodeWeaverSettings instance and updating the global instance."""
+        new_settings = self.model_copy().model_dump() | kwargs
+        try:
+            new_self = self.model_validate(new_settings)
+        except ValidationError:
+            logger.exception(
+                "`CodeWeaverSettings` received invalid settings for an update. The settings failed to validate. We did not update the settings."
+            )
+            return self
+        globals()["_settings"] = new_self
+        self = new_self.model_copy()
+        self._update_registry()
+        return self
+
+    @property
+    def map_view(self) -> CodeWeaverSettingsView:
+        """Get a read-only mapping view of the settings."""
+        if self._map is None:
+            self._map = (
+                MappingProxyType(self.model_dump())
+                if _is_settings_view(self.model_dump())
+                else None
+            )  # type: ignore
+        if not self._map:
+            raise TypeError("Settings map view is not a valid CodeWeaverSettingsView")
+        return self._map
+
+    def _update_registry(self) -> None:
+        """Update the settings registry."""
+        self._map = None  # reset the map so it will be regenerated
+        for hook in globals().get("_update_registry", []):
+            if callable(hook):
+                _ = hook(self.map_view)
+
+
+_update_registry: list[Callable[..., CodeWeaverSettingsView]] = []
 
 # Global settings instance
 _settings: CodeWeaverSettings | None = None
+
+_mapped_settings: CodeWeaverSettingsView | None = None
+"""An immutable mapping view of the global settings instance."""
+
+
+def register_settings_hook(hook: Callable[..., CodeWeaverSettingsView]) -> None:
+    """Register a settings hook."""
+    _update_registry.append(hook)
 
 
 def get_settings(path: Path | None = None) -> CodeWeaverSettings:
@@ -609,30 +693,50 @@ def get_settings(path: Path | None = None) -> CodeWeaverSettings:
     global _settings
 
     if path:
-        return CodeWeaverSettings(project_path=path)
+        return CodeWeaverSettings(project_path=path)  # type: ignore
     if _settings is None:
-        _settings = CodeWeaverSettings(project_path=Path.cwd())
+        _settings = CodeWeaverSettings(project_path=Path.cwd())  # type: ignore
     return _settings
+
+
+def get_settings_map() -> CodeWeaverSettingsView:
+    """Get a read-only mapping view of the global settings instance.
+
+    Almost nothing in CodeWeaver should need to modify settings at runtime,
+    so instead we distribute a thread-safe, immutable, view of the settings and provide a mechanism for them to get updated (by registering a hook with `register_settings_hook`).
+    """
+    global _mapped_settings
+    global _settings
+    settings = _settings or get_settings()
+    if _mapped_settings is None or _mapped_settings != settings.map_view:
+        _mapped_settings = settings.map_view
+    return _mapped_settings
 
 
 def reload_settings() -> CodeWeaverSettings:
     """Reload settings from configuration sources."""
     global _settings
+    global _mapped_settings
     _settings = None
+    _mapped_settings = None  # the mapping will be regenerated on next access
     return get_settings()
 
 
-def get_provider_settings(provider_kind: ProviderKind | str) -> Any:
-    """Check a setting value by a tuple of keys (the path to the setting)."""
-    if isinstance(provider_kind, str):
-        provider_kind = ProviderKind.from_string(provider_kind)
-    if provider_kind == ProviderKind.UNSET:  # type: ignore
-        raise MissingValueError(
-            "Provider kind cannot be _UNSET",
-            "settings.get_provider_settings: `provider_kind` is _UNSET",
-            None,
-            ["This may be a bug in CodeWeaver, please report it."],
-        )
+def is_provider_view(obj: Any) -> TypeGuard[ProviderSettingsView]:
+    """Check if the object is a valid provider settings view."""
+    return (
+        isinstance(obj, MappingProxyType)
+        and all(k for k in ProviderSettingsView.__value__.__args__[0].__args__ if k in obj)
+        and all(k for k in obj if k in ProviderSettings.model_fields)  # type: ignore
+    )
+
+
+def get_provider_settings() -> ProviderSettingsView:
+    """Return a view of the provider settings."""
+    settings = get_settings_map()
+    if not is_provider_view(settings["provider"]):
+        raise TypeError("Provider settings view is not valid")
+    return settings["provider"]
 
 
 __all__ = (
@@ -647,6 +751,7 @@ __all__ = (
     "FileFilterSettingsDict",
     "get_provider_settings",
     "get_settings",
+    "get_settings_map",
     "merge_agent_model_settings",
     "reload_settings",
 )

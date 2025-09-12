@@ -212,10 +212,7 @@ def has_git() -> bool:
         return False
     with contextlib.suppress(subprocess.CalledProcessError):
         output = subprocess.run(
-            ["--version"],
-            executable=git,
-            stderr=subprocess.STDOUT,
-            capture_output=True,  # noqa: S607
+            ["--version"], executable=git, stderr=subprocess.STDOUT, capture_output=True
         )
         return output.returncode == 0
     return False
@@ -556,11 +553,14 @@ def get_optimizations(model_kind: Literal["dense", "sparse", "both"]) -> Optimiz
 
 
 __all__ = (
+    "MISSING",
     "AvailableOptimizations",
+    "Missing",
     "OptimizationDecisions",
     "SimdExtensions",
     "decide_fastembed_runtime",
     "ensure_iterable",
+    "estimate_tokens",
     "get_git_revision",
     "get_optimizations",
     "get_possible_env_vars",
@@ -569,9 +569,14 @@ __all__ = (
     "has_git",
     "has_package",
     "in_codeweaver_clone",
+    "is_class",
     "is_debug",
     "is_git_dir",
+    "is_pydantic_basemodel",
+    "is_typeadapter",
     "lazy_importer",
     "normalize_ext",
     "rpartial",
+    "set_relative_path",
+    "uuid7",
 )

@@ -9,7 +9,7 @@ We wanted to mirror `pydantic-ai`'s handling of LLM models, but we had to make a
 # sourcery skip: avoid-global-variables
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any
 
 from codeweaver.provider import Provider
 from codeweaver.settings_types import EmbeddingModelSettings, EmbeddingProviderSettings
@@ -73,106 +73,3 @@ def user_settings_to_provider_settings(
 
 def get_embedding_model_provider() -> None:  # -> EmbeddingProvider[Any]:
     """Get embedding model provider."""
-
-
-type KnownEmbeddingModelName = Literal[
-    "azure:embed-v-4-0",  # cohere v4
-    "azure:text-embedding-3-large",
-    "azure:text-embedding-3-small",
-    "bedrock:amazon.titan-embed-text-v2:0",
-    "bedrock:cohere.embed-english-v3.0",
-    "bedrock:cohere.embed-multilingual-v3.0",
-    "cohere:embed-english-v3.0",
-    "cohere:embed-multilingual-light-v3.0",
-    "cohere:embed-multilingual-v3.0",
-    "cohere:embed-v4.0",
-    "fastembed:BAAI/bge-base-en-v1.5",
-    "fastembed:BAAI/bge-large-en-v1.5",
-    "fastembed:BAAI/bge-m3",
-    "fastembed:BAAI/bge-small-en-v1.5",
-    "fastembed:jinaai/jina-embeddings-v2-base-code",
-    "fastembed:jinaai/jina-embeddings-v3",
-    "fastembed:nomic-ai/nomic-embed-text-v1.5",
-    "fastembed:nomic-ai/nomic-embed-text-v1.5-Q",  # in HF as nomic-ai/nomic-embed-text-v1.5-GGUF
-    "fastembed:sentence-transformers/all-MiniLM-L6-v2",
-    "fastembed:snowflake/snowflake-arctic-embed-l",
-    "fastembed:snowflake/snowflake-arctic-embed-l-v2.0",
-    "fastembed:snowflake/snowflake-arctic-embed-m",
-    "fastembed:snowflake/snowflake-arctic-embed-m-long",
-    "fastembed:snowflake/snowflake-arctic-embed-s",
-    "fastembed:snowflake/snowflake-arctic-embed-xs",
-    "fastembed:thenlper/gte-base",
-    "fastembed:thenlper/gte-large",
-    "fireworks:WhereIsAI/UAE-Large-V1",
-    "fireworks:nomic-ai/nomic-embed-text-v1.5",
-    "fireworks:thenlper/gte-base",
-    "fireworks:thenlper/gte-large",
-    "github:cohere/Cohere-embed-v3-english",
-    "github:cohere/Cohere-embed-v3-multilingual",
-    "github:openai/text-embedding-3-large",
-    "github:openai/text-embedding-3-small",
-    "google:gemini-embedding-001",
-    "google:gemini-embedding-exp-03-07",
-    "groq:Alibaba-NLP/gte-modernbert-base",
-    "heroku:cohere-embed-multilingual",
-    "hf-inference:Alibaba-NLP/gte-modernbert-base",
-    "hf-inference:BAAI/bge-base-en-v1.5",
-    "hf-inference:BAAI/bge-large-en-v1.5",
-    "hf-inference:BAAI/bge-m3",
-    "hf-inference:BAAI/bge-small-en-v1.5",
-    "hf-inference:Snowflake/snowflake-arctic-embed-l-v2.0",
-    "hf-inference:WhereIsAI/UAE-Large-V1",
-    "hf-inference:ibm-granite/granite-embedding-278m-multilingual",
-    "hf-inference:intfloat/multilingual-e5-large",
-    "hf-inference:nomic-ai/modernbert-embed-base",
-    "hf-inference:sentence-transformers/all-MiniLM-L12-v2",
-    "hf-inference:sentence-transformers/all-MiniLM-L6-v2",
-    "hf-inference:sentence-transformers/all-mpnet-base-v2",
-    "hf-inference:sentence-transformers/gtr-t5-base",
-    "hf-inference:sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
-    "hf-inference:sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
-    "hf-inference:sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
-    "mistral:codestral-embed",
-    "mistral:mistral-embed",
-    "ollama:all-minilm",
-    "ollama:mxbai-embed-large",
-    "ollama:nomic-embed-text",
-    "openai:text-embedding-3-large",
-    "openai:text-embedding-3-small",
-    "sentence-transformers:Alibaba-NLP/gte-modernbert-base",
-    "sentence-transformers:Alibaba-NLP/gte-multilingual-base",
-    "sentence-transformers:BAAI/bge-m3",
-    "sentence-transformers:Qwen/Qwen3-Embedding-0.6B",
-    "sentence-transformers:Qwen/Qwen3-Embedding-4B",
-    "sentence-transformers:Qwen/Qwen3-Embedding-8B",
-    "sentence-transformers:WhereIsAI/UAE-Code-Large-V1",
-    "sentence-transformers:ibm-granite/granite-embedding-278m-multilingual",
-    "sentence-transformers:ibm-granite/granite-embedding-30m-english",
-    "sentence-transformers:jinaai/jina-embeddings-v4",
-    "sentence-transformers:sentence-transformers/all-MiniLM-L12-v2",
-    "sentence-transformers:sentence-transformers/all-MiniLM-L6-v2",
-    "together:Alibaba-NLP/gte-modernbert-base",
-    "together:BAAI/bge-base-en-v1.5",
-    "together:BAAI/bge-large-en-v1.5",
-    "together:intfloat/multilingual-e5-large-instruct",
-    "vercel:text-embedding-3-large",
-    "vercel:text-embedding-3-small",
-    "voyage:voyage-3-large",
-    "voyage:voyage-3.5",
-    "voyage:voyage-3.5-lite",
-    "voyage:voyage-code-3",
-    "voyage:voyage-context-3",
-]
-
-
-type KnownSparseEmbeddingModelName = Literal[
-    "fastembed:Qdrant/bm25",
-    "fastembed:Qdrant/bm42-all-minilm-l6-v2-attentions",
-    "fastembed:prithivida/Splade_PP_en_v1",
-    "fastembed:prithivida/Splade_PP_en_v2",  # newer version of Splade_PP_en_v1
-    "sentence-transformers:ibm-granite/granite-embedding-30m-sparse",
-    "sentence-transformers:opensearch-project/opensearch-neural-sparse-encoding-doc-v2-mini",
-    "sentence-transformers:opensearch-project/opensearch-neural-sparse-encoding-doc-v3-distill",
-    "sentence-transformers:opensearch-project/opensearch-neural-sparse-encoding-doc-v3-gte",
-    "sentence-transformers:prithivida/Splade_PP_en_v2",
-]

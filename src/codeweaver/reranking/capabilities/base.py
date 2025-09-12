@@ -137,6 +137,14 @@ class RerankingModelCapabilities(BasedModel):
     ] = None
     other: Annotated[dict[str, Any], Field(description="""Extra model-specific settings.""")] = {}
 
+    _available: Annotated[
+        bool,
+        Field(
+            init=False,
+            description="Whether the model is available, meaning its package is available in the environment and it has been implemented.",
+        ),
+    ] = False  # defaults to False, set to True when the model is known to be available
+
     @property
     def token_processor(self) -> Tokenizer[Any]:
         """Return the tokenizer for the model."""
@@ -145,6 +153,11 @@ class RerankingModelCapabilities(BasedModel):
         if self.tokenizer and self.tokenizer_model:
             return get_tokenizer(self.tokenizer, self.tokenizer_model)
         return get_tokenizer("tiktoken", "cl100k_base")
+
+    @property
+    def available(self) -> bool:
+        """Check if the model is available."""
+        return self._available
 
     def query_ok(self, query: str) -> bool:
         """Check if the query is within the model's limits."""

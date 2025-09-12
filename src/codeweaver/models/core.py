@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from pydantic import ConfigDict, Field, NonNegativeFloat, NonNegativeInt, model_validator
 
@@ -155,6 +155,11 @@ class FindCodeResponseSummary(BasedModel):
             description="""Programming languages in the results. If the language is supported for semantic search, it will be a `SemanticSearchLanguage`, otherwise a `str` from languages in `codeweaver._constants.py`"""
         ),
     ]
+
+    @classmethod
+    def get_schema(cls) -> dict[str, Any]:
+        """Get the JSON schema for the model as a Python dictionary."""
+        return cls.model_json_schema(mode="serialization")
 
 
 __all__ = ("CodeMatch", "CodeMatchType", "FindCodeResponseSummary", "SearchStrategy")

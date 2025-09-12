@@ -14,7 +14,8 @@ from typing import TYPE_CHECKING, Any, is_typeddict
 
 from codeweaver._server import build_app
 from codeweaver._utils import lazy_importer
-from codeweaver.app_bindings import register_app_bindings
+from codeweaver.app_bindings import register_app_bindings, register_tool
+from codeweaver.exceptions import CodeWeaverError
 
 
 if TYPE_CHECKING:
@@ -77,6 +78,7 @@ async def run() -> None:
         server_setup.get("middleware", set()),  # pyright: ignore[reportArgumentType]
         server_setup.get("middleware_settings", {}),
     )
+    server_setup["app"] = register_tool(server_setup["app"])
     await start_server(server_setup)
 
 
@@ -86,5 +88,11 @@ if __name__ == "__main__":
     except Exception as e:
         logging.getLogger(__name__).exception("Failed to start CodeWeaver server: ")
         raise RuntimeError("Failed to start CodeWeaver server.") from e
+    try:
+        registry = lazy_importer("codeweaver._registry")
+        registry.initialize_registries()
+    except Exception as e:
+        raise CodeWeaverError("Failed to import registry after server start.") from e
+
 
 __all__ = ("run", "start_server")

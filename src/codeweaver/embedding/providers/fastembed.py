@@ -74,7 +74,7 @@ def fastembed_output_transformer(output: list[np.ndarray]) -> list[list[float]] 
     return [emb.tolist() for emb in output]
 
 
-class FastEmbedProvider(EmbeddingProvider[TextEmbedding]):
+class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
     """
     FastEmbed implementation of the embedding provider.
 
@@ -137,7 +137,7 @@ class FastEmbedProvider(EmbeddingProvider[TextEmbedding]):
         return self._client.embedding_size
 
 
-class FastEmbedSparseProvider(FastEmbedProvider):
+class FastEmbedSparseProvider(FastEmbedEmbeddingProvider):
     """
     FastEmbed implementation for sparse embeddings.
     """
@@ -175,4 +175,4 @@ class FastEmbedSparseProvider(FastEmbedProvider):
         return await loop.run_in_executor(None, lambda: self._process_output(embeddings))
 
 
-__all__ = ("FastEmbedProvider", "FastEmbedSparseProvider")
+__all__ = ("FastEmbedEmbeddingProvider", "FastEmbedSparseProvider")

@@ -20,17 +20,32 @@ from __future__ import annotations
 
 import contextlib
 import importlib
+import logging
 
+from collections import defaultdict
 from collections.abc import Callable, Iterable, MutableMapping, Sequence
 from enum import IntFlag, auto
 from fnmatch import fnmatch
+from functools import cache
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Annotated, Any, ClassVar, NotRequired, Required, TypedDict
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    ClassVar,
+    Literal,
+    NotRequired,
+    Required,
+    TypedDict,
+    override,
+)
 
 from pydantic import ConfigDict, Field, computed_field
 from pydantic.alias_generators import to_pascal
+from pydantic_ai.models import Model
 
 from codeweaver._common import BasedModel, BaseEnum, LiteralStringT
+from codeweaver._utils import lazy_importer
 from codeweaver.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
@@ -40,76 +55,159 @@ from codeweaver.exceptions import ConfigurationError
 from codeweaver.provider import Provider, ProviderKind
 from codeweaver.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.reranking.providers.base import RerankingProvider
+from codeweaver.settings_types import CodeWeaverSettingsView
 from codeweaver.vector_stores.base import VectorStoreProvider
 
-
-type AgenticProfile = Any
-type AgenticProfileSpec = Callable[[str], Any] | Any | None
 
 if TYPE_CHECKING:
     from pydantic_ai.providers import Provider as AgentProvider
 
-    from codeweaver.settings import CodeWeaverSettings
-
+    from codeweaver.settings_types import CodeWeaverSettingsView, ProviderSettingsView
 else:
     # We need these in the environment at runtime for pydantic, but only when needed
     from codeweaver._utils import lazy_importer
 
     AgentProvider = lazy_importer("pydantic_ai.providers").Provider
     CodeWeaverSettings = lazy_importer("codeweaver.settings").CodeWeaverSettings
+    ProviderSettings = lazy_importer("codeweaver.settings").ProviderSettings
+
+type AgenticProfile = Any
+type AgenticProfileSpec = Callable[[str], Any] | Any | None
+
+_provider_settings: ProviderSettingsView | None
+
+logger = logging.getLogger(__name__)
+
+
+@cache
+def get_provider_settings() -> ProviderSettingsView:
+    """Get the provider settings."""
+    global _provider_settings
+    if _provider_settings is None:
+        from codeweaver.settings import get_provider_settings
+
+        _provider_settings = get_provider_settings()
+    return _provider_settings
+
 
 # I think I've defined this in like four places, but it's just for clarity
 type ModelName = str
 
 
-class Feature(BaseEnum, IntFlag):
-    """Enum for features supported by the CodeWeaver server."""
+@override
+class Feature(IntFlag, BaseEnum):  # pyright: ignore[reportIncompatibleVariableOverride, reportIncompatibleMethodOverride]
+    # We intentionally override BaseEnum here to get the IntFlag behavior where they overlap
+    """Features supported by the CodeWeaver server.
 
-    BASIC_SEARCH = auto()  # simple keyword search across the codebase
-    SEMANTIC_SEARCH = auto()  # ast-grep AST search
-    VECTOR_SEARCH = auto()  # embedding-based search
-    HYBRID_SEARCH = auto()  # combination of sparse and vector search
-    RERANKING = auto()  # reranking of search results
+    `Feature` uses `IntFlag` to allow bitwise operations to resolve dependencies and available feature sets.
 
-    AGENT = auto()  # agentic LLMs
+    Example usage:
+    ```python
+    # merge features
+    requested_features = Feature.HYBRID_SEARCH | Feature.RERANKING
+    print(f"Requested: {requested_features}")
 
-    WEB_SEARCH = auto()  # tavily, duckduckgo
+    # Get all required features including dependencies
+    required = requested_features.resolve_all_dependencies()
+    print(f"Required (with deps): {required}")
 
-    SPARSE_INDEXING = auto()  # sparse indexing
-    VECTOR_INDEXING = auto()  # vector indexing
+    # Check what's missing
+    current_features = Feature.FILE_DISCOVERY | Feature.BASIC_SEARCH
+    # calculate difference
+    missing = required & ~current_features
+    print(f"Missing: {missing}")
 
-    FILE_DISCOVERY = auto()  # file discovery
-    AUTOMATIC_INDEXING = auto()  # indexing on file changes
-    FILE_WATCHER = auto()  # file watcher service
-    FILE_FILTER = auto()  # file filtering
+    # Validate a configuration
+    config = Feature.VECTOR_SEARCH | Feature.BASIC_SEARCH | Feature.FILE_DISCOVERY
+    print(f"Config valid: {config.validate_dependencies()}")
 
-    MCP_CONTEXT_AGENT = auto()  # mcp_context_agent
-    PRECONTEXT_AGENT = auto()  # precontext_agent
+    # Get minimal set for specific features
+    minimal = Feature.minimal_set_for(Feature.PRECONTEXT_AGENT)
+    print(f"Minimal for PRECONTEXT_AGENT: {minimal}")
+    ```
+    """
 
-    HEALTH = auto()  # health
-    LOGGING = auto()  # logging
-    ERROR_HANDLING = auto()  # error_handling
-    RATE_LIMITING = auto()  # rate_limiting
-    STATISTICS = auto()  # statistics
+    # Infrastructure
+    FILE_DISCOVERY = auto()
+    FILE_FILTER = auto()
+    FILE_WATCHER = auto()
+    LOGGING = auto()
+    HEALTH = auto()
+    ERROR_HANDLING = auto()
+    RATE_LIMITING = auto()
+    STATISTICS = auto()
 
-    UNKNOWN = auto()  # unknown
+    # Indexing
+    SPARSE_INDEXING = auto()
+    VECTOR_INDEXING = auto()
+    AUTOMATIC_INDEXING = auto()
 
-    @property
-    def dependencies(self) -> Feature:
-        """Get the flag dependencies for a feature."""
-        deps: dict[Feature, Feature] = {
-            Feature.BASIC_SEARCH: Feature.FILE_DISCOVERY,
-            Feature.SEMANTIC_SEARCH: Feature.BASIC_SEARCH,
-            Feature.VECTOR_SEARCH: Feature.BASIC_SEARCH,
-            Feature.HYBRID_SEARCH: Feature.SPARSE_INDEXING & Feature.VECTOR_INDEXING,
-            Feature.RERANKING: Feature.BASIC_SEARCH & Feature.VECTOR_SEARCH,
-            Feature.AUTOMATIC_INDEXING: Feature.FILE_DISCOVERY & Feature.FILE_WATCHER,
-            Feature.FILE_WATCHER: Feature.FILE_DISCOVERY & Feature.FILE_FILTER,
-            Feature.MCP_CONTEXT_AGENT: Feature.VECTOR_SEARCH & Feature.RERANKING,
-            Feature.PRECONTEXT_AGENT: Feature.VECTOR_SEARCH & Feature.RERANKING & Feature.AGENT,
-            Feature.WEB_SEARCH: Feature.AGENT,
+    # Search
+    BASIC_SEARCH = auto()
+    SEMANTIC_SEARCH = auto()
+    VECTOR_SEARCH = auto()
+    HYBRID_SEARCH = auto()
+    RERANKING = auto()
+
+    # AI/Agents
+    AGENT = auto()
+    MCP_CONTEXT_AGENT = auto()
+    PRECONTEXT_AGENT = auto()
+    WEB_SEARCH = auto()
+
+    UNKNOWN = auto()
+
+    @classmethod
+    def get_dependencies(cls, feature: Feature) -> set[Feature]:
+        """Get individual feature dependencies."""
+        deps = {
+            cls.BASIC_SEARCH: {cls.FILE_DISCOVERY},
+            cls.SEMANTIC_SEARCH: {cls.BASIC_SEARCH},
+            cls.VECTOR_SEARCH: {cls.BASIC_SEARCH, cls.VECTOR_INDEXING},
+            cls.HYBRID_SEARCH: {cls.SPARSE_INDEXING, cls.VECTOR_INDEXING, cls.BASIC_SEARCH},
+            cls.RERANKING: {cls.BASIC_SEARCH, cls.VECTOR_SEARCH},
+            cls.AUTOMATIC_INDEXING: {cls.FILE_DISCOVERY, cls.FILE_WATCHER},
+            cls.FILE_WATCHER: {cls.FILE_DISCOVERY, cls.FILE_FILTER},
+            cls.MCP_CONTEXT_AGENT: {cls.VECTOR_SEARCH, cls.RERANKING},
+            cls.PRECONTEXT_AGENT: {cls.VECTOR_SEARCH, cls.RERANKING, cls.AGENT},
+            cls.WEB_SEARCH: {cls.AGENT},
         }
-        return deps.get(self, Feature(0))
+        return deps.get(feature, set())
+
+    def resolve_all_dependencies(self) -> Feature:
+        """Resolve all dependencies for the enabled features."""
+        resolved = Feature(0)
+        to_process = {
+            feature for feature in Feature if feature in self and feature != Feature.UNKNOWN
+        }
+        # Recursively resolve dependencies
+        while to_process:
+            feature = to_process.pop()
+            if feature not in resolved:
+                resolved |= feature
+                # Add dependencies to process
+                deps = self.get_dependencies(feature)
+                to_process.update(deps - set(resolved))
+
+        return resolved
+
+    def validate_dependencies(self) -> bool:
+        """Check if all dependencies are satisfied."""
+        resolved = self.resolve_all_dependencies()
+        return (resolved & self) == resolved
+
+    def missing_dependencies(self) -> Feature:
+        """Get the missing dependencies."""
+        resolved = self.resolve_all_dependencies()
+        return resolved & ~self
+
+    @classmethod
+    def minimal_set_for(cls, *features: Feature) -> Feature:
+        """Get minimal feature set including dependencies."""
+        requested = cls(0)
+        for feature in features:
+            requested |= feature
+        return requested.resolve_all_dependencies()
 
 
 type ServiceName = Annotated[
@@ -122,7 +220,32 @@ class ServiceCardDict(TypedDict, total=False):
     """Dictionary representing a service and its status."""
 
     name: Required[ServiceName]
-    feature: Required[Feature | str]
+    provider_kind: Required[ProviderKind]
+    feature: Required[
+        Feature
+        | Literal[
+            "agent",
+            "automatic indexing",
+            "basic search",
+            "error handling",
+            "file discovery",
+            "file filter",
+            "file watcher",
+            "health",
+            "hybrid search",
+            "logging",
+            "mcp context agent",
+            "precontext agent",
+            "rate limiting",
+            "reranking",
+            "semantic search",
+            "sparse indexing",
+            "statistics",
+            "vector indexing",
+            "vector search",
+            "web search",
+        ]
+    ]
     base_class: Required[type]
     import_path: Required[str]
     enabled: Required[bool]
@@ -220,6 +343,18 @@ class ServicesRegistry(BasedModel):
         """
         return MappingProxyType(self._services)
 
+    def get_service_dependencies(self, feature: Feature) -> set[Feature]:
+        """Get the dependencies for a service feature.
+
+        Args:
+            feature: The feature enum identifier
+
+        Returns:
+            A set of feature dependencies
+        """
+        cards = self._services.get(feature, ())
+        return {dep for card in cards for dep in card.dependencies}
+
     def get_service_status(self) -> tuple[ServiceCard, ...]:
         """Get the status of all registered services.
 
@@ -240,27 +375,49 @@ class ModelRegistry(BasedModel):
         """Initialize the model registry."""
         # provider -> (model_name -> capabilities)
         self._embedding_capabilities: MutableMapping[
-            Provider, MutableMapping[ModelName, EmbeddingModelCapabilities]
-        ] = {}
+            Provider, MutableMapping[ModelName, tuple[EmbeddingModelCapabilities, ...]]
+        ] = defaultdict(dict)
         self._sparse_embedding_capabilities: MutableMapping[
-            Provider, MutableMapping[ModelName, SparseEmbeddingModelCapabilities]
-        ] = {}
+            Provider, MutableMapping[ModelName, tuple[SparseEmbeddingModelCapabilities, ...]]
+        ] = defaultdict(dict)
         self._reranking_capabilities: MutableMapping[
-            Provider, MutableMapping[ModelName, RerankingModelCapabilities]
-        ] = {}
+            Provider, MutableMapping[ModelName, tuple[RerankingModelCapabilities, ...]]
+        ] = defaultdict(dict)
 
-        # provider -> list[(model_glob, ModelProfileSpec)] for pydantic-ai agentic profiles
-        self._agentic_profiles: MutableMapping[Provider, list[tuple[str, AgenticProfileSpec]]] = {}
+        # provider -> list[(model_glob, Model)] for pydantic-ai agentic profiles
+        self._agentic_profiles: MutableMapping[Provider, list[tuple[str, Model]]] = defaultdict(
+            list
+        )
 
         # flag to allow one-time default population by caller
         self._populated_defaults: bool = False
 
+    def _register_builtin_embedding_models(self) -> None:
+        """Register built-in embedding models."""
+        from codeweaver.embedding.capabilities import (
+            load_default_capabilities,
+            load_sparse_capabilities,
+        )
+
+        for cap in load_default_capabilities():
+            self.register_embedding_capabilities(cap, replace=False)
+        for cap in load_sparse_capabilities():
+            self.register_sparse_embedding_capabilities(cap, replace=False)
+
+    def _register_builtin_reranking_models(self) -> None:
+        from codeweaver.reranking.capabilities import load_default_capabilities
+
+        for cap in load_default_capabilities():
+            self.register_reranking_capabilities(cap, replace=False)
+
+    def _register_builtin_models(self) -> None:
+        self._register_builtin_embedding_models()
+        self._register_builtin_reranking_models()
+
     # ---------- Embedding capabilities ----------
     def register_embedding_capabilities(
         self,
-        capabilities: EmbeddingModelCapabilities
-        | Sequence[EmbeddingModelCapabilities]
-        | Iterable[EmbeddingModelCapabilities],
+        capabilities: EmbeddingModelCapabilities | Iterable[EmbeddingModelCapabilities],
         *,
         replace: bool = True,
     ) -> None:
@@ -284,11 +441,11 @@ class ModelRegistry(BasedModel):
             prov_map = self._embedding_capabilities.setdefault(prov, {})
             if not replace and name_key in prov_map:
                 continue
-            prov_map[name_key] = cap
+            prov_map[name_key] += (cap,)
 
     def get_embedding_capabilities(
         self, provider: Provider, name: str
-    ) -> EmbeddingModelCapabilities | None:
+    ) -> tuple[EmbeddingModelCapabilities, ...] | None:
         """Get embedding capabilities for a specific provider and model name."""
         prov_map = self._embedding_capabilities.get(provider)
         return prov_map.get(name.strip().lower()) if prov_map else None
@@ -302,8 +459,8 @@ class ModelRegistry(BasedModel):
                 cap
                 for prov_map in self._embedding_capabilities.values()
                 for cap in prov_map.values()
-            )
-        return tuple(self._embedding_capabilities.get(provider, {}).values())
+            )  # type: ignore
+        return tuple(self._embedding_capabilities.get(provider, {}).values())  # type: ignore
 
     # ---------- Sparse embedding capabilities ----------
     def register_sparse_embedding_capabilities(
@@ -326,11 +483,11 @@ class ModelRegistry(BasedModel):
             prov_map = self._sparse_embedding_capabilities.setdefault(prov, {})
             if not replace and name_key in prov_map:
                 continue
-            prov_map[name_key] = cap
+            prov_map[name_key] = (cap,)
 
     def get_sparse_embedding_capabilities(
         self, provider: Provider, name: str
-    ) -> SparseEmbeddingModelCapabilities | None:
+    ) -> tuple[SparseEmbeddingModelCapabilities, ...] | None:
         """Get sparse embedding capabilities for a specific provider and model name."""
         prov_map = self._sparse_embedding_capabilities.get(provider)
         return prov_map.get(name.strip().lower()) if prov_map else None
@@ -343,9 +500,11 @@ class ModelRegistry(BasedModel):
             return tuple(
                 cap
                 for prov_map in self._sparse_embedding_capabilities.values()
-                for cap in prov_map.values()
+                for cap_tuple in prov_map.values()
+                for cap in cap_tuple
             )
-        return tuple(self._sparse_embedding_capabilities.get(provider, {}).values())
+        prov_map = self._sparse_embedding_capabilities.get(provider, {})
+        return tuple(cap for cap_tuple in prov_map.values() for cap in cap_tuple)
 
     # ---------- Reranking capabilities ----------
     def register_reranking_capabilities(
@@ -363,16 +522,14 @@ class ModelRegistry(BasedModel):
             else tuple(capabilities)
         )
         for cap in caps_seq:
-            prov = cap.provider  # type: ignore[attr-defined]
-            name_key = cap.name.strip().lower()  # type: ignore[attr-defined]
-            prov_map = self._reranking_capabilities.setdefault(prov, {})
+            prov_map = self._reranking_capabilities.setdefault(cap.provider, {})
+            name_key = cap.name.strip().lower()
             if not replace and name_key in prov_map:
-                continue
-            prov_map[name_key] = cap
+                prov_map[name_key] = prov_map[name_key] + (cap,) if prov_map[name_key] else (cap,)
 
     def get_reranking_capabilities(
         self, provider: Provider, name: str
-    ) -> RerankingModelCapabilities | None:
+    ) -> tuple[RerankingModelCapabilities, ...] | None:
         """Get reranking capabilities for a specific provider and model name."""
         prov_map = self._reranking_capabilities.get(provider)
         return prov_map.get(name.strip().lower()) if prov_map else None
@@ -385,9 +542,11 @@ class ModelRegistry(BasedModel):
             return tuple(
                 cap
                 for prov_map in self._reranking_capabilities.values()
-                for cap in prov_map.values()
+                for cap_tuple in prov_map.values()
+                for cap in cap_tuple
             )
-        return tuple(self._reranking_capabilities.get(provider, {}).values())
+        prov_map = self._reranking_capabilities.get(provider, {})
+        return tuple(cap for cap_tuple in prov_map.values() for cap in cap_tuple)
 
     # ---------- Agentic model profiles (pydantic-ai) ----------
     def register_agentic_profile(
@@ -417,6 +576,16 @@ class ModelRegistry(BasedModel):
             None,
         )
 
+    def _register_builtin_agentic_profiles(self) -> None:
+        """Register built-in agentic profiles."""
+        from codeweaver.agent_models import KnownAgentModelName, infer_model
+
+        model_names = KnownAgentModelName.__value__.__dict__["__args__"][:-1]
+        for model_name in model_names:
+            with contextlib.suppress(ValueError, AttributeError, ImportError):
+                profile: Model = infer_model(model_name)
+                provider = Provider.from_string(profile._profile.name)
+
     # ---------- Population helpers ----------
     def mark_defaults_populated(self) -> None:
         """Mark the default capabilities as populated."""
@@ -441,7 +610,7 @@ class ProviderRegistry(BasedModel):
     )
 
     _instance: ProviderRegistry | None = None
-    _settings: CodeWeaverSettings | None = None
+    _settings: CodeWeaverSettingsView | None = None
     _embedding_prefix: ClassVar[LiteralStringT] = "codeweaver.embedding.providers."
     _sparse_prefix: ClassVar[LiteralStringT] = "codeweaver.embedding.providers."
     _rerank_prefix: ClassVar[LiteralStringT] = "codeweaver.reranking.providers."
@@ -541,10 +710,10 @@ class ProviderRegistry(BasedModel):
         return cls._instance
 
     @property
-    def settings(self) -> CodeWeaverSettings | None:
+    def settings(self) -> CodeWeaverSettingsView | None:
         """Get the CodeWeaver settings."""
         if self._settings is None:
-            self._settings = importlib.import_module("codeweaver.settings").get_settings()
+            self._settings = importlib.import_module("codeweaver.settings").get_settings_map()
         return self._settings
 
     def register(
@@ -557,29 +726,59 @@ class ProviderRegistry(BasedModel):
             provider_kind: The type of provider (embedding or vector store)
             provider_class: The provider implementation class
         """
-        if provider_kind == ProviderKind.EMBEDDING:
-            self.register_embedding_provider(provider, provider_class)
-        elif provider_kind == ProviderKind.VECTOR_STORE:
-            self.register_vector_store_provider(provider, provider_class)
+        match provider_kind:
+            case ProviderKind.AGENT:
+                self.register_agent_provider(provider, provider_class)
+            case ProviderKind.DATA:
+                self.register_data_provider(provider, provider_class)
+            case ProviderKind.EMBEDDING:
+                self.register_embedding_provider(provider, provider_class)
+            case ProviderKind.SPARSE_EMBEDDING:
+                self.register_sparse_embedding_provider(provider, provider_class)
+            case ProviderKind.VECTOR_STORE:
+                self.register_vector_store_provider(provider, provider_class)
+            case ProviderKind.RERANKING:
+                self.register_reranking_provider(provider, provider_class)
+            case _:
+                pass
+
+    def _register_builtin_pydantic_ai_providers(self) -> None:
+        """Register built-in Pydantic AI providers."""
+        agent_module = importlib.import_module(self._agent_import)
+        if providers := getattr(agent_module, "load_default_agent_providers", None):
+            for provider_class in providers:
+                provider = next(
+                    p for p in Provider if str(p).lower() in provider_class.__name__.lower()
+                )
+                self.register(provider, ProviderKind.AGENT, provider_class)
+        tool_module = importlib.import_module("codeweaver.tools")
+        if tools := getattr(tool_module, "load_default_data_providers", None):
+            for tool in tools:
+                provider = (
+                    Provider.DUCKDUCKGO if "duck" in tool.__name__.lower() else Provider.TAVILY
+                )
+                self.register(provider, ProviderKind.DATA, tool)
 
     def _register_builtin_providers(self) -> None:
         """Register built-in provider implementations."""
         # Register embedding providers dynamically
         for provider_kind, prov_map in self._provider_map.items():
+            if provider_kind == ProviderKind.AGENT:
+                continue
             for provider, module_path in prov_map.items():
+                if provider in (Provider.TAVILY, Provider.DUCKDUCKGO) or module_path == "EXCEPTION":
+                    continue
                 with contextlib.suppress(ImportError, AttributeError):
                     module = __import__(module_path, fromlist=["*"])
                     self._register_provider_by_kind(provider_kind, provider, module, module_path)
+        self._register_azure_exception_providers(Provider.AZURE)
+        # * NOTE: Embedding providers using OpenAIEmbeddingBase still need a class created to get instantiated. But no point building it until it's needed.
 
     def _register_provider_by_kind(
         self, provider_kind: ProviderKind, provider: Provider, module: Any, module_path: str
     ) -> None:
         """Register a provider based on its kind."""
         match provider_kind:
-            case ProviderKind.AGENT:
-                self._register_agent_provider_from_module(provider, module)
-            case ProviderKind.DATA:
-                self._register_data_provider_from_module(provider, module)
             case ProviderKind.EMBEDDING | ProviderKind.SPARSE_EMBEDDING:
                 self._register_embedding_provider_from_module(
                     provider, module, module_path, destination=provider_kind
@@ -590,22 +789,6 @@ class ProviderRegistry(BasedModel):
                 self._register_vector_store_provider_from_module(provider, module)
             case _:
                 pass
-
-    def _register_agent_provider_from_module(self, provider: Provider, module: Any) -> None:
-        """Register an agent provider from a module."""
-        if (provider_func := getattr(module, "get_agent_model_provider", None)) and (
-            provider_class := provider_func(provider)
-        ):
-            self.register_agent_provider(provider, provider_class)
-
-    def _register_data_provider_from_module(self, provider: Provider, module: Any) -> None:
-        """Register a data provider from a module."""
-        if (provider_func := getattr(module, "get_data_provider", None)) and (
-            data_provider_class := provider_func(provider)
-        ):
-            self.register_data_provider(provider, data_provider_class)
-        if provider_func and (data_provider_class := provider_func(provider)):
-            self.register_data_provider(provider, data_provider_class)
 
     def _register_embedding_provider_from_module(
         self, provider: Provider, module: Any, module_path: str, destination: ProviderKind
@@ -652,10 +835,6 @@ class ProviderRegistry(BasedModel):
         provider_name = f"{to_pascal(str(provider))}VectorStoreProvider"
         if provider_class := getattr(module, provider_name, None):
             self.register_vector_store_provider(provider, provider_class)
-
-    def add_settings(self, settings: CodeWeaverSettings) -> None:
-        """Add settings to the provider registry."""
-        self._settings = settings
 
     def register_agent_provider(self, provider: Provider, provider_class: type[Any]) -> None:
         """Register an agent provider implementation.
@@ -1114,11 +1293,6 @@ _provider_registry = ProviderRegistry()
 _model_registry = ModelRegistry()
 
 
-def update_settings(settings: CodeWeaverSettings) -> None:
-    """Update the global settings registry instance."""
-    return _provider_registry.add_settings(settings)
-
-
 def get_provider_registry() -> ProviderRegistry:
     """Get the global provider registry instance."""
     return _provider_registry
@@ -1261,7 +1435,9 @@ def resolve_agentic_profile(provider: Provider, model_name: str) -> AgenticProfi
 
 def initialize_registries() -> None:
     """Initialize the global registries."""
+    _model_registry._register_builtin_models()  # type: ignore
     _provider_registry._register_builtin_providers()  # type: ignore
+    # TODO: Services registry... we'll need to deconflict available providers, capabilities, against registered services to figure out what's actually available
 
 
 __all__ = (
@@ -1274,6 +1450,7 @@ __all__ = (
     "get_model_registry",
     "get_provider_registry",
     "get_services_registry",
+    "initialize_registries",
     "register_agent_provider",
     "register_agentic_profile",
     "register_data_provider",
@@ -1286,5 +1463,4 @@ __all__ = (
     "register_sparse_embedding_provider",
     "register_vector_store_provider",
     "resolve_agentic_profile",
-    "update_settings",
 )
