@@ -61,7 +61,6 @@ class SerializationKwargs(TypedDict, total=False):
     exclude_unset: NotRequired[bool]
     fallback: NotRequired[Callable[[Any], Any] | None]
     include: NotRequired[IncEx | None]
-    indent: NotRequired[int | None]
     round_trip: NotRequired[bool]
     serialize_as_any: NotRequired[bool]
     warnings: NotRequired[bool | Literal["none", "warn", "error"]]

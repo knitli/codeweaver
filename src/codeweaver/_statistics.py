@@ -76,6 +76,7 @@ class McpComponentTimingDict(TypedDict):
 class HttpRequestsDict(TypedDict):
     version: NonNegativeFloat
     health: NonNegativeFloat
+    state: NonNegativeFloat
     statistics: NonNegativeFloat
     settings: NonNegativeFloat
 
@@ -186,6 +187,13 @@ class TimingStatistics(DataclassSerializationMixin):
             description="""Time taken for version check http requests in milliseconds.""",
         ),
     ]
+    state_http: Annotated[
+        list[PositiveFloat],
+        Field(
+            default_factory=list,
+            description="""Time taken for state http requests in milliseconds.""",
+        ),
+    ]
     statistics_http: Annotated[
         list[PositiveFloat],
         Field(
@@ -224,7 +232,7 @@ class TimingStatistics(DataclassSerializationMixin):
     def update_http_requests(
         self,
         response_time: PositiveFloat,
-        component: Literal["health", "version", "statistics", "settings"],
+        component: Literal["health", "version", "statistics", "state", "settings"],
     ) -> None:
         """Update the timing statistics for a specific HTTP request type."""
         key = f"{component}_http"
@@ -304,6 +312,7 @@ class TimingStatistics(DataclassSerializationMixin):
                 "http_requests": {
                     "health": safe_mean(self.health_http),
                     "version": safe_mean(self.version_http),
+                    "state": safe_mean(self.state_http),
                     "statistics": safe_mean(self.statistics_http),
                     "settings": safe_mean(self.settings_http),
                 },
@@ -322,6 +331,7 @@ class TimingStatistics(DataclassSerializationMixin):
                     "health": len(self.health_http),
                     "version": len(self.version_http),
                     "statistics": len(self.statistics_http),
+                    "state": len(self.state_http),
                     "settings": len(self.settings_http),
                 },
             },
@@ -339,6 +349,7 @@ class TimingStatistics(DataclassSerializationMixin):
                     "health": safe_min(self.health_http),
                     "version": safe_min(self.version_http),
                     "statistics": safe_min(self.statistics_http),
+                    "state": safe_min(self.state_http),
                     "settings": safe_min(self.settings_http),
                 },
             },
@@ -355,6 +366,7 @@ class TimingStatistics(DataclassSerializationMixin):
                 "http_requests": {
                     "health": safe_median(self.health_http),
                     "version": safe_median(self.version_http),
+                    "state": safe_median(self.state_http),
                     "statistics": safe_median(self.statistics_http),
                     "settings": safe_median(self.settings_http),
                 },
@@ -372,6 +384,7 @@ class TimingStatistics(DataclassSerializationMixin):
                 "http_requests": {
                     "health": safe_max(self.health_http),
                     "version": safe_max(self.version_http),
+                    "state": safe_max(self.state_http),
                     "statistics": safe_max(self.statistics_http),
                     "settings": safe_max(self.settings_http),
                 },
@@ -934,6 +947,7 @@ class SessionStatistics(DataclassSerializationMixin):
             on_list_prompts_requests=[],
             health_http=[],
             version_http=[],
+            state_http=[],
             settings_http=[],
             statistics_http=[],
         )
@@ -1003,6 +1017,7 @@ class SessionStatistics(DataclassSerializationMixin):
             on_list_prompts_requests=[],
             health_http=[],
             version_http=[],
+            state_http=[],
             settings_http=[],
             statistics_http=[],
         )
@@ -1144,6 +1159,7 @@ class SessionStatistics(DataclassSerializationMixin):
             health_http=[],
             version_http=[],
             settings_http=[],
+            state_http=[],
             statistics_http=[],
         )
         self.index_statistics = FileStatistics()
@@ -1235,7 +1251,8 @@ def add_successful_request(
 
 
 def record_timed_http_request(
-    request_type: Literal["health", "version", "settings", "statistics"], time_taken: PositiveFloat
+    request_type: Literal["health", "version", "settings", "state", "statistics"],
+    time_taken: PositiveFloat,
 ) -> None:
     """Record the time taken for an HTTP request of a given type."""
     if _statistics and _statistics.timing_statistics:
@@ -1253,7 +1270,7 @@ def get_session_statistics() -> SessionStatistics:
 
 
 def timed_http(
-    request_type: Literal["health", "version", "settings", "statistics"],
+    request_type: Literal["health", "version", "settings", "state", "statistics"],
 ) -> Callable[
     [Callable[..., Awaitable[PlainTextResponse]]], Callable[..., Awaitable[PlainTextResponse]]
 ]:

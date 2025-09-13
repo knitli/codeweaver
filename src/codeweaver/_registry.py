@@ -43,6 +43,7 @@ from typing import (
 from pydantic import ConfigDict, Field, computed_field
 from pydantic.alias_generators import to_pascal
 from pydantic_ai.models import Model
+from rich.console import Console
 
 from codeweaver._common import BasedModel, BaseEnum, DictView, LiteralStringT
 from codeweaver.embedding.capabilities.base import (
@@ -68,6 +69,7 @@ type AgenticProfileSpec = Callable[[str], Any] | Any | None
 _provider_settings: DictView[ProviderSettingsDict] | None
 
 logger = logging.getLogger(__name__)
+console = Console(markup=True)
 
 
 @cache
@@ -431,10 +433,12 @@ class ModelRegistry(BasedModel):
         for cap in caps_seq:
             prov = cap.provider
             name_key = cap.name.strip().lower()
-            prov_map = self._embedding_capabilities.setdefault(prov, {})
-            if not replace and name_key in prov_map:
+            if not replace and name_key in self._embedding_capabilities.get(prov, {}):
                 continue
-            prov_map[name_key] += (cap,)
+            if name_key not in self._embedding_capabilities.get(prov, {}):
+                self._embedding_capabilities[prov][name_key] = (cap,)
+            else:
+                self._embedding_capabilities[prov][name_key] += (cap,)
 
     def get_embedding_capabilities(
         self, provider: Provider, name: str
@@ -577,7 +581,17 @@ class ModelRegistry(BasedModel):
         for model_name in model_names:
             with contextlib.suppress(ValueError, AttributeError, ImportError):
                 profile: Model = infer_model(model_name)
-                provider = Provider.from_string(profile._profile.name)
+                provider = Provider.from_string(
+                    profile._profile.split(":")[1]
+                    if len(profile._profile.split(":")) > 1
+                    else profile._profile
+                )
+                if not provider:
+                    console.print(
+                        f"[yellow]Warning:[/yellow] Could not infer provider for model '{model_name}' with profile '{profile._profile}'. Skipping registration."
+                    )
+                else:
+                    self.register_agentic_profile(provider, model_name, profile, replace=False)
 
     # ---------- Population helpers ----------
     def mark_defaults_populated(self) -> None:
@@ -1421,6 +1435,7 @@ def resolve_agentic_profile(provider: Provider, model_name: str) -> AgenticProfi
 
 def initialize_registries() -> None:
     """Initialize the global registries."""
+    global _model_registry, _provider_registry, _services_registry
     _model_registry._register_builtin_models()  # type: ignore
     _provider_registry._register_builtin_providers()  # type: ignore
     # TODO: Services registry... we'll need to deconflict available providers, capabilities, against registered services to figure out what's actually available

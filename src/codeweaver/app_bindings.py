@@ -146,9 +146,28 @@ async def settings_info(_request: Request) -> PlainTextResponse:
 @timed_http("version")
 async def version_info(_request: Request) -> PlainTextResponse:
     """Return current version information as JSON."""
-    from codeweaver import __version__ as version
+    from codeweaver import __version__
 
-    return PlainTextResponse(content=to_json({"version": version}), media_type="application/json")
+    try:
+        return PlainTextResponse(
+            content=to_json({"version": __version__}), media_type="application/json"
+        )
+    except Exception as e:
+        _logger.exception("Failed to serialize version information")
+        return PlainTextResponse(
+            content=to_json({"error": f"Failed to serialize version information: {e}"}),
+            status_code=500,
+            media_type="application/json",
+        )
+
+
+@timed_http("state")
+async def state_info(_request: Request) -> PlainTextResponse:
+    """Return the complete application state as JSON."""
+    from codeweaver._server import get_state
+
+    state = get_state()
+    return PlainTextResponse(content=state.dump_json(), media_type="application/json")
 
 
 @timed_http("health")
@@ -224,6 +243,7 @@ async def register_app_bindings(
 ) -> tuple[FastMCP[AppState], set[Middleware]]:
     """Register application bindings for tools and routes."""
     # Routes
+    app.custom_route("/state", methods=["GET"], name="state", include_in_schema=True)(state_info)  # type: ignore[arg-type]
     app.custom_route("/stats", methods=["GET"], name="stats", include_in_schema=True)(stats_info)  # type: ignore[arg-type]
     app.custom_route("/settings", methods=["GET"], name="settings", include_in_schema=True)(  # pyright: ignore[reportUnknownMemberType]
         settings_info

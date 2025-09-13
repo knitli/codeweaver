@@ -18,7 +18,6 @@ from pydantic import FilePath
 from codeweaver._server import build_app
 from codeweaver._utils import lazy_importer
 from codeweaver.app_bindings import register_app_bindings, register_tool
-from codeweaver.exceptions import CodeWeaverError
 from codeweaver.provider import Provider as Provider  # needed for pydantic models
 
 
@@ -71,6 +70,8 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: dict[s
             "uvicorn_config": {},
             **kwargs.copy(),
         }  # type: ignore
+    registry = lazy_importer("codeweaver._registry")
+    registry.initialize_registries()
     await app.run_http_async(**kwargs)  # type: ignore
 
 
@@ -113,12 +114,5 @@ if __name__ == "__main__":
     except Exception as e:
         logging.getLogger(__name__).exception("Failed to start CodeWeaver server: ")
         raise RuntimeError("Failed to start CodeWeaver server.") from e
-    try:
-        pass
-        # registry = lazy_importer("codeweaver._registry")
-        # registry.initialize_registries()
-    except Exception as e:
-        raise CodeWeaverError("Failed to import registry after server start.") from e
-
 
 __all__ = ("run", "start_server")

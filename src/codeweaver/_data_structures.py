@@ -213,7 +213,8 @@ class Span(DataclassSerializationMixin):
             description="""The identifier for the span's source, such as a file.""",
             repr=True,
             init=True,
-            alias="source_id",
+            serialization_alias="source_id",
+            validation_alias="source_id",
             exclude=False,
         ),
     ]  # Unique identifier for the source of the span, usually a `chunk_id` or `file_id`.

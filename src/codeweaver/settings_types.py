@@ -154,7 +154,7 @@ class FormattersDict(TypedDict, total=False):
             str,
             Field(
                 description="""The class name of the formatter in the form of an import path, like `logging.Formatter` or `rich.logging.RichFormatter`.""",
-                alias="class",
+                serialization_alias="class",
             ),
         ]
     ]
@@ -329,7 +329,7 @@ class HandlersDict(TypedDict, total=False):
             str,
             Field(
                 description="""The class name of the handler in the form of an import path, like `logging.StreamHandler` or `rich.logging.RichHandler`.""",
-                alias="class",
+                serialization_alias="class",
             ),
         ]
     ]

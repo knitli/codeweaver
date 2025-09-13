@@ -192,7 +192,8 @@ class MatchExcept(BaseModel, extra="forbid"):
         Field(
             ...,
             description="""Should have at least one value not matching the any given values""",
-            alias="except",
+            serialization_alias="except",
+            validation_alias="except",
         ),
     ] = None
 

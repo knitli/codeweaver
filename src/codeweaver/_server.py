@@ -14,7 +14,7 @@ import os
 import re
 import time
 
-from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
+from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import (
@@ -93,7 +93,6 @@ get_services_registry = lazy_importer("codeweaver._registry").get_services_regis
 # this is initialized after we setup logging.
 logger: logging.Logger
 
-_STORE: dict[Literal["settings", "server", "lifespan_func"], Any]
 _STATE: AppState | None = None
 _logger: logging.Logger | None = None
 
@@ -113,66 +112,6 @@ def get_state() -> AppState:
     if _STATE is None:
         raise RuntimeError("Application state has not been initialized.")
     return _STATE
-
-
-def get_store() -> dict[Literal["settings", "server", "lifespan_func"], Any]:
-    """Get the current application store."""
-    global _STORE
-    if _STORE is None:  # type: ignore  # we're going to check anyway
-        raise RuntimeError("Application store has not been initialized.")
-    return _STORE
-
-
-@dataclass(
-    order=True,
-    kw_only=True,
-    config=BasedModel.model_config | ConfigDict(arbitrary_types_allowed=True, extra="forbid"),
-)
-class StoredSettings(DataclassSerializationMixin):
-    """A simple container for storing/caching."""
-
-    settings: Annotated[CodeWeaverSettings, Field(description="""Resolved CodeWeaver settings""")]
-    server: Annotated[
-        FastMcpServerSettingsDict, Field(description="""Resolved FastMCP server settings""")
-    ]
-    lifespan_func: Annotated[
-        Callable[..., Awaitable[None]],
-        Field(description="""Lifespan function for the application"""),
-    ]
-
-    _initialized = False
-
-    def __post_init__(self) -> None:
-        _ = self.settings.model_rebuild()
-        if not _STORE and not self._initialized:
-            self.dump_to_global_store()
-            self._initialized = True
-
-    def dump_to_global_store(self) -> None:
-        """Dump the stored settings to a dictionary."""
-        from pydantic import TypeAdapter
-
-        global _STORE
-        temp_server = self.server.copy()
-        if middleware := getattr(temp_server, "middleware", None) or getattr(
-            temp_server, "additional_middleware", None
-        ):
-            self.server["middleware"] = [  # type: ignore
-                self.settings.server._validate_additional_middleware(middleware)  # type: ignore
-            ]  # type: ignore
-        if tools := getattr(temp_server, "tools", None) or getattr(
-            temp_server, "additional_tools", None
-        ):
-            self.server["tools"] = [  # type: ignore
-                self.settings.server._validate_additional_tools(tools)  # type: ignore
-            ]
-        for key in ("additional_middleware", "additional_tools", "additional_dependencies"):
-            _ = temp_server.pop(key, None)
-        self._initialized = True
-        temp_self = type(self)(
-            settings=self.settings, server=temp_server, lifespan_func=self.lifespan_func
-        )
-        _STORE = TypeAdapter(type(self)).dump_python(temp_self, mode="python")  # type: ignore
 
 
 class HealthStatus(BaseEnum):
@@ -213,9 +152,6 @@ class HealthInfo(DataclassSerializationMixin):
     )
 
     error: Annotated[str | None, Field(description="""Error message if any""")] = None
-
-    def __post_init__(self) -> None:
-        print(self._module)
 
     @classmethod
     def initialize(cls) -> HealthInfo:
@@ -283,8 +219,12 @@ class AppState(DataclassSerializationMixin):
     ] = False
 
     settings: Annotated[
-        CodeWeaverSettings | None, Field(description="""CodeWeaver configuration settings""")
-    ] = None
+        CodeWeaverSettings | None,
+        Field(
+            default_factory=importlib.import_module("codeweaver.settings").get_settings,
+            description="""CodeWeaver configuration settings""",
+        ),
+    ]
 
     config_path: Annotated[
         Path | None,
@@ -337,19 +277,20 @@ class AppState(DataclassSerializationMixin):
     # Health status
     health: Annotated[
         HealthInfo,
-        Field(default_factory=get_health_info, description="""Health status information"""),
+        Field(
+            default_factory=lambda: _health_info or get_health_info(),
+            description="""Health status information""",
+        ),
     ]
+
+    # Middleware stack
+    middleware_stack: Annotated[
+        tuple[Middleware, ...],
+        Field(description="""Tuple of FastMCP middleware instances applied to the server"""),
+    ] = ()
 
     # TODO: Future implementation
     indexer: None = None  # Placeholder for background indexer
-
-    middleware_stack: Annotated[
-        tuple[Middleware, ...],
-        Field(
-            default_factory=lambda data: tuple(data["settings"]["middleware"]),
-            description="""Loaded middleware stack""",
-        ),
-    ]
 
     def __post_init__(self) -> None:
         global _STATE
@@ -371,6 +312,10 @@ async def lifespan(
     statistics: SessionStatistics | None = None,
 ) -> AsyncIterator[AppState]:
     """Context manager for application lifespan with proper initialization."""
+    from rich.console import Console
+
+    console = Console(markup=True)
+    console.print("[bold red]Entering lifespan context manager...[/bold red]")
     statistics = statistics or _get_session_statistics()
     settings = settings or get_settings()
     if not hasattr(app, "state"):
@@ -397,8 +342,10 @@ async def lifespan(
             details={"state": state},
         )
     try:
-        state.health = state.health.initialize()
-
+        console.print("[bold green]Ensuring services set up...[/bold green]")
+        if not state.health:
+            state.health.initialize()
+        console.print("[bold aqua]Lifespan start actions complete, server initialized.[/bold aqua]")
         state.initialized = True
         # Yield the initialized state
         yield state
@@ -734,9 +681,7 @@ __all__ = (
     "HealthInfo",
     "HealthStatus",
     "ServerSetup",
-    "StoredSettings",
     "build_app",
     "get_state",
-    "get_store",
     "lifespan",
 )

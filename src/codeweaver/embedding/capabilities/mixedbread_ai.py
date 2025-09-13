@@ -8,11 +8,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from codeweaver.embedding.capabilities.base import (
-    EmbeddingCapabilities,
-    EmbeddingModelCapabilities,
-    PartialCapabilities,
-)
+from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities, PartialCapabilities
 from codeweaver.provider import Provider
 
 
@@ -25,6 +21,7 @@ CAP_MAP: dict[Literal["mixedbread-ai/mxbai-embed-large-v1"], tuple[MixedbreadAiP
 
 MXBAI_EMBED_LARGE_CAPABILITIES: PartialCapabilities = {
     "name": "mixedbread-ai/mxbai-embed-large-v1",
+    "provider": CAP_MAP["mixedbread-ai/mxbai-embed-large-v1"][0],
     "default_dimension": 1024,
     "context_window": 512,
     "preferred_metrics": ("cosine", "dot", "euclidean"),
@@ -63,13 +60,7 @@ ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (MXBAI_EMBED_LARGE_CAPABILIT
 
 def get_mixedbread_ai_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
     """Get the capabilities for mixedbread-ai embedding models."""
-    capabilities: list[EmbeddingCapabilities] = []
-    for cap in ALL_CAPABILITIES:
-        capabilities.extend([
-            EmbeddingCapabilities({**cap, "provider": provider})  # pyright: ignore[reportArgumentType]
-            for provider in [cap["name"]]  # pyright: ignore[reportArgumentType]
-        ])
-    return tuple(EmbeddingModelCapabilities.model_validate(cap) for cap in capabilities)
+    return (EmbeddingModelCapabilities.model_validate(MXBAI_EMBED_LARGE_CAPABILITIES),)
 
 
 __all__ = ("get_mixedbread_ai_embedding_capabilities",)

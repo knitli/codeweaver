@@ -95,8 +95,8 @@ def get_voyage_reranking_capabilities() -> tuple[
     lite_capabilities = base_capabilities.copy()
     lite_capabilities["name"] = "voyage-rerank-2.5-lite"
     return RerankingModelCapabilities.model_validate(
-        **base_capabilities
-    ), RerankingModelCapabilities.model_validate(**lite_capabilities)
+        base_capabilities
+    ), RerankingModelCapabilities.model_validate(lite_capabilities)
 
 
 __all__ = ("get_voyage_reranking_capabilities",)

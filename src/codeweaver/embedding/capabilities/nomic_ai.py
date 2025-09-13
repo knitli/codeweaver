@@ -93,7 +93,7 @@ NOMIC_AI_NOMIC_EMBED_TEXT_V2_MOE_CAPABILITIES: PartialCapabilities = {
     "name": "nomic-ai/nomic-embed-text-v2-moe",
     "default_dimension": 768,
     "context_window": 512,
-    "preferred_metrics": (None),
+    "preferred_metrics": ("cosine", "dot", "euclidean"),
     "supports_context_chunk_embedding": False,
     "tokenizer": "tokenizers",
     "tokenizer_model": "nomic-ai/nomic-embed-text-v2-moe",

@@ -350,7 +350,7 @@ class ImageDescription(BaseBedrockModel):
 
     width: PositiveInt
     height: PositiveInt
-    fmt: Annotated[str, Field(alias="format")]
+    fmt: Annotated[str, Field(serialization_alias="format", validation_alias="format")]
     bit_depth: PositiveInt
 
 

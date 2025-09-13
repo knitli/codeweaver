@@ -99,7 +99,7 @@ class EmbeddingModelCapabilities(BaseModel):
         ),
     ] = Provider.UNSET  # type: ignore
     version: Annotated[
-        str | int | None,
+        str | PositiveInt | PositiveFloat | None,
         Field(
             description="""The version of the model, if applicable. Can be a string or an integer. If not specified, defaults to `None`."""
         ),
