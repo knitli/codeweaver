@@ -21,8 +21,7 @@ from collections.abc import Callable
 from functools import cached_property
 from importlib import util
 from pathlib import Path
-from types import MappingProxyType
-from typing import Annotated, Any, Literal, Self, TypeGuard, cast
+from typing import Annotated, Any, Literal, Self, Unpack, cast
 
 from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.server.server import DuplicateBehavior
@@ -44,23 +43,25 @@ from pydantic_ai.settings import merge_model_settings
 from pydantic_core import from_json
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
-from codeweaver._common import UNSET, BasedModel, Unset
+from codeweaver._common import UNSET, BasedModel, DictView, Unset
 from codeweaver._constants import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_EXTENSIONS
 from codeweaver.provider import Provider
 from codeweaver.settings_types import (
     AVAILABLE_MIDDLEWARE,
     AgentProviderSettings,
     CodeWeaverSettingsDict,
-    CodeWeaverSettingsView,
     DataProviderSettings,
     EmbeddingModelSettings,
     EmbeddingProviderSettings,
+    ErrorHandlingMiddlewareSettings,
     FileFilterSettingsDict,
+    LoggingMiddlewareSettings,
     LoggingSettings,
     MiddlewareOptions,
-    ProviderSettingsView,
+    RateLimitingMiddlewareSettings,
     RerankingModelSettings,
     RerankingProviderSettings,
+    RetryMiddlewareSettings,
     RignoreSettings,
     SparseEmbeddingModelSettings,
     UvicornServerSettings,
@@ -109,6 +110,19 @@ DefaultAgentProviderSettings = (
         enabled=HAS_ANTHROPIC,
         model="claude-sonnet-4-latest",
         model_settings=AgentModelSettings(),
+    ),
+)
+
+DefaultMiddlewareSettings = MiddlewareOptions(
+    error_handling=ErrorHandlingMiddlewareSettings(
+        include_traceback=True, error_callback=None, transform_errors=False
+    ),
+    retry=RetryMiddlewareSettings(
+        max_retries=5, base_delay=1.0, max_delay=60.0, backoff_multiplier=2.0
+    ),
+    logging=LoggingMiddlewareSettings(log_level=20, include_payloads=False),
+    rate_limiting=RateLimitingMiddlewareSettings(
+        max_requests_per_second=75, get_client_id=None, burst_capacity=150, global_limit=True
     ),
 )
 
@@ -445,13 +459,7 @@ DefaultFastMcpServerSettings = FastMcpServerSettings.model_validate({
 })
 
 
-def _is_settings_view(obj: Any) -> TypeGuard[CodeWeaverSettingsView]:
-    """Check if the object is a valid settings view."""
-    return (
-        isinstance(obj, MappingProxyType)
-        and all(k for k in CodeWeaverSettingsView.__value__.__args__[0].__args__ if k in obj)
-        and all(k for k in obj if k in CodeWeaverSettings.model_fields)  # type: ignore
-    )
+_ = ProviderSettings.model_rebuild()
 
 
 class CodeWeaverSettings(BaseSettings):
@@ -497,7 +505,7 @@ class CodeWeaverSettings(BaseSettings):
     project_path: Annotated[
         Path,
         Field(
-            default_factory=lambda: importlib.import_module("codeweaver._utils").get_project_root(),
+            default_factory=importlib.import_module("codeweaver._utils").get_project_root(),
             description="""Root path of the codebase to analyze. CodeWeaver will try to detect the project root automatically if you don't provide one.""",
         ),
     ]
@@ -544,7 +552,7 @@ class CodeWeaverSettings(BaseSettings):
 
     middleware_settings: Annotated[
         MiddlewareOptions | None, Field(description="""Middleware settings""")
-    ] = None
+    ] = DefaultMiddlewareSettings
 
     filter_settings: Annotated[
         FileFilterSettings, Field(description="""File filtering settings""")
@@ -605,19 +613,39 @@ class CodeWeaverSettings(BaseSettings):
         ),
     ] = "1.0.0"
 
-    _map: Annotated[CodeWeaverSettingsView | None, PrivateAttr()] = None
+    _map: Annotated[DictView[CodeWeaverSettingsDict] | None, PrivateAttr()] = None
 
     def model_post_init(self, __context: Any, /) -> None:
         """Post-initialization validation."""
         # Ensure project path exists and is readable
         if not self.project_name and self.project_root:
             self.project_name = self.project_root.name
+        if type(self).__pydantic_complete__:
+            self._map = cast(DictView[CodeWeaverSettingsDict], DictView(self.model_dump()))
+            globals()["_mapped_settings"] = self._map
+
+    @classmethod
+    def from_config(cls, path: FilePath, **kwargs: Unpack[CodeWeaverSettingsDict]) -> Self:
+        """Create a CodeWeaverSettings instance from a configuration file."""
+        extension = path.suffix.lower()
+        match extension:
+            case ".json":
+                cls.model_config["json_file"] = path
+            case ".toml":
+                cls.model_config["toml_file"] = path
+            case ".yaml" | ".yml":
+                cls.model_config["yaml_file"] = path
+            case _:
+                raise ValueError(f"Unsupported configuration file format: {extension}")
+        from codeweaver._utils import get_project_root
+
+        return cls(project_path=get_project_root(), **{**kwargs, "config_file": path})  # type: ignore
 
     @computed_field
     @cached_property
     def project_root(self) -> Path:
         """Get the project root directory."""
-        if not self.project_path:
+        if not hasattr(self, "project_path") or not self.project_path:
             self.project_path = importlib.import_module("codeweaver._utils").get_project_root()
         return self.project_path.resolve()
 
@@ -638,7 +666,7 @@ class CodeWeaverSettings(BaseSettings):
         )
         # spellchecker:on
 
-    def update_settings(self, **kwargs: CodeWeaverSettingsDict) -> Self:
+    def _update_settings(self, **kwargs: CodeWeaverSettingsDict) -> Self:
         """Update settings, validating a new CodeWeaverSettings instance and updating the global instance."""
         new_settings = self.model_copy().model_dump() | kwargs
         try:
@@ -649,94 +677,98 @@ class CodeWeaverSettings(BaseSettings):
             )
             return self
         globals()["_settings"] = new_self
-        self = new_self.model_copy()
-        self._update_registry()
-        return self
+        globals()["_mapped_settings"] = (
+            None  # reset the mapping, it will be regenerated on next access
+        )
+        self._map = None  # reset the instance mapping, it will be regenerated on next access
+        return new_self.model_copy()
 
     @property
-    def map_view(self) -> CodeWeaverSettingsView:
+    def view(self) -> DictView[CodeWeaverSettingsDict]:
         """Get a read-only mapping view of the settings."""
-        if self._map is None:
-            self._map = (
-                MappingProxyType(self.model_dump())
-                if _is_settings_view(self.model_dump())
-                else None
-            )  # type: ignore
+        if self._map is None or not self._map:
+            try:
+                self._map = DictView(self.model_dump())  # type: ignore
+            except Exception:
+                logger.exception("Failed to create settings map view")
+                _ = type(self).model_rebuild()
+                self._map = DictView(self.model_dump())  # type: ignore
         if not self._map:
-            raise TypeError("Settings map view is not a valid CodeWeaverSettingsView")
+            raise TypeError("Settings map view is not a valid DictView[CodeWeaverSettingsDict]")
         return self._map
 
-    def _update_registry(self) -> None:
-        """Update the settings registry."""
-        self._map = None  # reset the map so it will be regenerated
-        for hook in globals().get("_update_registry", []):
-            if callable(hook):
-                _ = hook(self.map_view)
-
-
-_update_registry: list[Callable[..., CodeWeaverSettingsView]] = []
 
 # Global settings instance
 _settings: CodeWeaverSettings | None = None
+"""The global settings instance. Use `get_settings()` to access it."""
 
-_mapped_settings: CodeWeaverSettingsView | None = None
+_mapped_settings: DictView[CodeWeaverSettingsDict] | None = None
 """An immutable mapping view of the global settings instance."""
 
 
-def register_settings_hook(hook: Callable[..., CodeWeaverSettingsView]) -> None:
-    """Register a settings hook."""
-    _update_registry.append(hook)
+def get_settings(path: FilePath | None = None) -> CodeWeaverSettings:
+    """Get the global settings instance.
 
+    This should not be your first choice for getting settings. For most needs, you should. Use get_settings_map() to get a read-only mapping view of the settings. This map is a *live view*, meaning it will update if the settings are updated.
 
-def get_settings(path: Path | None = None) -> CodeWeaverSettings:
-    """Get the global settings instance."""
+    If you **really** need to get the mutable settings instance, you can use this function. It will create the global instance if it doesn't exist, optionally loading from a configuration file (like, .codeweaver.toml) if you provide a path.
+    """
     global _settings
-
-    if path:
-        return CodeWeaverSettings(project_path=path)  # type: ignore
+    root = importlib.import_module("codeweaver._utils").get_project_root()
+    if _settings and path and path.exists():
+        _settings = CodeWeaverSettings.from_config(path, **dict(_settings))
+    elif path and path.exists():
+        _settings = CodeWeaverSettings(project_path=root, config_file=path)
     if _settings is None:
-        _settings = CodeWeaverSettings(project_path=Path.cwd())  # type: ignore
+        _settings = CodeWeaverSettings(project_path=root)  # type: ignore
+    if not CodeWeaverSettings.__pydantic_complete__:
+        _ = CodeWeaverSettings.model_rebuild()
+
     return _settings
 
 
-def get_settings_map() -> CodeWeaverSettingsView:
+def update_settings(**kwargs: CodeWeaverSettingsDict) -> DictView[CodeWeaverSettingsDict]:
+    """Update the global settings instance.
+
+    Returns a read-only mapping view of the updated settings.
+    """
+    global _settings
+    if _settings is None:
+        try:
+            _settings = get_settings()
+        except Exception:
+            logger.exception("Failed to get settings: ")
+            _ = CodeWeaverSettings.model_rebuild()
+            _settings = get_settings()
+    _settings = _settings._update_settings(**kwargs)  # type: ignore
+    return _settings.view
+
+
+def get_settings_map() -> DictView[CodeWeaverSettingsDict]:
     """Get a read-only mapping view of the global settings instance.
 
     Almost nothing in CodeWeaver should need to modify settings at runtime,
-    so instead we distribute a thread-safe, immutable, view of the settings and provide a mechanism for them to get updated (by registering a hook with `register_settings_hook`).
+    so instead we distribute a live, read-only view of the global settings. It's thread-safe and will update if the settings are changed.
     """
     global _mapped_settings
     global _settings
-    settings = _settings or get_settings()
-    if _mapped_settings is None or _mapped_settings != settings.map_view:
-        _mapped_settings = settings.map_view
+    try:
+        settings = _settings or get_settings()
+    except Exception:
+        logger.exception("Failed to get settings: ")
+        _ = CodeWeaverSettings.model_rebuild()
+        settings = get_settings()
+    if _mapped_settings is None or _mapped_settings != settings.view:
+        _mapped_settings = settings.view
     return _mapped_settings
 
 
-def reload_settings() -> CodeWeaverSettings:
+def reset_settings() -> None:
     """Reload settings from configuration sources."""
     global _settings
     global _mapped_settings
     _settings = None
     _mapped_settings = None  # the mapping will be regenerated on next access
-    return get_settings()
-
-
-def is_provider_view(obj: Any) -> TypeGuard[ProviderSettingsView]:
-    """Check if the object is a valid provider settings view."""
-    return (
-        isinstance(obj, MappingProxyType)
-        and all(k for k in ProviderSettingsView.__value__.__args__[0].__args__ if k in obj)
-        and all(k for k in obj if k in ProviderSettings.model_fields)  # type: ignore
-    )
-
-
-def get_provider_settings() -> ProviderSettingsView:
-    """Return a view of the provider settings."""
-    settings = get_settings_map()
-    if not is_provider_view(settings["provider"]):
-        raise TypeError("Provider settings view is not valid")
-    return settings["provider"]
 
 
 __all__ = (
@@ -749,9 +781,9 @@ __all__ = (
     "FastMcpServerSettings",
     "FileFilterSettings",
     "FileFilterSettingsDict",
-    "get_provider_settings",
     "get_settings",
     "get_settings_map",
     "merge_agent_model_settings",
-    "reload_settings",
+    "reset_settings",
+    "update_settings",
 )

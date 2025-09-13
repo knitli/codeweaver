@@ -23,6 +23,7 @@ from pydantic_core import to_json
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
+from codeweaver._common import DictView
 from codeweaver._server import AppState, HealthInfo, get_health_info
 from codeweaver._statistics import SessionStatistics, get_session_statistics, timed_http
 from codeweaver.exceptions import CodeWeaverError
@@ -30,8 +31,8 @@ from codeweaver.language import SemanticSearchLanguage
 from codeweaver.middleware.statistics import StatisticsMiddleware
 from codeweaver.models.core import FindCodeResponseSummary
 from codeweaver.models.intent import IntentType
-from codeweaver.settings import CodeWeaverSettings, get_settings
-from codeweaver.settings_types import MiddlewareOptions
+from codeweaver.settings import get_settings_map
+from codeweaver.settings_types import CodeWeaverSettingsDict, MiddlewareOptions
 from codeweaver.tools.find_code import find_code_implementation
 
 
@@ -50,9 +51,9 @@ def statistics() -> SessionStatistics:
 
 
 @cache
-def settings() -> CodeWeaverSettings:
+def settings() -> DictView[CodeWeaverSettingsDict]:
     """Get the current settings."""
-    return get_settings()
+    return get_settings_map()
 
 
 def health_info() -> HealthInfo:
@@ -128,10 +129,10 @@ async def stats_info(_request: Request) -> PlainTextResponse:
 @timed_http("settings")
 async def settings_info(_request: Request) -> PlainTextResponse:
     """Return current settings as JSON."""
-    settings_model: CodeWeaverSettings = settings()
+    settings_view: DictView[CodeWeaverSettingsDict] = settings()
     try:
         return PlainTextResponse(
-            content=settings_model.model_dump_json(), media_type="application/json"
+            content=to_json(dict(settings_view.items())), media_type="application/json"
         )
     except Exception as e:
         _logger.exception("Failed to serialize settings")

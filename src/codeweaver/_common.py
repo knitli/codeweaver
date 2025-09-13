@@ -9,12 +9,13 @@ from __future__ import annotations
 
 import sys as _sys
 
-from collections.abc import Callable, Generator, Iterator
+from collections.abc import Callable, Generator, ItemsView, Iterator, KeysView, Mapping, ValuesView
 from enum import Enum, unique
 from functools import cached_property
 from threading import Lock as _Lock
-from types import FrameType
+from types import FrameType, MappingProxyType
 from typing import (
+    TYPE_CHECKING,
     Annotated,
     Any,
     Literal,
@@ -502,12 +503,71 @@ class Unset(Sentinel):
 UNSET: Unset = Unset("UNSET")
 
 
+class DictView[TypedDictT: (Mapping[str, Any])](Mapping[str, Any]):
+    """Read-only view wrapper around a mapping (intended for TypedDict-backed dicts)."""
+
+    __slots__ = ("_mapping", "data")
+
+    # Expose the concrete typed-mapping as `data` for typecheckers to grab
+    data: TypedDictT
+
+    def __init__(self, mapping: TypedDictT, /, *, make_immutable: bool = True) -> None:
+        # We keep the underlying mapping read-only via MappingProxyType by default.
+        self._mapping = MappingProxyType(dict(mapping)) if make_immutable else mapping
+        # Give a typed alias for callers and type checkers
+        self.data = cast(TypedDictT, self._mapping) if TYPE_CHECKING else self._mapping
+
+    # Mapping protocol
+    def __getitem__(self, key: str) -> Any:
+        return self._mapping[key]
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._mapping)
+
+    def __len__(self) -> int:
+        return len(self._mapping)
+
+    def __contains__(self, key: object) -> bool:
+        return key in self._mapping
+
+    # Convenience / views
+    def keys(self) -> KeysView[str]:
+        """Return a view of the keys in the mapping."""
+        return self._mapping.keys()
+
+    def values(self) -> ValuesView[Any]:
+        """Return a view of the values in the mapping."""
+        return self._mapping.values()
+
+    def items(self) -> ItemsView[str, Any]:
+        """Return a view of the items in the mapping."""
+        return self._mapping.items()
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Return the value for the given key, or the default value if the key is not found."""
+        return self._mapping.get(key, default)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        # allow setting during __init__, which sets _mapping and data
+        if name in {"_mapping", "data"}:
+            object.__setattr__(self, name, value)
+            return
+        raise AttributeError("DictView is read-only")
+
+    def __delattr__(self, name: str) -> None:
+        raise AttributeError("DictView is read-only")
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({dict(self._mapping)})"
+
+
 __all__ = (
     "UNSET",
     "BaseEnum",
     "BasedModel",
     "DataclassSerializationMixin",
     "DeserializationKwargs",
+    "DictView",
     "LiteralStringT",
     "Sentinel",
     "SerializationKwargs",

@@ -44,8 +44,7 @@ from pydantic import ConfigDict, Field, computed_field
 from pydantic.alias_generators import to_pascal
 from pydantic_ai.models import Model
 
-from codeweaver._common import BasedModel, BaseEnum, LiteralStringT
-from codeweaver._utils import lazy_importer
+from codeweaver._common import BasedModel, BaseEnum, DictView, LiteralStringT
 from codeweaver.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
@@ -55,38 +54,32 @@ from codeweaver.exceptions import ConfigurationError
 from codeweaver.provider import Provider, ProviderKind
 from codeweaver.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.reranking.providers.base import RerankingProvider
-from codeweaver.settings_types import CodeWeaverSettingsView
+from codeweaver.settings_types import CodeWeaverSettingsDict, ProviderSettingsDict
 from codeweaver.vector_stores.base import VectorStoreProvider
 
 
 if TYPE_CHECKING:
     from pydantic_ai.providers import Provider as AgentProvider
 
-    from codeweaver.settings_types import CodeWeaverSettingsView, ProviderSettingsView
-else:
-    # We need these in the environment at runtime for pydantic, but only when needed
-    from codeweaver._utils import lazy_importer
-
-    AgentProvider = lazy_importer("pydantic_ai.providers").Provider
-    CodeWeaverSettings = lazy_importer("codeweaver.settings").CodeWeaverSettings
-    ProviderSettings = lazy_importer("codeweaver.settings").ProviderSettings
 
 type AgenticProfile = Any
 type AgenticProfileSpec = Callable[[str], Any] | Any | None
 
-_provider_settings: ProviderSettingsView | None
+_provider_settings: DictView[ProviderSettingsDict] | None
 
 logger = logging.getLogger(__name__)
 
 
 @cache
-def get_provider_settings() -> ProviderSettingsView:
+def get_provider_settings() -> DictView[ProviderSettingsDict]:
     """Get the provider settings."""
     global _provider_settings
-    if _provider_settings is None:
-        from codeweaver.settings import get_provider_settings
+    if not _provider_settings:
+        from codeweaver.settings import get_settings_map
 
-        _provider_settings = get_provider_settings()
+        _provider_settings = DictView(get_settings_map()["providers"])
+    if not _provider_settings:
+        raise ValueError("Provider settings are not available.")
     return _provider_settings
 
 
@@ -610,7 +603,7 @@ class ProviderRegistry(BasedModel):
     )
 
     _instance: ProviderRegistry | None = None
-    _settings: CodeWeaverSettingsView | None = None
+    _settings: DictView[CodeWeaverSettingsDict] | None = None
     _embedding_prefix: ClassVar[LiteralStringT] = "codeweaver.embedding.providers."
     _sparse_prefix: ClassVar[LiteralStringT] = "codeweaver.embedding.providers."
     _rerank_prefix: ClassVar[LiteralStringT] = "codeweaver.reranking.providers."
@@ -708,13 +701,6 @@ class ProviderRegistry(BasedModel):
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
-
-    @property
-    def settings(self) -> CodeWeaverSettingsView | None:
-        """Get the CodeWeaver settings."""
-        if self._settings is None:
-            self._settings = importlib.import_module("codeweaver.settings").get_settings_map()
-        return self._settings
 
     def register(
         self, provider: Provider, provider_kind: ProviderKind, provider_class: type

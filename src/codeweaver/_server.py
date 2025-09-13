@@ -39,21 +39,26 @@ from pydantic.dataclasses import dataclass
 from pydantic_core import to_json
 
 from codeweaver import __version__ as version
-from codeweaver._common import BasedModel, BaseEnum, DataclassSerializationMixin
+from codeweaver._common import BasedModel, BaseEnum, DataclassSerializationMixin, DictView
 from codeweaver._logger import setup_logger
-from codeweaver._statistics import SessionStatistics
 from codeweaver._utils import get_project_root, lazy_importer, rpartial
 from codeweaver.exceptions import InitializationError
+from codeweaver.provider import (
+    Provider as Provider,  # we need this in the namespace for building the server
+)
 from codeweaver.settings import (
     CodeWeaverSettings,
     FastMcpServerSettings,
     FileFilterSettings,
     get_settings,
+    get_settings_map,
 )
 from codeweaver.settings_types import (
+    CodeWeaverSettingsDict,
     ErrorHandlingMiddlewareSettings,
     FastMcpServerSettingsDict,
     LoggingMiddlewareSettings,
+    LoggingSettings,
     MiddlewareOptions,
     RateLimitingMiddlewareSettings,
     RetryMiddlewareSettings,
@@ -68,6 +73,7 @@ if TYPE_CHECKING:
         ServiceCard,
         ServicesRegistry,
     )
+    from codeweaver._statistics import SessionStatistics
 else:
     # Pydantic needs these at runtime, but we want to lazy load them until needed.
     codeweaver_registry = lazy_importer("codeweaver._registry")
@@ -76,6 +82,7 @@ else:
     ProviderRegistry = codeweaver_registry.ProviderRegistry
     ServiceCard = codeweaver_registry.ServiceCard
     ServicesRegistry = codeweaver_registry.ServicesRegistry
+    SessionStatistics = lazy_importer("codeweaver._statistics").SessionStatistics
 
 # Lazy import of registries to delay until needed
 get_model_registry = lazy_importer("codeweaver._registry").get_model_registry
@@ -389,9 +396,6 @@ async def lifespan(
             "AppState should be an instance of AppState, but isn't. Something is wrong. Please report this issue.",
             details={"state": state},
         )
-    if not hasattr(state, "provider_registry"):
-        state.provider_registry = ProviderRegistry.get_instance()
-    state.provider_registry.add_settings(settings)
     try:
         state.health = state.health.initialize()
 
@@ -515,14 +519,14 @@ LEVEL_MAP: dict[
 
 
 def _setup_logger(
-    settings: CodeWeaverSettings,
+    settings: DictView[CodeWeaverSettingsDict],
 ) -> tuple[logging.Logger, Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]]:
     """Set up the logger from settings.
 
     Returns:
         Tuple of (logger, log_level)
     """
-    app_logger_settings = settings.logging or {}
+    app_logger_settings: LoggingSettings = cast(LoggingSettings, settings.get("logging", {}))
     level = app_logger_settings.get("level", 20)
     rich = app_logger_settings.get("use_rich", True)
     rich_kwargs = app_logger_settings.get("rich_kwargs", {})
@@ -539,23 +543,21 @@ def _setup_logger(
 
 
 def _configure_middleware(
-    settings: CodeWeaverSettings, app_logger: logging.Logger, level: int
+    settings: DictView[CodeWeaverSettingsDict], app_logger: logging.Logger, level: int
 ) -> tuple[MiddlewareOptions, Any]:
     """Configure middleware settings and determine logging middleware type.
 
     Returns:
         Tuple of (middleware_settings, logging_middleware_class)
     """
-    middleware_settings = settings.middleware_settings or {}
+    middleware_settings = settings.get("middleware_settings", settings.get("middleware", {})) or {}
     middleware_logging_settings = middleware_settings.get("logging", {}) or {}
     use_structured_logging = middleware_logging_settings.get("use_structured_logging", False)
     logging_middleware = (
         StructuredLoggingMiddleware if use_structured_logging else LoggingMiddleware
     )
     middleware_defaults: MiddlewareOptions = get_default_middleware_settings(app_logger, level)
-    if middleware_settings := settings.middleware_settings or None:  # type: ignore
-        middleware_defaults |= middleware_settings
-    middleware_settings: MiddlewareOptions = middleware_defaults
+    middleware_settings: MiddlewareOptions = middleware_defaults | middleware_settings
     return middleware_settings, logging_middleware
 
 
@@ -642,11 +644,11 @@ def _setup_file_filters_and_lifespan(
 
 def _filter_server_settings(server_settings: FastMcpServerSettings) -> FastMcpServerSettingsDict:
     """Filter server settings to remove keys not recognized by FastMCP."""
-    filtered_settings = server_settings.model_dump(mode="python")
     to_remove = ("additional_middleware", "additional_tools", "additional_dependencies")
-    for key in to_remove:
-        filtered_settings.pop(key, None)
-    return cast(FastMcpServerSettingsDict, filtered_settings)
+    return cast(
+        FastMcpServerSettingsDict,
+        {k: v for k, v in cast(dict[str, Any], server_settings).items() if k not in to_remove},
+    )
 
 
 def string_to_class(s: str) -> type[Any] | None:
@@ -672,29 +674,32 @@ class ServerSetup(TypedDict):
     middleware: NotRequired[set[Middleware] | set[type[Middleware]]]
 
 
-def build_app(settings: CodeWeaverSettings | None = None) -> ServerSetup:
+def build_app() -> ServerSetup:
     """Build and configure the FastMCP application without starting it."""
     session_statistics = _get_session_statistics()
     app_logger, level = __setup_interim_logger()
     local_logger: logging.Logger = globals()["logger"]  # type: ignore
-    local_logger.info("Initializing CodeWeaver server. Initial settings retrieved. Logging setup.")
-    settings = settings or get_settings()
-    middleware_settings, logging_middleware = _configure_middleware(settings, app_logger, level)
-    rebuilt_outcome = settings.model_rebuild()
-    local_logger.debug("Settings rebuilt: %s", rebuilt_outcome)
-    filtered_server_settings = _filter_server_settings(settings.server or {})
+    local_logger.info("Initializing CodeWeaver server. Logging set up.")
+    settings_view = get_settings_map()
+    middleware_settings, logging_middleware = _configure_middleware(
+        settings_view, app_logger, level
+    )
+    filtered_server_settings = _filter_server_settings(settings_view.get("server", {}))  # type: ignore
     middleware = {logging_middleware, *get_default_middleware()}
     base_fast_mcp_settings = _create_base_fastmcp_settings()
-    base_fast_mcp_settings = _integrate_user_settings(settings.server, filtered_server_settings)
+    base_fast_mcp_settings = _integrate_user_settings(
+        settings_view.get("server", {}),  # type: ignore
+        filtered_server_settings,
+    )
     local_logger.info("Base FastMCP settings created and merged with user settings.")
     local_logger.debug("Base FastMCP settings dump \n", extra=base_fast_mcp_settings)
-    lifespan_fn = _setup_file_filters_and_lifespan(settings, session_statistics)
+    lifespan_fn = _setup_file_filters_and_lifespan(get_settings(), session_statistics)
     base_fast_mcp_settings["lifespan"] = lifespan_fn
 
     # Transport selection is handled by the caller; remove from constructor kwargs.
     _ = base_fast_mcp_settings.pop("transport", "http")
 
-    final_app_logger, _final_level = _setup_logger(settings)
+    final_app_logger, _final_level = _setup_logger(settings_view)
     int_level = next((k for k, v in LEVEL_MAP.items() if v == _final_level), "INFO")
     for key, middleware_setting in middleware_settings.items():
         if "logger" in cast(dict[str, Any], middleware_setting):
@@ -712,11 +717,9 @@ def build_app(settings: CodeWeaverSettings | None = None) -> ServerSetup:
         **base_fast_mcp_settings,  # type: ignore
     )  # pyright: ignore[reportCallIssue]
     local_logger.info("FastMCP application initialized successfully.")
-    final_build = settings.model_rebuild()
-    local_logger.debug("Final settings rebuild: %s", final_build)
     return ServerSetup(
         app=server,
-        settings=settings,
+        settings=get_settings(),
         middleware_settings=middleware_settings,
         host=host or "127.0.0.1",
         port=port or 9328,

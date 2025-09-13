@@ -17,7 +17,8 @@ from codeweaver.language import SemanticSearchLanguage
 
 
 if TYPE_CHECKING:
-    from codeweaver.settings import CodeWeaverSettings
+    from codeweaver._common import DictView
+    from codeweaver.settings_types import CodeWeaverSettingsDict
 
 TEST_FILE_PATTERNS = ["*.test.*", "*.spec.*", "test/**/*", "spec/**/*"]
 
@@ -29,7 +30,7 @@ class FileDiscoveryService:
     language-aware file filtering.
     """
 
-    def __init__(self, settings: CodeWeaverSettings) -> None:
+    def __init__(self, settings: DictView[CodeWeaverSettingsDict]) -> None:
         """Initialize file discovery service.
 
         Args:
@@ -69,13 +70,13 @@ class FileDiscoveryService:
 
             # Use rignore for gitignore support
             walker = rignore.walk(
-                self.settings.project_root,
-                max_filesize=max_file_size or self.settings.max_file_size,
+                self.settings["project_root"],
+                max_filesize=max_file_size or self.settings["max_file_size"],
                 case_insensitive=True,
-                read_git_ignore=read_git_ignore or self.settings.filter_settings.use_gitignore,
+                read_git_ignore=read_git_ignore or self.settings["filter_settings"].use_gitignore,
                 read_ignore_files=read_ignore_files
-                or self.settings.filter_settings.use_other_ignore_files,
-                ignore_hidden=ignore_hidden or self.settings.filter_settings.ignore_hidden,
+                or self.settings["filter_settings"].use_other_ignore_files,
+                ignore_hidden=ignore_hidden or self.settings["filter_settings"].ignore_hidden,
                 additional_ignore_paths=extra_ignores,
             )
 
@@ -84,7 +85,7 @@ class FileDiscoveryService:
                 if file_path.is_file():
                     # Convert to relative path from project root
                     try:
-                        relative_path = file_path.relative_to(self.settings.project_root)
+                        relative_path = file_path.relative_to(self.settings["project_root"])
                         discovered.append(relative_path)
                     except ValueError:
                         # File is outside project root, skip
@@ -94,7 +95,7 @@ class FileDiscoveryService:
 
         except Exception as e:
             raise IndexingError(
-                f"Failed to discover files in {self.settings.project_root}",
+                f"Failed to discover files in {self.settings['project_root']}",
                 details={"error": str(e)},
                 suggestions=[
                     "Check that the project root exists and is readable",

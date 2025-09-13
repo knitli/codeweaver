@@ -10,12 +10,16 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, is_typeddict
+
+from pydantic import FilePath
 
 from codeweaver._server import build_app
 from codeweaver._utils import lazy_importer
 from codeweaver.app_bindings import register_app_bindings, register_tool
 from codeweaver.exceptions import CodeWeaverError
+from codeweaver.provider import Provider as Provider  # needed for pydantic models
 
 
 if TYPE_CHECKING:
@@ -70,9 +74,30 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: dict[s
     await app.run_http_async(**kwargs)  # type: ignore
 
 
-async def run() -> None:
+async def run(
+    *,
+    config_file: FilePath | None = None,
+    project_path: Path | None = None,
+    host: str = "127.0.0.1",
+    port: int = 9328,
+) -> None:
     """Run the CodeWeaver server."""
     server_setup = build_app()
+    if host:
+        server_setup["host"] = host
+    if port:
+        server_setup["port"] = port
+    if config_file or project_path:
+        from codeweaver.settings import get_settings
+
+        server_setup["settings"] = get_settings(path=config_file)
+    if project_path:
+        from codeweaver.settings import update_settings
+
+        _ = update_settings(**{
+            **server_setup["settings"].model_dump(),
+            "project_path": project_path,
+        })  # pyright: ignore[reportArgumentType]
     server_setup["app"], server_setup["middleware"] = await register_app_bindings(  # type: ignore
         server_setup["app"],
         server_setup.get("middleware", set()),  # pyright: ignore[reportArgumentType]
@@ -89,8 +114,9 @@ if __name__ == "__main__":
         logging.getLogger(__name__).exception("Failed to start CodeWeaver server: ")
         raise RuntimeError("Failed to start CodeWeaver server.") from e
     try:
-        registry = lazy_importer("codeweaver._registry")
-        registry.initialize_registries()
+        pass
+        # registry = lazy_importer("codeweaver._registry")
+        # registry.initialize_registries()
     except Exception as e:
         raise CodeWeaverError("Failed to import registry after server start.") from e
 

@@ -120,7 +120,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     _doc_kwargs: ClassVar[dict[str, Any]] = {}
     _query_kwargs: ClassVar[dict[str, Any]] = {}
 
-    _store: UUIDStore[list[CodeChunk]] = make_uuid_store(  # type: ignore
+    _store: UUIDStore[list] = make_uuid_store(  # type: ignore
         value_type=list, size_limit=1024 * 1024 * 3
     )
 
@@ -149,9 +149,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         self.query_kwargs = type(self)._query_kwargs.copy() or {}
         self._add_kwargs(kwargs or {})
         """Add any user-provided kwargs to the embedding provider, after we merge the defaults together."""
-        self._store = make_uuid_store(
-            value_type=list[CodeChunk], size_limit=1024 * 1024 * 3
-        )  # 3mb limit
+        self._store: list = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)  # type: ignore # 3mb limit
         self._initialize()
 
     def _add_kwargs(self, kwargs: dict[str, Any]) -> None:

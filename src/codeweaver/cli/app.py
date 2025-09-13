@@ -11,25 +11,28 @@ import sys
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Annotated, Any, Literal, cast
+from typing import Annotated, Any, Literal
 
 import cyclopts
 
+from pydantic import FilePath
 from pydantic_core import to_json
 from rich import print as rich_print
 from rich.console import Console
 from rich.table import Table
 
+from codeweaver._common import DictView
 from codeweaver._utils import lazy_importer
 from codeweaver.exceptions import CodeWeaverError
 from codeweaver.models.core import CodeMatch, FindCodeResponseSummary
 from codeweaver.models.intent import IntentType
-from codeweaver.settings import CodeWeaverSettings
+from codeweaver.settings import get_settings_map
+from codeweaver.settings_types import CodeWeaverSettingsDict
 from codeweaver.tools.find_code import find_code_implementation
 
 
 # Lazy import for performance
-get_settings: Any = lazy_importer("codeweaver.settings").get_settings
+settings_map: Any = lazy_importer("codeweaver.settings").get_settings_map()
 
 # Initialize console for rich output
 console = Console(markup=True, emoji=True)
@@ -41,10 +44,24 @@ app = cyclopts.App(
 )
 
 
+async def _run_server(
+    config_file: Annotated[FilePath | None, cyclopts.Parameter(name=["--config", "-c"])] = None,
+    project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
+    host: str = "127.0.0.1",
+    port: int = 9328,
+    *,
+    debug: bool = False,
+) -> None:
+    from codeweaver.main import run
+
+    console.print("[blue]Starting CodeWeaver MCP server...[/blue]")
+    return await run(config_file=config_file, project_path=project_path, host=host, port=port)
+
+
 @app.command
 async def server(
     *,
-    config_file: Annotated[Path | None, cyclopts.Parameter(name=["--config", "-c"])] = None,
+    config_file: Annotated[FilePath | None, cyclopts.Parameter(name=["--config", "-c"])] = None,
     project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
     host: str = "127.0.0.1",
     port: int = 9328,
@@ -52,27 +69,9 @@ async def server(
 ) -> None:
     """Start CodeWeaver MCP server."""
     try:
-        from codeweaver._server import build_app
-        from codeweaver.app_bindings import register_app_bindings
-        from codeweaver.main import start_server
-
-        # Load settings with overrides
-        settings = cast(
-            CodeWeaverSettings, get_settings(config_file) if config_file else get_settings()
+        await _run_server(
+            config_file=config_file, project_path=project_path, host=host, port=port, debug=debug
         )
-        if project_path:
-            settings.project_path = project_path
-
-        console.print("[green]Starting CodeWeaver MCP server...[/green]")
-        console.print(f"[blue]Project: {settings.project_root}[/blue]")
-        console.print(f"[blue]Server: http://{host}:{port}[/blue]")
-        server_setup = build_app(settings)
-        server_setup["app"], server_setup["middleware"] = await register_app_bindings(  # type: ignore
-            server_setup["app"],
-            server_setup.get("middleware", set()),  # type: ignore
-            server_setup.get("middleware_settings", {}),
-        )
-        await start_server(server_setup, **{"host": host, "port": port})  # type: ignore # noqa: PIE804
 
     except CodeWeaverError as e:
         console.print_exception(show_locals=True)
@@ -100,12 +99,13 @@ async def search(
 ) -> None:
     """Search codebase from command line (Phase 1: local only)."""
     try:
-        # Load settings with overrides
-        settings = cast(CodeWeaverSettings, get_settings())
+        settings = get_settings_map()
         if project_path:
-            settings.project_path = project_path
+            from codeweaver.settings import update_settings
 
-        console.print(f"[blue]Searching in: {settings.project_root}[/blue]")
+            settings = update_settings(project_path=project_path)  # type: ignore
+
+        console.print(f"[blue]Searching in: {settings['project_root']}[/blue]")
         console.print(f"[blue]Query: {query}[/blue]")
 
         # Execute search
@@ -113,7 +113,7 @@ async def search(
             query=query,
             settings=settings,
             intent=intent,
-            token_limit=settings.token_limit,
+            token_limit=settings["token_limit"],
             include_tests=include_tests,
         )
 
@@ -166,21 +166,20 @@ async def search(
 async def config(
     *,
     show: bool = False,
-    validate: bool = False,
     project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
 ) -> None:
     """Manage CodeWeaver configuration."""
     try:
-        settings = cast(CodeWeaverSettings, get_settings())
+        settings = get_settings_map()
         if project_path:
-            settings.project_path = project_path
+            from codeweaver.settings import update_settings
+
+            settings = update_settings(project_path=project_path)  # type: ignore
 
         if show:
             _show_config(settings)
-        elif validate:
-            _validate_config(settings)
         else:
-            console.print("Use --show to display configuration or --validate to check settings")
+            console.print("Use --show to display configuration")
 
     except CodeWeaverError as e:
         console.print(f"[red]Configuration Error: {e.message}[/red]")
@@ -250,7 +249,7 @@ def _display_markdown_results(
         console.print("```\n")
 
 
-def _show_config(settings: CodeWeaverSettings) -> None:
+def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
     """Display current configuration."""
     console.print("[bold blue]CodeWeaver Configuration[/bold blue]\n")
 
@@ -259,49 +258,18 @@ def _show_config(settings: CodeWeaverSettings) -> None:
     table.add_column("Value", style="white")
 
     # Core settings
-    table.add_row("Project Path", str(settings.project_root))
-    table.add_row("Project Name", settings.project_name or "auto-detected")
-    table.add_row("Token Limit", str(settings.token_limit))
-    table.add_row("Max File Size", f"{settings.max_file_size:,} bytes")
-    table.add_row("Max Results", str(settings.max_results))
+    table.add_row("Project Path", str(settings["project_root"]))
+    table.add_row("Project Name", settings["project_name"] or "auto-detected")
+    table.add_row("Token Limit", str(settings["token_limit"]))
+    table.add_row("Max File Size", f"{settings['max_file_size']:,} bytes")
+    table.add_row("Max Results", str(settings["max_results"]))
 
     # Feature flags
-    table.add_row("Background Indexing", "✅" if settings.enable_background_indexing else "❌")
-    table.add_row("Telemetry", "✅" if settings.enable_telemetry else "❌")
-    table.add_row("AI Intent Analysis", "✅" if settings.enable_ai_intent_analysis else "❌")
+    table.add_row("Background Indexing", "✅" if settings["enable_background_indexing"] else "❌")
+    table.add_row("Telemetry", "✅" if settings["enable_telemetry"] else "❌")
+    table.add_row("AI Intent Analysis", "✅" if settings["enable_ai_intent_analysis"] else "❌")
 
     console.print(table)
-
-
-def _validate_config(settings: CodeWeaverSettings) -> None:
-    """Validate current configuration."""
-    console.print("[bold blue]Validating Configuration...[/bold blue]\n")
-
-    issues: list[str] = []
-
-    # Check project root
-    if not settings.project_root.exists():
-        issues.append(f"Project root does not exist: {settings.project_root}")
-    elif not settings.project_root.is_dir():
-        issues.append(f"Project root is not a directory: {settings.project_root}")
-
-    # Check token limits
-    if settings.token_limit > 500_000:  # 500k tokens
-        issues.append(
-            "Token limit is very high and may cause performance issues or set your wallet on fire."
-        )
-
-    # Check file size limits
-    if settings.max_file_size > 50_000_000:  # 50MB
-        issues.append("Max file size is very large and may cause memory issues")
-
-    if issues:
-        console.print("[red]Configuration Issues Found:[/red]")
-        for issue in issues:
-            console.print(f"  ⚠️  {issue}")
-        console.print()
-    else:
-        console.print("[green]✅ Configuration is valid[/green]\n")
 
 
 def main() -> None:

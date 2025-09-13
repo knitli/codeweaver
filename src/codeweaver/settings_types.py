@@ -23,7 +23,6 @@ import ssl
 
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from types import MappingProxyType
 from typing import TYPE_CHECKING, Annotated, Any, Literal, NotRequired, Required, TypedDict
 
 from fastmcp.contrib.bulk_tool_caller.bulk_tool_caller import BulkToolCaller
@@ -59,7 +58,7 @@ from uvicorn.config import (
     WSProtocolType,
 )
 
-from codeweaver._common import BasedModel
+from codeweaver._common import BasedModel, DictView
 from codeweaver.exceptions import ConfigurationError
 
 
@@ -506,7 +505,7 @@ class FileFilterSettingsDict(TypedDict, total=False):
     ignore_hidden: NotRequired[bool]
     include_github_dir: NotRequired[bool]
     other_ignore_kwargs: NotRequired[RignoreSettings | Unset]
-    default_rignore_settings: NotRequired[MappingProxyType[str, Any]]
+    default_rignore_settings: NotRequired[DictView[RignoreSettings]]
 
 
 class ConnectionRateLimitConfig(TypedDict, total=False):
@@ -890,15 +889,7 @@ class ProviderSettingsDict(TypedDict, total=False):
     agent: NotRequired[tuple[AgentProviderSettings, ...] | None]
 
 
-type ProviderSettingsView = MappingProxyType[
-    Literal["data", "embedding", "reranking", "agent"],
-    tuple[DataProviderSettings, ...]
-    | tuple[EmbeddingProviderSettings, ...]
-    | tuple[RerankingProviderSettings, ...]
-    | tuple[AgentProviderSettings, ...]
-    | None,
-]
-"""An immutable view of a `ProviderSettingsDict`."""
+type ProviderSettingsView = DictView[ProviderSettingsDict]
 
 
 class CodeWeaverSettingsDict(TypedDict, total=False):
@@ -928,47 +919,6 @@ class CodeWeaverSettingsDict(TypedDict, total=False):
     enable_precontext: NotRequired[bool]
 
 
-type CodeWeaverSettingsView = MappingProxyType[
-    Literal[
-        "project_path",
-        "project_name",
-        "provider",
-        "config_file",
-        "token_limit",
-        "max_file_size",
-        "max_results",
-        "server",
-        "logging",
-        "middleware_settings",
-        "project_root",
-        "uvicorn_settings",
-        "filter_settings",
-        "enable_background_indexing",
-        "enable_telemetry",
-        "enable_health_endpoint",
-        "enable_statistics_endpoint",
-        "enable_settings_endpoint",
-        "enable_version_endpoint",
-        "allow_identifying_telemetry",
-        "enable_ai_intent_analysis",
-        "enable_precontext",
-    ],
-    Path
-    | str
-    | ProviderSettingsDict
-    | FilePath
-    | PositiveInt
-    | FastMcpServerSettingsDict
-    | LoggingSettings
-    | MiddlewareOptions
-    | UvicornServerSettingsDict
-    | FileFilterSettingsDict
-    | bool
-    | None,
-]
-"""An immutable view of a `CodeWeaverSettingsDict`."""
-
-
 __all__ = (
     "AWSProviderSettings",
     "AgentProviderSettings",
@@ -976,7 +926,6 @@ __all__ = (
     "AzureOpenAIProviderSettings",
     "BaseProviderSettings",
     "CodeWeaverSettingsDict",
-    "CodeWeaverSettingsView",
     "ConnectionConfiguration",
     "ConnectionRateLimitConfig",
     "DataProviderSettings",

@@ -33,6 +33,7 @@ from typing import TYPE_CHECKING, NamedTuple, cast
 
 from pydantic import NonNegativeInt, PositiveInt
 
+from codeweaver._common import DictView
 from codeweaver._data_structures import DiscoveredFile, Span
 from codeweaver._statistics import SessionStatistics
 from codeweaver._utils import estimate_tokens, uuid7
@@ -41,6 +42,7 @@ from codeweaver.language import SemanticSearchLanguage
 from codeweaver.models.core import CodeMatch, CodeMatchType, FindCodeResponseSummary, SearchStrategy
 from codeweaver.models.intent import IntentType
 from codeweaver.services.discovery import FileDiscoveryService
+from codeweaver.settings_types import CodeWeaverSettingsDict
 
 
 if TYPE_CHECKING:
@@ -60,7 +62,7 @@ class MatchedSection(NamedTuple):
 
 async def find_code_implementation(
     query: str,
-    settings: CodeWeaverSettings,
+    settings: DictView[CodeWeaverSettingsDict],
     *,
     intent: IntentType | None = None,
     token_limit: int = 10000,
@@ -76,7 +78,7 @@ async def find_code_implementation(
 
     Args:
         query: Search query
-        settings: CodeWeaver settings
+        settings: An immutable view of the current CodeWeaver settings
         intent: Query intent (optional)
         token_limit: Maximum tokens in response
         include_tests: Whether to include test files
