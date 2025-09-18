@@ -77,6 +77,7 @@ jobs:
         export PATH="$HOME/.local/bin:$PATH"
         mise run check
 
+# Note: Testing with coverage is more about seeing where we might have *important* gaps. We're not striving for high coverage rates just to meet a number. [See](https://github.com/knitli/codeweaver-mcp/tree/main/CODE_STYLE.md#testing-philosophy)
     - name: Run tests with coverage
       run: |
         export PATH="$HOME/.local/bin:$PATH"
@@ -98,6 +99,7 @@ jobs:
         path: |
           test-results.xml
           coverage.xml
+
 
   lint:
     name: Lint and Format

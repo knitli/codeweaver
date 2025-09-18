@@ -11,14 +11,7 @@ import sys
 
 
 MODULES_TO_CHECK = (
-    "codeweaver.cw_types",
-    "codeweaver.factories",
-    "codeweaver.providers",
-    "codeweaver.backends",
-    "codeweaver.sources",
-    "codeweaver.services",
-    "codeweaver.middleware",
-    "codeweaver.testing",
+    # Add the modules you want to check for importability
 )
 
 FAILED_IMPORTS = []

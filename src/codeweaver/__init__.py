@@ -2,145 +2,25 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+"""CodeWeaver: Extensible MCP server for semantic code search."""
 
-"""CodeWeaver MCP Platform.
-
-CodeWeaver is the first model context protocol (MCP) server built for its users -- AI assistants.
-It exposes a single tool to AI assistants -- asking them to declare their intent. It resolves that
-using simple and sophisticated techniques to provide the LLM exactly the context it needs.
-
-It's also a powerful platform for human developers to extend, change, and configure. CodeWeaver
-is built with factory patterns and protocol-based interfaces, allowing it to support multiple
-data sources, embedding generators/rerankers, sparse and vector databases, general services of any kind,
-and fully extend its intent layer with new orchestration strategies.
-
-Key Features:
-- Single natural language interface for its LLM users
-- Extensible architecture with pluggable providers and backends
-- Factory pattern for dynamic component creation and configuration
-- Support for multiple embedding providers (Voyage AI, OpenAI, Cohere, HuggingFace)
-- Multiple vector database backends (Qdrant, Pinecone, Weaviate, ChromaDB)
-- Universal data source abstraction (filesystem, git, database, API, web)
-- Structural search using ast-grep patterns for 20+ programming languages
-- Configuration-driven initialization with comprehensive plugin system
-- FastMCP middleware integration for cross-cutting concerns
-
-CodeWeaver is the context layer for AI-driven coding.
-"""
-
-from codeweaver.backends import (
-    BackendConfig,
-    BackendConfigExtended,
-    BackendFactory,
-    DistanceMetric,
-    FilterCondition,
-    HybridSearchBackend,
-    VectorBackend,
-    VectorPoint,
+from codeweaver._version import __version__
+from codeweaver.exceptions import (
+    CodeWeaverError,
+    ConfigurationError,
+    IndexingError,
+    ProviderError,
+    QueryError,
+    ValidationError,
 )
-from codeweaver.factories import (
-    BackendPlugin,
-    CodeWeaverFactory,
-    ComponentFactory,
-    ComponentRegistry,
-    ExtensibilityManager,
-    FactoryContext,
-    ProviderPlugin,
-    SourcePlugin,
-)
-from codeweaver.intent import (
-    AdaptiveStrategy,
-    AnalysisWorkflowStrategy,
-    PatternBasedParser,
-    SimpleSearchStrategy,
-    StrategyRegistry,
-    WorkflowDefinition,
-    WorkflowOrchestrator,
-    WorkflowResult,
-    WorkflowStep,
-)
-from codeweaver.providers import (
-    EmbeddingProvider,
-    ProviderCapabilities,
-    ProviderCapability,
-    ProviderSDK,
-    RerankProvider,
-    register_combined_provider,
-    register_embedding_provider,
-    register_reranking_provider,
-)
-from codeweaver.services import BaseServiceProvider, RateLimitConfig
-from codeweaver.sources import (
-    AbstractDataSource,
-    DataSource,
-    SourceConfig,
-    SourceRegistry,
-    SourceWatcher,
-)
-
-
-__version__ = "0.1.0"
-
-
-if __name__ == "__main__":
-    import warnings
-
-    # Suppress this specific pydantic warning. Every import in CodeWeaver is from the top-level `pydantic` package, so the warning is coming from a dependency.
-    # This is a temporary workaround until all dependencies are updated.
-    warnings.filterwarnings(
-        "ignore",
-        message=r".*`pydantic\.error_wrappers:ValidationError` has been moved to `pydantic:ValidationError`\.",
-        category=UserWarning,
-        module="pydantic._migration",
-    )
-    # If this module is run directly, start the server
-
-    import asyncio
-
-    import codeweaver.main
-
-    asyncio.run(codeweaver.main.main())
 
 
 __all__ = (
-    "AbstractDataSource",
-    "AdaptiveStrategy",
-    "AnalysisWorkflowStrategy",
-    "BackendConfig",
-    "BackendConfigExtended",
-    "BackendFactory",
-    "BackendPlugin",
-    "BaseServiceProvider",
-    "CodeWeaverFactory",
-    "ComponentFactory",
-    "ComponentRegistry",
-    "DataSource",
-    "DistanceMetric",
-    "EmbeddingProvider",
-    "ExtensibilityManager",
-    "FactoryContext",
-    "FilterCondition",
-    "HybridSearchBackend",
-    "PatternBasedParser",
-    "ProviderCapabilities",
-    "ProviderCapability",
-    "ProviderPlugin",
-    "ProviderSDK",
-    "RateLimitConfig",
-    "RerankProvider",
-    "SimpleSearchStrategy",
-    "SourceConfig",
-    "SourcePlugin",
-    "SourceRegistry",
-    "SourceWatcher",
-    "StrategyRegistry",
-    "VectorBackend",
-    "VectorPoint",
-    "WorkflowDefinition",
-    "WorkflowOrchestrator",
-    "WorkflowResult",
-    "WorkflowStep",
-    "register_combined_provider",
-    "register_embedding_provider",
-    "register_reranking_provider",
+    "CodeWeaverError",
+    "ConfigurationError",
+    "IndexingError",
+    "ProviderError",
+    "QueryError",
+    "ValidationError",
+    "__version__",
 )

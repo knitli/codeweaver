@@ -5,17 +5,30 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Debug MTEB Conversion Tool",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/mteb_to_codeweaver.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "stopOnEntry": true,
+        },
+        {
             "name": "Debug CodeWeaver CLI",
             "type": "debugpy",
             "request": "launch",
-            "program": "src/codeweaver/cli/__init__.py",
-            "console": "integratedTerminal"
+            "program": "${workspaceFolder}/src/codeweaver/cli/app.py",
+            "args": [
+                "server"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
         },
         {
             "name": "Debug Fetch Grammars Script",
             "type": "debugpy",
             "request": "launch",
-            "program": "scripts/fetch_grammars.py",
+            "program": "${workspaceFolder}/scripts/fetch_grammars.py",
             "console": "integratedTerminal",
         }
     ]

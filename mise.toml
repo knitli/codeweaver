@@ -17,6 +17,7 @@ node = "24"
 "pipx:claude-monitor" = "latest"
 "pipx:copychat" = "latest"
 "pipx:mike" = "latest"
+"pipx:mteb" = "latest"
 "pipx:reuse" = "latest"
 pkl = "latest"
 ripgrep = "latest"
@@ -29,18 +30,18 @@ uv = "latest"
 yamlfmt = "latest"
 
 [env]
-GH_REPO="knitli/codeweaver-mcp"
+GH_REPO = "knitli/codeweaver-mcp"
 
 [hooks]
 enter = """
 #!/bin/bash
 echo "Setting up CodeWeaver MCP environment..."
-chmod +x scripts/*.{sh,py} &>/dev/null &&
-mise run activate &&
+chmod +x scripts/*.{sh,py} &>/dev/null && mise run activate &&
 mise run setup &&
 mise run update-tools &&
 alias jj='jj --no-pager' &&
 alias git='git --no-pager' &&
+alias cdroot='cd $(git root)' &&
 if [ "$GITHUB_ACTIONS" == true ]; then
     export CI=true
 else
@@ -56,19 +57,38 @@ echo "Environment deactivated."
 
 [tasks]
 
+sync = """
+#!/bin/bash
+echo "Syncing dependencies..."
+uv sync --extra all --group all-dev
+"""
+
+update-dependencies = """
+#!/bin/bash
+echo "Updating dependencies..."
+uv sync --extra all --group all-dev -U
+"""
+
+source = """
+#!/bin/
+cdroot || true && source .venv/bin/activate
+"""
+
 # Development setup
 setup = """
 #!/bin/bash
 mise trust -y &&
 mise install -y &&
 mise reshim &&
-mise run activate &&
+mise activate &&
 echo "Initializing CodeWeaver MCP..."
 hk init --mise &&
 echo "Setting up development environment..."
 uv venv --allow-existing .venv &&
 source .venv/bin/activate
-uv sync --all-groups &&
+mise run sync &&
+git config alias.root 'rev-parse --show-toplevel' &&
+alias cdroot='cd $(git root)'
 # Determine if we're in CI
 if [ "$GITHUB_ACTIONS" == true ]; then
     export CI=true

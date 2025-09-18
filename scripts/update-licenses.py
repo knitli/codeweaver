@@ -278,10 +278,14 @@ def get_contributor() -> str:
     """Get a contributor from the user."""
     # first check if we're in an interactive shell
     if not sys.stdin.isatty():
-        print("Not in an interactive shell. Please provide contributors via command line arguments.")
+        print(
+            "Not in an interactive shell. Please provide contributors via command line arguments."
+        )
         sys.exit(1)
     # if we are, prompt for the contributor
-    if contributor := input("What's your name and email? (e.g. 'Adam Poulemanos <adam@knit.li>'): ").strip():
+    if contributor := input(
+        "What's your name and email? (e.g. 'Adam Poulemanos <adam@knit.li>'): "
+    ).strip():
         if "<" in contributor and ">" in contributor:
             return contributor
         if "@" in contributor and "@" in contributor.split(" ")[-1]:
@@ -291,13 +295,19 @@ def get_contributor() -> str:
             return f"{name} {email}"
         # assume they just provided a name; which is fine.
         return contributor
-    raise ValueError("No contributor provided. Please provide a name and email in the format 'Name <email>'.")
+    raise ValueError(
+        "No contributor provided. Please provide a name and email in the format 'Name <email>'."
+    )
 
 
 @app.command(
     help="Update all licenses in the repository. Will check every file in the repository and add license information if it's missing."
 )
-def update_all(*, contributors: Annotated[list[str], CONTRIBUTORS] = DEFAULT_CONTRIBUTORS, interactive: Annotated[bool, INTERACTIVE] = False) -> None:
+def update_all(
+    *,
+    contributors: Annotated[list[str], CONTRIBUTORS] = DEFAULT_CONTRIBUTORS,
+    interactive: Annotated[bool, INTERACTIVE] = False,
+) -> None:
     """Update all licenses in the repository."""
     path_obj = sort_paths()
     BASE_CMD.extend(process_contributors(contributors))
@@ -310,7 +320,11 @@ def update_all(*, contributors: Annotated[list[str], CONTRIBUTORS] = DEFAULT_CON
 @app.command(
     help="Add licenses for only those files missing license information in the repository. Will check every file in the repository and add license information if it's missing."
 )
-def missing(*, contributors: Annotated[list[str], CONTRIBUTORS] = DEFAULT_CONTRIBUTORS, interactive: Annotated[bool, INTERACTIVE] = False) -> None:
+def missing(
+    *,
+    contributors: Annotated[list[str], CONTRIBUTORS] = DEFAULT_CONTRIBUTORS,
+    interactive: Annotated[bool, INTERACTIVE] = False,
+) -> None:
     """Add licenses for only those files missing license information in the repository."""
     missing_files = get_files_with_missing()
     if not missing_files:
@@ -327,7 +341,11 @@ def missing(*, contributors: Annotated[list[str], CONTRIBUTORS] = DEFAULT_CONTRI
 @app.command(
     help="Update licenses for staged files in the repository. Will only check files that are staged for commit."
 )
-def staged(*, contributors: Annotated[list[str], CONTRIBUTORS] = DEFAULT_CONTRIBUTORS, interactive: Annotated[bool, INTERACTIVE] = False) -> None:
+def staged(
+    *,
+    contributors: Annotated[list[str], CONTRIBUTORS] = DEFAULT_CONTRIBUTORS,
+    interactive: Annotated[bool, INTERACTIVE] = False,
+) -> None:
     """Update licenses for staged files in the repository."""
     staged_files = get_staged_files()
     if not staged_files:

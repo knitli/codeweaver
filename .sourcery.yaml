@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+rule_settings:
+  enable:
+    - default
+    - gpsg
+  disable:
+    - dont-self-assign-variables
+    - do-not-use-staticmethod
+    - avoid-global-variables
+  python_version: '3.11'
+  rule_types:
+    - refactoring
+    - suggestion
+    - comment
+
+ignore:
+  - .env
+  - .git
+  - .github
+  - .tox
+  - .venv
+  - /usr
+  - build
+  - dist
+  - docs
+  - env
+  - external
+  - node_modules
+  - tox
+  - typings
+  - vendor
+  - welcome-to-sourcery.py
+  - '*.pyi'

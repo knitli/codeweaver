@@ -3,246 +3,289 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+"""CLI application for CodeWeaver using cyclopts."""
 
-"""
-Main CLI application for CodeWeaver.
+from __future__ import annotations
 
-Provides a comprehensive command-line interface for CodeWeaver operations,
-including MCP client capabilities, service management, auto-indexing,
-health monitoring, and configuration management.
-"""
-
-import asyncio
-import contextlib
-import logging
 import sys
 
-from collections.abc import Iterable
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import cyclopts
 
-from cyclopts import App
+from pydantic import FilePath
+from pydantic_core import to_json
+from rich import print as rich_print
+from rich.console import Console
+from rich.table import Table
 
-# Import command modules (will be created next)
-from codeweaver.cli.commands import (
-    client_commands,
-    config_commands,
-    index_commands,
-    services_commands,
-    stats_commands,
-)
-from codeweaver.cli.types import OutputFormat
-from codeweaver.cli.utils import ServerManager
+from codeweaver._common import DictView
+from codeweaver._utils import lazy_importer
+from codeweaver.exceptions import CodeWeaverError
+from codeweaver.models.core import CodeMatch, FindCodeResponseSummary
+from codeweaver.models.intent import IntentType
+from codeweaver.settings import get_settings_map
+from codeweaver.settings_types import CodeWeaverSettingsDict
+from codeweaver.tools.find_code import find_code_implementation
 
 
-logger = logging.getLogger(__name__)
+# Lazy import for performance
+settings_map: Any = lazy_importer("codeweaver.settings").get_settings_map()
 
-# Create main CLI application
-app = App(
+# Initialize console for rich output
+console = Console(markup=True, emoji=True)
+
+# Create the main CLI application
+app = cyclopts.App(
     name="codeweaver",
-    help="CodeWeaver CLI - Advanced MCP server with auto-indexing and intelligent code analysis",
-    version="0.1.0",
-    default_parameter=cyclopts.Parameter(show_default=True, show_choices=True),
+    help="CodeWeaver: A tool that gives AI agents exactly what you need them to have.",
 )
-# Add command groups
-app.command(client_commands.app, name="client")  # pyright: ignore[reportUnusedCallResult]
-app.command(services_commands.app, name="services")  # pyright: ignore[reportUnusedCallResult]
-app.command(index_commands.app, name="index")  # pyright: ignore[reportUnusedCallResult]
-app.command(stats_commands.app, name="stats")  # pyright: ignore[reportUnusedCallResult]
-app.command(config_commands.app, name="config")  # pyright: ignore[reportUnusedCallResult]
 
 
-@app.default
-def main(
-    config: Annotated[
-        Path | None, cyclopts.Parameter(name=["--config", "-c"], help="Path to configuration file")
-    ] = None,
-    verbose: Annotated[
-        bool, cyclopts.Parameter(name=["--verbose", "-v"], help="Enable verbose logging")
-    ] = False,
-    quiet: Annotated[
-        bool, cyclopts.Parameter(name=["--quiet", "-q"], help="Suppress non-error output")
-    ] = False,
-    fmt: Annotated[
-        OutputFormat,
-        cyclopts.Parameter(
-            name=["--format", "-f"], alias="format", help="Output format for command results"
-        ),
-    ] = OutputFormat.TEXT,
+async def _run_server(
+    config_file: Annotated[FilePath | None, cyclopts.Parameter(name=["--config", "-c"])] = None,
+    project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
+    host: str = "127.0.0.1",
+    port: int = 9328,
+    *,
+    debug: bool = False,
 ) -> None:
-    """
-    CodeWeaver CLI - Advanced MCP server with auto-indexing capabilities.
+    from codeweaver.main import run
 
-    Use 'codeweaver <command> --help' to see help for specific commands.
+    console.print("[blue]Starting CodeWeaver MCP server...[/blue]")
+    return await run(config_file=config_file, project_path=project_path, host=host, port=port)
 
-    Common usage:
-      codeweaver services start          # Start all services
-      codeweaver index start             # Start auto-indexing
-      codeweaver client test <server>    # Test MCP connection
-      codeweaver stats health            # Show health status
-      codeweaver config generate         # Generate config file
-    """
-    # Configure logging based on verbosity
-    if quiet:
-        log_level = logging.ERROR
-    elif verbose:
-        log_level = logging.DEBUG
-    else:
-        log_level = logging.INFO
 
-    logging.basicConfig(
-        level=log_level, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+@app.command
+async def server(
+    *,
+    config_file: Annotated[FilePath | None, cyclopts.Parameter(name=["--config", "-c"])] = None,
+    project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
+    host: str = "127.0.0.1",
+    port: int = 9328,
+    debug: bool = False,
+) -> None:
+    """Start CodeWeaver MCP server."""
+    try:
+        await _run_server(
+            config_file=config_file, project_path=project_path, host=host, port=port, debug=debug
+        )
+
+    except CodeWeaverError as e:
+        console.print_exception(show_locals=True)
+        if e.suggestions:
+            console.print("[yellow]Suggestions:[/yellow]")
+            for suggestion in e.suggestions:
+                console.print(f"  • {suggestion}")
+        sys.exit(1)
+    except KeyboardInterrupt:
+        console.print_exception(show_locals=False)
+    except Exception:
+        console.print_exception(show_locals=True)
+        sys.exit(1)
+
+
+@app.command
+async def search(
+    query: str,
+    *,
+    intent: IntentType | None = None,
+    limit: int = 10,
+    include_tests: bool = True,
+    project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
+    output_format: Literal["json", "table", "markdown"] = "table",
+) -> None:
+    """Search codebase from command line (Phase 1: local only)."""
+    try:
+        settings = get_settings_map()
+        if project_path:
+            from codeweaver.settings import update_settings
+
+            settings = update_settings(project_path=project_path)  # type: ignore
+
+        console.print(f"[blue]Searching in: {settings['project_root']}[/blue]")
+        console.print(f"[blue]Query: {query}[/blue]")
+
+        # Execute search
+        response = await find_code_implementation(
+            query=query,
+            settings=settings,
+            intent=intent,
+            token_limit=settings["token_limit"],
+            include_tests=include_tests,
+        )
+
+        # Limit results for CLI display
+        limited_matches = response.matches[:limit]
+
+        # Output results in requested format
+        if output_format == "json":
+            # Create a simplified version for JSON output
+            output = {
+                "query": query,
+                "summary": response.summary,
+                "total_matches": response.total_matches,
+                "matches": [
+                    {
+                        "file_path": str(match.file.path),
+                        "language": match.file.ext_kind.language,
+                        "relevance_score": match.relevance_score,
+                        "line_range": match.span,
+                        "content": (
+                            f"{match.content[:200]}..."
+                            if len(match.content) > 200
+                            else match.content
+                        ),
+                    }
+                    for match in limited_matches
+                ],
+            }
+            rich_print(to_json(output, indent=2))
+
+        elif output_format == "table":
+            _display_table_results(query, response, limited_matches)
+
+        elif output_format == "markdown":
+            _display_markdown_results(query, response, limited_matches)
+
+    except CodeWeaverError as e:
+        console.print(f"[red]Error: {e.message}[/red]")
+        if e.suggestions:
+            console.print("[yellow]Suggestions:[/yellow]")
+            for suggestion in e.suggestions:
+                console.print(f"  • {suggestion}")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Unexpected error: {e}[/red]")
+        sys.exit(1)
+
+
+@app.command
+async def config(
+    *,
+    show: bool = False,
+    project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
+) -> None:
+    """Manage CodeWeaver configuration."""
+    try:
+        settings = get_settings_map()
+        if project_path:
+            from codeweaver.settings import update_settings
+
+            settings = update_settings(project_path=project_path)  # type: ignore
+
+        if show:
+            _show_config(settings)
+        else:
+            console.print("Use --show to display configuration")
+
+    except CodeWeaverError as e:
+        console.print(f"[red]Configuration Error: {e.message}[/red]")
+        if e.suggestions:
+            console.print("[yellow]Suggestions:[/yellow]")
+            for suggestion in e.suggestions:
+                console.print(f"  • {suggestion}")
+        sys.exit(1)
+
+
+def _display_table_results(
+    query: str, response: FindCodeResponseSummary, matches: Sequence[CodeMatch]
+) -> None:
+    """Display search results as a table."""
+    console.print(f"\n[bold green]Search Results for: '{query}'[/bold green]")
+    console.print(
+        f"[dim]Found {response.total_matches} matches in {response.execution_time_ms:.1f}ms[/dim]\n"
     )
 
-    # Store global options for command access
-    app.meta["config_path"] = str(config) if config else None
-    app.meta["output_format"] = fmt
-    app.meta["verbose"] = verbose
-    app.meta["quiet"] = quiet
+    if not matches:
+        console.print("[yellow]No matches found[/yellow]")
+        return
 
-    # If no subcommand, show help
-    print("Use 'codeweaver --help' or 'codeweaver <command> --help' for usage information.")
+    table = Table(show_header=True, header_style="bold blue")
+    table.add_column("File", style="cyan", no_wrap=True, min_width=30)
+    table.add_column("Language", style="green", min_width=10)
+    table.add_column("Score", style="yellow", justify="right", min_width=8)
+    table.add_column("Lines", style="magenta", justify="center", min_width=10)
+    table.add_column("Preview", style="white", min_width=40, max_width=60)
+
+    for match in matches:
+        preview = (
+            match.content[:100].replace("\n", " ") + "..."
+            if len(match.content) > 100
+            else match.content.replace("\n", " ")
+        )
+
+        table.add_row(
+            str(match.file.path),
+            str(match.file.ext_kind.language) or "unknown",
+            f"{match.relevance_score:.2f}",
+            f"{match.span!s}",
+            preview,
+        )
+
+    console.print(table)
 
 
-@app.command
-def version() -> None:
-    """Show CodeWeaver version information."""
-    try:
-        from codeweaver import __version__
-
-        version_ = __version__
-    except ImportError:
-        version_ = "development"
-
-    print(f"CodeWeaver CLI version {version_}")
-
-
-@app.command
-async def health(
-    config: Annotated[
-        Path | None, cyclopts.Parameter(name=["--config", "-c"], help="Path to configuration file")
-    ] = None,
-    fmt: Annotated[
-        OutputFormat,
-        cyclopts.Parameter(name=["--format", "-f"], alias="format", help="Output format"),
-    ] = OutputFormat.TEXT,
+def _display_markdown_results(
+    query: str, response: FindCodeResponseSummary, matches: Sequence[CodeMatch]
 ) -> None:
-    """Quick health check of CodeWeaver server and services."""
+    """Display search results as markdown."""
+    console.print(f"# Search Results for: '{query}'\n")
+    console.print(f"Found {response.total_matches} matches in {response.execution_time_ms:.1f}ms\n")
+
+    if not matches:
+        console.print("*No matches found*")
+        return
+
+    for i, match in enumerate(matches, 1):
+        console.print(f"## {i}. {match.file.path}")
+        console.print(
+            f"**Language:** {match.file.ext_kind.language or 'unknown'} | **Score:** {match.relevance_score:.2f} | {match.span!s}"
+        )
+        console.print(f"```{match.file.ext_kind.language or ''}")
+        console.print(f"{match.content[:300]}..." if len(match.content) > 300 else match.content)
+        console.print("```\n")
+
+
+def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
+    """Display current configuration."""
+    console.print("[bold blue]CodeWeaver Configuration[/bold blue]\n")
+
+    table = Table(show_header=True, header_style="bold blue")
+    table.add_column("Setting", style="cyan", no_wrap=True)
+    table.add_column("Value", style="white")
+
+    # Core settings
+    table.add_row("Project Path", str(settings["project_root"]))
+    table.add_row("Project Name", settings["project_name"] or "auto-detected")
+    table.add_row("Token Limit", str(settings["token_limit"]))
+    table.add_row("Max File Size", f"{settings['max_file_size']:,} bytes")
+    table.add_row("Max Results", str(settings["max_results"]))
+
+    # Feature flags
+    table.add_row("Background Indexing", "✅" if settings["enable_background_indexing"] else "❌")
+    table.add_row("Telemetry", "✅" if settings["enable_telemetry"] else "❌")
+    table.add_row("AI Intent Analysis", "✅" if settings["enable_ai_intent_analysis"] else "❌")
+
+    console.print(table)
+
+
+def main() -> None:
+    """Main CLI entry point."""
     try:
-        from codeweaver.cli.commands.stats_commands import format_health_output
-
-        # Get server instance
-        server = await ServerManager.ensure_server("health check", str(config) if config else None)
-
-        # Collect health information
-        health_data: dict[str, bool | dict[Any, Any]] = {"server_running": ServerManager.is_running(), "services": {}}
-
-        # Check services if available
-        if server.services_manager:
-            services = await server.services_manager.list_services()
-            for service_name in services:
-                try:
-                    service = await server.services_manager.get_service(service_name)
-                    health_data["services"][service_name] = {
-                        "status": "running" if service else "stopped",
-                        "healthy": bool(service),
-                    }
-                except Exception as e:
-                    health_data["services"][service_name] = {
-                        "status": "error",
-                        "healthy": False,
-                        "error": str(e),
-                    }
-
-        # Format and display output
-        output = format_health_output(health_data, fmt)
-        print(output)
-
-    except Exception as e:
-        logger.exception("Health check failed")
-        if fmt == OutputFormat.JSON:
-            import json
-
-            print(json.dumps({"error": str(e), "healthy": False}))
-        else:
-            print(f"Health check failed: {e}")
-        sys.exit(1)
-
-
-@app.command
-async def shutdown(
-    config: Annotated[
-        Path | None, cyclopts.Parameter(name=["--config", "-c"], help="Path to configuration file")
-    ] = None,
-    force: Annotated[
-        bool, cyclopts.Parameter(name=["--force"], help="Force shutdown without graceful cleanup")
-    ] = False,
-) -> None:
-    """Shutdown CodeWeaver server and clean up resources."""
-    try:
-        if ServerManager.is_running():
-            print("Shutting down CodeWeaver server...")
-            await ServerManager.shutdown()
-            print("Server shutdown complete.")
-        else:
-            print("No running server instance found.")
-
-    except Exception as e:
-        logger.exception("Shutdown failed")
-        print(f"Shutdown failed: {e}")
-        if not force:
-            sys.exit(1)
-
-
-def run_cli(args: str | Iterable[str] | None = None) -> None:
-    """
-    Run the CLI application.
-
-    Args:
-        args: Command line arguments (defaults to sys.argv)
-    """
-    try:
-        # Parse and run commands
         app()
     except KeyboardInterrupt:
-        print("\nOperation cancelled.")
-        sys.exit(1)
+        console.print("\n[yellow]Operation cancelled by user[/yellow]")
+        sys.exit(0)
     except Exception as e:
-        logger.exception("CLI execution failed")
-        print(f"Error: {e}")
+        console.print(f"[red]Fatal error: {e}[/red]")
         sys.exit(1)
-
-
-def run_async_cli() -> None:
-    """
-    Run the CLI application with async support.
-
-    Args:
-        args: Command line arguments (defaults to sys.argv)
-    """
-    try:
-        # Create and run async event loop for CLI
-        if sys.platform == "win32":
-            # Windows-specific event loop policy
-            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-
-        # Run the CLI application
-        app()
-
-    except KeyboardInterrupt:
-        print("\nOperation cancelled.")
-        sys.exit(1)
-    except Exception as e:
-        logger.exception("CLI execution failed")
-        print(f"Error: {e}")
-        sys.exit(1)
-    finally:
-        # Clean up resources
-        with contextlib.suppress(Exception):
-            asyncio.run(ServerManager.shutdown())
 
 
 if __name__ == "__main__":
-    run_async_cli()
+    main()
+
+
+__all__ = ["app", "main"]

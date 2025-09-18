@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
 """Finds codeblocks in Markdown files with no language specified and adds 'plaintext' to them."""
+
 import re
 
 from concurrent.futures import ThreadPoolExecutor

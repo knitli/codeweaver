@@ -30,6 +30,7 @@ exclude = [
     "node_modules",
     "site-packages",
     "venv",
+    "typings",
 ]
 extend-include = ["*.ipynb"]
 
@@ -38,7 +39,7 @@ fix = true
 line-length = 100
 indent-width = 4
 
-target-version = "py313"
+target-version = "py312"
 
 [format]
 docstring-code-format = true
@@ -139,6 +140,7 @@ ignore = [
     "Q001",
     "Q002",
     "Q003",
+    "PYI051", # redundant annotation with Literal and str -- we like to be explicit here
     "COM812",
     "COM819",
     "ISC001",
@@ -146,13 +148,14 @@ ignore = [
     "D212",
     "SLF001", # Private member accessed
     "TRY003",
-    "UP015" # redundant-open-modes, explicit is preferred
+    "UP015",  # redundant-open-modes, explicit is preferred
 ]
 exclude = [
     ".venv/",
     "**/_vendor",
     "setuptools/_distutils",
     "setuptools/config/_validate_pyproject",
+    "typings",
 ]
 
 [lint.pydocstyle]
@@ -161,27 +164,27 @@ convention = "google"
 [lint.per-file-ignores]
 # Ignore specific rules for certain files
 "**/validation/**/*.py" = [
-    "S110", # try-except-pass
+    "S110",   # try-except-pass
     "TRY301", # abstract raise to an inner function
-    "S101", # allow assert
+    "S101",   # allow assert
     "SLF001", # Private member accessed
-    "D100", # missing docstring in public module
-    "D102", # missing docstring in public class
-    "D103", # missing docstring in public function
-    "D104", # missing docstring in public method
-    "D105", # missing docstring in magic method
-    "D107", # missing docstring in __init__
-    "G004", # f-string in logging statement
-    "N806", # incorrect case for function name
+    "D100",   # missing docstring in public module
+    "D102",   # missing docstring in public class
+    "D103",   # missing docstring in public function
+    "D104",   # missing docstring in public method
+    "D105",   # missing docstring in magic method
+    "D107",   # missing docstring in __init__
+    "G004",   # f-string in logging statement
+    "N806",   # incorrect case for function name
 ]
 "tests/*.py" = [
     "ANN",
-    "C901", # too complex
+    "C901",   # too complex
     "D",
     "DTZ",
     "FBT001", # boolean typed positional argument
-    "G004", # f-string in logging statement
-    "N806", # incorrect case for function name
+    "G004",   # f-string in logging statement
+    "N806",   # incorrect case for function name
     "PTH",
     "S",
     "SIM",
@@ -189,12 +192,12 @@ convention = "google"
 ]
 "src/codeweaver/testing/**/*.py" = [
     "ANN",
-    "C901", # too complex
+    "C901",   # too complex
     "D",
     "DTZ",
     "FBT001", # boolean typed positional argument
-    "G004", # f-string in logging statement
-    "N806", # incorrect case for function name
+    "G004",   # f-string in logging statement
+    "N806",   # incorrect case for function name
     "PTH",
     "S",
     "SIM",

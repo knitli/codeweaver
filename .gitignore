@@ -11,6 +11,7 @@ mise.local.toml
 mise.local.toml.license
 hk.local.pkl.license
 .ruff_cache
+.roo/mcp.json
 
 # non-public working files
 .workbench/*

@@ -10,38 +10,37 @@ check-filename = true
 extend-ignore-re = [
   "(?s)(#|//)\\s*spellchecker:off.*?\\n\\s*(#|//)\\s*spellchecker:on",
 ]
-extend-ignore-identifiers-re = [
-  "iif",
-  "iife",
-  "i18n",
-  "i18next",
-  "i18n-t",
-  "i18n-tc",
-  "strat",
-  "Inferrable",
-  "typ",
-  "nin",
-  "NIN"
-]
+[default.extend-words]
+edn = "edn"
+i18n = "i18n"
+i18n-t = "i18n-t"
+i18n-tc = "i18n-tc"
+i18next = "i18next"
+iif = "iif"
+iife = "iife"
+mak = "mak"
+strat = "strat"
+typ = "typ"
 
 [files]
 ignore-hidden = false
 ignore-files = true
 extend-exclude = [
-  "/usr/**/*",
-  "/tmp/**/*",
-  "/**/node_modules/**",
-  "node_modules",
-  "mkdocs-material",
-  "license-list-data",
-  "external",
-  "vendor",
   ".git",
   ".venv/**/*",
+  "/**/node_modules/**",
+  "/tmp/**/*",
+  "/usr/**/*",
   "/usr/share/code/**/*",
-  "eslint.config.mjs",
+  "context/apis/complete_docs/**/*",
   "docs/manifest.json",
-  "src/assets/videos/**/*",
+  "eslint.config.mjs",
+  "external",
+  "license-list-data",
+  "mkdocs-material",
+  "node_modules",
   "src/assets/fonts/**/*",
   "src/assets/images/**/*",
+  "src/assets/videos/**/*",
+  "vendor",
 ]
