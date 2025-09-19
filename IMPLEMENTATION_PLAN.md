@@ -59,23 +59,22 @@ CodeWeaver has evolved beyond its original architectural vision into a sophistic
 ### ❌ **Critical Gaps - What Needs Completion**
 
 **Core Integration**:
-- ✅ CLI implementation (comprehensive with server, search, config commands)
-- Provider registry system (`_registry.py`)
-- FastMCP middleware and application state management
+- Provider registry system (`_registry.py`) -- mostly done but needs to be connected and service registry remains incomplete
 - Vector store implementations (Qdrant incomplete, memory store basic)
-- Integration of vendored search system into `find_code` tool interface
+- Integration of vendored search system into `find_code` tool interface (in `src/codeweaver/services`: `_wrap_filters.py`, `_matched_models.py`, `filter.py`)
 
 **Pipeline Components**:
 - Background indexing with file watching
 - Semantic embedding integration
 - pydantic-graph orchestration
-- Query intent analysis implementation
+- Query intent analysis implementation with heuristic/nlp approach and agent-driven approach using mcp sampling
+- Evaluation system (pydantic-eval)
 
 **Infrastructure**:
 - Comprehensive testing framework
 - Error handling and graceful degradation
 - Performance optimization and caching
-- Authentication/authorization middleware
+- Authentication/authorization middleware (very little needs to be done here, but components need to be properly scoped to support it)
 
 ---
 
