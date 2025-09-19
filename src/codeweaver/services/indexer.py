@@ -11,6 +11,7 @@
 # TODO: implement file watcher
 # TODO: register with providers registry
 
+from collections.abc import Sequence
 from pathlib import Path
 
 import rignore
@@ -21,7 +22,7 @@ type WatchfilesAwatch = watchfiles.awatch | None
 
 
 class IgnoreFilter[Walker](watchfiles.DefaultFilter):
-    pass
+    ignore_dirs: Sequence[str]
 
 
 class FileWatcher[WatchfilesAwatch]:

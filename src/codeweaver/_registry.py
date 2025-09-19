@@ -569,9 +569,9 @@ class ModelRegistry(BasedModel):
                 profile(name) if callable(profile) else profile
                 for glob, profile in rules
                 if glob == name or fnmatch(name, glob)
-            ),
+            ),  # type: ignore
             None,
-        )
+        )  # pyright: ignore[reportUnknownVariableType]
 
     def _register_builtin_agentic_profiles(self) -> None:
         """Register built-in agentic profiles."""
@@ -582,9 +582,9 @@ class ModelRegistry(BasedModel):
             with contextlib.suppress(ValueError, AttributeError, ImportError):
                 profile: Model = infer_model(model_name)
                 provider = Provider.from_string(
-                    profile._profile.split(":")[1]
-                    if len(profile._profile.split(":")) > 1
-                    else profile._profile
+                    profile._profile.split(":")[1]  # type: ignore
+                    if len(profile._profile.split(":")) > 1  # type: ignore
+                    else profile._profile  # type: ignore
                 )
                 if not provider:
                     console.print(
@@ -772,7 +772,8 @@ class ProviderRegistry(BasedModel):
                     module = __import__(module_path, fromlist=["*"])
                     self._register_provider_by_kind(provider_kind, provider, module, module_path)
         self._register_azure_exception_providers(Provider.AZURE)
-        # * NOTE: Embedding providers using OpenAIEmbeddingBase still need a class created to get instantiated. But no point building it until it's needed.
+        # * NOTE: Embedding providers using OpenAIEmbeddingBase still need a class *created* before getting instantiated. But no point building it until it's needed.
+        # * OpenAIEmbeddingBase is a class factory
 
     def _register_provider_by_kind(
         self, provider_kind: ProviderKind, provider: Provider, module: Any, module_path: str
