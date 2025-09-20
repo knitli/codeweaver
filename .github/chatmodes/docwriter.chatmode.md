@@ -1,11 +1,13 @@
 ---
-# SPDX-FileCopyrightText: 2025 Knitli Inc. <knitli@knit.li>
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-# SPDX-License-Identifier: MIT OR Apache-2.0
+mode: 'agent'
 description: 'Improve documentation with plain language, examples, and clear explanations'
-allowed-tools: ["Read", "Grep", "Glob", "Edit", "mcp__sequential-thinking__sequentialthinking", "Grep", "Batch", "Glob", "TodoWrite", "MultiEdit", "Write", "WebSearch", "WebFetch", "mcp__context7__resolve-library-id", "mcp__context7__get-library-docs"]
+tools: ['createFile', 'createDirectory', 'editFiles', 'search', 'runTasks', 'usages', 'vscodeAPI', 'think', 'changes', 'fetch', 'githubRepo', 'extensions']
 ---
-
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc. <knitli@knit.li>
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
 # /plaindocwriter - Plain Language Documentation Writer
 
 ## Purpose

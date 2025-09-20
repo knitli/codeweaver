@@ -218,16 +218,25 @@ def has_git() -> bool:
     return False
 
 
-def get_git_revision(directory: Path) -> str | Missing:
-    """Get the SHA-1 of the HEAD of a git repository.
-
-    This is a precursor for future functionality. We'd like to be able to associate indexes and other artifacts with a specific git commit. Because there's nothing worse than an Agent working from a totally different context than the one you expect.
-    """
+def _get_git_dir(directory: Path) -> Path | Missing:
+    """Get the .git directory of a git repository."""
     if not is_git_dir(directory):
         with contextlib.suppress(FileNotFoundError):
             directory = get_project_root() or Path.cwd()
         if not directory or not is_git_dir(directory):
             return MISSING
+    return directory
+
+
+def get_git_revision(directory: Path) -> str | Missing:
+    """Get the SHA-1 of the HEAD of a git repository.
+
+    This is a precursor for future functionality. We'd like to be able to associate indexes and other artifacts with a specific git commit. Because there's nothing worse than an Agent working from a totally different context than the one you expect.
+    """
+    git_dir = _get_git_dir(directory)
+    if git_dir is MISSING:
+        return MISSING
+    directory = cast(Path, git_dir)
     if has_git():
         git = shutil.which("git")
         with contextlib.suppress(subprocess.CalledProcessError):
@@ -239,6 +248,50 @@ def get_git_revision(directory: Path) -> str | Missing:
                 text=True,
             )
             return output.stdout.strip()
+    return MISSING
+
+
+def _get_branch_from_origin(directory: Path) -> str | Missing:
+    """Get the branch name from the origin remote."""
+    git = shutil.which("git")
+    if not git:
+        return MISSING
+    with contextlib.suppress(subprocess.CalledProcessError):
+        output = subprocess.run(
+            ["rev-parse", "--abbrev-ref", "origin/HEAD"],  # noqa: S607
+            executable=git,
+            cwd=directory,
+            capture_output=True,
+            text=True,
+        )
+        branch = output.stdout.strip().removeprefix("origin/")
+        if branch and "/" in branch:
+            return branch.split("/", 1)[1]
+        if branch:
+            return branch
+    return MISSING
+
+
+def get_git_branch(directory: Path) -> str | Missing:
+    """Get the current branch name of a git repository."""
+    git_dir = _get_git_dir(directory)
+    if git_dir is MISSING:
+        return MISSING
+    directory = cast(Path, git_dir)
+    if has_git():
+        git = shutil.which("git")
+        with contextlib.suppress(subprocess.CalledProcessError):
+            output = subprocess.run(
+                ["rev-parse", "--abbrev-ref", "HEAD"],  # noqa: S607
+                executable=git,
+                cwd=directory,
+                capture_output=True,
+                text=True,
+            )
+            if branch := output.stdout.strip():
+                return branch if branch != "HEAD" else _get_branch_from_origin(directory)
+            if branch is MISSING:
+                return "detached"
     return MISSING
 
 

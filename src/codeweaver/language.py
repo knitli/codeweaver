@@ -134,6 +134,13 @@ class ConfigLanguage(BaseEnum):
             return SemanticSearchLanguage.from_string(self.value)  # pyright: ignore[reportReturnType]
         return None
 
+    @classmethod
+    def all_extensions(cls) -> Generator[str]:
+        """
+        Returns all file extensions for all configuration languages.
+        """
+        yield from (ext for lang in cls for ext in lang.extensions if ext and ext != "SELF")
+
 
 class SemanticSearchLanguage(str, BaseEnum):
     """
@@ -618,6 +625,15 @@ class SemanticSearchLanguage(str, BaseEnum):
                     for config_file in lang.config_files
                     if config_file.path
                 )
+
+    @classmethod
+    def code_extensions(cls) -> Generator[str]:
+        """
+        Returns all file extensions associated with programming languages (excluding configuration languages).
+        """
+        yield from (
+            ext for ext in cls.all_extensions() if ext and ext not in cls.config_language_exts()
+        )
 
     @classmethod
     def ext_pairs(cls) -> Generator[ExtPair]:

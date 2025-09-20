@@ -57,7 +57,13 @@ from typing_extensions import TypeIs
 from codeweaver._ast_grep import AstNode
 from codeweaver._common import BasedModel, BaseEnum, DataclassSerializationMixin
 from codeweaver._constants import get_ext_lang_pairs
-from codeweaver._utils import ensure_iterable, normalize_ext, set_relative_path, uuid7
+from codeweaver._utils import (
+    ensure_iterable,
+    get_git_branch,
+    normalize_ext,
+    set_relative_path,
+    uuid7,
+)
 from codeweaver.language import ConfigLanguage, SemanticSearchLanguage
 
 
@@ -122,6 +128,13 @@ class SemanticMetadata(BasedModel):
     ]
     primary_node: AstNode[SgNode] | None
     nodes: tuple[AstNode[SgNode], ...] = ()
+    parent_node_id: str | None = None
+    is_partial_node: Annotated[
+        bool,
+        Field(
+            description="""Whether the node is a partial node. Partial nodes are created when the node is too large for the context window."""
+        ),
+    ] = False
 
 
 class Metadata(TypedDict, total=False):
@@ -677,6 +690,9 @@ class CodeChunk(BasedModel):
             description="""Additional metadata about the code chunk""",
         ),
     ] = None
+    _version: Annotated[str, Field(repr=True, init=False, serialization_alias="chunk_version")] = (
+        "1.0.0"
+    )
     _embedding_batch: Annotated[
         UUID7 | None,
         Field(
@@ -707,6 +723,7 @@ class CodeChunk(BasedModel):
             "ext_kind": str(self_map.get("ext_kind")),
             "language": self_map.get("language"),
             "chunk_type": self_map.get("chunk_type"),
+            "chunk_version": self._version,
         }
 
         return to_json({k: v for k, v in ordered_self_map.items() if v}, round_trip=True)
@@ -789,13 +806,20 @@ class DiscoveredFile(DataclassSerializationMixin):
     file_hash: Annotated[
         BlakeHashKey, Field(description="""blake3 hash of the file contents""", init=False)
     ]
+    git_branch: Annotated[
+        str | None,
+        Field(description="""Git branch the file was discovered in, if applicable.""", init=False),
+    ] = None
 
     @classmethod
     def from_path(cls, path: Path) -> DiscoveredFile | None:
         """Create a DiscoveredFile from a file path."""
+        branch = get_git_branch(path if path.is_dir() else path.parent) or "main"
         if ext_kind := (ext_kind := ExtKind.from_file(path)):
             file_hash = BlakeKey(blake3(path.read_bytes()).hexdigest())
-            return cls(path=path, ext_kind=ext_kind, file_hash=file_hash)
+            return cls(
+                path=path, ext_kind=ext_kind, file_hash=file_hash, git_branch=cast(str, branch)
+            )
         return None
 
     @computed_field
@@ -803,6 +827,13 @@ class DiscoveredFile(DataclassSerializationMixin):
     def size(self) -> NonNegativeInt:
         """Return the size of the file in bytes."""
         return self.path.stat().st_size
+
+    def is_same(self, other_path: Path) -> bool:
+        """Checks if a file at other_path is the same as this one, by comparing blake3 hashes."""
+        if other_path.is_file() and other_path.exists():
+            file = type(self).from_path(other_path)
+            return bool(file and file.file_hash == self.file_hash)
+        return False
 
 
 @cache

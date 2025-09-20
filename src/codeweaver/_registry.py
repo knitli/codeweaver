@@ -46,14 +46,9 @@ from pydantic_ai.models import Model
 from rich.console import Console
 
 from codeweaver._common import BasedModel, BaseEnum, DictView, LiteralStringT
-from codeweaver.embedding.capabilities.base import (
-    EmbeddingModelCapabilities,
-    SparseEmbeddingModelCapabilities,
-)
 from codeweaver.embedding.providers import EmbeddingProvider
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.provider import Provider, ProviderKind
-from codeweaver.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.reranking.providers.base import RerankingProvider
 from codeweaver.settings_types import CodeWeaverSettingsDict, ProviderSettingsDict
 from codeweaver.vector_stores.base import VectorStoreProvider
@@ -61,6 +56,12 @@ from codeweaver.vector_stores.base import VectorStoreProvider
 
 if TYPE_CHECKING:
     from pydantic_ai.providers import Provider as AgentProvider
+
+    from codeweaver.embedding.capabilities import (
+        EmbeddingModelCapabilities,
+        SparseEmbeddingModelCapabilities,
+    )
+    from codeweaver.reranking.capabilities import RerankingModelCapabilities
 
 
 type AgenticProfile = Any
@@ -87,6 +88,9 @@ def get_provider_settings() -> DictView[ProviderSettingsDict]:
 
 # I think I've defined this in like four places, but it's just for clarity
 type ModelName = str
+
+
+# TODO: We'll bring in the
 
 
 @override

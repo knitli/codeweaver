@@ -490,9 +490,6 @@ class RignoreSettings(TypedDict, total=False):
     same_file_system: NotRequired[bool]
     should_exclude_entry: NotRequired[Callable[[Path], bool]]
 
-    filter: NotRequired[Callable[[Path], bool] | None]
-    """Not a rignore setting, but a convenient place to put it. We pop it before passing to rignore."""
-
 
 class FileFilterSettingsDict(TypedDict, total=False):
     """A serialized `FileFilterSettings` object."""

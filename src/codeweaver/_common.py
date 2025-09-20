@@ -242,6 +242,16 @@ class BaseEnum(Enum):
                 alias_map[member.value] = member
             return cast(dict[int, Self], alias_map)
         for member in cls:
+            if (
+                hasattr(member, "alias")
+                and member.alias  # type: ignore
+                and isinstance(member.alias, tuple)  # type: ignore
+                and all(isinstance(name, str) for name in member.alias)  # type: ignore
+            ):
+                for name in member.alias:  # type: ignore
+                    if name not in alias_map:
+                        alias_map[name] = member
+                continue  # aka values are in alias if present
             for alias in member.aka:
                 if alias not in alias_map:
                     alias_map[alias] = member
