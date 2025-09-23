@@ -383,9 +383,9 @@ class ModelRegistry(BasedModel):
             Provider, MutableMapping[ModelName, tuple[RerankingModelCapabilities, ...]]
         ] = defaultdict(dict)
 
-        # provider -> list[(model_glob, Model)] for pydantic-ai agentic profiles
-        self._agentic_profiles: MutableMapping[Provider, list[tuple[str, Model]]] = defaultdict(
-            list
+        # provider -> list[(model_glob, AgenticProfileSpec)] for agentic profiles
+        self._agentic_profiles: MutableMapping[Provider, list[tuple[str, AgenticProfileSpec]]] = (
+            defaultdict(list)
         )
 
         # flag to allow one-time default population by caller
@@ -526,7 +526,11 @@ class ModelRegistry(BasedModel):
             prov_map = self._reranking_capabilities.setdefault(cap.provider, {})
             name_key = cap.name.strip().lower()
             if not replace and name_key in prov_map:
-                prov_map[name_key] = prov_map[name_key] + (cap,) if prov_map[name_key] else (cap,)
+                continue
+            if name_key not in prov_map:
+                prov_map[name_key] = (cap,)
+            else:
+                prov_map[name_key] += (cap,)
 
     def get_reranking_capabilities(
         self, provider: Provider, name: str
@@ -570,12 +574,12 @@ class ModelRegistry(BasedModel):
         name = model_name.strip()
         return next(
             (
-                profile(name) if callable(profile) else profile
-                for glob, profile in rules
+                spec(name) if callable(spec) else spec
+                for glob, spec in rules
                 if glob == name or fnmatch(name, glob)
-            ),  # type: ignore
+            ),
             None,
-        )  # pyright: ignore[reportUnknownVariableType]
+        )
 
     def _register_builtin_agentic_profiles(self) -> None:
         """Register built-in agentic profiles."""
@@ -592,7 +596,7 @@ class ModelRegistry(BasedModel):
                 )
                 if not provider:
                     console.print(
-                        f"[yellow]Warning:[/yellow] Could not infer provider for model '{model_name}' with profile '{profile._profile}'. Skipping registration."
+                        f"[yellow]Warning:[/yellow] Could not infer provider for model '{model_name}' with profile '{profile._profile}'. Skipping registration."  # pyright: ignore[reportPrivateUsage]
                     )
                 else:
                     self.register_agentic_profile(provider, model_name, profile, replace=False)
@@ -1034,7 +1038,7 @@ class ProviderRegistry(BasedModel):
         Returns:
             An initialized provider instance
         """
-        provider_class = self.get_embedding_provider_class(provider)
+        provider_class = self.get_sparse_embedding_provider_class(provider)
         return provider_class(**kwargs)
 
     def create_reranking_provider(

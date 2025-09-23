@@ -3,6 +3,7 @@
 """Version information for CodeWeaver."""
 from typing import Final
 
-__version__: Final[str] = "0.0.1rc157+g3493158"
+
+__version__: Final[str] = "0.0.1rc165+g738254a"
 
 __all__ = ("__version__",)

@@ -489,6 +489,7 @@ template = '''# SPDX-FileCopyrightText: 2025 Knitli Inc.
 """Version information for CodeWeaver."""
 from typing import Final
 
+
 __version__: Final[str] = "{version}"
 
 __all__ = ("__version__",)

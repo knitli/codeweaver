@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run -s
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["rignore", "cyclopts"]
+# dependencies = ["rignore", "cyclopts", "reuse"]
 # ///
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>

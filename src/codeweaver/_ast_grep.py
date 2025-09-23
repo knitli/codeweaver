@@ -2,13 +2,13 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-
+# sourcery skip: docstrings-for-functions
 from __future__ import annotations
 
 from collections.abc import Iterator
 from functools import cached_property
 from pathlib import Path
-from typing import Annotated, Any, NamedTuple, Unpack, cast, overload
+from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, Unpack, cast, overload
 
 from ast_grep_py import (
     Config,
@@ -25,9 +25,17 @@ from ast_grep_py import (
 from ast_grep_py import Range as SgRange
 from ast_grep_py import SgNode as AstGrepNode
 from ast_grep_py import SgRoot as AstGrepRoot
-from pydantic import ConfigDict, Field, NonNegativeInt, PositiveInt, computed_field
+from pydantic import UUID7, ConfigDict, Field, NonNegativeInt, PositiveInt, computed_field
 
 from codeweaver._common import BasedModel, BaseEnum
+from codeweaver._utils import uuid7
+from codeweaver.language import SemanticSearchLanguage
+from codeweaver.services.textify import humanize
+
+
+# Lazy imports to avoid circular dependencies
+if TYPE_CHECKING:
+    from codeweaver.semantic import ImportanceScore, SemanticNodeCategory
 
 
 # re-export Ast Grep's rules and config types:
@@ -184,12 +192,33 @@ class AstNode[SgNode: (AstGrepNode)](BasedModel):
 
     model_config = BasedModel.model_config | ConfigDict(arbitrary_types_allowed=True)
 
+    language: Annotated[
+        SemanticSearchLanguage | None, Field(description="The language of the node")
+    ]
+
     _node: Annotated[AstGrepNode, Field(description="The underlying SgNode", exclude=True)]
 
+    node_id: Annotated[UUID7, Field(description="The unique ID of the node")] = uuid7()
+
+    parent_node_id: Annotated[UUID7 | None, Field(description="The ID of the parent node")] = None
+
     @classmethod
-    def from_sg_node(cls, sg_node: AstGrepNode) -> AstNode[SgNode]:
+    def from_sg_node(
+        cls, sg_node: AstGrepNode, language: SemanticSearchLanguage | None
+    ) -> AstNode[SgNode]:
         """Create a AstNode from an ast-grep `SgNode`."""
-        return cls(_node=sg_node)
+        return cls(_node=sg_node, language=language)
+
+    @computed_field
+    @cached_property
+    def title(self) -> str:
+        """Get a human-readable title for the node."""
+        kind = humanize(self.kind)
+        language = humanize(str(self.language))
+        text_snippet = humanize(self.text.strip().splitlines()[0])
+        if len(text_snippet) > 25:
+            text_snippet = f"{text_snippet[:22]}..."
+        return f"{language}-{kind}: '{text_snippet}'"
 
     @computed_field
     @cached_property
@@ -236,38 +265,42 @@ class AstNode[SgNode: (AstGrepNode)](BasedModel):
 
     def __getitem__(self, meta_var: str) -> AstNode[SgNode]:
         """Get the child node for the given meta variable."""
-        return type(self).from_sg_node(cast(SgNode, self._node[meta_var]))
+        return type(self).from_sg_node(cast(SgNode, self._node[meta_var]), self.language)
 
     # Refinement API
 
-    def matches(self, **rule: Rule) -> bool:
+    def matches(self, **rule: Unpack[Rule]) -> bool:
         """Check if the node matches the given rule."""
         return self._node.matches(**rule)
 
-    def inside(self, **rule: Rule) -> bool:
+    def inside(self, **rule: Unpack[Rule]) -> bool:
         """Check if the node is inside the given rule."""
         return self._node.inside(**rule)
 
-    def has(self, **rule: Rule) -> bool:
+    def has(self, **rule: Unpack[Rule]) -> bool:
         """Check if the node has the given rule."""
         return self._node.has(**rule)
 
-    def precedes(self, **rule: Rule) -> bool:
+    def precedes(self, **rule: Unpack[Rule]) -> bool:
         """Check if the node precedes the given rule."""
         return self._node.precedes(**rule)
 
-    def follows(self, **rule: Rule) -> bool:
+    def follows(self, **rule: Unpack[Rule]) -> bool:
         """Check if the node follows the given rule."""
         return self._node.follows(**rule)
 
     def get_match(self, meta_var: str) -> AstNode[SgNode] | None:
         """Get the match for the given meta variable."""
-        return type(self).from_sg_node(cast(SgNode, self._node.get_match(meta_var)))
+        return (
+            type(self).from_sg_node(cast(SgNode, self._node.get_match(meta_var)), self.language)
+            if self._node.get_match(meta_var)
+            else None
+        )
 
     def get_multiple_matches(self, meta_var: str) -> list[AstNode[SgNode]]:
         """Get the matches for the given meta variable."""
         return [
-            type(self).from_sg_node(cast(SgNode, match))
+            type(self).from_sg_node(cast(SgNode, match), self.language)
             for match in self._node.get_multiple_matches(meta_var)
         ]
 
@@ -284,8 +317,8 @@ class AstNode[SgNode: (AstGrepNode)](BasedModel):
     def find(self, config: Config | None = None, **rule: Any) -> AstNode[SgNode]:
         """Find a node using a config."""
         if config:
-            return type(self).from_sg_node(cast(SgNode, self._node.find(config)))
-        return type(self).from_sg_node(cast(SgNode, self._node.find(**rule)))
+            return type(self).from_sg_node(cast(SgNode, self._node.find(config)), self.language)
+        return type(self).from_sg_node(cast(SgNode, self._node.find(**rule)), self.language)
 
     @overload
     def find_all(self, config: None, **rule: Unpack[Rule]) -> tuple[AstNode[SgNode], ...]: ...
@@ -294,8 +327,12 @@ class AstNode[SgNode: (AstGrepNode)](BasedModel):
     def find_all(self, config: Config | None = None, **rule: Any) -> tuple[AstNode[SgNode], ...]:
         """Find all nodes using a config."""
         if config:
-            return tuple(type(self).from_sg_node(node) for node in self._node.find_all(config))
-        return tuple(type(self).from_sg_node(node) for node in self._node.find_all(**rule))
+            return tuple(
+                type(self).from_sg_node(node, self.language) for node in self._node.find_all(config)
+            )
+        return tuple(
+            type(self).from_sg_node(node, self.language) for node in self._node.find_all(**rule)
+        )
 
     # traversal API
     def get_root(self) -> RootAstNode[AstGrepRoot]:
@@ -311,7 +348,7 @@ class AstNode[SgNode: (AstGrepNode)](BasedModel):
     def _ancestor_list(self) -> tuple[AstNode[SgNode], ...]:
         """Get the ancestors of the node."""
         return tuple(
-            type(self).from_sg_node(ancestor)
+            type(self).from_sg_node(ancestor, self.language)
             for ancestor in self._node.ancestors()
             if self._node.ancestors() and ancestor
         )
@@ -324,36 +361,72 @@ class AstNode[SgNode: (AstGrepNode)](BasedModel):
     @cached_property
     def children(self) -> Iterator[AstNode[SgNode]]:
         """Get the children of the node."""
-        yield from (type(self).from_sg_node(child) for child in self._node.children())
+        yield from (
+            type(self).from_sg_node(child, self.language) for child in self._node.children()
+        )
 
     @computed_field
     @cached_property
     def parent(self) -> AstNode[SgNode] | None:
         """Get the parent of the node."""
         parent_node = self._node.parent()
-        return type(self).from_sg_node(parent_node) if parent_node else None
+        return type(self).from_sg_node(parent_node, self.language) if parent_node else None
 
     def next(self) -> AstNode[SgNode] | None:
         """Get the next sibling of the node."""
-        return type(self).from_sg_node(self._node.next()) if self._node.next() else None
+        if not self._node.next():
+            return None
+        return type(self).from_sg_node(cast(SgNode, self._node.next()), self.language)
 
     def next_all(self) -> Iterator[AstNode[SgNode]]:
         """Get all next siblings of the node."""
-        yield from (type(self).from_sg_node(n) for n in self._node.next_all())
+        yield from (type(self).from_sg_node(n, self.language) for n in self._node.next_all())
 
     def prev(self) -> AstNode[SgNode] | None:
         """Get the previous sibling of the node."""
-        return type(self).from_sg_node(self._node.prev()) if self._node.prev() else None
+        if not self._node.prev():
+            return None
+        return type(self).from_sg_node(cast(SgNode, self._node.prev()), self.language)
 
     def prev_all(self) -> Iterator[AstNode[SgNode]]:
         """Get all previous siblings of the node."""
-        yield from (type(self).from_sg_node(p) for p in self._node.prev_all())
+        yield from (type(self).from_sg_node(p, self.language) for p in self._node.prev_all())
 
-    def replace(self, new_text: str) -> str:
+    # Semantic classification and scoring methods
+
+    @cached_property
+    def semantic_category(self) -> SemanticNodeCategory:
+        """Get the semantic category for this node using the global mapper."""
+        from codeweaver.semantic import get_node_mapper
+
+        mapper = get_node_mapper()
+        return mapper.classify_node_type(self.kind, self.language)
+
+    @cached_property
+    def importance_score(self) -> ImportanceScore:
+        """Calculate the importance score for this node."""
+        from codeweaver.semantic import SemanticScorer
+
+        scorer = SemanticScorer(
+            depth_penalty_factor=0.02,
+            size_bonus_threshold=50,
+            size_bonus_factor=0.1,
+            root_bonus=0.05,
+        )
+        return scorer.calculate_importance_score(self.semantic_category, self)
+
+    def get_classification_confidence(self) -> float:
+        """Get the confidence level for the semantic classification of this node."""
+        from codeweaver.semantic import get_node_mapper
+
+        mapper = get_node_mapper()
+        return mapper.get_classification_confidence(self.kind, self.language)
+
+    def replace(self, _new_text: str) -> str:
         """Replace the text of the node with new_text."""
         raise NotImplementedError("Edit functionality is not implemented yet.")
 
-    def commit_edits(self, edits: list[str]) -> str:
+    def commit_edits(self, _edits: list[str]) -> str:
         """Commit a list of edits to the source code."""
         raise NotImplementedError("Edit functionality is not implemented yet.")
 

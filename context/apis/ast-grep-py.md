@@ -39,6 +39,8 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 ### Core Parser Classes
 
+>NOTE!: CodeWeaver has serializable versions of each of these types, any codeweaver implementation should use those types and not the native ast_grep_py types.  CodeWeaver's versions are in `src/codeweaver/_ast_grep.py`
+
 **Class: SgRoot**
 ```python
 class SgRoot:
@@ -274,118 +276,6 @@ def create_semantic_parser(file_path: Path) -> Optional[SgRoot]:
     return SgRoot(content, ast_grep_lang)
 ```
 
-**FastMCP Integration Pattern**:
-```python
-# Integration with FastMCP tool architecture
-from fastmcp import FastMCP
-from fastmcp.context import Context
-from ast_grep_py import SgRoot
-from typing import Dict, List, Any
-
-@app.tool()
-async def semantic_code_search(
-    query: str,
-    file_paths: List[str],
-    language: Optional[str] = None,
-    context: Context = None
-) -> Dict[str, Any]:
-    """
-    Semantic code search using ast-grep-py
-    Integrates with CodeWeaver's find_code architecture
-    """
-    
-    results = []
-    for file_path in file_paths:
-        path_obj = Path(file_path)
-        
-        # Auto-detect language if not provided
-        if not language:
-            detected_lang = SemanticSearchLanguage.lang_from_ext(path_obj.suffix.lstrip('.'))
-            if not detected_lang:
-                continue
-            language = detected_lang.value
-            
-        try:
-            content = path_obj.read_text()
-            root = SgRoot(content, language)
-            node = root.root()
-            
-            # Intelligent pattern matching based on query intent
-            matches = await analyze_code_intent(node, query, context)
-            
-            for match in matches:
-                results.append({
-                    "file_path": str(file_path),
-                    "match": match.text(),
-                    "range": {
-                        "start": match.range().start_pos,
-                        "end": match.range().end_pos
-                    },
-                    "context": get_surrounding_context(match)
-                })
-                
-        except Exception as e:
-            context.log_error(f"Error processing {file_path}", error=e)
-            continue
-    
-    return {
-        "results": results,
-        "total_files": len(file_paths),
-        "successful_files": len([r for r in results])
-    }
-```
-
-**Pydantic Graph Integration**:
-```python
-# Integration with pydantic-graph pipeline architecture
-from pydantic import BaseModel
-from pydantic_graph import Graph, Node
-from ast_grep_py import SgRoot
-from typing import List, Dict
-
-class SemanticIndexingNode(Node):
-    """Pydantic Graph node for semantic indexing workflow"""
-    
-    class Input(BaseModel):
-        file_paths: List[str]
-        languages: Dict[str, str]  # file_path -> language mapping
-        
-    class Output(BaseModel):
-        indexed_files: List[Dict[str, Any]]
-        semantic_graph: Dict[str, Any]
-        
-    async def run(self, input_data: Input) -> Output:
-        """Process files using ast-grep for semantic understanding"""
-        indexed_files = []
-        semantic_relationships = {}
-        
-        for file_path in input_data.file_paths:
-            language = input_data.languages.get(file_path)
-            if not language:
-                continue
-                
-            content = Path(file_path).read_text()
-            root = SgRoot(content, language)
-            node = root.root()
-            
-            # Extract semantic information
-            file_analysis = {
-                "path": file_path,
-                "language": language,
-                "functions": self._extract_functions(node),
-                "classes": self._extract_classes(node),
-                "imports": self._extract_imports(node),
-                "exports": self._extract_exports(node)
-            }
-            
-            indexed_files.append(file_analysis)
-            semantic_relationships[file_path] = self._build_relationships(node)
-            
-        return self.Output(
-            indexed_files=indexed_files,
-            semantic_graph=semantic_relationships
-        )
-```
 
 ### Performance Optimization Patterns
 

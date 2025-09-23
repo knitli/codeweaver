@@ -61,6 +61,7 @@ from codeweaver._utils import (
     ensure_iterable,
     get_git_branch,
     normalize_ext,
+    sanitize_unicode,
     set_relative_path,
     uuid7,
 )
@@ -113,8 +114,7 @@ class ChunkType(BaseEnum):
     TEXT_BLOCK = "text_block"
     FILE = "file"  # the whole file is the chunk
     SEMANTIC = "semantic"  # semantic chunking, e.g. from AST nodes
-    EXAMPLE = "example"  # from example files or documentation examples
-    RESEARCH = "research"  # from internet or similar research sources, not from code files
+    EXTERNAL = "external"  # from internet or similar external sources, not from code files
 
 
 class SemanticMetadata(BasedModel):
@@ -128,13 +128,44 @@ class SemanticMetadata(BasedModel):
     ]
     primary_node: AstNode[SgNode] | None
     nodes: tuple[AstNode[SgNode], ...] = ()
-    parent_node_id: str | None = None
+    node_id: UUID7 = uuid7()
+    parent_node_id: UUID7 | None = None
     is_partial_node: Annotated[
         bool,
         Field(
             description="""Whether the node is a partial node. Partial nodes are created when the node is too large for the context window."""
         ),
     ] = False
+
+    @classmethod
+    def from_parent_meta(
+        cls, child: AstNode[SgNode], parent_meta: SemanticMetadata, **overrides: Any
+    ) -> Self:
+        """Create a SemanticMetadata instance from a parent SemanticMetadata instance."""
+        return cls(
+            language=parent_meta.language,
+            primary_node=child,
+            nodes=tuple(child.children),
+            node_id=child.node_id or uuid7(),
+            parent_node_id=parent_meta.node_id,
+            **overrides,
+        )
+
+    @classmethod
+    def from_node(
+        cls, node: AstNode[SgNode] | SgNode, language: SemanticSearchLanguage | None
+    ) -> Self:
+        """Create a SemanticMetadata instance from an AST node."""
+        if isinstance(node, SgNode):
+            node = AstNode.from_sg_node(node, language=language)  # pyright: ignore[reportUnknownVariableType]
+        return cls(
+            language=language or node.language or "",
+            primary_node=node,
+            nodes=tuple(node.children),
+            node_id=node.node_id,
+            parent_node_id=node.parent_node_id,
+            is_partial_node=False,  # if we're creating from a full node, it's not partial
+        )
 
 
 class Metadata(TypedDict, total=False):
@@ -476,7 +507,7 @@ class SpanGroup(DataclassSerializationMixin):
         ),
     ]
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.spans = self.spans or set()
         self._normalize()
 
@@ -632,9 +663,9 @@ def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
     ):
         return ExtKind.from_string(language, "code")
     if "language" in validated_data and chunk_type != chunk_type.TEXT_BLOCK:
-        if chunk_type == ChunkType.RESEARCH:
+        if chunk_type == ChunkType.EXTERNAL:
             return ExtKind.from_string(validated_data["language"], ChunkKind.OTHER)
-        if chunk_type in (ChunkType.EXAMPLE, ChunkType.FILE):
+        if chunk_type in (ChunkType.FILE):
             return ExtKind.from_string(validated_data["language"], "docs")
         return ExtKind.from_string(validated_data["language"], "code")
     return None
@@ -804,11 +835,20 @@ class DiscoveredFile(DataclassSerializationMixin):
     ext_kind: ExtKind
 
     file_hash: Annotated[
-        BlakeHashKey, Field(description="""blake3 hash of the file contents""", init=False)
+        BlakeHashKey,
+        Field(
+            default_factory=lambda data: BlakeKey(blake3(data["path"].read_bytes()).hexdigest()),
+            description="""blake3 hash of the file contents. File hashes are from non-normalized content, so two files with different line endings, white spaces, unicode characters, etc. will have different hashes.""",
+            init=False,
+        ),
     ]
     git_branch: Annotated[
         str | None,
-        Field(description="""Git branch the file was discovered in, if applicable.""", init=False),
+        Field(
+            default_factory=lambda data: get_git_branch(data["path"]),
+            description="""Git branch the file was discovered in, if detected.""",
+            init=False,
+        ),
     ] = None
 
     @classmethod
@@ -829,11 +869,56 @@ class DiscoveredFile(DataclassSerializationMixin):
         return self.path.stat().st_size
 
     def is_same(self, other_path: Path) -> bool:
-        """Checks if a file at other_path is the same as this one, by comparing blake3 hashes."""
+        """Checks if a file at other_path is the same as this one, by comparing blake3 hashes.
+
+        The other can be in a different location (paths not the same), useful for checking if a file has been moved or copied, or deduping files (we can just point to one copy).
+        """
+        # TODO: A better approach for files that we can semantically analyze is to hash the AST or structure instead of the raw file contents and compare those.
         if other_path.is_file() and other_path.exists():
             file = type(self).from_path(other_path)
             return bool(file and file.file_hash == self.file_hash)
         return False
+
+    @computed_field
+    @cached_property
+    def is_binary(self) -> bool:
+        """Check if a file is binary by reading its first 1024 bytes."""
+        try:
+            with self.path.open("rb") as f:
+                chunk = f.read(1024)
+                if b"\0" in chunk:
+                    return True
+                text_characters = bytearray({7, 8, 9, 10, 12, 13, 27} | set(range(0x20, 0x100)))
+                nontext = chunk.translate(None, text_characters)
+                return bool(nontext) / len(chunk) > 0.30
+        except Exception:
+            return False
+
+    @computed_field
+    @cached_property
+    def is_text(self) -> bool:
+        """Check if a file is text by reading its first 1024 bytes."""
+        if not self.is_binary and self.contents.rstrip():
+            return True
+        if self.is_binary:
+            try:
+                if self.path.read_text(encoding="utf-8", errors="replace").rstrip():
+                    return True
+            except Exception:
+                return False
+        return False
+
+    @property
+    def contents(self) -> str:
+        """Return the normalized contents of the file."""
+        with contextlib.suppress(Exception):
+            return self.normalize_content(self.path.read_text(errors="replace"))
+        return ""
+
+    @staticmethod
+    def normalize_content(content: str | bytes | bytearray) -> str:
+        """Normalize file content by ensuring it's a UTF-8 string."""
+        return sanitize_unicode(content)
 
 
 @cache

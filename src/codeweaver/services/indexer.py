@@ -261,7 +261,7 @@ class Indexer(BasedModel):
                     return
                 # Only index files we recognize (code/config/docs) via DiscoveredFile
                 discovered_file = DiscoveredFile.from_path(path)
-                if not discovered_file:
+                if not discovered_file or not discovered_file.is_text:
                     return
                 # Remove any prior entries for this path (hash may have changed)
                 _ = self._remove_path(path)
@@ -361,19 +361,21 @@ class FileWatcher:
         self.file_filter = ff
         self.paths = paths
         self.handler = handler or self._default_handler
-        watch_kwargs: dict[str, Any] = {
-            # Keep a child process alive; do NOT perform indexing in the child process
-            # so that state remains in the main process.
-            "target": Indexer.keep_alive,
-            "target_type": "function",
-            "callback": self._default_handler,
-            "watch_filter": ff,
-            "grace_period": 20,
-            "debounce": 200_000,  # milliseconds - we want to avoid rapid re-indexing but not let things go stale, either.
-            "step": 15_000,  # milliseconds -- how long to wait for more changes before yielding on changes
-            "ignore_permission_denied": True,
-        }
-        watch_kwargs.update(kwargs)
+        watch_kwargs: dict[str, Any] = (
+            {
+                # Keep a child process alive; do NOT perform indexing in the child process
+                # so that state remains in the main process.
+                "target": Indexer.keep_alive,
+                "target_type": "function",
+                "callback": self._default_handler,
+                "watch_filter": ff,
+                "grace_period": 20,
+                "debounce": 200_000,  # milliseconds - we want to avoid rapid re-indexing but not let things go stale, either.
+                "step": 15_000,  # milliseconds -- how long to wait for more changes before yielding on changes
+                "ignore_permission_denied": True,
+            }
+            | kwargs
+        )
         watch_kwargs["recursive"] = True  # we always want recursive watching
         try:
             # Perform a one-time initial indexing pass if we have a walker

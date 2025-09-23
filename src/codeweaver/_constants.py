@@ -7,6 +7,7 @@ Constants used throughout the CodeWeaver project, primarily for default configur
 """
 
 from collections.abc import Generator
+from types import MappingProxyType
 from typing import Literal, NamedTuple
 
 from codeweaver._common import LiteralStringT
@@ -262,6 +263,9 @@ CODE_FILES_EXTENSIONS: tuple[ExtLangPair, ...] = (
     ExtLangPair(ext=".beef", language="beef"),
     ExtLangPair(ext=".binpb", language="protobuf"),
     ExtLangPair(ext=".boot", language="clojure"),
+    ExtLangPair(ext=".cob", language="cobol"),
+    ExtLangPair(ext=".cbl", language="cobol"),
+    ExtLangPair(ext=".cobol", language="cobol"),
     ExtLangPair(ext=".carbon", language="carbon"),
     ExtLangPair(ext=".chapel", language="chapel"),
     ExtLangPair(ext=".clj", language="clojure"),
@@ -360,6 +364,8 @@ CODE_FILES_EXTENSIONS: tuple[ExtLangPair, ...] = (
     ExtLangPair(ext=".pp", language="pascal"),
     ExtLangPair(ext=".proto", language="protobuf"),
     ExtLangPair(ext=".ps1", language="powershell"),
+    ExtLangPair(ext=".psm1", language="powershell"),
+    ExtLangPair(ext=".pssc", language="powershell"),
     ExtLangPair(ext=".purs", language="purescript"),
     ExtLangPair(ext=".pxd", language="cython"),
     ExtLangPair(ext=".pyx", language="cython"),
@@ -462,6 +468,45 @@ CONFIG_FILE_LANGUAGES = frozenset({
 CODE_LANGUAGES = frozenset({ext.language for ext in CODE_FILES_EXTENSIONS})
 
 DOCS_LANGUAGES = frozenset({ext.language for ext in DOC_FILES_EXTENSIONS})
+
+SEMANTIC_KINDS = MappingProxyType({
+    "python": {
+        "function_definition",
+        "class_definition",
+        "import_statement",
+        "import_from_statement",
+    },
+    "javascript": {
+        "function_declaration",
+        "function_expression",
+        "class_declaration",
+        "method_definition",
+        "import_statement",
+    },
+    "typescript": {
+        "function_declaration",
+        "function_expression",
+        "class_declaration",
+        "method_definition",
+        "interface_declaration",
+        "import_statement",
+    },
+    "java": {
+        "method_declaration",
+        "class_declaration",
+        "interface_declaration",
+        "import_declaration",
+    },
+    "rust": {"function_item", "struct_item", "impl_item", "trait_item", "use_declaration"},
+    "go": {"function_declaration", "method_declaration", "type_declaration", "import_declaration"},
+    "cpp": {
+        "function_definition",
+        "class_specifier",
+        "namespace_definition",
+        "template_declaration",
+    },
+    "c": {"function_definition", "struct_specifier", "typedef_declaration"},
+})
 
 
 def get_ext_lang_pairs() -> Generator[ExtLangPair]:

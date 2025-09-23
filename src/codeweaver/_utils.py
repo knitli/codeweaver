@@ -11,9 +11,11 @@ import contextlib
 import inspect
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
+import unicodedata
 
 from collections.abc import Callable, Iterable
 from functools import cache
@@ -81,6 +83,42 @@ def is_typeadapter(adapter: Any) -> TypeIs[TypeAdapter[Any] | type[TypeAdapter[A
     return hasattr(adapter, "pydantic_complete") and hasattr(adapter, "validate_python")
 
 
+def estimate_tokens(text: str | bytes, encoder: str = "cl100k_base") -> int:
+    """Estimate the number of tokens in a text."""
+    import tiktoken
+
+    encoding = tiktoken.get_encoding(encoder)
+    if isinstance(text, bytes):
+        text = text.decode("utf-8", errors="ignore")
+    return len(encoding.encode(text))
+
+
+def _check_env_var(var_name: str) -> str | None:
+    """Check if an environment variable is set and return its value, or None if not set."""
+    return os.getenv(var_name)
+
+
+def get_possible_env_vars() -> tuple[tuple[str, str], ...] | None:
+    """Get a tuple of any resolved environment variables for all providers and provider environment variables. If none are set, returns None."""
+    from codeweaver.provider import Provider
+
+    env_vars = sorted({item[1][0] for item in Provider.all_envs()})
+    found_vars = tuple(
+        (var, value) for var in env_vars if (value := _check_env_var(var)) is not None
+    )
+    return found_vars or None
+
+
+def has_package(package_name: str) -> bool:
+    """Check if a package is installed."""
+    try:
+        if util.find_spec(package_name):
+            return True
+    except metadata.PackageNotFoundError:
+        return False
+    return False
+
+
 # Even Python's latest and greatest typing (as of 3.12+), Python can't properly express this function.
 # You can't combine `TypeVarTuple` with `ParamSpec`, or use `Concatenate` to
 # express combining some args and some kwargs, particularly from the right.
@@ -141,6 +179,11 @@ def ensure_iterable[T](value: Iterable[T] | T) -> Iterable[T]:
         yield from cast(Iterable[T], value)
     else:
         yield cast(T, value)
+
+
+# ===========================================================================
+# *                            Git/Path Utilities
+# ===========================================================================
 
 
 def try_git_rev_parse() -> Path | None:
@@ -212,7 +255,10 @@ def has_git() -> bool:
         return False
     with contextlib.suppress(subprocess.CalledProcessError):
         output = subprocess.run(
-            ["--version"], executable=git, stderr=subprocess.STDOUT, capture_output=True
+            ["--version"],  # noqa: S607
+            executable=git,
+            stderr=subprocess.STDOUT,
+            capture_output=True,
         )
         return output.returncode == 0
     return False
@@ -304,6 +350,12 @@ def in_codeweaver_clone(path: Path) -> bool:
     )  # pyright: ignore[reportOptionalMemberAccess, reportUnknownMemberType]
 
 
+@cache
+def normalize_ext(ext: str) -> str:
+    """Normalize a file extension to a standard format. Cached because of hot/repetitive use."""
+    return ext.lower().strip() if ext.startswith(".") else f".{ext.lower().strip()}"
+
+
 # src/codeweaver/_utils.py
 def is_debug() -> bool:
     """Check if the application is running in debug mode."""
@@ -320,46 +372,54 @@ def is_debug() -> bool:
     return explicit_true or has_debugger or repo_heuristic
 
 
-def estimate_tokens(text: str | bytes, encoder: str = "cl100k_base") -> int:
-    """Estimate the number of tokens in a text."""
-    import tiktoken
+# ===========================================================================
+# *               Text Normalization/Safety Utilities
+# ===========================================================================
+# by default, we do basic NFKC normalization and strip known invisible/control chars
+# this is to avoid issues with fullwidth chars, zero-width spaces, etc.
+# We plan to add more advanced santization options in the future, which users can opt into.
+# TODO: Add Rebuff.ai integration, and/or other advanced sanitization options. Probably as middleware.
 
-    encoding = tiktoken.get_encoding(encoder)
-    if isinstance(text, bytes):
+NORMALIZE_FORM = "NFKC"
+
+CONTROL_CHARS = [chr(i) for i in range(0x20) if i not in (9, 10, 13)]
+INVISIBLE_CHARS = ("\u200b", "\u200c", "\u200d", "\u2060", "\ufeff", *CONTROL_CHARS)
+
+INVISIBLE_PATTERN = re.compile("|".join(re.escape(c) for c in INVISIBLE_CHARS))
+
+POSSIBLE_PROMPT_INJECTS = (
+    r"[<\(\|=:]\s*system\s*[>\)\|=:]",
+    r"[<\(\|=:]\s*instruction\s*[>\)\|=:]",
+    r"\b(?:ignore|disregard|forget|cancel|override|void)\b(?:\s+(?:previous|above|all|prior|earlier|former|before|other|last|everything|this)){0,2}\s*(?:instruct(?:ions?)?|direction(?:s?)?|directive(?:s?)?|command(?:s?)?|request(?:s?)?|order(?:s?)?|message(?:s?)?|prompt(?:s?)?)\b",
+)
+
+INJECT_PATTERN = re.compile("|".join(POSSIBLE_PROMPT_INJECTS), re.IGNORECASE)
+
+
+def sanitize_unicode(
+    text: str | bytes | bytearray,
+    normalize_form: Literal["NFC", "NFKC", "NFD", "NFKD"] = NORMALIZE_FORM,
+) -> str:
+    """Sanitize unicode text by normalizing and removing invisible/control characters.
+
+    TODO: Need to add a mechanism to override or customize the injection patterns.
+    """
+    if isinstance(text, bytes | bytearray):
         text = text.decode("utf-8", errors="ignore")
-    return len(encoding.encode(text))
+    if not text.strip():
+        return ""
 
+    text = unicodedata.normalize(normalize_form, text)
+    filtered = INVISIBLE_PATTERN.sub("", text)
 
-@cache
-def normalize_ext(ext: str) -> str:
-    """Normalize a file extension to a standard format. Cached because of hot/repetitive use."""
-    return ext.lower().strip() if ext.startswith(".") else f".{ext.lower().strip()}"
+    matches = list(INJECT_PATTERN.finditer(filtered))
+    for match in reversed(matches):
+        start, end = match.span()
+        logger.warning("Possible prompt injection detected and neutralized: %s", match.group(0))
+        replacement = "[[ POSSIBLE PROMPT INJECTION REMOVED ]]"
+        filtered = filtered[:start] + replacement + filtered[end:]
 
-
-def _check_env_var(var_name: str) -> str | None:
-    """Check if an environment variable is set and return its value, or None if not set."""
-    return os.getenv(var_name)
-
-
-def get_possible_env_vars() -> tuple[tuple[str, str], ...] | None:
-    """Get a tuple of any resolved environment variables for all providers and provider environment variables. If none are set, returns None."""
-    from codeweaver.provider import Provider
-
-    env_vars = sorted({item[1][0] for item in Provider.all_envs()})
-    found_vars = tuple(
-        (var, value) for var in env_vars if (value := _check_env_var(var)) is not None
-    )
-    return found_vars or None
-
-
-def has_package(package_name: str) -> bool:
-    """Check if a package is installed."""
-    try:
-        if util.find_spec(package_name):
-            return True
-    except metadata.PackageNotFoundError:
-        return False
-    return False
+    return filtered.strip()
 
 
 # ===========================================================================
