@@ -15,6 +15,22 @@ CodeWeaver is an extensible MCP (Model Context Protocol) server for semantic cod
 
 **Current Status**: Early development phase with foundational components partially implemented. The core MCP server, CLI, and provider system are not yet implemented.
 
+## Project Constitution (DEFINITIVE GUIDANCE)
+
+**This project is governed by the CodeWeaver Constitution at `.specify/memory/constitution.md`.**
+
+All development decisions, code reviews, and technical choices MUST comply with the constitutional principles. When in doubt, consult the constitution first.
+
+### Constitutional Requirements Summary
+
+1. **AI-First Context**: Enhance AI agent understanding of code through precise context delivery
+2. **Proven Patterns**: Use FastAPI/pydantic ecosystem patterns over reinvention
+3. **Evidence-Based Development (NON-NEGOTIABLE)**: All decisions backed by verifiable evidence
+4. **Testing Philosophy**: Effectiveness over coverage - focus on user-affecting behavior
+5. **Simplicity Through Architecture**: Clear, flat structure with obvious purpose
+
+**Full Constitutional Text**: See `.specify/memory/constitution.md` v2.0.0
+
 ## Development Commands
 
 ### Environment Setup
@@ -71,6 +87,9 @@ mise run ci
 ## Architecture Overview
 
 ### Core Design Principles
+
+**These principles derive from and must comply with the Project Constitution (.specify/memory/constitution.md):**
+
 - **AI-First Context**: Deliver precise codebase context for agent requests
 - **Pydantic Ecosystem Alignment**: Heavy use of `pydantic`, `pydantic-settings`, `pydantic-ai`, `FastMCP`
 - **Single Tool Interface**: One `find_code` tool vs multiple endpoints
@@ -97,20 +116,20 @@ src/codeweaver/
 - **cyclopts**: CLI framework (for future CLI implementation)
 
 ### Missing Components (Implementation Needed)
-- CLI entry point (`codeweaver.cli.app:main`)
-- Main FastMCP server with `find_code` tool
-- Provider system (embedding + vector store)
+- Provider system (vector store)
 - Pipeline orchestration with pydantic-graph
 - Comprehensive testing framework
 
 ## Code Style Guidelines
+
+**PRIMARY**: Follow the Project Constitution at `.specify/memory/constitution.md` for all architectural and development decisions.
 
 ### Follow CODE_STYLE.md Principles
 - **Line length**: 100 characters
 - **Docstrings**: Google convention, active voice, start with verbs
 - **Type hints**: Modern Python ≥3.11 syntax (`int | str`, `typing.Self`)
 - **Models**: Prefer `pydantic.BaseModel` with `frozen=True` for immutable data
-- **Lazy evaluation**: Use generators, tuples, frozensets when appropriate
+- **Lazy evaluation and immutables**: Use generators, tuples, frozensets when appropriate
 
 ### Architecture Patterns
 - **Flat Structure**: Avoid deep nesting, group related modules in packages
@@ -171,4 +190,11 @@ Apply relevant pytest markers to new tests (see pyproject.toml for full list).
 
 ## Instructions
 
-If your task involves writing or editing code in the codebase, you must read the instructions in [the AGENTS file](AGENTS.md) before you start.
+**CONSTITUTIONAL COMPLIANCE REQUIRED**: Before any development work, validate your approach against the Project Constitution at `.specify/memory/constitution.md`. This constitution supersedes all other guidance.
+
+If your task involves writing or editing code in the codebase, you must:
+
+1. **First**: Ensure compliance with the [Project Constitution](.specify/memory/constitution.md)
+2. **Second**: Read the instructions in [the AGENTS file](AGENTS.md)
+
+The constitution contains non-negotiable principles that govern all technical decisions in this project.

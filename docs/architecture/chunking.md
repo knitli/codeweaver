@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # CodeWeaver Chunking Architecture
 
 This document outlines a practical, extensible architecture for chunking files into context-preserving `CodeChunk`s, grounded in the project’s existing data structures and capabilities.

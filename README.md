@@ -4,16 +4,13 @@ SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 
 SPDX-License-Identifier: MIT OR Apache-2.0
 -->
-# CodeWeaver (Simplification)
+# CodeWeaver
 
 Extensible context platform and MCP server for hybrid semantic code search and targeted AI context delivery.
 
 CodeWeaver is more than an MCP server—it’s a context platform. It distills and delivers targeted, token-efficient context to your AI coding agent. Under the hood, it functions like RAG + hybrid search over semantically indexed code, and it can integrate arbitrary data sources (e.g., external API docs) through a provider architecture.
 
-This branch is a ground-up rewrite and reimagining of CodeWeaver. It establishes a stronger foundation, modern provider abstractions, and a span-based code model for precise results.
-
-Status: pre-release on the “simplification” branch, intended to merge to main so people can see and try it. Core architecture is in place; several integrations are still being tied together (see “Project status” and “Roadmap” below).
-
+Status: Pre-release. Core architecture is in place; several integrations are still being tied together (see “Project status” and “Roadmap” below).
 
 
 Contents
@@ -50,15 +47,15 @@ Features at a glance
   - codeweaver server to run as an MCP server
   - codeweaver search for local interactive search with multiple output formats (json, table, markdown)
   - codeweaver config for configuration management and validation
-- Designed for background indexing and live updates (file watching planned)
-- Strong foundation for performance and observability (statistics/telemetry scaffolded)
+- Designed for background indexing and live updates (file watching implemented with `watchfiles`)
+- Strong foundation for performance and observability (robust statistics implementation, telemetry scaffolded)
 
 
 
 Quickstart
 
 Requirements
-- Python 3.11+ (tested primarily on 3.12)
+- Python 3.12+ (tested primarily on 3.12)
 - Optional: Qdrant for vector storage (in progress), API keys for cloud providers if you choose them
 
 Install
@@ -251,27 +248,24 @@ Local run
 
 Contribution notes
 - Dual-licensed repository (MIT OR Apache-2.0)
-- A contributors agreement is included; please review CONTRIBUTERS_LICENSE_AGREEMENT.py if present in your checkout
-- Issues and PRs welcome—especially for providers, vector stores, pipelines, and indexing
-
-
+- A contributors agreement is included; please review CONTRIBUTORS_LICENSE_AGREEMENT.py
+- Issues and PRs welcome—especially for providers, vector stores, pipelines, and indexing (or anything else)
 
 Telemetry and auth middleware
 
 Telemetry
-- PostHog integration is available in recommended extras
+- PostHog integration is available in recommended extras (we take great care to avoid capturing identifying or proprietary data -- we will only use this telemetry for improving CodeWeaver). If you're unsure, please look at our implementation for yourself so you can see what we collect.
 - Use recommended-no-telemetry to exclude telemetry from install
 
 Auth middleware (optional)
 - Permit.io (permit-fastmcp), Eunomia (eunomia-mcp), and AuthKit integrations are scaffolded through FastMCP
 - Enablement is controlled via environment variables when using those middlewares (see comments in pyproject.toml)
 
-
-
 Licensing
 
-Dual licensed under MIT OR Apache-2.0. See LICENSE, LICENSE-MIT, and LICENSE-APACHE-2.0.
+All original Knitli code licensed under MIT OR Apache-2.0. See LICENSE, LICENSE-MIT, and LICENSE-APACHE-2.0. Some vendored code is Apache-2.0 only or MIT only. 
 
+This project follows the [`REUSE`](https://reuse.software) specification. *Every file contains exact license information or has an accompanying `.license` file*.
 
 
 Links
@@ -280,6 +274,11 @@ Links
 - Issues: https://github.com/knitli/codeweaver-mcp/issues
 - Documentation (in progress): https://dev.knitli.com/codeweaver
 - Changelog: https://github.com/knitli/codeweaver-mcp/blob/main/CHANGELOG.md
+
+- Knitli: https://knitli.com
+- X: https://x.com/knitli_inc
+- LinkedIn: https://linkedin.com/company/knitli
+- Github: https://github.com/knitli
 
 Notes
 - Python package name: codeweaver-mcp

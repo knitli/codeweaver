@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 ---
 mode: 'agent'
 description: 'Update an existing implementation plan file with new or update requirements to provide new features, refactoring existing code or upgrading packages, design, architecture or infrastructure.'

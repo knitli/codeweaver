@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 ---
 mode: 'agent'
 description: 'Update an existing specification file for the solution, optimized for Generative AI consumption based on new requirements or updates to any existing code.'

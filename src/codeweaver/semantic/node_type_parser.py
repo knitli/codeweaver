@@ -6,14 +6,19 @@
 
 from __future__ import annotations
 
+import logging
+
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Annotated, Any, NotRequired, Required, TypedDict
 
-from pydantic import Field
+from pydantic import Field, PrivateAttr, RootModel
 
 from codeweaver._common import BasedModel, LiteralStringT
 from codeweaver.language import SemanticSearchLanguage
 
+
+logger = logging.getLogger(__name__)
 
 type EmptyList = list[
     None
@@ -68,33 +73,39 @@ class NodeTypeInfo(BasedModel):
     ] = None
 
 
-class LanguageGrammar(BasedModel):
+class LanguageNodeType(BasedModel):
     """Parsed node_type information for a specific language."""
 
-    language: Annotated[SemanticSearchLanguage | str, Field(description="The language identifier")]
-    node_types: Annotated[
+    node_type: Annotated[
         dict[str, NodeTypeInfo], Field(description="Mapping of node type names to their info")
     ]
 
+
+class RootNodeTypes(RootModel[dict[SemanticSearchLanguage, list[LanguageNodeType]]]):
+    """Root model for list of node type information."""
+
+    root: dict[SemanticSearchLanguage, list[LanguageNodeType]]
+    _source_file: Annotated[Path | None, PrivateAttr(init=False)] = None
+
     @classmethod
-    def from_node_type_file(cls, node_type_file: Path) -> LanguageGrammar:
-        """Parse a node-types.json file into a LanguageGrammar.
+    def from_node_type_file(cls, file_path: Path) -> RootNodeTypes:
+        """Load and parse a node-types.json file.
 
         Args:
-            node_type_file: Path to the node-types.json file
+            file_path: Path to the node-types.json file
 
         Returns:
-            Parsed language node_type
+            Dictionary mapping language to list of LanguageNodeType instances
         """
-        # Extract language from filename (e.g., "python-node-types.json" -> "python")
-        language_name = node_type_file.stem.replace("-node-types", "")
+        from pydantic_core import from_json
 
-        language = SemanticSearchLanguage.from_string(language_name)
-        if language is None:  # type: ignore
-            language = language_name  # Fallback to string if not recognized
-        return cls.model_validate_json(
-            f'"{language!s}": "{node_type_file.read_text()}"', by_alias=True
-        )
+        data = from_json(file_path.read_bytes())
+        language = SemanticSearchLanguage.from_string(file_path.stem.replace("-node-types", ""))
+        future_self = RootNodeTypes.model_validate({
+            language: [LanguageNodeType.model_validate(item) for item in data]
+        })
+        future_self._source_file = file_path
+        return future_self
 
 
 class NodeTypeParser(BasedModel):
@@ -102,23 +113,20 @@ class NodeTypeParser(BasedModel):
 
     node_types_dir: Annotated[Path, Field(description="Directory containing node_type files")]
 
-    def parse_all_node_types(self) -> dict[SemanticSearchLanguage, LanguageGrammar]:
+    def parse_all_node_types(
+        self,
+    ) -> Sequence[Mapping[SemanticSearchLanguage, Sequence[LanguageNodeType]]]:
         """Parse all node-types.json files in the node_types directory.
 
         Returns:
             Dictionary mapping language names to their parsed node_types
         """
-        node_types: dict[SemanticSearchLanguage, LanguageGrammar] = {}
+        node_types: list[dict[SemanticSearchLanguage, list[LanguageNodeType]]] = []
 
         for node_type_file in self.node_types_dir.glob("*-node-types.json"):
             try:
-                node_type = LanguageGrammar.from_node_type_file(node_type_file)
-                language_key = (
-                    node_type.language
-                    if isinstance(node_type.language, SemanticSearchLanguage)
-                    else SemanticSearchLanguage.from_string(str(node_type.language))
-                )
-                node_types[language_key] = node_type
+                nodes = RootNodeTypes.from_node_type_file(node_type_file)
+                node_types.append(nodes.root)
             except Exception as e:
                 # Log error but continue processing other files
                 print(f"Warning: Failed to parse {node_type_file}: {e}")
@@ -134,8 +142,12 @@ class NodeTypeParser(BasedModel):
         all_types: set[str] = set()
         node_types = self.parse_all_node_types()
 
-        for node_type in node_types.values():
-            all_types.update(node_type.node_types.keys())
+        # Iterate explicitly and extract a string type name from each node entry.
+        for language_node_types in node_types:
+            for language_entries in language_node_types.values():
+                for entry in language_entries:
+                    for type_name in entry.node_type:
+                        all_types.add(type_name)
 
         return all_types
 
@@ -148,11 +160,25 @@ class NodeTypeParser(BasedModel):
         node_types = self.parse_all_node_types()
         pattern_languages: dict[str, list[SemanticSearchLanguage]] = {}
 
-        for language_name, node_type in node_types.items():
-            for node_t in node_type.node_types:
-                if node_t not in pattern_languages:
-                    pattern_languages[node_t] = []
-                pattern_languages[node_t].append(language_name)
+        # Build mapping keyed by the node type name (string), not by the whole node object.
+        for language_node_types in node_types:
+            for language_name, entries in language_node_types.items():
+                raw_key = None
+                if entries:
+                    # Use the first entry's first node type as the pattern key
+                    first_entry = entries[0]
+                    if first_entry.node_type:
+                        raw_key = next(iter(first_entry.node_type.keys()), None)
+                # Skip entries without a usable key
+                if not raw_key:
+                    continue
+
+                # Ensure we have a string key for the mapping (type-checker friendly)
+                serialized_key: str = raw_key
+
+                if serialized_key not in pattern_languages:
+                    pattern_languages[serialized_key] = []
+                pattern_languages[serialized_key].append(language_name)
 
         # Sort by frequency (most common patterns first)
         return dict(sorted(pattern_languages.items(), key=lambda x: len(x[1]), reverse=True))

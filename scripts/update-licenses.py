@@ -9,10 +9,7 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # sourcery skip: avoid-global-variables
 # ruff: noqa: S603
-"""Update licenses for files in the repository.
-
-TODO: Add interactive prompt for contributors.
-"""
+"""Update licenses for files in the repository."""
 
 import json
 import shutil
@@ -38,23 +35,17 @@ CONTRIBUTORS_GROUP = Group(
     help="Manage contributors for the license update.",
 )
 CONTRIBUTORS = Parameter(
-    "-c",
-    "--contributor",
     consume_multiple=True,
     help="Name and email of the contributor(s) to add. May be provided multiple times, or as a json list.",
     negative=(),
     json_list=True,
 )
 INTERACTIVE = Parameter(
-    "-i",
-    "--interactive",
-    negative=(),
-    help="Run the script in interactive mode, prompting for contributors.",
+    negative=(), help="Run the script in interactive mode, prompting for contributors."
 )
 app = App(
     name="Thread License Updater",
     version=__version__,
-    default_command="add",
     help="Update licenses for files in the repository using Reuse. Respects .gitignore.",
     help_format="rich",
     default_parameter=Parameter(negative=()),
@@ -68,7 +59,7 @@ def run_command(cmd: list[str], paths: list[Path]) -> None:
         return
     cmds = [[*cmd, str(path)] for path in paths]
     with ThreadPoolExecutor() as executor:
-        executor.map(subprocess.run, cmds)
+        _ = executor.map(subprocess.run, cmds)
 
 
 def years() -> str:
@@ -79,6 +70,9 @@ def years() -> str:
         return f"2025-{year}"
     return "2025"
 
+
+CODE_LICENSE = "MIT OR Apache-2.0"
+NON_CODE_LICENSE = "MIT OR Apache-2.0"
 
 BASE_CMD = [
     "reuse",
@@ -168,10 +162,8 @@ class PathsForProcessing(NamedTuple):
     @classmethod
     def from_paths(cls, paths: tuple[list[Path], list[Path]]) -> "PathsForProcessing":
         """Create an instance from a tuple of paths."""
-        if len(paths) != 3:
-            raise ValueError(
-                "Expected a tuple of three lists: (ast_grep_paths, code_paths, non_code_paths)"
-            )
+        if len(paths) != 2:
+            raise ValueError("Expected a tuple of two lists: (code_paths, non_code_paths)")
         return cls(code_paths=paths[0], non_code_paths=paths[1])
 
     def process_with_cmd(self, cmd: list[str]) -> None:
@@ -180,10 +172,10 @@ class PathsForProcessing(NamedTuple):
             return
         cmds = []
         if self.code_paths:
-            code_cmd = [*cmd, "-l", "AGPL-3.0-or-later"]
+            code_cmd = [*cmd, "-l", CODE_LICENSE]
             cmds.append((code_cmd, self.code_paths))
         if self.non_code_paths:
-            non_code_cmd = [*cmd, "-l", "MIT OR Apache-2.0"]
+            non_code_cmd = [*cmd, "-l", NON_CODE_LICENSE]
             cmds.append((non_code_cmd, self.non_code_paths))
         for cmd, paths in cmds:
             run_command(cmd, paths)
@@ -225,7 +217,7 @@ def get_files_with_missing() -> list[Path] | None:
     """Get files with missing licenses."""
     try:
         result = subprocess.run(CHECK_CMD, capture_output=True, text=True, check=True)
-        output = json.loads(result.stdout.strip())
+        output = json.loads(result.stdout.strip("%\n "))
         non_compliant_report = output.get("non_compliant", {})
         missing_files = non_compliant_report.get(
             "missing_copyright_info", []
@@ -309,6 +301,14 @@ def update_all(
     interactive: Annotated[bool, INTERACTIVE] = False,
 ) -> None:
     """Update all licenses in the repository."""
+    if interactive:
+        try:
+            contributor = get_contributor()
+            if contributor not in contributors:
+                contributors.append(contributor)
+        except ValueError as e:
+            print(e)
+            sys.exit(1)
     path_obj = sort_paths()
     BASE_CMD.extend(process_contributors(contributors))
     try:
@@ -330,6 +330,14 @@ def missing(
     if not missing_files:
         print("No files with missing licenses found.")
         return
+    if interactive:
+        try:
+            contributor = get_contributor()
+            if contributor not in contributors:
+                contributors.append(contributor)
+        except ValueError as e:
+            print(e)
+            sys.exit(1)
     path_obj = sort_paths(missing_files)
     BASE_CMD.extend(process_contributors(contributors))
     try:
@@ -347,6 +355,14 @@ def staged(
     interactive: Annotated[bool, INTERACTIVE] = False,
 ) -> None:
     """Update licenses for staged files in the repository."""
+    if interactive:
+        try:
+            contributor = get_contributor()
+            if contributor not in contributors:
+                contributors.append(contributor)
+        except ValueError as e:
+            print(e)
+            sys.exit(1)
     staged_files = get_staged_files()
     if not staged_files:
         print("No staged files found.")
@@ -367,7 +383,6 @@ def add(
         list[Path],
         Parameter(
             validator=validators.Path(exists=True),
-            parse=lambda x: x.split(" ") if isinstance(x, str) else x,
             required=True,
             consume_multiple=True,
             json_list=True,
@@ -381,6 +396,14 @@ def add(
     if not files:
         print("No files provided.")
         sys.exit(0)
+    if interactive:
+        try:
+            contributor = get_contributor()
+            if contributor not in contributors:
+                contributors.append(contributor)
+        except ValueError as e:
+            print(e)
+            sys.exit(1)
     path_obj = sort_paths(files)
     BASE_CMD.extend(process_contributors(contributors))
     try:

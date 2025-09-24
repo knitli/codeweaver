@@ -57,35 +57,47 @@ Study pydantic ecosystem patterns: [pydantic](https://github.com/pydantic/pydant
 
 **Why**: Maintainability, self-documentation, easier debugging. Get it right upfront.
 
-- **Strict typing** with [opinionated pyright rules](https://github.com/knitli/codeweaver-mcp/pyproject.toml#L)
-- **Structured data**: Use `TypedDict`, `Protocol`, `NamedTuple`, `enum.Enum`, `TypeGuard`
-- **Define structures**: Don't be lazy - use `dataclass` or `BaseModel` over `dict[str, Any]`
+- **Strict typing** with [opinionated pyright rules](pyproject.toml)
+- **Structured data**: Use `TypedDict`, `Protocol`, `NamedTuple`, `enum.Enum`, `typing_extensions.TypeIs` (similar to typing.TypeGuard but more flexible, typing.TypeGuard also OK)
+  - Use the project's derivative for these: 
+    - `dataclass` -> `pydantic.dataclasses.dataclass` **and** `codeweaver._common.DataclassSerializationMixin`
+    - `pydantic.BaseModel` -> `codeweaver._common.BasedModel`
+    - `enum.Enum` -> `codeweaver._common.BaseEnum`
+- **Define structures**: Don't be lazy - use `TypedDict`, `dataclass` or `BaseModel` to define structured data. Only use vague/generic types like `dict[str, Any]` when the types/structure are truly unknown or have many possibilities.
   - Complex objects: `dataclass` or `BaseModel` descendants
   - Need serialization/validation: `pydantic.dataclasses.dataclass`
-- **Generics**: Define proper generic types/protocols/guards, use `ParamSpec`/`Concatenate`
+- **Generics**: Define proper generic types/protocols/guards
+  - Use newer python generics syntax: `class SomeClass[SomeGeneric]:` -- don't use `typing.Generic`
+  - Use newer `type` keyword for aliases: `type MyAlias = tuple[Literal["like this"]]` not `TypeAlias`
 - **No string literals**: Use `enum.Enum` (CLI: `cyclopts` handles enum parsing)
+  - Exception: If the type will only be used once in one small section, and there are only 1-3 valid values, `Literal` is OK, but must be typed with `Literal`
 
 ### Pydantic Models
 
 ```python
 from typing import Annotated
-from pydantic import BaseModel, Field
+from pydantic import ConfigDict, Field
 
-class MyModel(BaseModel):
+from codeweaver._common import BasedModel
+
+class MyModel(BasedModel):
+    model_config = ConfigDict(extra="allow")
+
     name: Annotated[str, Field(description="Item name")]
     value: Annotated[int, Field(ge=0, description="Non-negative value")] = 0
 ```
 
 - Use `ConfigDict` for configuration (`extra="allow"` for plugins, `extra="forbid"` for strict)
-- Prefer domain-specific subclasses (`BaseSettings`, `BaseNode`) over raw `BaseModel`
+- Prefer domain-specific subclasses (codeweaver's `BasedModel` for most, `BaseNode` for pydantic graph) over raw `BaseModel`
 
 ## Common Linting Issues
 
 ### Logging
 
-- **No f-strings**: Use `%s` formatting or `extra={"key": value}`
+- **No f-strings in log statements**: Use `%s` formatting or `extra={"key": value}`
 - **No print statements**: Use logging in production
-- **Use logging.exception**: For exceptions (auto-includes exception details)
+- **Use logging.exception**: For exceptions with **no exception object in the statements** (logging.exception automatically includes the object)
+  - Don't use logging.error if you can use logging.exception
 
 ### Exception Handling
 
@@ -94,10 +106,13 @@ class MyModel(BaseModel):
 - **Use `raise from`**: Maintain exception context
 - **Use `contextlib.suppress`**: For intentional exception suppression
 
+- If raising an exception, raise to a specific, codeweaver exception (`codeweaver.exceptions`)
+
 ### Functions
 
 - **Type all parameters and returns**: Including `-> None`
-- **Boolean kwargs only**: Use `*` separator for boolean parameters
+- **Boolean kwargs only**: Use `*` separator for boolean parameters (booleans should not be positional arguments)
+
 
 ```python
 def my_function(arg1: str, *, flag: bool = False) -> None:
@@ -106,16 +121,20 @@ def my_function(arg1: str, *, flag: bool = False) -> None:
 
 Follow [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html). See [auto-fix script](scripts/fix-ruff-patterns.sh).
 
+### IsInstance
+
+- Use `|` syntax, not tuple: `isinstance(value, str | int | MyClass)` (not `(str, int, MyClass)`)
+
 ## Testing Philosophy
 
 **Effectiveness over coverage.** We prioritize meaningful tests over metrics.
 
-### Why Not 100% Coverage
+### Why Not 100% Coverage?
 
 - Doesn't improve user experience
 - Doesn't prevent important bugs
 - Tests implementation details, not behavior
-- Creates barriers to innovation and change
+- Creates barriers to innovation and change ("ugh, we have to update all those tests...")
 - Wastes time maintaining low-value tests
 
 ### Focus Instead On
@@ -124,7 +143,7 @@ Follow [Google Python Style Guide](https://google.github.io/styleguide/pyguide.h
 - **Realistic integration scenarios**
 - **Input/output validation** for important functions
 
-**One solid, realistic test > 10 implementation detail tests**
+**One solid, realistic test is better than 10 implementation detail tests**
 
 **Integration testing > unit testing** for most cases.
 

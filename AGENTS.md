@@ -7,11 +7,27 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 # AGENT GUIDELINES: Working on CodeWeaver
 
+## Project Constitution (MANDATORY COMPLIANCE)
+
+**This project is governed by the CodeWeaver Constitution at `.specify/memory/constitution.md`.**
+
+ALL development work MUST comply with constitutional principles. This constitution supersedes all other guidelines and practices. When any conflict arises between these guidelines and the constitution, the constitution takes precedence.
+
+### Constitutional Principles (Non-Negotiable)
+
+1. **AI-First Context**: Every feature must enhance AI agent understanding of code
+2. **Proven Patterns**: Use FastAPI/pydantic ecosystem patterns over reinvention
+3. **Evidence-Based Development**: All decisions backed by verifiable evidence (NO exceptions)
+4. **Testing Philosophy**: Effectiveness over coverage - focus on user-affecting behavior
+5. **Simplicity Through Architecture**: Clear, flat structure with obvious purpose
+
+**Before any code changes**: Validate your approach against `.specify/memory/constitution.md`.
+
 ## Code Style
 
-**Always review [CODE_STYLE.md](./CODE_STYLE.md) before writing or editing code.**
+**PRIMARY**: Ensure constitutional compliance first (`.specify/memory/constitution.md`), then review [CODE_STYLE.md](./CODE_STYLE.md) for implementation details.
 
-Channel @tiangolo's FastAPI architectural patterns.
+Channel @tiangolo's FastAPI architectural patterns as required by Constitutional Principle II (Proven Patterns).
 
 ## Context Management
 
@@ -32,7 +48,11 @@ Delegate high-context tasks with detailed instructions. Focus on high-level coor
 
 ## Core Rules
 
+**Constitutional Rule**: All work must comply with the Project Constitution (`.specify/memory/constitution.md`). Constitutional violations are never acceptable.
+
 **Golden Rule**: Do exactly what the user asks. No more, no less. If unclear, ask questions.
+
+**Evidence Rule**: Follow Constitutional Principle III - no workarounds, mock implementations, or placeholder code without explicit authorization.
 
 ### Red Flags 🚩
 
@@ -47,6 +67,7 @@ Stop and investigate when:
 1. **Stop** current work
 2. **Review** your understanding and plans
 3. **Assess** using sequential-thinking tool:
+   - Does approach comply with Project Constitution?
    - Is approach consistent with requirements?
    - Do you have sufficient information?
    - Is the task ambiguous?
@@ -62,12 +83,14 @@ Stop and investigate when:
 
 ### Never Do
 
-- Create workarounds without explicit user authorization
-- Write placeholder/mock/toy versions
-- Use NotImplementedError or TODO shortcuts
+- **Violate constitutional principles** - Constitution compliance is non-negotiable
+- Create workarounds without explicit user authorization (Constitutional Principle III)
+- Write placeholder/mock/toy versions (Constitutional Principle III)
+- Use NotImplementedError or TODO shortcuts (Constitutional Principle III)
 - Change project scope/goals independently
+- Ignore evidence-based development requirements
 
-**Bottom line**: No code beats bad code.
+**Bottom line**: No code beats bad code (Constitutional Principle III - Evidence-Based Development).
 
 ### When Stuck
 
@@ -87,12 +110,14 @@ Priority order for documentation:
 
 Bridge the gap between human expectations and AI agent capabilities through "exquisite context." Create beneficial cycles where AI-first tools enhance both agent and human capabilities.
 
+**Constitutional Alignment**: This mission directly implements Constitutional Principle I (AI-First Context).
+
 ### User Terms
 
 - **Agent/AI Agent** (not "model", "LLM", "tool")
 
   - **Developer's Agent**: Focused on developer tasks
-  - **Context Agent**: Internal agents delivering information
+  - **Context Agent**: Internal agents delivering information to the developer or developer's agent
 
 - **Developer/End User**: People using CodeWeaver
 

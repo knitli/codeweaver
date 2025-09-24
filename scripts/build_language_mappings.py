@@ -1,4 +1,10 @@
 #!/usr/bin/env -S uv run
+
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 # ///script
 # requires-python = ">=3.11"
 # dependencies = ["pydantic"]
@@ -11,16 +17,16 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.semantic.categories import SemanticNodeCategory
 from codeweaver.semantic.mapper import NodeMapper, get_node_mapper
-from codeweaver.semantic.node_type_parser import LanguageGrammar, NodeTypeParser
+from codeweaver.semantic.node_type_parser import LanguageNodeType, NodeTypeParser
 
 
-type ProjectNodeTypes = dict[SemanticSearchLanguage, LanguageGrammar]
+type ProjectNodeTypes = dict[SemanticSearchLanguage, LanguageNodeType]
 type PatternLanguages = dict[str, list[SemanticSearchLanguage]]
 type ConfidenceRow = tuple[str, SemanticNodeCategory, float, int]
 
@@ -34,7 +40,9 @@ def locate_node_types() -> Path:
     return node_types_dir
 
 
-def parse_node_types(node_types_dir: Path) -> dict[SemanticSearchLanguage, LanguageGrammar]:
+def parse_node_types(
+    node_types_dir: Path,
+) -> Sequence[Mapping[SemanticSearchLanguage, LanguageNodeType]]:
     """Parse the node types from the specified directory."""
     parser = NodeTypeParser(node_types_dir=node_types_dir)
     return parser.parse_all_node_types()
