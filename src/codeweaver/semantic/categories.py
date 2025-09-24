@@ -6,13 +6,16 @@
 
 from __future__ import annotations
 
-from typing import NewType
+from typing import Annotated, NewType
+
+from pydantic import Field
 
 from codeweaver._common import BaseEnum
 
 
 # Type alias for importance scores (0.0 to 1.0)
 ImportanceScore = NewType("ImportanceScore", float)
+type ImportanceScoreT = Annotated[ImportanceScore, Field(ge=0.0, le=1.0)]
 
 
 class SemanticNodeCategory(str, BaseEnum):
@@ -144,7 +147,7 @@ class SemanticNodeCategory(str, BaseEnum):
 
     __slots__ = ()
 
-    def default_importance_score(self) -> ImportanceScore:
+    def default_importance_score(self) -> ImportanceScoreT:
         """Get the default importance score for this semantic category."""
         return ImportanceScore(_DEFAULT_IMPORTANCE_SCORES[self])
 

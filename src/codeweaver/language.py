@@ -178,6 +178,22 @@ class SemanticSearchLanguage(str, BaseEnum):
 
     __slots__ = ()
 
+    @property
+    def alias(self) -> str | None:
+        """
+        Provide special-case short-form aliases for certain languages.
+
+        `BaseEnum.from_string` has robust handling for common variations in case, punctuation, and spacing, but it doesn't handle all possible variations. This property, which is accessed by `from_string` and `cls.aliases()`, provides a way to handle special cases that don't fit the general pattern.
+        """
+        return {
+            SemanticSearchLanguage.C_PLUS_PLUS: "c++",
+            SemanticSearchLanguage.C_SHARP: "c#",
+            SemanticSearchLanguage.JAVASCRIPT: "js",
+            SemanticSearchLanguage.TYPESCRIPT: "ts",
+            SemanticSearchLanguage.PYTHON: "py",
+            SemanticSearchLanguage.PHP: "php_sparse",  # there are two tree-sitter grammars for PHP; we call one 'sparse' to differentiate it, but we need to handle 'php' as an alias for it
+        }.get(self)
+
     @classmethod
     def extension_map(cls) -> MappingProxyType[SemanticSearchLanguage, tuple[str, ...]]:
         """

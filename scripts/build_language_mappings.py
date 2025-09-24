@@ -1,10 +1,4 @@
-#!/usr/bin/env -S uv run
-
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-#
-# SPDX-License-Identifier: MIT OR Apache-2.0
-
+#!/usr/bin/env -S uv run -s
 # ///script
 # requires-python = ">=3.11"
 # dependencies = ["pydantic"]
@@ -12,13 +6,15 @@
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
-# SPDX-License-Identifier: MIT OR Apache-2.0# python
+# SPDX-License-Identifier: MIT OR Apache-2.0
 """Build language mapping files from tree-sitter node-types.json files."""
 
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
+from functools import cache
 from pathlib import Path
+from typing import cast
 
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.semantic.categories import SemanticNodeCategory
@@ -26,7 +22,7 @@ from codeweaver.semantic.mapper import NodeMapper, get_node_mapper
 from codeweaver.semantic.node_type_parser import LanguageNodeType, NodeTypeParser
 
 
-type ProjectNodeTypes = dict[SemanticSearchLanguage, LanguageNodeType]
+type ProjectNodeTypes = Sequence[dict[SemanticSearchLanguage, Sequence[LanguageNodeType]]]
 type PatternLanguages = dict[str, list[SemanticSearchLanguage]]
 type ConfidenceRow = tuple[str, SemanticNodeCategory, float, int]
 
@@ -42,7 +38,7 @@ def locate_node_types() -> Path:
 
 def parse_node_types(
     node_types_dir: Path,
-) -> Sequence[Mapping[SemanticSearchLanguage, LanguageNodeType]]:
+) -> Sequence[Mapping[SemanticSearchLanguage, Sequence[LanguageNodeType]]]:
     """Parse the node types from the specified directory."""
     parser = NodeTypeParser(node_types_dir=node_types_dir)
     return parser.parse_all_node_types()
@@ -88,21 +84,64 @@ def print_confidence_rows(title: str, rows: Iterable[ConfidenceRow], limit: int 
         print(f"  {pattern} → {category} (confidence: {conf:.2f}, {lang_count} langs)")
 
 
+def down_to_node_types(project_root: ProjectNodeTypes) -> dict[SemanticSearchLanguage, set[str]]:
+    """Convert project node types to a mapping of language names to their node type names.
+
+    Defensive behavior:
+    - Coerce language keys to SemanticSearchLanguage when possible.
+    - Skip entries with unexpected language key types.
+    - Normalize node entries that may be model instances or dicts.
+    """
+    lang_to_types: dict[SemanticSearchLanguage, set[str]] = {}
+    for entry in project_root:
+        for lang_name, nodes in entry.items():
+            # Coerce language key to SemanticSearchLanguage when possible
+            if isinstance(lang_name, SemanticSearchLanguage):
+                language_key = lang_name
+            elif isinstance(lang_name, str):
+                try:
+                    language_key = SemanticSearchLanguage.from_string(lang_name)
+                except Exception:
+                    # fallback to string key (best-effort)
+                    language_key = lang_name  # type: ignore
+            else:
+                print(f"Skipping unexpected language key type in down_to_node_types: {type(lang_name)} -> {lang_name!r}")
+                continue
+
+            collected: list[str] = []
+            if not isinstance(nodes, (list, tuple)):
+                # skip unexpected shapes
+                continue
+
+            for node_entry in nodes:
+                mapping = None
+                if hasattr(node_entry, "node_type"):
+                    mapping = getattr(node_entry, "node_type")
+                elif isinstance(node_entry, dict):
+                    mapping = node_entry.get("node_type") or node_entry
+                if not isinstance(mapping, dict):
+                    continue
+                for key in mapping.keys():
+                    if isinstance(key, str):
+                        collected.append(key)
+
+            lang_to_types[language_key] = set(collected)
+    return lang_to_types
+
+
 def analyze_language_specific(
     mapper: NodeMapper, node_types: ProjectNodeTypes, targets: Iterable[SemanticSearchLanguage]
 ) -> None:
     """Analyze language-specific node types."""
     print("\n=== Language-Specific Analysis ===")
-    for lang_name in targets:
-        grammar = node_types.get(lang_name)
-        if not grammar:
-            continue
-        print(f"\n{lang_name.upper()}:")
-        node_type_names = list(getattr(grammar, "node_types", {}).keys())[:20]
-        for node_type in node_type_names:
-            category = mapper.classify_node_type(node_type, lang_name)
-            confidence = mapper.get_classification_confidence(node_type, lang_name)
-            print(f"  {node_type} → {category} (confidence: {confidence:.2f})")
+    nodes = down_to_node_types(node_types)
+    for target in targets:
+        if target in nodes and (flattened_nodes := sorted(nodes[target])):
+            print(f"\n{str(target).upper()}:")
+            for node_type in flattened_nodes:
+                category = mapper.classify_node_type(node_type, target)
+                confidence = mapper.get_classification_confidence(node_type, target)
+                print(f"  {node_type} → {category} (confidence: {confidence:.2f})")
 
 
 def compute_statistics(
@@ -132,8 +171,9 @@ def suggest_overrides(
     print("The following node types have low classification confidence and may need manual review:")
 
     overrides_by_language: dict[str, dict[str, SemanticNodeCategory]] = {}
-    for lang_name, grammar in node_types.items():
-        node_type_names = getattr(grammar, "node_types", {}).keys()
+    nodes = down_to_node_types(node_types)
+    for lang_name, node_type in nodes.items():
+        node_type_names = getattr(node_type, "node_type", {}).keys()
         for node_type in node_type_names:
             conf = mapper.get_classification_confidence(node_type, lang_name)
             if conf < threshold:
@@ -158,7 +198,7 @@ def analyze_node_types_and_generate_mappings() -> None:
 
     try:
         parser = NodeTypeParser(node_types_dir=node_types_dir)
-        node_types = parser.parse_all_node_types()
+        node_types: ProjectNodeTypes = cast(ProjectNodeTypes, parser.parse_all_node_types())
     except Exception as exc:
         print(f"Failed to parse node_types: {exc}")
         return

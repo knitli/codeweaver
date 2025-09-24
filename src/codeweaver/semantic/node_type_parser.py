@@ -39,15 +39,15 @@ class FieldsTypesDict(TypedDict):
 class FieldsInfoDict(TypedDict):
     """`Fields` entry in raw node type information from JSON."""
 
-    multiple: bool
-    required: bool
-    types: list[FieldsTypesDict] | EmptyList
+    multiple: Required[bool]
+    required: Required[bool]
+    types: Required[list[FieldsTypesDict] | EmptyList]
 
 
 class NodeTypeInfoDict(TypedDict):
     """TypedDict for raw node type information from JSON."""
 
-    type_name: Required[Annotated[str, Field(serialization_alias="type")]]
+    type_name: Required[Annotated[str, Field(serialization_alias="type", validation_alias="type")]]
     named: Required[bool]
     subtypes: NotRequired[list[dict[str, Any]] | EmptyList]
     fields: NotRequired[dict[LiteralStringT, FieldsInfoDict] | EmptyDict]
@@ -57,7 +57,12 @@ class NodeTypeInfoDict(TypedDict):
 class NodeTypeInfo(BasedModel):
     """Information about a tree-sitter node type."""
 
-    type_name: Annotated[str, Field(description="The node type name", serialization_alias="type")]
+    type_name: Annotated[
+        str,
+        Field(
+            description="The node type name", serialization_alias="type", validation_alias="type"
+        ),
+    ]
     named: Annotated[bool, Field(description="Whether the node is named")]
     subtypes: Annotated[
         list[FieldsTypesDict] | None,
@@ -71,6 +76,8 @@ class NodeTypeInfo(BasedModel):
         FieldsInfoDict | EmptyDict | None,
         Field(default_factory=dict, description="Node children if any"),
     ] = None
+    root: Annotated[bool | None, Field(description="Whether this node can be a root node")] = None
+    extra: Annotated[bool | None, Field(description="Whether this is an extra node")] = None
 
 
 class LanguageNodeType(BasedModel):
@@ -91,21 +98,214 @@ class RootNodeTypes(RootModel[dict[SemanticSearchLanguage, list[LanguageNodeType
     def from_node_type_file(cls, file_path: Path) -> RootNodeTypes:
         """Load and parse a node-types.json file.
 
-        Args:
-            file_path: Path to the node-types.json file
+        This method tolerates the two common tree-sitter node-types.json shapes:
+        - A list of node dicts (common)
+        - A mapping of type_name -> node dict (less common)
 
-        Returns:
-            Dictionary mapping language to list of LanguageNodeType instances
+        It normalizes nested "type" keys to "type_name" for validation, validates
+        each node into NodeTypeInfo, and constructs a LanguageNodeType whose
+        `node_type` is a mapping of type_name -> NodeTypeInfo instances.
+
+        On first validation failure for a file, write a diagnostic JSON to /tmp
+        to make inspection easy without altering behavior.
         """
+        import json
+
         from pydantic_core import from_json
 
-        data = from_json(file_path.read_bytes())
+        raw = from_json(file_path.read_bytes())
         language = SemanticSearchLanguage.from_string(file_path.stem.replace("-node-types", ""))
-        future_self = RootNodeTypes.model_validate({
-            language: [LanguageNodeType.model_validate(item) for item in data]
-        })
-        future_self._source_file = file_path
-        return future_self
+
+        def _normalize(obj: Any) -> Any:
+            """Recursively replace dict keys named 'type' -> 'type_name'."""
+            if isinstance(obj, dict):
+                new: dict[str, Any] = {}
+                for k, v in obj.items():
+                    nk = "type_name" if k == "type" else k
+                    new[nk] = _normalize(v)
+                return new
+            if isinstance(obj, list):
+                return [_normalize(i) for i in obj]
+            return obj
+
+        nodes_by_name: dict[str, dict] = {}
+        diagnostics_written = False
+        diagnostics_path = Path(f"/tmp/{file_path.stem}-first-failing-normalized.json")
+
+        try:
+            if isinstance(raw, dict):
+                # mapping keyed by type name
+                for key, value in raw.items():
+                    if not isinstance(value, dict):
+                        logger.debug("Skipping non-dict entry for key %s in %s", key, file_path)
+                        continue
+                    normalized = _normalize(value)
+                    # ensure type_name is present
+                    if "type_name" not in normalized:
+                        normalized["type_name"] = key
+                    try:
+                        nti = NodeTypeInfo.model_validate(normalized)
+                        nodes_by_name[str(nti.type_name)] = nti.model_dump()
+                    except Exception as e:
+                        logger.warning(
+                            "Validation failed for node entry (key=%s) in %s: %s\nentry_keys=%s normalized_keys=%s",
+                            key,
+                            file_path,
+                            e,
+                            [str(k) for k in value] if value else None,
+                            [str(k) for k in normalized]
+                            if isinstance(normalized, Mapping)
+                            else None,
+                        )
+                        if not diagnostics_written:
+                            try:
+                                payload = {
+                                    "file": str(file_path),
+                                    "key": key,
+                                    "entry_keys": [str(k) for k in value] if value else None,
+                                    "normalized_keys": [str(k) for k in normalized]
+                                    if isinstance(normalized, Mapping)
+                                    else None,
+                                    "normalized": normalized,
+                                }
+                                diagnostics_path.write_text(
+                                    json.dumps(payload, indent=2, default=str)
+                                )
+                                logger.error(
+                                    "Wrote failing normalized entry to %s", diagnostics_path
+                                )
+                            except Exception as write_err:
+                                logger.exception(
+                                    "Failed to write diagnostics file %s: %s",
+                                    diagnostics_path,
+                                    write_err,
+                                )
+                            diagnostics_written = True
+                        continue
+            elif isinstance(raw, list):
+                # list of node dicts
+                for idx, item in enumerate(raw):
+                    if not isinstance(item, dict):
+                        logger.debug("Skipping non-dict list item %s in %s", idx, file_path)
+                        continue
+                    normalized = _normalize(item)
+                    try:
+                        nti = NodeTypeInfo.model_validate(normalized)
+                        nodes_by_name[str(nti.type_name)] = nti.model_dump()
+                    except Exception as e:
+                        logger.warning(
+                            "Validation failed for node list item %s in %s: %s\nitem_keys=%s normalized_keys=%s",
+                            idx,
+                            file_path,
+                            e,
+                            [str(k) for k in item] if item else None,
+                            [str(k) for k in normalized]
+                            if isinstance(normalized, Mapping)
+                            else None,
+                        )
+                        if not diagnostics_written:
+                            try:
+                                payload = {
+                                    "file": str(file_path),
+                                    "index": idx,
+                                    "item_keys": [str(k) for k in item] if item else None,
+                                    "normalized_keys": [str(k) for k in normalized]
+                                    if isinstance(normalized, Mapping)
+                                    else None,
+                                    "normalized": normalized,
+                                }
+                                diagnostics_path.write_text(
+                                    json.dumps(payload, indent=2, default=str)
+                                )
+                                logger.error(
+                                    "Wrote failing normalized entry to %s", diagnostics_path
+                                )
+                            except Exception as write_err:
+                                logger.exception(
+                                    "Failed to write diagnostics file %s: %s",
+                                    diagnostics_path,
+                                    write_err,
+                                )
+                            diagnostics_written = True
+                        continue
+            else:
+                logger.warning("Unexpected JSON root type (%s) in %s", type(raw), file_path)
+
+            # Construct LanguageNodeType using validated NodeTypeInfo instances.
+            logger.debug(
+                "Preparing to build LanguageNodeType for %s: nodes=%d keys=%s",
+                file_path,
+                len(nodes_by_name),
+                list(nodes_by_name.keys())[:10],
+            )
+            sample_key = next(iter(nodes_by_name), None)
+            sample_repr = None
+            if sample_key:
+                sample_item = nodes_by_name[sample_key]
+                # nodes_by_name now stores plain serialized dicts (node.model_dump())
+                if isinstance(sample_item, dict):
+                    sample_repr = sample_item
+                else:
+                    try:
+                        sample_repr = sample_item.model_dump()
+                    except Exception:
+                        sample_repr = repr(sample_item)
+            try:
+                lang_node = LanguageNodeType.model_validate({"node_type": nodes_by_name})
+                future_self = RootNodeTypes.model_validate({language: [lang_node]})
+                future_self._source_file = file_path
+            except Exception as wrap_exc:
+                # Write a safe diagnostic with partial state to help debug
+                fallback_path = Path(f"/tmp/{file_path.stem}-language-validation-failure.json")
+                try:
+                    fallback = {
+                        "file": str(file_path),
+                        "error": repr(wrap_exc),
+                        "nodes_by_name_count": len(nodes_by_name),
+                        "nodes_by_name_keys": list(nodes_by_name.keys())[:50],
+                        "sample_node": sample_repr,
+                    }
+                    # json was imported earlier in this function scope
+                    diagnostics_written_here = False
+                    try:
+                        fallback_path.write_text(json.dumps(fallback, indent=2, default=str))
+                        logger.error(
+                            "Wrote language validation failure diagnostic to %s", fallback_path
+                        )
+                        diagnostics_written_here = True
+                    except Exception:
+                        logger.exception(
+                            "Failed to write language validation fallback for %s", file_path
+                        )
+                finally:
+                    # Re-raise the original exception to preserve behavior
+                    raise
+        except Exception as exc:
+            # Attempt to write a fallback diagnostic when parsing fails before
+            # per-item diagnostics could be written (e.g., validation in later
+            # stages raising pydantic-core errors). This helps capture the raw
+            # payload and the partial state for investigation without changing
+            # parsing behaviour.
+            try:
+                if not diagnostics_written:
+                    payload = {
+                        "file": str(file_path),
+                        "error": repr(exc),
+                        "raw_type": type(raw).__name__ if "raw" in locals() else None,
+                        "nodes_by_name_count": len(nodes_by_name)
+                        if "nodes_by_name" in locals()
+                        else None,
+                        "nodes_by_name_keys": list(nodes_by_name.keys())[:50]
+                        if "nodes_by_name" in locals()
+                        else None,
+                    }
+                    diagnostics_path.write_text(json.dumps(payload, indent=2, default=str))
+                    logger.error("Wrote fallback diagnostics to %s", diagnostics_path)
+            except Exception:
+                logger.exception("Failed to write fallback diagnostics for %s", file_path)
+            raise RuntimeError(f"Failed to parse node-types file {file_path}: {exc}") from exc
+        else:
+            return future_self
 
 
 class NodeTypeParser(BasedModel):
@@ -148,7 +348,6 @@ class NodeTypeParser(BasedModel):
                 for entry in language_entries:
                     for type_name in entry.node_type:
                         all_types.add(type_name)
-
         return all_types
 
     def find_common_patterns(self) -> dict[str, list[SemanticSearchLanguage]]:
