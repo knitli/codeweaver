@@ -12,7 +12,6 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
-from functools import cache
 from pathlib import Path
 from typing import cast
 
@@ -87,45 +86,26 @@ def print_confidence_rows(title: str, rows: Iterable[ConfidenceRow], limit: int 
 def down_to_node_types(project_root: ProjectNodeTypes) -> dict[SemanticSearchLanguage, set[str]]:
     """Convert project node types to a mapping of language names to their node type names.
 
-    Defensive behavior:
-    - Coerce language keys to SemanticSearchLanguage when possible.
-    - Skip entries with unexpected language key types.
-    - Normalize node entries that may be model instances or dicts.
+    This is defensive: node entries may be model instances or plain dicts and some
+    keys in malformed inputs can be unhashable. We only collect string keys.
     """
     lang_to_types: dict[SemanticSearchLanguage, set[str]] = {}
     for entry in project_root:
         for lang_name, nodes in entry.items():
-            # Coerce language key to SemanticSearchLanguage when possible
-            if isinstance(lang_name, SemanticSearchLanguage):
-                language_key = lang_name
-            elif isinstance(lang_name, str):
-                try:
-                    language_key = SemanticSearchLanguage.from_string(lang_name)
-                except Exception:
-                    # fallback to string key (best-effort)
-                    language_key = lang_name  # type: ignore
-            else:
-                print(f"Skipping unexpected language key type in down_to_node_types: {type(lang_name)} -> {lang_name!r}")
-                continue
-
             collected: list[str] = []
-            if not isinstance(nodes, (list, tuple)):
-                # skip unexpected shapes
-                continue
-
             for node_entry in nodes:
+                # node_entry may be a LanguageNodeType model or a raw dict
                 mapping = None
                 if hasattr(node_entry, "node_type"):
-                    mapping = getattr(node_entry, "node_type")
+                    mapping = node_entry.node_type
                 elif isinstance(node_entry, dict):
+                    # try common shapes: {"node_type": {...}} or direct mapping
                     mapping = node_entry.get("node_type") or node_entry
                 if not isinstance(mapping, dict):
+                    # skip unexpected shapes
                     continue
-                for key in mapping.keys():
-                    if isinstance(key, str):
-                        collected.append(key)
-
-            lang_to_types[language_key] = set(collected)
+                collected.extend(key for key in mapping if isinstance(key, str))
+            lang_to_types[lang_name] = set(collected)
     return lang_to_types
 
 
@@ -210,7 +190,7 @@ def analyze_node_types_and_generate_mappings() -> None:
 
     mapper = get_node_mapper()
 
-    high, medium, low = analyze_confidence(mapper, common_patterns, top=50)
+    high, medium, low = analyze_confidence(mapper, common_patterns, top=25)
     print_confidence_rows("High confidence classifications", high)
     print_confidence_rows("Medium confidence classifications", medium)
     print_confidence_rows("Low confidence classifications", low)

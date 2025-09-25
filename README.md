@@ -6,7 +6,24 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 -->
 # CodeWeaver
 
-Extensible context platform and MCP server for hybrid semantic code search and targeted AI context delivery.
+Extensible context platform and MCP server for hybrid semantic code search and targeted context delivery to AI coding agents.
+
+## Architectural Goals
+
+1. **Provide semantically-rich, ranked and prioritized search results for developers and their coding agents.**
+  **How**
+  - CodeWeaver uses ast-grep, and support for dozens of embedding and reranking models, local and remote, to provide weighted responses to searches.
+  - CodeWeaver is fully pluggable. You can add embedding providers, reranking providers, agent providers, services and middleware, and *new data sources* beyond your codebase.
+2. **Eliminate 'cognitive load' on coding agents trying to get context on the codebase.**
+  **How**
+  - **Reduces all operations to a single simple tool** -- `find_code` -- allowing your coding agent to request what it needs, explain what it's trying to do, and get exactly the information it needs in response.
+  - Uses **mcp sampling** to search and curate context for your coding agent -- using your coding agent! (also supports this outside of an MCP context where sampling isn't enabled or MCP is not available). CodeWeaver uses a *different instance* of your agent to evaluate your agent's needs and curate a response, keeping your agent unburdened with all the associated context from searching.
+3. **Significantly cut context bloat, and costs**.
+  **How**
+  - CodeWeaver aims to *restrict* context to your coding agent to *only the information it needs*. Of course, that's not easy to do, but we hope to get close.
+  - By reducing the context that's returned to your Agent, your Agent no longer has to "carry" all of that extra, unused, context with them -- reducing token use *with every turn* and reducing its exponential growth.
+
+## Overview
 
 CodeWeaver is more than an MCP server—it’s a context platform. It distills and delivers targeted, token-efficient context to your AI coding agent. Under the hood, it functions like RAG + hybrid search over semantically indexed code, and it can integrate arbitrary data sources (e.g., external API docs) through a provider architecture.
 
