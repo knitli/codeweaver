@@ -186,6 +186,7 @@ class SemanticSearchLanguage(str, BaseEnum):
         `BaseEnum.from_string` has robust handling for common variations in case, punctuation, and spacing, but it doesn't handle all possible variations. This property, which is accessed by `from_string` and `cls.aliases()`, provides a way to handle special cases that don't fit the general pattern.
         """
         return {
+            SemanticSearchLanguage.C_LANG: "c",
             SemanticSearchLanguage.C_PLUS_PLUS: "c++",
             SemanticSearchLanguage.C_SHARP: "c#",
             SemanticSearchLanguage.JAVASCRIPT: "js",

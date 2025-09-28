@@ -11,10 +11,11 @@ from typing import TYPE_CHECKING, Annotated
 from pydantic import Field, NonNegativeInt
 
 from codeweaver._common import BasedModel
+
 from .categories import ImportanceScore, SemanticNodeCategory
 
+
 if TYPE_CHECKING:
-    from ast_grep_py import SgNode
     from codeweaver._ast_grep import AstNode
 
 
@@ -23,25 +24,31 @@ class SemanticScorer(BasedModel):
 
     # Configuration for contextual adjustments
     depth_penalty_factor: Annotated[
-        float, Field(default=0.02, ge=0.0, le=0.1, description="Penalty per depth level (0.02 = 2% per level)")
+        float,
+        Field(
+            default=0.02,
+            ge=0.0,
+            le=0.1,
+            description="""Penalty per depth level (0.02 = 2% per level)""",
+        ),
     ]
 
     size_bonus_threshold: Annotated[
-        NonNegativeInt, Field(default=50, description="Character count threshold for size bonus")
+        NonNegativeInt,
+        Field(default=50, description="""Character count threshold for size bonus"""),
     ]
 
     size_bonus_factor: Annotated[
-        float, Field(default=0.1, ge=0.0, le=0.3, description="Bonus factor for large nodes")
+        float, Field(default=0.1, ge=0.0, le=0.3, description="""Bonus factor for large nodes""")
     ]
 
     root_bonus: Annotated[
-        float, Field(default=0.05, ge=0.0, le=0.2, description="Bonus for top-level definitions")
+        float,
+        Field(default=0.05, ge=0.0, le=0.2, description="""Bonus for top-level definitions"""),
     ]
 
     def calculate_importance_score(
-        self,
-        semantic_category: SemanticNodeCategory,
-        node: AstNode,
+        self, semantic_category: SemanticNodeCategory, node: AstNode
     ) -> ImportanceScore:
         """Calculate the final importance score for a node.
 
@@ -95,7 +102,15 @@ class SemanticScorer(BasedModel):
         # Could be enhanced with semantic category checking once integrated
         kind = node.kind.lower()
         definition_keywords = {
-            "class", "function", "method", "interface", "trait", "enum",
-            "struct", "type", "module", "namespace"
+            "class",
+            "function",
+            "method",
+            "interface",
+            "trait",
+            "enum",
+            "struct",
+            "type",
+            "module",
+            "namespace",
         }
         return any(keyword in kind for keyword in definition_keywords)

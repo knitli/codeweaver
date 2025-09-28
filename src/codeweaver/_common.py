@@ -189,6 +189,10 @@ class BaseEnum(Enum):
         """Generate multiple variations of a string."""
         return {
             s,
+            textcase.upper(s),
+            textcase.lower(s),
+            textcase.title(s),
+            textcase.pascal(s),
             textcase.snake(s),
             textcase.kebab(s),
             textcase.sentence(s),
@@ -201,16 +205,15 @@ class BaseEnum(Enum):
     def aka(self) -> tuple[str, ...] | tuple[int, ...]:
         """Return the alias for the enum member, if one exists."""
         if isinstance(self.value, str):
-            return tuple(
-                sorted({
-                    v.lower()
-                    for v in set(  # type: ignore
-                        *(self._multiply_variations(self.name)),
-                        *(self._multiply_variations(self.value)),
-                    )
-                    if v and isinstance(v, str)
-                })
+            names: set[str] = set()
+            if hasattr(self, "alias") and (alias := getattr(self, "alias", None)):
+                names.add(alias)
+            names |= (
+                self._multiply_variations(self.name)
+                | self._multiply_variations(self.value)
+                | {self.encoded_value, self.encoded_name}
             )
+            return tuple(sorted(names))
         return (self.value,)
 
     @property
@@ -242,16 +245,6 @@ class BaseEnum(Enum):
                 alias_map[member.value] = member
             return cast(dict[int, Self], alias_map)
         for member in cls:
-            if (
-                hasattr(member, "alias")
-                and member.alias  # type: ignore
-                and isinstance(member.alias, tuple)  # type: ignore
-                and all(isinstance(name, str) for name in member.alias)  # type: ignore
-            ):
-                for name in member.alias:  # type: ignore
-                    if name not in alias_map:
-                        alias_map[name] = member
-                continue  # aka values are in alias if present
             for alias in member.aka:
                 if alias not in alias_map:
                     alias_map[alias] = member

@@ -56,7 +56,9 @@ class ChunkGovernor(BasedModel):
 
     capabilities: Annotated[
         tuple[EmbeddingModelCapabilities | RerankingModelCapabilities, ...],
-        Field(default=(), description="The model capabilities to infer chunking behavior from."),
+        Field(
+            default=(), description="""The model capabilities to infer chunking behavior from."""
+        ),
     ]
 
     @computed_field
@@ -379,7 +381,9 @@ class ChunkMicroManager:
         # Handle any gaps between semantic chunks with fallback chunking
         return self._fill_gaps_with_fallback(chunks, content, file, source_id, effective_limit)
 
-    def _collect_semantic_nodes(self, root_node: AstNode[SgNode], candidate_nodes: list[AstNode[SgNode]]) -> None:
+    def _collect_semantic_nodes(
+        self, root_node: AstNode[SgNode], candidate_nodes: list[AstNode[SgNode]]
+    ) -> None:
         """Recursively collect all meaningful AST nodes for semantic analysis."""
         # Add current node if it's named and meaningful
         if root_node.is_named and root_node.text.strip():
@@ -389,7 +393,9 @@ class ChunkMicroManager:
         for child in root_node.children:
             self._collect_semantic_nodes(child, candidate_nodes)
 
-    def _score_and_prioritize_nodes(self, nodes: list[AstNode[SgNode]]) -> list[tuple[AstNode[SgNode], float]]:
+    def _score_and_prioritize_nodes(
+        self, nodes: list[AstNode[SgNode]]
+    ) -> list[tuple[AstNode[SgNode], float]]:
         """Score nodes by importance and return them sorted by priority and position."""
         scored_nodes = []
 

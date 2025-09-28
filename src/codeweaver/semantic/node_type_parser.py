@@ -10,11 +10,12 @@ import logging
 
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Annotated, Any, NotRequired, Required, TypedDict
+from typing import Annotated, Any, Literal, TypedDict, cast
 
-from pydantic import Field, PrivateAttr, RootModel
+from pydantic import Discriminator, Field, PrivateAttr, RootModel, Tag, computed_field
 
 from codeweaver._common import BasedModel, LiteralStringT
+from codeweaver._utils import lazy_importer
 from codeweaver.language import SemanticSearchLanguage
 
 
@@ -24,75 +25,222 @@ type EmptyList = list[
     None
 ]  # technically not true -- it has nothing, not None, but... as good as we can do
 
+type NodeNameT = LiteralStringT
+
+
+# ===========================================================================
+# *                  Node Field Type Definitions                  *
+# ===========================================================================
+# Could we just use one TypedDict with optional fields? Yes.
+# But this way, we get better validation and documentation.
+# Also, it can help us narrow down the language if we don't know it.
+
 
 class EmptyDict(TypedDict, total=False):
     """An empty dictionary type."""
 
 
-class FieldsTypesDict(TypedDict):
+class ChildInfo(TypedDict):
+    """`Fields` entry in raw node type information from JSON."""
+
+    multiple: bool
+    required: bool
+    types: list[SimpleField] | EmptyList
+
+
+type FieldInfoT = dict[NodeNameT, ChildInfo]
+
+
+class FieldsField(TypedDict):
+    """`types` entry in raw node type information from JSON with fields."""
+
+    fields: FieldInfoT
+
+
+class ChildrenFieldMixin(FieldsField):
+    """`types` entry in raw node type information from JSON with fields and children."""
+
+    children: ChildInfo  # fields MUST be present if children is present
+
+
+class SimpleField(TypedDict):
     """`types` entry in raw node type information from JSON."""
 
-    type_name: Annotated[str, Field(serialization_alias="type")]
+    type_name: Annotated[str, Field(serialization_alias="type", validation_alias="type")]
     named: bool
 
 
-class FieldsInfoDict(TypedDict):
-    """`Fields` entry in raw node type information from JSON."""
+class SubtypeField(SimpleField):
+    """Fields entry with `subtypes`."""
 
-    multiple: Required[bool]
-    required: Required[bool]
-    types: Required[list[FieldsTypesDict] | EmptyList]
+    subtypes: NodeNameT | list[SimpleField]
 
 
-class NodeTypeInfoDict(TypedDict):
-    """TypedDict for raw node type information from JSON."""
+class ExtraField(SimpleField):
+    """Fields entry with `extra`."""
 
-    type_name: Required[Annotated[str, Field(serialization_alias="type", validation_alias="type")]]
-    named: Required[bool]
-    subtypes: NotRequired[list[dict[str, Any]] | EmptyList]
-    fields: NotRequired[dict[LiteralStringT, FieldsInfoDict] | EmptyDict]
-    children: NotRequired[FieldsInfoDict | EmptyDict]
+    extra: bool
 
 
-class NodeTypeInfo(BasedModel):
-    """Information about a tree-sitter node type."""
-
-    type_name: Annotated[
-        str,
-        Field(
-            description="The node type name", serialization_alias="type", validation_alias="type"
-        ),
-    ]
-    named: Annotated[bool, Field(description="Whether the node is named")]
-    subtypes: Annotated[
-        list[FieldsTypesDict] | None,
-        Field(default_factory=list, description="Subtype information if any"),
-    ] = None
-    fields: Annotated[
-        dict[LiteralStringT, FieldsInfoDict] | EmptyDict | None,
-        Field(default_factory=dict, description="Node fields if any"),
-    ] = None
-    children: Annotated[
-        FieldsInfoDict | EmptyDict | None,
-        Field(default_factory=dict, description="Node children if any"),
-    ] = None
-    root: Annotated[bool | None, Field(description="Whether this node can be a root node")] = None
-    extra: Annotated[bool | None, Field(description="Whether this is an extra node")] = None
+class ExtraFieldsField(ExtraField, FieldsField):
+    """Fields entry with `extra` and `fields`."""
 
 
-class LanguageNodeType(BasedModel):
-    """Parsed node_type information for a specific language."""
-
-    node_type: Annotated[
-        dict[str, NodeTypeInfo], Field(description="Mapping of node type names to their info")
-    ]
+class ExtraChildrenField(ExtraField, ChildrenFieldMixin):
+    """Fields entry with `extra`, `fields`, and `children`."""
 
 
-class RootNodeTypes(RootModel[dict[SemanticSearchLanguage, list[LanguageNodeType]]]):
+class SimpleFieldFields(SimpleField, FieldsField):
+    """Fields entry with `fields`."""
+
+
+class SimpleFieldChildren(SimpleField, ChildrenFieldMixin):
+    """Fields entry with `fields` and `children`."""
+
+
+class RootField(SimpleField, ChildrenFieldMixin):
+    """Fields entry with `root`, `fields`, and `children`. `root` only appears with `fields` and `children` and is always True."""
+
+    root: Literal[True]
+
+
+type NodeTypeInfo = (
+    Annotated[SimpleField, Tag("simple")]
+    | Annotated[SimpleFieldFields, Tag("fields")]
+    | Annotated[SimpleFieldChildren, Tag("children")]
+    | Annotated[SubtypeField, Tag("subtypes")]
+    | Annotated[ExtraField, Tag("extra")]
+    | Annotated[ExtraFieldsField, Tag("extra_fields")]
+    | Annotated[ExtraChildrenField, Tag("extra_children")]
+    | Annotated[RootField, Tag("root")]
+)
+
+type WithFieldsT = (
+    Annotated[SimpleFieldFields, Tag("fields")]
+    | Annotated[ExtraFieldsField, Tag("extra_fields")]
+    | Annotated[SimpleFieldChildren, Tag("children")]
+    | Annotated[ExtraChildrenField, Tag("extra_children")]
+    | Annotated[RootField, Tag("root")]
+)
+type WithChildrenT = (
+    Annotated[SimpleFieldChildren, Tag("children")]
+    | Annotated[ExtraChildrenField, Tag("extra_children")]
+    | Annotated[RootField, Tag("root")]
+)
+
+
+"""
+Notes:
+
+('type', 'named'): ALL LANGS
+
+('type', 'named', 'subtypes'): ALL BUT SIX: {<SemanticSearchLanguage.CSS: 'css'>, <SemanticSearchLanguage.HTML: 'html'>, <SemanticSearchLanguage.ELIXIR: 'elixir'>, <SemanticSearchLanguage.SWIFT: 'swift'>, <SemanticSearchLanguage.YAML: 'yaml'>, <SemanticSearchLanguage.SOLIDITY: 'solidity'>}
+
+('type', 'named', 'extra'): JUST 10: {<SemanticSearchLanguage.C_LANG: 'c'>, <SemanticSearchLanguage.PHP: 'php'>, <SemanticSearchLanguage.GO: 'go'>, <SemanticSearchLanguage.SWIFT: 'swift'>, <SemanticSearchLanguage.C_PLUS_PLUS: 'cpp'>, <SemanticSearchLanguage.PYTHON: 'python'>, <SemanticSearchLanguage.BASH: 'bash'>, <SemanticSearchLanguage.SOLIDITY: 'solidity'>, <SemanticSearchLanguage.JAVASCRIPT: 'javascript'>, <SemanticSearchLanguage.JSX: 'jsx'>}
+
+('type', 'named', 'fields'): ALL BUT {<SemanticSearchLanguage.YAML: 'yaml'>}
+('type', 'named', 'fields', 'children'): ALL BUT {<SemanticSearchLanguage.YAML: 'yaml'>}
+('type', 'named', 'root', 'fields', 'children'): ALL BUT {<SemanticSearchLanguage.NIX: 'nix'>}
+
+('type', 'named', 'extra', 'fields'): ONLY {<SemanticSearchLanguage.LUA: 'lua'>}
+
+('type', 'named', 'extra', 'fields', 'children'): ONLY {<SemanticSearchLanguage.PHP: 'php'>}
+
+`fields` is always empty for `CSS`, `HTML`, `YAML` (but is sometimes empty for all others)
+
+'children' ALWAYS has 'multiple', 'required', 'types' keys when present.
+
+`type` is always a string
+`named` is always a bool
+`extra` is always a bool
+`root` is always a bool
+
+if present, `subtypes` is either a string or a list of dicts with 'type' and 'named' keys -- never empty or None
+
+`fields` is a dict of field name -> dict with 'multiple', 'required', 'types' keys -- never None, sometimes empty
+
+if `named` is False, `fields` can be present, but not `children`, `extra`, or `root`. `fields` will be empty if present.
+  this only happens for:
+  - SWIFT: `?`
+  - PYTHON: `is not` and `not in`
+  - HASKELL: `(#`
+"""
+type LanguageNodeType = dict[LiteralStringT, NodeTypeInfo]
+
+type NodeInfoKey = Literal["children", "extra", "fields", "root", "subtypes", "named", "type"]
+
+
+def get_discriminator_value(data: Any) -> str:
+    """Get the discriminator value for NodeTypeInfo based on the presence of keys."""
+    keys: tuple[NodeInfoKey, ...] = (
+        tuple(sorted(data.keys()))
+        if isinstance(data, dict)
+        else tuple(
+            sorted(
+                t
+                for t in ("type", "named", "subtypes", "extra", "fields", "children", "root")
+                if t in data
+            )
+        )
+    )
+    match keys:
+        case ("named", "type"):
+            return "simple"
+        case ("fields", "named", "type"):
+            return "fields"
+        case ("children", "fields", "named", "type"):
+            return "children"
+        case ("named", "subtypes", "type"):
+            return "subtypes"
+        case ("extra", "named", "type"):
+            return "extra"
+        case ("extra", "fields", "named", "type"):
+            return "extra_fields"
+        case ("children", "extra", "fields", "named", "type"):
+            return "extra_children"
+        case ("children", "fields", "named", "root", "type"):
+            return "root"
+        case _:
+            raise ValueError("Cannot determine discriminator value for NodeTypeInfo")
+
+
+class RootNodeTypes(RootModel[list[NodeTypeInfo]]):
     """Root model for list of node type information."""
 
-    root: dict[SemanticSearchLanguage, list[LanguageNodeType]]
+    root: list[
+        Annotated[
+            Annotated[SimpleField, Tag("simple")]
+            | Annotated[SimpleFieldFields, Tag("fields")]
+            | Annotated[SimpleFieldChildren, Tag("children")]
+            | Annotated[SubtypeField, Tag("subtypes")]
+            | Annotated[ExtraField, Tag("extra")]
+            | Annotated[ExtraFieldsField, Tag("extra_fields")]
+            | Annotated[ExtraChildrenField, Tag("extra_children")]
+            | Annotated[RootField, Tag("root")],
+            Field(description="List of node type information"),
+            Discriminator(get_discriminator_value),
+        ]
+    ]
     _source_file: Annotated[Path | None, PrivateAttr(init=False)] = None
+
+    @computed_field
+    @property
+    def language(self) -> SemanticSearchLanguage | None:
+        """Get the language if there's exactly one in the root mapping."""
+        if self._source_file:
+            return SemanticSearchLanguage.from_string(
+                self._source_file.stem.replace("-node-types", "")
+            )
+        if self.root:
+            deduction = lazy_importer("codeweaver.semantic._language_deduction")
+            if (deduced := deduction.from_node_types_info(self.root)) and isinstance(
+                deduced, SemanticSearchLanguage
+            ):
+                return deduced
+            if deduced:
+                logger.warning("Deduction was unable to determine a single language: %s", deduced)
+                # TODO: We can try to reduce possibilities by what we see in the repo.
+        return None
 
     @classmethod
     def from_node_type_file(cls, file_path: Path) -> RootNodeTypes:
@@ -109,229 +257,81 @@ class RootNodeTypes(RootModel[dict[SemanticSearchLanguage, list[LanguageNodeType
         On first validation failure for a file, write a diagnostic JSON to /tmp
         to make inspection easy without altering behavior.
         """
-        import json
-
         from pydantic_core import from_json
 
-        raw = from_json(file_path.read_bytes())
-        language = SemanticSearchLanguage.from_string(file_path.stem.replace("-node-types", ""))
-
-        def _normalize(obj: Any) -> Any:
-            """Recursively replace dict keys named 'type' -> 'type_name'."""
-            if isinstance(obj, dict):
-                new: dict[str, Any] = {}
-                for k, v in obj.items():
-                    nk = "type_name" if k == "type" else k
-                    new[nk] = _normalize(v)
-                return new
-            if isinstance(obj, list):
-                return [_normalize(i) for i in obj]
-            return obj
-
-        nodes_by_name: dict[str, dict] = {}
-        diagnostics_written = False
-        diagnostics_path = Path(f"/tmp/{file_path.stem}-first-failing-normalized.json")
-
         try:
-            if isinstance(raw, dict):
-                # mapping keyed by type name
-                for key, value in raw.items():
-                    if not isinstance(value, dict):
-                        logger.debug("Skipping non-dict entry for key %s in %s", key, file_path)
-                        continue
-                    normalized = _normalize(value)
-                    # ensure type_name is present
-                    if "type_name" not in normalized:
-                        normalized["type_name"] = key
-                    try:
-                        nti = NodeTypeInfo.model_validate(normalized)
-                        nodes_by_name[str(nti.type_name)] = nti.model_dump()
-                    except Exception as e:
-                        logger.warning(
-                            "Validation failed for node entry (key=%s) in %s: %s\nentry_keys=%s normalized_keys=%s",
-                            key,
-                            file_path,
-                            e,
-                            [str(k) for k in value] if value else None,
-                            [str(k) for k in normalized]
-                            if isinstance(normalized, Mapping)
-                            else None,
-                        )
-                        if not diagnostics_written:
-                            try:
-                                payload = {
-                                    "file": str(file_path),
-                                    "key": key,
-                                    "entry_keys": [str(k) for k in value] if value else None,
-                                    "normalized_keys": [str(k) for k in normalized]
-                                    if isinstance(normalized, Mapping)
-                                    else None,
-                                    "normalized": normalized,
-                                }
-                                diagnostics_path.write_text(
-                                    json.dumps(payload, indent=2, default=str)
-                                )
-                                logger.error(
-                                    "Wrote failing normalized entry to %s", diagnostics_path
-                                )
-                            except Exception as write_err:
-                                logger.exception(
-                                    "Failed to write diagnostics file %s: %s",
-                                    diagnostics_path,
-                                    write_err,
-                                )
-                            diagnostics_written = True
-                        continue
-            elif isinstance(raw, list):
-                # list of node dicts
-                for idx, item in enumerate(raw):
-                    if not isinstance(item, dict):
-                        logger.debug("Skipping non-dict list item %s in %s", idx, file_path)
-                        continue
-                    normalized = _normalize(item)
-                    try:
-                        nti = NodeTypeInfo.model_validate(normalized)
-                        nodes_by_name[str(nti.type_name)] = nti.model_dump()
-                    except Exception as e:
-                        logger.warning(
-                            "Validation failed for node list item %s in %s: %s\nitem_keys=%s normalized_keys=%s",
-                            idx,
-                            file_path,
-                            e,
-                            [str(k) for k in item] if item else None,
-                            [str(k) for k in normalized]
-                            if isinstance(normalized, Mapping)
-                            else None,
-                        )
-                        if not diagnostics_written:
-                            try:
-                                payload = {
-                                    "file": str(file_path),
-                                    "index": idx,
-                                    "item_keys": [str(k) for k in item] if item else None,
-                                    "normalized_keys": [str(k) for k in normalized]
-                                    if isinstance(normalized, Mapping)
-                                    else None,
-                                    "normalized": normalized,
-                                }
-                                diagnostics_path.write_text(
-                                    json.dumps(payload, indent=2, default=str)
-                                )
-                                logger.error(
-                                    "Wrote failing normalized entry to %s", diagnostics_path
-                                )
-                            except Exception as write_err:
-                                logger.exception(
-                                    "Failed to write diagnostics file %s: %s",
-                                    diagnostics_path,
-                                    write_err,
-                                )
-                            diagnostics_written = True
-                        continue
-            else:
-                logger.warning("Unexpected JSON root type (%s) in %s", type(raw), file_path)
-
-            # Construct LanguageNodeType using validated NodeTypeInfo instances.
-            logger.debug(
-                "Preparing to build LanguageNodeType for %s: nodes=%d keys=%s",
-                file_path,
-                len(nodes_by_name),
-                list(nodes_by_name.keys())[:10],
-            )
-            sample_key = next(iter(nodes_by_name), None)
-            sample_repr = None
-            if sample_key:
-                sample_item = nodes_by_name[sample_key]
-                # nodes_by_name now stores plain serialized dicts (node.model_dump())
-                if isinstance(sample_item, dict):
-                    sample_repr = sample_item
-                else:
-                    try:
-                        sample_repr = sample_item.model_dump()
-                    except Exception:
-                        sample_repr = repr(sample_item)
-            try:
-                lang_node = LanguageNodeType.model_validate({"node_type": nodes_by_name})
-                future_self = RootNodeTypes.model_validate({language: [lang_node]})
-                future_self._source_file = file_path
-            except Exception as wrap_exc:
-                # Write a safe diagnostic with partial state to help debug
-                fallback_path = Path(f"/tmp/{file_path.stem}-language-validation-failure.json")
-                try:
-                    fallback = {
-                        "file": str(file_path),
-                        "error": repr(wrap_exc),
-                        "nodes_by_name_count": len(nodes_by_name),
-                        "nodes_by_name_keys": list(nodes_by_name.keys())[:50],
-                        "sample_node": sample_repr,
-                    }
-                    # json was imported earlier in this function scope
-                    diagnostics_written_here = False
-                    try:
-                        fallback_path.write_text(json.dumps(fallback, indent=2, default=str))
-                        logger.error(
-                            "Wrote language validation failure diagnostic to %s", fallback_path
-                        )
-                        diagnostics_written_here = True
-                    except Exception:
-                        logger.exception(
-                            "Failed to write language validation fallback for %s", file_path
-                        )
-                finally:
-                    # Re-raise the original exception to preserve behavior
-                    raise
-        except Exception as exc:
-            # Attempt to write a fallback diagnostic when parsing fails before
-            # per-item diagnostics could be written (e.g., validation in later
-            # stages raising pydantic-core errors). This helps capture the raw
-            # payload and the partial state for investigation without changing
-            # parsing behaviour.
-            try:
-                if not diagnostics_written:
-                    payload = {
-                        "file": str(file_path),
-                        "error": repr(exc),
-                        "raw_type": type(raw).__name__ if "raw" in locals() else None,
-                        "nodes_by_name_count": len(nodes_by_name)
-                        if "nodes_by_name" in locals()
-                        else None,
-                        "nodes_by_name_keys": list(nodes_by_name.keys())[:50]
-                        if "nodes_by_name" in locals()
-                        else None,
-                    }
-                    diagnostics_path.write_text(json.dumps(payload, indent=2, default=str))
-                    logger.error("Wrote fallback diagnostics to %s", diagnostics_path)
-            except Exception:
-                logger.exception("Failed to write fallback diagnostics for %s", file_path)
-            raise RuntimeError(f"Failed to parse node-types file {file_path}: {exc}") from exc
+            raw_data: Any = from_json(file_path.read_text(encoding="utf-8"))
+            instance = cls.model_validate(raw_data)
+            instance._source_file = file_path
+        except Exception:
+            # Handle validation errors
+            logger.exception("Failed to load or validate %s", file_path)
+            raise
         else:
-            return future_self
+            return instance
 
 
 class NodeTypeParser(BasedModel):
     """Parser for processing multiple tree-sitter node_type files."""
 
-    node_types_dir: Annotated[Path, Field(description="Directory containing node_type files")]
+    node_types_dir: Annotated[Path, Field(description="""Directory containing node_type files""")]
 
     def parse_all_node_types(
         self,
-    ) -> Sequence[Mapping[SemanticSearchLanguage, Sequence[LanguageNodeType]]]:
+    ) -> Sequence[Mapping[SemanticSearchLanguage, Sequence[NodeTypeInfo]]]:
         """Parse all node-types.json files in the node_types directory.
 
         Returns:
             Dictionary mapping language names to their parsed node_types
         """
-        node_types: list[dict[SemanticSearchLanguage, list[LanguageNodeType]]] = []
+        node_types: list[dict[SemanticSearchLanguage, list[NodeTypeInfo]]] = []
 
         for node_type_file in self.node_types_dir.glob("*-node-types.json"):
             try:
                 nodes = RootNodeTypes.from_node_type_file(node_type_file)
-                node_types.append(nodes.root)
+                node_types.append({cast(SemanticSearchLanguage, nodes.language): nodes.root})
             except Exception as e:
                 # Log error but continue processing other files
                 print(f"Warning: Failed to parse {node_type_file}: {e}")
 
         return node_types
+
+    @staticmethod
+    def _get_node_types_from_info_values(info: NodeTypeInfo) -> set[LiteralStringT]:
+        """Extract node type names from NodeTypeInfo values."""
+        all_types: set[LiteralStringT] = set()
+        for key, value in info.items():
+            match key:
+                case "type_name" | "type":
+                    all_types.add(cast(LiteralStringT, value))
+                case "subtypes":
+                    if isinstance(value, str):
+                        all_types.add(cast(LiteralStringT, value))
+                    else:
+                        all_types |= {
+                            cast(LiteralStringT, v.get("type_name", v.get("type")))
+                            for v in cast(list[SubtypeField], value)
+                            if v.get("type_name") or v.get("type")
+                        }
+                case "fields":
+                    all_types |= cast(set[LiteralStringT], set(cast(WithFieldsT, value).keys()))
+                    for field_info in cast(WithFieldsT, value).values():
+                        if types := cast(ChildInfo, field_info).get("types"):
+                            all_types |= {
+                                cast(LiteralStringT, t.get("type_name", t.get("type")))
+                                for t in cast(list[SimpleField], types)
+                                if t.get("type_name") or t.get("type")
+                            }
+                case "children":
+                    if types := cast(ChildInfo, value).get("types"):
+                        all_types |= {
+                            cast(LiteralStringT, t.get("type_name", t.get("type")))
+                            for t in cast(list[SimpleField], types)
+                            if t.get("type_name") or t.get("type")
+                        }
+                case _:
+                    continue
+        return all_types
 
     def get_all_node_types(self) -> set[str]:
         """Get all unique node type names across all languages.
@@ -346,8 +346,11 @@ class NodeTypeParser(BasedModel):
         for language_node_types in node_types:
             for language_entries in language_node_types.values():
                 for entry in language_entries:
-                    for type_name in entry.node_type:
-                        all_types.add(type_name)
+                    for info_key, info_values in entry.items():
+                        all_types.add(info_key)
+                        all_types |= self._get_node_types_from_info_values(
+                            cast(NodeTypeInfo, info_values)
+                        )
         return all_types
 
     def find_common_patterns(self) -> dict[str, list[SemanticSearchLanguage]]:
@@ -366,8 +369,7 @@ class NodeTypeParser(BasedModel):
                 if entries:
                     # Use the first entry's first node type as the pattern key
                     first_entry = entries[0]
-                    if first_entry.node_type:
-                        raw_key = next(iter(first_entry.node_type.keys()), None)
+                    raw_key = next(iter(first_entry.keys()), None)
                 # Skip entries without a usable key
                 if not raw_key:
                     continue

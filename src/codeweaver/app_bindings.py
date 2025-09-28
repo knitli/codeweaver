@@ -217,7 +217,7 @@ def register_tool(app: FastMCP[AppState]) -> FastMCP[AppState]:
         Tool.from_function(
             find_code_tool,
             name="find_code",
-            description="Find code in the codebase",
+            description="""Find code in the codebase""",
             enabled=True,
             exclude_args=["context"],
             tags={"user", "external", "code-context"},

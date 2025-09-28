@@ -39,7 +39,7 @@ class NodeMapper(BasedModel):
         dict[SemanticSearchLanguage, dict[str, SemanticNodeCategory]],
         Field(
             default_factory=lambda x: MappingProxyType(dict(x)),
-            description="Manual overrides: SemanticSearchLanguage -> {node_type: SemanticNodeCategory}",
+            description="""Manual overrides: SemanticSearchLanguage -> {node_type: SemanticNodeCategory}""",
         ),
     ]
 

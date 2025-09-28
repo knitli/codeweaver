@@ -292,7 +292,7 @@ class ProviderSettings(BasedModel):
     """
     vector: Annotated[
         tuple[BaseVectorStoreConfig, ...],
-        Field(default_factory=QdrantVectorStore, description="Vector store provider configuration"),
+        Field(default_factory=QdrantVectorStore, description="""Vector store provider configuration"""),
     ] = QdrantConfig()
     """
     agent: Annotated[
@@ -356,7 +356,7 @@ class FastMcpServerSettings(BasedModel):
     additional_middleware: Annotated[
         list[str] | None,
         Field(
-            description="Additional middleware to add to the FastMCP server. Values should be full path import strings, like `codeweaver.middleware.statistics.StatisticsMiddleware`.",
+            description="""Additional middleware to add to the FastMCP server. Values should be full path import strings, like `codeweaver.middleware.statistics.StatisticsMiddleware`.""",
             validation_alias="middleware",
             serialization_alias="middleware",
         ),
@@ -364,7 +364,7 @@ class FastMcpServerSettings(BasedModel):
     additional_tools: Annotated[
         list[str] | None,
         Field(
-            description="Additional tools to add to the FastMCP server. Values can be either full path import strings, like `codeweaver.tools.git.GitTool`, or just the tool name, like `GitTool`.",
+            description="""Additional tools to add to the FastMCP server. Values can be either full path import strings, like `codeweaver.tools.git.GitTool`, or just the tool name, like `GitTool`.""",
             validation_alias="tools",
             serialization_alias="tools",
         ),

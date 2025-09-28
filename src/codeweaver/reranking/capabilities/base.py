@@ -141,7 +141,7 @@ class RerankingModelCapabilities(BasedModel):
         bool,
         Field(
             init=False,
-            description="Whether the model is available, meaning its package is available in the environment and it has been implemented.",
+            description="""Whether the model is available, meaning its package is available in the environment and it has been implemented.""",
         ),
     ] = False  # defaults to False, set to True when the model is known to be available
 

@@ -69,7 +69,7 @@ class MetaVar(str, BaseEnum):
     def to_metavar(
         self,
         variable_name: Annotated[
-            str, Field(description="The name of the variable", pattern="[A-Z0-9_]+")
+            str, Field(description="""The name of the variable", pattern="[A-Z0-9_]+""")
         ],
     ) -> str:
         """Return the pattern representation of the meta variable."""
@@ -153,7 +153,7 @@ class RootAstNode[SgRoot: (AstGrepRoot)](BasedModel):
 
     model_config = BasedModel.model_config | ConfigDict(arbitrary_types_allowed=True)
 
-    _root: Annotated[AstGrepRoot, Field(description="The underlying SgRoot", exclude=True)]
+    _root: Annotated[AstGrepRoot, Field(description="""The underlying SgRoot""", exclude=True)]
 
     @classmethod
     def from_sg_root(cls, sg_root: AstGrepRoot) -> RootAstNode[SgRoot]:
@@ -193,14 +193,16 @@ class AstNode[SgNode: (AstGrepNode)](BasedModel):
     model_config = BasedModel.model_config | ConfigDict(arbitrary_types_allowed=True)
 
     language: Annotated[
-        SemanticSearchLanguage | None, Field(description="The language of the node")
+        SemanticSearchLanguage | None, Field(description="""The language of the node""")
     ]
 
-    _node: Annotated[AstGrepNode, Field(description="The underlying SgNode", exclude=True)]
+    _node: Annotated[AstGrepNode, Field(description="""The underlying SgNode""", exclude=True)]
 
-    node_id: Annotated[UUID7, Field(description="The unique ID of the node")] = uuid7()
+    node_id: Annotated[UUID7, Field(description="""The unique ID of the node""")] = uuid7()
 
-    parent_node_id: Annotated[UUID7 | None, Field(description="The ID of the parent node")] = None
+    parent_node_id: Annotated[UUID7 | None, Field(description="""The ID of the parent node""")] = (
+        None
+    )
 
     @classmethod
     def from_sg_node(
