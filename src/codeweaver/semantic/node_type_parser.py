@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 
-from collections.abc import Mapping, Sequence
+from collections.abc import KeysView, Mapping, Sequence
 from pathlib import Path
 from typing import Annotated, Any, Literal, TypedDict, cast
 
@@ -66,7 +66,7 @@ class ChildrenFieldMixin(FieldsField):
 class SimpleField(TypedDict):
     """`types` entry in raw node type information from JSON."""
 
-    type_name: Annotated[str, Field(serialization_alias="type", validation_alias="type")]
+    type_name: Annotated[str, Field(validation_alias="type", description="The node type name")]
     named: bool
 
 
@@ -128,52 +128,19 @@ type WithChildrenT = (
     | Annotated[RootField, Tag("root")]
 )
 
-
-"""
-Notes:
-
-('type', 'named'): ALL LANGS
-
-('type', 'named', 'subtypes'): ALL BUT SIX: {<SemanticSearchLanguage.CSS: 'css'>, <SemanticSearchLanguage.HTML: 'html'>, <SemanticSearchLanguage.ELIXIR: 'elixir'>, <SemanticSearchLanguage.SWIFT: 'swift'>, <SemanticSearchLanguage.YAML: 'yaml'>, <SemanticSearchLanguage.SOLIDITY: 'solidity'>}
-
-('type', 'named', 'extra'): JUST 10: {<SemanticSearchLanguage.C_LANG: 'c'>, <SemanticSearchLanguage.PHP: 'php'>, <SemanticSearchLanguage.GO: 'go'>, <SemanticSearchLanguage.SWIFT: 'swift'>, <SemanticSearchLanguage.C_PLUS_PLUS: 'cpp'>, <SemanticSearchLanguage.PYTHON: 'python'>, <SemanticSearchLanguage.BASH: 'bash'>, <SemanticSearchLanguage.SOLIDITY: 'solidity'>, <SemanticSearchLanguage.JAVASCRIPT: 'javascript'>, <SemanticSearchLanguage.JSX: 'jsx'>}
-
-('type', 'named', 'fields'): ALL BUT {<SemanticSearchLanguage.YAML: 'yaml'>}
-('type', 'named', 'fields', 'children'): ALL BUT {<SemanticSearchLanguage.YAML: 'yaml'>}
-('type', 'named', 'root', 'fields', 'children'): ALL BUT {<SemanticSearchLanguage.NIX: 'nix'>}
-
-('type', 'named', 'extra', 'fields'): ONLY {<SemanticSearchLanguage.LUA: 'lua'>}
-
-('type', 'named', 'extra', 'fields', 'children'): ONLY {<SemanticSearchLanguage.PHP: 'php'>}
-
-`fields` is always empty for `CSS`, `HTML`, `YAML` (but is sometimes empty for all others)
-
-'children' ALWAYS has 'multiple', 'required', 'types' keys when present.
-
-`type` is always a string
-`named` is always a bool
-`extra` is always a bool
-`root` is always a bool
-
-if present, `subtypes` is either a string or a list of dicts with 'type' and 'named' keys -- never empty or None
-
-`fields` is a dict of field name -> dict with 'multiple', 'required', 'types' keys -- never None, sometimes empty
-
-if `named` is False, `fields` can be present, but not `children`, `extra`, or `root`. `fields` will be empty if present.
-  this only happens for:
-  - SWIFT: `?`
-  - PYTHON: `is not` and `not in`
-  - HASKELL: `(#`
-"""
 type LanguageNodeType = dict[LiteralStringT, NodeTypeInfo]
 
 type NodeInfoKey = Literal["children", "extra", "fields", "root", "subtypes", "named", "type"]
 
 
-def get_discriminator_value(data: Any) -> str:
+def get_discriminator_value(
+    data: Any,
+) -> Literal[
+    "simple", "fields", "children", "subtypes", "extra", "extra_fields", "extra_children", "root"
+]:
     """Get the discriminator value for NodeTypeInfo based on the presence of keys."""
-    keys: tuple[NodeInfoKey, ...] = (
-        tuple(sorted(data.keys()))
+    keys: tuple[NodeInfoKey, ...] = tuple(
+        sorted(cast(KeysView[NodeInfoKey], data.keys()))
         if isinstance(data, dict)
         else tuple(
             sorted(
@@ -261,7 +228,7 @@ class RootNodeTypes(RootModel[list[NodeTypeInfo]]):
 
         try:
             raw_data: Any = from_json(file_path.read_text(encoding="utf-8"))
-            instance = cls.model_validate(raw_data)
+            instance = cls.model_validate(raw_data, by_alias=True)
             instance._source_file = file_path
         except Exception:
             # Handle validation errors
@@ -297,6 +264,12 @@ class NodeTypeParser(BasedModel):
         return node_types
 
     @staticmethod
+    def _add_node_group(types: list[SimpleField]) -> set[LiteralStringT]:
+        """Extract node type names from a list of SimpleField entries."""
+        assembled_types = {t.get("type_name", t.get("type")) for t in types}
+        return {cast(LiteralStringT, t) for t in assembled_types if t}
+
+    @staticmethod
     def _get_node_types_from_info_values(info: NodeTypeInfo) -> set[LiteralStringT]:
         """Extract node type names from NodeTypeInfo values."""
         all_types: set[LiteralStringT] = set()
@@ -308,27 +281,17 @@ class NodeTypeParser(BasedModel):
                     if isinstance(value, str):
                         all_types.add(cast(LiteralStringT, value))
                     else:
-                        all_types |= {
-                            cast(LiteralStringT, v.get("type_name", v.get("type")))
-                            for v in cast(list[SubtypeField], value)
-                            if v.get("type_name") or v.get("type")
-                        }
+                        all_types |= NodeTypeParser._add_node_group(cast(list[SimpleField], value))
                 case "fields":
                     all_types |= cast(set[LiteralStringT], set(cast(WithFieldsT, value).keys()))
                     for field_info in cast(WithFieldsT, value).values():
                         if types := cast(ChildInfo, field_info).get("types"):
-                            all_types |= {
-                                cast(LiteralStringT, t.get("type_name", t.get("type")))
-                                for t in cast(list[SimpleField], types)
-                                if t.get("type_name") or t.get("type")
-                            }
+                            all_types |= NodeTypeParser._add_node_group(
+                                cast(list[SimpleField], types)
+                            )
                 case "children":
                     if types := cast(ChildInfo, value).get("types"):
-                        all_types |= {
-                            cast(LiteralStringT, t.get("type_name", t.get("type")))
-                            for t in cast(list[SimpleField], types)
-                            if t.get("type_name") or t.get("type")
-                        }
+                        all_types |= NodeTypeParser._add_node_group(cast(list[SimpleField], types))
                 case _:
                     continue
         return all_types
@@ -346,11 +309,7 @@ class NodeTypeParser(BasedModel):
         for language_node_types in node_types:
             for language_entries in language_node_types.values():
                 for entry in language_entries:
-                    for info_key, info_values in entry.items():
-                        all_types.add(info_key)
-                        all_types |= self._get_node_types_from_info_values(
-                            cast(NodeTypeInfo, info_values)
-                        )
+                    all_types |= self._get_node_types_from_info_values(entry)
         return all_types
 
     def find_common_patterns(self) -> dict[str, list[SemanticSearchLanguage]]:
@@ -362,24 +321,20 @@ class NodeTypeParser(BasedModel):
         node_types = self.parse_all_node_types()
         pattern_languages: dict[str, list[SemanticSearchLanguage]] = {}
 
-        # Build mapping keyed by the node type name (string), not by the whole node object.
+        # Build mapping keyed by the node type name (string), collecting all node types per language
         for language_node_types in node_types:
             for language_name, entries in language_node_types.items():
-                raw_key = None
-                if entries:
-                    # Use the first entry's first node type as the pattern key
-                    first_entry = entries[0]
-                    raw_key = next(iter(first_entry.keys()), None)
-                # Skip entries without a usable key
-                if not raw_key:
-                    continue
+                # Collect all unique node types for this language
+                language_node_type_names: set[str] = set()
+                for entry in entries:
+                    if type_name := entry.get("type_name", entry.get("type")):
+                        language_node_type_names.add(str(type_name))
 
-                # Ensure we have a string key for the mapping (type-checker friendly)
-                serialized_key: str = raw_key
-
-                if serialized_key not in pattern_languages:
-                    pattern_languages[serialized_key] = []
-                pattern_languages[serialized_key].append(language_name)
+                # Add this language to the pattern mapping for each node type it has
+                for node_type_name in language_node_type_names:
+                    if node_type_name not in pattern_languages:
+                        pattern_languages[node_type_name] = []
+                    pattern_languages[node_type_name].append(language_name)
 
         # Sort by frequency (most common patterns first)
         return dict(sorted(pattern_languages.items(), key=lambda x: len(x[1]), reverse=True))

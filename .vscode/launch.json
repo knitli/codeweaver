@@ -30,6 +30,14 @@
             "request": "launch",
             "program": "${workspaceFolder}/scripts/fetch_grammars.py",
             "console": "integratedTerminal",
+        },
+        {
+            "name": "Debug Lang Mapper Script",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/build_language_mappings.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
         }
     ]
 }

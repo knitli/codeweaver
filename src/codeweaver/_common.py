@@ -84,12 +84,10 @@ class DataclassSerializationMixin:
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the mixin and set the module name and adapter."""
-        import sys
-
         self._module = (
             self.__module__
             if hasattr(self, "__module__")
-            else self.__class__.__module__ or sys.modules[__name__].__name__
+            else self.__class__.__module__ or _sys.modules[__name__].__name__
         )
         self._adapter = TypeAdapter(type(self), module=self._module)
 
@@ -106,6 +104,17 @@ class DataclassSerializationMixin:
         else:
             return self._adapter
 
+    @classmethod
+    def _get_module(cls) -> str | None:
+        """Get the module name for the current class."""
+        return (
+            cls.__module__
+            if hasattr(cls, "__module__")
+            else cls.__class__.__module__
+            if hasattr(cls, "__class__")
+            else _sys.modules[__name__].__name__
+        )
+
     def dump_json(self, **kwargs: Unpack[SerializationKwargs]) -> bytes:
         """Serialize the session statistics to JSON bytes."""
         return self._adapted_self.dump_json(self, **kwargs)
@@ -114,15 +123,17 @@ class DataclassSerializationMixin:
         """Serialize the session statistics to a Python dictionary."""
         return self._adapted_self.dump_python(self, **kwargs)
 
-    def validate_json(self, data: bytes, **kwargs: Unpack[DeserializationKwargs]) -> Self:
+    @classmethod
+    def validate_json(cls, data: bytes, **kwargs: Unpack[DeserializationKwargs]) -> Self:
         """Deserialize the session statistics from JSON bytes."""
-        return self._adapted_self.validate_json(data, **kwargs)
+        adapter = TypeAdapter(cls, module=cls._get_module())
+        return adapter.validate_json(data, **kwargs)
 
-    def validate_python(
-        self, data: dict[str, Any], **kwargs: Unpack[DeserializationKwargs]
-    ) -> Self:
+    @classmethod
+    def validate_python(cls, data: dict[str, Any], **kwargs: Unpack[DeserializationKwargs]) -> Self:
         """Deserialize the session statistics from a Python dictionary."""
-        return self._adapted_self.validate_python(data, **kwargs)
+        adapter = TypeAdapter(cls, module=cls._get_module())
+        return adapter.validate_python(data, **kwargs)
 
 
 def _generate_title(model: type[Any]) -> str:

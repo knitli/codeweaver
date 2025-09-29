@@ -18,7 +18,7 @@ from typing import cast
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.semantic.categories import SemanticNodeCategory
 from codeweaver.semantic.mapper import NodeMapper, get_node_mapper
-from codeweaver.semantic.node_type_parser import LanguageNodeType, NodeTypeParser
+from codeweaver.semantic.node_type_parser import LanguageNodeType, NodeTypeInfo, NodeTypeParser
 
 
 type ProjectNodeTypes = Sequence[dict[SemanticSearchLanguage, Sequence[LanguageNodeType]]]
@@ -37,7 +37,7 @@ def locate_node_types() -> Path:
 
 def parse_node_types(
     node_types_dir: Path,
-) -> Sequence[Mapping[SemanticSearchLanguage, Sequence[LanguageNodeType]]]:
+) -> Sequence[Mapping[SemanticSearchLanguage, Sequence[NodeTypeInfo]]]:
     """Parse the node types from the specified directory."""
     parser = NodeTypeParser(node_types_dir=node_types_dir)
     return parser.parse_all_node_types()
@@ -46,6 +46,8 @@ def parse_node_types(
 def display_common_patterns(common_patterns: PatternLanguages, top: int = 20) -> None:
     """Display the most common node patterns across languages."""
     print("\n=== Most Common Node Types Across Languages ===")
+
+    filtered = {p: langs for p, langs in common_patterns.items() if langs}
     items = sorted(common_patterns.items(), key=lambda kv: len(kv[1]), reverse=True)
     for pattern, languages in items[:top]:
         print(f"{pattern}: {len(languages)} languages")
@@ -84,27 +86,33 @@ def print_confidence_rows(title: str, rows: Iterable[ConfidenceRow], limit: int 
 
 
 def down_to_node_types(project_root: ProjectNodeTypes) -> dict[SemanticSearchLanguage, set[str]]:
-    """Convert project node types to a mapping of language names to their node type names.
-
-    This is defensive: node entries may be model instances or plain dicts and some
-    keys in malformed inputs can be unhashable. We only collect string keys.
-    """
+    """Convert project node types to a mapping of language names to their node type names."""
     lang_to_types: dict[SemanticSearchLanguage, set[str]] = {}
     for entry in project_root:
         for lang_name, nodes in entry.items():
             collected: list[str] = []
-            for node_entry in nodes:
-                # node_entry may be a LanguageNodeType model or a raw dict
-                mapping = None
-                if hasattr(node_entry, "node_type"):
-                    mapping = node_entry.node_type
-                elif isinstance(node_entry, dict):
-                    # try common shapes: {"node_type": {...}} or direct mapping
-                    mapping = node_entry.get("node_type") or node_entry
-                if not isinstance(mapping, dict):
-                    # skip unexpected shapes
-                    continue
-                collected.extend(key for key in mapping if isinstance(key, str))
+            if "named" in nodes and isinstance(nodes, dict):
+                collected.append(nodes.get("type_name", nodes.get("type", "")))
+                if "children" in nodes and (children := nodes.get("children")):
+                    collected.extend(
+                        child.get("type_name", child.get("type", ""))
+                        for child in children
+                        if isinstance(child, dict)
+                    )
+                if "fields" in nodes and (fields := nodes.get("fields")):
+                    collected.extend(v for v in fields if isinstance(v, str))
+                    if types := [
+                        f.get("types")
+                        for f in fields
+                        if isinstance(f, dict) and "types" in f and f.get("types")
+                    ]:
+                        for type_list in types:
+                            if isinstance(type_list, list):
+                                collected.extend(
+                                    t.get("type_name", t.get("type", ""))
+                                    for t in type_list
+                                    if isinstance(t, dict)
+                                )
             lang_to_types[lang_name] = set(collected)
     return lang_to_types
 

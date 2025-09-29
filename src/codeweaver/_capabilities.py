@@ -3,7 +3,10 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
-"""Metadata about provider capabilities for all provider kinds in CodeWeaver."""
+"""Metadata about provider capabilities for all provider kinds in CodeWeaver.
+
+This module's capabilities are high-level and not specific to any model or version, focused on overall provider services. For more granular capabilities,
+"""
 
 from types import MappingProxyType
 
