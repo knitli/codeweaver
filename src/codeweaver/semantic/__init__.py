@@ -6,14 +6,15 @@
 
 from __future__ import annotations
 
-from .categories import SemanticNodeCategory, ImportanceScore
-from .mapper import NodeMapper, get_node_mapper
-from .scoring import SemanticScorer
+from codeweaver.semantic.categories import ImportanceScores, SemanticNodeCategory
+from codeweaver.semantic.mapper import NodeMapper, get_node_mapper
+from codeweaver.semantic.scoring import SemanticScorer
+
 
 __all__ = [
-    "SemanticNodeCategory",
-    "ImportanceScore",
+    "ImportanceScores",
     "NodeMapper",
-    "get_node_mapper",
+    "SemanticNodeCategory",
     "SemanticScorer",
+    "get_node_mapper",
 ]

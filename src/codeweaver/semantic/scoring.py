@@ -8,11 +8,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Annotated
 
-from pydantic import Field, NonNegativeInt
+from ast_grep_py import SgNode
+from pydantic import Field, NonNegativeFloat, NonNegativeInt
 
 from codeweaver._common import BasedModel
-
-from .categories import ImportanceScore, SemanticNodeCategory
+from codeweaver.semantic.categories import ImportanceScores, SemanticNodeCategory
 
 
 if TYPE_CHECKING:
@@ -24,12 +24,12 @@ class SemanticScorer(BasedModel):
 
     # Configuration for contextual adjustments
     depth_penalty_factor: Annotated[
-        float,
+        NonNegativeFloat,
         Field(
-            default=0.02,
+            default=0.04,
             ge=0.0,
             le=0.1,
-            description="""Penalty per depth level (0.02 = 2% per level)""",
+            description="""Penalty per depth level (0.04 = 4% per level)""",
         ),
     ]
 
@@ -39,17 +39,18 @@ class SemanticScorer(BasedModel):
     ]
 
     size_bonus_factor: Annotated[
-        float, Field(default=0.1, ge=0.0, le=0.3, description="""Bonus factor for large nodes""")
+        NonNegativeFloat,
+        Field(default=0.1, ge=0.0, le=0.3, description="""Bonus factor for large nodes"""),
     ]
 
     root_bonus: Annotated[
-        float,
+        NonNegativeFloat,
         Field(default=0.05, ge=0.0, le=0.2, description="""Bonus for top-level definitions"""),
     ]
 
     def calculate_importance_score(
-        self, semantic_category: SemanticNodeCategory, node: AstNode
-    ) -> ImportanceScore:
+        self, semantic_category: SemanticNodeCategory, node: AstNode[SgNode]
+    ) -> ImportanceScores:
         """Calculate the final importance score for a node.
 
         Args:
@@ -60,23 +61,25 @@ class SemanticScorer(BasedModel):
             Final importance score incorporating base score and contextual adjustments
         """
         # Start with base semantic score
-        base_score = semantic_category.default_importance_score()
-
-        # Apply contextual adjustments
-        adjusted_score = self._apply_contextual_adjustments(base_score, node)
+        base_scores = semantic_category.category.importance_scores.dump_python()
+        # get contextual adjustments
+        adjustment = self._apply_contextual_adjustments(node)
+        adjusted_scores = {k: v + adjustment for k, v in base_scores.items()}
+        corrected_scores = {k: max(0.00, min(0.99, v)) for k, v in adjusted_scores.items()}
+        # Average the adjusted scores
 
         # Clamp to valid range
-        return ImportanceScore(max(0.0, min(1.0, adjusted_score)))
+        return ImportanceScores.validate_python(corrected_scores)
 
-    def _apply_contextual_adjustments(self, base_score: float, node: AstNode) -> float:
-        """Apply contextual adjustments to the base semantic score.
+    def _apply_contextual_adjustments(self, node: AstNode[SgNode]) -> float:
+        """Calculates an adjustment to apply to an importance score based on context.
 
         Adjustments include:
         - Depth penalty: Deeper nesting reduces importance
         - Size bonus: Larger nodes get slight boost
         - Root bonus: Top-level definitions get boost
         """
-        adjusted_score = base_score
+        adjusted_score = 1.0
 
         # Calculate depth from ancestors
         depth = len(list(node.ancestors()))
@@ -94,9 +97,9 @@ class SemanticScorer(BasedModel):
         if depth <= 1 and self._is_definition_node(node):
             adjusted_score += self.root_bonus
 
-        return adjusted_score
+        return adjusted_score - 1.0
 
-    def _is_definition_node(self, node: AstNode) -> bool:
+    def _is_definition_node(self, node: AstNode[SgNode]) -> bool:
         """Check if a node represents a definition (class, function, etc.)."""
         # This is a heuristic based on common node kinds
         # Could be enhanced with semantic category checking once integrated

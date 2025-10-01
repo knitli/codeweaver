@@ -292,7 +292,7 @@ class ProviderSettings(BasedModel):
     """
     vector: Annotated[
         tuple[BaseVectorStoreConfig, ...],
-        Field(default_factory=QdrantVectorStore, description="""Vector store provider configuration"""),
+        Field(default_factory=QdrantVectorStore, description="Vector store provider configuration"),
     ] = QdrantConfig()
     """
     agent: Annotated[

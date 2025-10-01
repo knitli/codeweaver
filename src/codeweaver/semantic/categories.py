@@ -13,12 +13,24 @@ from collections import Counter
 from collections.abc import Sequence
 from functools import cached_property
 from types import MappingProxyType
-from typing import Annotated, Self, TypedDict, Unpack
+from typing import Annotated, Any, Self, TypedDict, Unpack, cast
 
 import textcase
 
-from pydantic import Field, NonNegativeFloat, NonNegativeInt, computed_field, field_validator
+from pydantic import (
+    Field,
+    FieldSerializationInfo,
+    GetCoreSchemaHandler,
+    NonNegativeFloat,
+    NonNegativeInt,
+    PositiveFloat,
+    ValidatorFunctionWrapHandler,
+    computed_field,
+    field_serializer,
+    field_validator,
+)
 from pydantic.dataclasses import dataclass
+from pydantic_core import ArgsKwargs, core_schema
 
 from codeweaver._common import BasedModel, BaseEnum, DataclassSerializationMixin
 from codeweaver.language import SemanticSearchLanguage
@@ -29,8 +41,11 @@ from codeweaver.language import SemanticSearchLanguage
 # =============================================================================
 
 
-class ContextWeightDict(TypedDict):
-    """Typed dictionary for context weights in AI assistant scenarios."""
+class ImportanceScoresDict(TypedDict):
+    """Typed dictionary for context weights in AI assistant scenarios.
+
+    `ImportanceScoresDict` is the python-serialized and mutable version of `ImportanceScores`.
+    """
 
     discovery: Annotated[
         NonNegativeFloat,
@@ -83,22 +98,22 @@ class ImportanceScores(DataclassSerializationMixin):
         Field(description="Weight for documentation context; explaining code", ge=0.0, le=1.0),
     ]
 
-    def weighted_score(self, context_weights: ContextWeightDict) -> float:
+    def weighted_score(self, context_weights: ImportanceScoresDict) -> PositiveFloat:
         """Calculate weighted importance score for given AI assistant context."""
         return (
-            self.discovery * context_weights.get("discovery", 0.2)
-            + self.comprehension * context_weights.get("comprehension", 0.2)
-            + self.modification * context_weights.get("modification", 0.2)
-            + self.debugging * context_weights.get("debugging", 0.2)
-            + self.documentation * context_weights.get("documentation", 0.2)
+            self.discovery * context_weights["discovery"]
+            + self.comprehension * context_weights["comprehension"]
+            + self.modification * context_weights["modification"]
+            + self.debugging * context_weights["debugging"]
+            + self.documentation * context_weights["documentation"]
         )
 
-    def as_dict(self) -> ContextWeightDict:
+    def as_dict(self) -> ImportanceScoresDict:
         """Convert importance scores to a dictionary format."""
-        return ContextWeightDict(**self.dump_python())
+        return ImportanceScoresDict(**self.dump_python())
 
     @classmethod
-    def from_dict(cls, **data: Unpack[ContextWeightDict]) -> Self:
+    def from_dict(cls, **data: Unpack[ImportanceScoresDict]) -> Self:
         """Create ImportanceScores from a dictionary format."""
         return cls.validate_python(data=data)  # pyright: ignore[reportArgumentType]
 
@@ -112,6 +127,20 @@ class SemanticTier(int, BaseEnum):
     OPERATIONS_EXPRESSIONS = 4  # Data operations and computations
     SYNTAX_REFERENCES = 5  # Literals and syntax elements
 
+    @property
+    def semantic_categories(self) -> tuple[SemanticNodeCategory, ...]:
+        """Get all semantic categories in this tier."""
+        return tuple(node for node, tier in SemanticNodeCategory.tier_map().items() if tier == self)
+
+    @classmethod
+    def from_category(cls, category: SemanticNodeCategory | str) -> SemanticTier:
+        """Get semantic tier for a given category."""
+        if not isinstance(category, SemanticNodeCategory):
+            category = SemanticNodeCategory.from_string(category)
+        return category.category.tier or next(
+            tier for tier in cls if category in tier.semantic_categories
+        )
+
 
 class SemanticCategoryDict(TypedDict):
     """Typed dictionary for semantic category definitions."""
@@ -120,10 +149,13 @@ class SemanticCategoryDict(TypedDict):
         SemanticNodeCategory | str,
         Field(description="Category identifier", pattern=r"^[A-Z][A-Z0-9_]+$", max_length=50),
     ]
-    description: Annotated[str, Field(description="Human-readable description")]
+    description: Annotated[str, Field(description="Human-friendly description")]
     tier: Annotated[int, Field(description="Importance tier")]
-    importance_scores: Annotated[ContextWeightDict, Field(description="Importance scores")]
-    parent_category: Annotated[str | None, Field(description="Parent category identifier")]
+    importance_scores: Annotated[ImportanceScoresDict, Field(description="Importance scores")]
+    parent_category: Annotated[
+        str | None,
+        Field(description="Parent category identifier, used for language-specific categories"),
+    ]
     language_specific: Annotated[bool, Field(description="Is language-specific")]
     language: Annotated[
         SemanticSearchLanguage | str | None, Field(description="Programming language")
@@ -162,16 +194,11 @@ class SemanticCategory(BasedModel):
 
     def __model_post_init__(self) -> None:
         """Post-initialization validation."""
-        with contextlib.suppress(KeyError, AttributeError):
+        with contextlib.suppress(KeyError, AttributeError, ValueError):
             if not self.name.category:
-                SemanticNodeCategory.categories = lambda: MappingProxyType({
-                    **SemanticNodeCategory.categories(),
-                    self.name: self,
-                })
-                SemanticNodeCategory.tier_map = lambda: MappingProxyType({
-                    **SemanticNodeCategory.tier_map(),
-                    self.name: self.tier,
-                })
+                SemanticNodeCategory._update_categories(self)  # pyright: ignore[reportPrivateUsage]
+            if not self.name.tier:
+                SemanticNodeCategory._update_tier_map(self)  # pyright: ignore[reportPrivateUsage]
 
     @field_validator("name", mode="before")
     @classmethod
@@ -179,15 +206,19 @@ class SemanticCategory(BasedModel):
         """Ensure name is a SemanticNodeCategory."""
         if isinstance(v, SemanticNodeCategory):
             return v
+        with contextlib.suppress(ValueError, AttributeError):
+            return SemanticNodeCategory.from_string(v)
         return SemanticNodeCategory.add_member(textcase.upper(v), textcase.snake(v))
 
     @field_validator("importance_scores", mode="before")
     @classmethod
     def validate_importance_scores(
-        cls, v: ContextWeightDict | ImportanceScores
+        cls, v: ImportanceScoresDict | ImportanceScores
     ) -> ImportanceScores:
-        """Ensure importance_scores is a ContextWeightDict."""
-        return ImportanceScores.validate_python(v) if isinstance(v, dict) else v
+        """Ensure importance_scores is a ImportanceScoresDict."""
+        return (
+            ImportanceScores.validate_python(cast(dict[str, Any], v)) if isinstance(v, dict) else v
+        )
 
     def is_extension_of(self, core_category: str) -> bool:
         """Check if this category extends a core category."""
@@ -195,7 +226,9 @@ class SemanticCategory(BasedModel):
 
     def get_composite_score(self, context: str = "default") -> float:
         """Get composite importance score for specific context."""
-        context_weights = CONTEXT_WEIGHT_PROFILES.get(context, DEFAULT_CONTEXT_WEIGHTS)
+        context_weights = AgentTask.profiles().get(
+            AgentTask.from_string(context), AgentTask.DEFAULT.profile
+        )
         return self.importance_scores.weighted_score(context_weights)
 
 
@@ -204,23 +237,23 @@ class SemanticNodeCategory(str, BaseEnum):
 
     # Tier 1: Structural Definitions
     DEFINITION_CALLABLE = "definition_callable"
-    """Functions, methods, procedures, named lambdas"""
+    """Named function and method definitions with explicit declarations. Excludes anonymous functions, lambdas, and inline expressions."""
     DEFINITION_TYPE = "definition_type"
-    """Classes, structs, interfaces, traits, generics, type aliases"""
+    """Type and class definitions including classes, structs, interfaces, traits, generics, and type aliases. Excludes type usage and instantiation."""
     DEFINITION_DATA = "definition_data"
-    """Enums, constants, configuration blocks, named data"""
+    """Named data declarations including enums, module-level constants, configuration schemas, and static data structures. Excludes literal values and runtime assignments."""
     DEFINITION_TEST = "definition_test"
-    """Test functions, test cases, examples, assertions"""
+    """Test function definitions, test case declarations, test suites, and testing framework constructs. Excludes assertion statements and test execution calls."""
 
     # Tier 2: Behavioral Contracts
     BOUNDARY_MODULE = "boundary_module"
     """Imports, exports, namespaces, package declarations"""
     BOUNDARY_ERROR = "boundary_error"
-    """Error boundaries, exception handling, error messages"""
+    """Error type definitions, exception class declarations, and error boundary specifications. Excludes throw/catch statements and error control flow."""
     BOUNDARY_RESOURCE = "boundary_resource"
-    """Resource boundaries, API endpoints, data sources"""
+    """Resource acquisition and lifecycle declarations including file handles, database connections, memory allocators, and cleanup specifications. Excludes resource usage and operations."""
     DOCUMENTATION_STRUCTURED = "documentation_structured"
-    """Structured documentation, API docs, user guides"""
+    """Structured documentation with formal syntax including API documentation, docstrings, JSDoc comments, and contract specifications. Excludes regular comments and inline annotations."""
 
     # Tier 3: Control Flow & Logic
     FLOW_BRANCHING = "flow_branching"
@@ -228,7 +261,7 @@ class SemanticNodeCategory(str, BaseEnum):
     FLOW_ITERATION = "flow_iteration"
     """Iteration control flow structures (for, while)"""
     FLOW_CONTROL = "flow_control"
-    """General control flow structures (break, continue)"""
+    """Explicit control flow statements including return, break, continue, and goto statements. Excludes exception throwing and error handling."""
     FLOW_ASYNC = "flow_async"
     """Asynchronous control flow structures (async, await)"""
 
@@ -236,11 +269,11 @@ class SemanticNodeCategory(str, BaseEnum):
     OPERATION_INVOCATION = "operation_invocation"
     """Function/method invocation expressions"""
     OPERATION_DATA = "operation_data"
-    """Data access and manipulation operations"""
+    """Variable assignments, property access, field modifications, and data structure operations. Excludes mathematical computations and logical operations."""
     OPERATION_COMPUTATION = "operation_computation"
     """Mathematical and logical computation operations"""
     EXPRESSION_ANONYMOUS = "expression_anonymous"
-    """Anonymous expressions (e.g., lambdas, closures)"""
+    """Anonymous function expressions including lambdas, closures, arrow functions, and inline function literals. Excludes named function declarations."""
 
     # Tier 5: Syntax & References
     REFERENCE_IDENTIFIER = "reference_identifier"
@@ -248,7 +281,7 @@ class SemanticNodeCategory(str, BaseEnum):
     LITERAL_VALUE = "literal_value"
     """Literal values (strings, numbers, booleans)"""
     ANNOTATION_METADATA = "annotation_metadata"
-    """Decorators, attributes, pragmas, compiler hints (not type annotations)"""
+    """Metadata annotations including decorators, attributes, pragmas, and compiler directives. Excludes type annotations and regular comments."""
     SYNTAX_STRUCTURAL = "syntax_structural"
     """Structural syntax elements (braces, parentheses, punctuation)"""
 
@@ -277,6 +310,13 @@ class SemanticNodeCategory(str, BaseEnum):
     @classmethod
     def tier_map(cls) -> MappingProxyType[SemanticNodeCategory, SemanticTier]:
         """Get mapping of categories to their semantic tiers."""
+        if not hasattr(cls, "_tier_map_cache"):
+            cls._tier_map_cache = cls._tier_map()
+        return cls._tier_map_cache
+
+    @classmethod
+    def _tier_map(cls) -> MappingProxyType[SemanticNodeCategory, SemanticTier]:
+        """Get mapping of categories to their semantic tiers."""
         return MappingProxyType({
             cls.DEFINITION_CALLABLE: SemanticTier.STRUCTURAL_DEFINITIONS,
             cls.DEFINITION_TYPE: SemanticTier.STRUCTURAL_DEFINITIONS,
@@ -303,10 +343,17 @@ class SemanticNodeCategory(str, BaseEnum):
     @classmethod
     def categories(cls) -> MappingProxyType[SemanticNodeCategory, SemanticCategory]:
         """Get mapping of categories to their SemanticCategory definitions."""
+        if not hasattr(cls, "_categories_cache"):
+            cls._categories_cache = cls._categories()
+        return cls._categories_cache
+
+    @classmethod
+    def _categories(cls) -> MappingProxyType[SemanticNodeCategory, SemanticCategory]:
+        """Get mapping of categories to their SemanticCategory definitions."""
         return MappingProxyType({
             cls.DEFINITION_CALLABLE: SemanticCategory(
                 name=cls.DEFINITION_CALLABLE,
-                description="Functions, methods, procedures, named lambdas",
+                description="Named function and method definitions with explicit declarations",
                 tier=SemanticTier.STRUCTURAL_DEFINITIONS,
                 importance_scores=ImportanceScores(
                     discovery=0.95,
@@ -318,13 +365,13 @@ class SemanticNodeCategory(str, BaseEnum):
                 examples=(
                     "function definitions",
                     "method definitions",
-                    "procedures",
-                    "named lambdas",
+                    "class constructors",
+                    "procedure declarations",
                 ),
             ),
             cls.DEFINITION_TYPE: SemanticCategory(
                 name=cls.DEFINITION_TYPE,
-                description="Classes, structs, interfaces, traits, generics, type aliases",
+                description="Type and class definitions including classes, structs, interfaces, traits, generics, and type aliases",
                 tier=SemanticTier.STRUCTURAL_DEFINITIONS,
                 importance_scores=ImportanceScores(
                     discovery=0.95,
@@ -335,14 +382,15 @@ class SemanticNodeCategory(str, BaseEnum):
                 ),
                 examples=(
                     "class definitions",
-                    "interface definitions",
+                    "interface declarations",
                     "struct definitions",
-                    "generic types",
+                    "generic type parameters",
+                    "type aliases",
                 ),
             ),
             cls.DEFINITION_DATA: SemanticCategory(
                 name=cls.DEFINITION_DATA,
-                description="Enums, constants, configuration blocks, named data",
+                description="Named data declarations including enums, module-level constants, configuration schemas, and static data structures",
                 tier=SemanticTier.STRUCTURAL_DEFINITIONS,
                 importance_scores=ImportanceScores(
                     discovery=0.85,
@@ -351,11 +399,17 @@ class SemanticNodeCategory(str, BaseEnum):
                     debugging=0.65,
                     documentation=0.90,
                 ),
-                examples=("enum definitions", "constant declarations", "configuration objects"),
+                examples=(
+                    "enum definitions",
+                    "const/final declarations",
+                    "JSON schemas",
+                    "static data tables",
+                    "module exports",
+                ),
             ),
             cls.DEFINITION_TEST: SemanticCategory(
                 name=cls.DEFINITION_TEST,
-                description="Test functions, test cases, examples, assertions",
+                description="Test function definitions, test case declarations, test suites, and testing framework constructs",
                 tier=SemanticTier.STRUCTURAL_DEFINITIONS,
                 importance_scores=ImportanceScores(
                     discovery=0.88,
@@ -364,11 +418,17 @@ class SemanticNodeCategory(str, BaseEnum):
                     debugging=0.90,
                     documentation=0.85,
                 ),
-                examples=("test functions", "test cases", "assertion blocks", "example code"),
+                examples=(
+                    "test functions",
+                    "test suite definitions",
+                    "describe/it blocks",
+                    "@Test annotations",
+                    "fixture definitions",
+                ),
             ),
             cls.BOUNDARY_MODULE: SemanticCategory(
                 name=cls.BOUNDARY_MODULE,
-                description="Imports, exports, namespaces, package declarations",
+                description="Module boundary declarations including imports, exports, namespaces, and package specifications",
                 tier=SemanticTier.BEHAVIORAL_CONTRACTS,
                 importance_scores=ImportanceScores(
                     discovery=0.85,
@@ -377,11 +437,18 @@ class SemanticNodeCategory(str, BaseEnum):
                     debugging=0.60,
                     documentation=0.75,
                 ),
-                examples=("import statements", "export declarations", "namespace definitions"),
+                examples=(
+                    "import statements",
+                    "export declarations",
+                    "namespace definitions",
+                    "package declarations",
+                    "module specifications",
+                    "using directives",
+                ),
             ),
             cls.BOUNDARY_ERROR: SemanticCategory(
                 name=cls.BOUNDARY_ERROR,
-                description="Exception definitions, error types, error handling blocks",
+                description="Error type definitions, exception class declarations, and error boundary specifications",
                 tier=SemanticTier.BEHAVIORAL_CONTRACTS,
                 importance_scores=ImportanceScores(
                     discovery=0.70,
@@ -390,11 +457,16 @@ class SemanticNodeCategory(str, BaseEnum):
                     debugging=0.95,
                     documentation=0.70,
                 ),
-                examples=("exception classes", "try/catch blocks", "error handling", "error types"),
+                examples=(
+                    "exception class definitions",
+                    "error type declarations",
+                    "error boundary components",
+                    "custom error constructors",
+                ),
             ),
             cls.BOUNDARY_RESOURCE: SemanticCategory(
                 name=cls.BOUNDARY_RESOURCE,
-                description="Resource management, lifecycle, cleanup",
+                description="Resource acquisition and lifecycle declarations including file handles, database connections, memory allocators, and cleanup specifications",
                 tier=SemanticTier.BEHAVIORAL_CONTRACTS,
                 importance_scores=ImportanceScores(
                     discovery=0.65,
@@ -404,15 +476,16 @@ class SemanticNodeCategory(str, BaseEnum):
                     documentation=0.65,
                 ),
                 examples=(
-                    "file handles",
-                    "database connections",
-                    "memory management",
-                    "RAII patterns",
+                    "file handle declarations",
+                    "database connection pools",
+                    "memory allocator definitions",
+                    "context manager protocols",
+                    "resource cleanup specifications",
                 ),
             ),
             cls.DOCUMENTATION_STRUCTURED: SemanticCategory(
                 name=cls.DOCUMENTATION_STRUCTURED,
-                description="Formal documentation, API docs, contracts",
+                description="Structured documentation with formal syntax including API documentation, docstrings, JSDoc comments, and contract specifications",
                 tier=SemanticTier.BEHAVIORAL_CONTRACTS,
                 importance_scores=ImportanceScores(
                     discovery=0.55,
@@ -422,15 +495,16 @@ class SemanticNodeCategory(str, BaseEnum):
                     documentation=0.95,
                 ),
                 examples=(
-                    "JSDoc comments",
-                    "docstrings",
-                    "API documentation",
-                    "contract specifications",
+                    "JSDoc function documentation",
+                    "Python docstrings",
+                    "Rust doc comments (///)",
+                    "API contract specifications",
+                    "OpenAPI documentation",
                 ),
             ),
             cls.FLOW_BRANCHING: SemanticCategory(
                 name=cls.FLOW_BRANCHING,
-                description="Conditionals, pattern matching, switch statements",
+                description="Conditional and pattern-based control flow including if statements, switch expressions, and pattern matching",
                 tier=SemanticTier.CONTROL_FLOW_LOGIC,
                 importance_scores=ImportanceScores(
                     discovery=0.60,
@@ -441,14 +515,15 @@ class SemanticNodeCategory(str, BaseEnum):
                 ),
                 examples=(
                     "if/else statements",
+                    "switch/case statements",
                     "match expressions",
-                    "switch statements",
                     "pattern matching",
+                    "conditional expressions (ternary)",
                 ),
             ),
             cls.FLOW_ITERATION: SemanticCategory(
                 name=cls.FLOW_ITERATION,
-                description="Loops, generators, iterators",
+                description="Iterative control flow including loops and iteration constructs",
                 tier=SemanticTier.CONTROL_FLOW_LOGIC,
                 importance_scores=ImportanceScores(
                     discovery=0.50,
@@ -457,11 +532,17 @@ class SemanticNodeCategory(str, BaseEnum):
                     debugging=0.80,
                     documentation=0.45,
                 ),
-                examples=("for loops", "while loops", "generator functions", "iterator patterns"),
+                examples=(
+                    "for loops",
+                    "while loops",
+                    "do-while loops",
+                    "foreach/for-in loops",
+                    "loop comprehensions",
+                ),
             ),
             cls.FLOW_CONTROL: SemanticCategory(
                 name=cls.FLOW_CONTROL,
-                description="Return, break, continue, goto, exceptions",
+                description="Explicit control flow statements including return, break, continue, and goto statements",
                 tier=SemanticTier.CONTROL_FLOW_LOGIC,
                 importance_scores=ImportanceScores(
                     discovery=0.45,
@@ -472,14 +553,15 @@ class SemanticNodeCategory(str, BaseEnum):
                 ),
                 examples=(
                     "return statements",
-                    "break/continue",
-                    "throw statements",
-                    "goto statements",
+                    "break statements",
+                    "continue statements",
+                    "goto labels",
+                    "yield statements",
                 ),
             ),
             cls.FLOW_ASYNC: SemanticCategory(
                 name=cls.FLOW_ASYNC,
-                description="Async/await, futures, promises, coroutines",
+                description="Asynchronous control flow including async/await expressions, futures, promises, and coroutine constructs",
                 tier=SemanticTier.CONTROL_FLOW_LOGIC,
                 importance_scores=ImportanceScores(
                     discovery=0.65,
@@ -488,11 +570,17 @@ class SemanticNodeCategory(str, BaseEnum):
                     debugging=0.85,
                     documentation=0.60,
                 ),
-                examples=("async functions", "await expressions", "promise handling", "coroutines"),
+                examples=(
+                    "async function declarations",
+                    "await expressions",
+                    "promise chains",
+                    "coroutine definitions",
+                    "parallel execution blocks",
+                ),
             ),
             cls.OPERATION_INVOCATION: SemanticCategory(
                 name=cls.OPERATION_INVOCATION,
-                description="Function calls, method calls, constructor calls",
+                description="Function and method invocations including calls, constructor invocations, and operator calls",
                 tier=SemanticTier.OPERATIONS_EXPRESSIONS,
                 importance_scores=ImportanceScores(
                     discovery=0.45,
@@ -502,15 +590,16 @@ class SemanticNodeCategory(str, BaseEnum):
                     documentation=0.25,
                 ),
                 examples=(
-                    "function calls",
-                    "method invocations",
-                    "constructor calls",
-                    "object creation",
+                    "function calls (func())",
+                    "method invocations (obj.method())",
+                    "constructor calls (new Class())",
+                    "operator overload calls",
+                    "macro invocations",
                 ),
             ),
             cls.OPERATION_DATA: SemanticCategory(
                 name=cls.OPERATION_DATA,
-                description="Assignments, property access, data manipulation",
+                description="Variable assignments, property access, field modifications, and data structure operations",
                 tier=SemanticTier.OPERATIONS_EXPRESSIONS,
                 importance_scores=ImportanceScores(
                     discovery=0.35,
@@ -521,14 +610,15 @@ class SemanticNodeCategory(str, BaseEnum):
                 ),
                 examples=(
                     "variable assignments",
-                    "property access",
-                    "field access",
-                    "array indexing",
+                    "property access (obj.prop)",
+                    "field modifications",
+                    "array/object indexing",
+                    "destructuring assignments",
                 ),
             ),
             cls.OPERATION_COMPUTATION: SemanticCategory(
                 name=cls.OPERATION_COMPUTATION,
-                description="Arithmetic, logical, comparison operations",
+                description="Mathematical and logical computation operations including arithmetic, comparisons, and boolean logic",
                 tier=SemanticTier.OPERATIONS_EXPRESSIONS,
                 importance_scores=ImportanceScores(
                     discovery=0.25,
@@ -538,15 +628,16 @@ class SemanticNodeCategory(str, BaseEnum):
                     documentation=0.25,
                 ),
                 examples=(
-                    "arithmetic operations",
-                    "logical operations",
-                    "comparison operations",
-                    "bitwise operations",
+                    "arithmetic operations (+, -, *, /)",
+                    "comparison operations (==, <, >)",
+                    "logical operations (&&, ||, !)",
+                    "bitwise operations (&, |, ^)",
+                    "mathematical functions",
                 ),
             ),
             cls.EXPRESSION_ANONYMOUS: SemanticCategory(
                 name=cls.EXPRESSION_ANONYMOUS,
-                description="Lambdas, closures, anonymous functions",
+                description="Anonymous function expressions including lambdas, closures, arrow functions, and inline function literals",
                 tier=SemanticTier.OPERATIONS_EXPRESSIONS,
                 importance_scores=ImportanceScores(
                     discovery=0.40,
@@ -556,15 +647,16 @@ class SemanticNodeCategory(str, BaseEnum):
                     documentation=0.45,
                 ),
                 examples=(
-                    "lambda expressions",
-                    "arrow functions",
-                    "closures",
-                    "anonymous functions",
+                    "lambda expressions (λ)",
+                    "arrow functions (=>)",
+                    "inline closures",
+                    "anonymous function literals",
+                    "function expressions",
                 ),
             ),
             cls.REFERENCE_IDENTIFIER: SemanticCategory(
                 name=cls.REFERENCE_IDENTIFIER,
-                description="Variable names, type names, references",
+                description="Variable names, type names, and symbol references excluding literals and operators",
                 tier=SemanticTier.SYNTAX_REFERENCES,
                 importance_scores=ImportanceScores(
                     discovery=0.25,
@@ -573,11 +665,17 @@ class SemanticNodeCategory(str, BaseEnum):
                     debugging=0.45,
                     documentation=0.20,
                 ),
-                examples=("variable names", "type references", "identifiers", "symbol references"),
+                examples=(
+                    "variable names",
+                    "type references",
+                    "function name references",
+                    "module/namespace references",
+                    "symbol identifiers",
+                ),
             ),
             cls.LITERAL_VALUE: SemanticCategory(
                 name=cls.LITERAL_VALUE,
-                description="Strings, numbers, booleans, null values",
+                description="Literal constant values including strings, numbers, booleans, and null values",
                 tier=SemanticTier.SYNTAX_REFERENCES,
                 importance_scores=ImportanceScores(
                     discovery=0.15,
@@ -587,15 +685,16 @@ class SemanticNodeCategory(str, BaseEnum):
                     documentation=0.20,
                 ),
                 examples=(
-                    "string literals",
-                    "numeric constants",
-                    "boolean values",
-                    "null/undefined",
+                    'string literals ("text")',
+                    "numeric literals (42, 3.14)",
+                    "boolean literals (true/false)",
+                    "null/undefined values",
+                    "character literals ('a')",
                 ),
             ),
             cls.ANNOTATION_METADATA: SemanticCategory(
                 name=cls.ANNOTATION_METADATA,
-                description="Decorators, attributes, pragmas, compiler hints",
+                description="Metadata annotations including decorators, attributes, pragmas, and compiler directives",
                 tier=SemanticTier.SYNTAX_REFERENCES,
                 importance_scores=ImportanceScores(
                     discovery=0.35,
@@ -605,15 +704,16 @@ class SemanticNodeCategory(str, BaseEnum):
                     documentation=0.40,
                 ),
                 examples=(
-                    "Python decorators",
-                    "Java annotations",
-                    "C# attributes",
-                    "compiler pragmas",
+                    "Python decorators (@decorator)",
+                    "Java annotations (@Override)",
+                    "C# attributes ([Attribute])",
+                    "Rust attributes (#[derive])",
+                    "compiler pragmas (#pragma)",
                 ),
             ),
             cls.SYNTAX_STRUCTURAL: SemanticCategory(
                 name=cls.SYNTAX_STRUCTURAL,
-                description="Structural syntax elements (braces, parentheses, punctuation)",
+                description="Structural syntax elements including braces, parentheses, delimiters, and punctuation marks",
                 tier=SemanticTier.SYNTAX_REFERENCES,
                 importance_scores=ImportanceScores(
                     discovery=0.01,
@@ -622,9 +722,28 @@ class SemanticNodeCategory(str, BaseEnum):
                     debugging=0.20,
                     documentation=0.05,
                 ),
-                examples=("braces", "parentheses", "semicolons", "commas"),
+                examples=(
+                    "braces ({ })",
+                    "parentheses (( ))",
+                    "brackets ([ ])",
+                    "semicolons (;)",
+                    "commas (,)",
+                    "angle brackets (< >)",
+                ),
             ),
         })
+
+    @classmethod
+    def _update_categories(cls, category: SemanticCategory) -> None:
+        """Internal method to update categories mapping."""
+        new_categories = MappingProxyType({**cls.categories(), category.name: category})
+        cls._categories_cache = new_categories
+
+    @classmethod
+    def _update_tier_map(cls, category: SemanticCategory) -> None:
+        """Internal method to update tier mapping."""
+        new_tier_map = MappingProxyType({**cls.tier_map(), category.name: category.tier})
+        cls._tier_map_cache = new_tier_map
 
     @property
     def category(self) -> SemanticCategory:
@@ -641,11 +760,16 @@ class SemanticNodeCategory(str, BaseEnum):
         if not isinstance(language, SemanticSearchLanguage):
             language = SemanticSearchLanguage.from_string(language)
         if isinstance(category, dict):
+            category["language"] = language
             category = SemanticCategory.model_validate(category)
         if not category.language_specific:
             raise ValueError("Only language-specific categories can be added.")
         member_name = f"{language.name.upper()}_{category.name}"
-        return cls.add_member(member_name, textcase.snake(member_name))
+        new_member = cls.add_member(member_name, textcase.snake(member_name))
+        category = category.model_copy(update={"name": new_member})
+        cls._update_categories(category)
+        cls._update_tier_map(category)
+        return new_member
 
 
 # =============================================================================
@@ -668,59 +792,59 @@ class AgentTask(str, BaseEnum):
     __slots__ = ()
 
     @classmethod
-    def profiles(cls) -> MappingProxyType[AgentTask, ContextWeightDict]:
+    def profiles(cls) -> MappingProxyType[AgentTask, ImportanceScoresDict]:
         """Get list of available context weight profiles."""
         return MappingProxyType({
-            cls.LOCAL_EDIT: ContextWeightDict(
+            cls.LOCAL_EDIT: ImportanceScoresDict(
                 discovery=0.4,
                 comprehension=0.3,
                 modification=0.2,
                 debugging=0.05,
                 documentation=0.05,
             ),
-            cls.DEBUG: ContextWeightDict(
+            cls.DEBUG: ImportanceScoresDict(
                 discovery=0.2,
                 comprehension=0.3,
                 modification=0.1,
                 debugging=0.35,
                 documentation=0.05,
             ),
-            cls.REFACTOR: ContextWeightDict(
+            cls.REFACTOR: ImportanceScoresDict(
                 discovery=0.15,
                 comprehension=0.25,
                 modification=0.45,
                 debugging=0.1,
                 documentation=0.05,
             ),
-            cls.DOCUMENT: ContextWeightDict(
+            cls.DOCUMENT: ImportanceScoresDict(
                 discovery=0.2,
                 comprehension=0.2,
                 modification=0.1,
                 debugging=0.05,
                 documentation=0.45,
             ),
-            cls.SEARCH: ContextWeightDict(
+            cls.SEARCH: ImportanceScoresDict(
                 discovery=0.5,
                 comprehension=0.2,
                 modification=0.15,
                 debugging=0.1,
                 documentation=0.05,
             ),
-            cls.IMPLEMENT: ContextWeightDict(
+            cls.IMPLEMENT: ImportanceScoresDict(
                 discovery=0.3,
                 comprehension=0.3,
                 modification=0.25,
                 debugging=0.1,
                 documentation=0.05,
             ),
-            cls.REVIEW: ContextWeightDict(
+            cls.REVIEW: ImportanceScoresDict(
                 discovery=0.25,
                 comprehension=0.35,
                 modification=0.15,
                 debugging=0.15,
                 documentation=0.1,
             ),
-            cls.DEFAULT: ContextWeightDict(
+            cls.DEFAULT: ImportanceScoresDict(
                 discovery=0.25,
                 comprehension=0.25,
                 modification=0.2,
@@ -729,52 +853,10 @@ class AgentTask(str, BaseEnum):
             ),
         })
 
-
-DEFAULT_CONTEXT_WEIGHTS = {
-    "discovery": 0.25,
-    "comprehension": 0.25,
-    "modification": 0.2,
-    "debugging": 0.15,
-    "documentation": 0.15,
-}
-
-CONTEXT_WEIGHT_PROFILES = {
-    "code_completion": {
-        "discovery": 0.4,
-        "comprehension": 0.3,
-        "modification": 0.2,
-        "debugging": 0.05,
-        "documentation": 0.05,
-    },
-    "debugging": {
-        "discovery": 0.2,
-        "comprehension": 0.3,
-        "modification": 0.1,
-        "debugging": 0.35,
-        "documentation": 0.05,
-    },
-    "refactoring": {
-        "discovery": 0.15,
-        "comprehension": 0.25,
-        "modification": 0.45,
-        "debugging": 0.1,
-        "documentation": 0.05,
-    },
-    "documentation": {
-        "discovery": 0.2,
-        "comprehension": 0.2,
-        "modification": 0.1,
-        "debugging": 0.05,
-        "documentation": 0.45,
-    },
-    "search": {
-        "discovery": 0.5,
-        "comprehension": 0.2,
-        "modification": 0.15,
-        "debugging": 0.1,
-        "documentation": 0.05,
-    },
-}
+    @property
+    def profile(self) -> ImportanceScoresDict:
+        """Get the context weight profile for this task."""
+        return self.profiles().get(self, self.profiles()[self.DEFAULT])
 
 
 # =============================================================================
@@ -782,12 +864,60 @@ CONTEXT_WEIGHT_PROFILES = {
 # =============================================================================
 
 
+def _validate_categories(
+    value: Any, nxt: ValidatorFunctionWrapHandler, _info: core_schema.ValidationInfo
+) -> Any:
+    """Validate core categories for JSON input."""
+    if (
+        isinstance(value, ArgsKwargs)
+        and hasattr(value.args, "__len__")
+        and len(value.args) == 3
+        and value.args[0] == {}
+        and value.args[1] == {}
+        and isinstance(value.args[2], MappingProxyType | dict)
+    ):
+        return (
+            value.args[0],
+            value.args[1],
+            MappingProxyType(
+                nxt(
+                    dict(value.args[2])
+                    if isinstance(value.args[2], MappingProxyType)
+                    else value.args[2]
+                )
+            ),
+        )  # type: ignore
+    if isinstance(value, MappingProxyType) and all(
+        isinstance(k, SemanticNodeCategory) and isinstance(v, SemanticCategory)
+        for k, v in value.items()  # type: ignore
+        if k and v  # type: ignore
+    ):
+        return value  # type: ignore
+    if isinstance(value, MappingProxyType | dict):
+        return MappingProxyType(nxt(dict(value) if isinstance(value, MappingProxyType) else value))  # type: ignore
+    if isinstance(value, str | bytes | bytearray):
+        return _validate_categories(nxt(value), nxt, _info)
+    raise ValueError("Invalid type for core_categories")
+
+
 @dataclass
 class CategoryRegistry(DataclassSerializationMixin):
     """Registry for core and language-specific semantic categories."""
 
-    _extensions: dict[SemanticSearchLanguage, dict[SemanticNodeCategory, SemanticCategory]]
-    _mappings: dict[SemanticSearchLanguage, dict[str, SemanticNodeCategory]]
+    _extensions: Annotated[
+        dict[SemanticSearchLanguage, dict[SemanticNodeCategory, SemanticCategory]],
+        Field(
+            default_factory=dict, description="Language-specific category extensions", init=False
+        ),
+    ]
+    _mappings: Annotated[
+        dict[SemanticSearchLanguage, dict[str, SemanticNodeCategory]],
+        Field(
+            default_factory=dict,
+            description="Language-specific mappings from node types to categories",
+            init=False,
+        ),
+    ]
 
     _core_categories: Annotated[
         MappingProxyType[SemanticNodeCategory, SemanticCategory],
@@ -798,7 +928,7 @@ class CategoryRegistry(DataclassSerializationMixin):
         ),
     ]
 
-    def __init__(self) -> None:
+    def __post_init__(self) -> None:
         """Setup the category registry."""
         self._extensions: dict[
             SemanticSearchLanguage, dict[SemanticNodeCategory, SemanticCategory]
@@ -808,15 +938,24 @@ class CategoryRegistry(DataclassSerializationMixin):
         ] = {}  # language -> {node_type -> category}
 
     def register_core(
-        self, category: SemanticCategory
+        self, category: SemanticCategory | SemanticCategoryDict
     ) -> MappingProxyType[SemanticNodeCategory, SemanticCategory]:
         """Register a new core category."""
-        if not isinstance(category.name, SemanticNodeCategory):
+        if isinstance(category, dict):
+            if category.get("language_specific", False):
+                raise ValueError("Core categories cannot be language-specific.")
+            if category.get("language") is not None:
+                raise ValueError("Core categories cannot have a specific language.")
+            category = SemanticCategory.model_validate(category)
+        if not isinstance(category.name, SemanticNodeCategory):  # type: ignore
             node = SemanticNodeCategory.add_member(
                 category.name.upper(), textcase.snake(category.name)
             )
             category = category.model_copy(update={"name": node})
-        return MappingProxyType({**self._core_categories, category.name: category})
+            SemanticNodeCategory._update_categories(category)  # pyright: ignore[reportPrivateUsage]
+            SemanticNodeCategory._update_tier_map(category)  # pyright: ignore[reportPrivateUsage]
+        self._core_categories = SemanticNodeCategory.categories()
+        return self._core_categories
 
     def register_extension(
         self,
@@ -824,6 +963,9 @@ class CategoryRegistry(DataclassSerializationMixin):
         category: SemanticCategory | SemanticCategoryDict,
     ) -> None:
         """Register a language-specific extension category."""
+        if not hasattr(self, "_extensions"):
+            self._extensions = {}
+            self._mappings = {}
         if not isinstance(language, SemanticSearchLanguage):
             language = SemanticSearchLanguage.from_string(language)
         if language not in self._extensions:
@@ -913,6 +1055,39 @@ class CategoryRegistry(DataclassSerializationMixin):
 
         # Default to unknown
         return None
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, _source: Any, _handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        """Get Pydantic core schema for CategoryRegistry."""
+        return core_schema.with_info_wrap_validator_function(
+            _validate_categories,
+            core_schema.dict_schema(),
+            field_name="_core_categories",
+            # spellchecker:off
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                cls._serialize_core_categories,
+                is_field_serializer=True,
+                info_arg=True,
+                when_used="json",
+            ),
+            # spellchecker:on
+        )
+
+    @field_serializer(
+        "_core_categories",
+        mode="plain",
+        when_used="json",
+        return_type=dict[SemanticNodeCategory, SemanticCategory],
+    )
+    def _serialize_core_categories(
+        self,
+        value: MappingProxyType[SemanticNodeCategory, SemanticCategory],
+        _info: FieldSerializationInfo,
+    ) -> str:
+        """Serialize core categories for JSON output."""
+        return dict(value)  # type: ignore
 
 
 # =============================================================================
@@ -1071,7 +1246,7 @@ RUST_DEFINITION_TRAIT_IMPL = SemanticNodeCategory.add_language_member(
         parent_category="DEFINITION_TYPE",
         language_specific=True,
         language=SemanticSearchLanguage.RUST,
-        importance_scores=ContextWeightDict(
+        importance_scores=ImportanceScoresDict(
             discovery=0.90,
             comprehension=0.85,
             modification=0.88,
@@ -1091,7 +1266,7 @@ RUST_ANNOTATION_LIFETIME = SemanticNodeCategory.add_language_member(
         parent_category="DEFINITION_TYPE",
         language_specific=True,
         language=SemanticSearchLanguage.RUST,
-        importance_scores=ContextWeightDict(
+        importance_scores=ImportanceScoresDict(
             discovery=0.90,
             comprehension=0.85,
             modification=0.88,
@@ -1116,7 +1291,7 @@ REACT_DEFINITION_COMPONENT = SemanticNodeCategory.add_language_member(
         parent_category="DEFINITION_CALLABLE",
         language_specific=True,
         language=SemanticSearchLanguage.JSX,
-        importance_scores=ContextWeightDict(
+        importance_scores=ImportanceScoresDict(
             discovery=0.95,
             comprehension=0.90,
             modification=0.85,
@@ -1136,7 +1311,7 @@ REACT_OPERATION_HOOK = SemanticNodeCategory.add_language_member(
         parent_category="OPERATION_INVOCATION",
         language_specific=True,
         language=SemanticSearchLanguage.JSX,
-        importance_scores=ContextWeightDict(
+        importance_scores=ImportanceScoresDict(
             discovery=0.70,
             comprehension=0.80,
             modification=0.75,
@@ -1174,7 +1349,7 @@ TSX_REACT_EXTENSIONS = {cat.name: cat for cat in TSX_REACT}
 
 def create_default_registry() -> CategoryRegistry:
     """Create a CategoryRegistry with all core categories registered."""
-    registry = CategoryRegistry()
+    registry = CategoryRegistry({}, {}, SemanticNodeCategory.categories())
 
     # Core categories are in the class definition
 

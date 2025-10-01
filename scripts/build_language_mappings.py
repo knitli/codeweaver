@@ -48,7 +48,7 @@ def display_common_patterns(common_patterns: PatternLanguages, top: int = 20) ->
     print("\n=== Most Common Node Types Across Languages ===")
 
     filtered = {p: langs for p, langs in common_patterns.items() if langs}
-    items = sorted(common_patterns.items(), key=lambda kv: len(kv[1]), reverse=True)
+    items = sorted(filtered.items(), key=lambda kv: len(kv[1]), reverse=True)
     for pattern, languages in items[:top]:
         print(f"{pattern}: {len(languages)} languages")
 
@@ -79,7 +79,16 @@ def analyze_confidence(
 
 def print_confidence_rows(title: str, rows: Iterable[ConfidenceRow], limit: int = 10) -> None:
     """Print a table of confidence rows."""
-    rows = list(rows)
+    rows = [
+        r
+        for r in rows
+        if r[1]
+        not in (
+            SemanticNodeCategory.SYNTAX_STRUCTURAL,
+            SemanticNodeCategory.ANNOTATION_METADATA,
+            SemanticNodeCategory.OPERATION_INVOCATION,
+        )
+    ]
     print(f"\n{title} ({len(rows)}):")
     for pattern, category, conf, lang_count in rows[:limit]:
         print(f"  {pattern} → {category} (confidence: {conf:.2f}, {lang_count} langs)")
@@ -94,11 +103,13 @@ def down_to_node_types(project_root: ProjectNodeTypes) -> dict[SemanticSearchLan
             if "named" in nodes and isinstance(nodes, dict):
                 collected.append(nodes.get("type_name", nodes.get("type", "")))
                 if "children" in nodes and (children := nodes.get("children")):
-                    collected.extend(
-                        child.get("type_name", child.get("type", ""))
-                        for child in children
-                        if isinstance(child, dict)
-                    )
+                    for child in children:
+                        child_types = child.get("types", [])
+                        collected.extend(
+                            t.get("type_name", t.get("type", ""))
+                            for t in child_types
+                            if isinstance(t, dict)
+                        )
                 if "fields" in nodes and (fields := nodes.get("fields")):
                     collected.extend(v for v in fields if isinstance(v, str))
                     if types := [
@@ -113,6 +124,12 @@ def down_to_node_types(project_root: ProjectNodeTypes) -> dict[SemanticSearchLan
                                     for t in type_list
                                     if isinstance(t, dict)
                                 )
+                if "subtypes" in nodes and (subtypes := nodes.get("subtypes")):
+                    collected.extend(
+                        st.get("type_name", st.get("type", ""))
+                        for st in subtypes
+                        if isinstance(st, dict)
+                    )
             lang_to_types[lang_name] = set(collected)
     return lang_to_types
 
@@ -122,14 +139,15 @@ def analyze_language_specific(
 ) -> None:
     """Analyze language-specific node types."""
     print("\n=== Language-Specific Analysis ===")
-    nodes = down_to_node_types(node_types)
-    for target in targets:
-        if target in nodes and (flattened_nodes := sorted(nodes[target])):
-            print(f"\n{str(target).upper()}:")
-            for node_type in flattened_nodes:
-                category = mapper.classify_node_type(node_type, target)
-                confidence = mapper.get_classification_confidence(node_type, target)
-                print(f"  {node_type} → {category} (confidence: {confidence:.2f})")
+    nodes = down_to_node_types([
+        item for item in node_types if any(lang in item for lang in targets)
+    ])
+    for lang, node_values in nodes.items():
+        print(f"\n{lang}: {len(node_values)} unique node types")
+        for node_type in node_values:
+            category = mapper.classify_node_type(node_type, lang)
+            confidence = mapper.get_classification_confidence(node_type, lang)
+            print(f"  {node_type} → {category} (confidence: {confidence:.2f})")
 
 
 def compute_statistics(
@@ -203,17 +221,7 @@ def analyze_node_types_and_generate_mappings() -> None:
     print_confidence_rows("Medium confidence classifications", medium)
     print_confidence_rows("Low confidence classifications", low)
 
-    analyze_language_specific(
-        mapper,
-        node_types,
-        [
-            SemanticSearchLanguage.PYTHON,
-            SemanticSearchLanguage.JAVASCRIPT,
-            SemanticSearchLanguage.TYPESCRIPT,
-            SemanticSearchLanguage.RUST,
-            SemanticSearchLanguage.GO,
-        ],
-    )
+    analyze_language_specific(mapper, node_types, list(SemanticSearchLanguage))
     compute_statistics(parser, mapper, common_patterns)
     suggest_overrides(mapper, node_types, threshold=0.3, top_n=5)
 

@@ -44,10 +44,7 @@ def markdown_file():
     # Create a simple ExtKind for testing
     ext_kind = ExtKind(language="markdown", kind=ChunkKind.DOCS)
     return DiscoveredFile(
-        path=Path("test.md"),
-        ext_kind=ext_kind,
-        file_hash="a" * 64,
-        git_branch="main"
+        path=Path("test.md"), ext_kind=ext_kind, file_hash="a" * 64, git_branch="main"
     )
 
 
@@ -57,10 +54,7 @@ def python_file():
     # Create a simple ExtKind for testing
     ext_kind = ExtKind(language="python", kind=ChunkKind.CODE)
     return DiscoveredFile(
-        path=Path("test.py"),
-        ext_kind=ext_kind,
-        file_hash="b" * 64,
-        git_branch="main"
+        path=Path("test.py"), ext_kind=ext_kind, file_hash="b" * 64, git_branch="main"
     )
 
 
@@ -321,7 +315,7 @@ Final thoughts.
                 f'    """This is a docstring for function {i}."""',
                 "    # Some implementation here",
                 f"    return {i}",
-                ""
+                "",
             ])
         large_content = "\n".join(function_blocks)
 
@@ -336,5 +330,6 @@ Final thoughts.
         for chunk in chunks:
             # Rough token estimation - should be under limit
             from codeweaver._utils import estimate_tokens
+
             tokens = estimate_tokens(chunk.serialize_for_embedding())
             assert tokens <= effective_limit

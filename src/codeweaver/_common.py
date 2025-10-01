@@ -9,7 +9,16 @@ from __future__ import annotations
 
 import sys as _sys
 
-from collections.abc import Callable, Generator, ItemsView, Iterator, KeysView, Mapping, ValuesView
+from collections.abc import (
+    Callable,
+    Generator,
+    ItemsView,
+    Iterator,
+    KeysView,
+    Mapping,
+    Sequence,
+    ValuesView,
+)
 from enum import Enum, unique
 from functools import cached_property
 from threading import Lock as _Lock
@@ -25,6 +34,7 @@ from typing import (
     TypedDict,
     Unpack,
     cast,
+    override,
 )
 
 import textcase
@@ -36,6 +46,7 @@ from pydantic import (
     GetCoreSchemaHandler,
     GetPydanticSchema,
     PrivateAttr,
+    RootModel,
     TypeAdapter,
 )
 from pydantic.fields import ComputedFieldInfo, FieldInfo
@@ -161,6 +172,45 @@ def _generate_field_title(name: str, info: FieldInfo | ComputedFieldInfo) -> str
     ):
         return textcase.sentence(aliased)
     return textcase.sentence(name)
+
+
+class RootedRoot[RootType: Sequence[Any]](RootModel[Sequence[Any]]):
+    """A pre-customized pydantic RootModel with common configuration for CodeWeaver."""
+
+    model_config = ConfigDict(
+        arbitrary_types_allowed=False,
+        cache_strings="all",
+        serialize_by_alias=True,
+        str_strip_whitespace=True,
+        field_title_generator=_generate_field_title,
+        model_title_generator=_generate_title,
+        use_attribute_docstrings=True,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+    root: RootType  # pyright: ignore[reportIncompatibleVariableOverride]
+
+    @override
+    def __iter__(self) -> Generator[Any]:
+        """Iterate over the root items."""
+        yield from self.root
+
+    def __getitem__(self, index: int) -> Any:
+        """Get an item by index."""
+        return self.root[index]
+
+    def __len__(self) -> int:
+        """Get the length of the root."""
+        return len(self.root)
+
+    def __contains__(self, item: Any) -> bool:
+        """Check if an item is in the root."""
+        return item in self.root
+
+    def __next__(self) -> Any:
+        """Get the next item in the root."""
+        return next(iter(self.root))
 
 
 class BasedModel(BaseModel):
