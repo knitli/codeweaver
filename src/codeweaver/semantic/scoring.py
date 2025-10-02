@@ -12,11 +12,11 @@ from ast_grep_py import SgNode
 from pydantic import Field, NonNegativeFloat, NonNegativeInt
 
 from codeweaver._common import BasedModel
-from codeweaver.semantic.categories import ImportanceScores, SemanticNodeCategory
 
 
 if TYPE_CHECKING:
     from codeweaver._ast_grep import AstNode
+    from codeweaver.semantic.categories import ImportanceScores, SemanticNodeCategory
 
 
 class SemanticScorer(BasedModel):

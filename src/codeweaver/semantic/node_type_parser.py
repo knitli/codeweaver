@@ -8,15 +8,18 @@ from __future__ import annotations
 
 import logging
 
+from collections import defaultdict
 from collections.abc import KeysView, Mapping, Sequence
+from functools import cached_property
 from pathlib import Path
 from textwrap import dedent
-from typing import Annotated, Any, Literal, NewType, TypedDict, cast
+from types import MappingProxyType
+from typing import Annotated, Any, Literal, NamedTuple, TypedDict, cast
 
 from pydantic import DirectoryPath, Discriminator, Field, FilePath, PrivateAttr, Tag, computed_field
 
-from codeweaver._common import BasedModel, LiteralStringT, RootedRoot
-from codeweaver._utils import lazy_importer
+from codeweaver._common import AbstractNodeName, BasedModel, LiteralStringT, RootedRoot
+from codeweaver._utils import dict_set_to_tuple
 from codeweaver.language import SemanticSearchLanguage
 
 
@@ -28,9 +31,6 @@ type EmptyList = list[
 
 type NodeNameT = LiteralStringT
 
-AbstractNodeName = NewType("AbstractNodeName", LiteralStringT)
-
-
 # ===========================================================================
 # *                  Node Field Type Definitions                  *
 # ===========================================================================
@@ -41,6 +41,65 @@ AbstractNodeName = NewType("AbstractNodeName", LiteralStringT)
 # ================================================
 # *          Base Types for Node Type Info
 # ================================================
+
+
+FIELD_KEYS = ("children", "extra", "fields", "root", "subtypes", "named", "type_name")
+
+
+class SimpleNodeField(NamedTuple):
+    """A simple field in a node type entry."""
+
+    name: NodeNameT
+    named: bool
+
+    @property
+    def is_named(self) -> bool:
+        """Check if the field is named."""
+        return self.named
+
+
+class NodeField(NamedTuple):
+    """A field in a node type entry."""
+
+    named: bool
+    root: bool
+    extra: bool
+    subtypes: Annotated[tuple[SimpleNodeField, ...] | None, Field(default_factory=tuple)]
+    name: Annotated[
+        NodeNameT | AbstractNodeName,
+        Field(
+            description="""The name of the node field.""",
+            default_factory=lambda data: AbstractNodeName if data.get("subtypes") else str,
+        ),
+    ]
+    fields: Annotated[
+        tuple[tuple[SimpleNodeField, ...] | None],
+        Field(default_factory=lambda data: None if data.get("subtypes") else tuple),
+    ]
+    children: Annotated[
+        SimpleNodeField | None,
+        Field(default_factory=lambda data: tuple if data.get("fields") else None),
+    ]
+
+    @property
+    def has_children(self) -> bool:
+        """Check if the field has children."""
+        return self.children is not None
+
+    @property
+    def is_abstract(self) -> bool:
+        """Check if the field is abstract (has subtypes)."""
+        return self.subtypes is not None
+
+    @property
+    def is_extra(self) -> bool:
+        """Check if the field is extra. (...aren't we all?)."""
+        return self.extra
+
+    @property
+    def is_root(self) -> bool:
+        """Check if the field is a root node."""
+        return self.root
 
 
 class ChildInfo(TypedDict):
@@ -254,6 +313,43 @@ def get_discriminator_value(
             raise ValueError("Cannot determine discriminator value for NodeTypeInfo")
 
 
+NAMED_NODE_COUNTS = MappingProxyType({
+    231: SemanticSearchLanguage.C_PLUS_PLUS,
+    221: SemanticSearchLanguage.C_SHARP,
+    192: SemanticSearchLanguage.TYPESCRIPT,
+    188: SemanticSearchLanguage.HASKELL,
+    183: SemanticSearchLanguage.SWIFT,
+    170: SemanticSearchLanguage.RUST,
+    162: SemanticSearchLanguage.PHP,
+    152: SemanticSearchLanguage.JAVA,
+    150: SemanticSearchLanguage.RUBY,
+    149: SemanticSearchLanguage.SCALA,
+    133: SemanticSearchLanguage.C_LANG,
+    130: SemanticSearchLanguage.PYTHON,
+    125: SemanticSearchLanguage.SOLIDITY,
+    121: SemanticSearchLanguage.KOTLIN,
+    120: SemanticSearchLanguage.JAVASCRIPT,
+    113: SemanticSearchLanguage.GO,
+    65: SemanticSearchLanguage.CSS,
+    63: SemanticSearchLanguage.BASH,
+    51: SemanticSearchLanguage.LUA,
+    46: SemanticSearchLanguage.ELIXIR,
+    43: SemanticSearchLanguage.NIX,
+    20: SemanticSearchLanguage.HTML,
+    14: SemanticSearchLanguage.JSON,
+    6: SemanticSearchLanguage.YAML,
+})
+"""Count of top-level named nodes in each language's grammar. It took me awhile to come to this approach, but it's fast, reliable, and way less complicated than anything else I tried.
+
+The only potential issue is if the nodes are not a complete set.
+"""
+
+
+def lang_from_named_node_count(nodes: list[NodeTypeInfo]) -> SemanticSearchLanguage:
+    """Get the language from the count of named nodes, if possible."""
+    return NAMED_NODE_COUNTS[sum(1 for node in nodes if node["named"] for node in nodes)]
+
+
 class RootNodeTypes(RootedRoot[tuple[NodeTypeInfo, ...]]):
     """Root model for list of node type information."""
 
@@ -274,23 +370,118 @@ class RootNodeTypes(RootedRoot[tuple[NodeTypeInfo, ...]]):
     _source_file: Annotated[FilePath | None, PrivateAttr(init=False)] = None
 
     @computed_field
-    @property
-    def language(self) -> SemanticSearchLanguage | None:
-        """Get the language if there's exactly one in the root mapping."""
-        if self._source_file:
+    @cached_property
+    def language(self) -> SemanticSearchLanguage:
+        """Get the language for the root node types."""
+        if self._source_file and "-node-types" in self._source_file.stem:
             return SemanticSearchLanguage.from_string(
                 self._source_file.stem.replace("-node-types", "")
             )
-        if self.root:
-            deduction = lazy_importer("codeweaver.semantic._language_deduction")
-            if (deduced := deduction.from_node_types_info(self.root)) and isinstance(
-                deduced, SemanticSearchLanguage
-            ):
-                return deduced
-            if deduced:
-                logger.warning("Deduction was unable to determine a single language: %s", deduced)
-                # TODO: We can try to reduce possibilities by what we see in the repo.
-        return None
+        if self._source_file and (
+            lang := next(
+                (
+                    semlang
+                    for semlang in SemanticSearchLanguage
+                    if any(a for a in semlang.aka if cast(str, a) in self._source_file.stem)
+                ),
+                None,
+            )
+        ):
+            return lang
+        try:
+            lang = lang_from_named_node_count(self.root)
+        except KeyError as e:
+            logger.exception(
+                "Could not determine language from node counts. Most likely because there are no nodes. Node count: %d",
+                len(self.root),
+                extra={"nodes": self.root},
+            )
+            from codeweaver.exceptions import InitializationError
+
+            raise InitializationError(
+                "Could not determine language from node counts in `RootNodeTypes`.",
+                details={
+                    "source_file": str(self._source_file) if self._source_file else "unknown",
+                    "node_count": len(self.root),
+                },
+            ) from e
+        else:
+            return lang
+
+    @property
+    def concrete_types(self) -> frozenset[NodeNameT]:
+        """Get a set of all concrete node type names in the root list."""
+        return cast(
+            frozenset[NodeNameT],
+            frozenset(
+                sorted({
+                    *(t["type_name"] for t in self.named_types),
+                    *(t["type_name"] for val in self.subtype_map.values() for t in val),
+                })
+            ),
+        )
+
+    @property
+    def concrete_to_abstract(self) -> MappingProxyType[NodeNameT, tuple[AbstractNodeName, ...]]:
+        """Get a mapping of concrete node types to their abstract parent types."""
+        subs = self.subtype_map
+        concrete: dict[NodeNameT, set[AbstractNodeName]] = defaultdict(set)
+        for abstract, fields in subs.items():
+            for field in fields:
+                concrete[field["type_name"]].add(abstract)
+        return MappingProxyType(dict_set_to_tuple(concrete))
+
+    @property
+    def flattened(self) -> list[NodeTypeInfo]:
+        """Get a flattened list of all NodeTypeInfo entries."""
+        return self.root.copy()
+
+    @property
+    def named_types(self) -> list[NodeTypeInfo]:
+        """Get a list of all named NodeTypeInfo entries."""
+        return [node for node in self if node["named"]]
+
+    @property
+    def flat_map(self) -> MappingProxyType[SemanticSearchLanguage, list[NodeTypeInfo]]:
+        """Get a mapping of language to its NodeTypeInfo entries."""
+        return MappingProxyType({self.language: self.flattened})
+
+    @property
+    def subtypes(self) -> frozenset[NodeNameT]:
+        """Get a set of all node type names that are subtypes."""
+        return frozenset({t["type_name"] for val in self.subtype_map.values() for t in val})
+
+    @property
+    def subtype_map(self) -> MappingProxyType[AbstractNodeName, list[SimpleField]]:
+        """Get a mapping of all subtypes to their SimpleField."""
+        subtypes: dict[AbstractNodeName, list[SimpleField]] = defaultdict(list)
+        for entry in self:
+            if "subtypes" in entry:
+                subtypes[AbstractNodeName(entry["type_name"])].extend(entry["subtypes"])
+        return MappingProxyType(subtypes)
+
+    @property
+    def abstracts(self) -> frozenset[AbstractNodeName]:
+        """Get a set of all abstract node type names in the root list."""
+        return frozenset({
+            AbstractNodeName(entry["type_name"]) for entry in self if "subtypes" in entry
+        })
+
+    @property
+    def fields(self) -> MappingProxyType[NodeNameT, ChildInfo]:
+        """Get a mapping of all field names to their ChildInfo."""
+        fields: dict[NodeNameT, ChildInfo] = {}
+        for entry in self:
+            if "fields" in entry:
+                fields |= entry["fields"]
+        return MappingProxyType(fields)
+
+    @property
+    def children(self) -> MappingProxyType[NodeNameT, ChildInfo]:
+        """Get a mapping of all child names to their ChildInfo."""
+        return MappingProxyType({
+            entry["type_name"]: entry["children"] for entry in self if "children" in entry
+        })
 
     @classmethod
     def from_node_type_file(cls, file_path: FilePath) -> RootNodeTypes:
@@ -334,12 +525,27 @@ class NodeTypeParser(BasedModel):
         for node_type_file in self.node_types_dir.glob("*-node-types.json"):
             try:
                 nodes = RootNodeTypes.from_node_type_file(node_type_file)
-                node_types.append({cast(SemanticSearchLanguage, nodes.language): nodes})
+                node_types.append({nodes.language: nodes})
             except Exception as e:
                 # Log error but continue processing other files
                 print(f"Warning: Failed to parse {node_type_file}: {e}")
 
         return node_types
+
+    def flatten(
+        self,
+    ) -> MappingProxyType[SemanticSearchLanguage | Literal["unknown"], list[NodeTypeInfo]]:
+        """Flatten the parsed node types into a mapping of language to list of NodeTypeInfo."""
+        nodes = self.parse_all_node_types()
+        flattened = [v.flat_map for val in nodes for v in val.values()]
+        return MappingProxyType({
+            lang: types for mapping in flattened for lang, types in mapping.items()
+        })
+
+    @cached_property
+    def nodes(self) -> tuple[RootNodeTypes, ...]:
+        """Get all parsed node types."""
+        return tuple(node for mapping in self.parse_all_node_types() for node in mapping.values())
 
     @staticmethod
     def _add_node_group(types: list[SimpleField]) -> set[NodeNameT]:
@@ -348,16 +554,19 @@ class NodeTypeParser(BasedModel):
         return {cast(NodeNameT, t) for t in assembled_types if t}
 
     @staticmethod
-    def _get_node_types_from_info_values(info: NodeTypeInfo) -> set[NodeNameT]:
+    def _get_node_types_from_info_values(info: NodeTypeInfo) -> set[NodeNameT]:  # noqa: C901
         """Extract node type names from NodeTypeInfo values."""
         all_types: set[NodeNameT] = set()
         for key, value in info.items():
             match key:
                 case "type_name" | "type":
-                    all_types.add(cast(LiteralStringT, value))
+                    if "subtypes" in info:
+                        all_types.add(AbstractNodeName(value))  # pyright: ignore[reportArgumentType]
+                    else:
+                        all_types.add(cast(NodeNameT, value))
                 case "subtypes":
                     if isinstance(value, str):
-                        all_types.add(cast(LiteralStringT, value))
+                        all_types.add(AbstractNodeName(value))  # pyright: ignore[reportArgumentType]
                     else:
                         all_types |= NodeTypeParser._add_node_group(cast(list[SimpleField], value))
                 case "fields":

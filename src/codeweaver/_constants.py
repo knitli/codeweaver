@@ -421,6 +421,8 @@ CODE_FILES_EXTENSIONS: tuple[ExtLangPair, ...] = (
     ExtLangPair(ext=".rktl", language="racket"),
     ExtLangPair(ext=".rsx", language="r"),
     ExtLangPair(ext=".s", language="assembly"),
+    ExtLangPair(ext=".sas", language="sas"),
+    ExtLangPair(ext=".sass", language="sass"),
     ExtLangPair(ext=".sc", language="scheme"),
     ExtLangPair(ext=".sch", language="scheme"),
     ExtLangPair(ext=".scheme", language="scheme"),
@@ -568,9 +570,9 @@ DELIMITERS: MappingProxyType[LiteralStringT, frozenset[tuple[str, str]]] = Mappi
         ("while", "done"),
         ("until", "done"),
         *(
-            l
-            for l in GENERIC_CODE_DELIMITERS
-            if l[0] not in {"if", "case", "do", "for", "while", "until"}
+            delim
+            for delim in GENERIC_CODE_DELIMITERS
+            if delim[0] not in {"if", "case", "do", "for", "while", "until"}
         ),
     }),
     "c": frozenset({*C_COMMON_DELIMITERS}),
@@ -722,7 +724,10 @@ DELIMITERS: MappingProxyType[LiteralStringT, frozenset[tuple[str, str]]] = Mappi
         *C_COMMON_DELIMITERS,
     }),
     "reason": frozenset({*C_COMMON_DELIMITERS}),
+    "sas": frozenset({("*", ";"), ("/*", "*/"), *COMMON_DELIMITERS}),
+    "sass": frozenset({*C_COMMON_DELIMITERS}),
     "scala": frozenset({*C_COMMON_DELIMITERS}),
+    "scss": frozenset({*C_COMMON_DELIMITERS}),
     "sql": frozenset({("--", "\n"), ("/*", "*/"), *GENERIC_CODE_DELIMITERS}),
     "solidity": frozenset({*C_COMMON_DELIMITERS}),
     "swift": frozenset({*C_COMMON_DELIMITERS}),

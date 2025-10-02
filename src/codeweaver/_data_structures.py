@@ -127,7 +127,15 @@ class SemanticMetadata(BasedModel):
         Field(description="""The programming language of the code chunk"""),
     ]
     primary_node: AstNode[SgNode] | None
-    nodes: tuple[AstNode[SgNode], ...] = ()
+    children: tuple[AstNode[SgNode], ...] = ()
+    # TODO: Logic for symbol extraction from AST nodes
+    symbol: Annotated[
+        str | None,
+        Field(
+            description="""The symbol represented by the node""",
+            default_factory=lambda data: data["primary_node"],
+        ),
+    ] = None
     node_id: UUID7 = uuid7()
     parent_node_id: UUID7 | None = None
     is_partial_node: Annotated[
@@ -145,7 +153,7 @@ class SemanticMetadata(BasedModel):
         return cls(
             language=parent_meta.language,
             primary_node=child,
-            nodes=tuple(child.children),
+            children=tuple(child.children),
             node_id=child.node_id or uuid7(),
             parent_node_id=parent_meta.node_id,
             **overrides,
@@ -161,8 +169,9 @@ class SemanticMetadata(BasedModel):
         return cls(
             language=language or node.language or "",
             primary_node=node,
-            nodes=tuple(node.children),
+            children=tuple(node.children),
             node_id=node.node_id,
+            symbol=node.symbol,
             parent_node_id=node.parent_node_id,
             is_partial_node=False,  # if we're creating from a full node, it's not partial
         )
@@ -852,14 +861,23 @@ class DiscoveredFile(DataclassSerializationMixin):
     ] = None
 
     @classmethod
-    def from_path(cls, path: Path) -> DiscoveredFile | None:
+    def from_path(cls, path: Path, *, file_hash: BlakeKey | None = None) -> DiscoveredFile | None:
         """Create a DiscoveredFile from a file path."""
         branch = get_git_branch(path if path.is_dir() else path.parent) or "main"
         if ext_kind := (ext_kind := ExtKind.from_file(path)):
-            file_hash = BlakeKey(blake3(path.read_bytes()).hexdigest())
+            new_hash = BlakeKey(blake3(path.read_bytes()).hexdigest())
+            if file_hash and new_hash != file_hash:
+                raise ValueError("Provided file_hash does not match the computed hash.")
             return cls(
-                path=path, ext_kind=ext_kind, file_hash=file_hash, git_branch=cast(str, branch)
+                path=path, ext_kind=ext_kind, file_hash=new_hash, git_branch=cast(str, branch)
             )
+        return None
+
+    @classmethod
+    def from_chunk(cls, chunk: CodeChunk) -> DiscoveredFile | None:
+        """Create a DiscoveredFile from a CodeChunk, if it has a valid file_path."""
+        if chunk.file_path and chunk.file_path.is_file() and chunk.file_path.exists():
+            return cls.from_path(chunk.file_path)
         return None
 
     @computed_field

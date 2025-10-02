@@ -70,6 +70,67 @@ JavaScriptFamily: JavaScriptFamilyT = (
     SemanticSearchLanguage.TSX,
 )
 
+LANGUAGE_POPULARITY = (
+    SemanticSearchLanguage.HTML,
+    SemanticSearchLanguage.JAVASCRIPT,
+    SemanticSearchLanguage.CSS,
+    SemanticSearchLanguage.PYTHON,
+    SemanticSearchLanguage.BASH,
+    SemanticSearchLanguage.TYPESCRIPT,
+    SemanticSearchLanguage.JAVA,
+    SemanticSearchLanguage.C_PLUS_PLUS,
+    SemanticSearchLanguage.C_LANG,
+    SemanticSearchLanguage.C_SHARP,
+    SemanticSearchLanguage.PHP,
+    SemanticSearchLanguage.RUBY,
+    SemanticSearchLanguage.KOTLIN,
+    SemanticSearchLanguage.GO,
+    SemanticSearchLanguage.SWIFT,
+    SemanticSearchLanguage.LUA,
+    SemanticSearchLanguage.RUST,
+    SemanticSearchLanguage.NIX,
+    SemanticSearchLanguage.SOLIDITY,
+    SemanticSearchLanguage.SCALA,
+    SemanticSearchLanguage.HASKELL,
+    SemanticSearchLanguage.ELIXIR,
+    SemanticSearchLanguage.YAML,
+    SemanticSearchLanguage.JSON,
+)
+# Arranged in ranked order from most to least based on number of 2025 pushes to Github
+# source: https://github.com/github/innovationgraph/blob/main/data/languages.csv
+# Other sources remove HTML, CSS, YAML and JSON and we need them for our purposes here
+# Clearly, the number of pushes metric skews things a bit -- HTML, CSS, and Javascript get pushed with most builds while Yaml and JSON is widely represented but not heavily pushed (config and data files).
+# We'll sort these out heuristically.
+
+NAMED_NODE_COUNTS = MappingProxyType({
+    SemanticSearchLanguage.C_PLUS_PLUS: 231,
+    SemanticSearchLanguage.C_SHARP: 221,
+    SemanticSearchLanguage.TYPESCRIPT: 192,
+    SemanticSearchLanguage.HASKELL: 188,
+    SemanticSearchLanguage.SWIFT: 183,
+    SemanticSearchLanguage.RUST: 170,
+    SemanticSearchLanguage.PHP: 162,
+    SemanticSearchLanguage.JAVA: 152,
+    SemanticSearchLanguage.RUBY: 150,
+    SemanticSearchLanguage.SCALA: 149,
+    SemanticSearchLanguage.C_LANG: 133,
+    SemanticSearchLanguage.PYTHON: 130,
+    SemanticSearchLanguage.SOLIDITY: 125,
+    SemanticSearchLanguage.KOTLIN: 121,
+    SemanticSearchLanguage.JAVASCRIPT: 120,
+    SemanticSearchLanguage.GO: 113,
+    SemanticSearchLanguage.CSS: 65,
+    SemanticSearchLanguage.BASH: 63,
+    SemanticSearchLanguage.LUA: 51,
+    SemanticSearchLanguage.ELIXIR: 46,
+    SemanticSearchLanguage.NIX: 43,
+    SemanticSearchLanguage.HTML: 20,
+    SemanticSearchLanguage.JSON: 14,
+    SemanticSearchLanguage.YAML: 6,
+})
+"""Count of top-level named nodes in each language's grammar. It took me awhile to come to this approach, but it's fast and reliable."""
+
+
 UNIQUE_NODES: MappingProxyType[
     LiteralStringT, SemanticSearchLanguage | TypeScriptGroupT | JavaScriptFamilyT
 ] = MappingProxyType({
@@ -1995,7 +2056,7 @@ def _get_node_types(node_types_data: Sequence[NodeTypeInfo]) -> set[LiteralStrin
         if "subtypes" in item:
             sub = item["subtypes"]
             if isinstance(sub, str):
-                node_types.add(sub)
+                node_types.add(cast(LiteralStringT, sub))
             # sub is a list of `SimpleField`
             else:
                 type_names = {s.get("type", "") or s["type_name"] for s in sub if s}

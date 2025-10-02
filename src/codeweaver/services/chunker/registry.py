@@ -18,8 +18,7 @@ from codeweaver._utils import uuid7
 class SourceIdRegistry(BasedModel):
     """Maintains per-file source IDs to ensure span consistency within files.
 
-    This registry ensures that all spans from the same file share the same source_id,
-    enabling robust set-like span operations and clean merging/splitting.
+    This registry ensures that all spans from the same file share the same source_id, enabling set-like span operations and clean merging/splitting.
     """
 
     def __init__(self) -> None:

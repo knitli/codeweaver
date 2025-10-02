@@ -785,6 +785,33 @@ def languages_present_from_configs() -> tuple[SemanticSearchLanguage, ...] | Non
     return None
 
 
+class Parser(str, BaseEnum):
+    """
+    Enum representing available parsers in CodeWeaver.
+    """
+
+    TREE_SITTER = "tree-sitter"
+    LANGCHAIN_RECURSIVE = "langchain-recursive"
+
+    __slots__ = ()
+
+
+def _build_parsers_map() -> MappingProxyType[SemanticSearchLanguage, Parser]:
+    """
+    Builds a mapping of SemanticSearchLanguage to their corresponding Parser.
+
+    Returns:
+        A MappingProxyType mapping each SemanticSearchLanguage to its Parser.
+    """
+    mapping: dict[SemanticSearchLanguage, Parser] = dict.fromkeys(
+        SemanticSearchLanguage, Parser.TREE_SITTER
+    )
+    return MappingProxyType(mapping)
+
+
+PARSERS = _build_parsers_map()
+
+
 __all__ = (
     "ConfigLanguage",
     "ConfigNamePair",

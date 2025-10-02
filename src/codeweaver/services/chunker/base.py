@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
 from ast_grep_py import SgNode
 from langchain_core.documents import Document
@@ -397,20 +397,13 @@ class ChunkMicroManager:
         self, nodes: list[AstNode[SgNode]]
     ) -> list[tuple[AstNode[SgNode], float]]:
         """Score nodes by importance and return them sorted by priority and position."""
-        scored_nodes = []
-
-        for node in nodes:
-            try:
-                # Get importance score using semantic classification
-                importance_score = float(node.importance_score)
-                scored_nodes.append((node, importance_score))
-            except Exception:
-                # Fallback to low importance if scoring fails
-                scored_nodes.append((node, 0.1))
+        scored_nodes = [
+            (node, node.importance_score) for node in nodes if hasattr(node, "importance_score")
+        ]
 
         # Sort by importance (descending) then by position (ascending)
         scored_nodes.sort(key=lambda x: (-x[1], x[0].range.start.line, x[0].range.start.column))
-        return scored_nodes
+        return cast(list[tuple[AstNode[SgNode], float]], scored_nodes)
 
     def _process_semantic_node_with_importance(
         self,
@@ -427,9 +420,9 @@ class ChunkMicroManager:
 
         # Add importance metadata to all chunks
         for chunk in chunks:
-            if chunk.metadata:
-                chunk.metadata["importance_score"] = importance_score
-                chunk.metadata["semantic_category"] = str(node.semantic_category)
+            if chunk.metadata and chunk.metadata.get("semantic_meta"):
+                chunk.metadata["semantic_meta"]["importance_score"] = importance_score  # type: ignore
+                chunk.metadata["semantic_meta"]["category"] = str(node.semantic_category)  # type: ignore
 
         return chunks
 
@@ -484,7 +477,7 @@ class ChunkMicroManager:
 
     def _process_semantic_node(
         self,
-        node: AstNode,
+        node: AstNode[SgNode],
         content_lines: list[str],
         file: DiscoveredFile,
         source_id: UUID7,
@@ -505,7 +498,7 @@ class ChunkMicroManager:
 
     def _split_large_semantic_node(
         self,
-        node: AstNode,
+        node: AstNode[SgNode],
         content_lines: list[str],
         file: DiscoveredFile,
         source_id: UUID7,
@@ -579,14 +572,7 @@ class ChunkMicroManager:
             # Create a temporary DiscoveredFile for the chunk
             from codeweaver.services.chunker.registry import source_id_for
 
-            temp_file = DiscoveredFile(
-                path=chunk.file_path,
-                ext_kind=chunk.ext_kind,
-                file_hash="",  # Not needed for chunking
-                _is_hidden=False,
-                _is_binary=False,
-                _is_text=True,
-            )
+            temp_file = DiscoveredFile(path=chunk.file_path, ext_kind=chunk.ext_kind)
             split_chunk = self._create_chunk_from_parts(
                 content=part.rstrip(),
                 start_line=start_line,
@@ -602,7 +588,7 @@ class ChunkMicroManager:
         return chunks
 
     def _create_semantic_chunk_from_node(
-        self, node: AstNode, file: DiscoveredFile, source_id: UUID7
+        self, node: AstNode[SgNode], file: DiscoveredFile, source_id: UUID7
     ) -> CodeChunk:
         """Create a CodeChunk from an AST node with semantic metadata."""
         # Convert ast-grep Range to line numbers
@@ -612,9 +598,6 @@ class ChunkMicroManager:
         # Extract semantic information
         node_kind = node.kind
         node_text = node.text
-
-        # Try to extract a meaningful name from the node
-        semantic_name = self._extract_semantic_name(node, node_kind)
 
         # Create rich semantic metadata
         semantic_meta = {
@@ -626,7 +609,8 @@ class ChunkMicroManager:
             },
         }
 
-        if semantic_name:
+        # Try to extract a meaningful name from the node
+        if semantic_name := self._extract_semantic_name(node, node_kind):
             semantic_meta["symbol_name"] = semantic_name
 
         # Try to extract additional context (imports, parent scope, etc.)
@@ -652,7 +636,7 @@ class ChunkMicroManager:
             chunk_type=ChunkType.SEMANTIC,
         )
 
-    def _extract_semantic_name(self, node: AstNode, node_kind: str) -> str | None:
+    def _extract_semantic_name(self, node: AstNode[SgNode], node_kind: str) -> str | None:
         """Extract a meaningful name from an AST node."""
         try:
             # Extract names based on node type
@@ -669,59 +653,58 @@ class ChunkMicroManager:
 
         return None
 
-    def _extract_function_name(self, node: AstNode) -> str | None:
+    def _extract_function_name(self, node: AstNode[SgNode]) -> str | None:
         """Extract function name from node."""
         name_node = node.get_match("name")
         if name_node:
             return name_node.text.strip()
 
-        # Try to find identifier child
-        for child in node.children:
-            if child.kind == "identifier" and child.text.strip():
-                return child.text.strip()
+        return next(
+            (
+                child.text.strip()
+                for child in node.children
+                if child.kind == "identifier" and child.text.strip()
+            ),
+            None,
+        )
 
-        return None
-
-    def _extract_class_name(self, node: AstNode) -> str | None:
+    def _extract_class_name(self, node: AstNode[SgNode]) -> str | None:
         """Extract class name from node."""
         name_node = node.get_match("name")
         if name_node:
             return name_node.text.strip()
 
-        # Try to find identifier child
-        for child in node.children:
-            if child.kind == "identifier" and child.text.strip():
-                return child.text.strip()
+        return next(
+            (
+                child.text.strip()
+                for child in node.children
+                if child.kind == "identifier" and child.text.strip()
+            ),
+            None,
+        )
 
-        return None
-
-    def _extract_import_name(self, node: AstNode) -> str | None:
+    def _extract_import_name(self, node: AstNode[SgNode]) -> str | None:
         """Extract import name from node."""
         text = node.text.strip()
-        if text:
-            return text.split("\n")[0]  # First line of import
+        return text.split("\n")[0] if text else None
 
-        return None
-
-    def _extract_context_info(self, node: AstNode) -> dict[str, Any] | None:
+    def _extract_context_info(self, node: AstNode[SgNode]) -> dict[str, Any] | None:
         """Extract additional context information from the node."""
         try:
             context: dict[str, Any] = {}
 
             # Try to find parent context (class, namespace, etc.)
             parent = node.parent
-            if parent and parent.kind in [
-                "class_definition",
-                "class_declaration",
-                "namespace_definition",
-            ]:
-                parent_name = self._extract_semantic_name(parent, parent.kind)
-                if parent_name:
-                    context["parent_scope"] = {"name": parent_name, "kind": parent.kind}
-
-            return context or None
+            if (
+                parent
+                and parent.kind in ["class_definition", "class_declaration", "namespace_definition"]
+                and (parent_name := self._extract_semantic_name(parent, parent.kind))
+            ):
+                context["parent_scope"] = {"name": parent_name, "kind": parent.kind}
         except Exception:
             return None
+        else:
+            return context or None
 
     def _fill_gaps_with_fallback(
         self,
@@ -732,12 +715,8 @@ class ChunkMicroManager:
         effective_limit: int,
     ) -> list[CodeChunk]:
         """Fill gaps between semantic chunks with fallback chunking if needed."""
-        if not semantic_chunks:
-            return semantic_chunks
-
-        # For now, just return the semantic chunks
-        # In a more sophisticated implementation, we could identify gaps
-        # and fill them with fallback chunks
+        # for now we just return them.
+        # TODO: implement gap filling logic
         return semantic_chunks
 
     def _create_chunk_from_parts(

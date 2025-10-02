@@ -29,6 +29,7 @@ from typing import (
     Any,
     Literal,
     LiteralString,
+    NewType,
     NotRequired,
     Self,
     TypedDict,
@@ -57,6 +58,8 @@ from pydantic_core import core_schema
 type LiteralStringT = Annotated[
     LiteralString, GetPydanticSchema(lambda _schema, handler: handler(str))
 ]
+AbstractNodeName = NewType("AbstractNodeName", LiteralStringT)
+
 type EnumExtend = Callable[[Enum, str], Enum]
 extend_enum: EnumExtend = extend_enum  # pyright: ignore[reportUnknownVariableType]
 

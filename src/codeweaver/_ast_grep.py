@@ -3,9 +3,14 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # sourcery skip: docstrings-for-functions
+"""Custom wrappers around ast-grep's core types to add functionality and serialization."""
+# sourcery skip: docstrings-for-functions
+
 from __future__ import annotations
 
-from collections.abc import Iterator
+import contextlib
+
+from collections.abc import Iterator, Sequence
 from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, Unpack, cast, overload
@@ -27,7 +32,7 @@ from ast_grep_py import SgNode as AstGrepNode
 from ast_grep_py import SgRoot as AstGrepRoot
 from pydantic import UUID7, ConfigDict, Field, NonNegativeInt, PositiveInt, computed_field
 
-from codeweaver._common import BasedModel, BaseEnum
+from codeweaver._common import BasedModel, BaseEnum, LiteralStringT
 from codeweaver._utils import uuid7
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.services.textify import humanize
@@ -35,7 +40,7 @@ from codeweaver.services.textify import humanize
 
 # Lazy imports to avoid circular dependencies
 if TYPE_CHECKING:
-    from codeweaver.semantic import ImportanceScore, SemanticNodeCategory
+    from codeweaver.semantic.categories import ImportanceScores, SemanticNodeCategory
 
 
 # re-export Ast Grep's rules and config types:
@@ -204,12 +209,83 @@ class AstNode[SgNode: (AstGrepNode)](BasedModel):
         None
     )
 
+    def __init__(
+        self,
+        node: AstGrepNode,
+        language: SemanticSearchLanguage | None = None,
+        node_id: UUID7 | None = None,
+        parent_node_id: UUID7 | None = None,
+    ) -> None:
+        """Initialize the AstNode and set the parent_node_id if applicable."""
+        node_id = node_id or uuid7()
+        if parent_node_id is None and (parent_node := self.parent):
+            parent_node_id = getattr(parent_node, "node_id", None)
+            if parent_node_id is None:
+                parent_node_id = uuid7()
+                parent_node.node_id = parent_node_id
+        if language is None:
+            language = self._determine_language()
+        assert language is not None, "Language could not be determined."
+        self.language = language
+        self._node = node
+        self.node_id = node_id
+        self.parent_node_id = parent_node_id
+        super().__init__()
+
+    def _language_from_node_types(self) -> SemanticSearchLanguage:
+        """Try to determine the language from node types."""
+
+        def get_children(node: AstNode[SgNode]) -> list[AstNode[SgNode]]:
+            return list(node.children)
+
+        nodes = [self.kind]
+        if children := get_children(self):
+            nodes.extend(child.kind for child in children)
+        ancestors = [a.kind for a in self.ancestors() for a in (a, *get_children(a))]
+        nodes.extend(ancestors)
+        from codeweaver.semantic._language_deduction import deduce_from_node_types
+
+        if language := deduce_from_node_types(cast(Sequence[LiteralStringT], nodes)):
+            if isinstance(language, SemanticSearchLanguage):
+                return language
+            from codeweaver.semantic._language_deduction import LANGUAGE_POPULARITY
+
+            return next((lang for lang in LANGUAGE_POPULARITY if lang in language))  # noqa: UP034
+        raise ValueError(f"Could not determine language from node types. Node kind: {self.kind}")
+
+    def _language_from_ancestors(self) -> SemanticSearchLanguage:
+        """Try to determine the language from ancestor nodes."""
+        parents = list(self.ancestors())
+        for ancestor in reversed(parents):
+            if ancestor and ancestor.language:
+                return ancestor.language
+            with contextlib.suppress(Exception):
+                if language := SemanticSearchLanguage.from_extension(
+                    Path(ancestor._node.get_root().filename()).suffix
+                ):
+                    return language
+        return self._language_from_node_types()
+
+    def _determine_language(self) -> SemanticSearchLanguage:
+        """Determine the language of the node if not already set."""
+        if self.language is not None:
+            return self.language
+        language = SemanticSearchLanguage.from_extension(Path(self._root.filename).suffix)
+        if language is None:
+            language = self._language_from_ancestors()
+        return language
+
     @classmethod
     def from_sg_node(
         cls, sg_node: AstGrepNode, language: SemanticSearchLanguage | None
     ) -> AstNode[SgNode]:
         """Create a AstNode from an ast-grep `SgNode`."""
-        return cls(_node=sg_node, language=language)
+        return cls(language=language, node=sg_node)
+
+    @computed_field
+    @cached_property
+    def symbol(self) -> str:
+        """Get a symbolic representation of the node."""
 
     @computed_field
     @cached_property
@@ -402,10 +478,11 @@ class AstNode[SgNode: (AstGrepNode)](BasedModel):
         from codeweaver.semantic import get_node_mapper
 
         mapper = get_node_mapper()
-        return mapper.classify_node_type(self.kind, self.language)
+        return mapper.classify_node_type(self.kind, cast(SemanticSearchLanguage, self.language))
 
+    @computed_field
     @cached_property
-    def importance_score(self) -> ImportanceScore:
+    def importance_score(self) -> ImportanceScores:
         """Calculate the importance score for this node."""
         from codeweaver.semantic import SemanticScorer
 
@@ -413,16 +490,18 @@ class AstNode[SgNode: (AstGrepNode)](BasedModel):
             depth_penalty_factor=0.02,
             size_bonus_threshold=50,
             size_bonus_factor=0.1,
-            root_bonus=0.05,
+            root_bonus=0.07,
         )
-        return scorer.calculate_importance_score(self.semantic_category, self)
+        return scorer.calculate_importance_score(self.semantic_category, self)  # pyright: ignore[reportArgumentType]
 
     def get_classification_confidence(self) -> float:
         """Get the confidence level for the semantic classification of this node."""
         from codeweaver.semantic import get_node_mapper
 
         mapper = get_node_mapper()
-        return mapper.get_classification_confidence(self.kind, self.language)
+        return mapper.get_classification_confidence(
+            self.kind, cast(SemanticSearchLanguage, self.language)
+        )
 
     def replace(self, _new_text: str) -> str:
         """Replace the text of the node with new_text."""

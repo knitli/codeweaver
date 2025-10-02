@@ -17,17 +17,21 @@ import subprocess
 import sys
 import unicodedata
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Hashable, Iterable
 from functools import cache
 from importlib import metadata, util
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Literal, NotRequired, Required, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Literal, NotRequired, Required, TypedDict, cast
 
 from pydantic import UUID7, BaseModel, TypeAdapter
 from typing_extensions import TypeIs
 
-from codeweaver._common import Sentinel
+from codeweaver._common import LiteralStringT, Sentinel
+
+
+if TYPE_CHECKING:
+    from codeweaver._common import AbstractNodeName
 
 
 logger = logging.getLogger(__name__)
@@ -50,6 +54,17 @@ def uuid7() -> UUID7:
     return cast(
         UUID7, uuid7_gen()
     )  # it's always UUID7 and not str | int | bytes because we don't take kwargs
+
+
+def dict_set_to_tuple(
+    d: dict[str, set[str]]
+    | dict[LiteralStringT | AbstractNodeName, set[LiteralStringT | AbstractNodeName]],
+) -> dict[str, tuple[str, ...]] | dict[Hashable, tuple[LiteralStringT | AbstractNodeName, ...]]:
+    """Convert all sets in a dictionary to tuples."""
+    return dict(
+        sorted({k: tuple(sorted(v)) for k, v in d.items()}.items()),  # type: ignore
+        key=lambda item: str(item[0]),  # type: ignore
+    )
 
 
 @cache
