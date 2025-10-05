@@ -2,7 +2,26 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-"""Parser for tree-sitter node-types.json files to extract node type information."""
+"""Parser for tree-sitter node-types.json files to extract node type information.
+
+## For Experienced Tree-Sitter Devs and Users
+
+We made some design choices here that may seem unusual if you're used to working with tree-sitter directly.
+We felt that some of tree-sitter's terminology were misleading and unintuitive, so we adjusted them to be more clear and consistent:
+
+- **Node Types**: In tree-sitter, "node types" can refer to both concrete and abstract types. All CodeWeaver `node_type` entries are `name` fields in the tree-sitter `node-types.json` file.
+
+    - **node_type**: We use "node_type" to refer to any type (the `name` field in the tree-sitter `node-types.json` file), whether concrete or abstract.
+    - **concrete types**: These are node types that can appear directly in the syntax tree. They may have children or be leaf nodes. In a node-types.json field, concrete types are those without a `subtypes` field, or those that appear as entries in a `subtypes` list.
+    - **abstract types**: These are node types that do not appear directly in the syntax tree (usually). They serve as categories for grouping related concrete types. In a node-types.json field, abstract types are those with a `subtypes` field.
+    - `NodeName` and `AbstractNodeName` are `NewType` aliases for literal strings representing concrete and abstract node type names, respectively. We use these types to make it clear when a function or field expects a concrete or abstract type name. (if you're unfamiliar with `NewType`, it's a way to create a distinct type from an existing type, primarily for type-checking purposes. At runtime, they're all just strings.)
+
+- **Fields vs. Children**: In tree-sitter, "fields" are named relationships that group related child nodes, while "children" are positional relationships without names. We maintain this distinction but clarify their roles:
+
+    - **Fields**: Named structural relationships in the grammar that group related child nodes or represent unique named components of a parent node. Fields are defined explicitly in the grammar and can help identify important parts of the syntax tree. In a node-types.json field, `fields` is a dictionary mapping field names to `FieldInfo` entries, tree-sitter calls this object a `child_type`. We use `FieldInfo` to represent this structure, with a NewType alias, `ChildInfo` for child nodes, again for clarity about the type relationships.
+
+- **Extra Nodes**: In tree-sitter, "extra" nodes are those that can appear anywhere in the syntax tree without specific constraints, they are often types like "comment" or whitespace types. We call these `free` nodes, to clarify that they can appear freely anywhere.
+"""
 
 from __future__ import annotations
 
@@ -12,17 +31,20 @@ from collections import defaultdict
 from collections.abc import KeysView, Mapping, Sequence
 from functools import cached_property
 from pathlib import Path
-from textwrap import dedent
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Annotated, Any, Literal, NamedTuple, TypedDict, cast
+from typing import Annotated, Any, Literal, NamedTuple, NewType, cast
 
 from pydantic import DirectoryPath, Discriminator, Field, FilePath, PrivateAttr, Tag, computed_field
 
-from codeweaver._common import AbstractNodeName, BasedModel, LiteralStringT, RootedRoot
+from codeweaver._common import (
+    AbstractNodeName,
+    BasedModel,
+    LiteralStringT,
+    NodeName,
+    RootedRoot,
+    generate_field_title,
+)
 from codeweaver.language import SemanticSearchLanguage
-
-if TYPE_CHECKING:
-    from codeweaver.semantic.grammar_types import FieldInfo, NodeSemanticInfo
 
 
 logger = logging.getLogger(__name__)
@@ -31,14 +53,13 @@ type EmptyList = list[
     None
 ]  # technically not true -- it has nothing, not None, but... as good as we can do
 
-type NodeNameT = LiteralStringT
 
 # ===========================================================================
 # *                  Node Field Type Definitions                  *
 # ===========================================================================
-# Could we just use one TypedDict with optional fields? Yes.
-# But this way, we get better validation and documentation.
-# Also, it can help us narrow down the language if we don't know it.
+# Original was a series of typed dicts with discriminators for each node type.
+# API has been improved/simplified using NamedTuples, which allow for cleaner
+# introspection and validation, and of course come immutable.
 
 # ================================================
 # *          Base Types for Node Type Info
@@ -51,13 +72,316 @@ FIELD_KEYS = ("children", "extra", "fields", "root", "subtypes", "named", "type_
 class SimpleNodeField(NamedTuple):
     """A simple field in a node type entry."""
 
-    name: NodeNameT
-    named: bool
+    node_type: Annotated[
+        NodeName,
+        Field(
+            description="""The name of the field""",
+            default_factory=NodeName,
+            validation_alias="name",
+            field_title_generator=generate_field_title,
+        ),
+    ]
+    named: Annotated[
+        bool,
+        Field(
+            description="""Whether the field is a named type in the language's grammar definition. Named types tend to be more semantically important. Unnamed types are usually syntactic, like whitespace tokens. For tasks like code understanding or classification, you can safely ignore unnamed types. For code editing and modification, you can't.""",
+            field_title_generator=generate_field_title,
+        ),
+    ]
+
+    @property
+    def name(self) -> NodeName:
+        """Get the field name."""
+        return self.node_type
 
     @property
     def is_named(self) -> bool:
-        """Check if the field is named."""
+        """Check if the field is named. 'named' means it has a defined rule name in the grammar, not that it has a name, which it always does."""
         return self.named
+
+
+class FieldInfo(NamedTuple):
+    """Information about a field in a node type.
+
+    Fields are named structural relationships in tree-sitter grammars that group
+    related child nodes or represent unique named components of a parent node.
+
+    Attributes:
+        name: Field name (e.g., "name", "body", "parameters")
+        required: Whether one of the child fields must accompany the parent node (note: for abstract types, the parent node may not actually be in the AST, so you would only see the child fields)
+        multiple: Whether the node type can have multiple children or subtypes in the AST
+        types: Tuple of allowed node type names for this field
+    """
+
+    node_type: Annotated[
+        NodeName | AbstractNodeName,
+        Field(
+            description="""Field name (e.g., 'name', 'body', 'parameters')""",
+            init=False,
+            field_title_generator=generate_field_title,
+        ),
+    ]
+    required: Annotated[
+        bool,
+        Field(
+            description="""Whether any of the types in `types` *must* be present as children of the parent node (the node in `name`).""",
+            field_title_generator=generate_field_title,
+        ),
+    ]
+    multiple: Annotated[
+        bool,
+        Field(
+            description="""Whether the field can appear in the AST with multiple children or subtypes. For example, `function_definition` can have multiple subordinate types, like `parameters`, `body`, `signature`. On the other hand, `variable_declaration` is typically a single node and can't have multiple subtypes in most grammars.""",
+            field_title_generator=generate_field_title,
+        ),
+    ]
+    types: Annotated[
+        tuple[SimpleNodeField, ...],
+        Field(
+            description="""A tuple of allowed node fields for this field""",
+            field_title_generator=generate_field_title,
+        ),
+    ]
+
+    @property
+    def is_required(self) -> bool:
+        """Check if field is required."""
+        return self.required
+
+    @property
+    def is_collection(self) -> bool:
+        """Check if field can have multiple values."""
+        return self.multiple
+
+    @property
+    def name(self) -> NodeName | AbstractNodeName:
+        """Get the field name."""
+        return self.node_type
+
+    @cached_property
+    def nodes(self) -> tuple[NodeName, ...]:
+        """Get set of type names for fast lookup."""
+        return tuple(node.node_type for node in self.types)
+
+    def accepts_type(self, type_name: NodeName) -> bool:
+        """Check if this field accepts a given type.
+
+        Args:
+            type_name: Node type name to check
+
+        Returns:
+            True if this field can contain nodes of the given type
+        """
+        return type_name in self.nodes
+
+    @classmethod
+    def from_node_type(cls, field: NodeType) -> Self:
+        """Create an instance from a NodeField."""
+        if (
+            not field.has_fields
+            or not field.has_children_constraints
+            or not field.has_children_constraints
+        ):
+            raise ValueError("Invalid field")
+
+        return cls.model_validate(
+            node_type=field.node_type, required=field.is_required, multiple=field.is_collection
+        )
+
+
+ChildInfo = NewType("ChildInfo", FieldInfo)
+
+
+class NodeType(NamedTuple):
+    """Semantic information extracted from grammar for a node type.
+
+    This is the primary data structure for grammar-based classification,
+    containing all structural and semantic information available from
+    the tree-sitter grammar.
+
+    Attributes:
+        node_type: The node type name (e.g., "function_definition")
+        language: Programming language name
+        is_named: Whether node has a defined rule name in grammar
+        is_abstract: Whether node has subtypes (abstract category)
+        is_extra: Whether node can appear anywhere (no constraints)
+        is_root: Whether node is a root node (entry point)
+        abstract_category: Supertype if this is a concrete type
+        concrete_subtypes: If this is abstract, tuple of concrete implementations
+        fields: Named fields with structural relationships
+        children_types: Allowed child types (positional constraints)
+    """
+
+    node_type: Annotated[
+        str,
+        Field(
+            description="The node type name (e.g., 'function_definition')", validation_alias="name"
+        ),
+    ]
+    language: Annotated[
+        SemanticSearchLanguage,
+        Field(description="The programming language associated with this node.", init=False),
+    ]
+    named: Annotated[bool, Field(description="Whether node has a defined rule name in grammar")]
+    _extra: Annotated[bool, Field(description="Whether node can appear anywhere (no constraints)")]
+    _root: Annotated[bool, Field(description="Whether node is a root node (entry point)")]
+
+    fields: Annotated[
+        tuple[FieldInfo, ...], Field(description="Named fields with structural relationships")
+    ]
+    children: Annotated[
+        tuple[ChildInfo, ...],
+        Field(
+            description="Allowed child types (positional constraints). A `ChildInfo` object is structurally identical to `FieldInfo`, we aliased it for clarity about the differences in role and relationships."
+        ),
+    ]
+
+    @property
+    def has_fields(self) -> bool:
+        """Check if node has named fields."""
+        return len(self.fields) > 0
+
+    @property
+    def has_children_constraints(self) -> bool:
+        """Check if node has children constraints."""
+        return len(self.children_types) > 0
+
+    @cached_property
+    def required_field_names(self) -> frozenset[str]:
+        """Get set of required field names."""
+        return frozenset(f.name for f in self.fields if f.is_required)
+
+    @cached_property
+    def optional_field_names(self) -> frozenset[str]:
+        """Get set of optional field names."""
+        return frozenset(f.name for f in self.fields if not f.is_required)
+
+    @cached_property
+    def field_map(self) -> dict[str, FieldInfo]:
+        """Get mapping from field name to field info."""
+        return {f.name: f for f in self.fields}
+
+    def get_field(self, name: str) -> FieldInfo | None:
+        """Get field info by name.
+
+        Args:
+            name: Field name to look up
+
+        Returns:
+            FieldInfo if found, None otherwise
+        """
+        return self.field_map.get(name)
+
+    def has_field(self, name: str) -> bool:
+        """Check if node has a specific field.
+
+        Args:
+            name: Field name to check
+
+        Returns:
+            True if field exists
+        """
+        return name in self.field_map
+
+    def infer_semantic_category(self) -> str:
+        """Infer semantic category from grammar structure.
+
+        Uses field names to infer the most likely semantic category based on
+        empirical patterns from grammar analysis.
+
+        Returns:
+            Semantic category string: "callable", "type_def", "control_flow",
+            "operation", or "unknown"
+        """
+        field_names = {f.name for f in self.fields}
+
+        # Check for callable signatures
+        if self._is_callable(field_names):
+            return "callable"
+
+        # Check for type definitions
+        if self._is_type_def(field_names):
+            return "type_def"
+
+        # Check for control flow
+        if "condition" in field_names or "consequence" in field_names:
+            return "control_flow"
+
+        # Check for operations
+        if "operator" in field_names:
+            return "operation"
+
+        # Check for pattern matching
+        if "pattern" in field_names or "patterns" in field_names:
+            return "pattern_match"
+
+        # Use abstract category as fallback
+        if self.is_abstract and self.abstract_category:
+            return self.abstract_category
+
+        return "unknown"
+
+    def _is_callable(self, field_names: set[str]) -> bool:
+        """Check if node appears to be a callable."""
+        if "parameters" in field_names:
+            return True
+
+        # Has name and body but not type-related fields
+        if "name" in field_names and "body" in field_names:
+            return "type_parameters" not in field_names and "type" not in field_names
+
+        return False
+
+    def _is_type_def(self, field_names: set[str]) -> bool:
+        """Check if node appears to be a type definition."""
+        if "type_parameters" in field_names:
+            return True
+
+        # Definition/declaration with type field
+        return self.node_type.endswith(("_definition", "_declaration")) and "type" in field_names
+
+
+class AbstractTypeInfo(NamedTuple):
+    """Information about an abstract type and its subtypes.
+
+    Abstract types are defined via the 'subtypes' field in tree-sitter grammars
+    and represent polymorphic categories that don't appear directly in syntax trees.
+
+    Attributes:
+        abstract_type: The abstract type name (e.g., "expression", "statement")
+        language: Programming language name
+        concrete_subtypes: Tuple of concrete node types that implement this abstract type
+    """
+
+    abstract_type: str
+    language: str
+    concrete_subtypes: tuple[str, ...]
+
+    @cached_property
+    def subtype_set(self) -> frozenset[str]:
+        """Get set of subtypes for fast lookup."""
+        return frozenset(self.concrete_subtypes)
+
+    def is_subtype(self, type_name: str) -> bool:
+        """Check if a type is a subtype of this abstract type.
+
+        Args:
+            type_name: Node type name to check
+
+        Returns:
+            True if type_name is a concrete subtype of this abstract type
+        """
+        return type_name in self.subtype_set
+
+    @property
+    def subtype_count(self) -> int:
+        """Get number of concrete subtypes."""
+        return len(self.concrete_subtypes)
+
+
+# Type aliases for convenience
+FieldInfoTuple = tuple[FieldInfo, ...]
+AbstractTypeMap = dict[str, dict[str, AbstractTypeInfo]]
 
 
 class NodeField(NamedTuple):
@@ -68,7 +392,7 @@ class NodeField(NamedTuple):
     extra: bool
     subtypes: Annotated[tuple[SimpleNodeField, ...] | None, Field(default_factory=tuple)]
     name: Annotated[
-        NodeNameT | AbstractNodeName,
+        NodeName | AbstractNodeName,
         Field(
             description="""The name of the node field.""",
             default_factory=lambda data: AbstractNodeName if data.get("subtypes") else str,
@@ -102,150 +426,6 @@ class NodeField(NamedTuple):
     def is_root(self) -> bool:
         """Check if the field is a root node."""
         return self.root
-
-
-class ChildInfo(TypedDict):
-    """`ChildInfo` is used for `children` and `fields` entries in raw node type information from JSON.
-
-    The tree-sitter documentation refers to these as `child types`. They describe the types of nodes
-    that can be children of a given node, either as direct children (`children`) or as a type of an abstract field (`fields`).
-    """
-
-    multiple: Annotated[
-        bool,
-        Field(
-            description="""If true, there can be multiple children associated with the parent node."""
-        ),
-    ]
-    required: Annotated[
-        bool,
-        Field(
-            description="""If true, at least one of the node types in `types` must accompany the parent node."""
-        ),
-    ]
-    types: list[SimpleField] | EmptyList
-
-
-class FieldsField(TypedDict):
-    """The `fields` entry in raw node type information from JSON with fields."""
-
-    fields: Annotated[
-        dict[
-            Annotated[
-                NodeNameT,
-                Field(
-                    description="""A field is a way to group related child nodes under a parent node, or represent a node with a unique name to simplify searches (or both). The grammar author explicitly defines fields in the grammar. Usually they represent a structural or semantic relationship between the parent node and its children, and they can help you find nodes more easily. (Basically, the grammar author is giving you a hint about how to interpret the syntax tree.)
-
-                    Fields are different from `children` because `children` are just a list of child nodes, which are positionally related (so you they have an index, but no name you can use to access them directly in the syntax tree). Fields, on the other hand, are named and can group multiple child nodes together under a single name. This makes it easier to find and work with specific parts of the syntax tree.
-                    """
-                ),
-            ],
-            ChildInfo,
-        ],
-        Field(
-            description="""For a field, the `ChildInfo` describes the types of nodes that can be associated with that field."""
-        ),
-    ]
-
-
-class ChildrenFieldMixin(FieldsField):
-    """Mixin for `children` entry in raw node type information from JSON with children.
-
-    You will only find `children` in combination with the `fields` field in a node type entry. Note that `ChildrenFieldMixin` extends `FieldsField`, so any node type with `children` will also have `fields`.
-    """
-
-    children: Annotated[
-        ChildInfo,
-        Field(
-            description="Information about the child nodes associated with this field. The `ChildInfo` describes the types of nodes that can be children of the parent node, but without a specific field name."
-        ),
-    ]
-
-
-class SimpleField(TypedDict):
-    """`SimpleField` is the base entry for raw node type information from JSON.
-
-    *Every* node type entry has these fields, and the pattern is often also nested in `subtypes`, `fields`, and `children` entries.
-    """
-
-    type_name: Annotated[
-        NodeNameT, Field(validation_alias="type", description="The node type name")
-    ]
-    named: Annotated[
-        bool,
-        Field(
-            description=dedent("""
-            `named` indicates that the node has a defined *rule* name in the language's grammar. Most nodes that represent significant language constructs are named, while nodes representing punctuation or operators are often unnamed.
-
-            This field can help filter out syntactic information. Generally, if your search is focused on code understanding or relationships between constructs, you can ignore unnamed nodes (i.e., those with `named: false`). For editing, formatting, code highlighting, and debugging tasks, the unnamed nodes may be relevant.""")
-        ),
-    ]
-
-
-class SubtypeField(TypedDict):
-    """When the `subtypes` field is present, `type_name` takes on a slightly different meaning, which is why we have a separate TypedDict for it.
-
-    `subtypes` is a list of node type entries that are considered subtypes of the parent node type. The parent node type itself is an abstract type that does not appear directly in the syntax tree, but its subtypes do. This is useful for representing polymorphic relationships in the syntax tree, where a parent node type can have multiple concrete implementations (subtypes) that share common characteristics. For example, a parent node type `expression` might have subtypes like `binary_expression`, `unary_expression`, and `literal`, each representing different kinds of expressions in the language.
-
-    In practical terms, the `subtypes` field is generated when the grammar defines a `supertypes list`, which is a way to group related node types under a common abstract type. You can use the `subtypes` parent type to search for all its subtypes in one go, which is particularly useful for tasks like code analysis or transformation where you want to operate on a broad category of nodes without specifying each subtype individually.
-    """
-
-    type_name: Annotated[
-        AbstractNodeName,
-        Field(
-            validation_alias="type",
-            description="The node type name",
-            default_factory=AbstractNodeName,
-        ),
-    ]
-    named: Annotated[
-        bool,
-        Field(
-            description=dedent("""
-            `named` indicates that the node has a defined *rule* name in the language's grammar. Most nodes that represent significant language constructs are named, while nodes representing punctuation or operators are often unnamed.
-
-            This field can help filter out syntactic information. Generally, if your search is focused on code understanding or relationships between constructs, you can ignore unnamed nodes (i.e., those with `named: false`). For editing, formatting, code highlighting, and debugging tasks, the unnamed nodes may be relevant.""")
-        ),
-    ]
-    subtypes: Annotated[list[SimpleField], Field()]
-
-
-class ExtraField(SimpleField):
-    """Fields entry with `extra`."""
-
-    extra: Annotated[
-        bool,
-        Field(
-            description="""`extra` indicates that the node in `type_name` and its children, if any, have no structural requirements or constraints -- meaning they can appear *anywhere* in the syntax tree. Most nodes with `extra` are syntactic elements like comments, whitespace, or punctuation that can be interspersed throughout the code without affecting its structure or meaning."""
-        ),
-    ]
-
-
-class ExtraFieldsField(ExtraField, FieldsField):
-    """Fields entry with `extra` and `fields`."""
-
-
-class ExtraChildrenField(ExtraField, ChildrenFieldMixin):
-    """Fields entry with `extra`, `fields`, and `children`."""
-
-
-class SimpleFieldFields(SimpleField, FieldsField):
-    """Fields entry with `fields`."""
-
-
-class SimpleFieldChildren(SimpleField, ChildrenFieldMixin):
-    """Fields entry with `fields` and `children`."""
-
-
-class RootField(SimpleField, ChildrenFieldMixin):
-    """Fields entry with `root`, `fields`, and `children`. `root` only appears with `fields` and `children` and is always True."""
-
-    root: Annotated[
-        Literal[True],
-        Field(
-            description="""Indicates that the node in `type_name` is a root node. Root nodes are top-level constructs in the syntax tree, such as entire files or modules. They serve as entry points for parsing and analyzing code."""
-        ),
-    ]
 
 
 type NodeTypeInfo = (
@@ -411,10 +591,10 @@ class RootNodeTypes(RootedRoot[tuple[NodeTypeInfo, ...]]):
             return lang
 
     @property
-    def concrete_types(self) -> frozenset[NodeNameT]:
+    def concrete_types(self) -> frozenset[NodeName]:
         """Get a set of all concrete node type names in the root list."""
         return cast(
-            frozenset[NodeNameT],
+            frozenset[NodeName],
             frozenset(
                 sorted({
                     *(t["type_name"] for t in self.named_types),
@@ -424,10 +604,10 @@ class RootNodeTypes(RootedRoot[tuple[NodeTypeInfo, ...]]):
         )
 
     @property
-    def concrete_to_abstract(self) -> MappingProxyType[NodeNameT, tuple[AbstractNodeName, ...]]:
+    def concrete_to_abstract(self) -> MappingProxyType[NodeName, tuple[AbstractNodeName, ...]]:
         """Get a mapping of concrete node types to their abstract parent types."""
         subs = self.subtype_map
-        concrete_to_abstract: dict[NodeNameT, set[AbstractNodeName]] = defaultdict(set)
+        concrete_to_abstract: dict[NodeName, set[AbstractNodeName]] = defaultdict(set)
         for concrete_type in self.concrete_types:
             for abstract_type, subtypes in subs.items():
                 if any(concrete_type == t["type_name"] for t in subtypes):
@@ -450,7 +630,7 @@ class RootNodeTypes(RootedRoot[tuple[NodeTypeInfo, ...]]):
         return MappingProxyType({self.language: self.flattened})
 
     @property
-    def subtypes(self) -> frozenset[NodeNameT]:
+    def subtypes(self) -> frozenset[NodeName]:
         """Get a set of all node type names that are subtypes."""
         return frozenset({t["type_name"] for val in self.subtype_map.values() for t in val})
 
@@ -471,16 +651,16 @@ class RootNodeTypes(RootedRoot[tuple[NodeTypeInfo, ...]]):
         })
 
     @property
-    def fields(self) -> MappingProxyType[NodeNameT, ChildInfo]:
+    def fields(self) -> MappingProxyType[NodeName, ChildInfo]:
         """Get a mapping of all field names to their ChildInfo."""
-        fields: dict[NodeNameT, ChildInfo] = {}
+        fields: dict[NodeName, ChildInfo] = {}
         for entry in self:
             if "fields" in entry:
                 fields |= entry["fields"]
         return MappingProxyType(fields)
 
     @property
-    def children(self) -> MappingProxyType[NodeNameT, ChildInfo]:
+    def children(self) -> MappingProxyType[NodeName, ChildInfo]:
         """Get a mapping of all child names to their ChildInfo."""
         return MappingProxyType({
             entry["type_name"]: entry["children"] for entry in self if "children" in entry
@@ -549,22 +729,22 @@ class NodeTypeParser(BasedModel):
         return tuple(node for mapping in self.parse_all_node_types() for node in mapping.values())
 
     @staticmethod
-    def _add_node_group(types: list[SimpleField]) -> set[NodeNameT]:
+    def _add_node_group(types: list[SimpleField]) -> set[NodeName]:
         """Extract node type names from a list of SimpleField entries."""
         assembled_types = {t.get("type_name", t.get("type")) for t in types}
-        return {cast(NodeNameT, t) for t in assembled_types if t}
+        return {cast(NodeName, t) for t in assembled_types if t}
 
     @staticmethod
-    def _get_node_types_from_info_values(info: NodeTypeInfo) -> set[NodeNameT]:  # noqa: C901
+    def _get_node_types_from_info_values(info: NodeTypeInfo) -> set[NodeName]:  # noqa: C901
         """Extract node type names from NodeTypeInfo values."""
-        all_types: set[NodeNameT] = set()
+        all_types: set[NodeName] = set()
         for key, value in info.items():
             match key:
                 case "type_name" | "type":
                     if "subtypes" in info:
                         all_types.add(AbstractNodeName(value))  # pyright: ignore[reportArgumentType]
                     else:
-                        all_types.add(cast(NodeNameT, value))
+                        all_types.add(cast(NodeName, value))
                 case "subtypes":
                     if isinstance(value, str):
                         all_types.add(AbstractNodeName(value))  # pyright: ignore[reportArgumentType]
@@ -584,13 +764,13 @@ class NodeTypeParser(BasedModel):
                     continue
         return all_types
 
-    def get_all_node_types(self) -> set[NodeNameT]:
+    def get_all_node_types(self) -> set[NodeName]:
         """Get all unique node type names across all languages.
 
         Returns:
             Set of all node type names found in node_types
         """
-        all_types: set[NodeNameT] = set()
+        all_types: set[NodeName] = set()
         node_types = self.parse_all_node_types()
 
         # Iterate explicitly and extract a string type name from each node entry.
@@ -627,8 +807,6 @@ class NodeTypeParser(BasedModel):
             >>> python_expr.is_subtype("binary_expression")
             True
         """
-        from codeweaver.semantic.grammar_types import AbstractTypeInfo
-
         type_map: dict[str, dict[str, AbstractTypeInfo]] = defaultdict(dict)
 
         for language_mapping in self.parse_all_node_types():
@@ -705,9 +883,7 @@ class NodeTypeParser(BasedModel):
         }
 
     def get_node_semantic_info(
-        self,
-        node_type: str,
-        language: SemanticSearchLanguage | str,
+        self, node_type: str, language: SemanticSearchLanguage | str
     ) -> NodeSemanticInfo | None:
         """Get comprehensive semantic information for a node type.
 
@@ -734,18 +910,13 @@ class NodeTypeParser(BasedModel):
         if not isinstance(language, SemanticSearchLanguage):
             language = SemanticSearchLanguage.from_string(language)
 
-        # Find node info in parsed data
-        node_info = self._find_node_info(node_type, language)
-        if not node_info:
-            return None
-
-        # Extract semantic information
-        return self._extract_semantic_info(node_info, language.value)
+        if node_info := self._find_node_info(node_type, language):
+            # Extract semantic information
+            return self._extract_semantic_info(node_info, language.value)
+        return None
 
     def _find_node_info(
-        self,
-        node_type: str,
-        language: SemanticSearchLanguage,
+        self, node_type: str, language: SemanticSearchLanguage
     ) -> NodeTypeInfo | None:
         """Find node info for a specific type in a language.
 
@@ -768,11 +939,7 @@ class NodeTypeParser(BasedModel):
 
         return None
 
-    def _extract_semantic_info(
-        self,
-        node_info: NodeTypeInfo,
-        language: str,
-    ) -> NodeSemanticInfo:
+    def _extract_semantic_info(self, node_info: NodeTypeInfo, language: str) -> NodeSemanticInfo:
         """Extract semantic information from node type info.
 
         Args:
@@ -782,8 +949,6 @@ class NodeTypeParser(BasedModel):
         Returns:
             NodeSemanticInfo with all extracted data
         """
-        from codeweaver.semantic.grammar_types import NodeSemanticInfo
-
         # Extract fields
         fields = self._extract_fields(node_info)
 
@@ -793,11 +958,15 @@ class NodeTypeParser(BasedModel):
         # Check if abstract (has subtypes)
         subtypes_data = node_info.get("subtypes", [])
         is_abstract = bool(subtypes_data)
-        subtypes = tuple(
-            str(st.get("type_name", st.get("type", "")))
-            for st in subtypes_data
-            if isinstance(st, dict)
-        ) if is_abstract else ()
+        subtypes = (
+            tuple(
+                str(st.get("type_name", st.get("type", "")))
+                for st in subtypes_data
+                if isinstance(st, dict)
+            )
+            if is_abstract
+            else ()
+        )
 
         # Find supertype if this is a concrete type
         node_type_name = str(node_info.get("type_name", node_info.get("type", "")))
@@ -825,8 +994,6 @@ class NodeTypeParser(BasedModel):
         Returns:
             Tuple of FieldInfo objects
         """
-        from codeweaver.semantic.grammar_types import FieldInfo
-
         fields_data = node_info.get("fields")
         if not isinstance(fields_data, dict):
             return ()
@@ -843,12 +1010,14 @@ class NodeTypeParser(BasedModel):
                 if isinstance(t, dict)
             )
 
-            fields.append(FieldInfo(
-                name=str(field_name),
-                required=field_data.get("required", False),
-                multiple=field_data.get("multiple", False),
-                types=types,
-            ))
+            fields.append(
+                FieldInfo(
+                    name=str(field_name),
+                    required=field_data.get("required", False),
+                    multiple=field_data.get("multiple", False),
+                    types=types,
+                )
+            )
 
         return tuple(fields)
 
@@ -867,9 +1036,7 @@ class NodeTypeParser(BasedModel):
 
         types_data = children_data.get("types", [])
         return tuple(
-            str(t.get("type_name", t.get("type", "")))
-            for t in types_data
-            if isinstance(t, dict)
+            str(t.get("type_name", t.get("type", ""))) for t in types_data if isinstance(t, dict)
         )
 
     def _find_supertype(self, node_type: str, language: str) -> str | None:
@@ -890,9 +1057,7 @@ class NodeTypeParser(BasedModel):
         return None
 
     def get_supertype_hierarchy(
-        self,
-        node_type: str,
-        language: SemanticSearchLanguage | str,
+        self, node_type: str, language: SemanticSearchLanguage | str
     ) -> list[str]:
         """Get hierarchy of supertypes for a node type.
 
@@ -929,14 +1094,14 @@ class NodeTypeParser(BasedModel):
 
         return hierarchy
 
-    def find_common_patterns(self) -> dict[NodeNameT, list[SemanticSearchLanguage]]:
+    def find_common_patterns(self) -> dict[NodeName, list[SemanticSearchLanguage]]:
         """Find common node type patterns across languages.
 
         Returns:
             Dictionary mapping patterns to languages that have them
         """
         node_types = self.parse_all_node_types()
-        pattern_languages: dict[NodeNameT, list[SemanticSearchLanguage]] = {}
+        pattern_languages: dict[NodeName, list[SemanticSearchLanguage]] = {}
 
         # Build mapping keyed by the node type name (string), collecting all node types per language
         for language_node_types in node_types:
@@ -950,8 +1115,8 @@ class NodeTypeParser(BasedModel):
                 # Add this language to the pattern mapping for each node type it has
                 for node_type_name in language_node_type_names:
                     if node_type_name not in pattern_languages:
-                        pattern_languages[cast(NodeNameT, node_type_name)] = []
-                    pattern_languages[cast(NodeNameT, node_type_name)].append(language_name)
+                        pattern_languages[cast(NodeName, node_type_name)] = []
+                    pattern_languages[cast(NodeName, node_type_name)].append(language_name)
 
         # Sort by frequency (most common patterns first)
         return dict(sorted(pattern_languages.items(), key=lambda x: len(x[1]), reverse=True))

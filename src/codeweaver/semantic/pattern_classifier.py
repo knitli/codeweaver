@@ -26,6 +26,8 @@ from codeweaver.semantic.syntactic import SyntacticClassifier
 class ClassificationPhase(BaseEnum):
     """Phases of the hierarchical classification pipeline."""
 
+    GRAMMAR = "grammar"  # pre-defined grammar patterns inferred from tree-sitter grammars
+
     SYNTACTIC = "syntactic"
     TIER_MATCH = "tier_match"
     PATTERN_MATCH = "pattern_match"

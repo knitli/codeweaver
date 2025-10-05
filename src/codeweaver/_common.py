@@ -58,6 +58,8 @@ from pydantic_core import core_schema
 type LiteralStringT = Annotated[
     LiteralString, GetPydanticSchema(lambda _schema, handler: handler(str))
 ]
+
+NodeName = NewType("NodeName", LiteralStringT)
 AbstractNodeName = NewType("AbstractNodeName", LiteralStringT)
 
 type EnumExtend = Callable[[Enum, str], Enum]
@@ -150,7 +152,7 @@ class DataclassSerializationMixin:
         return adapter.validate_python(data, **kwargs)
 
 
-def _generate_title(model: type[Any]) -> str:
+def generate_title(model: type[Any]) -> str:
     """Generate a title for a model."""
     model_name = (
         model.__name__
@@ -164,7 +166,7 @@ def _generate_title(model: type[Any]) -> str:
     return textcase.title(model_name.replace("Model", ""))
 
 
-def _generate_field_title(name: str, info: FieldInfo | ComputedFieldInfo) -> str:
+def generate_field_title(name: str, info: FieldInfo | ComputedFieldInfo) -> str:
     """Generate a title for a model field."""
     if titled := info.title:
         return titled
@@ -185,8 +187,8 @@ class RootedRoot[RootType: Sequence[Any]](RootModel[Sequence[Any]]):
         cache_strings="all",
         serialize_by_alias=True,
         str_strip_whitespace=True,
-        field_title_generator=_generate_field_title,
-        model_title_generator=_generate_title,
+        field_title_generator=generate_field_title,
+        model_title_generator=generate_title,
         use_attribute_docstrings=True,
         validate_by_alias=True,
         validate_by_name=True,
@@ -222,8 +224,8 @@ class BasedModel(BaseModel):
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
         cache_strings="all",
-        field_title_generator=_generate_field_title,
-        model_title_generator=_generate_title,
+        field_title_generator=generate_field_title,
+        model_title_generator=generate_title,
         serialize_by_alias=True,
         str_strip_whitespace=True,
         use_attribute_docstrings=True,

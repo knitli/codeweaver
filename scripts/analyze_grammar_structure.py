@@ -49,6 +49,18 @@ class GrammarStructureStats:
     # Root patterns
     root_nodes: list[str] = field(default_factory=list)
 
+    # Q1: Category references in connections
+    field_references: dict[str, set[str]] = field(default_factory=lambda: defaultdict(set))
+    children_references: dict[str, set[str]] = field(default_factory=lambda: defaultdict(set))
+    category_references_in_fields: Counter[str] = field(default_factory=Counter)
+    category_references_in_children: Counter[str] = field(default_factory=Counter)
+    concrete_references_in_fields: Counter[str] = field(default_factory=Counter)
+    concrete_references_in_children: Counter[str] = field(default_factory=Counter)
+
+    # Q2: Multiple category membership
+    concrete_to_categories: dict[str, set[str]] = field(default_factory=lambda: defaultdict(set))
+    multi_category_things: dict[str, list[str]] = field(default_factory=dict)
+
     def summary(self) -> str:
         """Generate summary statistics."""
         return f"""
@@ -149,6 +161,10 @@ class GrammarStructureAnalyzer:
         for node_info in node_types:
             self._analyze_node(node_info, stats)
 
+        # Post-process: Classify references and identify multi-category Things
+        self._classify_connection_references(stats)
+        self._identify_multi_category_things(stats)
+
         return stats
 
     def _analyze_node(self, node_info: dict[str, Any], stats: GrammarStructureStats) -> None:
@@ -161,27 +177,46 @@ class GrammarStructureAnalyzer:
         else:
             stats.unnamed_nodes += 1
 
-        # Check for subtypes (abstract types)
+        # Check for subtypes (abstract types / Categories)
         if "subtypes" in node_info:
             stats.abstract_type_count += 1
             subtypes = [st["type"] for st in node_info.get("subtypes", [])]
             stats.abstract_types[node_type] = subtypes
 
-        # Check for fields
+            # Q2: Track which concrete types belong to which categories
+            for subtype in subtypes:
+                stats.concrete_to_categories[subtype].add(node_type)
+
+        # Check for fields (Direct connections)
         if "fields" in node_info:
             stats.nodes_with_fields += 1
             fields = node_info["fields"]
 
             # Count field names
-            for field_name in fields:
+            for field_name, field_info in fields.items():
                 stats.common_field_names[field_name] += 1
 
                 if parent_category := self._infer_category_from_node_type(node_type):
                     stats.field_semantic_roles[field_name].append(f"{parent_category}:{node_type}")
 
-        # Check for children
+                # Q1: Track what types are referenced in fields
+                if "types" in field_info:
+                    for type_ref in field_info["types"]:
+                        ref_type = type_ref.get("type", "")
+                        if ref_type:
+                            stats.field_references[node_type].add(ref_type)
+
+        # Check for children (Positional connections)
         if "children" in node_info:
             stats.nodes_with_children += 1
+
+            # Q1: Track what types are referenced in children
+            children_info = node_info["children"]
+            if "types" in children_info:
+                for type_ref in children_info["types"]:
+                    ref_type = type_ref.get("type", "")
+                    if ref_type:
+                        stats.children_references[node_type].add(ref_type)
 
             # Check for both fields and children
             if "fields" in node_info:
@@ -195,6 +230,38 @@ class GrammarStructureAnalyzer:
         # Check for root
         if node_info.get("root", False):
             stats.root_nodes.append(node_type)
+
+    def _classify_connection_references(self, stats: GrammarStructureStats) -> None:
+        """Classify connection references as Category or Concrete Thing references.
+
+        Answers Q1: Can connections reference Categories or only concrete Things?
+        """
+        abstract_types = set(stats.abstract_types.keys())
+
+        # Analyze field references
+        for _source_node, target_types in stats.field_references.items():
+            for target_type in target_types:
+                if target_type in abstract_types:
+                    stats.category_references_in_fields[target_type] += 1
+                else:
+                    stats.concrete_references_in_fields[target_type] += 1
+
+        # Analyze children references
+        for _source_node, target_types in stats.children_references.items():
+            for target_type in target_types:
+                if target_type in abstract_types:
+                    stats.category_references_in_children[target_type] += 1
+                else:
+                    stats.concrete_references_in_children[target_type] += 1
+
+    def _identify_multi_category_things(self, stats: GrammarStructureStats) -> None:
+        """Identify Things that belong to multiple Categories.
+
+        Answers Q2: Can a Thing belong to multiple Categories?
+        """
+        for concrete_type, categories in stats.concrete_to_categories.items():
+            if len(categories) > 1:
+                stats.multi_category_things[concrete_type] = sorted(categories)
 
     def _infer_category_from_node_type(self, node_type: str) -> str | None:
         """Infer semantic category from node type name."""
@@ -218,6 +285,13 @@ class GrammarStructureAnalyzer:
             "universal_field_names": Counter(),
             "common_extra_nodes": Counter(),
             "field_semantic_patterns": defaultdict(Counter),
+            # Q1 patterns
+            "category_refs_in_fields": Counter(),
+            "category_refs_in_children": Counter(),
+            "concrete_refs_in_fields": Counter(),
+            "concrete_refs_in_children": Counter(),
+            # Q2 patterns
+            "all_multi_category_things": defaultdict(set),
         }
 
         for stats in self.stats.values():
@@ -239,7 +313,113 @@ class GrammarStructureAnalyzer:
                     category = context.split(":")[0]
                     patterns["field_semantic_patterns"][field_name][category] += 1
 
+            # Q1: Aggregate category and concrete references
+            patterns["category_refs_in_fields"].update(stats.category_references_in_fields)
+            patterns["category_refs_in_children"].update(stats.category_references_in_children)
+            patterns["concrete_refs_in_fields"].update(stats.concrete_references_in_fields)
+            patterns["concrete_refs_in_children"].update(stats.concrete_references_in_children)
+
+            # Q2: Aggregate multi-category Things
+            for thing, categories in stats.multi_category_things.items():
+                patterns["all_multi_category_things"][thing].update(categories)
+
         return patterns
+
+    def analyze_category_references(self) -> dict[str, Any]:
+        """Analyze Q1: Category vs Concrete references in connections.
+
+        Returns detailed statistics about what types of references appear in
+        fields (Direct connections) and children (Positional connections).
+        """
+        total_category_in_fields = 0
+        total_concrete_in_fields = 0
+        total_category_in_children = 0
+        total_concrete_in_children = 0
+
+        # Language-specific examples
+        examples_fields_category: list[tuple[str, str, str]] = []  # (language, source, target)
+        examples_fields_concrete: list[tuple[str, str, str]] = []
+        examples_children_category: list[tuple[str, str, str]] = []
+        examples_children_concrete: list[tuple[str, str, str]] = []
+
+        for lang, stats in self.stats.items():
+            abstract_types = set(stats.abstract_types.keys())
+
+            # Count references
+            total_category_in_fields += sum(stats.category_references_in_fields.values())
+            total_concrete_in_fields += sum(stats.concrete_references_in_fields.values())
+            total_category_in_children += sum(stats.category_references_in_children.values())
+            total_concrete_in_children += sum(stats.concrete_references_in_children.values())
+
+            # Collect examples (limit to first 3 per type per language)
+            field_cat_count = 0
+            field_conc_count = 0
+            for source, targets in stats.field_references.items():
+                for target in targets:
+                    if target in abstract_types and field_cat_count < 3:
+                        examples_fields_category.append((lang.value, source, target))
+                        field_cat_count += 1
+                    elif target not in abstract_types and field_conc_count < 3:
+                        examples_fields_concrete.append((lang.value, source, target))
+                        field_conc_count += 1
+
+            child_cat_count = 0
+            child_conc_count = 0
+            for source, targets in stats.children_references.items():
+                for target in targets:
+                    if target in abstract_types and child_cat_count < 3:
+                        examples_children_category.append((lang.value, source, target))
+                        child_cat_count += 1
+                    elif target not in abstract_types and child_conc_count < 3:
+                        examples_children_concrete.append((lang.value, source, target))
+                        child_conc_count += 1
+
+        return {
+            "field_category_count": total_category_in_fields,
+            "field_concrete_count": total_concrete_in_fields,
+            "children_category_count": total_category_in_children,
+            "children_concrete_count": total_concrete_in_children,
+            "examples_fields_category": examples_fields_category[:20],
+            "examples_fields_concrete": examples_fields_concrete[:20],
+            "examples_children_category": examples_children_category[:20],
+            "examples_children_concrete": examples_children_concrete[:20],
+        }
+
+    def analyze_multi_category_membership(self) -> dict[str, Any]:
+        """Analyze Q2: Things belonging to multiple Categories.
+
+        Returns statistics about how common it is for a Thing to belong to
+        multiple Categories across all languages.
+        """
+        all_things_with_categories: dict[str, int] = Counter()
+        things_in_multiple: list[tuple[str, str, list[str]]] = []  # (language, thing, categories)
+
+        for lang, stats in self.stats.items():
+            # Count all Things that have any category membership
+            for thing, categories in stats.concrete_to_categories.items():
+                all_things_with_categories[thing] = len(categories)
+
+                # Track multi-category Things
+                if len(categories) > 1:
+                    things_in_multiple.append((lang.value, thing, sorted(categories)))
+
+        # Statistics
+        total_things_with_categories = len(all_things_with_categories)
+        total_multi_category = sum(1 for count in all_things_with_categories.values() if count > 1)
+        max_categories = max(all_things_with_categories.values()) if all_things_with_categories else 0
+
+        return {
+            "total_things_with_categories": total_things_with_categories,
+            "total_multi_category": total_multi_category,
+            "percentage_multi": (
+                (total_multi_category / total_things_with_categories * 100)
+                if total_things_with_categories
+                else 0
+            ),
+            "max_categories_per_thing": max_categories,
+            "examples": things_in_multiple[:30],  # First 30 examples
+            "distribution": Counter(all_things_with_categories.values()),
+        }
 
     def generate_report(self, output_file: Path | None = None) -> str:
         """Generate comprehensive analysis report."""
@@ -288,6 +468,109 @@ class GrammarStructureAnalyzer:
             total = sum(category_counts.values())
             categories = ", ".join(f"{cat}({count})" for cat, count in category_counts.items())
             report_lines.append(f"  {field_name} [{total} uses]: {categories}")
+
+        # Q1 Analysis: Category References
+        report_lines.extend([
+            "",
+            "## Q1: Category vs Concrete References in Connections",
+            "",
+            "Analysis of whether connections (fields/children) reference Categories (abstract types)",
+            "or only concrete Things.",
+            "",
+        ])
+
+        q1_analysis = self.analyze_category_references()
+
+        report_lines.extend([
+            "### Direct Connections (fields)",
+            f"  Category references: {q1_analysis['field_category_count']}",
+            f"  Concrete references: {q1_analysis['field_concrete_count']}",
+            f"  Percentage Category: {q1_analysis['field_category_count'] / (q1_analysis['field_category_count'] + q1_analysis['field_concrete_count']) * 100:.1f}%",
+            "",
+            "Examples of Category references in fields:",
+        ])
+
+        for lang, source, target in q1_analysis["examples_fields_category"][:10]:
+            report_lines.append(f"  - {lang}: {source} → {target} (Category)")
+
+        report_lines.extend([
+            "",
+            "Examples of Concrete references in fields:",
+        ])
+
+        for lang, source, target in q1_analysis["examples_fields_concrete"][:10]:
+            report_lines.append(f"  - {lang}: {source} → {target} (Concrete)")
+
+        report_lines.extend([
+            "",
+            "### Positional Connections (children)",
+            f"  Category references: {q1_analysis['children_category_count']}",
+            f"  Concrete references: {q1_analysis['children_concrete_count']}",
+            f"  Percentage Category: {q1_analysis['children_category_count'] / (q1_analysis['children_category_count'] + q1_analysis['children_concrete_count']) * 100:.1f}%" if (q1_analysis['children_category_count'] + q1_analysis['children_concrete_count']) > 0 else "  Percentage Category: N/A",
+            "",
+            "Examples of Category references in children:",
+        ])
+
+        for lang, source, target in q1_analysis["examples_children_category"][:10]:
+            report_lines.append(f"  - {lang}: {source} → {target} (Category)")
+
+        report_lines.extend([
+            "",
+            "Examples of Concrete references in children:",
+        ])
+
+        for lang, source, target in q1_analysis["examples_children_concrete"][:10]:
+            report_lines.append(f"  - {lang}: {source} → {target} (Concrete)")
+
+        # Q2 Analysis: Multi-Category Membership
+        report_lines.extend([
+            "",
+            "## Q2: Things with Multiple Category Membership",
+            "",
+            "Analysis of whether concrete Things can belong to multiple Categories",
+            "(i.e., appear in multiple abstract types' subtypes lists).",
+            "",
+        ])
+
+        q2_analysis = self.analyze_multi_category_membership()
+
+        report_lines.extend([
+            f"Total Things with category membership: {q2_analysis['total_things_with_categories']}",
+            f"Things belonging to multiple Categories: {q2_analysis['total_multi_category']}",
+            f"Percentage multi-category: {q2_analysis['percentage_multi']:.1f}%",
+            f"Maximum categories per Thing: {q2_analysis['max_categories_per_thing']}",
+            "",
+            "Distribution of category membership:",
+        ])
+
+        for num_cats, count in sorted(q2_analysis["distribution"].items()):
+            report_lines.append(f"  {num_cats} category/categories: {count} Things")
+
+        report_lines.extend([
+            "",
+            "Examples of Things with multiple Category membership:",
+        ])
+
+        for lang, thing, categories in q2_analysis["examples"][:20]:
+            cats_str = ", ".join(categories)
+            report_lines.append(f"  - {lang}: {thing} → [{cats_str}]")
+
+        report_lines.extend([
+            "",
+            "## Conclusions",
+            "",
+            "### Q1: Category References",
+            f"**Answer: YES** - Connections CAN reference Categories (abstract types).",
+            f"- Fields reference Categories in {q1_analysis['field_category_count']} cases",
+            f"- Children reference Categories in {q1_analysis['children_category_count']} cases",
+            "- This is a common pattern used for polymorphic type constraints",
+            "",
+            "### Q2: Multiple Category Membership",
+            f"**Answer: YES** - Things CAN belong to multiple Categories, but it's {('uncommon' if q2_analysis['percentage_multi'] < 20 else 'common')}.",
+            f"- Only {q2_analysis['percentage_multi']:.1f}% of Things belong to multiple Categories",
+            f"- Maximum observed: {q2_analysis['max_categories_per_thing']} categories for a single Thing",
+            "- This typically occurs for nodes that serve multiple grammatical roles",
+        ])
 
         report = "\n".join(report_lines)
 

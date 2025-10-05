@@ -198,12 +198,10 @@ class ContextualScorer(ConfidenceScorer):
         self, result: ClassificationResult, sibling_types: list[str]
     ) -> float:
         """Adjust confidence based on sibling node types."""
-        if result.category == SemanticNodeCategory.SYNTAX_SYNTACTIC:
+        if result.category == SemanticNodeCategory.SYNTAX_STRUCTURAL:
             structural_siblings = sum(
-
-                    any(punct in s.lower() for punct in [",", ";", "(", ")", "[", "]"])
-                    for s in sibling_types
-
+                any(punct in s.lower() for punct in [",", ";", "(", ")", "[", "]"])
+                for s in sibling_types
             )
             if structural_siblings > len(sibling_types) * 0.5:
                 return 1.1

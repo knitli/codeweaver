@@ -161,7 +161,7 @@ class SemanticNodeClassifier:
                 category=grammar_result.category,
                 tier=grammar_result.tier,
                 confidence=grammar_result.confidence,
-                phase=ClassificationPhase.TIER_1,  # High priority
+                phase=ClassificationPhase.GRAMMAR,
                 matched_pattern=f"grammar_{grammar_result.classification_method}",
                 alternative_categories=None,
             )

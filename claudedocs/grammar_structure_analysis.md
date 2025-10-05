@@ -769,79 +769,604 @@ Root Nodes: scalar
 
 ### Common Abstract Types (appears in multiple languages)
   expression: 18/25 languages (72.0%)
-  statement: 14/25 languages (56.0%)
-  type: 9/25 languages (36.0%)
   primary_expression: 8/25 languages (32.0%)
-  declaration: 8/25 languages (32.0%)
-  pattern: 8/25 languages (32.0%)
-  literal: 4/25 languages (16.0%)
+  statement: 14/25 languages (56.0%)
   abstract_declarator: 2/25 languages (8.0%)
   declarator: 2/25 languages (8.0%)
   field_declarator: 2/25 languages (8.0%)
   type_declarator: 2/25 languages (8.0%)
   type_specifier: 2/25 languages (8.0%)
-  simple_statement: 2/25 languages (8.0%)
-  simple_type: 2/25 languages (8.0%)
-  variable: 2/25 languages (8.0%)
-  primary_type: 2/25 languages (8.0%)
+  declaration: 8/25 languages (32.0%)
+  literal: 4/25 languages (16.0%)
   lvalue_expression: 1/25 languages (4.0%)
   non_lvalue_expression: 1/25 languages (4.0%)
+  pattern: 8/25 languages (32.0%)
+  type: 9/25 languages (36.0%)
   type_declaration: 1/25 languages (4.0%)
+  simple_statement: 2/25 languages (8.0%)
+  simple_type: 2/25 languages (8.0%)
   class_decl: 1/25 languages (4.0%)
+  constraint: 1/25 languages (4.0%)
+  constraints: 1/25 languages (4.0%)
+  decl: 1/25 languages (4.0%)
+  guard: 1/25 languages (4.0%)
+  instance_decl: 1/25 languages (4.0%)
+  qualifier: 1/25 languages (4.0%)
+  quantified_type: 1/25 languages (4.0%)
+  type_param: 1/25 languages (4.0%)
+  unannotated_type: 1/25 languages (4.0%)
+  module_directive: 1/25 languages (4.0%)
+  value: 1/25 languages (4.0%)
+  class_member_declaration: 1/25 languages (4.0%)
+  variable: 2/25 languages (8.0%)
+  compound_statement: 1/25 languages (4.0%)
+  expression_statement: 1/25 languages (4.0%)
+  parameter: 1/25 languages (4.0%)
+  arg: 1/25 languages (4.0%)
+  call_operator: 1/25 languages (4.0%)
+  lhs: 1/25 languages (4.0%)
+  method_name: 1/25 languages (4.0%)
+  nonlocal_variable: 1/25 languages (4.0%)
+  pattern_constant: 1/25 languages (4.0%)
+  pattern_expr: 1/25 languages (4.0%)
+  pattern_expr_basic: 1/25 languages (4.0%)
+  pattern_primitive: 1/25 languages (4.0%)
+  pattern_top_expr_body: 1/25 languages (4.0%)
+  primary: 1/25 languages (4.0%)
+  simple_numeric: 1/25 languages (4.0%)
+  declaration_statement: 1/25 languages (4.0%)
+  literal_pattern: 1/25 languages (4.0%)
+  definition: 1/25 languages (4.0%)
+  primary_type: 2/25 languages (8.0%)
 
-### Universal Field Names (top 30)
-  name: 381 total occurrences
-  body: 281 total occurrences
-  type: 217 total occurrences
-  value: 151 total occurrences
-  condition: 102 total occurrences
-  operator: 89 total occurrences
-  parameters: 87 total occurrences
-  right: 86 total occurrences
+### Universal Field Names
   left: 84 total occurrences
-  type_parameters: 73 total occurrences
-  alternative: 45 total occurrences
-  pattern: 43 total occurrences
-  return_type: 43 total occurrences
-  declarator: 38 total occurrences
-  argument: 34 total occurrences
-  arguments: 34 total occurrences
-  consequence: 30 total occurrences
-  expression: 27 total occurrences
-  type_arguments: 26 total occurrences
-  alias: 22 total occurrences
-  object: 22 total occurrences
-  decorator: 21 total occurrences
-  key: 20 total occurrences
-  function: 19 total occurrences
-  field: 18 total occurrences
-  label: 17 total occurrences
-  element: 16 total occurrences
-  patterns: 16 total occurrences
-  attributes: 16 total occurrences
+  operator: 89 total occurrences
+  right: 86 total occurrences
+  body: 281 total occurrences
+  condition: 102 total occurrences
   initializer: 15 total occurrences
+  update: 8 total occurrences
+  fallthrough: 1 total occurrences
+  termination: 1 total occurrences
+  value: 151 total occurrences
+  argument: 34 total occurrences
+  name: 381 total occurrences
+  redirect: 5 total occurrences
+  descriptor: 3 total occurrences
+  destination: 1 total occurrences
+  variable: 4 total occurrences
+  index: 8 total occurrences
+  alternative: 45 total occurrences
+  consequence: 30 total occurrences
+  declarator: 38 total occurrences
+  size: 4 total occurrences
+  parameters: 87 total occurrences
+  type: 217 total occurrences
+  prefix: 4 total occurrences
+  arguments: 34 total occurrences
+  function: 19 total occurrences
+  underlying_type: 1 total occurrences
+  field: 18 total occurrences
+  register: 2 total occurrences
+  assembly_code: 2 total occurrences
+  clobbers: 2 total occurrences
+  goto_labels: 2 total occurrences
+  input_operands: 2 total occurrences
+  output_operands: 2 total occurrences
+  label: 17 total occurrences
+  constraint: 12 total occurrences
+  symbol: 4 total occurrences
+  operand: 14 total occurrences
+  designator: 2 total occurrences
+  member: 3 total occurrences
+  directive: 2 total occurrences
+  path: 9 total occurrences
+  filter: 2 total occurrences
+  end: 9 total occurrences
+  start: 8 total occurrences
+  namespace: 4 total occurrences
+  default_value: 14 total occurrences
+  base: 4 total occurrences
+  header: 1 total occurrences
+  partition: 2 total occurrences
+  captures: 2 total occurrences
+  template_parameters: 1 total occurrences
+  length: 4 total occurrences
+  placement: 1 total occurrences
+  default_type: 2 total occurrences
+  pattern: 43 total occurrences
+  scope: 5 total occurrences
+  delimiter: 1 total occurrences
+  requirements: 1 total occurrences
+  message: 1 total occurrences
+  indices: 1 total occurrences
+  alias: 22 total occurrences
+  rank: 1 total occurrences
+  type_parameters: 73 total occurrences
+  expression: 27 total occurrences
+  subscript: 2 total occurrences
+  accessors: 3 total occurrences
+  returns: 2 total occurrences
+  content: 4 total occurrences
+  qualifier: 2 total occurrences
+  key: 20 total occurrences
+  target: 7 total occurrences
+  quoted_end: 5 total occurrences
+  quoted_start: 5 total occurrences
+  element: 16 total occurrences
+  type_arguments: 26 total occurrences
+  communication: 1 total occurrences
+  tag: 1 total occurrences
+  result: 11 total occurrences
+  receiver: 2 total occurrences
+  package: 4 total occurrences
+  channel: 1 total occurrences
+  capacity: 1 total occurrences
+  binds: 6 total occurrences
+  match: 5 total occurrences
+  patterns: 16 total occurrences
+  kind: 15 total occurrences
+  constructor: 10 total occurrences
+  from: 2 total occurrences
+  step: 2 total occurrences
+  to: 2 total occurrences
+  bind: 2 total occurrences
+  arrow: 7 total occurrences
+  implicit: 2 total occurrences
+  alternatives: 4 total occurrences
+  context: 8 total occurrences
+  declarations: 3 total occurrences
+  fundeps: 1 total occurrences
+  declaration: 6 total occurrences
+  else: 3 total occurrences
+  if: 1 total occurrences
+  then: 1 total occurrences
+  forall: 8 total occurrences
+  constructors: 3 total occurrences
+  deriving: 2 total occurrences
+  signature: 3 total occurrences
+  classes: 1 total occurrences
+  strategy: 2 total occurrences
+  via: 2 total occurrences
+  statement: 2 total occurrences
+  id: 2 total occurrences
+  module: 8 total occurrences
+  synonym: 2 total occurrences
+  equation: 1 total occurrences
+  children: 2 total occurrences
+  export: 1 total occurrences
+  parameter: 9 total occurrences
+  subfield: 1 total occurrences
+  associativity: 1 total occurrences
+  precedence: 1 total occurrences
+  quantifier: 2 total occurrences
+  variables: 2 total occurrences
+  calling_convention: 2 total occurrences
+  entity: 2 total occurrences
+  safety: 1 total occurrences
+  parens: 2 total occurrences
+  determined: 2 total occurrences
+  matched: 1 total occurrences
+  fundep: 1 total occurrences
+  names: 3 total occurrences
+  classifier: 1 total occurrences
+  guard: 3 total occurrences
+  imports: 1 total occurrences
+  exports: 1 total occurrences
+  import: 1 total occurrences
+  left_operand: 2 total occurrences
+  right_operand: 2 total occurrences
+  multiplicity: 1 total occurrences
+  qualifiers: 1 total occurrences
+  decl: 1 total occurrences
+  guards: 1 total occurrences
+  minus: 1 total occurrences
+  number: 1 total occurrences
+  quoter: 2 total occurrences
+  fields: 1 total occurrences
+  role: 1 total occurrences
+  transformation: 1 total occurrences
+  closed_family: 1 total occurrences
+  dimensions: 9 total occurrences
+  array: 1 total occurrences
+  interfaces: 3 total occurrences
+  permits: 2 total occurrences
+  superclass: 2 total occurrences
+  object: 22 total occurrences
+  modules: 2 total occurrences
+  init: 1 total occurrences
+  provided: 1 total occurrences
+  provider: 1 total occurrences
+  modifiers: 1 total occurrences
+  template_argument: 1 total occurrences
+  template_processor: 1 total occurrences
+  resources: 1 total occurrences
+  optional_chain: 7 total occurrences
+  decorator: 21 total occurrences
+  source: 10 total occurrences
+  property: 7 total occurrences
+  increment: 3 total occurrences
+  close_tag: 3 total occurrences
+  open_tag: 3 total occurrences
+  attribute: 8 total occurrences
+  flags: 3 total occurrences
+  finalizer: 3 total occurrences
+  handler: 4 total occurrences
+  table: 3 total occurrences
+  clause: 1 total occurrences
+  method: 2 total occurrences
+  attr: 2 total occurrences
+  attrpath: 3 total occurrences
+  binding: 1 total occurrences
+  default: 2 total occurrences
+  ellipses: 1 total occurrences
+  formal: 1 total occurrences
+  formals: 1 total occurrences
+  universal: 1 total occurrences
+  attrs: 2 total occurrences
+  environment: 1 total occurrences
+  attributes: 16 total occurrences
+  reference_modifier: 6 total occurrences
+  return_type: 43 total occurrences
+  static_modifier: 2 total occurrences
+  initialize: 1 total occurrences
+  end_tag: 2 total occurrences
+  identifier: 2 total occurrences
+  conditional_expressions: 1 total occurrences
+  return_expression: 2 total occurrences
+  final: 1 total occurrences
+  readonly: 1 total occurrences
+  visibility: 2 total occurrences
+  superclasses: 1 total occurrences
+  operators: 1 total occurrences
+  definition: 2 total occurrences
+  code: 1 total occurrences
+  format_specifier: 2 total occurrences
+  type_conversion: 2 total occurrences
+  module_name: 1 total occurrences
+  subject: 1 total occurrences
+  cause: 1 total occurrences
+  class: 3 total occurrences
+  locals: 1 total occurrences
+  block: 2 total occurrences
+  clauses: 1 total occurrences
+  begin: 1 total occurrences
+  exceptions: 1 total occurrences
+  trait: 4 total occurrences
+  bounds: 5 total occurrences
+  doc: 2 total occurrences
+  inner: 2 total occurrences
+  outer: 2 total occurrences
+  macro: 1 total occurrences
+  list: 1 total occurrences
+  class_parameters: 4 total occurrences
+  derive: 5 total occurrences
+  extend: 7 total occurrences
+  lambda_start: 1 total occurrences
+  extra: 1 total occurrences
+  bound: 5 total occurrences
+  enumerators: 1 total occurrences
+  parameter_types: 1 total occurrences
+  interpolator: 1 total occurrences
+  selector: 1 total occurrences
+  initial: 1 total occurrences
+  import_name: 1 total occurrences
+  ancestor: 1 total occurrences
+  ancestor_arguments: 1 total occurrences
+  location: 4 total occurrences
+  error: 2 total occurrences
+  version_constraint: 1 total occurrences
+  attempt: 1 total occurrences
+  key_identifier: 1 total occurrences
+  key_type: 1 total occurrences
+  value_identifier: 1 total occurrences
+  value_type: 1 total occurrences
+  lhs: 8 total occurrences
+  op: 10 total occurrences
+  rhs: 8 total occurrences
+  expr: 4 total occurrences
+  must_inherit: 1 total occurrences
+  declaration_kind: 2 total occurrences
+  constructed_type: 1 total occurrences
+  data_contents: 1 total occurrences
+  raw_value: 1 total occurrences
+  constrained_type: 2 total occurrences
+  must_equal: 1 total occurrences
+  collection: 1 total occurrences
+  item: 1 total occurrences
+  params: 1 total occurrences
+  bound_identifier: 5 total occurrences
+  inherits_from: 2 total occurrences
+  reference_specifier: 2 total occurrences
+  external_name: 2 total occurrences
+  interpolation: 4 total occurrences
+  text: 3 total occurrences
+  suffix: 2 total occurrences
+  if_nil: 1 total occurrences
+  wrapped: 1 total occurrences
+  operation: 2 total occurrences
+  computed_value: 1 total occurrences
+  suppressed: 1 total occurrences
+  if_false: 1 total occurrences
+  if_true: 1 total occurrences
+  mutability: 1 total occurrences
+  index_type: 2 total occurrences
+  sign: 2 total occurrences
 
 ### Field Semantic Patterns
 
 Shows which semantic categories commonly use each field name:
 
-  name [201 uses]: type_def(93), callable(54), control_flow(25)
-  body [171 uses]: control_flow(75), callable(45), type_def(43)
-  type [87 uses]: type_def(69), callable(8), control_flow(6)
+  name [201 uses]: callable(54), operation(7), control_flow(25), type_def(93), boundary(22)
+  body [171 uses]: control_flow(75), callable(45), type_def(43), boundary(8)
+  type [87 uses]: callable(8), type_def(69), control_flow(6), boundary(3), operation(1)
   condition [73 uses]: control_flow(73)
   parameters [70 uses]: callable(60), type_def(8), operation(2)
   type_parameters [64 uses]: type_def(32), callable(30), operation(2)
-  right [60 uses]: operation(48), control_flow(7), type_def(4)
-  left [59 uses]: operation(48), control_flow(6), type_def(4)
-  operator [56 uses]: operation(50), control_flow(3), boundary(2)
-  value [45 uses]: control_flow(22), type_def(15), operation(3)
-  return_type [40 uses]: callable(37), operation(2), type_def(1)
+  right [60 uses]: operation(48), control_flow(7), callable(1), type_def(4)
+  left [59 uses]: operation(48), callable(1), control_flow(6), type_def(4)
+  operator [56 uses]: operation(50), boundary(2), control_flow(3), type_def(1)
+  value [45 uses]: control_flow(22), operation(3), callable(2), type_def(15), boundary(3)
+  return_type [40 uses]: callable(37), type_def(1), operation(2)
   alternative [31 uses]: control_flow(29), type_def(2)
   arguments [20 uses]: operation(13), callable(5), type_def(2)
   consequence [19 uses]: control_flow(17), type_def(2)
-  alias [16 uses]: boundary(9), type_def(4), control_flow(3)
+  alias [16 uses]: control_flow(3), type_def(4), boundary(9)
   function [14 uses]: operation(10), callable(4)
-  type_arguments [14 uses]: type_def(8), operation(3), callable(3)
+  type_arguments [14 uses]: operation(3), type_def(8), callable(3)
   decorator [14 uses]: type_def(10), boundary(3), callable(1)
   declarator [13 uses]: callable(7), type_def(5), control_flow(1)
   argument [13 uses]: operation(13)
+  initializer [12 uses]: control_flow(11), type_def(1)
+  result [9 uses]: callable(6), type_def(2), operation(1)
+  patterns [9 uses]: type_def(6), callable(3)
+  source [9 uses]: boundary(9)
+  update [8 uses]: control_flow(8)
+  element [8 uses]: type_def(8)
+  attributes [8 uses]: type_def(4), callable(4)
+  operand [7 uses]: operation(5), type_def(2)
+  pattern [7 uses]: type_def(3), control_flow(4)
+  module [7 uses]: boundary(4), control_flow(1), type_def(2)
+  object [7 uses]: type_def(1), callable(2), operation(2), control_flow(2)
+  kind [6 uses]: type_def(3), control_flow(3)
+  dimensions [6 uses]: type_def(2), control_flow(3), callable(1)
+  constraint [5 uses]: callable(1), type_def(3), control_flow(1)
+  path [5 uses]: boundary(3), control_flow(1), type_def(1)
+  context [5 uses]: type_def(5)
+  constructor [5 uses]: type_def(5)
+  forall [5 uses]: type_def(5)
+  parameter [5 uses]: callable(5)
+  bound [5 uses]: type_def(4), callable(1)
+  key [4 uses]: operation(1), type_def(2), control_flow(1)
+  package [4 uses]: type_def(1), boundary(3)
+  declaration [4 uses]: type_def(1), boundary(3)
+  bounds [4 uses]: type_def(3), control_flow(1)
+  default_value [4 uses]: type_def(2), callable(2)
+  variable [3 uses]: control_flow(1), boundary(2)
+  scope [3 uses]: control_flow(2), operation(1)
+  target [3 uses]: operation(3)
+  namespace [3 uses]: type_def(1), boundary(2)
+  match [3 uses]: type_def(1), callable(1), control_flow(1)
+  expression [3 uses]: callable(1), control_flow(2)
+  increment [3 uses]: control_flow(3)
+  trait [3 uses]: type_def(2), callable(1)
+  derive [3 uses]: type_def(2), boundary(1)
+  extend [3 uses]: type_def(2), boundary(1)
+  bound_identifier [3 uses]: control_flow(3)
+  directive [2 uses]: operation(2)
+  base [2 uses]: control_flow(1), type_def(1)
+  partition [2 uses]: boundary(2)
+  captures [2 uses]: callable(2)
+  default_type [2 uses]: type_def(2)
+  returns [2 uses]: callable(2)
+  qualifier [2 uses]: control_flow(2)
+  length [2 uses]: type_def(2)
+  receiver [2 uses]: callable(1), operation(1)
+  binds [2 uses]: type_def(1), callable(1)
+  constructors [2 uses]: type_def(2)
+  deriving [2 uses]: type_def(2)
+  id [2 uses]: boundary(1), control_flow(1)
+  children [2 uses]: boundary(2)
+  quantifier [2 uses]: control_flow(2)
+  variables [2 uses]: control_flow(2)
+  calling_convention [2 uses]: boundary(2)
+  entity [2 uses]: boundary(2)
+  signature [2 uses]: boundary(2)
+  arrow [2 uses]: callable(2)
+  parens [2 uses]: callable(2)
+  names [2 uses]: type_def(1), boundary(1)
+  alternatives [2 uses]: callable(2)
+  permits [2 uses]: type_def(2)
+  superclass [2 uses]: type_def(2)
+  modules [2 uses]: boundary(2)
+  method [2 uses]: callable(1), operation(1)
+  reference_modifier [2 uses]: callable(2)
+  static_modifier [2 uses]: callable(2)
+  return_expression [2 uses]: control_flow(2)
+  else [2 uses]: control_flow(2)
+  class_parameters [2 uses]: type_def(2)
+  property [2 uses]: control_flow(2)
+  redirect [1 uses]: callable(1)
+  underlying_type [1 uses]: control_flow(1)
+  header [1 uses]: boundary(1)
+  template_parameters [1 uses]: callable(1)
+  rank [1 uses]: type_def(1)
+  declarations [1 uses]: type_def(1)
+  fundeps [1 uses]: type_def(1)
+  implicit [1 uses]: type_def(1)
+  export [1 uses]: boundary(1)
+  safety [1 uses]: boundary(1)
+  import [1 uses]: boundary(1)
+  multiplicity [1 uses]: callable(1)
+  guards [1 uses]: control_flow(1)
+  field [1 uses]: type_def(1)
+  transformation [1 uses]: control_flow(1)
+  closed_family [1 uses]: type_def(1)
+  determined [1 uses]: type_def(1)
+  interfaces [1 uses]: type_def(1)
+  init [1 uses]: control_flow(1)
+  provided [1 uses]: boundary(1)
+  provider [1 uses]: boundary(1)
+  modifiers [1 uses]: boundary(1)
+  optional_chain [1 uses]: operation(1)
+  member [1 uses]: type_def(1)
+  end [1 uses]: control_flow(1)
+  start [1 uses]: control_flow(1)
+  step [1 uses]: control_flow(1)
+  clause [1 uses]: control_flow(1)
+  table [1 uses]: callable(1)
+  default [1 uses]: control_flow(1)
+  ellipses [1 uses]: control_flow(1)
+  formal [1 uses]: control_flow(1)
+  formals [1 uses]: callable(1)
+  universal [1 uses]: callable(1)
+  initialize [1 uses]: control_flow(1)
+  conditional_expressions [1 uses]: control_flow(1)
+  prefix [1 uses]: control_flow(1)
+  superclasses [1 uses]: type_def(1)
+  format_specifier [1 uses]: control_flow(1)
+  type_conversion [1 uses]: control_flow(1)
+  module_name [1 uses]: boundary(1)
+  subject [1 uses]: control_flow(1)
+  block [1 uses]: operation(1)
+  clauses [1 uses]: control_flow(1)
+  handler [1 uses]: control_flow(1)
+  extra [1 uses]: type_def(1)
+  enumerators [1 uses]: control_flow(1)
+  parameter_types [1 uses]: callable(1)
+  selector [1 uses]: type_def(1)
+  initial [1 uses]: control_flow(1)
+  import_name [1 uses]: boundary(1)
+  ancestor [1 uses]: control_flow(1)
+  ancestor_arguments [1 uses]: control_flow(1)
+  key_identifier [1 uses]: type_def(1)
+  key_type [1 uses]: type_def(1)
+  value_identifier [1 uses]: type_def(1)
+  value_type [1 uses]: type_def(1)
+  must_inherit [1 uses]: type_def(1)
+  declaration_kind [1 uses]: type_def(1)
+  constructed_type [1 uses]: type_def(1)
+  collection [1 uses]: control_flow(1)
+  item [1 uses]: control_flow(1)
+  params [1 uses]: callable(1)
+  inherits_from [1 uses]: control_flow(1)
+  external_name [1 uses]: callable(1)
+  wrapped [1 uses]: type_def(1)
+  expr [1 uses]: control_flow(1)
+
+## Q1: Category vs Concrete References in Connections
+
+Analysis of whether connections (fields/children) reference Categories (abstract types)
+or only concrete Things.
+
+### Direct Connections (fields)
+  Category references: 761
+  Concrete references: 8845
+  Percentage Category: 7.9%
+
+Examples of Category references in fields:
+  - bash: binary_expression → _expression (Category)
+  - bash: case_item → _primary_expression (Category)
+  - bash: case_statement → _primary_expression (Category)
+  - c: abstract_array_declarator → expression (Category)
+  - c: abstract_array_declarator → _abstract_declarator (Category)
+  - c: abstract_function_declarator → _abstract_declarator (Category)
+  - cpp: abstract_array_declarator → expression (Category)
+  - cpp: abstract_array_declarator → _abstract_declarator (Category)
+  - cpp: abstract_function_declarator → _abstract_declarator (Category)
+  - csharp: and_pattern → pattern (Category)
+
+Examples of Concrete references in fields:
+  - bash: binary_expression → &= (Concrete)
+  - bash: binary_expression → **= (Concrete)
+  - bash: binary_expression → >>= (Concrete)
+  - c: abstract_array_declarator → * (Concrete)
+  - c: abstract_function_declarator → parameter_list (Concrete)
+  - c: alignof_expression → type_descriptor (Concrete)
+  - cpp: abstract_array_declarator → * (Concrete)
+  - cpp: abstract_function_declarator → parameter_list (Concrete)
+  - cpp: alias_declaration → type_descriptor (Concrete)
+  - csharp: accessor_declaration → arrow_expression_clause (Concrete)
+
+### Positional Connections (children)
+  Category references: 621
+  Concrete references: 5408
+  Percentage Category: 10.3%
+
+Examples of Category references in children:
+  - bash: array → _primary_expression (Category)
+  - bash: case_item → _statement (Category)
+  - bash: command_name → _primary_expression (Category)
+  - c: abstract_parenthesized_declarator → _abstract_declarator (Category)
+  - c: alignas_qualifier → expression (Category)
+  - c: argument_list → expression (Category)
+  - cpp: abstract_parenthesized_declarator → _abstract_declarator (Category)
+  - cpp: abstract_reference_declarator → _abstract_declarator (Category)
+  - cpp: alignas_qualifier → expression (Category)
+  - csharp: anonymous_object_creation_expression → expression (Category)
+
+Examples of Concrete references in children:
+  - bash: arithmetic_expansion → subscript (Concrete)
+  - bash: arithmetic_expansion → postfix_expression (Concrete)
+  - bash: arithmetic_expansion → parenthesized_expression (Concrete)
+  - c: abstract_array_declarator → type_qualifier (Concrete)
+  - c: abstract_parenthesized_declarator → ms_call_modifier (Concrete)
+  - c: abstract_pointer_declarator → ms_pointer_modifier (Concrete)
+  - cpp: abstract_array_declarator → type_qualifier (Concrete)
+  - cpp: abstract_function_declarator → type_qualifier (Concrete)
+  - cpp: abstract_function_declarator → attribute_declaration (Concrete)
+  - csharp: accessor_declaration → attribute_list (Concrete)
+
+## Q2: Things with Multiple Category Membership
+
+Analysis of whether concrete Things can belong to multiple Categories
+(i.e., appear in multiple abstract types' subtypes lists).
+
+Total Things with category membership: 736
+Things belonging to multiple Categories: 99
+Percentage multi-category: 13.5%
+Maximum categories per Thing: 5
+
+Distribution of category membership:
+  1 category/categories: 637 Things
+  2 category/categories: 68 Things
+  3 category/categories: 18 Things
+  4 category/categories: 12 Things
+  5 category/categories: 1 Things
+
+Examples of Things with multiple Category membership:
+  - bash: word → [_expression, _primary_expression]
+  - c: array_declarator → [_declarator, _field_declarator, _type_declarator]
+  - c: attributed_declarator → [_declarator, _field_declarator, _type_declarator]
+  - c: function_declarator → [_declarator, _field_declarator, _type_declarator]
+  - c: identifier → [_declarator, expression]
+  - c: parenthesized_declarator → [_declarator, _field_declarator, _type_declarator]
+  - c: pointer_declarator → [_declarator, _field_declarator, _type_declarator]
+  - c: primitive_type → [_type_declarator, type_specifier]
+  - c: type_identifier → [_type_declarator, type_specifier]
+  - cpp: array_declarator → [_declarator, _field_declarator, _type_declarator]
+  - cpp: attributed_declarator → [_declarator, _field_declarator, _type_declarator]
+  - cpp: function_declarator → [_declarator, _field_declarator, _type_declarator]
+  - cpp: identifier → [_declarator, expression]
+  - cpp: operator_name → [_declarator, _field_declarator]
+  - cpp: parenthesized_declarator → [_declarator, _field_declarator, _type_declarator]
+  - cpp: pointer_declarator → [_declarator, _field_declarator, _type_declarator]
+  - cpp: qualified_identifier → [_declarator, expression, type_specifier]
+  - cpp: reference_declarator → [_declarator, _field_declarator, _type_declarator]
+  - cpp: template_function → [_declarator, expression]
+  - cpp: primitive_type → [_type_declarator, type_specifier]
+
+## Conclusions
+
+### Q1: Category References
+**Answer: YES** - Connections CAN reference Categories (abstract types).
+- Fields reference Categories in 761 cases
+- Children reference Categories in 621 cases
+- This is a common pattern used for polymorphic type constraints
+
+### Q2: Multiple Category Membership
+**Answer: YES** - Things CAN belong to multiple Categories, but it's uncommon.
+- Only 13.5% of Things belong to multiple Categories
+- Maximum observed: 5 categories for a single Thing
+- This typically occurs for nodes that serve multiple grammatical roles
