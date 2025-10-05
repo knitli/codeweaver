@@ -1,7 +1,3 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-#
-# SPDX-License-Identifier: MIT OR Apache-2.0
 """File discovery service with rignore integration."""
 
 from __future__ import annotations
@@ -9,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import rignore  # type: ignore
+import rignore
 
 from codeweaver._data_structures import DiscoveredFile
 from codeweaver.exceptions import IndexingError
@@ -19,7 +15,6 @@ from codeweaver.language import SemanticSearchLanguage
 if TYPE_CHECKING:
     from codeweaver._common import DictView
     from codeweaver.settings_types import CodeWeaverSettingsDict
-
 TEST_FILE_PATTERNS = ["*.test.*", "*.spec.*", "test/**/*", "spec/**/*"]
 
 
@@ -67,8 +62,6 @@ class FileDiscoveryService:
             extra_ignores = [str(path) for path in additional_ignore_paths]
             if not include_tests:
                 extra_ignores.extend(TEST_FILE_PATTERNS)
-
-            # Use rignore for gitignore support
             walker = rignore.walk(
                 self.settings["project_root"],
                 max_filesize=max_file_size or self.settings["max_file_size"],
@@ -79,20 +72,13 @@ class FileDiscoveryService:
                 ignore_hidden=ignore_hidden or self.settings["filter_settings"].ignore_hidden,
                 additional_ignore_paths=extra_ignores,
             )
-
             for file_path in walker:
-                # rignore returns Path objects directly
                 if file_path.is_file():
-                    # Convert to relative path from project root
                     try:
                         relative_path = file_path.relative_to(self.settings["project_root"])
                         discovered.append(relative_path)
                     except ValueError:
-                        # File is outside project root, skip
                         continue
-
-            return sorted(discovered)
-
         except Exception as e:
             raise IndexingError(
                 f"Failed to discover files in {self.settings['project_root']}",
@@ -102,6 +88,8 @@ class FileDiscoveryService:
                     "Verify that rignore can access the directory",
                 ],
             ) from e
+        else:
+            return sorted(discovered)
 
     async def get_discovered_files(self) -> tuple[tuple[DiscoveredFile, ...], tuple[Path, ...]]:
         """Get all discovered files and filtered files.
@@ -112,14 +100,12 @@ class FileDiscoveryService:
         files = await self._discover_files()
         discovered_files: list[DiscoveredFile] = []
         filtered_files: list[Path] = []
-
         for file_path in files:
             if discovered_file := DiscoveredFile.from_path(file_path):
                 discovered_files.append(discovered_file)
             else:
                 filtered_files.append(file_path)
-
-        return tuple(discovered_files), tuple(filtered_files)
+        return (tuple(discovered_files), tuple(filtered_files))
 
 
 __all__ = ("FileDiscoveryService",)

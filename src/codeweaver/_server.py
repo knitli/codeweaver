@@ -1,9 +1,3 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-#
-# SPDX-License-Identifier: MIT OR Apache-2.0
-
-# sourcery skip: snake-case-variable-declarations
 """Initialize the FastMCP application with default middleware and settings."""
 
 from __future__ import annotations
@@ -43,9 +37,7 @@ from codeweaver._common import BasedModel, BaseEnum, DataclassSerializationMixin
 from codeweaver._logger import setup_logger
 from codeweaver._utils import get_project_root, lazy_importer, rpartial
 from codeweaver.exceptions import InitializationError
-from codeweaver.provider import (
-    Provider as Provider,  # we need this in the namespace for building the server
-)
+from codeweaver.provider import Provider as Provider
 from codeweaver.settings import (
     CodeWeaverSettings,
     FastMcpServerSettings,
@@ -75,7 +67,6 @@ if TYPE_CHECKING:
     )
     from codeweaver._statistics import SessionStatistics
 else:
-    # Pydantic needs these at runtime, but we want to lazy load them until needed.
     codeweaver_registry = lazy_importer("codeweaver._registry")
     Feature = codeweaver_registry.Feature
     ModelRegistry = codeweaver_registry.ModelRegistry
@@ -83,26 +74,18 @@ else:
     ServiceCard = codeweaver_registry.ServiceCard
     ServicesRegistry = codeweaver_registry.ServicesRegistry
     SessionStatistics = lazy_importer("codeweaver._statistics").SessionStatistics
-
-# Lazy import of registries to delay until needed
 get_model_registry = lazy_importer("codeweaver._registry").get_model_registry
 get_provider_registry = lazy_importer("codeweaver._registry").get_provider_registry
 get_services_registry = lazy_importer("codeweaver._registry").get_services_registry
-
-
-# this is initialized after we setup logging.
 logger: logging.Logger
-
 _STATE: AppState | None = None
 _logger: logging.Logger | None = None
-
-BRACKET_PATTERN: re.Pattern[str] = re.compile(r"\[.+\]")
+BRACKET_PATTERN: re.Pattern[str] = re.compile("\\[.+\\]")
 
 
 def _get_session_statistics() -> SessionStatistics:
     """Get or create the session statistics instance."""
     statistics = importlib.import_module("codeweaver._statistics")
-
     return statistics.get_session_statistics()
 
 
@@ -143,15 +126,12 @@ class HealthInfo(DataclassSerializationMixin):
 
     from codeweaver._registry import Feature, ServiceCard
 
-    status: Annotated[HealthStatus, Field(description="""Health status of the server""")] = (
+    status: Annotated[HealthStatus, Field(description="Health status of the server")] = (
         HealthStatus.HEALTHY
     )
-    version: Annotated[str, Field(description="""Version of the CodeWeaver server""")] = version
-    startup_time: Annotated[float, Field(description="""Startup time of the server""")] = (
-        time.time()
-    )
-
-    error: Annotated[str | None, Field(description="""Error message if any""")] = None
+    version: Annotated[str, Field(description="Version of the CodeWeaver server")] = version
+    startup_time: Annotated[float, Field(description="Startup time of the server")] = time.time()
+    error: Annotated[str | None, Field(description="Error message if any")] = None
 
     @classmethod
     def initialize(cls) -> HealthInfo:
@@ -162,19 +142,19 @@ class HealthInfo(DataclassSerializationMixin):
     @property
     def available_features(self) -> frozenset[Feature]:
         """Computed field for available features based on the services registry."""
-        return frozenset(feature for feature, _ in _get_available_features_and_services())
+        return frozenset((feature for feature, _ in _get_available_features_and_services()))
 
     @computed_field
     @property
     def available_services(self) -> tuple[ServiceCard, ...]:
         """Computed field for available services based on the services registry."""
-        return tuple(card for _, card in _get_available_features_and_services())
+        return tuple((card for _, card in _get_available_features_and_services()))
 
     @computed_field
     @property
     def available_features_and_services(self) -> tuple[tuple[Feature, ServiceCard], ...]:
         """Computed field for available service features based on the services registry."""
-        return tuple((feature, card) for feature, card in _get_available_features_and_services())
+        return tuple(((feature, card) for feature, card in _get_available_features_and_services()))
 
     def update_status(
         self,
@@ -215,93 +195,80 @@ class AppState(DataclassSerializationMixin):
     """Application state for CodeWeaver server."""
 
     initialized: Annotated[
-        bool, Field(description="""Indicates if the server has been initialized""")
+        bool, Field(description="Indicates if the server has been initialized")
     ] = False
-
     settings: Annotated[
         CodeWeaverSettings | None,
         Field(
             default_factory=importlib.import_module("codeweaver.settings").get_settings,
-            description="""CodeWeaver configuration settings""",
+            description="CodeWeaver configuration settings",
         ),
     ]
-
     config_path: Annotated[
         Path | None,
         Field(
             default_factory=lambda data: data["settings"].get("config_file"),
-            description="""Path to the configuration file, if any""",
+            description="Path to the configuration file, if any",
         ),
     ]
     project_root: Annotated[
         Path,
         Field(
             default_factory=lambda data: data["settings"].get("project_root") or get_project_root(),
-            description="""Path to the project root""",
+            description="Path to the project root",
         ),
     ]
-    # Provider registry integration
     provider_registry: Annotated[
         ProviderRegistry,
         Field(
             default_factory=get_provider_registry,
-            description="""Provider registry for dynamic provider management""",
+            description="Provider registry for dynamic provider management",
         ),
     ]
-
     services_registry: Annotated[
         ServicesRegistry,
         Field(
             default_factory=get_services_registry,
-            description="""Service registry for managing available services""",
+            description="Service registry for managing available services",
         ),
     ]
-
     model_registry: Annotated[
         ModelRegistry,
         Field(
             default_factory=get_model_registry,
-            description="""Model registry for managing AI and embedding/reranking models""",
+            description="Model registry for managing AI and embedding/reranking models",
         ),
     ]
-
-    # Statistics and performance tracking
     statistics: Annotated[
         SessionStatistics,
         Field(
             default_factory=_get_session_statistics,
-            description="""Session statistics and performance tracking""",
+            description="Session statistics and performance tracking",
         ),
     ]
-
-    # Health status
     health: Annotated[
         HealthInfo,
         Field(
             default_factory=lambda: _health_info or get_health_info(),
-            description="""Health status information""",
+            description="Health status information",
         ),
     ]
-
-    # Middleware stack
     middleware_stack: Annotated[
         tuple[Middleware, ...],
-        Field(description="""Tuple of FastMCP middleware instances applied to the server"""),
+        Field(description="Tuple of FastMCP middleware instances applied to the server"),
     ] = ()
-
-    # TODO: Future implementation
-    indexer: None = None  # Placeholder for background indexer
+    indexer: None = None
 
     def __post_init__(self) -> None:
         global _STATE
-        _STATE = self  # type: ignore  # Store the state globally for easy access
+        _STATE = self
 
     @computed_field
     @property
     def request_count(self) -> NonNegativeInt:
         """Computed field for the number of requests handled by the server."""
         if self.statistics:
-            return self.statistics._total_requests + (self.statistics._total_http_requests or 0)  # type: ignore
+            return self.statistics._total_requests + (self.statistics._total_http_requests or 0)
         return 0
 
 
@@ -319,23 +286,8 @@ async def lifespan(
     statistics = statistics or _get_session_statistics()
     settings = settings or get_settings()
     if not hasattr(app, "state"):
-        setattr(  # noqa: B010  # Ruff, it's not safer, but it does make pylance complain less
-            app,
-            "state",
-            AppState(
-                initialized=False,
-                settings=settings,
-                health=get_health_info(),
-                statistics=statistics,
-                project_root=settings.project_root or get_project_root(),
-                config_path=settings.config_file if settings else None,
-                provider_registry=get_provider_registry(),
-                services_registry=get_services_registry(),
-                model_registry=get_model_registry(),
-                middleware_stack=tuple(getattr(app, "middleware", ())),
-            ),
-        )
-    state: AppState = app.state  # type: ignore
+        app.state = AppState(initialized=False, settings=settings, health=get_health_info(), statistics=statistics, project_root=settings.project_root or get_project_root(), config_path=settings.config_file if settings else None, provider_registry=get_provider_registry(), services_registry=get_services_registry(), model_registry=get_model_registry(), middleware_stack=tuple(getattr(app, "middleware", ())))
+    state: AppState = app.state
     if not isinstance(state, AppState):
         raise InitializationError(
             "AppState should be an instance of AppState, but isn't. Something is wrong. Please report this issue.",
@@ -347,19 +299,13 @@ async def lifespan(
             state.health.initialize()
         console.print("[bold aqua]Lifespan start actions complete, server initialized.[/bold aqua]")
         state.initialized = True
-        # Yield the initialized state
         yield state
-
     except Exception as e:
-        # Handle initialization errors
-        state.health.status = HealthStatus.UNHEALTHY  # type: ignore
-
-        state.health.error = to_json({"error": e})  # type: ignore
+        state.health.status = HealthStatus.UNHEALTHY
+        state.health.error = to_json({"error": e})
         state.initialized = False
         raise
-
     finally:
-        # Cleanup resources
         state.initialized = False
 
 
@@ -408,14 +354,13 @@ def resolve_includes_and_excludes(
         for file in settings.get("forced_includes", set())
         if file
         and "*" not in file
-        and "?" not in file
+        and ("?" not in file)
         and Path(file).exists()
         and Path(file).is_file()
     }
     for include in settings.get("forced_includes", set()):
         other_files |= resolve_globs(include, repo_root)
     for ext in settings.get("excluded_extensions", set()):
-        # we only exclude `other_files` if the file was not specifically included (not by globs)
         if not ext:
             continue
         ext = ext.lstrip("*?[]")
@@ -432,9 +377,9 @@ def resolve_includes_and_excludes(
             excludes |= resolve_globs(exclude, repo_root)
     excludes |= specifically_included_files
     other_files -= {exclude for exclude in excludes if exclude not in specifically_included_files}
-    other_files -= {None, Path(), Path("./"), Path("./.")}  # Remove empty paths
-    excludes -= {None, Path(), Path("./"), Path("./.")}  # Remove empty paths
-    return frozenset(other_files), frozenset(excludes)
+    other_files -= {None, Path(), Path("./"), Path("./.")}
+    excludes -= {None, Path(), Path("./"), Path("./.")}
+    return (frozenset(other_files), frozenset(excludes))
 
 
 def setup_local_logger(level: int = logging.INFO) -> None:
@@ -455,9 +400,12 @@ def __setup_interim_logger() -> tuple[logging.Logger, int]:
     """
     level = int(os.environ.get("CODEWEAVER_LOG_LEVEL", "20"))
     setup_local_logger(level)
-    return setup_logger(
-        name="codeweaver", level=level, rich=True, rich_kwargs={}, logging_kwargs=None
-    ), level
+    return (
+        setup_logger(
+            name="codeweaver", level=level, rich=True, rich_kwargs={}, logging_kwargs=None
+        ),
+        level,
+    )
 
 
 LEVEL_MAP: dict[
@@ -486,7 +434,7 @@ def _setup_logger(
         logging_kwargs=logging_kwargs,
     )
     fast_mcp_log_level = LEVEL_MAP.get(level, "INFO")
-    return app_logger, fast_mcp_log_level
+    return (app_logger, fast_mcp_log_level)
 
 
 def _configure_middleware(
@@ -505,7 +453,7 @@ def _configure_middleware(
     )
     middleware_defaults: MiddlewareOptions = get_default_middleware_settings(app_logger, level)
     middleware_settings: MiddlewareOptions = middleware_defaults | middleware_settings
-    return middleware_settings, logging_middleware
+    return (middleware_settings, logging_middleware)
 
 
 def get_default_middleware() -> list[type[Middleware]]:
@@ -544,30 +492,31 @@ def _integrate_user_settings(
         Updated FastMCP settings dictionary
     """
     additional_keys = ("additional_middleware", "additional_tools")
-    # Excuse the many type: ignore comments. It's because we're amending the TypedDict structure before passing it to the server.
     for key in additional_keys:
         replacement_key = key.replace("additional_", "")
         if not base_fast_mcp_settings.get(replacement_key):
-            base_fast_mcp_settings[replacement_key] = []  # type: ignore
-        if not base_fast_mcp_settings[replacement_key] and base_fast_mcp_settings.get(key):  # type: ignore
-            base_fast_mcp_settings[replacement_key] = [  # type: ignore
+            base_fast_mcp_settings[replacement_key] = []
+        if not base_fast_mcp_settings[replacement_key] and base_fast_mcp_settings.get(key):
+            base_fast_mcp_settings[replacement_key] = [
                 string_to_class(s) if isinstance(s, str) else s
-                for s in base_fast_mcp_settings[key]  # type: ignore
+                for s in base_fast_mcp_settings[key]
                 if s
-            ]  # type: ignore
+            ]
         if key in base_fast_mcp_settings:
             _ = base_fast_mcp_settings.pop(key, None)
         if (value := getattr(settings, key, None)) and isinstance(value, list):
-            base_fast_mcp_settings[replacement_key].extend(  # type: ignore
-                string_to_class(item) if isinstance(item, str) else item
-                for item in value  # type: ignore
-                if item and item not in base_fast_mcp_settings[replacement_key]  # type: ignore
+            base_fast_mcp_settings[replacement_key].extend(
+
+                    string_to_class(item) if isinstance(item, str) else item
+                    for item in value
+                    if item and item not in base_fast_mcp_settings[replacement_key]
+
             )
-        base_fast_mcp_settings[replacement_key] = (  # type: ignore
-            list(set(base_fast_mcp_settings[replacement_key]))  # type: ignore
-            if base_fast_mcp_settings[replacement_key]  # type: ignore
+        base_fast_mcp_settings[replacement_key] = (
+            list(set(base_fast_mcp_settings[replacement_key]))
+            if base_fast_mcp_settings[replacement_key]
             else []
-        )  # type: ignore
+        )
     return base_fast_mcp_settings
 
 
@@ -605,9 +554,10 @@ def string_to_class(s: str) -> type[Any] | None:
     class_name = components[-1]
     try:
         module = __import__(module_name, fromlist=[class_name])
-        return getattr(module, class_name, None)
     except (ImportError, AttributeError):
         return None
+    else:
+        return getattr(module, class_name, None)
 
 
 class ServerSetup(TypedDict):
@@ -625,27 +575,23 @@ def build_app() -> ServerSetup:
     """Build and configure the FastMCP application without starting it."""
     session_statistics = _get_session_statistics()
     app_logger, level = __setup_interim_logger()
-    local_logger: logging.Logger = globals()["logger"]  # type: ignore
+    local_logger: logging.Logger = globals()["logger"]
     local_logger.info("Initializing CodeWeaver server. Logging set up.")
     settings_view = get_settings_map()
     middleware_settings, logging_middleware = _configure_middleware(
         settings_view, app_logger, level
     )
-    filtered_server_settings = _filter_server_settings(settings_view.get("server", {}))  # type: ignore
+    filtered_server_settings = _filter_server_settings(settings_view.get("server", {}))
     middleware = {logging_middleware, *get_default_middleware()}
     base_fast_mcp_settings = _create_base_fastmcp_settings()
     base_fast_mcp_settings = _integrate_user_settings(
-        settings_view.get("server", {}),  # type: ignore
-        filtered_server_settings,
+        settings_view.get("server", {}), filtered_server_settings
     )
     local_logger.info("Base FastMCP settings created and merged with user settings.")
     local_logger.debug("Base FastMCP settings dump \n", extra=base_fast_mcp_settings)
     lifespan_fn = _setup_file_filters_and_lifespan(get_settings(), session_statistics)
     base_fast_mcp_settings["lifespan"] = lifespan_fn
-
-    # Transport selection is handled by the caller; remove from constructor kwargs.
     _ = base_fast_mcp_settings.pop("transport", "http")
-
     final_app_logger, _final_level = _setup_logger(settings_view)
     int_level = next((k for k, v in LEVEL_MAP.items() if v == _final_level), "INFO")
     for key, middleware_setting in middleware_settings.items():
@@ -653,16 +599,12 @@ def build_app() -> ServerSetup:
             middleware_settings[key]["logger"] = final_app_logger
         if "log_level" in cast(dict[str, Any], middleware_setting):
             middleware_settings[key]["log_level"] = int_level
-    # Rebind loggers for any logging middleware safely
     global _logger
     _logger = final_app_logger
     host = base_fast_mcp_settings.pop("host", "127.0.0.1")
     port = base_fast_mcp_settings.pop("port", 9328)
     http_path = base_fast_mcp_settings.pop("streamable_http_path", "/codeweaver")
-    server = FastMCP[AppState](
-        name="CodeWeaver",
-        **base_fast_mcp_settings,  # type: ignore
-    )  # pyright: ignore[reportCallIssue]
+    server = FastMCP[AppState](name="CodeWeaver", **base_fast_mcp_settings)
     local_logger.info("FastMCP application initialized successfully.")
     return ServerSetup(
         app=server,

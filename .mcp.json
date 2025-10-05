@@ -1,16 +1,5 @@
 {
   "mcpServers": {
-    "filesystem": {
-      "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "~/thread",
-        "~/.cargo"
-      ],
-      "env": {}
-    },
     "context7": {
       "args": [
         "--bun",
@@ -27,5 +16,14 @@
       "command": "npx",
       "type": "stdio"
     }
+  },
+  "serena": {
+    "args": [
+      "run",
+      "serena",
+      "start-mcp-server"
+    ],
+    "command": "uv",
+    "type": "stdio"
   }
 }

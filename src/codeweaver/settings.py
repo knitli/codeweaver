@@ -21,6 +21,7 @@ from collections.abc import Callable
 from functools import cached_property
 from importlib import util
 from pathlib import Path
+from textwrap import dedent
 from typing import Annotated, Any, Literal, Self, Unpack, cast
 
 from fastmcp.server.middleware import Middleware, MiddlewareContext
@@ -50,6 +51,8 @@ from codeweaver.settings_types import (
     AVAILABLE_MIDDLEWARE,
     AgentProviderSettings,
     CodeWeaverSettingsDict,
+    CustomDelimiter,
+    CustomLanguage,
     DataProviderSettings,
     EmbeddingModelSettings,
     EmbeddingProviderSettings,
@@ -189,7 +192,7 @@ class FileFilterSettings(BasedModel):
     include_github_dir: Annotated[
         bool,
         Field(
-            description="""Whether to include the .github directory in search and indexing. Because the .github directory is hidden, it would be otherwise discluded from default settings. Most people want to include it for work on GitHub Actions, workflows, and other GitHub-related files."""
+            description="""Whether to include the .github directory in search and indexing. Because the .github directory is hidden, it wouldn't be included in default settings. Most people want to include it for work on GitHub Actions, workflows, and other GitHub-related files."""
         ),
     ] = True
     other_ignore_kwargs: Annotated[
@@ -210,7 +213,7 @@ class FileFilterSettings(BasedModel):
     def model_post_init(self, _context: MiddlewareContext[Any] | None = None, /) -> None:
         """Post-initialization processing."""
         if self.include_github_dir:
-            self.forced_includes = self.forced_includes.union(frozenset({"**/.github/**"}))
+            self.forced_includes |= {"**/.github/**"}
 
     @staticmethod
     def _self_to_kwargs(self_kind: FileFilterSettings | FileFilterSettingsDict) -> RignoreSettings:
@@ -263,9 +266,7 @@ class FileFilterSettings(BasedModel):
 
     def _adjust_settings(self) -> RignoreSettings:
         """Adjusts a few settings, primarily to reform keywords. `rignore`'s choice of keywords is a bit odd, so we wrapped them in clearer alternatives."""
-        base_kwargs = self._self_to_kwargs(self)
-        base_kwargs["filter"] = self.filter
-        return base_kwargs
+        return self._self_to_kwargs(self)
 
     def to_kwargs(self) -> RignoreSettings:
         """Serialize to kwargs for rignore."""
@@ -529,8 +530,8 @@ class CodeWeaverSettings(BaseSettings):
 
     # Performance settings
     token_limit: Annotated[
-        PositiveInt, Field(le=130_000, description="""Maximum tokens per response""")
-    ] = 10_000
+        PositiveInt, Field(le=200_000, description="""Maximum tokens per response""")
+    ] = 30_000
     max_file_size: Annotated[
         PositiveInt, Field(ge=51_200, description="""Maximum file size to process in bytes""")
     ] = 1_048_576  # 1 MB
@@ -558,18 +559,44 @@ class CodeWeaverSettings(BaseSettings):
         FileFilterSettings, Field(description="""File filtering settings""")
     ] = FileFilterSettings()
 
+    custom_languages: Annotated[
+        list[CustomLanguage] | None,
+        Field(
+            description=dedent("""
+            If CodeWeaver's built-in language support doesn't cover your codebase sufficiently, you can do one of two things:
+            1. Define custom delimiters for the languages you want to improve support for. This is the recommended approach if you just want to improve chunking for a specific language or file type. Or if you want full control over how chunking is done for a specific language or file type. Do that with the `custom_delimiters` setting, by providing a list of `CustomDelimiter` objects.
+            2. You can optionally provide a list of custom languages for your codebase. This is useful if you use a language or file type that isn't natively supported by CodeWeaver. You can define the language name, file extensions, and the language's family for CodeWeaver to infer a chunking strategy. You can't define custom delimiters here -- use `custom_delimiters` for that.
+
+            Note that CodeWeaver has very extensive built-in language support (currently around 170 languages and 200+ file types), so you should only need to use this if you have a very niche or uncommon language or file type, or if we just missed the extension you are using in our definitions. In either case, please consider submitting a pull request to add it to our built-in definitions, or [file an issue](https://github.com/knitli/codeweaver-mcp/issues/) to let us know!
+            """)
+        ),
+    ] = None
+
+    custom_delimiters: Annotated[
+        list[CustomDelimiter] | None,
+        Field(
+            description=dedent("""
+        You can optionally provide a list of custom delimiters for your codebase. There are two scenarios where you might want to do this:
+        1. You use a language or file type that isn't natively supported by CodeWeaver, and you want to add support for it by defining custom delimiters (you could also submit a pull request! Our builtin delimiters are very extensive, and do a decent job of covering unknown languages, but anything explicitly defined will probably do better.
+        2. You want to override the default delimiters for a language or file type. For example, if you don't think the delimiters are providing good results, you can override them here.
+        3. (I said two...) You should NOT do this if you want a completely custom chunking strategy. You can add one programmatically to the `Chunker` class with `register._chunker.` Your chunker should subclass `codeweaver.services.chunker.base.BaseChunker`.
+        """)
+        ),
+    ] = None
+
     enable_background_indexing: Annotated[
         bool,
         Field(
-            description="""Enable automatic background indexing (default behavior and recommended)"""
+            description="""Enable automatic background indexing (default behavior and recommended). If disabled, it will only index files when you explicitly tell it to, which will make it much harder to deliver quality context to your agents."""
         ),
     ] = True
     enable_telemetry: Annotated[
         bool,
         Field(
-            description="""Enable privacy-friendly usage telemetry. ON by default. We do not collect any identifying information -- we hash all file and directory paths, repository names, and other identifiers to ensure privacy while still gathering useful aggregate data for improving CodeWeaver. You can see exactly what we collect, and how we collect it [here](services/telemetry.py). You can disable this if you prefer not to send any data. You can also provide your own PostHog Project Key to collect your own telemetry data. We will not use this information for anything else -- it is only used to improve CodeWeaver."""
+            description="""Enable privacy-friendly usage telemetry. ON by default. We do not collect any identifying information -- we hash all file and directory paths, repository names, and other identifiers to ensure privacy while still gathering useful aggregate data for improving CodeWeaver. We add a second round of filters within Posthog cloud before we get the data just to be sure we caught everything. You can see exactly what we collect, and how we collect it [here](services/telemetry.py). You can disable telemetry if you prefer not to send any data. You can also provide your own PostHog Project Key to collect your own telemetry data. **We will only ever use this data to improve CodeWeaver. We will never sell or share it with anyone else, and we won't use it for targeted marketing (we will use high level aggregate data, like how many people use it, and how many tokens CodeWeaver has saved.)**"""
         ),
     ] = True
+    # TODO: I don't think we're actually checking for these before initializing the server. We should.
     enable_health_endpoint: Annotated[
         bool, Field(description="""Enable the health check endpoint""")
     ] = True

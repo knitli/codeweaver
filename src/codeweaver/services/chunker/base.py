@@ -2,36 +2,55 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-"""Base chunker service definitions."""
+"""Base chunker services and definitions.
+
+CodeWeaver has a robust chunking system that allows it to extract meaningful information from any codebase. Chunks are created based on a few factors:
+
+1. The kind of chunk available.
+
+    - When we have a tree-sitter grammar for a language (there are currently 26 supported languages, see `codeweaver.language.SemanticSearchLanguage`), then semantic chunking is the primary strategy.
+    - If semantic chunking isn't available, we fall back to specialized chunkers for the language, if we have one. These come from `langchain_text_splitters` and include chunkers for markdown, latex, protobuf, restructuredtext, perl, powershell, and visualbasic6.
+    - If one of those isn't available, we again fall back to a set of chunkers defined in
+"""
 
 from __future__ import annotations
 
 import logging
 
+from abc import ABC, abstractmethod
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Annotated, Any, cast
+from functools import cached_property
+from pathlib import Path
+from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, cast
 
 from ast_grep_py import SgNode
 from langchain_core.documents import Document
 from langchain_text_splitters import (
+    ExperimentalMarkdownSyntaxTextSplitter,
     Language,
     LatexTextSplitter,
-    MarkdownHeaderTextSplitter,
     MarkdownTextSplitter,
     RecursiveCharacterTextSplitter,
 )
 from pydantic import UUID7, ConfigDict, Field, PositiveInt, computed_field
 
 from codeweaver._common import BasedModel
-from codeweaver._data_structures import ChunkType, CodeChunk, DiscoveredFile, ExtKind, Metadata
+from codeweaver._data_structures import (
+    ChunkType,
+    CodeChunk,
+    DiscoveredFile,
+    ExtKind,
+    Metadata,
+    SemanticMetadata,
+)
 from codeweaver._utils import uuid7
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities
-from codeweaver.language import ConfigLanguage, SemanticSearchLanguage
+from codeweaver.language import Chunker, ConfigLanguage, SemanticSearchLanguage
 from codeweaver.reranking.capabilities.base import RerankingModelCapabilities
 
 
 if TYPE_CHECKING:
-    from codeweaver._ast_grep import AstNode
+    from codeweaver.semantic._ast_grep import AstNode
 
 
 SAFETY_MARGIN = 0.1
@@ -46,7 +65,14 @@ SPLITTER_AVAILABLE = {
     "powershell": "powershell",
     "visualbasic6": "visualbasic6",
 }
-"""Languages with langchain_text_splitters support that don't have semantic search support. The keys are the name of the language as defined in `codeweaver._constants`, and the values are the name of the language as defined in `langchain_text_splitters.Language`."""
+"""Languages with langchain_text_splitters support that don't have semantic search support. The keys are the name of the language as defined in `codeweaver._supported_languages.SecondarySupportedLanguage`, and the values are the name of the language as defined in `langchain_text_splitters.Language`."""
+
+
+class ChunkerEntry(NamedTuple):
+    """An entry in the chunker registry."""
+
+    chunker_kind: Chunker
+    chunker: type[BaseChunker]
 
 
 class ChunkGovernor(BasedModel):
@@ -56,25 +82,59 @@ class ChunkGovernor(BasedModel):
 
     capabilities: Annotated[
         tuple[EmbeddingModelCapabilities | RerankingModelCapabilities, ...],
-        Field(
-            default=(), description="""The model capabilities to infer chunking behavior from."""
-        ),
-    ]
+        Field(description="""The model capabilities to infer chunking behavior from."""),
+    ] = ()
 
     @computed_field
-    @property
+    @cached_property
     def chunk_limit(self) -> PositiveInt:
         """The absolute maximum chunk size in tokens."""
         return min(capability.context_window for capability in self.capabilities)
 
     @computed_field
-    @property
+    @cached_property
     def simple_overlap(self) -> int:
         """A simple overlap value to use for chunking without context or external factors.
 
         Calculates as 20% of the chunk_limit, clamped between 50 and 200 tokens. Practically, we only use this value when we can't determine a better overlap based on the tokenizer or other factors. `ChunkMicroManager` may override this value based on more complex logic, aiming to identify and encapsulate logical boundaries within the text with no need for overlap.
         """
         return int(max(50, min(200, self.chunk_limit * 0.2)))
+
+
+class BaseChunker(ABC):
+    """Base class for chunkers."""
+
+    _governor: ChunkGovernor
+    chunker: Chunker
+
+    def __init__(self, governor: ChunkGovernor) -> None:
+        """Initialize the chunker."""
+        self._governor = governor
+
+    @abstractmethod
+    def chunk(
+        self, content: str, *, file_path: Path | None = None, context: dict[str, Any] | None = None
+    ) -> list[CodeChunk]:
+        """Chunk the given content into code chunks using `self._governor` settings."""
+
+    def next_chunker(self) -> ChunkMicroManager:
+        """Get a ChunkMicroManager instance for this chunker."""
+        return ChunkMicroManager(self._governor)
+
+    @property
+    def governor(self) -> ChunkGovernor:
+        """Get the ChunkGovernor instance."""
+        return self._governor
+
+    @property
+    def chunk_limit(self) -> PositiveInt:
+        """Get the chunk limit from the governor."""
+        return self._governor.chunk_limit
+
+    @property
+    def simple_overlap(self) -> int:
+        """Get the simple overlap from the governor."""
+        return self._governor.simple_overlap
 
 
 class ChunkMicroManager:
@@ -115,7 +175,6 @@ class ChunkMicroManager:
             return []
 
         if self._semantic_available(file.ext_kind):
-            # Phase 2: AST-based semantic chunking
             return self._chunk_with_ast(file, content)
 
         if self._special_splitter_available(file.ext_kind):
@@ -142,9 +201,11 @@ class ChunkMicroManager:
         try:
             # Use specialized splitters for specific languages
             if language_name == "markdown":
-                # Use MarkdownHeaderTextSplitter for better semantic chunking
+                # Use ExperimentalMarkdownSyntaxSplitter for better semantic chunking
                 headers_to_split_on = [("#", "Header 1"), ("##", "Header 2"), ("###", "Header 3")]
-                splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on)
+                splitter = ExperimentalMarkdownSyntaxTextSplitter(
+                    headers_to_split_on=headers_to_split_on, strip_headers=False
+                )
                 # Get documents with header metadata
                 docs = splitter.split_text(content)
 
@@ -239,19 +300,21 @@ class ChunkMicroManager:
                 "name": f"{file.path.name}, part {doc_idx + 1}",
                 "semantic_meta": None,
                 "tags": (str(file.ext_kind.language),),  # tuple[str]
+                "context": doc.metadata or {},  # type: ignore
             }
 
             # Add header information if available
             if (
-                hasattr(doc, "metadata")
-                and doc.metadata  # pyright: ignore[reportUnknownMemberType]
-                and any(key.startswith("Header") for key in doc.metadata)  # type: ignore
-            ) and (
-                header_levels := sorted([  # type: ignore
-                    (int(key.split()[-1]), value)  # type: ignore
-                    for key, value in doc.metadata.items()  # type: ignore
-                    if key.startswith("Header")  # pyright: ignore[reportUnknownMemberType]
-                ])
+                doc.metadata  # type: ignore
+                and doc.metadata.get("Header")  # type: ignore
+                and any(key.lower().startswith("header") for key in doc.metadata)  # type: ignore
+                and (
+                    header_levels := sorted([  # type: ignore
+                        (int(key.split()[-1]), value)  # type: ignore
+                        for key, value in doc.metadata.items()  # type: ignore
+                        if key.lower().startswith("header")  # pyright: ignore[reportUnknownMemberType]
+                    ])
+                )
             ):
                 metadata["name"] = header_levels[-1][1]  # Most specific header
 
@@ -307,7 +370,7 @@ class ChunkMicroManager:
 
     def _chunk_with_ast(self, file: DiscoveredFile, content: str) -> list[CodeChunk]:
         """Chunk using AST-based semantic analysis."""
-        from codeweaver._ast_grep import AstNode
+        from codeweaver.semantic._ast_grep import AstNode
         from codeweaver.services.chunker.registry import source_id_for
 
         logger = logging.getLogger(__name__)
@@ -322,7 +385,7 @@ class ChunkMicroManager:
             from ast_grep_py import SgRoot as AstGrepRoot
 
             root = AstGrepRoot(content, str(language))
-            ast_node: AstNode[SgNode] = AstNode.from_sg_node(root.root(), language)
+            ast_node: AstNode[SgNode] = AstNode.from_sg_node(root.root(), language)  # type: ignore
 
             # Calculate effective limits with safety margin
             effective_chunk_limit = int(self._governor.chunk_limit * (1 - SAFETY_MARGIN))
@@ -572,13 +635,13 @@ class ChunkMicroManager:
             # Create a temporary DiscoveredFile for the chunk
             from codeweaver.services.chunker.registry import source_id_for
 
-            temp_file = DiscoveredFile(path=chunk.file_path, ext_kind=chunk.ext_kind)
+            temp_file = DiscoveredFile.from_chunk(chunk)
             split_chunk = self._create_chunk_from_parts(
                 content=part.rstrip(),
                 start_line=start_line,
                 end_line=end_line,
                 file=temp_file,
-                source_id=chunk.parent_id or source_id_for(chunk.file_path),
+                source_id=chunk.parent_id or source_id_for(cast(Path, chunk.file_path)),
                 metadata=metadata,
                 chunk_type=ChunkType.SEMANTIC,
             )
@@ -600,30 +663,22 @@ class ChunkMicroManager:
         node_text = node.text
 
         # Create rich semantic metadata
-        semantic_meta = {
-            "language": str(file.ext_kind.language),
-            "node_kind": node_kind,
-            "node_range": {
-                "start": {"line": node.range.start.line, "column": node.range.start.column},
-                "end": {"line": node.range.end.line, "column": node.range.end.column},
-            },
-        }
-
-        # Try to extract a meaningful name from the node
-        if semantic_name := self._extract_semantic_name(node, node_kind):
-            semantic_meta["symbol_name"] = semantic_name
-
-        # Try to extract additional context (imports, parent scope, etc.)
-        context_info = self._extract_context_info(node)
-        if context_info:
-            semantic_meta.update(context_info)
-
+        semantic_meta = SemanticMetadata.model_validate({
+            "language": node.language,
+            "symbol": node.symbol,
+            "primary_node": node,
+            "children": node.children,
+            "node_id": node.node_id,
+            "parent_node_id": node.parent_node_id,
+            "is_partial_node": True,
+        })
         metadata: Metadata = {
             "chunk_id": uuid7(),
             "created_at": datetime.now(UTC).timestamp(),
-            "name": semantic_name or f"{node_kind.replace('_', ' ').title()}",
+            "name": semantic_meta.symbol or f"{node_kind.replace('_', ' ').title()}",
             "semantic_meta": semantic_meta,
             "tags": (str(file.ext_kind.language), node_kind),
+            "context": self._extract_context_info(node),
         }
 
         return self._create_chunk_from_parts(
@@ -635,23 +690,6 @@ class ChunkMicroManager:
             metadata=metadata,
             chunk_type=ChunkType.SEMANTIC,
         )
-
-    def _extract_semantic_name(self, node: AstNode[SgNode], node_kind: str) -> str | None:
-        """Extract a meaningful name from an AST node."""
-        try:
-            # Extract names based on node type
-            if "function" in node_kind or "method" in node_kind:
-                return self._extract_function_name(node)
-            if "class" in node_kind or "interface" in node_kind:
-                return self._extract_class_name(node)
-            if "import" in node_kind:
-                return self._extract_import_name(node)
-        except Exception as e:
-            # If name extraction fails, return None
-            logger = logging.getLogger(__name__)
-            logger.debug("Failed to extract semantic name: %s", e)
-
-        return None
 
     def _extract_function_name(self, node: AstNode[SgNode]) -> str | None:
         """Extract function name from node."""
@@ -698,7 +736,7 @@ class ChunkMicroManager:
             if (
                 parent
                 and parent.kind in ["class_definition", "class_declaration", "namespace_definition"]
-                and (parent_name := self._extract_semantic_name(parent, parent.kind))
+                and (parent_name := parent.symbol)
             ):
                 context["parent_scope"] = {"name": parent_name, "kind": parent.kind}
         except Exception:
@@ -746,16 +784,3 @@ class ChunkMicroManager:
             ext_kind=file.ext_kind,
             metadata=metadata,
         )
-
-
-"""*NOTE* Where this is going:
-my overall plan is:
-- SemanticSearchLanguages -> use ast-grep for node-base chunking, but we need to integrate that with the Governor to determine where to draw the lines. Ideally, we'd chunk by function, class, etc. but if those are too big, we'd need to break them down further. We'll use metadata from the AST to help and also to add relevant context to the splits (like generating a summary in the metadata).
-- Other languages with special splitters -> use langchain_text_splitters to chunk based on language-specific rules. We already have the file extension mappings in _constants. Here again, we'd like to use some logical boundaries that we can identify.
-- This is more important for some languages than others -- markdown and rst are the really important ones here. text_splitters also has two splitters for markdown -- one that splits by headers, and one that uses a more general approach. Headers are obviously the best choice when we can keep the chunks under the limit. If we can, we probably don't need overlap, but we do if we have to break a section down further. The level of header matters here too, of course.
-- Fallback -> use a simple character-based splitter with a fixed chunk size and overlap. This is the least ideal, but it's better than nothing. We can use the governor to determine the chunk size and overlap.
-
-- other considerations:
-- How much should we try to 'humanize' the chunks? For semantic parsing, I think none -- they're very hierarchical and rich in metadata. At most, we produce a humanized title/summary.The question is really on code that doesn't have AST support. Regardless, we have the utilities built in textify.py to help with this.
-- We need to account for the length of metadata and just key/value semantics in the chunk size calculations. The most accurate way is to serialize -> tokenize -> count tokens, but that's expensive over many chunks. We can probably get away with a rough estimate based on character count and average token length, and then *maybe* do a final check.
-"""

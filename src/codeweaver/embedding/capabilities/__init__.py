@@ -10,7 +10,7 @@ to query by name/provider.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Generator, Sequence
+from collections.abc import Callable, Generator
 from importlib.util import find_spec
 from typing import TYPE_CHECKING
 

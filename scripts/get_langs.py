@@ -337,9 +337,9 @@ class TreeSitterRepo:
         only_node_types: bool = False,
     ) -> TreeSitterRepo:
         """Creates a TreeSitterRepo from a tuple or returns the input if already a TreeSitterRepo."""
-        if isinstance(repo_tuple, TreeSitterRepo) and not (node_types or only_node_types):
-            return repo_tuple
-        if isinstance(repo_tuple, TreeSitterRepo) and (node_types or only_node_types):
+        if isinstance(repo_tuple, TreeSitterRepo):
+            if not (node_types or only_node_types):
+                return repo_tuple
             return TreeSitterRepo(
                 language=repo_tuple.language,
                 repo=repo_tuple.repo,
@@ -826,7 +826,7 @@ async def fetch_grammars(  # noqa: C901
             help="Only fetch the node types file for each grammar, if it exists.",
         ),
     ] = False,
-) -> None:
+) -> None:  # sourcery skip: low-code-quality, no-long-functions
     """Fetch and save grammars from GitHub. Use `--languages` to specify languages, otherwise it will fetch all grammars."""
     console.print("Starting grammar fetch...🌳")
 
@@ -887,7 +887,7 @@ async def fetch_grammars(  # noqa: C901
         if normalize:
             normalize_grammars()
         try:
-            grammars.serialize(save_dir=save_dir)
+            grammars.serialize(save_dir=save_dir)  # pyright: ignore[reportOptionalMemberAccess]
         except Exception as e:
             console.print(f"[red]Failed to serialize grammars:[/red] {e}")
         if grammars:

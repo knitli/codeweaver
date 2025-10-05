@@ -2,7 +2,15 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-"""Hierarchical classification mapper for semantic nodes."""
+"""Pattern-based classification fallback for semantic nodes.
+
+This module provides pattern-based classification as a fallback when grammar-based
+classification is not available. It uses regex patterns and heuristics to infer
+semantic categories for:
+- Languages without abstract type information
+- Nodes without fields or structural information
+- Dynamically loaded grammars (future feature)
+"""
 
 from __future__ import annotations
 
@@ -48,18 +56,29 @@ class ClassificationResult(DataclassSerializationMixin):
         return self.phase == ClassificationPhase.SYNTACTIC
 
 
-class HierarchicalMapper:
-    """Hierarchical semantic node classification system."""
+class PatternBasedClassifier:
+    """Pattern-based classification fallback for semantic nodes.
+
+    This classifier serves as a fallback when grammar-based classification
+    is not available. It uses:
+    - Syntactic fast-path for punctuation and operators
+    - Tier-based pattern matching
+    - Regex pattern matching
+    - Ultimate fallback to SYNTAX_REFERENCES
+    """
 
     def __init__(self) -> None:
-        """Initialize the hierarchical mapper with necessary components."""
+        """Initialize the pattern-based classifier with necessary components."""
         self.syntactic_classifier = SyntacticClassifier()
         self.compiled_patterns = get_compiled_patterns()
 
     def classify_node(
         self, node_type: str, language: SemanticSearchLanguage, context: str | None = None
     ) -> ClassificationResult:
-        """Main classification entry point using hierarchical pipeline."""
+        """Main classification entry point using pattern-based pipeline.
+
+        This is used as a fallback when grammar-based classification is not available.
+        """
         # Phase 1: Syntactic fast-path classification
         if syntactic_result := self._classify_syntactic_phase(node_type):
             return syntactic_result
@@ -334,19 +353,29 @@ class HierarchicalMapper:
         return alternatives
 
 
+# Backward compatibility alias
+HierarchicalMapper = PatternBasedClassifier
+
 # Global instance for convenient access
-_hierarchical_mapper = HierarchicalMapper()
+_pattern_classifier = PatternBasedClassifier()
+_hierarchical_mapper = _pattern_classifier  # Backward compatibility
 
 
 def classify_node_hierarchical(
     node_type: str, language: SemanticSearchLanguage, context: str | None = None
 ) -> ClassificationResult:
-    """Convenient function for hierarchical classification."""
-    return _hierarchical_mapper.classify_node(node_type, language, context)
+    """Convenient function for pattern-based classification.
+
+    Note: This is a fallback classifier. Grammar-based classification is preferred.
+    """
+    return _pattern_classifier.classify_node(node_type, language, context)
 
 
 def classify_batch_hierarchical(
     node_types: list[tuple[str, SemanticSearchLanguage]], context: str | None = None
 ) -> list[ClassificationResult]:
-    """Convenient function for batch hierarchical classification."""
-    return _hierarchical_mapper.classify_batch(node_types, context)
+    """Convenient function for batch pattern-based classification.
+
+    Note: This is a fallback classifier. Grammar-based classification is preferred.
+    """
+    return _pattern_classifier.classify_batch(node_types, context)

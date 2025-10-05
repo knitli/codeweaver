@@ -14,13 +14,15 @@ from functools import cached_property
 from pathlib import Path
 from textwrap import dedent
 from types import MappingProxyType
-from typing import Annotated, Any, Literal, NamedTuple, TypedDict, cast
+from typing import TYPE_CHECKING, Annotated, Any, Literal, NamedTuple, TypedDict, cast
 
 from pydantic import DirectoryPath, Discriminator, Field, FilePath, PrivateAttr, Tag, computed_field
 
 from codeweaver._common import AbstractNodeName, BasedModel, LiteralStringT, RootedRoot
-from codeweaver._utils import dict_set_to_tuple
 from codeweaver.language import SemanticSearchLanguage
+
+if TYPE_CHECKING:
+    from codeweaver.semantic.grammar_types import FieldInfo, NodeSemanticInfo
 
 
 logger = logging.getLogger(__name__)
@@ -425,11 +427,12 @@ class RootNodeTypes(RootedRoot[tuple[NodeTypeInfo, ...]]):
     def concrete_to_abstract(self) -> MappingProxyType[NodeNameT, tuple[AbstractNodeName, ...]]:
         """Get a mapping of concrete node types to their abstract parent types."""
         subs = self.subtype_map
-        concrete: dict[NodeNameT, set[AbstractNodeName]] = defaultdict(set)
-        for abstract, fields in subs.items():
-            for field in fields:
-                concrete[field["type_name"]].add(abstract)
-        return MappingProxyType(dict_set_to_tuple(concrete))
+        concrete_to_abstract: dict[NodeNameT, set[AbstractNodeName]] = defaultdict(set)
+        for concrete_type in self.concrete_types:
+            for abstract_type, subtypes in subs.items():
+                if any(concrete_type == t["type_name"] for t in subtypes):
+                    concrete_to_abstract[concrete_type].add(abstract_type)
+        return MappingProxyType({k: tuple(sorted(v)) for k, v in concrete_to_abstract.items()})
 
     @property
     def flattened(self) -> list[NodeTypeInfo]:
@@ -532,9 +535,7 @@ class NodeTypeParser(BasedModel):
 
         return node_types
 
-    def flatten(
-        self,
-    ) -> MappingProxyType[SemanticSearchLanguage | Literal["unknown"], list[NodeTypeInfo]]:
+    def flatten(self) -> MappingProxyType[SemanticSearchLanguage, list[NodeTypeInfo]]:
         """Flatten the parsed node types into a mapping of language to list of NodeTypeInfo."""
         nodes = self.parse_all_node_types()
         flattened = [v.flat_map for val in nodes for v in val.values()]
@@ -598,6 +599,335 @@ class NodeTypeParser(BasedModel):
                 for entry in language_entries:
                     all_types |= self._get_node_types_from_info_values(entry)
         return all_types
+
+    # ===========================================================================
+    # Enhanced API: Grammar-Based Semantic Extraction
+    # ===========================================================================
+
+    @cached_property
+    def abstract_type_map(self) -> dict[str, dict[str, AbstractTypeInfo]]:
+        """Map of abstract types to their info across all languages.
+
+        Returns:
+            Dictionary structure:
+            {
+                "expression": {
+                    "python": AbstractTypeInfo(...),
+                    "javascript": AbstractTypeInfo(...),
+                    ...
+                },
+                "statement": {...},
+                ...
+            }
+
+        Example:
+            >>> parser = NodeTypeParser()
+            >>> expr_map = parser.abstract_type_map.get("expression", {})
+            >>> python_expr = expr_map.get("python")
+            >>> python_expr.is_subtype("binary_expression")
+            True
+        """
+        from codeweaver.semantic.grammar_types import AbstractTypeInfo
+
+        type_map: dict[str, dict[str, AbstractTypeInfo]] = defaultdict(dict)
+
+        for language_mapping in self.parse_all_node_types():
+            for language, root_nodes in language_mapping.items():
+                for node_info in root_nodes:
+                    # Check if this node has subtypes (is abstract)
+                    if subtypes := node_info.get("subtypes"):
+                        # Get abstract type name
+                        abstract_name = str(node_info.get("type_name", node_info.get("type", "")))
+                        # Normalize: remove leading underscore
+                        normalized = abstract_name.lstrip("_")
+
+                        # Extract subtype names
+                        subtype_names = tuple(
+                            str(st.get("type_name", st.get("type", "")))
+                            for st in subtypes
+                            if isinstance(st, dict)
+                        )
+
+                        if normalized and subtype_names:
+                            type_map[normalized][language.value] = AbstractTypeInfo(
+                                abstract_type=normalized,
+                                language=language.value,
+                                concrete_subtypes=subtype_names,
+                            )
+
+        return dict(type_map)
+
+    @cached_property
+    def field_semantic_patterns(self) -> dict[str, dict[str, int]]:
+        """Map field names to their common semantic categories.
+
+        Based on empirical analysis of grammar structures across 21 languages.
+        This data is pre-computed from the grammar structure analysis.
+
+        Returns:
+            Dictionary mapping field names to category usage counts:
+            {
+                "name": {"type_def": 65, "callable": 32, "control_flow": 24},
+                "body": {"control_flow": 52, "type_def": 27, "callable": 26},
+                ...
+            }
+
+        Example:
+            >>> parser = NodeTypeParser()
+            >>> name_patterns = parser.field_semantic_patterns.get("name", {})
+            >>> sorted(name_patterns.items(), key=lambda x: x[1], reverse=True)
+            [('type_def', 65), ('callable', 32), ('control_flow', 24)]
+        """
+        # Pre-computed from grammar analysis (claudedocs/grammar_structure_analysis.md)
+        return {
+            "name": {"type_def": 65, "callable": 32, "control_flow": 24},
+            "body": {"control_flow": 52, "type_def": 27, "callable": 26},
+            "type": {"type_def": 57, "callable": 8, "control_flow": 6},
+            "condition": {"control_flow": 60},
+            "operator": {"operation": 39, "boundary": 2, "type_def": 1},
+            "right": {"operation": 30, "control_flow": 4, "type_def": 2},
+            "parameters": {"callable": 34, "type_def": 3},
+            "left": {"operation": 30, "control_flow": 3, "type_def": 2},
+            "type_parameters": {"type_def": 18, "callable": 10},
+            "alternative": {"control_flow": 26},
+            "value": {"control_flow": 13, "type_def": 9, "callable": 2},
+            "arguments": {"operation": 10, "callable": 5, "type_def": 2},
+            "return_type": {"callable": 16, "type_def": 1},
+            "consequence": {"control_flow": 14},
+            "declarator": {"callable": 7, "type_def": 5, "control_flow": 1},
+            "type_arguments": {"type_def": 6, "callable": 3, "operation": 1},
+            "initializer": {"control_flow": 8, "type_def": 1},
+            "function": {"operation": 6, "callable": 3},
+            "argument": {"operation": 9},
+            "result": {"callable": 6, "type_def": 2, "operation": 1},
+            "pattern": {"pattern_match": 20, "control_flow": 10},
+            "patterns": {"pattern_match": 15, "control_flow": 5},
+        }
+
+    def get_node_semantic_info(
+        self,
+        node_type: str,
+        language: SemanticSearchLanguage | str,
+    ) -> NodeSemanticInfo | None:
+        """Get comprehensive semantic information for a node type.
+
+        This is the primary method for grammar-based classification, extracting
+        all structural and semantic information available from the grammar.
+
+        Args:
+            node_type: The node type name (e.g., "function_definition")
+            language: The programming language
+
+        Returns:
+            NodeSemanticInfo with all extracted semantic data, or None if not found
+
+        Example:
+            >>> parser = NodeTypeParser()
+            >>> info = parser.get_node_semantic_info("function_definition", "python")
+            >>> info.has_fields
+            True
+            >>> "parameters" in info.field_map
+            True
+            >>> info.infer_semantic_category()
+            'callable'
+        """
+        if not isinstance(language, SemanticSearchLanguage):
+            language = SemanticSearchLanguage.from_string(language)
+
+        # Find node info in parsed data
+        node_info = self._find_node_info(node_type, language)
+        if not node_info:
+            return None
+
+        # Extract semantic information
+        return self._extract_semantic_info(node_info, language.value)
+
+    def _find_node_info(
+        self,
+        node_type: str,
+        language: SemanticSearchLanguage,
+    ) -> NodeTypeInfo | None:
+        """Find node info for a specific type in a language.
+
+        Args:
+            node_type: Node type name to find
+            language: Programming language
+
+        Returns:
+            NodeTypeInfo dict if found, None otherwise
+        """
+        for language_mapping in self.parse_all_node_types():
+            if language not in language_mapping:
+                continue
+
+            root_nodes = language_mapping[language]
+            for node_info in root_nodes:
+                type_name = node_info.get("type_name", node_info.get("type"))
+                if type_name == node_type:
+                    return node_info
+
+        return None
+
+    def _extract_semantic_info(
+        self,
+        node_info: NodeTypeInfo,
+        language: str,
+    ) -> NodeSemanticInfo:
+        """Extract semantic information from node type info.
+
+        Args:
+            node_info: Raw node type info from JSON
+            language: Programming language name
+
+        Returns:
+            NodeSemanticInfo with all extracted data
+        """
+        from codeweaver.semantic.grammar_types import NodeSemanticInfo
+
+        # Extract fields
+        fields = self._extract_fields(node_info)
+
+        # Extract children constraints
+        children = self._extract_children_types(node_info)
+
+        # Check if abstract (has subtypes)
+        subtypes_data = node_info.get("subtypes", [])
+        is_abstract = bool(subtypes_data)
+        subtypes = tuple(
+            str(st.get("type_name", st.get("type", "")))
+            for st in subtypes_data
+            if isinstance(st, dict)
+        ) if is_abstract else ()
+
+        # Find supertype if this is a concrete type
+        node_type_name = str(node_info.get("type_name", node_info.get("type", "")))
+        supertype = self._find_supertype(node_type_name, language)
+
+        return NodeSemanticInfo(
+            node_type=node_type_name,
+            language=language,
+            is_named=node_info.get("named", False),
+            is_abstract=is_abstract,
+            is_extra=node_info.get("extra", False),
+            is_root=node_info.get("root", False),
+            abstract_category=supertype,
+            concrete_subtypes=subtypes,
+            fields=fields,
+            children_types=children,
+        )
+
+    def _extract_fields(self, node_info: NodeTypeInfo) -> tuple[FieldInfo, ...]:
+        """Extract field information from node type info.
+
+        Args:
+            node_info: Raw node type info from JSON
+
+        Returns:
+            Tuple of FieldInfo objects
+        """
+        from codeweaver.semantic.grammar_types import FieldInfo
+
+        fields_data = node_info.get("fields")
+        if not isinstance(fields_data, dict):
+            return ()
+
+        fields: list[FieldInfo] = []
+        for field_name, field_data in fields_data.items():
+            if not isinstance(field_data, dict):
+                continue
+
+            types_data = field_data.get("types", [])
+            types = tuple(
+                str(t.get("type_name", t.get("type", "")))
+                for t in types_data
+                if isinstance(t, dict)
+            )
+
+            fields.append(FieldInfo(
+                name=str(field_name),
+                required=field_data.get("required", False),
+                multiple=field_data.get("multiple", False),
+                types=types,
+            ))
+
+        return tuple(fields)
+
+    def _extract_children_types(self, node_info: NodeTypeInfo) -> tuple[str, ...]:
+        """Extract allowed children types from node type info.
+
+        Args:
+            node_info: Raw node type info from JSON
+
+        Returns:
+            Tuple of allowed child type names
+        """
+        children_data = node_info.get("children")
+        if not isinstance(children_data, dict):
+            return ()
+
+        types_data = children_data.get("types", [])
+        return tuple(
+            str(t.get("type_name", t.get("type", "")))
+            for t in types_data
+            if isinstance(t, dict)
+        )
+
+    def _find_supertype(self, node_type: str, language: str) -> str | None:
+        """Find supertype (abstract category) for a concrete node type.
+
+        Args:
+            node_type: Concrete node type name
+            language: Programming language name
+
+        Returns:
+            Abstract type name if found, None otherwise
+        """
+        for abstract_name, lang_map in self.abstract_type_map.items():
+            if language in lang_map:
+                type_info = lang_map[language]
+                if type_info.is_subtype(node_type):
+                    return abstract_name
+        return None
+
+    def get_supertype_hierarchy(
+        self,
+        node_type: str,
+        language: SemanticSearchLanguage | str,
+    ) -> list[str]:
+        """Get hierarchy of supertypes for a node type.
+
+        Walks up the abstract type hierarchy from most specific to most general.
+
+        Args:
+            node_type: Node type name
+            language: Programming language
+
+        Returns:
+            List of supertypes from most specific to most general.
+            E.g., ["binary_expression", "expression", "primary_expression"]
+
+        Example:
+            >>> parser = NodeTypeParser()
+            >>> parser.get_supertype_hierarchy("binary_expression", "python")
+            ['expression']
+        """
+        if not isinstance(language, SemanticSearchLanguage):
+            language = SemanticSearchLanguage.from_string(language)
+
+        hierarchy = []
+        current = node_type
+
+        # Walk up the hierarchy
+        max_depth = 10  # Prevent infinite loops
+        for _ in range(max_depth):
+            supertype = self._find_supertype(current, language.value)
+            if not supertype:
+                break
+
+            hierarchy.append(supertype)
+            current = supertype
+
+        return hierarchy
 
     def find_common_patterns(self) -> dict[NodeNameT, list[SemanticSearchLanguage]]:
         """Find common node type patterns across languages.

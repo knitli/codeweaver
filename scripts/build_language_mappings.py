@@ -37,10 +37,10 @@ def locate_node_types() -> Path:
 
 def parse_node_types(
     node_types_dir: Path,
-) -> Sequence[Mapping[SemanticSearchLanguage, Sequence[NodeTypeInfo]]]:
+) -> Mapping[SemanticSearchLanguage, Sequence[NodeTypeInfo]]:
     """Parse the node types from the specified directory."""
     parser = NodeTypeParser(node_types_dir=node_types_dir)
-    return parser.parse_all_node_types()
+    return parser.flatten()
 
 
 def display_common_patterns(common_patterns: PatternLanguages, top: int = 20) -> None:
@@ -94,7 +94,8 @@ def print_confidence_rows(title: str, rows: Iterable[ConfidenceRow], limit: int 
         print(f"  {pattern} → {category} (confidence: {conf:.2f}, {lang_count} langs)")
 
 
-def down_to_node_types(project_root: ProjectNodeTypes) -> dict[SemanticSearchLanguage, set[str]]:
+def down_to_node_types(project_root: ProjectNodeTypes) -> dict[SemanticSearchLanguage, set[str]]:  # noqa: C901
+    # sourcery skip: low-code-quality
     """Convert project node types to a mapping of language names to their node type names."""
     lang_to_types: dict[SemanticSearchLanguage, set[str]] = {}
     for entry in project_root:
@@ -216,7 +217,7 @@ def analyze_node_types_and_generate_mappings() -> None:
 
     mapper = get_node_mapper()
 
-    high, medium, low = analyze_confidence(mapper, common_patterns, top=25)
+    high, medium, low = analyze_confidence(mapper, common_patterns, top=25)  # type: ignore
     print_confidence_rows("High confidence classifications", high)
     print_confidence_rows("Medium confidence classifications", medium)
     print_confidence_rows("Low confidence classifications", low)

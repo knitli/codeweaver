@@ -18,6 +18,7 @@ from functools import cache, cached_property
 from pathlib import Path
 from types import MappingProxyType
 from typing import (
+    TYPE_CHECKING,
     Annotated,
     Any,
     ClassVar,
@@ -54,19 +55,28 @@ from pydantic.dataclasses import dataclass
 from pydantic_core import to_json
 from typing_extensions import TypeIs
 
-from codeweaver._ast_grep import AstNode
 from codeweaver._common import BasedModel, BaseEnum, DataclassSerializationMixin
 from codeweaver._constants import get_ext_lang_pairs
 from codeweaver._utils import (
     ensure_iterable,
     get_git_branch,
+    lazy_importer,
     normalize_ext,
     sanitize_unicode,
     set_relative_path,
     uuid7,
 )
-from codeweaver.language import ConfigLanguage, SemanticSearchLanguage
+from codeweaver.semantic._ast_grep import AstNode
 
+
+if TYPE_CHECKING:
+    from codeweaver.language import ConfigLanguage, SemanticSearchLanguage
+else:
+    # this prevents a very big circular import situation
+    # While they're only type annotations, because of pydantic serialization/deserialization/validation, we need the types at runtime
+    language_module = lazy_importer("codeweaver.language")
+    ConfigLanguage = language_module.ConfigLanguage
+    SemanticSearchLanguage = language_module.SemanticSearchLanguage
 
 try:
     # there are a handful of rare situations where users might not be able to install blake3
@@ -199,7 +209,7 @@ class Metadata(TypedDict, total=False):
     ]
     tags: NotRequired[
         Annotated[
-            tuple[str] | None,
+            tuple[str, ...] | None,
             Field(description="""Tags associated with the code chunk, if applicable"""),
         ]
     ]
@@ -210,6 +220,13 @@ class Metadata(TypedDict, total=False):
                 description="""Semantic metadata associated with the code chunk, if applicable. Should be included if the code chunk was from semantic chunking."""
             ),
         ]
+    ]
+    context: Annotated[
+        dict[str, Any] | None,
+        Field(
+            default_factory=dict,
+            description="""Optional context for evaluating the chunk's origin, transformation, etc. You can really put anything here.""",
+        ),
     ]
 
 
@@ -693,7 +710,7 @@ class CodeChunk(BasedModel):
         AfterValidator(set_relative_path),
     ] = None
     language: SemanticSearchLanguage | str | None = None
-    chunk_type: ChunkType = ChunkType.TEXT_BLOCK  # For Phase 1, simple text blocks
+    chunk_type: ChunkType = ChunkType.TEXT_BLOCK
     ext_kind: Annotated[
         ExtKind | None,
         Field(
@@ -874,11 +891,11 @@ class DiscoveredFile(DataclassSerializationMixin):
         return None
 
     @classmethod
-    def from_chunk(cls, chunk: CodeChunk) -> DiscoveredFile | None:
+    def from_chunk(cls, chunk: CodeChunk) -> DiscoveredFile:
         """Create a DiscoveredFile from a CodeChunk, if it has a valid file_path."""
         if chunk.file_path and chunk.file_path.is_file() and chunk.file_path.exists():
-            return cls.from_path(chunk.file_path)
-        return None
+            return cast(DiscoveredFile, cls.from_path(chunk.file_path))
+        raise ValueError("CodeChunk must have a valid file_path to create a DiscoveredFile.")
 
     @computed_field
     @property

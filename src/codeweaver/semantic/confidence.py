@@ -1,7 +1,3 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-#
-# SPDX-License-Identifier: MIT OR Apache-2.0
 """Confidence scoring system for semantic node classification."""
 
 from __future__ import annotations
@@ -16,7 +12,7 @@ from codeweaver.semantic.categories import (
     ImportanceScoresDict,
     SemanticNodeCategory,
 )
-from codeweaver.semantic.hierarchical import ClassificationPhase, ClassificationResult
+from codeweaver.semantic.pattern_classifier import ClassificationPhase, ClassificationResult
 
 
 @dataclass(frozen=True)
@@ -32,12 +28,12 @@ class ConfidenceMetrics:
     @property
     def is_high_confidence(self) -> bool:
         """Check if this represents high confidence classification."""
-        return self.final_confidence >= 0.80
+        return self.final_confidence >= 0.8
 
     @property
     def is_reliable(self) -> bool:
         """Check if this classification is reliable enough for use."""
-        return self.final_confidence >= 0.60
+        return self.final_confidence >= 0.6
 
 
 def _calculate_importance_multiplier_cached(
@@ -46,8 +42,6 @@ def _calculate_importance_multiplier_cached(
     """Cached version of importance multiplier calculation."""
     try:
         scores = category.category.importance_scores
-
-        # Calculate weighted importance score
         weighted_importance = (
             scores.discovery * scores.discovery
             + scores.comprehension * scores.comprehension
@@ -55,12 +49,10 @@ def _calculate_importance_multiplier_cached(
             + scores.debugging * scores.debugging
             + scores.documentation * scores.documentation
         )
-
-        # Scale from 0.8 to 1.1 based on importance
-        return 0.8 + (weighted_importance * 0.3)
-
     except (ValueError, AttributeError):
-        return 0.8  # Default fallback
+        return 0.8
+    else:
+        return 0.8 + weighted_importance * 0.3
 
 
 @lru_cache(maxsize=256)
@@ -76,7 +68,6 @@ class ConfidenceScorer:
 
     def __init__(self) -> None:
         """Initialize with default context weights."""
-        # Default context weights for general AI assistant usage
         self.default_context = AgentTask.DEFAULT.profile
 
     def calculate_confidence(
@@ -88,26 +79,15 @@ class ConfidenceScorer:
         """Calculate detailed confidence metrics for a classification result."""
         if context_weights is None:
             context_weights = self.default_context
-
-        # Base confidence from classification phase
         base_confidence = self._get_base_confidence(result.phase)
-
-        # Importance multiplier based on category's importance scores
         importance_multiplier = _calculate_importance_multiplier(
             result.category, ImportanceScores.validate_python(cast(dict[str, Any], context_weights))
         )
-
-        # Pattern specificity multiplier
         pattern_multiplier = self._calculate_pattern_multiplier(result, pattern_specificity)
-
-        # Context multiplier (future extension for contextual information)
-        context_multiplier = 1.0  # Default, could be enhanced with AST context
-
-        # Final confidence calculation
+        context_multiplier = 1.0
         final_confidence = min(
             0.99, base_confidence * importance_multiplier * pattern_multiplier * context_multiplier
         )
-
         return ConfidenceMetrics(
             base_confidence=base_confidence,
             importance_multiplier=importance_multiplier,
@@ -119,34 +99,28 @@ class ConfidenceScorer:
     def _get_base_confidence(self, phase: ClassificationPhase) -> float:
         """Get base confidence based on classification phase."""
         phase_confidence_map = {
-            ClassificationPhase.SYNTACTIC: 0.95,  # Syntactic fast-path
-            ClassificationPhase.TIER_MATCH: 0.75,  # Tier-level match
-            ClassificationPhase.PATTERN_MATCH: 0.60,  # Category pattern match
-            ClassificationPhase.LANGUAGE_EXT: 0.90,  # Language extension
-            ClassificationPhase.FALLBACK: 0.30,  # Unknown fallback
+            ClassificationPhase.SYNTACTIC: 0.95,
+            ClassificationPhase.TIER_MATCH: 0.75,
+            ClassificationPhase.PATTERN_MATCH: 0.6,
+            ClassificationPhase.LANGUAGE_EXT: 0.9,
+            ClassificationPhase.FALLBACK: 0.3,
         }
-        return phase_confidence_map.get(phase, 0.30)
+        return phase_confidence_map.get(phase, 0.3)
 
     def _calculate_pattern_multiplier(
         self, result: ClassificationResult, pattern_specificity: float | None
     ) -> float:
         """Calculate pattern specificity multiplier."""
         if pattern_specificity is not None:
-            # Use provided specificity
-            return min(1.0, 0.7 + (pattern_specificity * 0.3))
-
-        # Estimate specificity from matched pattern
+            return min(1.0, 0.7 + pattern_specificity * 0.3)
         if not result.matched_pattern:
-            return 0.85  # Default for no pattern
-
+            return 0.85
         pattern = result.matched_pattern
-
-        # Longer, more specific patterns get higher multiplier
         if len(pattern) > 20:
             return 1.0
         if len(pattern) > 10:
             return 0.95
-        return 0.90 if len(pattern) > 5 else 0.85
+        return 0.9 if len(pattern) > 5 else 0.85
 
     def enhance_result_confidence(
         self,
@@ -156,8 +130,6 @@ class ConfidenceScorer:
     ) -> ClassificationResult:
         """Create an enhanced result with updated confidence score."""
         metrics = self.calculate_confidence(result, context_weights, pattern_specificity)
-
-        # Create new result with enhanced confidence
         return ClassificationResult(
             category=result.category,
             confidence=metrics.final_confidence,
@@ -180,17 +152,11 @@ class ContextualScorer(ConfidenceScorer):
         context_weights: ImportanceScoresDict | None = None,
     ) -> ConfidenceMetrics:
         """Calculate confidence with additional contextual factors."""
-        # Get base confidence metrics
         base_metrics = self.calculate_confidence(result, context_weights)
-
-        # Apply contextual adjustments
         context_multiplier = self._calculate_contextual_multiplier(
             result, parent_type, sibling_types, ast_depth
         )
-
-        # Update final confidence with context
         final_confidence = min(0.99, base_metrics.final_confidence * context_multiplier)
-
         return ConfidenceMetrics(
             base_confidence=base_metrics.base_confidence,
             importance_multiplier=base_metrics.importance_multiplier,
@@ -208,52 +174,42 @@ class ContextualScorer(ConfidenceScorer):
     ) -> float:
         """Calculate multiplier based on contextual factors."""
         multiplier = 1.0
-
-        # Parent context adjustments
         if parent_type:
             multiplier *= self._adjust_for_parent_context(result, parent_type)
-
-        # Sibling context adjustments
         if sibling_types:
             multiplier *= self._adjust_for_sibling_context(result, sibling_types)
-
-        # AST depth adjustments (deeper nodes might be more specific)
         if ast_depth is not None:
-            if ast_depth > 5:  # Deep nesting often indicates specific constructs
+            if ast_depth > 5:
                 multiplier *= 1.05
-            elif ast_depth < 2:  # Shallow might be more structural
+            elif ast_depth < 2:
                 multiplier *= 1.02
-
-        return min(1.15, multiplier)  # Cap the contextual boost
+        return min(1.15, multiplier)
 
     def _adjust_for_parent_context(self, result: ClassificationResult, parent_type: str) -> float:
         """Adjust confidence based on parent node type."""
-        # Example adjustments based on parent-child relationships
         if result.category == SemanticNodeCategory.OPERATION_COMPUTATION:
             if "expression" in parent_type.lower():
-                return 1.1  # Operations in expressions are very likely
+                return 1.1
             if "statement" in parent_type.lower():
-                return 0.95  # Less likely in statement context
-
-        return 1.0  # No adjustment by default
+                return 0.95
+        return 1.0
 
     def _adjust_for_sibling_context(
         self, result: ClassificationResult, sibling_types: list[str]
     ) -> float:
         """Adjust confidence based on sibling node types."""
-        # Example adjustments based on sibling patterns
         if result.category == SemanticNodeCategory.SYNTAX_SYNTACTIC:
             structural_siblings = sum(
-                any(punct in s.lower() for punct in [",", ";", "(", ")", "[", "]"])
-                for s in sibling_types
+
+                    any(punct in s.lower() for punct in [",", ";", "(", ")", "[", "]"])
+                    for s in sibling_types
+
             )
             if structural_siblings > len(sibling_types) * 0.5:
-                return 1.1  # High structural context
+                return 1.1
+        return 1.0
 
-        return 1.0  # No adjustment by default
 
-
-# Global instances
 _confidence_scorer = ConfidenceScorer()
 _contextual_scorer = ContextualScorer()
 

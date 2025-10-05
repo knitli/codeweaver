@@ -17,7 +17,7 @@ import subprocess
 import sys
 import unicodedata
 
-from collections.abc import Callable, Hashable, Iterable
+from collections.abc import Callable, Iterable
 from functools import cache
 from importlib import metadata, util
 from pathlib import Path
@@ -56,10 +56,22 @@ def uuid7() -> UUID7:
     )  # it's always UUID7 and not str | int | bytes because we don't take kwargs
 
 
-def dict_set_to_tuple(
-    d: dict[str, set[str]]
-    | dict[LiteralStringT | AbstractNodeName, set[LiteralStringT | AbstractNodeName]],
-) -> dict[str, tuple[str, ...]] | dict[Hashable, tuple[LiteralStringT | AbstractNodeName, ...]]:
+type DictInputTypesT = (
+    dict[str, set[str]]
+    | dict[LiteralStringT, set[LiteralStringT]]
+    | dict[AbstractNodeName, set[LiteralStringT]]
+    | dict[LiteralStringT, set[AbstractNodeName]]
+)
+
+type DictOutputTypesT = (
+    dict[str, tuple[str, ...]]
+    | dict[LiteralStringT, tuple[LiteralStringT, ...]]
+    | dict[AbstractNodeName, tuple[LiteralStringT, ...]]
+    | dict[LiteralStringT, tuple[AbstractNodeName, ...]]
+)
+
+
+def dict_set_to_tuple(d: DictInputTypesT) -> DictOutputTypesT:
     """Convert all sets in a dictionary to tuples."""
     return dict(
         sorted({k: tuple(sorted(v)) for k, v in d.items()}.items()),  # type: ignore
@@ -392,7 +404,7 @@ def is_debug() -> bool:
 # ===========================================================================
 # by default, we do basic NFKC normalization and strip known invisible/control chars
 # this is to avoid issues with fullwidth chars, zero-width spaces, etc.
-# We plan to add more advanced santization options in the future, which users can opt into.
+# We plan to add more advanced sanitization options in the future, which users can opt into.
 # TODO: Add Rebuff.ai integration, and/or other advanced sanitization options. Probably as middleware.
 
 NORMALIZE_FORM = "NFKC"

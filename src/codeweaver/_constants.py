@@ -6,12 +6,16 @@
 Constants used throughout the CodeWeaver project, primarily for default configurations.
 """
 
+from __future__ import annotations
+
 import contextlib
 
 from collections.abc import Generator
 from pathlib import Path
 from types import MappingProxyType
-from typing import Literal, NamedTuple, TypedDict, cast
+from typing import Annotated, Literal, NamedTuple, TypedDict, cast
+
+from pydantic import Field
 
 from codeweaver._common import LiteralStringT
 
@@ -26,10 +30,12 @@ class ExtLangPair(NamedTuple):
     Not all 'extensions' are actually file extensions, some are file names or special cases, like `Makefile` or `Dockerfile`.
     """
 
-    ext: LiteralStringT
+    ext: Annotated[LiteralStringT, Field(min_length=2, max_length=30)]
     """The file extension, including leading dot if it's a file extension."""
 
-    language: LiteralStringT
+    language: Annotated[
+        LiteralStringT, Field(min_length=1, max_length=50, default_factory=lambda x: str(x).lower())
+    ]
     """The programming or config language associated with the file extension."""
 
     @property
@@ -68,11 +74,26 @@ class ExtLangPair(NamedTuple):
             return "config"
         raise ValueError(f"Unknown category for {self.ext}")
 
+    @property
+    def is_weird_extension(self) -> bool:
+        """Check if a file extension doesn't fit the usual pattern of a dot followed by alphanumerics."""
+        if not self.is_actual_ext or self.is_file_name:
+            return True
+        if self.ext.istitle():
+            return True
+        return True if self.ext.find(".", 1) != -1 else "." not in self.ext
+
     def is_same(self, filename: str) -> bool:
         """Check if the given filename is the same filetype as the extension."""
-        if self.is_actual_ext:
-            return filename.endswith(self.ext)
-        return filename == self.ext if self.is_file_name else False
+        # fast case first for elimination
+        if self.ext.lower() not in filename.lower():
+            return False
+        # a couple of these may seem redundant but we're descending in confidence levels here
+        if not self.is_weird_extension and filename.endswith(self.ext):
+            return True
+        if self.is_file_name and filename == self.ext:
+            return True
+        return bool(self.is_weird_extension and filename.lower().endswith(self.ext.lower()))
 
 
 DEFAULT_EXCLUDED_DIRS: frozenset[LiteralStringT] = frozenset({
@@ -207,6 +228,7 @@ DATA_FILES_EXTENSIONS: tuple[ExtLangPair, ...] = (
     ExtLangPair(ext=".dbf", language="dbf"),
     ExtLangPair(ext=".sqlite", language="sql"),
     ExtLangPair(ext=".sqlite3", language="sql"),
+    ExtLangPair(ext=".tsv", language="tsv"),
     ExtLangPair(ext=".xls", language="excel"),
     ExtLangPair(ext=".xlsx", language="excel"),
 )
@@ -365,7 +387,7 @@ CODE_FILES_EXTENSIONS: tuple[ExtLangPair, ...] = (
     ExtLangPair(ext=".lucee", language="lucee"),
     ExtLangPair(
         ext=".m", language="matlab"
-    ),  # .m is also objective-c, octave, and mercury, but these days, matlab is most likely IMO
+    ),  # .m is also objective-c, octave, and mercury, but these days, matlab is most likely IMO for active projects
     ExtLangPair(ext=".mak", language="make"),
     ExtLangPair(ext=".makefile", language="make"),
     ExtLangPair(ext=".mk", language="make"),
@@ -376,7 +398,7 @@ CODE_FILES_EXTENSIONS: tuple[ExtLangPair, ...] = (
     ExtLangPair(ext=".move", language="move"),
     ExtLangPair(ext=".nh", language="newick"),
     ExtLangPair(ext=".nhx", language="newick"),
-    ExtLangPair(ext=".nim", language="nim"),
+    ExtLangPair(ext=".nim", language="nimble"),
     ExtLangPair(ext=".nim.cfg", language="nimble"),
     ExtLangPair(ext=".nim.cfg", language="nimble"),
     ExtLangPair(ext=".nimble", language="nimble"),
@@ -392,6 +414,7 @@ CODE_FILES_EXTENSIONS: tuple[ExtLangPair, ...] = (
     ExtLangPair(ext=".pascal", language="pascal"),
     ExtLangPair(ext=".pgsql", language="sql"),
     ExtLangPair(ext=".pharo", language="pharo"),
+    ExtLangPair(ext=".pkl", language="pkl"),
     ExtLangPair(ext=".pl", language="perl"),
     ExtLangPair(ext=".pm", language="perl"),
     ExtLangPair(ext=".pony", language="pony"),
@@ -434,7 +457,7 @@ CODE_FILES_EXTENSIONS: tuple[ExtLangPair, ...] = (
     ExtLangPair(ext=".sqlite", language="sql"),
     ExtLangPair(ext=".sqlite3", language="sql"),
     ExtLangPair(ext=".sty", language="latex"),
-    ExtLangPair(ext="rei", language="reason"),
+    ExtLangPair(ext=".rei", language="reason"),
     ExtLangPair(
         ext=".sv", language="verilog"
     ),  # systemverilog -- more likely these days than `v` for verilog
@@ -532,211 +555,6 @@ FALLBACK_TEST: MappingProxyType[FallbackInputExtension, FallBackTestDef] = Mappi
 })
 """A mapping of file extensions to their fallback test definitions."""
 
-COMMON_DELIMITERS = ("(", ")"), ("{", "}"), ("[", "]")
-"""Common delimiters used in various programming languages. Delimiters are recursively tested until a match that produces results under the target character count is found."""
-
-QUOTE_DELIMITERS = ('"', '"'), ("'", "'"), ("`", "`"), ("\n", "\n"), ("", "")
-"""Common quote delimiters used in various programming languages."""
-
-GENERIC_CODE_DELIMITERS = (
-    ("module", "end"),
-    ("class", "end"),
-    ("def", "end"),
-    ("case", "end"),
-    ("do", "end"),
-    ("for", "end"),
-    ("if", "end"),
-    ("try", "end"),
-    ("unless", "end"),
-    ("while", "end"),
-    ("begin", "end"),
-    ("=begin", "=end"),
-    ("#", "\n"),
-    *COMMON_DELIMITERS,
-    *QUOTE_DELIMITERS,
-)
-
-C_COMMON_DELIMITERS = (("/*", "*/"), ("//", "\n"), *GENERIC_CODE_DELIMITERS)
-"""Common delimiters used in C-like programming languages."""
-
-DELIMITERS: MappingProxyType[LiteralStringT, frozenset[tuple[str, str]]] = MappingProxyType({
-    "assembly": frozenset({(";", "\n"), *COMMON_DELIMITERS}),
-    "bash": frozenset({
-        ("#", "\n"),
-        ("if", "fi"),
-        ("case", "esac"),
-        ("do", "done"),
-        ("for", "done"),
-        ("while", "done"),
-        ("until", "done"),
-        *(
-            delim
-            for delim in GENERIC_CODE_DELIMITERS
-            if delim[0] not in {"if", "case", "do", "for", "while", "until"}
-        ),
-    }),
-    "c": frozenset({*C_COMMON_DELIMITERS}),
-    "coq": frozenset({
-        ("(*", "*)"),
-        ("{|", "|}"),
-        ("Proof", "Qed"),
-        ("Proof", "Defined"),
-        ("Proof", "Admitted"),
-        ("match", "end"),
-        *C_COMMON_DELIMITERS,
-    }),
-    "cpp": frozenset({*C_COMMON_DELIMITERS}),
-    "csharp": frozenset({*C_COMMON_DELIMITERS}),
-    "clojure": frozenset({
-        ("#'", "'"),
-        ('#"', '"'),
-        (";", "\n"),
-        *COMMON_DELIMITERS,
-        *QUOTE_DELIMITERS,
-    }),
-    "dart": frozenset({('"""', '"""'), *C_COMMON_DELIMITERS}),
-    "dhall": frozenset({
-        ("''", "''"),
-        ("`", "`"),
-        ("--", "\n"),
-        ("{-", "-}"),
-        *GENERIC_CODE_DELIMITERS,
-    }),
-    "dyck": frozenset({("%", "\n"), *COMMON_DELIMITERS}),
-    "elixir": frozenset({
-        ("#", "\n"),
-        ("@doc", "@doc"),
-        ('"""', '"""'),
-        ("fn", "end"),
-        ("do", "end"),
-        *GENERIC_CODE_DELIMITERS,
-    }),
-    "elm": frozenset({
-        ("--", "\n"),
-        ("{-", "-}"),
-        ("let", "in"),
-        ("if", "then"),
-        ("else", "end"),
-        *GENERIC_CODE_DELIMITERS,
-    }),
-    "erlang": frozenset({
-        ("%", "\n"),
-        ("%%", "\n"),
-        ("fun", "end"),
-        ("receive", "end"),
-        *GENERIC_CODE_DELIMITERS,
-    }),
-    "fortran": frozenset({
-        ("!", "\n"),
-        ("if", "end if"),
-        ("do", "end do"),
-        ("select case", "end select"),
-        ("subroutine", "end subroutine"),
-        ("function", "end function"),
-        *GENERIC_CODE_DELIMITERS,
-    }),
-    "fsharp": frozenset({
-        ("//", "\n"),
-        ("/*", "*/"),
-        ("begin", "end"),
-        ("(*", "*)"),
-        ("struct", "end"),
-        ("sig", "end"),
-        ("{|", "|}"),
-        ("(*", "*)"),
-        *C_COMMON_DELIMITERS,
-    }),
-    "go": frozenset({("`", "`"), *C_COMMON_DELIMITERS}),
-    "graphql": frozenset({("#", "\n"), *COMMON_DELIMITERS}),
-    "haskell": frozenset({
-        ("--", "\n"),
-        ("{-", "-}"),
-        ("let", "in"),
-        ("do", "end"),
-        ("where", "\n"),
-        ('"""', '"""'),
-        *GENERIC_CODE_DELIMITERS,
-    }),
-    "hcl": frozenset({("#", "\n"), *C_COMMON_DELIMITERS}),
-    "html": frozenset({("<!--", "-->"), ("<", ">"), *COMMON_DELIMITERS}),
-    "java": frozenset({*C_COMMON_DELIMITERS}),
-    "javaScript": frozenset({*C_COMMON_DELIMITERS}),
-    "json": frozenset({*COMMON_DELIMITERS}),
-    "json5": frozenset({*C_COMMON_DELIMITERS}),
-    "jsonc": frozenset({*C_COMMON_DELIMITERS}),
-    "jsx": frozenset({*C_COMMON_DELIMITERS}),
-    "julia": frozenset({
-        ("#", "\n"),
-        ("begin", "end"),
-        ("function", "end"),
-        ("macro", "end"),
-        ("if", "end"),
-        ("let", "end"),
-        ("while", "end"),
-        ("for", "end"),
-        ("struct", "end"),
-        ("#=", "=#"),
-        *COMMON_DELIMITERS,
-    }),
-    "kotlin": frozenset({*C_COMMON_DELIMITERS}),
-    "latex": frozenset({(r"\if", r"\fi"), (r"\\begin{", r"\\end{"), *COMMON_DELIMITERS}),
-    "lisp": frozenset({("'", "'"), ('"`', '"`'), ("#|", "|#"), (";", "\n"), *COMMON_DELIMITERS}),
-    "nim": frozenset({("#", "\n"), ("#[", "#]"), ('"""', '"""'), *COMMON_DELIMITERS}),
-    "matlab": frozenset({
-        ("%", "\n"),
-        ("if", "end"),
-        ("for", "end"),
-        ("while", "end"),
-        ("switch", "end"),
-        ("try", "end"),
-        ("function", "end"),
-        ("parfor", "end"),
-        ("%{", "%}"),
-        *GENERIC_CODE_DELIMITERS,
-    }),
-    "move": frozenset({*C_COMMON_DELIMITERS}),
-    "ocaml": frozenset({
-        ("begin", "end"),
-        ("(*", "*)"),
-        ("struct", "end"),
-        ("sig", "end"),
-        ("{|", "|}"),
-        ("(*", "*)"),
-        *C_COMMON_DELIMITERS,
-    }),
-    "pascal": frozenset({("(*", "*)"), ("//", "\n"), *GENERIC_CODE_DELIMITERS}),
-    "php": frozenset({("#", "\n"), *C_COMMON_DELIMITERS}),
-    "python": frozenset({('"""', '"""'), ("'''", "'''"), ("#", "\n"), *GENERIC_CODE_DELIMITERS}),
-    "r": frozenset({
-        ("r#", "#"),
-        ("#", "\n"),
-        ("if", "then"),
-        ("else", "end"),
-        *GENERIC_CODE_DELIMITERS,
-    }),
-    "raku": frozenset({("#", "\n"), ("=begin", "=end"), *GENERIC_CODE_DELIMITERS}),
-    "ruby": frozenset({("=begin", "=end"), *GENERIC_CODE_DELIMITERS}),
-    "rust": frozenset({
-        ("///", "\n"),
-        ("//", "\n"),
-        ("/**", "*/"),
-        ("#[", "]"),
-        *C_COMMON_DELIMITERS,
-    }),
-    "reason": frozenset({*C_COMMON_DELIMITERS}),
-    "sas": frozenset({("*", ";"), ("/*", "*/"), *COMMON_DELIMITERS}),
-    "sass": frozenset({*C_COMMON_DELIMITERS}),
-    "scala": frozenset({*C_COMMON_DELIMITERS}),
-    "scss": frozenset({*C_COMMON_DELIMITERS}),
-    "sql": frozenset({("--", "\n"), ("/*", "*/"), *GENERIC_CODE_DELIMITERS}),
-    "solidity": frozenset({*C_COMMON_DELIMITERS}),
-    "swift": frozenset({*C_COMMON_DELIMITERS}),
-    "tsx": frozenset({*C_COMMON_DELIMITERS}),
-    "typescript": frozenset({*C_COMMON_DELIMITERS}),
-    "xml": frozenset({("<!--", "-->"), ("<", ">"), *COMMON_DELIMITERS}),
-    "zig": frozenset({("//", "\n"), *GENERIC_CODE_DELIMITERS}),
-})
-"""A mapping of languages to their delimiters, which are a tuple of start and end strings."""
 
 CONFIG_FILE_LANGUAGES = frozenset({
     "bash",
@@ -750,17 +568,30 @@ CONFIG_FILE_LANGUAGES = frozenset({
     "jsonc",
     "just",
     "make",
+    "pkl",
     "properties",
     "toml",
     "xml",
     "yaml",
 })
 
-CODE_LANGUAGES = frozenset({ext.language for ext in CODE_FILES_EXTENSIONS})
 
-DATA_LANGUAGES = frozenset({ext.language for ext in DATA_FILES_EXTENSIONS})
+def _get_languages_helper() -> tuple[
+    frozenset[LiteralStringT],
+    frozenset[LiteralStringT],
+    frozenset[LiteralStringT],
+    frozenset[LiteralStringT],
+]:
+    """Helper function to get all languages as frozensets."""
+    code_langs: set[LiteralStringT] = {ext.language for ext in CODE_FILES_EXTENSIONS}
+    data_langs: set[LiteralStringT] = {ext.language for ext in DATA_FILES_EXTENSIONS}
+    doc_langs: set[LiteralStringT] = {ext.language for ext in DOC_FILES_EXTENSIONS}
+    all_langs: set[LiteralStringT] = code_langs | data_langs | doc_langs
+    return frozenset(code_langs), frozenset(data_langs), frozenset(doc_langs), frozenset(all_langs)
 
-DOCS_LANGUAGES = frozenset({ext.language for ext in DOC_FILES_EXTENSIONS})
+
+CODE_LANGUAGES, DATA_LANGUAGES, DOCS_LANGUAGES, ALL_LANGUAGES = _get_languages_helper()
+"""Frozen sets of languages for code, data, documentation, and all combined."""
 
 SEMANTIC_KINDS = MappingProxyType({
     "python": {
@@ -802,11 +633,6 @@ SEMANTIC_KINDS = MappingProxyType({
 })
 
 
-def get_delimiters_for_language(language: LiteralStringT) -> frozenset[tuple[str, str]]:
-    """Get the delimiters for a given language. If the language is not found, return the generic code delimiters."""
-    return DELIMITERS.get(language, frozenset({*GENERIC_CODE_DELIMITERS}))
-
-
 def get_ext_lang_pairs(*, include_data: bool = False) -> Generator[ExtLangPair]:
     """Yield all `ExtLangPair` instances for code, config, and docs files."""
     if include_data:
@@ -831,6 +657,22 @@ def _run_fallback_test(extension: FallbackInputExtension, path: Path) -> Fallbac
     return cast(FallbackLanguage, return_value)
 
 
+def get_ext_lang_pair_for_file(
+    file_path: Path, *, include_data: bool = False
+) -> ExtLangPair | None:
+    """Get the `ExtLangPair` for a given file path."""
+    if not file_path.is_file():
+        return None
+    filename = file_path.name
+    for pair in get_ext_lang_pairs(include_data=include_data):
+        if pair.is_same(filename):
+            if pair.ext in FALLBACK_TEST:
+                language = _run_fallback_test(cast(FallbackInputExtension, pair.ext), file_path)
+                return ExtLangPair(ext=pair.ext, language=language)
+            return pair
+    return None
+
+
 def get_language_from_extension(
     extension: LiteralStringT, *, path: Path | None = None
 ) -> LiteralStringT | None:
@@ -844,6 +686,7 @@ def get_language_from_extension(
 
 
 __all__ = (
+    "ALL_LANGUAGES",
     "CODE_FILES_EXTENSIONS",
     "CODE_LANGUAGES",
     "CONFIG_FILE_LANGUAGES",
@@ -851,14 +694,11 @@ __all__ = (
     "DATA_LANGUAGES",
     "DEFAULT_EXCLUDED_DIRS",
     "DEFAULT_EXCLUDED_EXTENSIONS",
-    "DELIMITERS",
     "DOCS_LANGUAGES",
     "DOC_FILES_EXTENSIONS",
     "FALLBACK_TEST",
-    "GENERIC_CODE_DELIMITERS",
     "ExtLangPair",
     "FallBackTestDef",
-    "get_delimiters_for_language",
     "get_ext_lang_pairs",
     "get_language_from_extension",
 )

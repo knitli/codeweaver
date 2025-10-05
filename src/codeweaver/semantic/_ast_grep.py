@@ -225,7 +225,7 @@ class AstNode[SgNode: (AstGrepNode)](BasedModel):
                 parent_node.node_id = parent_node_id
         if language is None:
             language = self._determine_language()
-        assert language is not None, "Language could not be determined."
+        assert language is not None, "Language could not be determined."  # noqa: S101
         self.language = language
         self._node = node
         self.node_id = node_id
@@ -286,6 +286,7 @@ class AstNode[SgNode: (AstGrepNode)](BasedModel):
     @cached_property
     def symbol(self) -> str:
         """Get a symbolic representation of the node."""
+        raise NotImplementedError("Symbol generation is not implemented yet.")
 
     @computed_field
     @cached_property

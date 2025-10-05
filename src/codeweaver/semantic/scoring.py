@@ -15,7 +15,7 @@ from codeweaver._common import BasedModel
 
 
 if TYPE_CHECKING:
-    from codeweaver._ast_grep import AstNode
+    from codeweaver.semantic._ast_grep import AstNode
     from codeweaver.semantic.categories import ImportanceScores, SemanticNodeCategory
 
 

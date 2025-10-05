@@ -1,7 +1,4 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
@@ -23,6 +20,27 @@
             ],
             "console": "integratedTerminal",
             "justMyCode": false
+        },
+        {
+            "name": "CW Module As Script",
+            "type": "debugpy",
+            "program": "${file}",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "stopOnEntry": true,
+            "args": "${command:pickArgs}"
+        },
+        {
+            "name": "Debug Selection",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${selectedText}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "stopOnEntry": true,
+            "args": "${command:pickArgs}",
+            "showReturnValue": true
         },
         {
             "name": "Debug Fetch Grammars Script",

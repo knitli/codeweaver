@@ -3,7 +3,7 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-"""A foundational enum class for the CodeWeaver project for common functionality."""
+"""Foundational base classes and types used throughout the CodeWeaver project."""
 
 from __future__ import annotations
 
@@ -265,20 +265,23 @@ class BaseEnum(Enum):
             *self._encode_name(s),
         }
 
-    @property
+    @cached_property
     def aka(self) -> tuple[str, ...] | tuple[int, ...]:
         """Return the alias for the enum member, if one exists."""
         if isinstance(self.value, str):
-            names: set[str] = set()
+            names: set[str] = {
+                self.value,
+                self.name,
+                self.decoded_value,
+                self.decoded_name,
+                self.variable,
+                self.as_title,
+            }
             if hasattr(self, "alias") and (alias := getattr(self, "alias", None)):
                 names.add(alias)
-            names |= (
-                self._multiply_variations(self.name)
-                | self._multiply_variations(self.value)
-                | {self.encoded_value, self.encoded_name}
-            )
+            names |= {n for name in names.copy() for n in self._multiply_variations(name)}
             return tuple(sorted(names))
-        return (self.value,)
+        return (self.value, self.name, self.variable, self.as_title)
 
     @property
     def encoded_value(self) -> str:
@@ -301,18 +304,17 @@ class BaseEnum(Enum):
         return self._decode_name(self.name) if self.value_type is str else self.name
 
     @classmethod
-    def aliases(cls) -> dict[str, Self] | dict[int, Self]:
+    def aliases(cls) -> dict[str, Self] | dict[int | str, Self]:
         """Provides a way to identify alternate names for a member, used in string conversion and identification."""
         alias_map: dict[str | int, Self] = {}
         if cls._value_type() is int:
             for member in cls:
                 alias_map[member.value] = member
-            return cast(dict[int, Self], alias_map)
         for member in cls:
             for alias in member.aka:
                 if alias not in alias_map:
                     alias_map[alias] = member
-        return cast(dict[str, Self], alias_map)
+        return alias_map
 
     @classmethod
     def from_string(cls, value: str) -> Self:
@@ -320,8 +322,6 @@ class BaseEnum(Enum):
         """Convert a string to the corresponding enum member. Flexibly handles different cases, dashes vs underscores, and some common variations."""
         if cls._value_type() is int and str(value).isdigit():
             return cls(int(value))
-        if cls._value_type() is int:
-            raise ValueError(f"{value} is not a valid {cls.__qualname__}")
         if literal_value := next(
             (
                 member
@@ -360,7 +360,7 @@ class BaseEnum(Enum):
         return value.lower().replace("-", "__").replace(":", "___").replace(" ", "____")
 
     @staticmethod
-    def _decode_name(value: str, *, for_pydantic_ai: bool = False) -> str:
+    def _decode_name(value: str) -> str:
         """Decodes an enum member or value into its original form."""
         return value.lower().replace("____", " ").replace("___", ":").replace("__", "-")
 
@@ -429,9 +429,14 @@ class BaseEnum(Enum):
         return type(self)._value_type()
 
     @property
-    def as_variable(self) -> str:
+    def variable(self) -> str:
         """Return the string representation of the enum member as a variable name."""
-        return self.value if self.value_type is str else str(self.name.lower())
+        return textcase.snake(self.value) if self.value_type is str else textcase.snake(self.name)
+
+    @property
+    def as_title(self) -> str:
+        """Return the title-cased representation of the enum member."""
+        return textcase.title(self.value) if self.value_type is str else textcase.title(self.name)
 
     @classmethod
     def members(cls) -> Generator[Self]:
@@ -629,12 +634,14 @@ class DictView[TypedDictT: (Mapping[str, Any])](Mapping[str, Any]):
 
 __all__ = (
     "UNSET",
+    "AbstractNodeName",
     "BaseEnum",
     "BasedModel",
     "DataclassSerializationMixin",
     "DeserializationKwargs",
     "DictView",
     "LiteralStringT",
+    "RootedRoot",
     "Sentinel",
     "SerializationKwargs",
     "Unset",

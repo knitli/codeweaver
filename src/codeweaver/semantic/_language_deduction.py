@@ -1776,7 +1776,9 @@ UNIQUE_NODES: MappingProxyType[
     "type_role": SemanticSearchLanguage.HASKELL,
     "type_spec": SemanticSearchLanguage.GO,
     "type_switch_statement": SemanticSearchLanguage.GO,
+    # spellchecker:off  # yes, this is a typo, but it isn't ours -- it is this way in the grammar
     "type_synomym": SemanticSearchLanguage.HASKELL,
+    # spellchecker:on
     "type_test": SemanticSearchLanguage.KOTLIN,
     "typealias_declaration": SemanticSearchLanguage.SWIFT,
     "typed_default_parameter": SemanticSearchLanguage.PYTHON,

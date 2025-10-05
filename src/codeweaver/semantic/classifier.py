@@ -25,10 +25,11 @@ from codeweaver.semantic.categories import (
 )
 from codeweaver.semantic.confidence import ConfidenceMetrics, ConfidenceScorer, ContextualScorer
 from codeweaver.semantic.extensions import ContextualExtensionManager, LanguageExtensionManager
-from codeweaver.semantic.hierarchical import (
+from codeweaver.semantic.grammar_classifier import GrammarBasedClassifier
+from codeweaver.semantic.pattern_classifier import (
     ClassificationPhase,
     ClassificationResult,
-    HierarchicalMapper,
+    PatternBasedClassifier,
 )
 
 
@@ -107,7 +108,8 @@ class SemanticNodeClassifier:
         self.registry = registry or create_default_registry()
 
         # Core classification components
-        self.hierarchical_mapper = HierarchicalMapper()
+        self.grammar_classifier = GrammarBasedClassifier()  # NEW: Grammar-first
+        self.pattern_fallback = PatternBasedClassifier()  # Pattern-based fallback
 
         # Extension management
         if enable_contextual_extensions:
@@ -135,6 +137,7 @@ class SemanticNodeClassifier:
         if not isinstance(language, SemanticSearchLanguage):
             language = SemanticSearchLanguage.from_string(language)
 
+        # Phase 1: Check language-specific extensions first
         if (
             ext_result := self.extension_manager.classify_with_context(  # type: ignore
                 node_type, language, parent_type, sibling_types, file_path
@@ -151,10 +154,31 @@ class SemanticNodeClassifier:
                 "language_extension",
             )
 
-        # Phase 2: Hierarchical classification
-        base_result = self.hierarchical_mapper.classify_node(node_type, language, context)
+        # Phase 2: Grammar-based classification (NEW - primary path)
+        if grammar_result := self.grammar_classifier.classify_node(node_type, language):
+            # Convert GrammarClassificationResult to ClassificationResult
+            base_result = ClassificationResult(
+                category=grammar_result.category,
+                tier=grammar_result.tier,
+                confidence=grammar_result.confidence,
+                phase=ClassificationPhase.TIER_1,  # High priority
+                matched_pattern=f"grammar_{grammar_result.classification_method}",
+                alternative_categories=None,
+            )
 
-        # Phase 3: Apply language-specific refinements
+            # Apply language-specific refinements
+            refined_result = self.extension_manager.refine_classification(
+                base_result, language, context
+            )
+
+            return self._enhance_result_with_confidence(
+                refined_result, context_weights, parent_type, sibling_types, file_path, "grammar"
+            )
+
+        # Phase 3: Pattern-based classification (fallback)
+        base_result = self.pattern_fallback.classify_node(node_type, language, context)
+
+        # Phase 4: Apply language-specific refinements
         refined_result = self.extension_manager.refine_classification(
             base_result, language, context
         )
@@ -196,13 +220,13 @@ class SemanticNodeClassifier:
         # Get primary classification
         primary = self.classify_node(node_type, language)
         alternatives = [primary]
-        # Get alternatives from hierarchical mapper
-        if hasattr(self.hierarchical_mapper, "get_classification_alternatives"):
-            hierarchical_alternatives = self.hierarchical_mapper.get_classification_alternatives(
+        # Get alternatives from pattern-based classifier
+        if hasattr(self.pattern_fallback, "get_classification_alternatives"):
+            pattern_alternatives = self.pattern_fallback.get_classification_alternatives(
                 node_type, language, threshold
             )
 
-            for alt in hierarchical_alternatives:
+            for alt in pattern_alternatives:
                 if alt.category != primary.category and alt.confidence >= threshold:
                     enhanced_alt = self._enhance_result_with_confidence(
                         alt, None, None, None, None, "alternative"

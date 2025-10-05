@@ -23,7 +23,7 @@ from codeweaver.semantic.categories import (
     SemanticNodeCategory,
     create_default_registry,
 )
-from codeweaver.semantic.hierarchical import ClassificationPhase, ClassificationResult
+from codeweaver.semantic.pattern_classifier import ClassificationPhase, ClassificationResult
 
 
 type CacheKey = tuple[str, str]  # (node_type, language_name)

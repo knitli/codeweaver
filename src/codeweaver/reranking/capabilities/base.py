@@ -120,7 +120,10 @@ class RerankingModelCapabilities(BasedModel):
         Callable[..., Sequence[Sequence[float]] | Sequence[Sequence[int]]] | None
     ) = default_output_transformer
     context_window: Annotated[
-        PositiveInt, Field(description="""The context window size of the model.""")
+        PositiveInt,
+        Field(
+            description="""The context window size of the model. Defaults to 256, which is the minimum of all supported models."""
+        ),
     ] = 256
     supports_custom_prompt: Annotated[
         bool | None, Field(description="""Whether the model supports custom prompts.""")
@@ -135,7 +138,9 @@ class RerankingModelCapabilities(BasedModel):
     tokenizer_model: Annotated[
         str | None, Field(description="""The tokenizer model to use for the model.""")
     ] = None
-    other: Annotated[dict[str, Any], Field(description="""Extra model-specific settings.""")] = {}
+    other: Annotated[
+        dict[str, Any] | None, Field(description="""Extra model-specific settings.""")
+    ] = None
 
     _available: Annotated[
         bool,
@@ -144,6 +149,14 @@ class RerankingModelCapabilities(BasedModel):
             description="""Whether the model is available, meaning its package is available in the environment and it has been implemented.""",
         ),
     ] = False  # defaults to False, set to True when the model is known to be available
+
+    def __init__(self, **data: Any) -> None:
+        """Initialize the RerankingModelCapabilities."""
+        self.other = data.get("other", {})
+        super().__init__(**data)
+        if not self.tokenizer:
+            self.tokenizer = "tiktoken"
+            self.tokenizer_model = "cl100k_base"
 
     @property
     def token_processor(self) -> Tokenizer[Any]:

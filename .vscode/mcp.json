@@ -15,39 +15,26 @@
     ],
     "servers": {
         "browser-debug-tools": {
-            "args": ["--bun", "@agentdeskai/browser-tools-server@latest"],
-            "command": "bunx",
-            "type": "stdio"
-        },
-        "console-ninja": {
-            "args": ["--bun", "~/.console-ninja/mcp/"],
+            "args": [
+                "--bun",
+                "@agentdeskai/browser-tools-server@latest"
+            ],
             "command": "bunx",
             "type": "stdio"
         },
         "context7": {
-            "args": ["--bun", "@upstash/context7-mcp@latest"],
+            "args": [
+                "--bun",
+                "@upstash/context7-mcp@latest"
+            ],
             "command": "bunx",
             "type": "stdio"
         },
         "fetch": {
-            "args": ["mcp-server-fetch"],
-            "command": "uvx"
-        },
-        "github-remote": {
-            "headers": {
-                "Authorization": "Bearer ${input:github_mcp_pat}"
-            },
-            "type": "http",
-            "url": "https://api.githubcopilot.com/mcp/"
-        },
-        "playwright": {
             "args": [
-                "--bun",
-                "@playwright/mcp@latest",
-                "--browser",
-                "/mnt/c/Users/bm-sv/scoop/shims/chromium.exe"
+                "mcp-server-fetch"
             ],
-            "command": "bunx"
+            "command": "uvx"
         },
         "sequential-thinking": {
             "args": [
@@ -59,10 +46,33 @@
         },
         "tavily": {
             "command": "bunx",
-            "args": ["--bun", "tavily-mcp@latest"],
+            "args": [
+                "--bun",
+                "tavily-mcp@latest"
+            ],
             "env": {
-                "TAVILY_API_KEY": "${input:tavily_api_key}",
+                "TAVILY_API_KEY": "${env:tavily_api_key}",
             }
-        }
+        },
+        "serena": {
+            "command": "uv",
+            "args": [
+                "run",
+                "serena",
+                "start-mcp-server"
+            ]
+        },
+        "morph-llm-fast-edit": {
+            "args": [
+                "--bun",
+                "@morph-llm/morph-fast-apply@latest"
+            ],
+            "env": {
+                "MORPH_API_KEY": "${env:MORPH_API_KEY}",
+                "ALL_TOOLS": "false"
+            },
+            "command": "bunx",
+            "type": "stdio"
+        },
     }
 }
