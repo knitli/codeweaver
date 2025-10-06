@@ -98,13 +98,18 @@ structural roles vs semantic meaning. Here's our approach:
    - Position matters but no explicit role name
    - Example: function arguments in some languages
    - **Tree-sitter equivalent**: Grammar "children"
+   - If a thing has fields, it can also have children, but not vice versa (all things with children have fields)
+   - All children are named (is_explicit_rule = True)
    - **Empirical finding**: 6,029 Positional connections across all languages
 
 3. **LOOSE** - Permissive relationship allowing appearance anywhere
    - Can appear in any context without explicit declaration
-   - Used for comments, whitespace, ambient elements
+   - Only used in a plurality of languages (11 of 25)
+   - *almost always* a **comment**. Two exceptions:
+        - Python: `line_continuation` token (1/2, other is `comment`)
+        - PHP: `text_interpolation` (1/2, other is `comment`)
    - **Tree-sitter equivalent**: "extra" nodes
-   - **Empirical finding**: ~2-3 Loose types per language (typically comments, whitespace)
+   - **Empirical finding**: 1 or 2 Loose types per language (typically comments, whitespace)
 
 *Note: Direct and Positional Connections describe **structure**, while Loose Connections
 describe **permission**.*
@@ -154,6 +159,14 @@ type constraints:
   - **Tree-sitter equivalent**: `named = True/False`
   - **Note**: Included for completeness; limited practical utility for semantic analysis
 
+- **kind** (ThingKind enum)
+  - Classification of Thing type: TOKEN or COMPOSITE
+  - TOKEN: Leaf Thing with no structural children
+  - COMPOSITE: Non-leaf Thing with structural children
+
+- **is_start** (bool, Composite only)
+  - Whether this Composite is the root of the parse tree (i.e., the start symbol)
+
 - **is_significant** (bool, Token only)
   - Whether the Token carries semantic/structural meaning vs formatting trivia
   - True: keywords, identifiers, literals, operators, comments
@@ -201,6 +214,7 @@ For developers familiar with tree-sitter terminology:
 | `named` attribute | `is_explicit_rule` | Has named grammar rule |
 | `multiple` attribute | `allows_multiple` | Upper cardinality bound |
 | `required` attribute | `requires_presence` | Lower cardinality bound |
+| 'root' attribute | `is_start` | The starting node of the parse tree |
 
 ## Design Rationale
 
@@ -225,35 +239,443 @@ For developers familiar with tree-sitter terminology:
 - **Future-proof**: Accommodates real-world patterns (multi-category, polymorphic references)
 """
 
-from typing import NewType
+from __future__ import annotations
 
-from codeweaver._common import BaseEnum, LiteralStringT
+import logging
 
+from typing import Annotated, Any, ClassVar, Literal, NewType
+
+from pydantic import ConfigDict, Field, field_validator
+
+from codeweaver._common import BasedModel, BaseEnum, LiteralStringT
+from codeweaver.language import SemanticSearchLanguage
+
+
+logger = logging.getLogger()
 
 Role = NewType("Role", LiteralStringT)
+CategoryName = NewType("CategoryName", LiteralStringT)
+ThingName = NewType("ThingName", LiteralStringT)
+TokenName = NewType("TokenName", LiteralStringT)
 
 
 class ConnectionClass(BaseEnum):
-    """Classification of connection types between Things.
+    """Classification of connections between Things in a parse tree.
 
-    This enum defines the three classes of connections that can exist between Things in a parse tree:
-    - DIRECT: Named semantic relationship **with a Role**
-    - POSITIONAL: Ordered structural relationship without semantic naming
-    - LOOSE: Permissive relationship allowing appearance anywhere
+    Tree-Sitter mapping:
+    - DIRECT -> fields: Named semantic relationship **with a Role**
+    - POSITIONAL -> children: Ordered structural relationship without semantic naming
+    - LOOSE -> extras: Permissive relationship allowing appearance anywhere
     """
 
     DIRECT = "direct"
     POSITIONAL = "positional"
     LOOSE = "loose"
 
+    @property
+    def is_structural(self) -> bool:
+        """Whether this connection class describes structural relationships.
+
+        DIRECT and POSITIONAL connections describe structure, while LOOSE connections
+        describe permission.
+        """
+        return self in {ConnectionClass.DIRECT, ConnectionClass.POSITIONAL}
+
+    @property
+    def is_loose(self) -> bool:
+        """Whether this connection class is LOOSE (extras)."""
+        return self is ConnectionClass.LOOSE
+
+    @property
+    def is_direct(self) -> bool:
+        """Whether this connection class is DIRECT (fields)."""
+        return self is ConnectionClass.DIRECT
+
+    @property
+    def is_positional(self) -> bool:
+        """Whether this connection class is POSITIONAL (children)."""
+        return self is ConnectionClass.POSITIONAL
+
+    @property
+    def allows_role(self) -> bool:
+        """Whether this connection class allows a Role.
+
+        Only DIRECT connections have Roles; POSITIONAL and LOOSE do not.
+        """
+        return self.is_direct
+
 
 class ThingKind(BaseEnum):
-    """Classification of Thing types in a parse tree.
+    """Classification of Thing types in a parse tree. Things are concrete nodes, that is, what actually exists in the parse tree.
 
-    This enum defines the two kinds of Things that can appear in a parse tree:
-    - TOKEN: Leaf Thing with no structural children
-    - COMPOSITE: Non-leaf Thing with structural children
+    Tree-Sitter mapping:
+    - TOKEN -> nodes with no fields/children (leaf nodes): Leaf Thing with no structural children
+    - COMPOSITE -> nodes with fields/children (non-leaf nodes): Non-leaf Thing with structural children
+
+    A TOKEN represents keywords, identifiers, literals, and punctuation -- what you literally see in the source code. A COMPOSITE node represents complex structures like functions, classes, and expressions, which have direct and/or positional connections to child Things.
     """
 
     TOKEN = "token"  # noqa: S105  # false positive: "token" is not a hardcoded security token
     COMPOSITE = "composite"
+
+
+class TokenSignificance(BaseEnum):
+    """Classification of Token significance.
+
+    Tree-Sitter mapping:
+    - STRUCTURAL: keywords, operators, punctuation
+    - IDENTIFIER: variable/function/type names
+    - LITERAL: string/number/boolean literals
+    - TRIVIAL: whitespace, formatting tokens
+    - COMMENT: comments
+
+    A Token can be classified by its significance, indicating whether it carries semantic or structural meaning versus being mere formatting trivia. This classification helps in filtering Tokens during semantic analysis while preserving them for formatting purposes.
+    """
+
+    STRUCTURAL = "structural"
+    IDENTIFIER = "identifier"
+    LITERAL = "literal"
+    TRIVIAL = "trivial"
+    COMMENT = "comment"
+
+    @property
+    def is_significant(self) -> bool:
+        """Whether this TokenSignificance indicates a significant Token.
+
+        Significant Tokens carry semantic/structural meaning, while trivial ones do not.
+        """
+        return self in {
+            TokenSignificance.STRUCTURAL,
+            TokenSignificance.IDENTIFIER,
+            TokenSignificance.LITERAL,
+            TokenSignificance.COMMENT,
+        }
+
+    @property
+    def is_trivial(self) -> bool:
+        """Whether this TokenSignificance indicates a trivial Token.
+
+        Trivial Tokens do not carry semantic/structural meaning.
+        """
+        return self is TokenSignificance.TRIVIAL
+
+    @property
+    def identifies(self) -> bool:
+        """Whether this TokenSignificance indicates an identifying Token.
+
+        Identifying Tokens are used for names of variables, functions, types, etc.
+        """
+        return self in {TokenSignificance.IDENTIFIER, TokenSignificance.LITERAL}
+
+
+class Thing(BasedModel):
+    """Base class for Things (Things and Tokens -- also called Composites and Tokens)).
+
+    There are two kinds of Things: Token (leaf) or Composite (non-leaf). Things are what you actually see in the AST produced by parsing code. A token is what you literally see in the source code (keywords, identifiers, literals, punctuation). A Composite represents complex structures like functions, classes, and expressions, which have direct and/or positional connections to child Things.
+
+    We keep Token as a separate class for clarity, type safety, and to enforce that Tokens cannot have children.
+
+    """
+
+    model_config = BasedModel.model_config | ConfigDict(frozen=True)
+
+    name: Annotated[ThingName | TokenName, Field(description="The name of the Thing.")]
+
+    language: Annotated[
+        SemanticSearchLanguage, Field(description="The programming language this Thing belongs to.")
+    ]
+
+    categories: Annotated[
+        frozenset[CategoryName],
+        Field(
+            default_factory=frozenset,
+            description="""
+            Set of Category names this Thing belongs to.
+
+            Most Things (86.5%) belong to a single Category.
+            Some Things (13.5%) belong to multiple Categories.
+            Empty set indicates no category membership, which is the case for:
+            - CSS
+            - Elixir
+            - HTML
+            - Solidity
+            - Swift
+            - Yaml
+
+            Multi-category is common in C/C++ (declarators serving multiple roles).
+            """,
+        ),
+    ]
+
+    is_explicit_rule: Annotated[
+        bool,
+        Field(
+            description="""
+            Whether this Thing has a dedicated named production rule in the grammar.
+
+            Tree-sitter: `named = True/False`
+            True: Named grammar rule (appears with semantic name)
+            False: Anonymous construct or synthesized node
+
+            Note: Limited utility for semantic analysis; included for completeness.
+            """
+        ),
+    ] = True
+
+    _kind: ClassVar[Literal[ThingKind.TOKEN, ThingKind.COMPOSITE]]
+
+    @property
+    def is_multi_category(self) -> bool:
+        """Check if this Thing belongs to multiple Categories."""
+        return len(self.categories) > 1
+
+    @property
+    def is_single_category(self) -> bool:
+        """Check if this Thing belongs to exactly one Category."""
+        return len(self.categories) == 1
+
+    @property
+    def primary_category(self) -> CategoryName | None:
+        """Get the primary Category of this Thing, if it exists.
+
+        Returns the single Category if the Thing belongs to exactly one; otherwise, returns None.
+        """
+        return next(iter(self.categories)) if self.is_single_category else None
+
+    @property
+    def kind(self) -> Literal[ThingKind.TOKEN, ThingKind.COMPOSITE]:
+        """The kind of this Thing (TOKEN or COMPOSITE)."""
+        return self._kind
+
+    @property
+    def is_token(self) -> bool:
+        """Whether this Thing is a Token."""
+        return self._kind == ThingKind.TOKEN
+
+    @property
+    def is_composite(self) -> bool:
+        """Whether this Thing is a Composite."""
+        return self._kind == ThingKind.COMPOSITE
+
+    def __str__(self) -> str:
+        """String representation of the Thing."""
+        if self.primary_category:
+            return f"Thing: {self.name}, Category: {self.primary_category}, Language: {self.language.variable}"
+        return f"Thing: {self.name}, Categories: {list(self.categories)}, Language: {self.language.variable}"
+
+
+class CompositeThing(Thing):
+    """A CompositeThing is a concrete element that appears in the parse tree. A Token is a Thing, but a CompositeThing (this class) is not a Token.
+
+    Tree-sitter equivalent: Node with fields and/or children
+
+    Attributes:
+        name: Thing identifier (e.g., "if_statement", "identifier")
+        kind: Structural classification (always COMPOSITE)
+        language: Programming language this Thing belongs to
+        categories: Set of Category names this Thing belongs to
+        is_explicit_rule: Whether has named grammar rule
+
+    Relationships:
+        - Thing → Many Categories (via categories attribute)
+        - Categories reference Things via their `member_things` attribute
+
+    A CompositeThing represents complex structures like functions, classes, and expressions, which have direct and/or positional connections to child Things.
+
+    Empirical findings:
+        - Average 3-5 Direct Connections per CompositeThing
+        - Average 1-2 Positional Connections per CompositeThing
+    """
+
+    direct_connections: Annotated[
+        frozenset[DirectConnection],
+        Field(
+            default_factory=frozenset,
+            description="""
+        Named semantic relationships to child Things with specific Roles.
+        Tree-sitter equivalent: Grammar "fields"
+        """,
+        ),
+    ]
+
+    positional_connections: Annotated[
+        frozenset[PositionalConnection],
+        Field(
+            default_factory=frozenset,
+            description="""
+        Ordered structural relationships to child Things without Roles (may have an implied role from its position).
+        Tree-sitter equivalent: Grammar "children"
+        """,
+        ),
+    ]
+
+    is_start: Annotated[
+        bool,
+        Field(
+            description="Whether this Composite is the root of the parse tree (i.e., the start symbol)."
+        ),
+    ] = False
+
+    _kind: ClassVar[Literal[ThingKind.COMPOSITE]] = ThingKind.COMPOSITE  # type: ignore
+
+    @property
+    def kind(self) -> Literal[ThingKind.COMPOSITE]:
+        """The kind of this Thing (always COMPOSITE)."""
+        return self._kind
+
+    @property
+    def is_token(self) -> Literal[False]:
+        """Whether this Thing is a Token (always False)."""
+        return False
+
+    @property
+    def is_composite(self) -> Literal[True]:
+        """Whether this Thing is a Composite (always True)."""
+        return True
+
+    @property
+    def is_multi_category(self) -> bool:
+        """Check if this Thing belongs to multiple Categories."""
+        return len(self.categories) > 1
+
+    @property
+    def is_single_category(self) -> bool:
+        """Check if this Thing belongs to exactly one Category."""
+        return len(self.categories) == 1
+
+    @property
+    def primary_category(self) -> CategoryName | None:
+        """Get the primary Category of this Thing, if it exists.
+
+        Returns the single Category if the Thing belongs to exactly one; otherwise, returns None.
+        """
+        return next(iter(self.categories)) if self.is_single_category else None
+
+    def is_in_category(self, category: CategoryName) -> bool:
+        """Check if this Thing belongs to the specified Category."""
+        return category in self.categories
+
+    def __str__(self) -> str:
+        """String representation of the CompositeThing."""
+        if self.primary_category:
+            return f"CompositeThing: {self.name}, Category: {self.primary_category}, Language: {self.language.variable}"
+        return f"CompositeThing: {self.name}, Categories: {list(self.categories)}, Language: {self.language.variable}"
+
+
+class Token(Thing):
+    """A Token is a leaf Thing with no structural children.
+
+    A Token represents keywords, identifiers, literals, and punctuation -- what you literally see in the source code. Tokens are classified by their significance, indicating whether they carry semantic or structural meaning versus being mere formatting trivia.
+    """
+
+    significance: Annotated[
+        TokenSignificance,
+        Field(
+            description="""
+            Semantic importance classification.
+
+            STRUCTURAL: Keywords, operators, delimiters (if, {, +)
+            IDENTIFIER: Variable/function/class names
+            LITERAL: String/number/boolean values
+            TRIVIA: Whitespace, line continuations (insignificant)
+            COMMENT: Code comments (significant but not code)
+
+            Used for filtering: include STRUCTURAL/IDENTIFIER/LITERAL for semantic analysis,
+            include all for formatting/reconstruction.
+        """
+        ),
+    ]
+
+    _kind: ClassVar[Literal[ThingKind.TOKEN]] = ThingKind.TOKEN  # type: ignore
+
+    @property
+    def kind(self) -> Literal[ThingKind.TOKEN]:
+        """The kind of this Thing (always TOKEN)."""
+        return self._kind
+
+    @property
+    def is_token(self) -> Literal[True]:
+        """Whether this Thing is a Token (always True)."""
+        return True
+
+    @property
+    def is_composite(self) -> Literal[False]:
+        """Whether this Thing is a Composite (always False)."""
+        return False
+
+    def __str__(self) -> str:
+        """String representation of the Token."""
+        return f"Token: {self.name}, Significance: {self.significance.value}, Language: {self.language.variable}"
+
+
+class Category(BasedModel):
+    """A Category is an abstract classification that groups Things with shared characteristics.
+
+    Categories do not appear in parse trees. They are primarily for classification of related Things. For example, `expression` is a Category containing `binary_expression`,
+    `unary_expression`, etc.
+    """
+
+    model_config = BasedModel.model_config | ConfigDict(frozen=True)
+
+    name: Annotated[Role, Field(description="The name of the Category.")]
+
+    language: Annotated[
+        SemanticSearchLanguage,
+        Field(description="The programming language this Category belongs to."),
+    ]
+
+    member_things: Annotated[
+        frozenset[ThingName],
+        Field(
+            default_factory=frozenset, description="The *names* of this category's member Things."
+        ),
+    ]
+
+    @field_validator("language", mode="after")
+    def _validate_language(self, value: Any) -> SemanticSearchLanguage:
+        """Validate that the language is a SemanticSearchLanguage that has defined Categories in its grammar."""
+        if not isinstance(value, SemanticSearchLanguage):
+            raise TypeError("Invalid language")
+        if value in (
+            SemanticSearchLanguage.CSS,
+            SemanticSearchLanguage.ELIXIR,
+            SemanticSearchLanguage.HTML,
+            SemanticSearchLanguage.SOLIDITY,
+            SemanticSearchLanguage.SWIFT,
+            SemanticSearchLanguage.YAML,
+        ):
+            logger.warning(
+                """Something doesn't look right here. You provided %s and that language has no Categories. We're going to let it go because the grammar could have changed. Please submit an issue at https://github.com/knitli/codeweaver-mcp/issues/ to let us know.""",
+                value.variable,
+            )
+        return value
+
+    def __str__(self) -> str:
+        """String representation of the Category."""
+        return f"Category: {self.name}, Language: {self.language.variable}, Members: {list(self.member_things)}"
+
+    @property
+    def short_str(self) -> str:
+        """Short string representation of the Category."""
+        return f"{self.name} {self.language.variable}"
+
+    def includes(self, thing_name: ThingName | TokenName) -> bool:
+        """Check if this Category includes the specified Thing name."""
+        return thing_name in self.member_things
+
+    def overlap_with(self, other: Category) -> frozenset[ThingName | TokenName]:
+        """Check if this Category shares any member Things with another Category. Returns the overlapping member Thing names.
+
+        Used for analyzing multi-category membership.
+        """
+        return self.member_things & other.member_things
+
+
+# ==========================================================================
+#                       Other Notes from Grammar Analysis
+# ==========================================================================
+#   - Most 'unnamed' *fields* (direct connections) are punctuation or operator symbols (e.g., "=", "+", ";", ",") (81%). The unnamed fields with alpha characters are keywords (e.g., "else", "catch", "finally", "return").
+#  - **All** 'named' *fields* (direct connections) are alpha characters (keywords or semantic names).
+#  - All *children* (positional connections) are 'named' (is_explicit_rule = True).
+#
+# ==========================================================================

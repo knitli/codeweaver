@@ -1,3 +1,4 @@
+# sourcery skip: name-type-suffix, no-complex-if-expressions
 #!/usr/bin/env python3
 """Analyze grammar structure patterns across all supported languages.
 
@@ -202,8 +203,7 @@ class GrammarStructureAnalyzer:
                 # Q1: Track what types are referenced in fields
                 if "types" in field_info:
                     for type_ref in field_info["types"]:
-                        ref_type = type_ref.get("type", "")
-                        if ref_type:
+                        if ref_type := type_ref.get("type", ""):
                             stats.field_references[node_type].add(ref_type)
 
         # Check for children (Positional connections)
@@ -214,8 +214,7 @@ class GrammarStructureAnalyzer:
             children_info = node_info["children"]
             if "types" in children_info:
                 for type_ref in children_info["types"]:
-                    ref_type = type_ref.get("type", "")
-                    if ref_type:
+                    if ref_type := type_ref.get("type", ""):
                         stats.children_references[node_type].add(ref_type)
 
             # Check for both fields and children
@@ -239,7 +238,7 @@ class GrammarStructureAnalyzer:
         abstract_types = set(stats.abstract_types.keys())
 
         # Analyze field references
-        for _source_node, target_types in stats.field_references.items():
+        for target_types in stats.field_references.values():
             for target_type in target_types:
                 if target_type in abstract_types:
                     stats.category_references_in_fields[target_type] += 1
@@ -247,7 +246,7 @@ class GrammarStructureAnalyzer:
                     stats.concrete_references_in_fields[target_type] += 1
 
         # Analyze children references
-        for _source_node, target_types in stats.children_references.items():
+        for target_types in stats.children_references.values():
             for target_type in target_types:
                 if target_type in abstract_types:
                     stats.category_references_in_children[target_type] += 1
@@ -298,30 +297,30 @@ class GrammarStructureAnalyzer:
             # Abstract type patterns (normalize leading underscore)
             for abstract_type in stats.abstract_types:
                 normalized = abstract_type.lstrip("_")
-                patterns["common_abstract_types"][normalized] += 1
+                patterns["common_abstract_types"][normalized] += 1  # type: ignore
 
             # Field name patterns
-            patterns["universal_field_names"].update(stats.common_field_names)
+            patterns["universal_field_names"].update(stats.common_field_names)  # type: ignore
 
             # Extra node patterns
             for extra_node in stats.extra_nodes:
-                patterns["common_extra_nodes"][extra_node] += 1
+                patterns["common_extra_nodes"][extra_node] += 1  # type: ignore
 
             # Field semantic patterns
             for field_name, contexts in stats.field_semantic_roles.items():
                 for context in contexts:
                     category = context.split(":")[0]
-                    patterns["field_semantic_patterns"][field_name][category] += 1
+                    patterns["field_semantic_patterns"][field_name][category] += 1  # type: ignore
 
             # Q1: Aggregate category and concrete references
-            patterns["category_refs_in_fields"].update(stats.category_references_in_fields)
-            patterns["category_refs_in_children"].update(stats.category_references_in_children)
-            patterns["concrete_refs_in_fields"].update(stats.concrete_references_in_fields)
-            patterns["concrete_refs_in_children"].update(stats.concrete_references_in_children)
+            patterns["category_refs_in_fields"].update(stats.category_references_in_fields)  # type: ignore
+            patterns["category_refs_in_children"].update(stats.category_references_in_children)  # type: ignore
+            patterns["concrete_refs_in_fields"].update(stats.concrete_references_in_fields)  # type: ignore
+            patterns["concrete_refs_in_children"].update(stats.concrete_references_in_children)  # type: ignore
 
             # Q2: Aggregate multi-category Things
             for thing, categories in stats.multi_category_things.items():
-                patterns["all_multi_category_things"][thing].update(categories)
+                patterns["all_multi_category_things"][thing].update(categories)  # type: ignore
 
         return patterns
 
@@ -405,8 +404,10 @@ class GrammarStructureAnalyzer:
 
         # Statistics
         total_things_with_categories = len(all_things_with_categories)
-        total_multi_category = sum(1 for count in all_things_with_categories.values() if count > 1)
-        max_categories = max(all_things_with_categories.values()) if all_things_with_categories else 0
+        total_multi_category = sum(count > 1 for count in all_things_with_categories.values())
+        max_categories = (
+            max(all_things_with_categories.values()) if all_things_with_categories else 0
+        )
 
         return {
             "total_things_with_categories": total_things_with_categories,
@@ -490,38 +491,38 @@ class GrammarStructureAnalyzer:
             "Examples of Category references in fields:",
         ])
 
-        for lang, source, target in q1_analysis["examples_fields_category"][:10]:
-            report_lines.append(f"  - {lang}: {source} → {target} (Category)")
+        report_lines.extend(
+            f"  - {lang}: {source} → {target} (Category)"
+            for lang, source, target in q1_analysis["examples_fields_category"][:10]
+        )
+        report_lines.extend(["", "Examples of Concrete references in fields:"])
 
-        report_lines.extend([
-            "",
-            "Examples of Concrete references in fields:",
-        ])
-
-        for lang, source, target in q1_analysis["examples_fields_concrete"][:10]:
-            report_lines.append(f"  - {lang}: {source} → {target} (Concrete)")
-
+        report_lines.extend(
+            f"  - {lang}: {source} → {target} (Concrete)"
+            for lang, source, target in q1_analysis["examples_fields_concrete"][:10]
+        )
         report_lines.extend([
             "",
             "### Positional Connections (children)",
             f"  Category references: {q1_analysis['children_category_count']}",
             f"  Concrete references: {q1_analysis['children_concrete_count']}",
-            f"  Percentage Category: {q1_analysis['children_category_count'] / (q1_analysis['children_category_count'] + q1_analysis['children_concrete_count']) * 100:.1f}%" if (q1_analysis['children_category_count'] + q1_analysis['children_concrete_count']) > 0 else "  Percentage Category: N/A",
+            f"  Percentage Category: {q1_analysis['children_category_count'] / (q1_analysis['children_category_count'] + q1_analysis['children_concrete_count']) * 100:.1f}%"
+            if (q1_analysis["children_category_count"] + q1_analysis["children_concrete_count"]) > 0
+            else "  Percentage Category: N/A",
             "",
             "Examples of Category references in children:",
         ])
 
-        for lang, source, target in q1_analysis["examples_children_category"][:10]:
-            report_lines.append(f"  - {lang}: {source} → {target} (Category)")
+        report_lines.extend(
+            f"  - {lang}: {source} → {target} (Category)"
+            for lang, source, target in q1_analysis["examples_children_category"][:10]
+        )
+        report_lines.extend(["", "Examples of Concrete references in children:"])
 
-        report_lines.extend([
-            "",
-            "Examples of Concrete references in children:",
-        ])
-
-        for lang, source, target in q1_analysis["examples_children_concrete"][:10]:
-            report_lines.append(f"  - {lang}: {source} → {target} (Concrete)")
-
+        report_lines.extend(
+            f"  - {lang}: {source} → {target} (Concrete)"
+            for lang, source, target in q1_analysis["examples_children_concrete"][:10]
+        )
         # Q2 Analysis: Multi-Category Membership
         report_lines.extend([
             "",
@@ -543,13 +544,11 @@ class GrammarStructureAnalyzer:
             "Distribution of category membership:",
         ])
 
-        for num_cats, count in sorted(q2_analysis["distribution"].items()):
-            report_lines.append(f"  {num_cats} category/categories: {count} Things")
-
-        report_lines.extend([
-            "",
-            "Examples of Things with multiple Category membership:",
-        ])
+        report_lines.extend(
+            f"  {num_cats} category/categories: {count} Things"
+            for num_cats, count in sorted(q2_analysis["distribution"].items())
+        )
+        report_lines.extend(["", "Examples of Things with multiple Category membership:"])
 
         for lang, thing, categories in q2_analysis["examples"][:20]:
             cats_str = ", ".join(categories)
@@ -560,7 +559,7 @@ class GrammarStructureAnalyzer:
             "## Conclusions",
             "",
             "### Q1: Category References",
-            f"**Answer: YES** - Connections CAN reference Categories (abstract types).",
+            "**Answer: YES** - Connections CAN reference Categories (abstract types).",
             f"- Fields reference Categories in {q1_analysis['field_category_count']} cases",
             f"- Children reference Categories in {q1_analysis['children_category_count']} cases",
             "- This is a common pattern used for polymorphic type constraints",
