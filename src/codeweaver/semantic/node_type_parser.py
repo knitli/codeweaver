@@ -1,499 +1,285 @@
+# sourcery skip: lambdas-should-be-short
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-"""Parser for tree-sitter node-types.json files to extract node type information.
+"""Parser for tree-sitter node-types.json files with intuitive terminology.
 
-## For Experienced Tree-Sitter Devs and Users
+This module provides functionality to parse tree-sitter `node-types.json` files and extract
+grammar information using clear, intuitive terminology instead of tree-sitter's confusing vocabulary.
 
-We made some design choices here that may seem unusual if you're used to working with tree-sitter directly.
-We felt that some of tree-sitter's terminology were misleading and unintuitive, so we adjusted them to be more clear and consistent:
+## Background
 
-- **Node Types**: In tree-sitter, "node types" can refer to both concrete and abstract types. All CodeWeaver `node_type` entries are `name` fields in the tree-sitter `node-types.json` file.
+tl;dr: **This is the parser we wish we had when we started working with tree-sitter. We hope it
+makes your experience with tree-sitter grammars smoother and more intuitive.**
 
-    - **node_type**: We use "node_type" to refer to any type (the `name` field in the tree-sitter `node-types.json` file), whether concrete or abstract.
-    - **concrete types**: These are node types that can appear directly in the syntax tree. They may have children or be leaf nodes. In a node-types.json field, concrete types are those without a `subtypes` field, or those that appear as entries in a `subtypes` list.
-    - **abstract types**: These are node types that do not appear directly in the syntax tree (usually). They serve as categories for grouping related concrete types. In a node-types.json field, abstract types are those with a `subtypes` field.
-    - `NodeName` and `AbstractNodeName` are `NewType` aliases for literal strings representing concrete and abstract node type names, respectively. We use these types to make it clear when a function or field expects a concrete or abstract type name. (if you're unfamiliar with `NewType`, it's a way to create a distinct type from an existing type, primarily for type-checking purposes. At runtime, they're all just strings.)
+When developing CodeWeaver and our rust-based future backend, Thread, we spent a lot of time
+with tree-sitter and its quirks. While tree-sitter is a powerful tool, its vocabulary and structure,
+combined with the lack of comprehensive documentation, can make it challenging to work with.
+Simply put: it's not intuitive.
 
-- **Fields vs. Children**: In tree-sitter, "fields" are named relationships that group related child nodes, while "children" are positional relationships without names. We maintain this distinction but clarify their roles:
+This is on full display in the `node-types.json` file, which describes the various node types
+in a grammar. This file is crucial for understanding how to interact with parse trees, but its
+structure and terminology are confusing. It conflates several distinct concepts:
+- It doesn't clearly differentiate between **nodes** (vertices) and **edges** (relationships)
+- It uses "named" to describe both nodes and edges, meaning "has a grammar rule", not "has a name"
+  (everything has a name!)
+- It flattens hierarchies and structural patterns in ways that obscure their meaning
 
-    - **Fields**: Named structural relationships in the grammar that group related child nodes or represent unique named components of a parent node. Fields are defined explicitly in the grammar and can help identify important parts of the syntax tree. In a node-types.json field, `fields` is a dictionary mapping field names to `FieldInfo` entries, tree-sitter calls this object a `child_type`. We use `FieldInfo` to represent this structure, with a NewType alias, `ChildInfo` for child nodes, again for clarity about the type relationships.
+When I originally wrote this parser, my misunderstandings of these concepts led to a week of
+lost time and incorrect assumptions. After that, I decided to write this parser using terminology
+and structure that more intuitively describes the concepts at play -- completely departing from
+tree-sitter's terminology.
 
-- **Extra Nodes**: In tree-sitter, "extra" nodes are those that can appear anywhere in the syntax tree without specific constraints, they are often types like "comment" or whitespace types. We call these `free` nodes, to clarify that they can appear freely anywhere.
+Knitli is fundamentally about making complex systems more intuitive and accessible, and this is
+a perfect example of that philosophy in action. By using clearer terminology and structure, we're
+making it easier for developers to understand and work with tree-sitter grammars. This saves time,
+reduces frustration, and empowers developers to build better tools.
+
+**For tree-sitter experts:** We provide a translation guide below to help bridge the gap between
+the two terminologies. If you find this frustrating, we understand -- but we believe clarity for
+newcomers is more important than tradition.
+
+## CodeWeaver's Terminology
+
+We clarify and separate concepts that tree-sitter conflates: nodes vs edges, abstract vs concrete,
+structural roles vs semantic meaning. Here's our approach:
+
+### Abstract Groupings
+
+**Category** - Abstract classification that groups Things with shared characteristics.
+- Do NOT appear in parse trees (abstract only)
+- Used for polymorphic type constraints and classification
+- Example: `expression` is a Category containing `binary_expression`, `unary_expression`, etc.
+- **Tree-sitter equivalent**: Nodes with `subtypes` field (abstract types)
+- **Empirical finding**: ~110 unique Categories across 25 languages
+
+**Multi-Category Membership:**
+- Things can belong to multiple Categories (uncommon but important)
+- **13.5%** of Things belong to 2+ Categories
+- **86.5%** belong to exactly 1 Category
+- Common in C/C++ (declarators serving multiple roles)
+- Example: `identifier` → `[_declarator, expression]`
+
+### Concrete Parse Tree Nodes
+
+**Thing** - A concrete element that appears in the parse tree.
+- Two kinds: **Token** (leaf) or **Composite** (non-leaf)
+- What you actually see when you parse code
+- **Tree-sitter equivalent**: Named or unnamed "nodes" (named does not correlate to our Composite vs Token distinction)
+- Name chosen for clarity: "it's a thing in your code" (considered: Entity, Element, Construct)
+
+**Token** - Leaf Thing with no structural children.
+- Represents keywords, identifiers, literals, punctuation
+- What you literally **see** in the source code
+- Classified by significance: structural, identifier, literal, trivial, comment
+- **Tree-sitter equivalent**: Node with no `fields` or `children`
+
+**Composite Node** - Non-leaf Thing with structural children.
+- Has Direct and/or Positional connections to child Things
+- Represents complex structures: functions, classes, expressions
+- **Tree-sitter equivalent**: Node with `fields` and/or `children`
+
+### Structural Relationships
+
+**Connection** - Directed relationship from parent Thing to child Thing(s).
+- Graph terminology: an "edge"
+- Three classes: Direct, Positional, Loose
+- **Tree-sitter equivalent**: `fields` (Direct), `children` (Positional), `extras` (Loose)
+
+**ConnectionClass** - Classification of connection types:
+
+1. **DIRECT** - Named semantic relationship with a **Role**
+   - Has a specific semantic function (e.g., "condition", "body", "parameters")
+   - Most precise type of structural relationship
+   - **Tree-sitter equivalent**: Grammar "fields"
+   - **Empirical finding**: 9,606 Direct connections across all languages
+
+2. **POSITIONAL** - Ordered structural relationship without semantic naming
+   - Position matters but no explicit role name
+   - Example: function arguments in some languages
+   - **Tree-sitter equivalent**: Grammar "children"
+   - If a thing has fields, it can also have children, but not vice versa (all things with children have fields)
+   - All children are named (is_explicit_rule = True)
+   - **Empirical finding**: 6,029 Positional connections across all languages
+
+
+*Note: Direct and Positional Connections describe **structure**, while Loose Connections
+describe **permission**.*
+
+**Role** - Named semantic function of a Direct connection.
+- Only Direct connections have Roles (Positional and Loose do not)
+- Describes **what purpose** a child serves, not just that it exists
+- Examples: "condition", "body", "parameters", "left", "right", "operator"
+- **Tree-sitter equivalent**: Field name in grammar
+- **Empirical finding**: ~90 unique role names across all languages
+
+### Connection Target References
+
+**Polymorphic Type Constraints:**
+Connections can reference either Categories (abstract) OR concrete Things, enabling flexible
+type constraints:
+
+**Category References** (polymorphic constraints):
+- Connection accepts ANY member of a Category
+- Example: `condition` field → `expression` (accepts any expression type)
+- **Empirical finding**:
+  - **7.9%** of field references are to Categories
+  - **10.3%** of children references are to Categories
+- Common pattern: `argument_list.children → expression` (any expression type accepted)
+
+**Concrete Thing References** (specific constraints):
+- Connection accepts only specific Thing types
+- Example: `operator` field → `["+", "-", "*", "/"]` (specific operators only)
+- **Empirical finding**:
+  - **92.1%** of field references are to concrete Things
+  - **89.7%** of children references are to concrete Things
+- Common pattern: Structural components like `parameter_list`, `block`, specific tokens
+
+**Mixed References** (both in same connection):
+- Single connection can reference both Categories AND concrete Things
+- Example: `body` field → `[block, expression]` (either concrete type)
+- Design principle: Store references as-is, provide resolution utilities when needed
+
+### Attributes
+
+**Thing Attributes:**
+
+- **can_be_anywhere** (bool)
+    - Whether the Thing can appear anywhere in the parse tree (usually comments)
+    - **Tree-sitter equivalent**: the `extra` attribute
+    Data notes:
+   - Only used in a plurality of languages (11 of 25)
+   - *almost always* a **comment**. Two exceptions:
+        - Python: `line_continuation` token (1/2, other is `comment`)
+        - PHP: `text_interpolation` (1/2, other is `comment`)
+   - **Empirical finding**: 1 or 2 Loose types per language ('comment' is one for all 11)
+
+- **is_explicit_rule** (bool)
+  - Whether the Thing has a dedicated named production rule in the grammar
+  - True: Named grammar rule (appears with semantic name)
+  - False: Anonymous grammar construct or synthesized node
+  - **Tree-sitter equivalent**: `named = True/False`
+  - **Note**: Included for completeness; limited practical utility for semantic analysis
+
+- **kind** (ThingKind enum)
+  - Classification of Thing type: TOKEN or COMPOSITE
+  - TOKEN: Leaf Thing with no structural children
+  - COMPOSITE: Non-leaf Thing with structural children
+
+- **is_start** (bool, Composite only)
+  - Whether this Composite is the root of the parse tree (i.e., the start symbol)
+
+- **is_significant** (bool, Token only)
+  - Whether the Token carries semantic/structural meaning vs formatting trivia
+  - True: keywords, identifiers, literals, operators, comments
+  - False: whitespace, line continuations, formatting tokens
+  - Practically similar to `is_explicit_rule` but focuses on semantic importance
+  - Used for filtering during semantic analysis vs preserving for formatting
+
+**Connection Attributes:**
+
+- **allows_multiple** (bool)
+  - Whether the Connection permits multiple children of specified type(s)
+  - Defines cardinality upper bound (0 or 1 vs 0 or many)
+  - **Tree-sitter equivalent**: `multiple = True/False`
+  - **Note**: Specifies CAN have multiple, not MUST have multiple
+
+- **requires_presence** (bool)
+  - Whether at least one child of specified type(s) MUST be present
+  - Defines cardinality lower bound (0 or more vs 1 or more)
+  - **Tree-sitter equivalent**: `required = True/False`
+  - **Note**: Doesn't require a specific Connection, just ≥1 from the allowed list
+
+**Cardinality Matrix:**
+
+| requires_presence | allows_multiple | Meaning |
+|------------------|-----------------|---------|
+| False | False | 0 or 1 (optional single) |
+| False | True | 0 or more (optional multiple) |
+| True | False | exactly 1 (required single) |
+| True | True | 1 or more (required multiple) |
+
+## Tree-sitter Translation Guide
+
+For developers familiar with tree-sitter terminology:
+
+| Tree-sitter Term | CodeWeaver Term | Notes |
+|-----------------|-----------------|-------|
+| Abstract type (with subtypes) | Category | Doesn't appear in parse trees |
+| Named/unnamed node | Thing | Concrete parse tree node |
+| Node with no fields | Token | Leaf node |
+| Node with fields/children | Composite Node | Non-leaf node |
+| Field | Direct Connection | Has semantic Role |
+| Child | Positional Connection | Ordered, no Role |
+| Extra | Loose Connection | Can appear anywhere |
+| Field name | Role | Semantic function |
+| `named` attribute | `is_explicit_rule` | Has named grammar rule |
+| `multiple` attribute | `allows_multiple` | Upper cardinality bound |
+| `required` attribute | `requires_presence` | Lower cardinality bound |
+| 'root' attribute | `is_start` | The starting node of the parse tree |
+
+## Design Rationale
+
+**Why these names?**
+- **Thing**: Simple, clear, unpretentious. "It's a thing in your code."
+- **Category**: Universally understood as abstract grouping
+- **Connection**: Graph theory standard; clearer than conflating fields/children/extras
+- **Role**: Describes purpose, not just presence
+- **ConnectionClass**: Explicit enumeration of relationship types
+
+**Empirical validation:**
+- Analysis of 25 languages, 5,000+ node types
+- ~110 unique Categories, ~736 unique Things with category membership
+- 7.9-10.3% of references are polymorphic (Category references)
+- 13.5% of Things have multi-category membership
+- Patterns consistent across language families
+
+**Benefits:**
+- **Clearer mental model**: Separate nodes, edges, and attributes explicitly
+- **Easier to learn**: Intuitive names reduce cognitive load
+- **Better tooling**: Explicit types enable better type checking and validation
+- **Future-proof**: Accommodates real-world patterns (multi-category, polymorphic references)
 """
 
 from __future__ import annotations
 
 import logging
+import re
 
-from collections import defaultdict
-from collections.abc import KeysView, Mapping, Sequence
-from functools import cached_property
+from enum import Flag, auto
 from pathlib import Path
 from types import MappingProxyType
-from typing import Annotated, Any, Literal, NamedTuple, NewType, cast
+from typing import Annotated, Any, ClassVar, Literal, NamedTuple, NewType, TypedDict
 
-from pydantic import DirectoryPath, Discriminator, Field, FilePath, PrivateAttr, Tag, computed_field
-
-from codeweaver._common import (
-    AbstractNodeName,
-    BasedModel,
-    LiteralStringT,
-    NodeName,
-    RootedRoot,
-    generate_field_title,
+from pydantic import (
+    ConfigDict,
+    DirectoryPath,
+    Field,
+    FilePath,
+    NonNegativeInt,
+    PrivateAttr,
+    computed_field,
+    field_validator,
 )
+from pydantic_core import from_json
+
+from codeweaver._common import BasedModel, BaseEnum, LiteralStringT, RootedRoot
 from codeweaver.language import SemanticSearchLanguage
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
-type EmptyList = list[
-    None
-]  # technically not true -- it has nothing, not None, but... as good as we can do
+Role = NewType("Role", LiteralStringT)
+CategoryName = NewType("CategoryName", LiteralStringT)
+ThingName = NewType("ThingName", LiteralStringT)
+TokenName = NewType("TokenName", LiteralStringT)
 
+IS_OPERATOR = re.compile(r"^[\+\-\*/%&|\^~!=<>]+$")
+"""Not perfect but should get us >90% with a couple false positives."""
 
-# ===========================================================================
-# *                  Node Field Type Definitions                  *
-# ===========================================================================
-# Original was a series of typed dicts with discriminators for each node type.
-# API has been improved/simplified using NamedTuples, which allow for cleaner
-# introspection and validation, and of course come immutable.
-
-# ================================================
-# *          Base Types for Node Type Info
-# ================================================
-
-
-FIELD_KEYS = ("children", "extra", "fields", "root", "subtypes", "named", "type_name")
-
-
-class SimpleNodeField(NamedTuple):
-    """A simple field in a node type entry."""
-
-    node_type: Annotated[
-        NodeName,
-        Field(
-            description="""The name of the field""",
-            default_factory=NodeName,
-            validation_alias="name",
-            field_title_generator=generate_field_title,
-        ),
-    ]
-    named: Annotated[
-        bool,
-        Field(
-            description="""Whether the field is a named type in the language's grammar definition. Named types tend to be more semantically important. Unnamed types are usually syntactic, like whitespace tokens. For tasks like code understanding or classification, you can safely ignore unnamed types. For code editing and modification, you can't.""",
-            field_title_generator=generate_field_title,
-        ),
-    ]
-
-    @property
-    def name(self) -> NodeName:
-        """Get the field name."""
-        return self.node_type
-
-    @property
-    def is_named(self) -> bool:
-        """Check if the field is named. 'named' means it has a defined rule name in the grammar, not that it has a name, which it always does."""
-        return self.named
-
-
-class FieldInfo(NamedTuple):
-    """Information about a field in a node type.
-
-    Fields are named structural relationships in tree-sitter grammars that group
-    related child nodes or represent unique named components of a parent node.
-
-    Attributes:
-        name: Field name (e.g., "name", "body", "parameters")
-        required: Whether one of the child fields must accompany the parent node (note: for abstract types, the parent node may not actually be in the AST, so you would only see the child fields)
-        multiple: Whether the node type can have multiple children or subtypes in the AST
-        types: Tuple of allowed node type names for this field
-    """
-
-    node_type: Annotated[
-        NodeName | AbstractNodeName,
-        Field(
-            description="""Field name (e.g., 'name', 'body', 'parameters')""",
-            init=False,
-            field_title_generator=generate_field_title,
-        ),
-    ]
-    required: Annotated[
-        bool,
-        Field(
-            description="""Whether any of the types in `types` *must* be present as children of the parent node (the node in `name`).""",
-            field_title_generator=generate_field_title,
-        ),
-    ]
-    multiple: Annotated[
-        bool,
-        Field(
-            description="""Whether the field can appear in the AST with multiple children or subtypes. For example, `function_definition` can have multiple subordinate types, like `parameters`, `body`, `signature`. On the other hand, `variable_declaration` is typically a single node and can't have multiple subtypes in most grammars.""",
-            field_title_generator=generate_field_title,
-        ),
-    ]
-    types: Annotated[
-        tuple[SimpleNodeField, ...],
-        Field(
-            description="""A tuple of allowed node fields for this field""",
-            field_title_generator=generate_field_title,
-        ),
-    ]
-
-    @property
-    def is_required(self) -> bool:
-        """Check if field is required."""
-        return self.required
-
-    @property
-    def is_collection(self) -> bool:
-        """Check if field can have multiple values."""
-        return self.multiple
-
-    @property
-    def name(self) -> NodeName | AbstractNodeName:
-        """Get the field name."""
-        return self.node_type
-
-    @cached_property
-    def nodes(self) -> tuple[NodeName, ...]:
-        """Get set of type names for fast lookup."""
-        return tuple(node.node_type for node in self.types)
-
-    def accepts_type(self, type_name: NodeName) -> bool:
-        """Check if this field accepts a given type.
-
-        Args:
-            type_name: Node type name to check
-
-        Returns:
-            True if this field can contain nodes of the given type
-        """
-        return type_name in self.nodes
-
-    @classmethod
-    def from_node_type(cls, field: NodeType) -> Self:
-        """Create an instance from a NodeField."""
-        if (
-            not field.has_fields
-            or not field.has_children_constraints
-            or not field.has_children_constraints
-        ):
-            raise ValueError("Invalid field")
-
-        return cls.model_validate(
-            node_type=field.node_type, required=field.is_required, multiple=field.is_collection
-        )
-
-
-ChildInfo = NewType("ChildInfo", FieldInfo)
-
-
-class NodeType(NamedTuple):
-    """Semantic information extracted from grammar for a node type.
-
-    This is the primary data structure for grammar-based classification,
-    containing all structural and semantic information available from
-    the tree-sitter grammar.
-
-    Attributes:
-        node_type: The node type name (e.g., "function_definition")
-        language: Programming language name
-        is_named: Whether node has a defined rule name in grammar
-        is_abstract: Whether node has subtypes (abstract category)
-        is_extra: Whether node can appear anywhere (no constraints)
-        is_root: Whether node is a root node (entry point)
-        abstract_category: Supertype if this is a concrete type
-        concrete_subtypes: If this is abstract, tuple of concrete implementations
-        fields: Named fields with structural relationships
-        children_types: Allowed child types (positional constraints)
-    """
-
-    node_type: Annotated[
-        str,
-        Field(
-            description="The node type name (e.g., 'function_definition')", validation_alias="name"
-        ),
-    ]
-    language: Annotated[
-        SemanticSearchLanguage,
-        Field(description="The programming language associated with this node.", init=False),
-    ]
-    named: Annotated[bool, Field(description="Whether node has a defined rule name in grammar")]
-    _extra: Annotated[bool, Field(description="Whether node can appear anywhere (no constraints)")]
-    _root: Annotated[bool, Field(description="Whether node is a root node (entry point)")]
-
-    fields: Annotated[
-        tuple[FieldInfo, ...], Field(description="Named fields with structural relationships")
-    ]
-    children: Annotated[
-        tuple[ChildInfo, ...],
-        Field(
-            description="Allowed child types (positional constraints). A `ChildInfo` object is structurally identical to `FieldInfo`, we aliased it for clarity about the differences in role and relationships."
-        ),
-    ]
-
-    @property
-    def has_fields(self) -> bool:
-        """Check if node has named fields."""
-        return len(self.fields) > 0
-
-    @property
-    def has_children_constraints(self) -> bool:
-        """Check if node has children constraints."""
-        return len(self.children_types) > 0
-
-    @cached_property
-    def required_field_names(self) -> frozenset[str]:
-        """Get set of required field names."""
-        return frozenset(f.name for f in self.fields if f.is_required)
-
-    @cached_property
-    def optional_field_names(self) -> frozenset[str]:
-        """Get set of optional field names."""
-        return frozenset(f.name for f in self.fields if not f.is_required)
-
-    @cached_property
-    def field_map(self) -> dict[str, FieldInfo]:
-        """Get mapping from field name to field info."""
-        return {f.name: f for f in self.fields}
-
-    def get_field(self, name: str) -> FieldInfo | None:
-        """Get field info by name.
-
-        Args:
-            name: Field name to look up
-
-        Returns:
-            FieldInfo if found, None otherwise
-        """
-        return self.field_map.get(name)
-
-    def has_field(self, name: str) -> bool:
-        """Check if node has a specific field.
-
-        Args:
-            name: Field name to check
-
-        Returns:
-            True if field exists
-        """
-        return name in self.field_map
-
-    def infer_semantic_category(self) -> str:
-        """Infer semantic category from grammar structure.
-
-        Uses field names to infer the most likely semantic category based on
-        empirical patterns from grammar analysis.
-
-        Returns:
-            Semantic category string: "callable", "type_def", "control_flow",
-            "operation", or "unknown"
-        """
-        field_names = {f.name for f in self.fields}
-
-        # Check for callable signatures
-        if self._is_callable(field_names):
-            return "callable"
-
-        # Check for type definitions
-        if self._is_type_def(field_names):
-            return "type_def"
-
-        # Check for control flow
-        if "condition" in field_names or "consequence" in field_names:
-            return "control_flow"
-
-        # Check for operations
-        if "operator" in field_names:
-            return "operation"
-
-        # Check for pattern matching
-        if "pattern" in field_names or "patterns" in field_names:
-            return "pattern_match"
-
-        # Use abstract category as fallback
-        if self.is_abstract and self.abstract_category:
-            return self.abstract_category
-
-        return "unknown"
-
-    def _is_callable(self, field_names: set[str]) -> bool:
-        """Check if node appears to be a callable."""
-        if "parameters" in field_names:
-            return True
-
-        # Has name and body but not type-related fields
-        if "name" in field_names and "body" in field_names:
-            return "type_parameters" not in field_names and "type" not in field_names
-
-        return False
-
-    def _is_type_def(self, field_names: set[str]) -> bool:
-        """Check if node appears to be a type definition."""
-        if "type_parameters" in field_names:
-            return True
-
-        # Definition/declaration with type field
-        return self.node_type.endswith(("_definition", "_declaration")) and "type" in field_names
-
-
-class AbstractTypeInfo(NamedTuple):
-    """Information about an abstract type and its subtypes.
-
-    Abstract types are defined via the 'subtypes' field in tree-sitter grammars
-    and represent polymorphic categories that don't appear directly in syntax trees.
-
-    Attributes:
-        abstract_type: The abstract type name (e.g., "expression", "statement")
-        language: Programming language name
-        concrete_subtypes: Tuple of concrete node types that implement this abstract type
-    """
-
-    abstract_type: str
-    language: str
-    concrete_subtypes: tuple[str, ...]
-
-    @cached_property
-    def subtype_set(self) -> frozenset[str]:
-        """Get set of subtypes for fast lookup."""
-        return frozenset(self.concrete_subtypes)
-
-    def is_subtype(self, type_name: str) -> bool:
-        """Check if a type is a subtype of this abstract type.
-
-        Args:
-            type_name: Node type name to check
-
-        Returns:
-            True if type_name is a concrete subtype of this abstract type
-        """
-        return type_name in self.subtype_set
-
-    @property
-    def subtype_count(self) -> int:
-        """Get number of concrete subtypes."""
-        return len(self.concrete_subtypes)
-
-
-# Type aliases for convenience
-FieldInfoTuple = tuple[FieldInfo, ...]
-AbstractTypeMap = dict[str, dict[str, AbstractTypeInfo]]
-
-
-class NodeField(NamedTuple):
-    """A field in a node type entry."""
-
-    named: bool
-    root: bool
-    extra: bool
-    subtypes: Annotated[tuple[SimpleNodeField, ...] | None, Field(default_factory=tuple)]
-    name: Annotated[
-        NodeName | AbstractNodeName,
-        Field(
-            description="""The name of the node field.""",
-            default_factory=lambda data: AbstractNodeName if data.get("subtypes") else str,
-        ),
-    ]
-    fields: Annotated[
-        tuple[tuple[SimpleNodeField, ...] | None],
-        Field(default_factory=lambda data: None if data.get("subtypes") else tuple),
-    ]
-    children: Annotated[
-        SimpleNodeField | None,
-        Field(default_factory=lambda data: tuple if data.get("fields") else None),
-    ]
-
-    @property
-    def has_children(self) -> bool:
-        """Check if the field has children."""
-        return self.children is not None
-
-    @property
-    def is_abstract(self) -> bool:
-        """Check if the field is abstract (has subtypes)."""
-        return self.subtypes is not None
-
-    @property
-    def is_extra(self) -> bool:
-        """Check if the field is extra. (...aren't we all?)."""
-        return self.extra
-
-    @property
-    def is_root(self) -> bool:
-        """Check if the field is a root node."""
-        return self.root
-
-
-type NodeTypeInfo = (
-    Annotated[SimpleField, Tag("simple")]
-    | Annotated[SimpleFieldFields, Tag("fields")]
-    | Annotated[SimpleFieldChildren, Tag("children")]
-    | Annotated[SubtypeField, Tag("subtypes")]
-    | Annotated[ExtraField, Tag("extra")]
-    | Annotated[ExtraFieldsField, Tag("extra_fields")]
-    | Annotated[ExtraChildrenField, Tag("extra_children")]
-    | Annotated[RootField, Tag("root")]
-)
-
-type WithFieldsT = (
-    Annotated[SimpleFieldFields, Tag("fields")]
-    | Annotated[ExtraFieldsField, Tag("extra_fields")]
-    | Annotated[SimpleFieldChildren, Tag("children")]
-    | Annotated[ExtraChildrenField, Tag("extra_children")]
-    | Annotated[RootField, Tag("root")]
-)
-type WithChildrenT = (
-    Annotated[SimpleFieldChildren, Tag("children")]
-    | Annotated[ExtraChildrenField, Tag("extra_children")]
-    | Annotated[RootField, Tag("root")]
-)
-
-type LanguageNodeType = dict[LiteralStringT, NodeTypeInfo]
-
-type NodeInfoKey = Literal["children", "extra", "fields", "root", "subtypes", "named", "type"]
-
-
-def get_discriminator_value(
-    data: Any,
-) -> Literal[
-    "simple", "fields", "children", "subtypes", "extra", "extra_fields", "extra_children", "root"
-]:
-    """Get the discriminator value for NodeTypeInfo based on the presence of keys."""
-    keys: tuple[NodeInfoKey, ...] = tuple(
-        sorted(cast(KeysView[NodeInfoKey], data.keys()))
-        if isinstance(data, dict)
-        else tuple(
-            sorted(
-                t
-                for t in ("type", "named", "subtypes", "extra", "fields", "children", "root")
-                if t in data
-            )
-        )
-    )
-    match keys:
-        case ("named", "type"):
-            return "simple"
-        case ("fields", "named", "type"):
-            return "fields"
-        case ("children", "fields", "named", "type"):
-            return "children"
-        case ("named", "subtypes", "type"):
-            return "subtypes"
-        case ("extra", "named", "type"):
-            return "extra"
-        case ("extra", "fields", "named", "type"):
-            return "extra_fields"
-        case ("children", "extra", "fields", "named", "type"):
-            return "extra_children"
-        case ("children", "fields", "named", "root", "type"):
-            return "root"
-        case _:
-            raise ValueError("Cannot determine discriminator value for NodeTypeInfo")
-
+NOT_SYMBOL = re.compile(r"^[A-Za-z@#_][A-Za-z0-9_]*$")
+"""Rough approximation of what is NOT a symbol (identifier, keyword, etc). Accounts for @ in C# and # in preprocessor directives."""
 
 NAMED_NODE_COUNTS = MappingProxyType({
     231: SemanticSearchLanguage.C_PLUS_PLUS,
@@ -527,596 +313,1114 @@ The only potential issue is if the nodes are not a complete set.
 """
 
 
-def lang_from_named_node_count(nodes: list[NodeTypeInfo]) -> SemanticSearchLanguage:
-    """Get the language from the count of named nodes, if possible."""
-    return NAMED_NODE_COUNTS[sum(1 for node in nodes if node["named"] for node in nodes)]
+class AllThingsDict(TypedDict):
+    """TypedDict for all Things and Tokens in a grammar."""
+
+    composite_things: dict[ThingName, CompositeThing]
+    tokens: dict[TokenName, Token]
 
 
-class RootNodeTypes(RootedRoot[tuple[NodeTypeInfo, ...]]):
-    """Root model for list of node type information."""
+class ConnectionClass(BaseEnum):
+    """Classification of connections between Things in a parse tree.
 
-    root: list[  # type: ignore # yes, we are overriding the name 'root' from `RootedRoot`
-        Annotated[
-            Annotated[SimpleField, Tag("simple")]
-            | Annotated[SimpleFieldFields, Tag("fields")]
-            | Annotated[SimpleFieldChildren, Tag("children")]
-            | Annotated[SubtypeField, Tag("subtypes")]
-            | Annotated[ExtraField, Tag("extra")]
-            | Annotated[ExtraFieldsField, Tag("extra_fields")]
-            | Annotated[ExtraChildrenField, Tag("extra_children")]
-            | Annotated[RootField, Tag("root")],
-            Field(description="List of node type information"),
-            Discriminator(get_discriminator_value),
-        ]
-    ]
-    _source_file: Annotated[FilePath | None, PrivateAttr(init=False)] = None
+    Tree-Sitter mapping:
+    - DIRECT -> fields: Named semantic relationship **with a Role**
+    - POSITIONAL -> children: Ordered structural relationship without semantic naming
+    """
 
-    @computed_field
-    @cached_property
-    def language(self) -> SemanticSearchLanguage:
-        """Get the language for the root node types."""
-        if self._source_file and "-node-types" in self._source_file.stem:
-            return SemanticSearchLanguage.from_string(
-                self._source_file.stem.replace("-node-types", "")
-            )
-        if self._source_file and (
-            lang := next(
-                (
-                    semlang
-                    for semlang in SemanticSearchLanguage
-                    if any(a for a in semlang.aka if cast(str, a) in self._source_file.stem)
-                ),
-                None,
-            )
-        ):
-            return lang
-        try:
-            lang = lang_from_named_node_count(self.root)
-        except KeyError as e:
-            logger.exception(
-                "Could not determine language from node counts. Most likely because there are no nodes. Node count: %d",
-                len(self.root),
-                extra={"nodes": self.root},
-            )
-            from codeweaver.exceptions import InitializationError
-
-            raise InitializationError(
-                "Could not determine language from node counts in `RootNodeTypes`.",
-                details={
-                    "source_file": str(self._source_file) if self._source_file else "unknown",
-                    "node_count": len(self.root),
-                },
-            ) from e
-        else:
-            return lang
+    DIRECT = "direct"
+    POSITIONAL = "positional"
 
     @property
-    def concrete_types(self) -> frozenset[NodeName]:
-        """Get a set of all concrete node type names in the root list."""
-        return cast(
-            frozenset[NodeName],
-            frozenset(
-                sorted({
-                    *(t["type_name"] for t in self.named_types),
-                    *(t["type_name"] for val in self.subtype_map.values() for t in val),
-                })
-            ),
-        )
+    def is_direct(self) -> bool:
+        """Whether this connection class is DIRECT (fields)."""
+        return self is ConnectionClass.DIRECT
 
     @property
-    def concrete_to_abstract(self) -> MappingProxyType[NodeName, tuple[AbstractNodeName, ...]]:
-        """Get a mapping of concrete node types to their abstract parent types."""
-        subs = self.subtype_map
-        concrete_to_abstract: dict[NodeName, set[AbstractNodeName]] = defaultdict(set)
-        for concrete_type in self.concrete_types:
-            for abstract_type, subtypes in subs.items():
-                if any(concrete_type == t["type_name"] for t in subtypes):
-                    concrete_to_abstract[concrete_type].add(abstract_type)
-        return MappingProxyType({k: tuple(sorted(v)) for k, v in concrete_to_abstract.items()})
+    def is_positional(self) -> bool:
+        """Whether this connection class is POSITIONAL (children)."""
+        return self is ConnectionClass.POSITIONAL
 
     @property
-    def flattened(self) -> list[NodeTypeInfo]:
-        """Get a flattened list of all NodeTypeInfo entries."""
-        return self.root.copy()
+    def allows_role(self) -> bool:
+        """Whether this connection class allows a Role.
 
-    @property
-    def named_types(self) -> list[NodeTypeInfo]:
-        """Get a list of all named NodeTypeInfo entries."""
-        return [node for node in self if node["named"]]
-
-    @property
-    def flat_map(self) -> MappingProxyType[SemanticSearchLanguage, list[NodeTypeInfo]]:
-        """Get a mapping of language to its NodeTypeInfo entries."""
-        return MappingProxyType({self.language: self.flattened})
-
-    @property
-    def subtypes(self) -> frozenset[NodeName]:
-        """Get a set of all node type names that are subtypes."""
-        return frozenset({t["type_name"] for val in self.subtype_map.values() for t in val})
-
-    @property
-    def subtype_map(self) -> MappingProxyType[AbstractNodeName, list[SimpleField]]:
-        """Get a mapping of all subtypes to their SimpleField."""
-        subtypes: dict[AbstractNodeName, list[SimpleField]] = defaultdict(list)
-        for entry in self:
-            if "subtypes" in entry:
-                subtypes[AbstractNodeName(entry["type_name"])].extend(entry["subtypes"])
-        return MappingProxyType(subtypes)
-
-    @property
-    def abstracts(self) -> frozenset[AbstractNodeName]:
-        """Get a set of all abstract node type names in the root list."""
-        return frozenset({
-            AbstractNodeName(entry["type_name"]) for entry in self if "subtypes" in entry
-        })
-
-    @property
-    def fields(self) -> MappingProxyType[NodeName, ChildInfo]:
-        """Get a mapping of all field names to their ChildInfo."""
-        fields: dict[NodeName, ChildInfo] = {}
-        for entry in self:
-            if "fields" in entry:
-                fields |= entry["fields"]
-        return MappingProxyType(fields)
-
-    @property
-    def children(self) -> MappingProxyType[NodeName, ChildInfo]:
-        """Get a mapping of all child names to their ChildInfo."""
-        return MappingProxyType({
-            entry["type_name"]: entry["children"] for entry in self if "children" in entry
-        })
-
-    @classmethod
-    def from_node_type_file(cls, file_path: FilePath) -> RootNodeTypes:
-        """Load and parse a node-types.json file.
-
-        It normalizes nested "type" keys to "type_name" for validation, validates
-        each node into NodeTypeInfo, and constructs a LanguageNodeType whose
-        `node_type` is a mapping of type_name -> NodeTypeInfo instances.
-
-        On first validation failure for a file, log the error and re-raise.
+        Only DIRECT connections have Roles; POSITIONAL does not.
         """
-        from pydantic_core import from_json
-
-        try:
-            raw_data: Any = from_json(file_path.read_bytes())
-            instance = cls.model_validate(raw_data, by_alias=True)
-            instance._source_file = file_path
-        except Exception:
-            # Handle validation errors
-            logger.exception("Failed to load or validate %s", file_path)
-            raise
-        else:
-            return instance
+        return self.is_direct
 
 
-class NodeTypeParser(BasedModel):
-    """Parser for processing multiple tree-sitter node_type files."""
+class ThingKind(BaseEnum):
+    """Classification of Thing types in a parse tree. Things are concrete nodes, that is, what actually exists in the parse tree.
 
-    node_types_dir: Annotated[
-        DirectoryPath, Field(description="""Directory containing node_type files""")
-    ] = Path(__file__).parent.parent.parent.parent / "node_types"
+    Tree-Sitter mapping:
+    - TOKEN -> nodes with no fields/children (leaf nodes): Leaf Thing with no structural children
+    - COMPOSITE -> nodes with fields/children (non-leaf nodes): Non-leaf Thing with structural children
 
-    def parse_all_node_types(self) -> Sequence[Mapping[SemanticSearchLanguage, RootNodeTypes]]:
-        """Parse all node-types.json files in the node_types directory.
+    A TOKEN represents keywords, identifiers, literals, and punctuation -- what you literally see in the source code. A COMPOSITE node represents complex structures like functions, classes, and expressions, which have direct and/or positional connections to child Things.
+    """
 
-        Returns:
-            Dictionary mapping language names to their parsed node_types
+    TOKEN = "token"  # noqa: S105  # false positive: "token" is not a hardcoded security token
+    COMPOSITE = "composite"
+
+
+class TokenSignificance(BaseEnum):
+    """Classification of Token significance.
+
+    Tree-Sitter mapping:
+    - STRUCTURAL: keywords
+    - OPERATOR: operators
+    - IDENTIFIER: variable/function/type names
+    - LITERAL: string/number/boolean literals
+    - TRIVIAL: whitespace, punctuation, formatting tokens
+    - COMMENT: comments
+
+    A Token can be classified by its significance, indicating whether it carries semantic or structural meaning versus being mere formatting trivia. This classification helps in filtering Tokens during semantic analysis while preserving them for formatting purposes.
+    """
+
+    STRUCTURAL = "structural"
+    OPERATOR = "operator"
+    IDENTIFIER = "identifier"
+    LITERAL = "literal"
+    TRIVIAL = "trivial"
+    COMMENT = "comment"
+
+    @property
+    def is_significant(self) -> bool:
+        """Whether this TokenSignificance indicates a significant Token.
+
+        Significant Tokens carry semantic/structural meaning, while trivial ones do not.
         """
-        node_types: Sequence[Mapping[SemanticSearchLanguage, RootNodeTypes]] = []
-
-        for node_type_file in self.node_types_dir.glob("*-node-types.json"):
-            try:
-                nodes = RootNodeTypes.from_node_type_file(node_type_file)
-                node_types.append({nodes.language: nodes})
-            except Exception as e:
-                # Log error but continue processing other files
-                print(f"Warning: Failed to parse {node_type_file}: {e}")
-
-        return node_types
-
-    def flatten(self) -> MappingProxyType[SemanticSearchLanguage, list[NodeTypeInfo]]:
-        """Flatten the parsed node types into a mapping of language to list of NodeTypeInfo."""
-        nodes = self.parse_all_node_types()
-        flattened = [v.flat_map for val in nodes for v in val.values()]
-        return MappingProxyType({
-            lang: types for mapping in flattened for lang, types in mapping.items()
-        })
-
-    @cached_property
-    def nodes(self) -> tuple[RootNodeTypes, ...]:
-        """Get all parsed node types."""
-        return tuple(node for mapping in self.parse_all_node_types() for node in mapping.values())
-
-    @staticmethod
-    def _add_node_group(types: list[SimpleField]) -> set[NodeName]:
-        """Extract node type names from a list of SimpleField entries."""
-        assembled_types = {t.get("type_name", t.get("type")) for t in types}
-        return {cast(NodeName, t) for t in assembled_types if t}
-
-    @staticmethod
-    def _get_node_types_from_info_values(info: NodeTypeInfo) -> set[NodeName]:  # noqa: C901
-        """Extract node type names from NodeTypeInfo values."""
-        all_types: set[NodeName] = set()
-        for key, value in info.items():
-            match key:
-                case "type_name" | "type":
-                    if "subtypes" in info:
-                        all_types.add(AbstractNodeName(value))  # pyright: ignore[reportArgumentType]
-                    else:
-                        all_types.add(cast(NodeName, value))
-                case "subtypes":
-                    if isinstance(value, str):
-                        all_types.add(AbstractNodeName(value))  # pyright: ignore[reportArgumentType]
-                    else:
-                        all_types |= NodeTypeParser._add_node_group(cast(list[SimpleField], value))
-                case "fields":
-                    all_types |= cast(set[LiteralStringT], set(cast(WithFieldsT, value).keys()))
-                    for field_info in cast(WithFieldsT, value).values():
-                        if types := cast(ChildInfo, field_info).get("types"):
-                            all_types |= NodeTypeParser._add_node_group(
-                                cast(list[SimpleField], types)
-                            )
-                case "children":
-                    if types := cast(ChildInfo, value).get("types"):
-                        all_types |= NodeTypeParser._add_node_group(cast(list[SimpleField], types))
-                case _:
-                    continue
-        return all_types
-
-    def get_all_node_types(self) -> set[NodeName]:
-        """Get all unique node type names across all languages.
-
-        Returns:
-            Set of all node type names found in node_types
-        """
-        all_types: set[NodeName] = set()
-        node_types = self.parse_all_node_types()
-
-        # Iterate explicitly and extract a string type name from each node entry.
-        for language_node_types in node_types:
-            for language_entries in language_node_types.values():
-                for entry in language_entries:
-                    all_types |= self._get_node_types_from_info_values(entry)
-        return all_types
-
-    # ===========================================================================
-    # Enhanced API: Grammar-Based Semantic Extraction
-    # ===========================================================================
-
-    @cached_property
-    def abstract_type_map(self) -> dict[str, dict[str, AbstractTypeInfo]]:
-        """Map of abstract types to their info across all languages.
-
-        Returns:
-            Dictionary structure:
-            {
-                "expression": {
-                    "python": AbstractTypeInfo(...),
-                    "javascript": AbstractTypeInfo(...),
-                    ...
-                },
-                "statement": {...},
-                ...
-            }
-
-        Example:
-            >>> parser = NodeTypeParser()
-            >>> expr_map = parser.abstract_type_map.get("expression", {})
-            >>> python_expr = expr_map.get("python")
-            >>> python_expr.is_subtype("binary_expression")
-            True
-        """
-        type_map: dict[str, dict[str, AbstractTypeInfo]] = defaultdict(dict)
-
-        for language_mapping in self.parse_all_node_types():
-            for language, root_nodes in language_mapping.items():
-                for node_info in root_nodes:
-                    # Check if this node has subtypes (is abstract)
-                    if subtypes := node_info.get("subtypes"):
-                        # Get abstract type name
-                        abstract_name = str(node_info.get("type_name", node_info.get("type", "")))
-                        # Normalize: remove leading underscore
-                        normalized = abstract_name.lstrip("_")
-
-                        # Extract subtype names
-                        subtype_names = tuple(
-                            str(st.get("type_name", st.get("type", "")))
-                            for st in subtypes
-                            if isinstance(st, dict)
-                        )
-
-                        if normalized and subtype_names:
-                            type_map[normalized][language.value] = AbstractTypeInfo(
-                                abstract_type=normalized,
-                                language=language.value,
-                                concrete_subtypes=subtype_names,
-                            )
-
-        return dict(type_map)
-
-    @cached_property
-    def field_semantic_patterns(self) -> dict[str, dict[str, int]]:
-        """Map field names to their common semantic categories.
-
-        Based on empirical analysis of grammar structures across 21 languages.
-        This data is pre-computed from the grammar structure analysis.
-
-        Returns:
-            Dictionary mapping field names to category usage counts:
-            {
-                "name": {"type_def": 65, "callable": 32, "control_flow": 24},
-                "body": {"control_flow": 52, "type_def": 27, "callable": 26},
-                ...
-            }
-
-        Example:
-            >>> parser = NodeTypeParser()
-            >>> name_patterns = parser.field_semantic_patterns.get("name", {})
-            >>> sorted(name_patterns.items(), key=lambda x: x[1], reverse=True)
-            [('type_def', 65), ('callable', 32), ('control_flow', 24)]
-        """
-        # Pre-computed from grammar analysis (claudedocs/grammar_structure_analysis.md)
-        return {
-            "name": {"type_def": 65, "callable": 32, "control_flow": 24},
-            "body": {"control_flow": 52, "type_def": 27, "callable": 26},
-            "type": {"type_def": 57, "callable": 8, "control_flow": 6},
-            "condition": {"control_flow": 60},
-            "operator": {"operation": 39, "boundary": 2, "type_def": 1},
-            "right": {"operation": 30, "control_flow": 4, "type_def": 2},
-            "parameters": {"callable": 34, "type_def": 3},
-            "left": {"operation": 30, "control_flow": 3, "type_def": 2},
-            "type_parameters": {"type_def": 18, "callable": 10},
-            "alternative": {"control_flow": 26},
-            "value": {"control_flow": 13, "type_def": 9, "callable": 2},
-            "arguments": {"operation": 10, "callable": 5, "type_def": 2},
-            "return_type": {"callable": 16, "type_def": 1},
-            "consequence": {"control_flow": 14},
-            "declarator": {"callable": 7, "type_def": 5, "control_flow": 1},
-            "type_arguments": {"type_def": 6, "callable": 3, "operation": 1},
-            "initializer": {"control_flow": 8, "type_def": 1},
-            "function": {"operation": 6, "callable": 3},
-            "argument": {"operation": 9},
-            "result": {"callable": 6, "type_def": 2, "operation": 1},
-            "pattern": {"pattern_match": 20, "control_flow": 10},
-            "patterns": {"pattern_match": 15, "control_flow": 5},
+        return self in {
+            TokenSignificance.STRUCTURAL,
+            TokenSignificance.IDENTIFIER,
+            TokenSignificance.LITERAL,
+            TokenSignificance.COMMENT,
         }
 
-    def get_node_semantic_info(
-        self, node_type: str, language: SemanticSearchLanguage | str
-    ) -> NodeSemanticInfo | None:
-        """Get comprehensive semantic information for a node type.
+    @property
+    def is_trivial(self) -> bool:
+        """Whether this TokenSignificance indicates a trivial Token.
 
-        This is the primary method for grammar-based classification, extracting
-        all structural and semantic information available from the grammar.
-
-        Args:
-            node_type: The node type name (e.g., "function_definition")
-            language: The programming language
-
-        Returns:
-            NodeSemanticInfo with all extracted semantic data, or None if not found
-
-        Example:
-            >>> parser = NodeTypeParser()
-            >>> info = parser.get_node_semantic_info("function_definition", "python")
-            >>> info.has_fields
-            True
-            >>> "parameters" in info.field_map
-            True
-            >>> info.infer_semantic_category()
-            'callable'
+        Trivial Tokens do not carry semantic/structural meaning.
         """
-        if not isinstance(language, SemanticSearchLanguage):
-            language = SemanticSearchLanguage.from_string(language)
+        return self is TokenSignificance.TRIVIAL
 
-        if node_info := self._find_node_info(node_type, language):
-            # Extract semantic information
-            return self._extract_semantic_info(node_info, language.value)
-        return None
+    @property
+    def identifies(self) -> bool:
+        """Whether this TokenSignificance indicates an identifying Token.
 
-    def _find_node_info(
-        self, node_type: str, language: SemanticSearchLanguage
-    ) -> NodeTypeInfo | None:
-        """Find node info for a specific type in a language.
-
-        Args:
-            node_type: Node type name to find
-            language: Programming language
-
-        Returns:
-            NodeTypeInfo dict if found, None otherwise
+        Identifying Tokens are used for names of variables, functions, types, etc.
         """
-        for language_mapping in self.parse_all_node_types():
-            if language not in language_mapping:
-                continue
+        return self in {TokenSignificance.IDENTIFIER, TokenSignificance.LITERAL}
 
-            root_nodes = language_mapping[language]
-            for node_info in root_nodes:
-                type_name = node_info.get("type_name", node_info.get("type"))
-                if type_name == node_type:
-                    return node_info
+    @classmethod
+    def from_node_dto(cls, node_dto: NodeTypeDTO) -> TokenSignificance:
+        """Create TokenSignificance from NodeTypeDTO."""
+        if node_dto.is_composite or node_dto.is_category:
+            raise ValueError("Cannot determine TokenSignificance for Composite or Category nodes")
+        if node_dto.is_keyword_token:
+            return cls.STRUCTURAL
+        if node_dto.is_operator_token:
+            return cls.OPERATOR
+        if node_dto.is_symbol_token:
+            return cls.TRIVIAL  # it's punctuation because we just ruled out operators
+        if "comment" in node_dto.node.lower():
+            return cls.COMMENT
+        if "literal" in node_dto.node.lower():
+            return cls.LITERAL
 
-        return None
 
-    def _extract_semantic_info(self, node_info: NodeTypeInfo, language: str) -> NodeSemanticInfo:
-        """Extract semantic information from node type info.
+class Thing(BasedModel):
+    """Base class for Things (Things and Tokens -- also called Composites and Tokens)).
 
-        Args:
-            node_info: Raw node type info from JSON
-            language: Programming language name
+    There are two kinds of Things: Token (leaf) or Composite (non-leaf). Things are what you actually see in the AST produced by parsing code. A token is what you literally see in the source code (keywords, identifiers, literals, punctuation). A Composite represents complex structures like functions, classes, and expressions, which have direct and/or positional connections to child Things.
 
-        Returns:
-            NodeSemanticInfo with all extracted data
+    We keep Token as a separate class for clarity, type safety, and to enforce that Tokens cannot have children.
+
+    """
+
+    model_config = BasedModel.model_config | ConfigDict(frozen=True)
+
+    name: Annotated[ThingName | TokenName, Field(description="The name of the Thing.")]
+
+    language: Annotated[
+        SemanticSearchLanguage, Field(description="The programming language this Thing belongs to.")
+    ]
+
+    categories: Annotated[
+        frozenset[CategoryName],
+        Field(
+            default_factory=frozenset,
+            description="""
+            Set of Category names this Thing belongs to.
+
+            Most Things (86.5%) belong to a single Category.
+            Some Things (13.5%) belong to multiple Categories.
+            Empty set indicates no category membership, which is the case for:
+            - CSS
+            - Elixir
+            - HTML
+            - Solidity
+            - Swift
+            - Yaml
+
+            Multi-category is common in C/C++ (declarators serving multiple roles).
+            """,
+        ),
+    ]
+
+    is_explicit_rule: Annotated[
+        bool,
+        Field(
+            description="""
+            Whether this Thing has a dedicated named production rule in the grammar.
+
+            Tree-sitter: `named = True/False`
+            True: Named grammar rule (appears with semantic name)
+            False: Anonymous construct or synthesized node
+
+            Note: Limited utility for semantic analysis; included for completeness.
+            """
+        ),
+    ] = True
+
+    _kind: ClassVar[Literal[ThingKind.TOKEN, ThingKind.COMPOSITE]]
+
+    @property
+    def is_multi_category(self) -> bool:
+        """Check if this Thing belongs to multiple Categories."""
+        return len(self.categories) > 1
+
+    @property
+    def is_single_category(self) -> bool:
+        """Check if this Thing belongs to exactly one Category."""
+        return len(self.categories) == 1
+
+    @property
+    def primary_category(self) -> CategoryName | None:
+        """Get the primary Category of this Thing, if it exists.
+
+        Returns the single Category if the Thing belongs to exactly one; otherwise, returns None.
         """
-        # Extract fields
-        fields = self._extract_fields(node_info)
+        return next(iter(self.categories)) if self.is_single_category else None
 
-        # Extract children constraints
-        children = self._extract_children_types(node_info)
+    @property
+    def kind(self) -> Literal[ThingKind.TOKEN, ThingKind.COMPOSITE]:
+        """The kind of this Thing (TOKEN or COMPOSITE)."""
+        return self._kind
 
-        # Check if abstract (has subtypes)
-        subtypes_data = node_info.get("subtypes", [])
-        is_abstract = bool(subtypes_data)
-        subtypes = (
-            tuple(
-                str(st.get("type_name", st.get("type", "")))
-                for st in subtypes_data
-                if isinstance(st, dict)
+    @property
+    def is_token(self) -> bool:
+        """Whether this Thing is a Token."""
+        return self._kind == ThingKind.TOKEN
+
+    @property
+    def is_composite(self) -> bool:
+        """Whether this Thing is a Composite."""
+        return self._kind == ThingKind.COMPOSITE
+
+    def __str__(self) -> str:
+        """String representation of the Thing."""
+        if self.primary_category:
+            return f"Thing: {self.name}, Category: {self.primary_category}, Language: {self.language.variable}"
+        return f"Thing: {self.name}, Categories: {list(self.categories)}, Language: {self.language.variable}"
+
+
+class CompositeThing(Thing):
+    """A CompositeThing is a concrete element that appears in the parse tree. A Token is a Thing, but a CompositeThing (this class) is not a Token.
+
+    Tree-sitter equivalent: Node with fields and/or children
+
+    Attributes:
+        name: Thing identifier (e.g., "if_statement", "identifier")
+        kind: Structural classification (always COMPOSITE)
+        language: Programming language this Thing belongs to
+        categories: Set of Category names this Thing belongs to
+        is_explicit_rule: Whether has named grammar rule
+
+    Relationships:
+        - Thing → Many Categories (via categories attribute)
+        - Categories reference Things via their `member_things` attribute
+
+    A CompositeThing represents complex structures like functions, classes, and expressions, which have direct and/or positional connections to child Things.
+
+    Empirical findings:
+        - Average 3-5 Direct Connections per CompositeThing
+        - Average 1-2 Positional Connections per CompositeThing
+    """
+
+    direct_connections: Annotated[
+        frozenset[DirectConnection],
+        Field(
+            default_factory=frozenset,
+            description="""
+        Named semantic relationships to child Things with specific Roles.
+        Tree-sitter equivalent: Grammar "fields"
+        """,
+        ),
+    ]
+
+    positional_connections: Annotated[
+        frozenset[PositionalConnection],
+        Field(
+            default_factory=frozenset,
+            description="""
+        Ordered structural relationships to child Things without Roles (may have an implied role from its position).
+        Tree-sitter equivalent: Grammar "children"
+        """,
+        ),
+    ]
+
+    can_be_anywhere: Annotated[
+        bool,
+        Field(
+            description="""
+            Whether the target Thing can appear anywhere in the parse tree. Corresponds to tree-sitter's `extra` attribute.
+            """
+        ),
+    ] = False
+
+    is_start: Annotated[
+        bool,
+        Field(
+            description="Whether this Composite is the root of the parse tree (i.e., the start symbol)."
+        ),
+    ] = False
+
+    _kind: ClassVar[Literal[ThingKind.COMPOSITE]] = ThingKind.COMPOSITE  # type: ignore
+
+    @property
+    def kind(self) -> Literal[ThingKind.COMPOSITE]:
+        """The kind of this Thing (always COMPOSITE)."""
+        return self._kind
+
+    @property
+    def is_token(self) -> Literal[False]:
+        """Whether this Thing is a Token (always False)."""
+        return False
+
+    @property
+    def is_composite(self) -> Literal[True]:
+        """Whether this Thing is a Composite (always True)."""
+        return True
+
+    @property
+    def is_multi_category(self) -> bool:
+        """Check if this Thing belongs to multiple Categories."""
+        return len(self.categories) > 1
+
+    @property
+    def is_single_category(self) -> bool:
+        """Check if this Thing belongs to exactly one Category."""
+        return len(self.categories) == 1
+
+    @property
+    def primary_category(self) -> CategoryName | None:
+        """Get the primary Category of this Thing, if it exists.
+
+        Returns the single Category if the Thing belongs to exactly one; otherwise, returns None.
+        """
+        return next(iter(self.categories)) if self.is_single_category else None
+
+    def is_in_category(self, category: CategoryName) -> bool:
+        """Check if this Thing belongs to the specified Category."""
+        return category in self.categories
+
+    def __str__(self) -> str:
+        """String representation of the CompositeThing."""
+        if self.primary_category:
+            return f"CompositeThing: {self.name}, Category: {self.primary_category}, Language: {self.language.variable}"
+        return f"CompositeThing: {self.name}, Categories: {list(self.categories)}, Language: {self.language.variable}"
+
+
+class Token(Thing):
+    """A Token is a leaf Thing with no structural children.
+
+    A Token represents keywords, identifiers, literals, and punctuation -- what you literally see in the source code. Tokens are classified by their significance, indicating whether they carry semantic or structural meaning versus being mere formatting trivia.
+    """
+
+    significance: Annotated[
+        TokenSignificance,
+        Field(
+            description="""
+            Semantic importance classification.
+
+            STRUCTURAL: Keywords, operators, delimiters (if, {, +)
+            IDENTIFIER: Variable/function/class names
+            LITERAL: String/number/boolean values
+            TRIVIAL: Whitespace, line continuations (insignificant)
+            COMMENT: Code comments (significant but not code)
+
+            Used for filtering: include STRUCTURAL/IDENTIFIER/LITERAL for semantic analysis,
+            include all for formatting/reconstruction.
+        """
+        ),
+    ]
+
+    _kind: ClassVar[Literal[ThingKind.TOKEN]] = ThingKind.TOKEN  # type: ignore
+
+    @property
+    def kind(self) -> Literal[ThingKind.TOKEN]:
+        """The kind of this Thing (always TOKEN)."""
+        return self._kind
+
+    @property
+    def is_token(self) -> Literal[True]:
+        """Whether this Thing is a Token (always True)."""
+        return True
+
+    @property
+    def is_composite(self) -> Literal[False]:
+        """Whether this Thing is a Composite (always False)."""
+        return False
+
+    def __str__(self) -> str:
+        """String representation of the Token."""
+        return f"Token: {self.name}, Significance: {self.significance.value}, Language: {self.language.variable}"
+
+
+class Category(BasedModel):
+    """A Category is an abstract classification that groups Things with shared characteristics.
+
+    Categories do not appear in parse trees. They are primarily for classification of related Things. For example, `expression` is a Category containing `binary_expression`,
+    `unary_expression`, etc.
+    """
+
+    model_config = BasedModel.model_config | ConfigDict(frozen=True)
+
+    name: Annotated[Role, Field(description="The name of the Category.")]
+
+    language: Annotated[
+        SemanticSearchLanguage,
+        Field(description="The programming language this Category belongs to."),
+    ]
+
+    member_things: Annotated[
+        frozenset[ThingName],
+        Field(
+            default_factory=frozenset, description="The *names* of this category's member Things."
+        ),
+    ]
+
+    @field_validator("language", mode="after")
+    def _validate_language(self, value: Any) -> SemanticSearchLanguage:
+        """Validate that the language is a SemanticSearchLanguage that has defined Categories in its grammar."""
+        if not isinstance(value, SemanticSearchLanguage):
+            raise TypeError("Invalid language")
+        if value in (
+            SemanticSearchLanguage.CSS,
+            SemanticSearchLanguage.ELIXIR,
+            SemanticSearchLanguage.HTML,
+            SemanticSearchLanguage.SOLIDITY,
+            SemanticSearchLanguage.SWIFT,
+            SemanticSearchLanguage.YAML,
+        ):
+            logger.warning(
+                """Something doesn't look right here. You provided %s and that language has no Categories. We're going to let it go because the grammar could have changed. Please submit an issue at https://github.com/knitli/codeweaver-mcp/issues/ to let us look into it more deeply.""",
+                value.variable,
             )
-            if is_abstract
-            else ()
+        return value
+
+    def __str__(self) -> str:
+        """String representation of the Category."""
+        return f"Category: {self.name}, Language: {self.language.variable}, Members: {list(self.member_things)}"
+
+    @property
+    def short_str(self) -> str:
+        """Short string representation of the Category."""
+        return f"{self.name} {self.language.variable}"
+
+    def includes(self, thing_name: ThingName | TokenName) -> bool:
+        """Check if this Category includes the specified Thing name."""
+        return thing_name in self.member_things
+
+    def overlap_with(self, other: Category) -> frozenset[ThingName | TokenName]:
+        """Check if this Category shares any member Things with another Category. Returns the overlapping member Thing names.
+
+        Used for analyzing multi-category membership.
+        """
+        return self.member_things & other.member_things
+
+
+class ConnectionConstraint(Flag, BaseEnum):  # type:ignore  # we intentionally override BaseEnum where there's overlap with Flag
+    """Flags for Connection constraints."""
+
+    ZERO_OR_ONE = auto()
+    """May have zero or one child of the specified type(s)."""
+    ZERO_OR_MANY = auto()
+    """May have zero or many children of the specified type(s) (unconstrained)."""
+    ONLY_ONE = auto()
+    """Must have exactly one child of the specified type(s)."""
+    ONE_OR_MANY = auto()
+    """Must have one or many children of the specified type(s)."""
+
+    ALL = ZERO_OR_ONE | ZERO_OR_MANY | ONLY_ONE | ONE_OR_MANY
+
+    @classmethod
+    def from_cardinality(cls, min_card: int, max_card: int) -> ConnectionConstraint:
+        """Create ConnectionConstraint from cardinality tuple."""
+        match (min_card, max_card):
+            case (0, 1):
+                return cls.ZERO_OR_ONE
+            case (0, -1):
+                return cls.ZERO_OR_MANY
+            case (1, 1):
+                return cls.ONLY_ONE
+            case (1, -1):
+                return cls.ONE_OR_MANY
+            case _:
+                raise ValueError(f"Invalid cardinality: ({min_card}, {max_card})")
+
+
+class Connection(BasedModel):
+    """Base class for Connections between Things in a parse tree.
+
+    A Connection is a relationship from a parent Thing to child Thing(s) (an 'edge' in graph terminology). There are three classes of Connections: Direct or Positional. Direct and Positional Connections describe structure.
+
+    Attributes:
+        connection_class: Classification of connection type (DIRECT, POSITIONAL)
+        target_names: Set of names of target Things this Connection can point to
+        allows_multiple: Whether this Connection permits multiple children of specified type(s)
+        requires_presence: Whether at least one child of specified type(s) MUST be present
+
+    Relationships:
+        - Connection → Many Things (via target_names attribute)
+        - Things reference Connections via their `direct_connections` or `positional_connections` attributes
+
+    Empirical findings:
+        - Average 3-5 Direct Connections per CompositeThing
+        - Average 1-2 Positional Connections per CompositeThing
+    """
+
+    model_config = BasedModel.model_config | ConfigDict(frozen=True)
+
+    source_thing: Annotated[
+        ThingName,
+        Field(description="The name of the source Thing this Connection originates from."),
+    ]
+
+    target_things: Annotated[
+        frozenset[ThingName | TokenName],
+        Field(
+            default_factory=frozenset,
+            description="""
+            Set of names of target Things this Connection can point to.
+
+            Can reference either Categories (abstract) OR concrete Things, enabling flexible type constraints:
+            - Category References (polymorphic constraints): Accepts ANY member of a Category.
+            """,
+        ),
+    ]
+
+    allows_multiple: Annotated[
+        bool,
+        Field(
+            description="""
+            Whether connection permits multiple children of specified types.
+
+            Defines upper cardinality bound:
+            - False: at most 1 child (0 or 1)
+            - True: any number of children (0 or many)
+
+            Tree-sitter: `multiple = True/False`
+            """
+        ),
+    ] = False
+
+    requires_presence: Annotated[
+        bool,
+        Field(
+            description="""
+            Whether at least one child of specified types MUST be present.
+
+            Defines lower cardinality bound (0 or 1 vs 1 or many).
+
+            Tree-sitter: `required = True/False`
+            """
+        ),
+    ] = False
+
+    language: Annotated[
+        SemanticSearchLanguage,
+        Field(description="The programming language this Connection belongs to."),
+    ]
+
+    _connection_class: ClassVar[Literal[ConnectionClass.DIRECT, ConnectionClass.POSITIONAL]]
+
+    @property
+    def _cardinality(self) -> tuple[Literal[0, 1], Literal[-1, 1]]:
+        """Get human-readable cardinality description."""
+        min_card = 1 if self.requires_presence else 0
+        max_card = -1 if self.allows_multiple else 1  # -1 indicates unbounded
+        return (min_card, max_card)
+
+    @computed_field
+    @property
+    def constraints(self) -> ConnectionConstraint:
+        """Get ConnectionConstraint flags for this Connection."""
+        return ConnectionConstraint.from_cardinality(*self._cardinality)
+
+
+class DirectConnection(Connection):
+    """A DirectConnection is a named semantic relationship with a Role.
+
+    Tree-sitter equivalent: Grammar "fields".
+
+    Attributes:
+        role: Semantic function name (e.g., "condition", "body")
+        _connection_class: Always ConnectionClass.DIRECT
+
+
+    Characteristics:
+        - Most precise type of structural relationship
+        - Role describes what purpose the child serves
+        - Only Direct connections have Roles
+
+    Empirical findings:
+        - ~90 unique role names across all languages
+        - Most common: name (381), body (281), type (217), condition (102)
+        - Average 3-5 Direct connections per Composite Thing
+    """
+
+    role: Annotated[
+        Role,
+        Field(
+            description="""
+            The semantic function of this DirectConnection.
+
+            Describes what purpose a child serves, not just that it exists.
+            Examples: "condition", "body", "parameters", "left", "right", "operator"
+
+            Tree-sitter equivalent: Field name in grammar
+            """,
+            default_factory=Role,
+        ),
+    ]
+
+    _connection_class: ClassVar[Literal[ConnectionClass.DIRECT]] = ConnectionClass.DIRECT  # type: ignore
+
+
+class PositionalConnection(Connection):
+    """A PositionalConnection is an ordered structural relationship without a Role.
+
+    Tree-sitter equivalent: Grammar "children".
+
+    Characteristics:
+        - Less precise than DirectConnection (no Role)
+        - Ordered relationship (position may imply role)
+        - No Role; may have implied role from position
+
+    Empirical findings:
+        - Average 1-2 Positional connections per Composite Thing
+    """
+
+    position: Annotated[
+        NonNegativeInt | None,
+        Field(
+            description="The position index of this PositionalConnection among its siblings, starting from 0."
+        ),
+    ] = None
+
+    _connection_class: ClassVar[  # type: ignore
+        Literal[ConnectionClass.POSITIONAL]
+    ] = ConnectionClass.POSITIONAL  # type: ignore
+
+
+def _get_types_files_in_directory(directory: DirectoryPath) -> list[FilePath]:
+    """Get list of node types files in a directory.
+
+    Args:
+        directory: Directory to search for node types files
+
+    Returns:
+        List of node types file paths
+    """
+    return [
+        path
+        for path in directory.iterdir()
+        if path.is_file() and path.name.endswith("node-types.json")
+    ]
+
+
+# ===========================================================================
+#  Translating Node Types Files to CodeWeaver
+#
+# - The downside of adopting your own vocabulary and structure is that you
+#   have to translate between your internal representation and the external
+#   format.
+# - Once the JSON for each language is loaded, we need to translate it into
+#   our internal representation.
+#
+# node-types.json Structure:
+# - An array of 'node type' objects with:
+#   - Always: `type` (str), `named` (bool)
+#   - Sometimes: `root` (bool), `fields` (object), `children` (object),
+#     `subtypes` (array), `extra` (bool)
+#
+#   Field Details:
+#   - subtypes: array of objects with `type` (str) and `named` (bool)
+#   - children: a 'child type' object with `multiple` (bool), `required`
+#     (bool), and `types` (array of objects with `type` and `named`)
+#   - fields: object mapping field names (strings) to child type objects
+#     (same structure as children)
+#   - extra: boolean indicating this node can appear anywhere in the tree
+#
+# Mapping to CodeWeaver:
+#
+# Node Classification:
+#  - Categories: node types that HAVE `subtypes` (abstract groupings like
+#    "expression"); the nodes listed in the subtypes array become the
+#    Category's member_things
+#  - Tokens: nodes with NO fields AND NO children (leaf nodes)
+#  - Composites: nodes with fields OR children (non-leaf nodes)
+#  - Note: Categories, Tokens, and Composites can ALL have `extra: true`
+#
+# Connection Types:
+#  - Direct connections: derived from `fields` (semantic relationships with
+#    named Roles)
+#  - Positional connections: derived from `children` (ordered relationships,
+#    no semantic Role)
+#  - Note: The `extra` flag doesn't create connections; it marks Things that
+#    can appear as children anywhere in the tree
+#
+# Field Mappings:
+#  - Role: the key name in the `fields` object (e.g., "condition", "body")
+#  - is_explicit_rule: maps from `named`
+#  - allows_multiple: maps from `multiple` (in child type objects)
+#  - requires_presence: maps from `required` (in child type objects)
+#  - target_things: the `types` array in fields/children
+#  - source_thing: the `type` of the containing node
+#  - is_start: maps from `root`
+#  - can_appear_anywhere: maps from `extra` (marks Things that can appear
+#    as children of any node)
+#
+# Translation Algorithm:
+#  1. First pass: Identify Categories (nodes with `subtypes`)
+#  2. Second pass: Create Things (Tokens vs Composites based on fields/children)
+#  3. Third pass: Create Connections from fields/children on each Thing
+#  4. Mark Things with `can_appear_anywhere: true` where applicable
+#
+# Approach: DTO classes for JSON structure, then conversion functions to keep pydantic validation
+# cleanly separated from parsing logic. We'll use NamedTuple for DTOs to keep them lightweight, but allow for methods if needed (unlike TypedDict).
+# ===========================================================================
+
+
+class SimpleNodeTypeDTO(NamedTuple):
+    """NamedTuple for a simple node type object in the node types file (objects with no attributes besides `type` and `named`). While these appear in the node-types file at the top level (all Tokens are of this form unless only 'extra' is present without fields [majority of extra cases, which are rare themselves]), they also appear nested within `subtypes`, `fields`, and `children`. We only use it for nested objects, not top-level ones.
+
+    Note: This is an intermediate structure used during parsing and conversion. It is not part of the final internal representation.
+
+    Attributes:
+        node: Name of the node type (alias for `type`)
+        named: Whether the node type is named (true) or anonymous (false)
+    """
+
+    # node is a Python keyword, so we use 'node' here and map it in the Field to prevent shadowing
+    node: Annotated[
+        LiteralStringT,
+        Field(description="Name of the node type.", validation_alias="type", default_factory=str),
+    ]
+    named: Annotated[
+        bool, Field(description="Whether the node type is named (true) or anonymous (false).")
+    ]
+
+
+class ChildTypeDTO(NamedTuple):
+    """NamedTuple for a child type object in the node types file.
+
+
+    Note: This is an intermediate structure used during parsing and conversion. It is not part of the final internal representation.
+
+    Attributes:
+        multiple: Whether multiple children of this type are allowed
+        required: Whether at least one child of this type is required
+        types: List of type objects for the allowed child types
+    """
+
+    multiple: Annotated[
+        bool, Field(description="Whether multiple children of this type are allowed.")
+    ]
+    required: Annotated[
+        bool, Field(description="Whether at least one child of this type is required.")
+    ]
+    types: Annotated[
+        list[SimpleNodeTypeDTO],
+        Field(description="List of type objects for the allowed child types."),
+    ]
+
+
+class NodeTypeDTO(BasedModel):
+    """BasedModel for a single node type object in the node types file. This is the main structure we need to parse and convert into our internal representation. All subordinate structures (subtypes, fields, children) are represented using the SimpleNodeTypeDTO and ChildTypeDTO NamedTuples defined above.
+
+    Attributes:
+        node: Name of the node type (alias for `type`)
+        named: Whether the node type is named (true) or anonymous (false)
+        root: Whether the node type is the root of the parse tree
+        fields: Mapping of field names to child type objects
+        children: Child type object for positional children
+        subtypes: List of subtype objects if this is an abstract node type
+        extra: Whether this node type can appear anywhere in the parse tree
+    """
+
+    model_config = BasedModel.model_config | ConfigDict(frozen=True)
+
+    language: Annotated[SemanticSearchLanguage, PrivateAttr()]
+
+    # type is a Python keyword, so we use 'node' here and map it in the Field to prevent shadowing
+    node: Annotated[
+        LiteralStringT,
+        Field(description="Name of the node type.", validation_alias="type", default_factory=str),
+    ]
+    named: Annotated[
+        bool, Field(description="Whether the node type is named (true) or anonymous (false).")
+    ]
+    root: Annotated[bool, Field(description="Whether the node type is the root of the parse tree.")]
+    fields: (
+        Annotated[
+            dict[LiteralStringT, ChildTypeDTO],
+            Field(description="Mapping of field names to child type objects."),
+        ]
+        | None
+    ) = None
+    children: (
+        Annotated[ChildTypeDTO, Field(description="Child type object for positional children.")]
+        | None
+    ) = None
+    subtypes: (
+        Annotated[
+            list[SimpleNodeTypeDTO],
+            Field(
+                description="List of subtype objects if this is an abstract node type.",
+                default_factory=list,
+            ),
+        ]
+        | None
+    ) = None
+    extra: Annotated[
+        bool | None,
+        Field(description="Whether this node type can appear anywhere in the parse tree."),
+    ] = None
+
+    # ===============================
+    # * Translation Helper Methods *
+    # ===============================
+
+    @computed_field
+    @property
+    def is_category(self) -> bool:
+        """Check if this node type is a Category (has subtypes)."""
+        return bool(self.subtypes)
+
+    @computed_field
+    @property
+    def is_token(self) -> bool:
+        """Check if this node type is a Token (no fields and no children)."""
+        return not self.fields and not self.children and not self.subtypes
+
+    @computed_field
+    @property
+    def is_symbol_token(self) -> bool:
+        """Check if this node type is a Symbol Token (a Token that is not an identifier or literal)."""
+        return self.is_token and not NOT_SYMBOL.match(self.node)
+
+    @computed_field
+    @property
+    def is_operator_token(self) -> bool:
+        """Check if this node type is an Operator Token (a Token that is an operator)."""
+        return self.is_symbol_token and IS_OPERATOR.match(self.node) is not None
+
+    @computed_field
+    @property
+    def is_keyword_token(self) -> bool:
+        """Check if this node type is a Keyword Token (a Token that is a keyword)."""
+        return not self.is_symbol_token
+
+    @computed_field
+    @property
+    def is_composite(self) -> bool:
+        """Check if this node type is a Composite (has fields or children)."""
+        return bool(self.fields) or bool(self.children)
+
+    @computed_field
+    @property
+    def positional_children(self) -> tuple[SimpleNodeTypeDTO, ...]:
+        """Extract positional children from a ChildTypeDTO."""
+        return tuple(self.children.types) if self.children else ()
+
+    @computed_field
+    @property
+    def direct_field_children(self) -> dict[LiteralStringT, tuple[SimpleNodeTypeDTO, ...]]:
+        """Extract direct field children from the fields mapping."""
+        return (
+            {role: tuple(child.types) for role, child in self.fields.items()} if self.fields else {}
         )
 
-        # Find supertype if this is a concrete type
-        node_type_name = str(node_info.get("type_name", node_info.get("type", "")))
-        supertype = self._find_supertype(node_type_name, language)
+    @computed_field
+    @property
+    def cardinality(self) -> tuple[Literal[0, 1], Literal[-1, 1]] | None:
+        """Get human-readable cardinality description for positional children."""
+        if self.children:
+            min_card = 1 if self.children.required else 0
+            max_card = -1 if self.children.multiple else 1  # -1 indicates unbounded
+            return (min_card, max_card)
+        return None
 
-        return NodeSemanticInfo(
-            node_type=node_type_name,
-            language=language,
-            is_named=node_info.get("named", False),
-            is_abstract=is_abstract,
-            is_extra=node_info.get("extra", False),
-            is_root=node_info.get("root", False),
-            abstract_category=supertype,
-            concrete_subtypes=subtypes,
-            fields=fields,
-            children_types=children,
+
+class NodeArray(RootedRoot[list[NodeTypeDTO]]):
+    """Root object for node types file containing array of node type objects.
+
+    Attributes:
+        nodes: List of node type objects
+    """
+
+    root: Annotated[
+        list[NodeTypeDTO],
+        Field(
+            description="List of node type objects from the node types file.", default_factory=list
+        ),
+    ]
+
+    @classmethod
+    def from_json_data(cls, data: dict[SemanticSearchLanguage, list[dict[str, Any]]]) -> NodeArray:
+        """Create NodeArray from JSON data."""
+        return cls(
+            root=[
+                NodeTypeDTO.model_validate({"language": language, **node})
+                for language, nodes in data.items()
+                for node in nodes
+            ]
         )
 
-    def _extract_fields(self, node_info: NodeTypeInfo) -> tuple[FieldInfo, ...]:
-        """Extract field information from node type info.
 
-        Args:
-            node_info: Raw node type info from JSON
+class NodeTypeFileLoader:
+    """Container for node types files in a directory structure.
+
+    Attributes:
+        directory: Directory containing node types files
+        files: List of node types file paths
+    """
+
+    directory: Annotated[
+        DirectoryPath, Field(description="""Directory containing node types files.""")
+    ] = Path(__file__).parent.parent.parent.parent / "node_types"
+
+    files: Annotated[
+        list[FilePath],
+        Field(
+            description="""List of node types file paths.""",
+            default_factory=lambda data: _get_types_files_in_directory(data["directory"]),
+            init=False,
+        ),
+    ]
+
+    _data: ClassVar[dict[SemanticSearchLanguage, list[dict[str, Any]]]] = {}
+
+    _nodes: ClassVar[list[NodeArray]] = []
+
+    def __init__(
+        self, directory: DirectoryPath | None = None, files: list[FilePath] | None = None
+    ) -> None:
+        """Initialize NodeTypesFiles, auto-populating files if not provided."""
+        # Optionally override directory
+        if directory is not None:
+            self.directory = directory
+        # Initialize files list deterministically
+        if files is not None:
+            self.files = files
+        else:
+            self.files = _get_types_files_in_directory(self.directory)
+        # We keep actual file loading lazy to avoid unnecessary I/O during initialization
+
+    def _load_data(self) -> dict[SemanticSearchLanguage, list[dict[str, Any]]]:
+        """Load data (list of node types file paths)."""
+        return {
+            SemanticSearchLanguage.from_string(file.stem.replace("-node-types", "")): from_json(
+                file.read_bytes()
+            )
+            for file in self.files
+        }
+
+    def get_all_types(self) -> dict[SemanticSearchLanguage, list[dict[str, Any]]]:
+        """Get all types from a node types files.
 
         Returns:
-            Tuple of FieldInfo objects
+            List of dictionaries containing raw data from node types files. This is in the tree-sitter node-types.json format.
         """
-        fields_data = node_info.get("fields")
-        if not isinstance(fields_data, dict):
-            return ()
+        if not type(self)._data:
+            type(self)._data = self._load_data()
+        return type(self)._data
 
-        fields: list[FieldInfo] = []
-        for field_name, field_data in fields_data.items():
-            if not isinstance(field_data, dict):
-                continue
+    def get_all_nodes(self) -> list[NodeArray]:
+        """Get all nodes from the node types files.
 
-            types_data = field_data.get("types", [])
-            types = tuple(
-                str(t.get("type_name", t.get("type", "")))
-                for t in types_data
-                if isinstance(t, dict)
+        Returns:
+            List of dictionaries containing the language and list of NodeTypeDTOs for that language.
+        """
+        data = type(self)._data or self.get_all_types()
+        if not type(self)._data:
+            type(self)._data = data
+        node_arrays = [
+            NodeArray.from_json_data({language: lang_nodes})
+            for language, lang_nodes in data.items()
+        ]
+        if not type(self)._nodes:
+            type(self)._nodes = node_arrays
+        return type(self)._nodes
+
+
+class NodeTypeParser:
+    """Parses and translates node types files into CodeWeaver's internal representation."""
+
+    def __init__(self) -> None:
+        """Initialize NodeTypeParser with an optional NodeTypeFileLoader.
+
+        Args:
+            loader: Optional NodeTypeFileLoader to use for loading node types files. If not provided, a default loader will be created.
+        """
+        self.loader = NodeTypeFileLoader()
+        self.nodes = self.loader.get_all_nodes()
+
+        # Internal mappings
+        self.categories: dict[tuple[SemanticSearchLanguage, Role], Category] = {}
+        self.things: dict[tuple[SemanticSearchLanguage, ThingName], Thing] = {}
+
+    # we don't start the process until explicitly called
+
+    def parse_all_nodes(self) -> None:
+        """Parse and translate all node types files into internal representation."""
+        for node_array in self.nodes:
+            self._parse_node_array(node_array)
+
+    def _create_category(self, node_dto: NodeTypeDTO, language: SemanticSearchLanguage) -> None:
+        """Create a Category from a NodeTypeDTO and add it to the internal mapping.
+
+        Args:
+            node_dto: NodeTypeDTO representing the category to create.
+            language: SemanticSearchLanguage representing the language of the category.
+        """
+        category_name = CategoryName(node_dto.node)
+        if (language, category_name) in self.categories:
+            logger.debug(
+                "Category %s in language %s already exists; skipping",
+                category_name,
+                language.variable,
             )
+            return
 
-            fields.append(
-                FieldInfo(
-                    name=str(field_name),
-                    required=field_data.get("required", False),
-                    multiple=field_data.get("multiple", False),
-                    types=types,
+        member_things = frozenset(ThingName(subtype.node) for subtype in node_dto.subtypes or [])
+        category = Category(
+            name=Role(category_name), language=language, member_things=member_things
+        )
+        self.categories[(language, Role(category_name))] = category
+        logger.debug("Created %s", category)
+
+        # Update member Things to include this Category
+        for thing_name in member_things:
+            thing_key = (language, thing_name)
+            if thing := self.things.get(thing_key):
+                thing.categories = thing.categories | {category_name}
+                logger.debug("Updated %s to include category %s", thing, category_name)
+            else:
+                # Create a placeholder Thing to be filled in later
+                placeholder_thing = Thing(
+                    name=thing_name,
+                    language=language,
+                    categories=frozenset({CategoryName(category_name)}),
+                    is_explicit_rule=False,
                 )
+                self.things[thing_key] = placeholder_thing
+                logger.debug(
+                    "Created placeholder %s to include category %s",
+                    placeholder_thing,
+                    category_name,
+                )
+
+    def _create_token(self, node_dto: NodeTypeDTO) -> None:
+        """Create a Token from a NodeTypeDTO and add it to the internal mapping.
+
+        Args:
+            node_dto: NodeTypeDTO representing the token to create.
+        """
+        language = node_dto.language
+        token_name = TokenName(node_dto.node)
+        thing_key = (language, ThingName(token_name))
+        if thing_key in self.things:
+            logger.debug("Token %s in language %s already exists; skipping", token_name, language)
+            return
+
+        # Determine significance
+        if node_dto.is_symbol_token:
+            significance = (
+                TokenSignificance.OPERATOR
+                if node_dto.is_operator_token
+                else TokenSignificance.STRUCTURAL
             )
+        elif node_dto.is_keyword_token:
+            significance = TokenSignificance.STRUCTURAL
+        else:
+            significance = TokenSignificance.from_node_dto(node_dto)
 
-        return tuple(fields)
-
-    def _extract_children_types(self, node_info: NodeTypeInfo) -> tuple[str, ...]:
-        """Extract allowed children types from node type info.
-
-        Args:
-            node_info: Raw node type info from JSON
-
-        Returns:
-            Tuple of allowed child type names
-        """
-        children_data = node_info.get("children")
-        if not isinstance(children_data, dict):
-            return ()
-
-        types_data = children_data.get("types", [])
-        return tuple(
-            str(t.get("type_name", t.get("type", ""))) for t in types_data if isinstance(t, dict)
+        token = Token(
+            name=token_name,
+            language=language,
+            categories=frozenset(),
+            is_explicit_rule=node_dto.named,
+            significance=significance,
         )
+        self.things[thing_key] = token
+        logger.debug("Created %s", token)
 
-    def _find_supertype(self, node_type: str, language: str) -> str | None:
-        """Find supertype (abstract category) for a concrete node type.
-
-        Args:
-            node_type: Concrete node type name
-            language: Programming language name
-
-        Returns:
-            Abstract type name if found, None otherwise
-        """
-        for abstract_name, lang_map in self.abstract_type_map.items():
-            if language in lang_map:
-                type_info = lang_map[language]
-                if type_info.is_subtype(node_type):
-                    return abstract_name
-        return None
-
-    def get_supertype_hierarchy(
-        self, node_type: str, language: SemanticSearchLanguage | str
-    ) -> list[str]:
-        """Get hierarchy of supertypes for a node type.
-
-        Walks up the abstract type hierarchy from most specific to most general.
+    def _parse_node_array(self, node_array: NodeArray) -> None:
+        """Parse and translate a single node types file into internal representation.
 
         Args:
-            node_type: Node type name
-            language: Programming language
-
-        Returns:
-            List of supertypes from most specific to most general.
-            E.g., ["binary_expression", "expression", "primary_expression"]
-
-        Example:
-            >>> parser = NodeTypeParser()
-            >>> parser.get_supertype_hierarchy("binary_expression", "python")
-            ['expression']
+            node_array: NodeArray containing the list of NodeTypeDTOs to parse.
         """
-        if not isinstance(language, SemanticSearchLanguage):
-            language = SemanticSearchLanguage.from_string(language)
+        language = node_array.root[0].language if node_array.root else None
+        if language is None:
+            logger.warning("Node array has no language; skipping")
+            return
 
-        hierarchy = []
-        current = node_type
+        # First pass: Identify Categories
+        for node_dto in node_array.root:
+            if node_dto.is_category:
+                self._create_category(node_dto, language)
 
-        # Walk up the hierarchy
-        max_depth = 10  # Prevent infinite loops
-        for _ in range(max_depth):
-            supertype = self._find_supertype(current, language.value)
-            if not supertype:
-                break
+        # Second pass: Create Things (Tokens vs Composites)
+        for node_dto in node_array.root:
+            if node_dto.is_token:
+                self._create_token(node_dto, language)
+            elif node_dto.is_composite:
+                self._create_composite(node_dto, language)
+            elif not node_dto.is_category:
+                logger.warning(
+                    "Node type %s in language %s is neither Token, Composite, nor Category; skipping",
+                    node_dto.node,
+                    language.variable,
+                )
 
-            hierarchy.append(supertype)
-            current = supertype
+        # Third pass: Create Connections from fields/children on each Thing
+        for node_dto in node_array.root:
+            thing_key = (language, ThingName(node_dto.node))
+            thing = self.things.get(thing_key)
+            if thing and isinstance(thing, CompositeThing):
+                self._create_connections(node_dto, thing, language)
 
-        return hierarchy
+        # Fourth pass: Mark Things with `can_appear_anywhere: true` where applicable
+        for node_dto in node_array.root:
+            if node_dto.extra:
+                thing_key = (language, ThingName(node_dto.node))
+                thing = self.things.get(thing_key)
+                if thing and isinstance(thing, CompositeThing):
+                    thing.can_be_anywhere = True
 
-    def find_common_patterns(self) -> dict[NodeName, list[SemanticSearchLanguage]]:
-        """Find common node type patterns across languages.
 
-        Returns:
-            Dictionary mapping patterns to languages that have them
-        """
-        node_types = self.parse_all_node_types()
-        pattern_languages: dict[NodeName, list[SemanticSearchLanguage]] = {}
-
-        # Build mapping keyed by the node type name (string), collecting all node types per language
-        for language_node_types in node_types:
-            for language_name, entries in language_node_types.items():
-                # Collect all unique node types for this language
-                language_node_type_names: set[str] = set()
-                for entry in entries:
-                    if type_name := entry.get("type_name", entry.get("type")):
-                        language_node_type_names.add(str(type_name))
-
-                # Add this language to the pattern mapping for each node type it has
-                for node_type_name in language_node_type_names:
-                    if node_type_name not in pattern_languages:
-                        pattern_languages[cast(NodeName, node_type_name)] = []
-                    pattern_languages[cast(NodeName, node_type_name)].append(language_name)
-
-        # Sort by frequency (most common patterns first)
-        return dict(sorted(pattern_languages.items(), key=lambda x: len(x[1]), reverse=True))
+# ==========================================================================
+#                       Other Notes from Grammar Analysis
+# ==========================================================================
+#   - Most 'unnamed' *fields* (direct connections) are punctuation or operator symbols (e.g., "=", "+", ";", ",") (81%). The unnamed fields with alpha characters are keywords (e.g., "else", "catch", "finally", "return").
+#  - **All** 'named' *fields* (direct connections) are alpha characters (keywords or semantic names).
+#  - All *children* (positional connections) are 'named' (is_explicit_rule = True).
+#
+# ==========================================================================
