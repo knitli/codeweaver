@@ -1,3 +1,4 @@
+# sourcery skip: lambdas-should-be-short
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -65,13 +66,13 @@ structural roles vs semantic meaning. Here's our approach:
 **Thing** - A concrete element that appears in the parse tree.
 - Two kinds: **Token** (leaf) or **Composite** (non-leaf)
 - What you actually see when you parse code
-- **Tree-sitter equivalent**: Named or unnamed "nodes"
+- **Tree-sitter equivalent**: Named or unnamed "nodes" (named does not correlate to our Composite vs Token distinction)
 - Name chosen for clarity: "it's a thing in your code" (considered: Entity, Element, Construct)
 
 **Token** - Leaf Thing with no structural children.
 - Represents keywords, identifiers, literals, punctuation
 - What you literally **see** in the source code
-- Classified by significance: structural, identifier, literal, trivia, comment
+- Classified by significance: structural, identifier, literal, trivial, comment
 - **Tree-sitter equivalent**: Node with no `fields` or `children`
 
 **Composite Node** - Non-leaf Thing with structural children.
@@ -102,14 +103,6 @@ structural roles vs semantic meaning. Here's our approach:
    - All children are named (is_explicit_rule = True)
    - **Empirical finding**: 6,029 Positional connections across all languages
 
-3. **LOOSE** - Permissive relationship allowing appearance anywhere
-   - Can appear in any context without explicit declaration
-   - Only used in a plurality of languages (11 of 25)
-   - *almost always* a **comment**. Two exceptions:
-        - Python: `line_continuation` token (1/2, other is `comment`)
-        - PHP: `text_interpolation` (1/2, other is `comment`)
-   - **Tree-sitter equivalent**: "extra" nodes
-   - **Empirical finding**: 1 or 2 Loose types per language (typically comments, whitespace)
 
 *Note: Direct and Positional Connections describe **structure**, while Loose Connections
 describe **permission**.*
@@ -151,6 +144,16 @@ type constraints:
 ### Attributes
 
 **Thing Attributes:**
+
+- **can_be_anywhere** (bool)
+    - Whether the Thing can appear anywhere in the parse tree (usually comments)
+    - **Tree-sitter equivalent**: the `extra` attribute
+    Data notes:
+   - Only used in a plurality of languages (11 of 25)
+   - *almost always* a **comment**. Two exceptions:
+        - Python: `line_continuation` token (1/2, other is `comment`)
+        - PHP: `text_interpolation` (1/2, other is `comment`)
+   - **Empirical finding**: 1 or 2 Loose types per language ('comment' is one for all 11)
 
 - **is_explicit_rule** (bool)
   - Whether the Thing has a dedicated named production rule in the grammar
@@ -243,9 +246,21 @@ from __future__ import annotations
 
 import logging
 
-from typing import Annotated, Any, ClassVar, Literal, NewType
+from enum import Flag, auto
+from pathlib import Path
+from types import MappingProxyType
+from typing import Annotated, Any, ClassVar, Literal, NewType, TypedDict
 
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import (
+    ConfigDict,
+    DirectoryPath,
+    Field,
+    FilePath,
+    NonNegativeInt,
+    computed_field,
+    field_validator,
+)
+from pydantic_core import from_json
 
 from codeweaver._common import BasedModel, BaseEnum, LiteralStringT
 from codeweaver.language import SemanticSearchLanguage
@@ -258,6 +273,44 @@ CategoryName = NewType("CategoryName", LiteralStringT)
 ThingName = NewType("ThingName", LiteralStringT)
 TokenName = NewType("TokenName", LiteralStringT)
 
+NAMED_NODE_COUNTS = MappingProxyType({
+    231: SemanticSearchLanguage.C_PLUS_PLUS,
+    221: SemanticSearchLanguage.C_SHARP,
+    192: SemanticSearchLanguage.TYPESCRIPT,
+    188: SemanticSearchLanguage.HASKELL,
+    183: SemanticSearchLanguage.SWIFT,
+    170: SemanticSearchLanguage.RUST,
+    162: SemanticSearchLanguage.PHP,
+    152: SemanticSearchLanguage.JAVA,
+    150: SemanticSearchLanguage.RUBY,
+    149: SemanticSearchLanguage.SCALA,
+    133: SemanticSearchLanguage.C_LANG,
+    130: SemanticSearchLanguage.PYTHON,
+    125: SemanticSearchLanguage.SOLIDITY,
+    121: SemanticSearchLanguage.KOTLIN,
+    120: SemanticSearchLanguage.JAVASCRIPT,
+    113: SemanticSearchLanguage.GO,
+    65: SemanticSearchLanguage.CSS,
+    63: SemanticSearchLanguage.BASH,
+    51: SemanticSearchLanguage.LUA,
+    46: SemanticSearchLanguage.ELIXIR,
+    43: SemanticSearchLanguage.NIX,
+    20: SemanticSearchLanguage.HTML,
+    14: SemanticSearchLanguage.JSON,
+    6: SemanticSearchLanguage.YAML,
+})
+"""Count of top-level named nodes in each language's grammar. It took me awhile to come to this approach, but it's fast, reliable, and way less complicated than anything else I tried.
+
+The only potential issue is if the nodes are not a complete set.
+"""
+
+
+class AllThingsDict(TypedDict):
+    """TypedDict for all Things and Tokens in a grammar."""
+
+    composite_things: dict[ThingName, CompositeThing]
+    tokens: dict[TokenName, Token]
+
 
 class ConnectionClass(BaseEnum):
     """Classification of connections between Things in a parse tree.
@@ -265,26 +318,10 @@ class ConnectionClass(BaseEnum):
     Tree-Sitter mapping:
     - DIRECT -> fields: Named semantic relationship **with a Role**
     - POSITIONAL -> children: Ordered structural relationship without semantic naming
-    - LOOSE -> extras: Permissive relationship allowing appearance anywhere
     """
 
     DIRECT = "direct"
     POSITIONAL = "positional"
-    LOOSE = "loose"
-
-    @property
-    def is_structural(self) -> bool:
-        """Whether this connection class describes structural relationships.
-
-        DIRECT and POSITIONAL connections describe structure, while LOOSE connections
-        describe permission.
-        """
-        return self in {ConnectionClass.DIRECT, ConnectionClass.POSITIONAL}
-
-    @property
-    def is_loose(self) -> bool:
-        """Whether this connection class is LOOSE (extras)."""
-        return self is ConnectionClass.LOOSE
 
     @property
     def is_direct(self) -> bool:
@@ -300,7 +337,7 @@ class ConnectionClass(BaseEnum):
     def allows_role(self) -> bool:
         """Whether this connection class allows a Role.
 
-        Only DIRECT connections have Roles; POSITIONAL and LOOSE do not.
+        Only DIRECT connections have Roles; POSITIONAL does not.
         """
         return self.is_direct
 
@@ -509,6 +546,15 @@ class CompositeThing(Thing):
         ),
     ]
 
+    can_be_anywhere: Annotated[
+        bool,
+        Field(
+            description="""
+            Whether the target Thing can appear anywhere in the parse tree. Corresponds to tree-sitter's `extra` attribute.
+            """
+        ),
+    ] = False
+
     is_start: Annotated[
         bool,
         Field(
@@ -577,7 +623,7 @@ class Token(Thing):
             STRUCTURAL: Keywords, operators, delimiters (if, {, +)
             IDENTIFIER: Variable/function/class names
             LITERAL: String/number/boolean values
-            TRIVIA: Whitespace, line continuations (insignificant)
+            TRIVIAL: Whitespace, line continuations (insignificant)
             COMMENT: Code comments (significant but not code)
 
             Used for filtering: include STRUCTURAL/IDENTIFIER/LITERAL for semantic analysis,
@@ -645,7 +691,7 @@ class Category(BasedModel):
             SemanticSearchLanguage.YAML,
         ):
             logger.warning(
-                """Something doesn't look right here. You provided %s and that language has no Categories. We're going to let it go because the grammar could have changed. Please submit an issue at https://github.com/knitli/codeweaver-mcp/issues/ to let us know.""",
+                """Something doesn't look right here. You provided %s and that language has no Categories. We're going to let it go because the grammar could have changed. Please submit an issue at https://github.com/knitli/codeweaver-mcp/issues/ to let us look into it more deeply.""",
                 value.variable,
             )
         return value
@@ -669,6 +715,308 @@ class Category(BasedModel):
         Used for analyzing multi-category membership.
         """
         return self.member_things & other.member_things
+
+
+class ConnectionConstraint(Flag, BaseEnum):  # type:ignore  # we intentionally override BaseEnum where there's overlap with Flag
+    """Flags for Connection constraints."""
+
+    ZERO_OR_ONE = auto()
+    """May have zero or one child of the specified type(s)."""
+    ZERO_OR_MANY = auto()
+    """May have zero or many children of the specified type(s) (unconstrained)."""
+    ONLY_ONE = auto()
+    """Must have exactly one child of the specified type(s)."""
+    ONE_OR_MANY = auto()
+    """Must have one or many children of the specified type(s)."""
+
+    ALL = ZERO_OR_ONE | ZERO_OR_MANY | ONLY_ONE | ONE_OR_MANY
+
+    @classmethod
+    def from_cardinality(cls, min_card: int, max_card: int) -> ConnectionConstraint:
+        """Create ConnectionConstraint from cardinality tuple."""
+        match (min_card, max_card):
+            case (0, 1):
+                return cls.ZERO_OR_ONE
+            case (0, -1):
+                return cls.ZERO_OR_MANY
+            case (1, 1):
+                return cls.ONLY_ONE
+            case (1, -1):
+                return cls.ONE_OR_MANY
+            case _:
+                raise ValueError(f"Invalid cardinality: ({min_card}, {max_card})")
+
+
+class Connection(BasedModel):
+    """Base class for Connections between Things in a parse tree.
+
+    A Connection is a relationship from a parent Thing to child Thing(s) (an 'edge' in graph terminology). There are three classes of Connections: Direct or Positional. Direct and Positional Connections describe structure.
+
+    Attributes:
+        connection_class: Classification of connection type (DIRECT, POSITIONAL)
+        target_names: Set of names of target Things this Connection can point to
+        allows_multiple: Whether this Connection permits multiple children of specified type(s)
+        requires_presence: Whether at least one child of specified type(s) MUST be present
+
+    Relationships:
+        - Connection → Many Things (via target_names attribute)
+        - Things reference Connections via their `direct_connections` or `positional_connections` attributes
+
+    Empirical findings:
+        - Average 3-5 Direct Connections per CompositeThing
+        - Average 1-2 Positional Connections per CompositeThing
+    """
+
+    model_config = BasedModel.model_config | ConfigDict(frozen=True)
+
+    source_thing: Annotated[
+        ThingName,
+        Field(description="The name of the source Thing this Connection originates from."),
+    ]
+
+    target_things: Annotated[
+        frozenset[ThingName | TokenName],
+        Field(
+            default_factory=frozenset,
+            description="""
+            Set of names of target Things this Connection can point to.
+
+            Can reference either Categories (abstract) OR concrete Things, enabling flexible type constraints:
+            - Category References (polymorphic constraints): Accepts ANY member of a Category.
+            """,
+        ),
+    ]
+
+    allows_multiple: Annotated[
+        bool,
+        Field(
+            description="""
+            Whether connection permits multiple children of specified types.
+
+            Defines upper cardinality bound:
+            - False: at most 1 child (0 or 1)
+            - True: any number of children (0 or many)
+
+            Tree-sitter: `multiple = True/False`
+            """
+        ),
+    ] = False
+
+    requires_presence: Annotated[
+        bool,
+        Field(
+            description="""
+            Whether at least one child of specified types MUST be present.
+
+            Defines lower cardinality bound (0 or 1 vs 1 or many).
+
+            Tree-sitter: `required = True/False`
+            """
+        ),
+    ] = False
+
+    language: Annotated[
+        SemanticSearchLanguage,
+        Field(description="The programming language this Connection belongs to."),
+    ]
+
+    _connection_class: ClassVar[Literal[ConnectionClass.DIRECT, ConnectionClass.POSITIONAL]]
+
+    @property
+    def _cardinality(self) -> tuple[Literal[0, 1], Literal[-1, 1]]:
+        """Get human-readable cardinality description."""
+        min_card = 1 if self.requires_presence else 0
+        max_card = -1 if self.allows_multiple else 1  # -1 indicates unbounded
+        return (min_card, max_card)
+
+    @computed_field
+    @property
+    def constraints(self) -> ConnectionConstraint:
+        """Get ConnectionConstraint flags for this Connection."""
+        return ConnectionConstraint.from_cardinality(*self._cardinality)
+
+
+class DirectConnection(Connection):
+    """A DirectConnection is a named semantic relationship with a Role.
+
+    Tree-sitter equivalent: Grammar "fields".
+
+    Attributes:
+        role: Semantic function name (e.g., "condition", "body")
+        _connection_class: Always ConnectionClass.DIRECT
+
+
+    Characteristics:
+        - Most precise type of structural relationship
+        - Role describes what purpose the child serves
+        - Only Direct connections have Roles
+
+    Empirical findings:
+        - ~90 unique role names across all languages
+        - Most common: name (381), body (281), type (217), condition (102)
+        - Average 3-5 Direct connections per Composite Thing
+    """
+
+    role: Annotated[
+        Role,
+        Field(
+            description="""
+            The semantic function of this DirectConnection.
+
+            Describes what purpose a child serves, not just that it exists.
+            Examples: "condition", "body", "parameters", "left", "right", "operator"
+
+            Tree-sitter equivalent: Field name in grammar
+            """,
+            default_factory=Role,
+        ),
+    ]
+
+    _connection_class: ClassVar[Literal[ConnectionClass.DIRECT]] = ConnectionClass.DIRECT  # type: ignore
+
+
+class PositionalConnection(Connection):
+    """A PositionalConnection is an ordered structural relationship without a Role.
+
+    Tree-sitter equivalent: Grammar "children".
+
+    Characteristics:
+        - Less precise than DirectConnection (no Role)
+        - Ordered relationship (position may imply role)
+        - No Role; may have implied role from position
+
+    Empirical findings:
+        - Average 1-2 Positional connections per Composite Thing
+    """
+
+    position: Annotated[
+        NonNegativeInt | None,
+        Field(
+            description="The position index of this PositionalConnection among its siblings, starting from 0."
+        ),
+    ] = None
+
+    _connection_class: ClassVar[  # type: ignore
+        Literal[ConnectionClass.POSITIONAL]
+    ] = ConnectionClass.POSITIONAL  # type: ignore
+
+
+def _get_types_files_in_directory(directory: DirectoryPath) -> list[FilePath]:
+    """Get list of node types files in a directory.
+
+    Args:
+        directory: Directory to search for node types files
+
+    Returns:
+        List of node types file paths
+    """
+    return [
+        path
+        for path in directory.iterdir()
+        if path.is_file() and path.name.endswith("node-types.json")
+    ]
+
+# ===========================================================================
+#  Translating Node Types Files to CodeWeaver
+#
+# - The downside of adopting your own vocabulary and structure is that you
+#   have to translate between your internal representation and the external
+#   format.
+# - Once the JSON for each language is loaded, we need to translate it into
+#   our internal representation.
+#
+# node-types.json Structure:
+# - An array of 'node type' objects with:
+#   - Always: `type` (str), `named` (bool)
+#   - Sometimes: `root` (bool), `fields` (object), `children` (object),
+#     `subtypes` (array), `extra` (bool)
+#
+#   Field Details:
+#   - subtypes: array of objects with `type` (str) and `named` (bool)
+#   - children: a 'child type' object with `multiple` (bool), `required`
+#     (bool), and `types` (array of objects with `type` and `named`)
+#   - fields: object mapping field names (strings) to child type objects
+#     (same structure as children)
+#   - extra: boolean indicating this node can appear anywhere in the tree
+#
+# Mapping to CodeWeaver:
+#
+# Node Classification:
+#  - Categories: node types that HAVE `subtypes` (abstract groupings like
+#    "expression"); the nodes listed in the subtypes array become the
+#    Category's member_things
+#  - Tokens: nodes with NO fields AND NO children (leaf nodes)
+#  - Composites: nodes with fields OR children (non-leaf nodes)
+#  - Note: Categories, Tokens, and Composites can ALL have `extra: true`
+#
+# Connection Types:
+#  - Direct connections: derived from `fields` (semantic relationships with
+#    named Roles)
+#  - Positional connections: derived from `children` (ordered relationships,
+#    no semantic Role)
+#  - Note: The `extra` flag doesn't create connections; it marks Things that
+#    can appear as children anywhere in the tree
+#
+# Field Mappings:
+#  - Role: the key name in the `fields` object (e.g., "condition", "body")
+#  - is_explicit_rule: maps from `named`
+#  - allows_multiple: maps from `multiple` (in child type objects)
+#  - requires_presence: maps from `required` (in child type objects)
+#  - target_things: the `types` array in fields/children
+#  - source_thing: the `type` of the containing node
+#  - is_start: maps from `root`
+#  - can_appear_anywhere: maps from `extra` (marks Things that can appear
+#    as children of any node)
+#
+# Translation Algorithm:
+#  1. First pass: Identify Categories (nodes with `subtypes`)
+#  2. Second pass: Create Things (Tokens vs Composites based on fields/children)
+#  3. Third pass: Create Connections from fields/children on each Thing
+#  4. Mark Things with `can_appear_anywhere: true` where applicable
+# ===========================================================================
+
+class NodeTypeFileLoader:
+    """Container for node types files in a directory structure.
+
+    Attributes:
+        directory: Directory containing node types files
+        root: List of node types file paths
+    """
+
+    directory: Annotated[
+        DirectoryPath, Field(description="""Directory containing node types files.""")
+    ] = Path(__file__).parent.parent.parent.parent / "node_types"
+
+    root: Annotated[
+        list[FilePath],
+        Field(
+            description="""List of node types file paths.""",
+            default_factory=lambda data: _get_types_files_in_directory(data["directory"]),
+            init=False,
+        ),
+    ]
+
+    _data: ClassVar[list[dict[str, Any]]] = []
+
+    def __init__(self, **data: Any) -> None:
+        """Initialize NodeTypesFiles, auto-populating root if not provided."""
+        super().__init__(**data)
+        if not self.root:
+            self.root = _get_types_files_in_directory(self.directory)
+
+    def _load_data(self) -> list[dict[str, Any]]:
+        """Load data (list of node types file paths)."""
+        return [from_json(file.read_bytes()) for file in self.root]
+
+    def get_all_types(self) -> list[dict[str, Any]]:
+        """Get all types from the node types files.
+
+        Returns:
+            List of dictionaries containing raw data from node types files. This is in the tree-sitter node-types.json format.
+        """
+        if not type(self)._data:
+            type(self)._data = self._load_data()
+        return type(self)._data
 
 
 # ==========================================================================
