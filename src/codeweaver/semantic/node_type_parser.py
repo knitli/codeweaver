@@ -245,11 +245,9 @@ For developers familiar with tree-sitter terminology:
 from __future__ import annotations
 
 import logging
-import re
 
 from enum import Flag, auto
 from pathlib import Path
-from types import MappingProxyType
 from typing import Annotated, Any, ClassVar, Literal, NamedTuple, NewType, TypedDict
 
 from pydantic import (
@@ -274,43 +272,6 @@ Role = NewType("Role", LiteralStringT)
 CategoryName = NewType("CategoryName", LiteralStringT)
 ThingName = NewType("ThingName", LiteralStringT)
 TokenName = NewType("TokenName", LiteralStringT)
-
-IS_OPERATOR = re.compile(r"^[\+\-\*/%&|\^~!=<>]+$")
-"""Not perfect but should get us >90% with a couple false positives."""
-
-NOT_SYMBOL = re.compile(r"^[A-Za-z@#_][A-Za-z0-9_]*$")
-"""Rough approximation of what is NOT a symbol (identifier, keyword, etc). Accounts for @ in C# and # in preprocessor directives."""
-
-NAMED_NODE_COUNTS = MappingProxyType({
-    231: SemanticSearchLanguage.C_PLUS_PLUS,
-    221: SemanticSearchLanguage.C_SHARP,
-    192: SemanticSearchLanguage.TYPESCRIPT,
-    188: SemanticSearchLanguage.HASKELL,
-    183: SemanticSearchLanguage.SWIFT,
-    170: SemanticSearchLanguage.RUST,
-    162: SemanticSearchLanguage.PHP,
-    152: SemanticSearchLanguage.JAVA,
-    150: SemanticSearchLanguage.RUBY,
-    149: SemanticSearchLanguage.SCALA,
-    133: SemanticSearchLanguage.C_LANG,
-    130: SemanticSearchLanguage.PYTHON,
-    125: SemanticSearchLanguage.SOLIDITY,
-    121: SemanticSearchLanguage.KOTLIN,
-    120: SemanticSearchLanguage.JAVASCRIPT,
-    113: SemanticSearchLanguage.GO,
-    65: SemanticSearchLanguage.CSS,
-    63: SemanticSearchLanguage.BASH,
-    51: SemanticSearchLanguage.LUA,
-    46: SemanticSearchLanguage.ELIXIR,
-    43: SemanticSearchLanguage.NIX,
-    20: SemanticSearchLanguage.HTML,
-    14: SemanticSearchLanguage.JSON,
-    6: SemanticSearchLanguage.YAML,
-})
-"""Count of top-level named nodes in each language's grammar. It took me awhile to come to this approach, but it's fast, reliable, and way less complicated than anything else I tried.
-
-The only potential issue is if the nodes are not a complete set.
-"""
 
 
 class AllThingsDict(TypedDict):
