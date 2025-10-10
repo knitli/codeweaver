@@ -259,3 +259,12 @@ IS_KEYWORD = re.compile(
 )
 """keywords in supported languages, with some variations and suffixes to catch more cases."""
 # spellchecker:on
+
+__all__ = (
+    "IS_KEYWORD",
+    "IS_LITERAL",
+    "IS_OPERATOR",
+    "LANGUAGE_SPECIFIC_TOKEN_EXCEPTIONS",
+    "NAMED_NODE_COUNTS",
+    "NOT_SYMBOL",
+)

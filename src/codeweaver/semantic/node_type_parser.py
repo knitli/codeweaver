@@ -245,10 +245,15 @@ For developers familiar with tree-sitter terminology:
 from __future__ import annotations
 
 import logging
+import re
 
+from collections import defaultdict
+from collections.abc import Generator, Iterable, Iterator, Sequence
 from enum import Flag, auto
+from functools import cache, cached_property
 from pathlib import Path
-from typing import Annotated, Any, ClassVar, Literal, NamedTuple, NewType, TypedDict
+from types import MappingProxyType
+from typing import Annotated, Any, ClassVar, Literal, NamedTuple, NewType, TypedDict, cast, override
 
 from pydantic import (
     ConfigDict,
@@ -256,6 +261,7 @@ from pydantic import (
     Field,
     FilePath,
     NonNegativeInt,
+    PositiveInt,
     PrivateAttr,
     computed_field,
     field_validator,
@@ -263,7 +269,38 @@ from pydantic import (
 from pydantic_core import from_json
 
 from codeweaver._common import BasedModel, BaseEnum, LiteralStringT, RootedRoot
+from codeweaver._utils import lazy_importer
 from codeweaver.language import SemanticSearchLanguage
+
+
+type ConstantsGroup = tuple[
+    MappingProxyType[PositiveInt, SemanticSearchLanguage],
+    MappingProxyType[
+        SemanticSearchLanguage,
+        dict[LiteralStringT, Literal["structural", "operator", "identifier"]],
+    ],
+    re.Pattern[str],
+    re.Pattern[str],
+    re.Pattern[str],
+    re.Pattern[str],
+]
+
+
+@cache
+def get_constants() -> ConstantsGroup:
+    """Retrieves constants from the _constants module. Uses lazy importing to avoid compiling regexes until needed."""
+    _constants_module = lazy_importer("codeweaver.semantic._constants")
+    return tuple(
+        getattr(_constants_module, key)
+        for key in (
+            "named_node_counts",
+            "language_specific_token_exceptions",
+            "is_operator",
+            "not_symbol",
+            "is_literal",
+            "is_keyword",
+        )
+    )
 
 
 logger = logging.getLogger()
@@ -380,16 +417,21 @@ class TokenSignificance(BaseEnum):
         """Create TokenSignificance from NodeTypeDTO."""
         if node_dto.is_composite or node_dto.is_category:
             raise ValueError("Cannot determine TokenSignificance for Composite or Category nodes")
-        if node_dto.is_keyword_token:
-            return cls.STRUCTURAL
-        if node_dto.is_operator_token:
-            return cls.OPERATOR
-        if node_dto.is_symbol_token:
-            return cls.TRIVIAL  # it's punctuation because we just ruled out operators
-        if "comment" in node_dto.node.lower():
+        _, language_specific_exceptions, is_operator, _, is_literal, is_keyword = get_constants()
+        if (
+            node_dto.language in language_specific_exceptions
+            and node_dto.node in language_specific_exceptions[node_dto.language]
+        ):
+            return cls.from_string(language_specific_exceptions[node_dto.language][node_dto.node])
+        if "comment" in node_dto.node.lower() or node_dto.node.lower() == "comment":
             return cls.COMMENT
-        if "literal" in node_dto.node.lower():
-            return cls.LITERAL
+        if "identifier" in node_dto.node.lower() or node_dto.node.lower() == "identifier":
+            return cls.IDENTIFIER
+        if is_keyword.match(node_dto.node):
+            return cls.STRUCTURAL
+        if is_operator.match(node_dto.node):
+            return cls.OPERATOR
+        return cls.LITERAL if is_literal.match(node_dto.node) else cls.TRIVIAL
 
 
 class Thing(BasedModel):
@@ -409,28 +451,6 @@ class Thing(BasedModel):
         SemanticSearchLanguage, Field(description="The programming language this Thing belongs to.")
     ]
 
-    categories: Annotated[
-        frozenset[CategoryName],
-        Field(
-            default_factory=frozenset,
-            description="""
-            Set of Category names this Thing belongs to.
-
-            Most Things (86.5%) belong to a single Category.
-            Some Things (13.5%) belong to multiple Categories.
-            Empty set indicates no category membership, which is the case for:
-            - CSS
-            - Elixir
-            - HTML
-            - Solidity
-            - Swift
-            - Yaml
-
-            Multi-category is common in C/C++ (declarators serving multiple roles).
-            """,
-        ),
-    ]
-
     is_explicit_rule: Annotated[
         bool,
         Field(
@@ -446,7 +466,43 @@ class Thing(BasedModel):
         ),
     ] = True
 
+    can_be_anywhere: Annotated[
+        bool,
+        Field(
+            description="""
+            Whether the target Thing can appear anywhere in the parse tree. Corresponds to tree-sitter's `extra` attribute.
+            """
+        ),
+    ] = False
+
+    _categories: Annotated[CategoryGenerator, PrivateAttr()]
+
     _kind: ClassVar[Literal[ThingKind.TOKEN, ThingKind.COMPOSITE]]
+
+    @computed_field
+    @cached_property
+    def categories(self) -> frozenset[Category]:
+        """Get the Categories this Thing belongs to."""
+        return frozenset(self._categories)
+
+    @classmethod
+    def from_node_dto(cls, node_dto: NodeTypeDTO, categories: Iterable[CategoryName]) -> Thing:
+        """Create a Thing (Token or Composite) from a NodeTypeDTO and its Categories."""
+        if node_dto.is_category:
+            raise ValueError("Cannot create Thing from Category node")
+        thing_cls: type[Thing] = CompositeThing if node_dto.is_composite else Token
+        thing_kwargs: dict[str, Any] = {
+            "name": ThingName(node_dto.node),
+            "language": node_dto.language,
+            "is_explicit_rule": node_dto.named,
+            "can_be_anywhere": node_dto.extra,
+            "_categories": categories,
+        }
+        if not node_dto.is_composite:
+            thing_kwargs["significance"] = TokenSignificance.from_node_dto(node_dto)
+        if thing_cls is CompositeThing:
+            thing_kwargs["is_start"] = node_dto.root
+        return thing_cls(**thing_kwargs)  # type: ignore[call-arg]
 
     @property
     def is_multi_category(self) -> bool:
@@ -459,7 +515,7 @@ class Thing(BasedModel):
         return len(self.categories) == 1
 
     @property
-    def primary_category(self) -> CategoryName | None:
+    def primary_category(self) -> Category | None:
         """Get the primary Category of this Thing, if it exists.
 
         Returns the single Category if the Thing belongs to exactly one; otherwise, returns None.
@@ -511,37 +567,6 @@ class CompositeThing(Thing):
         - Average 1-2 Positional Connections per CompositeThing
     """
 
-    direct_connections: Annotated[
-        frozenset[DirectConnection],
-        Field(
-            default_factory=frozenset,
-            description="""
-        Named semantic relationships to child Things with specific Roles.
-        Tree-sitter equivalent: Grammar "fields"
-        """,
-        ),
-    ]
-
-    positional_connections: Annotated[
-        frozenset[PositionalConnection],
-        Field(
-            default_factory=frozenset,
-            description="""
-        Ordered structural relationships to child Things without Roles (may have an implied role from its position).
-        Tree-sitter equivalent: Grammar "children"
-        """,
-        ),
-    ]
-
-    can_be_anywhere: Annotated[
-        bool,
-        Field(
-            description="""
-            Whether the target Thing can appear anywhere in the parse tree. Corresponds to tree-sitter's `extra` attribute.
-            """
-        ),
-    ] = False
-
     is_start: Annotated[
         bool,
         Field(
@@ -549,7 +574,23 @@ class CompositeThing(Thing):
         ),
     ] = False
 
+    _direct_connections: Annotated[DirectConnectionGenerator, PrivateAttr()]
+
+    _positional_connections: Annotated[PositionalConnectionGenerator, PrivateAttr()]
+
     _kind: ClassVar[Literal[ThingKind.COMPOSITE]] = ThingKind.COMPOSITE  # type: ignore
+
+    @computed_field
+    @cached_property
+    def direct_connections(self) -> frozenset[DirectConnection]:
+        """Get the set of DirectConnections from this CompositeThing to its child Things."""
+        return frozenset(self._direct_connections)
+
+    @computed_field
+    @cached_property
+    def positional_connections(self) -> frozenset[PositionalConnection]:
+        """Get the set of PositionalConnections from this CompositeThing to its child Things."""
+        return frozenset(self._positional_connections)
 
     @property
     def kind(self) -> Literal[ThingKind.COMPOSITE]:
@@ -565,28 +606,6 @@ class CompositeThing(Thing):
     def is_composite(self) -> Literal[True]:
         """Whether this Thing is a Composite (always True)."""
         return True
-
-    @property
-    def is_multi_category(self) -> bool:
-        """Check if this Thing belongs to multiple Categories."""
-        return len(self.categories) > 1
-
-    @property
-    def is_single_category(self) -> bool:
-        """Check if this Thing belongs to exactly one Category."""
-        return len(self.categories) == 1
-
-    @property
-    def primary_category(self) -> CategoryName | None:
-        """Get the primary Category of this Thing, if it exists.
-
-        Returns the single Category if the Thing belongs to exactly one; otherwise, returns None.
-        """
-        return next(iter(self.categories)) if self.is_single_category else None
-
-    def is_in_category(self, category: CategoryName) -> bool:
-        """Check if this Thing belongs to the specified Category."""
-        return category in self.categories
 
     def __str__(self) -> str:
         """String representation of the CompositeThing."""
@@ -657,12 +676,24 @@ class Category(BasedModel):
         Field(description="The programming language this Category belongs to."),
     ]
 
-    member_things: Annotated[
-        frozenset[ThingName],
-        Field(
-            default_factory=frozenset, description="The *names* of this category's member Things."
-        ),
-    ]
+    _member_things: Annotated[ThingGenerator, PrivateAttr()]
+
+    @classmethod
+    def from_node_dto(
+        cls, node_dto: NodeTypeDTO, member_things: Iterable[ThingName | TokenName]
+    ) -> Category:
+        """Create a Category from the given node DTOs."""
+        return cls.model_validate({
+            "name": Role(node_dto.node),
+            "language": node_dto.language,
+            "_member_things": member_things,
+        })
+
+    @computed_field
+    @cached_property
+    def member_things(self) -> frozenset[ThingType]:
+        """Get the set of member Things in this Category."""
+        return frozenset(self._member_things)
 
     @field_validator("language", mode="after")
     def _validate_language(self, value: Any) -> SemanticSearchLanguage:
@@ -685,18 +716,34 @@ class Category(BasedModel):
 
     def __str__(self) -> str:
         """String representation of the Category."""
-        return f"Category: {self.name}, Language: {self.language.variable}, Members: {list(self.member_things)}"
+        return f"Category: {self.name}, Language: {self.language.variable}, Members: [{', '.join(sorted(thing.name for thing in self.member_things), key=str.lower)}]"  # pyright: ignore[reportCallIssue]
 
     @property
     def short_str(self) -> str:
         """Short string representation of the Category."""
-        return f"{self.name} {self.language.variable}"
+        return f"Category: {self.name} <<{self.language!s}>>"
+
+    def __contains__(self, thing: CompositeThing | Token) -> bool:
+        """Check if this Category contains the specified Thing."""
+        return thing in self.member_things
+
+    @override
+    def __iter__(self) -> Iterator[CompositeThing | Token]:  # pyright: ignore[reportIncompatibleMethodOverride]
+        """Iterate over the member Things in this Category."""
+        return iter(self.member_things)
+
+    def __len__(self) -> int:
+        """Get the number of member Things in this Category."""
+        return len(self.member_things)
 
     def includes(self, thing_name: ThingName | TokenName) -> bool:
         """Check if this Category includes the specified Thing name."""
-        return thing_name in self.member_things
+        return (
+            next((thing for thing in self.member_things if thing.name == thing_name), None)
+            is not None
+        )
 
-    def overlap_with(self, other: Category) -> frozenset[ThingName | TokenName]:
+    def overlap_with(self, other: Category) -> frozenset[CompositeThing | Token | Category]:
         """Check if this Category shares any member Things with another Category. Returns the overlapping member Thing names.
 
         Used for analyzing multi-category membership.
@@ -721,17 +768,42 @@ class ConnectionConstraint(Flag, BaseEnum):  # type:ignore  # we intentionally o
     @classmethod
     def from_cardinality(cls, min_card: int, max_card: int) -> ConnectionConstraint:
         """Create ConnectionConstraint from cardinality tuple."""
-        match (min_card, max_card):
-            case (0, 1):
-                return cls.ZERO_OR_ONE
-            case (0, -1):
-                return cls.ZERO_OR_MANY
-            case (1, 1):
-                return cls.ONLY_ONE
-            case (1, -1):
-                return cls.ONE_OR_MANY
+        return next(member for member in cls if member.as_cardinality == (min_card, max_card))
+
+    @property
+    def as_cardinality(self) -> tuple[Literal[0, 1], Literal[-1, 1]]:
+        """Get cardinality tuple from ConnectionConstraint."""
+        match self:
+            case ConnectionConstraint.ZERO_OR_ONE:
+                return (0, 1)
+            case ConnectionConstraint.ZERO_OR_MANY:
+                return (0, -1)
+            case ConnectionConstraint.ONLY_ONE:
+                return (1, 1)
+            case ConnectionConstraint.ONE_OR_MANY:
+                return (1, -1)
             case _:
-                raise ValueError(f"Invalid cardinality: ({min_card}, {max_card})")
+                raise ValueError(f"Invalid ConnectionConstraint: {self}")
+
+    @property
+    def allows_multiple(self) -> bool:
+        """Check if this ConnectionConstraint allows multiple children (ZERO_OR_MANY or ONE_OR_MANY)."""
+        return self in {ConnectionConstraint.ZERO_OR_MANY, ConnectionConstraint.ONE_OR_MANY}
+
+    @property
+    def is_unconstrained(self) -> bool:
+        """Check if this ConnectionConstraint is unconstrained (ZERO_OR_MANY)."""
+        return self is ConnectionConstraint.ZERO_OR_MANY
+
+    @property
+    def requires_at_least_one(self) -> bool:
+        """Check if this ConnectionConstraint requires at least one child (ONLY_ONE or ONE_OR_MANY)."""
+        return self in {ConnectionConstraint.ONLY_ONE, ConnectionConstraint.ONE_OR_MANY}
+
+    @property
+    def must_be_single(self) -> bool:
+        """Check if this ConnectionConstraint requires exactly one child (ONLY_ONE)."""
+        return self is ConnectionConstraint.ONLY_ONE
 
 
 class Connection(BasedModel):
@@ -759,19 +831,6 @@ class Connection(BasedModel):
     source_thing: Annotated[
         ThingName,
         Field(description="The name of the source Thing this Connection originates from."),
-    ]
-
-    target_things: Annotated[
-        frozenset[ThingName | TokenName],
-        Field(
-            default_factory=frozenset,
-            description="""
-            Set of names of target Things this Connection can point to.
-
-            Can reference either Categories (abstract) OR concrete Things, enabling flexible type constraints:
-            - Category References (polymorphic constraints): Accepts ANY member of a Category.
-            """,
-        ),
     ]
 
     allows_multiple: Annotated[
@@ -807,7 +866,15 @@ class Connection(BasedModel):
         Field(description="The programming language this Connection belongs to."),
     ]
 
+    _target_things: Annotated[ThingOrCategoryGenerator, PrivateAttr()]
+
     _connection_class: ClassVar[Literal[ConnectionClass.DIRECT, ConnectionClass.POSITIONAL]]
+
+    @computed_field
+    @cached_property
+    def target_things(self) -> frozenset[ThingOrCategoryType]:
+        """Get the set of target Things this Connection can point to."""
+        return frozenset(self._target_things)
 
     @property
     def _cardinality(self) -> tuple[Literal[0, 1], Literal[-1, 1]]:
@@ -821,6 +888,24 @@ class Connection(BasedModel):
     def constraints(self) -> ConnectionConstraint:
         """Get ConnectionConstraint flags for this Connection."""
         return ConnectionConstraint.from_cardinality(*self._cardinality)
+
+    def can_connect_to(self, thing: Thing | Token | Category) -> bool:
+        """Check if this Connection can point to the specified Thing."""
+        if hasattr(thing, "can_be_anywhere") and cast(Thing | Token, thing).can_be_anywhere:
+            return True
+        return thing in self.target_things
+
+    @computed_field
+    @property
+    def connection_count(self) -> NonNegativeInt:
+        """Get the number of target Things this Connection can point to."""
+        return len(self.target_things)
+
+    @computed_field
+    @property
+    def connection_class(self) -> Literal[ConnectionClass.DIRECT, ConnectionClass.POSITIONAL]:
+        """Get the connection class of this Connection (DIRECT or POSITIONAL)."""
+        return self._connection_class
 
 
 class DirectConnection(Connection):
@@ -860,6 +945,27 @@ class DirectConnection(Connection):
     ]
 
     _connection_class: ClassVar[Literal[ConnectionClass.DIRECT]] = ConnectionClass.DIRECT  # type: ignore
+    # pylance complains because the base class is a union of both DIRECT and POSITIONAL, but this is exactly what we want
+    # We have clear segregation between DirectConnection and PositionalConnection via this class variable and separate subclasses
+
+    @classmethod
+    def from_node_dto(cls, node_dto: NodeTypeDTO) -> list[DirectConnection]:
+        """Create DirectConnections from the given node DTOs."""
+        if not node_dto.fields:
+            return []
+        return [
+            cls.model_validate({
+                "source_thing": ThingName(node_dto.node),
+                "role": Role(role),
+                "allows_multiple": child_type.multiple,
+                "requires_presence": child_type.required,
+                "language": node_dto.language,
+                "_target_things": ThingGenerator(
+                    [ThingName(t.node) for t in child_type.types], language=node_dto.language
+                ),
+            })
+            for role, child_type in node_dto.fields.items()
+        ]
 
 
 class PositionalConnection(Connection):
@@ -886,6 +992,27 @@ class PositionalConnection(Connection):
     _connection_class: ClassVar[  # type: ignore
         Literal[ConnectionClass.POSITIONAL]
     ] = ConnectionClass.POSITIONAL  # type: ignore
+    # pylance complains because the base class is a union of both DIRECT and POSITIONAL, but this is exactly what we want
+
+    @classmethod
+    def from_node_dto(cls, node_dto: NodeTypeDTO) -> list[PositionalConnection]:
+        """Create PositionalConnections from the given node DTOs."""
+        if not node_dto.children:
+            return []
+        child_type = node_dto.children
+        target_things = tuple(ThingName(t.node) for t in child_type.types)
+        return [
+            cls.model_validate({
+                "source_thing": ThingName(node_dto.node),
+                "position": index,
+                "allows_multiple": child_type.multiple,
+                "requires_presence": child_type.required,
+                "language": node_dto.language,
+                "target": ThingName(node),
+                "_target_things": ThingGenerator(list(target_things), language=node_dto.language),
+            })
+            for index, node in enumerate(target_things)
+        ]
 
 
 def _get_types_files_in_directory(directory: DirectoryPath) -> list[FilePath]:
@@ -902,6 +1029,365 @@ def _get_types_files_in_directory(directory: DirectoryPath) -> list[FilePath]:
         for path in directory.iterdir()
         if path.is_file() and path.name.endswith("node-types.json")
     ]
+
+
+type ThingType = CompositeThing | Token
+type ThingNameType = ThingName | TokenName
+
+type ThingOrCategoryType = CompositeThing | Token | Category
+type ThingOrCategoryNameType = ThingName | TokenName | CategoryName
+
+
+class BaseGenerator[Name, T]:
+    """Base class for generators of Things."""
+
+    _items: list[Name]
+    _language: SemanticSearchLanguage
+    _registry: _ThingRegistry
+
+    def __init__(self, items: list[Name], language: SemanticSearchLanguage) -> None:
+        """Initialize the BaseGenerator.
+
+        Args:
+            items: List of items to generate
+        """
+        self._items = items
+        self._language = language
+        self._registry = _get_registry()
+
+    def __iter__(self) -> Generator[T, None, None]:
+        """Iterate over the items in this generator."""
+        raise NotImplementedError("Subclasses must implement __iter__")
+
+    def __len__(self) -> int:
+        """Get the number of items in this generator."""
+        return len(self._items)
+
+
+class CategoryGenerator(BaseGenerator[CategoryName, Category]):
+    """Generator for Categories in a specific programming language.
+
+    Provides lazy access to Categories by name, constructing them on demand.
+    """
+
+    _items: list[CategoryName]
+
+    def __iter__(self) -> Generator[Category, None, None]:
+        """Iterate over the Categories in this generator."""
+        for name in self._items:
+            category = self._registry.get_category_by_name(name, language=self._language)
+            if category is not None:
+                yield category  # type: ignore
+
+
+class ThingGenerator(BaseGenerator[ThingNameType, ThingType]):
+    """Generator for Things (Things and Tokens) in a specific programming language.
+
+    Provides lazy access to Things by name, constructing them on demand.
+    """
+
+    _items: list[ThingNameType]
+
+    def __iter__(self) -> Generator[ThingType, None, None]:
+        """Iterate over the Things in this generator."""
+        for name in self._items:
+            thing = self._registry.get_thing_by_name(name, language=self._language)
+            if thing is not None and not isinstance(thing, Category):
+                yield thing  # type: ignore
+
+
+class ThingOrCategoryGenerator(BaseGenerator[ThingOrCategoryNameType, ThingOrCategoryType]):
+    """Generator for Things (Things and Tokens) in a specific programming language.
+
+    Provides lazy access to Things by name, constructing them on demand.
+    """
+
+    _items: list[ThingOrCategoryNameType]
+
+    def __iter__(self) -> Generator[ThingOrCategoryType, None, None]:
+        """Iterate over the Things in this generator."""
+        for name in self._items:
+            thing = self._registry.get_thing_by_name(name)
+            if thing is not None:
+                yield thing  # type: ignore
+
+
+class DirectConnectionGenerator(BaseGenerator[ThingName, DirectConnection]):
+    """Generator for DirectConnections in a specific programming language.
+
+    Provides lazy access to DirectConnections by source Thing name, constructing them on demand.
+    """
+
+    _items: list[ThingName]
+
+    _source: ThingName
+
+    def __init__(
+        self, items: list[ThingName], source: ThingName, language: SemanticSearchLanguage
+    ) -> None:
+        """Initialize the DirectConnectionGenerator."""
+        super().__init__(items, language)
+        self._source = source
+
+    def __iter__(self) -> Generator[DirectConnection, None, None]:
+        """Iterate over the DirectConnections in this generator."""
+        for name in self._items:
+            direct_connections, _ = self._registry.get_connections_by_source(
+                name, language=self._language, direct=True
+            )
+            yield from direct_connections
+
+
+class PositionalConnectionGenerator(BaseGenerator[ThingName, PositionalConnection]):
+    """Generator for PositionalConnections in a specific programming language.
+
+    Provides lazy access to PositionalConnections by source Thing name, constructing them on demand.
+    """
+
+    _items: list[ThingName]
+
+    _source: ThingName
+
+    def __init__(
+        self, items: list[ThingName], source: ThingName, language: SemanticSearchLanguage
+    ) -> None:
+        """Initialize the PositionalConnectionGenerator."""
+        super().__init__(items, language)
+        self._source = source
+
+    def __iter__(self) -> Generator[PositionalConnection, None, None]:
+        """Iterate over the PositionalConnections in this generator."""
+        for name in self._items:
+            _, positional_connections = self._registry.get_connections_by_source(
+                name, language=self._language, direct=False
+            )
+            yield from positional_connections
+
+
+type _TokenDict = dict[TokenName, Token]
+type _CompositeThingDict = dict[ThingName, CompositeThing]
+type _CategoryDict = dict[CategoryName, Category]
+
+_registry: _ThingRegistry | None = None
+
+
+def _get_registry() -> _ThingRegistry:
+    """Get the ThingRegistry instance."""
+    global _registry
+    if _registry is None:
+        _registry = _ThingRegistry()
+    return _registry
+
+
+class _ThingRegistry:
+    """Registry for managing Things and Categories for programming languages.
+
+    Responsibilities:
+        - A simple store for constructed Things and Categories
+        - Along with ThingGenerator, provides lazy access to Things by name
+
+    """
+
+    _tokens: dict[SemanticSearchLanguage, _TokenDict]
+    _composite_things: dict[SemanticSearchLanguage, _CompositeThingDict]
+    _categories: dict[SemanticSearchLanguage, _CategoryDict]
+
+    _contents: tuple[
+        dict[SemanticSearchLanguage, _TokenDict],
+        dict[SemanticSearchLanguage, _CompositeThingDict],
+        dict[SemanticSearchLanguage, _CategoryDict],
+    ]
+
+    _direct_connections: dict[SemanticSearchLanguage, dict[ThingName, list[DirectConnection]]]
+    """Direct connections by source Thing name."""
+    _positional_connections: dict[
+        SemanticSearchLanguage, dict[ThingName, list[PositionalConnection]]
+    ]
+    """Positional connections by source Thing name."""
+
+    def __init__(self) -> None:
+        """Initialize the ThingRegistry."""
+        (
+            self._tokens,
+            self._categories,
+            self._composite_things,
+            self._direct_connections,
+            self._positional_connections,
+        ) = {}, {}, {}, {}, {}
+        for lang in SemanticSearchLanguage:
+            # pylance complains because the defaultdict isn't the TypedDict
+            self._tokens[lang] = defaultdict(dict)  # type: ignore
+            self._composite_things[lang] = defaultdict(dict)  # type: ignore
+            self._categories[lang] = defaultdict(dict)  # type: ignore
+            self._direct_connections[lang] = defaultdict(dict)  # type: ignore
+            self._positional_connections[lang] = defaultdict(dict)  # type: ignore
+
+        self._contents = self._tokens, self._composite_things, self._categories
+        self._connections = self._direct_connections, self._positional_connections
+
+    def _language_content(
+        self, language: SemanticSearchLanguage
+    ) -> MappingProxyType[ThingOrCategoryNameType, ThingOrCategoryType]:
+        """Provides a combined read-only view of all Things for a specific language."""
+        return MappingProxyType(
+            self._tokens[language] | self._composite_things[language] | self._categories[language]
+        )
+
+    def register_thing(self, thing: ThingOrCategoryType) -> None:
+        """Register a Thing in the appropriate category."""
+        self_attr = (
+            self._tokens
+            if isinstance(thing, Token)
+            else self._composite_things
+            if isinstance(thing, CompositeThing)
+            else self._categories
+        )
+        self_attr[thing.language][thing.name] = thing  # type: ignore
+        logger.debug("Registered %s", thing)
+
+    def register_connection(self, connection: Connection) -> None:
+        """Register a Connection in the appropriate category."""
+        self_attr = (
+            self._direct_connections
+            if connection.connection_class.is_direct
+            else self._positional_connections
+        )
+        if connection.source_thing not in self_attr[connection.language]:
+            self_attr[connection.language][connection.source_thing] = []
+        self_attr[connection.language][connection.source_thing].append(connection)  # type: ignore
+        logger.debug("Registered %s", connection)
+    
+    def register_connections(self, connections: Iterable[Connection]) -> None:
+        """Register multiple Connections."""
+        for connection in connections:
+            self.register_connection(connection)
+
+    def get_thing_by_name(
+        self, name: ThingOrCategoryNameType, *, language: SemanticSearchLanguage | None = None
+    ) -> ThingOrCategoryType | None:
+        """Get a Thing by its name across all languages."""
+        if language and name in (content := self._language_content(language)):
+            return content[name]
+        if not language:
+            for content in self._contents:
+                for language in content:
+                    if name in content[language]:
+                        return content[language][name]  # type: ignore
+        return None
+
+    def get_category_by_name(
+        self, name: CategoryName, *, language: SemanticSearchLanguage | None = None
+    ) -> Category | None:
+        """Get a Category by its name across all languages."""
+        if language and name in (content := self._categories[language]):
+            return content[name]
+        if not language:
+            for content in self._categories:
+                for language, cats in self._categories.items():
+                    if name in cats:
+                        return content[language][name]  # type: ignore
+        return None
+
+    def get_direct_connections_by_source(
+        self, source: ThingName, *, language: SemanticSearchLanguage | None = None
+    ) -> list[DirectConnection]:
+        """Get DirectConnections by their source Thing name across all languages."""
+        if language:
+            return self.direct_connections[language].get(source, [])
+        return (
+            next(
+                conns
+                for content in self._direct_connections.values()
+                for con_name, conns in content.items()
+                if con_name == source
+            )
+            if any(
+                conns
+                for content in self._direct_connections.values()
+                for con_name, conns in content.items()
+                if con_name == source
+            )
+            else []
+        )
+
+    def _get_positional_connections_by_source(
+        self, source: ThingName, *, language: SemanticSearchLanguage | None = None
+    ) -> list[PositionalConnection]:
+        """Get PositionalConnections by their source Thing name across all languages."""
+        if language:
+            return self.positional_connections[language].get(source, [])
+        return (
+            next(
+                conns
+                for content in self._positional_connections.values()
+                for con_name, conns in content.items()
+                if con_name == source
+            )
+            if any(
+                conns
+                for content in self._positional_connections.values()
+                for con_name, conns in content.items()
+                if con_name == source
+            )
+            else []
+        )
+
+    def get_connections_by_source(
+        self,
+        source: ThingName,
+        *,
+        language: SemanticSearchLanguage | None = None,
+        direct: bool = True,
+    ) -> list[DirectConnection] | list[PositionalConnection]:
+        """Get Connections by their source Thing name across all languages."""
+        if direct:
+            return self.get_direct_connections_by_source(source, language=language)
+        return self._get_positional_connections_by_source(source, language=language)
+
+    def register_things(self, things: Iterable[ThingOrCategoryType]) -> None:
+        """Register multiple Things."""
+        for thing in things:
+            self.register_thing(thing)
+
+    @property
+    def tokens(self) -> MappingProxyType[SemanticSearchLanguage, _TokenDict]:
+        """Get all registered Tokens."""
+        return MappingProxyType(self._tokens)
+
+    def composite_things(self) -> MappingProxyType[SemanticSearchLanguage, _CompositeThingDict]:
+        """Get all registered CompositeThings."""
+        return MappingProxyType(self._composite_things)
+
+    def categories(self) -> MappingProxyType[SemanticSearchLanguage, _CategoryDict]:
+        """Get all registered Categories."""
+        return MappingProxyType(self._categories)
+
+    @property
+    def connections(
+        self,
+    ) -> tuple[
+        MappingProxyType[SemanticSearchLanguage, dict[ThingName, list[DirectConnection]]],
+        MappingProxyType[SemanticSearchLanguage, dict[ThingName, list[PositionalConnection]]],
+    ]:
+        """Get all registered Connections."""
+        return (
+            MappingProxyType(self._direct_connections),
+            MappingProxyType(self._positional_connections),
+        )
+
+    @property
+    def direct_connections(
+        self,
+    ) -> MappingProxyType[SemanticSearchLanguage, dict[ThingName, list[DirectConnection]]]:
+        """Get all registered DirectConnections."""
+        return MappingProxyType(self._direct_connections)
+
+    @property
+    def positional_connections(
+        self,
+    ) -> MappingProxyType[SemanticSearchLanguage, dict[ThingName, list[PositionalConnection]]]:
+        """Get all registered PositionalConnections."""
+        return MappingProxyType(self._positional_connections)
 
 
 # ===========================================================================
@@ -957,10 +1443,11 @@ def _get_types_files_in_directory(directory: DirectoryPath) -> list[FilePath]:
 #    as children of any node)
 #
 # Translation Algorithm:
-#  1. First pass: Identify Categories (nodes with `subtypes`)
-#  2. Second pass: Create Things (Tokens vs Composites based on fields/children)
-#  3. Third pass: Create Connections from fields/children on each Thing
-#  4. Mark Things with `can_appear_anywhere: true` where applicable
+#  - We use a lazy registry pattern to manage Things and Categories, so they can hold references to each other while being constructed and immutable.
+#  - First pass: parse the JSON into intermediate DTO structures (NamedTuples and BasedModels)
+#    that mirror the JSON structure but are easier to work with in Python.
+#  - Second pass: convert the DTOs into our internal Thing and Category classes,
+#    using the registry to resolve references by name.
 #
 # Approach: DTO classes for JSON structure, then conversion functions to keep pydantic validation
 # cleanly separated from parsing logic. We'll use NamedTuple for DTOs to keep them lightweight, but allow for methods if needed (unlike TypedDict).
@@ -1083,13 +1570,16 @@ class NodeTypeDTO(BasedModel):
     @property
     def is_symbol_token(self) -> bool:
         """Check if this node type is a Symbol Token (a Token that is not an identifier or literal)."""
-        return self.is_token and not NOT_SYMBOL.match(self.node)
+        if not self.is_token:
+            return False
+        not_symbol = get_constants()[3]
+        return self.is_token and not not_symbol.match(self.node)
 
     @computed_field
     @property
     def is_operator_token(self) -> bool:
         """Check if this node type is an Operator Token (a Token that is an operator)."""
-        return self.is_symbol_token and IS_OPERATOR.match(self.node) is not None
+        return self.is_symbol_token and get_constants()[2].match(self.node) is not None
 
     @computed_field
     @property
@@ -1127,6 +1617,14 @@ class NodeTypeDTO(BasedModel):
             return (min_card, max_card)
         return None
 
+    @computed_field
+    @property
+    def constraints(self) -> ConnectionConstraint | None:
+        """Get ConnectionConstraint flags for positional children."""
+        if self.children:
+            return ConnectionConstraint.from_cardinality(*self.cardinality)  # type: ignore
+        return None
+
 
 class NodeArray(RootedRoot[list[NodeTypeDTO]]):
     """Root object for node types file containing array of node type objects.
@@ -1141,6 +1639,8 @@ class NodeArray(RootedRoot[list[NodeTypeDTO]]):
             description="List of node type objects from the node types file.", default_factory=list
         ),
     ]
+
+    language = Annotated[SemanticSearchLanguage, PrivateAttr()]
 
     @classmethod
     def from_json_data(cls, data: dict[SemanticSearchLanguage, list[dict[str, Any]]]) -> NodeArray:
@@ -1233,18 +1733,15 @@ class NodeTypeFileLoader:
 class NodeTypeParser:
     """Parses and translates node types files into CodeWeaver's internal representation."""
 
-    def __init__(self) -> None:
+    def __init__(self, nodes: Sequence[NodeArray] | None = None) -> None:
         """Initialize NodeTypeParser with an optional NodeTypeFileLoader.
 
         Args:
-            loader: Optional NodeTypeFileLoader to use for loading node types files. If not provided, a default loader will be created.
+            nodes: Optional pre-loaded list of NodeArray to parse; if None, will load from NodeTypeFileLoader
         """
-        self.loader = NodeTypeFileLoader()
-        self.nodes = self.loader.get_all_nodes()
+        self.nodes = nodes or NodeTypeFileLoader().get_all_nodes()
 
-        # Internal mappings
-        self.categories: dict[tuple[SemanticSearchLanguage, Role], Category] = {}
-        self.things: dict[tuple[SemanticSearchLanguage, ThingName], Thing] = {}
+        self._registry: _ThingRegistry = _get_registry()
 
     # we don't start the process until explicitly called
 
@@ -1253,49 +1750,15 @@ class NodeTypeParser:
         for node_array in self.nodes:
             self._parse_node_array(node_array)
 
-    def _create_category(self, node_dto: NodeTypeDTO, language: SemanticSearchLanguage) -> None:
+    def _create_category(self, node_dto: NodeTypeDTO) -> None:
         """Create a Category from a NodeTypeDTO and add it to the internal mapping.
 
         Args:
             node_dto: NodeTypeDTO representing the category to create.
-            language: SemanticSearchLanguage representing the language of the category.
         """
-        category_name = CategoryName(node_dto.node)
-        if (language, category_name) in self.categories:
-            logger.debug(
-                "Category %s in language %s already exists; skipping",
-                category_name,
-                language.variable,
-            )
-            return
-
         member_things = frozenset(ThingName(subtype.node) for subtype in node_dto.subtypes or [])
-        category = Category(
-            name=Role(category_name), language=language, member_things=member_things
-        )
-        self.categories[(language, Role(category_name))] = category
-        logger.debug("Created %s", category)
-
-        # Update member Things to include this Category
-        for thing_name in member_things:
-            thing_key = (language, thing_name)
-            if thing := self.things.get(thing_key):
-                thing.categories = thing.categories | {category_name}
-                logger.debug("Updated %s to include category %s", thing, category_name)
-            else:
-                # Create a placeholder Thing to be filled in later
-                placeholder_thing = Thing(
-                    name=thing_name,
-                    language=language,
-                    categories=frozenset({CategoryName(category_name)}),
-                    is_explicit_rule=False,
-                )
-                self.things[thing_key] = placeholder_thing
-                logger.debug(
-                    "Created placeholder %s to include category %s",
-                    placeholder_thing,
-                    category_name,
-                )
+        category = Category.from_node_dto(node_dto, member_things=member_things)
+        self._registry.register_thing(category)
 
     def _create_token(self, node_dto: NodeTypeDTO) -> None:
         """Create a Token from a NodeTypeDTO and add it to the internal mapping.
@@ -1303,34 +1766,48 @@ class NodeTypeParser:
         Args:
             node_dto: NodeTypeDTO representing the token to create.
         """
-        language = node_dto.language
-        token_name = TokenName(node_dto.node)
-        thing_key = (language, ThingName(token_name))
-        if thing_key in self.things:
-            logger.debug("Token %s in language %s already exists; skipping", token_name, language)
-            return
-
-        # Determine significance
-        if node_dto.is_symbol_token:
-            significance = (
-                TokenSignificance.OPERATOR
-                if node_dto.is_operator_token
-                else TokenSignificance.STRUCTURAL
-            )
-        elif node_dto.is_keyword_token:
-            significance = TokenSignificance.STRUCTURAL
-        else:
-            significance = TokenSignificance.from_node_dto(node_dto)
-
-        token = Token(
-            name=token_name,
-            language=language,
-            categories=frozenset(),
-            is_explicit_rule=node_dto.named,
-            significance=significance,
+        categories = self._get_node_categories(node_dto)
+        token = Token.from_node_dto(
+            node_dto, categories=CategoryGenerator(list(categories), language=node_dto.language)
         )
-        self.things[thing_key] = token
-        logger.debug("Created %s", token)
+        self._registry.register_thing(cast(Token, token))
+
+    def _get_node_categories(self, node_dto: NodeTypeDTO) -> frozenset[CategoryName]:
+        """Get the set of Categories a node belongs to based on its name and language.
+
+        Args:
+            node_dto: NodeTypeDTO representing the node to check.
+
+        Returns:
+            Set of Categories the node belongs to.
+        """
+        return frozenset(
+            cat_name
+            for cat_name, category in self._registry.categories().get(node_dto.language, {}).items()
+            if category.includes(ThingName(node_dto.node))
+        )
+
+    def _create_composite(self, node_dto: NodeTypeDTO) -> None:
+        """Create a CompositeThing from a NodeTypeDTO and add it to the internal mapping.
+
+        Args:
+            node_dto: NodeTypeDTO representing the composite to create.
+        """
+        categories = self._get_node_categories(node_dto)
+
+        composite = CompositeThing.from_node_dto(
+            node_dto, categories=ThingGenerator(list(categories))
+        )
+        self._registry.register_thing(cast(CompositeThing, composite))
+        # Create and register DirectConnections
+        if fields := node_dto.fields:
+            for role, child in fields.items():
+                direct_conns = DirectConnection.from_node_dto(node_dto, role, child)
+                self._registry.register_connections(direct_conns)
+        # Create and register PositionalConnections
+        if children := node_dto.children:
+            positional_conns = PositionalConnection.from_node_dto(node_dto, children)
+            self._registry.register_connections(positional_conns)
 
     def _parse_node_array(self, node_array: NodeArray) -> None:
         """Parse and translate a single node types file into internal representation.
@@ -1338,43 +1815,14 @@ class NodeTypeParser:
         Args:
             node_array: NodeArray containing the list of NodeTypeDTOs to parse.
         """
-        language = node_array.root[0].language if node_array.root else None
-        if language is None:
-            logger.warning("Node array has no language; skipping")
-            return
-
-        # First pass: Identify Categories
         for node_dto in node_array.root:
             if node_dto.is_category:
-                self._create_category(node_dto, language)
-
-        # Second pass: Create Things (Tokens vs Composites)
+                self._create_category(node_dto)
         for node_dto in node_array.root:
             if node_dto.is_token:
-                self._create_token(node_dto, language)
+                self._create_token(node_dto)
             elif node_dto.is_composite:
-                self._create_composite(node_dto, language)
-            elif not node_dto.is_category:
-                logger.warning(
-                    "Node type %s in language %s is neither Token, Composite, nor Category; skipping",
-                    node_dto.node,
-                    language.variable,
-                )
-
-        # Third pass: Create Connections from fields/children on each Thing
-        for node_dto in node_array.root:
-            thing_key = (language, ThingName(node_dto.node))
-            thing = self.things.get(thing_key)
-            if thing and isinstance(thing, CompositeThing):
-                self._create_connections(node_dto, thing, language)
-
-        # Fourth pass: Mark Things with `can_appear_anywhere: true` where applicable
-        for node_dto in node_array.root:
-            if node_dto.extra:
-                thing_key = (language, ThingName(node_dto.node))
-                thing = self.things.get(thing_key)
-                if thing and isinstance(thing, CompositeThing):
-                    thing.can_be_anywhere = True
+                self._create_composite(node_dto)
 
 
 # ==========================================================================

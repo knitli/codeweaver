@@ -19,7 +19,6 @@ from typing import Literal, NamedTuple
 
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.semantic.categories import SemanticNodeCategory, SemanticTier
-from codeweaver.semantic.grammar_types import NodeSemanticInfo
 from codeweaver.semantic.node_type_parser import NodeTypeParser
 
 
