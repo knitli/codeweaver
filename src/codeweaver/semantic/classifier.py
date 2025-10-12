@@ -18,9 +18,9 @@ from codeweaver._common import DataclassSerializationMixin
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.semantic.categories import (
     CategoryRegistry,
+    ImportanceRank,
     ImportanceScoresDict,
-    SemanticNodeCategory,
-    SemanticTier,
+    SemanticClass,
     create_default_registry,
 )
 from codeweaver.semantic.confidence import ConfidenceMetrics, ConfidenceScorer, ContextualScorer
@@ -37,12 +37,12 @@ from codeweaver.semantic.pattern_classifier import (
 class EnhancedClassificationResult(DataclassSerializationMixin):
     """Enhanced result with full classification details."""
 
-    category: SemanticNodeCategory
+    category: SemanticClass
     confidence: float
     phase: ClassificationPhase
-    tier: SemanticTier
+    tier: ImportanceRank
     matched_pattern: str | None = None
-    alternative_categories: list[SemanticNodeCategory] | None = None
+    alternative_categories: list[SemanticClass] | None = None
     confidence_metrics: ConfidenceMetrics | None = None
     extension_source: str | None = None
 
@@ -77,7 +77,7 @@ class EnhancedClassificationResult(DataclassSerializationMixin):
 class CoverageReport(TypedDict):
     """Report on classification coverage for a language."""
 
-    category: SemanticNodeCategory
+    category: SemanticClass
     confidence: NonNegativeFloat
     phase: ClassificationPhase
     grade: Literal["A", "B", "C", "D", "F"]

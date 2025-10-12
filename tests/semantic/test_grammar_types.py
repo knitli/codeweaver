@@ -18,12 +18,7 @@ class TestFieldInfo:
 
     def test_basic_properties(self):
         """Test basic FieldInfo properties."""
-        field = FieldInfo(
-            name="body",
-            required=True,
-            multiple=False,
-            types=("block", "statement"),
-        )
+        field = FieldInfo(name="body", required=True, multiple=False, types=("block", "statement"))
 
         assert field.name == "body"
         assert field.is_required is True
@@ -33,10 +28,7 @@ class TestFieldInfo:
     def test_type_names_cached_property(self):
         """Test type_names cached property."""
         field = FieldInfo(
-            name="parameters",
-            required=True,
-            multiple=True,
-            types=("parameter", "parameter_list"),
+            name="parameters", required=True, multiple=True, types=("parameter", "parameter_list")
         )
 
         type_names = field.type_names
@@ -50,10 +42,7 @@ class TestFieldInfo:
     def test_accepts_type(self):
         """Test accepts_type method."""
         field = FieldInfo(
-            name="value",
-            required=False,
-            multiple=False,
-            types=("expression", "literal"),
+            name="value", required=False, multiple=False, types=("expression", "literal")
         )
 
         assert field.accepts_type("expression") is True

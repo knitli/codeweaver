@@ -576,7 +576,9 @@ class ChunkMicroManager:
         child_nodes = list(node.children)
         if child_nodes:
             for child in child_nodes:
-                if child.text.strip() and estimate_tokens(child.text) > 20:  # Skip trivial nodes
+                if (
+                    child.text.strip() and estimate_tokens(child.text) > 20
+                ):  # Skip punctuation nodes
                     child_chunks = self._process_semantic_node(
                         child, content_lines, file, source_id, effective_limit
                     )

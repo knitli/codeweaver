@@ -286,7 +286,18 @@ async def lifespan(
     statistics = statistics or _get_session_statistics()
     settings = settings or get_settings()
     if not hasattr(app, "state"):
-        app.state = AppState(initialized=False, settings=settings, health=get_health_info(), statistics=statistics, project_root=settings.project_root or get_project_root(), config_path=settings.config_file if settings else None, provider_registry=get_provider_registry(), services_registry=get_services_registry(), model_registry=get_model_registry(), middleware_stack=tuple(getattr(app, "middleware", ())))
+        app.state = AppState(
+            initialized=False,
+            settings=settings,
+            health=get_health_info(),
+            statistics=statistics,
+            project_root=settings.project_root or get_project_root(),
+            config_path=settings.config_file if settings else None,
+            provider_registry=get_provider_registry(),
+            services_registry=get_services_registry(),
+            model_registry=get_model_registry(),
+            middleware_stack=tuple(getattr(app, "middleware", ())),
+        )
     state: AppState = app.state
     if not isinstance(state, AppState):
         raise InitializationError(
@@ -506,11 +517,9 @@ def _integrate_user_settings(
             _ = base_fast_mcp_settings.pop(key, None)
         if (value := getattr(settings, key, None)) and isinstance(value, list):
             base_fast_mcp_settings[replacement_key].extend(
-
-                    string_to_class(item) if isinstance(item, str) else item
-                    for item in value
-                    if item and item not in base_fast_mcp_settings[replacement_key]
-
+                string_to_class(item) if isinstance(item, str) else item
+                for item in value
+                if item and item not in base_fast_mcp_settings[replacement_key]
             )
         base_fast_mcp_settings[replacement_key] = (
             list(set(base_fast_mcp_settings[replacement_key]))

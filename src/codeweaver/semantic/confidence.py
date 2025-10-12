@@ -10,7 +10,7 @@ from codeweaver.semantic.categories import (
     AgentTask,
     ImportanceScores,
     ImportanceScoresDict,
-    SemanticNodeCategory,
+    SemanticClass,
 )
 from codeweaver.semantic.pattern_classifier import ClassificationPhase, ClassificationResult
 
@@ -37,7 +37,7 @@ class ConfidenceMetrics:
 
 
 def _calculate_importance_multiplier_cached(
-    category: SemanticNodeCategory, scores: ImportanceScores
+    category: SemanticClass, scores: ImportanceScores
 ) -> float:
     """Cached version of importance multiplier calculation."""
     try:
@@ -57,7 +57,7 @@ def _calculate_importance_multiplier_cached(
 
 @lru_cache(maxsize=256)
 def _calculate_importance_multiplier(
-    category: SemanticNodeCategory, context_weights: ImportanceScores
+    category: SemanticClass, context_weights: ImportanceScores
 ) -> float:
     """Use ImportanceScores to adjust confidence."""
     return _calculate_importance_multiplier_cached(category, context_weights)
@@ -187,7 +187,7 @@ class ContextualScorer(ConfidenceScorer):
 
     def _adjust_for_parent_context(self, result: ClassificationResult, parent_type: str) -> float:
         """Adjust confidence based on parent node type."""
-        if result.category == SemanticNodeCategory.OPERATION_COMPUTATION:
+        if result.category == SemanticClass.OPERATION_OPERATOR:
             if "expression" in parent_type.lower():
                 return 1.1
             if "statement" in parent_type.lower():
@@ -198,7 +198,7 @@ class ContextualScorer(ConfidenceScorer):
         self, result: ClassificationResult, sibling_types: list[str]
     ) -> float:
         """Adjust confidence based on sibling node types."""
-        if result.category == SemanticNodeCategory.SYNTAX_STRUCTURAL:
+        if result.category == SemanticClass.SYNTAX_PUNCTUATION:
             structural_siblings = sum(
                 any(punct in s.lower() for punct in [",", ";", "(", ")", "[", "]"])
                 for s in sibling_types

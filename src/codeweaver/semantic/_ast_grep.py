@@ -40,7 +40,7 @@ from codeweaver.services.textify import humanize
 
 # Lazy imports to avoid circular dependencies
 if TYPE_CHECKING:
-    from codeweaver.semantic.categories import ImportanceScores, SemanticNodeCategory
+    from codeweaver.semantic.categories import ImportanceScores, SemanticClass
 
 
 # re-export Ast Grep's rules and config types:
@@ -474,7 +474,7 @@ class AstNode[SgNode: (AstGrepNode)](BasedModel):
     # Semantic classification and scoring methods
 
     @cached_property
-    def semantic_category(self) -> SemanticNodeCategory:
+    def semantic_category(self) -> SemanticClass:
         """Get the semantic category for this node using the global mapper."""
         from codeweaver.semantic import get_node_mapper
 

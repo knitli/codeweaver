@@ -16,7 +16,7 @@ from codeweaver._common import BasedModel
 
 if TYPE_CHECKING:
     from codeweaver.semantic._ast_grep import AstNode
-    from codeweaver.semantic.categories import ImportanceScores, SemanticNodeCategory
+    from codeweaver.semantic.categories import ImportanceScores, SemanticClass
 
 
 class SemanticScorer(BasedModel):
@@ -49,7 +49,7 @@ class SemanticScorer(BasedModel):
     ]
 
     def calculate_importance_score(
-        self, semantic_category: SemanticNodeCategory, node: AstNode[SgNode]
+        self, semantic_category: SemanticClass, node: AstNode[SgNode]
     ) -> ImportanceScores:
         """Calculate the final importance score for a node.
 

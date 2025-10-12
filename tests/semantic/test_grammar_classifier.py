@@ -75,10 +75,7 @@ class TestFieldBasedClassification:
             assert result.confidence >= 0.80
             assert result.classification_method in ["field_inference", "abstract_type"]
             # Evidence should mention relevant fields
-            assert any(
-                field in result.evidence.lower()
-                for field in ["parameters", "body", "name"]
-            )
+            assert any(field in result.evidence.lower() for field in ["parameters", "body", "name"])
 
     def test_classify_class_definition(self, classifier):
         """Test field-based classification of class definition."""
@@ -97,7 +94,10 @@ class TestFieldBasedClassification:
             # If statements should be control flow conditional
             assert result.category == SemanticNodeCategory.CONTROL_FLOW_CONDITIONAL
             assert result.confidence >= 0.80
-            assert "condition" in result.evidence.lower() or result.classification_method == "abstract_type"
+            assert (
+                "condition" in result.evidence.lower()
+                or result.classification_method == "abstract_type"
+            )
 
 
 class TestChildrenConstraintClassification:
@@ -121,7 +121,10 @@ class TestChildrenConstraintClassification:
 
         if result is not None and result.classification_method == "children":
             # Should be classified as composite or similar
-            assert result.tier in [SemanticTier.SYNTAX_REFERENCES, SemanticTier.OPERATIONS_EXPRESSIONS]
+            assert result.tier in [
+                SemanticTier.SYNTAX_REFERENCES,
+                SemanticTier.OPERATIONS_EXPRESSIONS,
+            ]
 
 
 class TestExtraNodeClassification:
@@ -148,10 +151,7 @@ class TestClassificationPipeline:
 
     def test_classification_with_language_enum(self, classifier):
         """Test classification with SemanticSearchLanguage enum."""
-        result = classifier.classify_node(
-            "function_definition",
-            SemanticSearchLanguage.PYTHON
-        )
+        result = classifier.classify_node("function_definition", SemanticSearchLanguage.PYTHON)
 
         # Should work with enum as well as string
         assert result is None or isinstance(result, GrammarClassificationResult)
@@ -174,8 +174,7 @@ class TestAbstractCategoryMapping:
         """Test getting semantic category for abstract type in specific language."""
         # Expression should map to OPERATION_COMPUTATION
         category = classifier.get_abstract_category_for_language(
-            "expression",
-            SemanticSearchLanguage.PYTHON
+            "expression", SemanticSearchLanguage.PYTHON
         )
 
         if category is not None:
@@ -184,8 +183,7 @@ class TestAbstractCategoryMapping:
     def test_nonexistent_abstract_type(self, classifier):
         """Test that nonexistent abstract types return None."""
         category = classifier.get_abstract_category_for_language(
-            "nonexistent_abstract_type",
-            SemanticSearchLanguage.PYTHON
+            "nonexistent_abstract_type", SemanticSearchLanguage.PYTHON
         )
 
         assert category is None

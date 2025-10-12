@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import ClassVar
 
-from codeweaver.semantic.categories import SemanticNodeCategory, SemanticTier
+from codeweaver.semantic.categories import ImportanceRank, SemanticClass
 from codeweaver.semantic.patterns import match_tier_patterns_cached
 
 
@@ -30,9 +30,9 @@ class SyntacticResult:
     """Result of syntactic node classification."""
 
     classification: SyntacticClassification
-    category: SemanticNodeCategory
+    category: SemanticClass
     confidence: float
-    tier: SemanticTier
+    tier: ImportanceRank
     node: str | None = None
     matched_pattern: str | None = None
 
@@ -51,13 +51,13 @@ class SyntacticClassifier:
         """Classify node types with no letters using pre-compiled patterns."""
         # Use the cached utility function
         if self.is_syntactic_node(node_type):
-            tier = SemanticTier.SYNTAX_REFERENCES
+            tier = ImportanceRank.SYNTAX_REFERENCES
             if result := match_tier_patterns_cached(node_type, tier, only_syntactic=True):
                 category, confidence, text, _match_obj, _matched_pattern = result
 
                 # Determine classification type based on confidence and category
                 if confidence >= 0.90:
-                    if category == SemanticNodeCategory.OPERATION_COMPUTATION:
+                    if category == SemanticClass.OPERATION_OPERATOR:
                         classification = SyntacticClassification.DEFINITE_OPERATOR
                     else:
                         classification = SyntacticClassification.DEFINITE_PUNCTUATION
@@ -118,9 +118,9 @@ class ContextualClassifier:
         ):
             return SyntacticResult(
                 classification=SyntacticClassification.DEFINITE_OPERATOR,
-                category=SemanticNodeCategory.OPERATION_COMPUTATION,
+                category=SemanticClass.OPERATION_OPERATOR,
                 confidence=0.85,  # Higher confidence with context
-                tier=SemanticNodeCategory.OPERATION_COMPUTATION.tier,
+                tier=SemanticClass.OPERATION_OPERATOR.tier,
                 matched_pattern=base_result.matched_pattern,
             )
 
@@ -130,9 +130,9 @@ class ContextualClassifier:
         ):
             return SyntacticResult(
                 classification=SyntacticClassification.DEFINITE_PUNCTUATION,
-                category=SemanticNodeCategory.SYNTAX_STRUCTURAL,
+                category=SemanticClass.SYNTAX_PUNCTUATION,
                 confidence=0.90,
-                tier=SemanticNodeCategory.SYNTAX_STRUCTURAL.tier,
+                tier=SemanticClass.SYNTAX_PUNCTUATION.tier,
                 matched_pattern=base_result.matched_pattern,
             )
 

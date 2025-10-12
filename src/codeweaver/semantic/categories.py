@@ -13,7 +13,7 @@ from collections import Counter
 from collections.abc import Sequence
 from functools import cached_property
 from types import MappingProxyType
-from typing import Annotated, Any, Self, TypedDict, Unpack, cast
+from typing import TYPE_CHECKING, Annotated, Any, Self, TypedDict, Unpack, cast
 
 import textcase
 
@@ -34,6 +34,10 @@ from pydantic_core import ArgsKwargs, core_schema
 
 from codeweaver._common import BasedModel, BaseEnum, DataclassSerializationMixin
 from codeweaver.language import SemanticSearchLanguage
+
+
+if TYPE_CHECKING:
+    from codeweaver.semantic.node_type_parser import TokenPurpose
 
 
 # =============================================================================
@@ -118,35 +122,47 @@ class ImportanceScores(DataclassSerializationMixin):
         return cls.validate_python(data=data)  # pyright: ignore[reportArgumentType]
 
 
-class SemanticTier(int, BaseEnum):
-    """Semantic importance tiers from highest to lowest priority."""
+class ImportanceRank(int, BaseEnum):
+    """Semantic importance rankings from highest to lowest priority.
 
-    STRUCTURAL_DEFINITIONS = 1  # Core code structures
+    These are general guidelines. The actual importance depends on the task and context, but these serve as a useful baseline.
+    """
+
+    PRIMARY_DEFINITIONS = 1  # Core code structures
     BEHAVIORAL_CONTRACTS = 2  # Interfaces and boundaries
     CONTROL_FLOW_LOGIC = 3  # Execution flow control
     OPERATIONS_EXPRESSIONS = 4  # Data operations and computations
     SYNTAX_REFERENCES = 5  # Literals and syntax elements
 
     @property
-    def semantic_categories(self) -> tuple[SemanticNodeCategory, ...]:
+    def semantic_categories(self) -> tuple[SemanticClass, ...]:
         """Get all semantic categories in this tier."""
-        return tuple(node for node, tier in SemanticNodeCategory.tier_map().items() if tier == self)
+        return tuple(node for node, tier in SemanticClass.tier_map().items() if tier == self)
 
     @classmethod
-    def from_category(cls, category: SemanticNodeCategory | str) -> SemanticTier:
-        """Get semantic tier for a given category."""
-        if not isinstance(category, SemanticNodeCategory):
-            category = SemanticNodeCategory.from_string(category)
+    def from_category(cls, category: SemanticClass | str) -> ImportanceRank:
+        """Get semantic importance rank for a given category."""
+        if not isinstance(category, SemanticClass):
+            category = SemanticClass.from_string(category)
         return category.category.tier or next(
             tier for tier in cls if category in tier.semantic_categories
         )
+
+    @classmethod
+    def from_token_purpose(cls, purpose: TokenPurpose) -> ImportanceRank:
+        """Map token purpose to an approximate importance rank."""
+        from codeweaver.semantic.node_type_parser import TokenPurpose
+
+        if purpose == TokenPurpose.OPERATOR:
+            return ImportanceRank.OPERATIONS_EXPRESSIONS
+        return ImportanceRank.SYNTAX_REFERENCES
 
 
 class SemanticCategoryDict(TypedDict):
     """Typed dictionary for semantic category definitions."""
 
     name: Annotated[
-        SemanticNodeCategory | str,
+        SemanticClass | str,
         Field(description="Category identifier", pattern=r"^[A-Z][A-Z0-9_]+$", max_length=50),
     ]
     description: Annotated[str, Field(description="Human-friendly description")]
@@ -166,9 +182,9 @@ class SemanticCategoryDict(TypedDict):
 class SemanticCategory(BasedModel):
     """Universal semantic category for AST nodes."""
 
-    name: Annotated[SemanticNodeCategory, Field(description="Category identifier")]
+    name: Annotated[SemanticClass, Field(description="Category identifier")]
     description: Annotated[str, Field(description="Human-readable description")]
-    tier: Annotated[SemanticTier, Field(description="Importance tier")]
+    tier: Annotated[ImportanceRank, Field(description="Importance tier")]
     importance_scores: Annotated[
         ImportanceScores, Field(description="Multi-dimensional importance")
     ]
@@ -196,19 +212,19 @@ class SemanticCategory(BasedModel):
         """Post-initialization validation."""
         with contextlib.suppress(KeyError, AttributeError, ValueError):
             if not self.name.category:
-                SemanticNodeCategory._update_categories(self)  # pyright: ignore[reportPrivateUsage]
+                SemanticClass._update_categories(self)  # pyright: ignore[reportPrivateUsage]
             if not self.name.tier:
-                SemanticNodeCategory._update_tier_map(self)  # pyright: ignore[reportPrivateUsage]
+                SemanticClass._update_tier_map(self)  # pyright: ignore[reportPrivateUsage]
 
     @field_validator("name", mode="before")
     @classmethod
-    def validate_name(cls, v: str | SemanticNodeCategory) -> SemanticNodeCategory:
-        """Ensure name is a SemanticNodeCategory."""
-        if isinstance(v, SemanticNodeCategory):
+    def validate_name(cls, v: str | SemanticClass) -> SemanticClass:
+        """Ensure name is a SemanticClass."""
+        if isinstance(v, SemanticClass):
             return v
         with contextlib.suppress(ValueError, AttributeError):
-            return SemanticNodeCategory.from_string(v)
-        return SemanticNodeCategory.add_member(textcase.upper(v), textcase.snake(v))
+            return SemanticClass.from_string(v)
+        return SemanticClass.add_member(textcase.upper(v), textcase.snake(v))
 
     @field_validator("importance_scores", mode="before")
     @classmethod
@@ -232,7 +248,7 @@ class SemanticCategory(BasedModel):
         return self.importance_scores.weighted_score(context_weights)
 
 
-class SemanticNodeCategory(str, BaseEnum):
+class SemanticClass(str, BaseEnum):
     """Language-agnostic semantic categories for AST nodes."""
 
     # Tier 1: Structural Definitions
@@ -270,22 +286,47 @@ class SemanticNodeCategory(str, BaseEnum):
     """Function/method invocation expressions"""
     OPERATION_DATA = "operation_data"
     """Variable assignments, property access, field modifications, and data structure operations. Excludes mathematical computations and logical operations."""
-    OPERATION_COMPUTATION = "operation_computation"
-    """Mathematical and logical computation operations"""
+    OPERATION_OPERATOR = "operation_computation"
+    """Mathematical and logical computation operations, including arithmetic, comparisons, and boolean logic and use of operator literals. Excludes data structure manipulations and assignments (OPERATION_DATA) where we can distinguish them. Because some data structure manipulations use operators, OPERATION_DATA may sometimes be misclassified as OPERATION_OPERATOR."""
     EXPRESSION_ANONYMOUS = "expression_anonymous"
     """Anonymous function expressions including lambdas, closures, arrow functions, and inline function literals. Excludes named function declarations."""
 
     # Tier 5: Syntax & References
-    REFERENCE_IDENTIFIER = "reference_identifier"
-    """Identifiers and references (variables, built-in types)"""
-    LITERAL_VALUE = "literal_value"
+    SYNTAX_KEYWORD = "syntax_keyword"
+    """Language keywords and reserved words, including type keywords like 'int', 'string', 'class', 'def', etc."""
+    SYNTAX_IDENTIFIER = "syntax_identifier"
+    """Identifiers and references (variables)"""
+    SYNTAX_LITERAL = "syntax_literal"
     """Literal values (strings, numbers, booleans)"""
-    ANNOTATION_METADATA = "annotation_metadata"
-    """Metadata annotations including decorators, attributes, pragmas, and compiler directives. Excludes type annotations and regular comments."""
-    SYNTAX_STRUCTURAL = "syntax_structural"
-    """Structural syntax elements (braces, parentheses, punctuation)"""
+    SYNTAX_ANNOTATION = "syntax_annotation"
+    """Metadata annotations including decorators, attributes, pragmas, and compiler directives. Excludes type annotations and regular comments. More significant decorators (like in Python) will be classified as SYNTAX_KEYWORD"""
+    SYNTAX_PUNCTUATION = "syntax_punctuation"
+    """Punctuation syntax elements (braces, parentheses, punctuation)"""
 
     __slots__ = ()
+
+    @classmethod
+    def from_token_purpose(cls, purpose: TokenPurpose, token_name: str) -> SemanticClass:
+        """Map token purpose to an approximate semantic category."""
+        from codeweaver.semantic._constants import IS_ANNOTATION
+        from codeweaver.semantic.node_type_parser import TokenPurpose
+
+        if (purpose == TokenPurpose.COMMENT and token_name == "line_comment") or (  # noqa: S105
+            purpose == TokenPurpose.KEYWORD and IS_ANNOTATION.match(token_name)
+        ):
+            return cls.SYNTAX_ANNOTATION
+        if (
+            purpose == TokenPurpose.COMMENT
+        ):  # we have to assume anything else is a doc/function/method/class comment
+            # With actual text analysis we can further reduce false positives here
+            return cls.DOCUMENTATION_STRUCTURED
+        return {
+            TokenPurpose.IDENTIFIER: cls.SYNTAX_IDENTIFIER,
+            TokenPurpose.LITERAL: cls.SYNTAX_LITERAL,
+            TokenPurpose.OPERATOR: cls.OPERATION_OPERATOR,
+            TokenPurpose.KEYWORD: cls.SYNTAX_KEYWORD,
+            TokenPurpose.PUNCTUATION: cls.SYNTAX_PUNCTUATION,
+        }[purpose]
 
     @property
     def is_core(self) -> bool:
@@ -303,58 +344,63 @@ class SemanticNodeCategory(str, BaseEnum):
         return None if self.is_core else self.category.language
 
     @property
-    def tier(self) -> SemanticTier:
+    def tier(self) -> ImportanceRank:
         """Get the semantic tier for this category."""
-        return self.tier_map().get(self, SemanticTier.SYNTAX_REFERENCES)
+        return self.tier_map().get(self, ImportanceRank.SYNTAX_REFERENCES)
 
     @classmethod
-    def tier_map(cls) -> MappingProxyType[SemanticNodeCategory, SemanticTier]:
+    def tier_map(cls) -> MappingProxyType[SemanticClass, ImportanceRank]:
         """Get mapping of categories to their semantic tiers."""
         if not hasattr(cls, "_tier_map_cache"):
             cls._tier_map_cache = cls._tier_map()
         return cls._tier_map_cache
 
     @classmethod
-    def _tier_map(cls) -> MappingProxyType[SemanticNodeCategory, SemanticTier]:
+    def _tier_map(cls) -> MappingProxyType[SemanticClass, ImportanceRank]:
         """Get mapping of categories to their semantic tiers."""
         return MappingProxyType({
-            cls.DEFINITION_CALLABLE: SemanticTier.STRUCTURAL_DEFINITIONS,
-            cls.DEFINITION_TYPE: SemanticTier.STRUCTURAL_DEFINITIONS,
-            cls.DEFINITION_DATA: SemanticTier.STRUCTURAL_DEFINITIONS,
-            cls.DEFINITION_TEST: SemanticTier.STRUCTURAL_DEFINITIONS,
-            cls.BOUNDARY_MODULE: SemanticTier.BEHAVIORAL_CONTRACTS,
-            cls.BOUNDARY_ERROR: SemanticTier.BEHAVIORAL_CONTRACTS,
-            cls.BOUNDARY_RESOURCE: SemanticTier.BEHAVIORAL_CONTRACTS,
-            cls.DOCUMENTATION_STRUCTURED: SemanticTier.BEHAVIORAL_CONTRACTS,
-            cls.FLOW_BRANCHING: SemanticTier.CONTROL_FLOW_LOGIC,
-            cls.FLOW_ITERATION: SemanticTier.CONTROL_FLOW_LOGIC,
-            cls.FLOW_CONTROL: SemanticTier.CONTROL_FLOW_LOGIC,
-            cls.FLOW_ASYNC: SemanticTier.CONTROL_FLOW_LOGIC,
-            cls.OPERATION_INVOCATION: SemanticTier.OPERATIONS_EXPRESSIONS,
-            cls.OPERATION_DATA: SemanticTier.OPERATIONS_EXPRESSIONS,
-            cls.OPERATION_COMPUTATION: SemanticTier.OPERATIONS_EXPRESSIONS,
-            cls.EXPRESSION_ANONYMOUS: SemanticTier.OPERATIONS_EXPRESSIONS,
-            cls.REFERENCE_IDENTIFIER: SemanticTier.SYNTAX_REFERENCES,
-            cls.LITERAL_VALUE: SemanticTier.SYNTAX_REFERENCES,
-            cls.ANNOTATION_METADATA: SemanticTier.SYNTAX_REFERENCES,
-            cls.SYNTAX_STRUCTURAL: SemanticTier.SYNTAX_REFERENCES,
+            # Top priority definitions
+            cls.DEFINITION_CALLABLE: ImportanceRank.PRIMARY_DEFINITIONS,
+            cls.DEFINITION_TYPE: ImportanceRank.PRIMARY_DEFINITIONS,
+            cls.DEFINITION_DATA: ImportanceRank.PRIMARY_DEFINITIONS,
+            cls.DEFINITION_TEST: ImportanceRank.PRIMARY_DEFINITIONS,
+            # Behavioral contracts and boundaries (tier 2)
+            cls.BOUNDARY_MODULE: ImportanceRank.BEHAVIORAL_CONTRACTS,
+            cls.BOUNDARY_ERROR: ImportanceRank.BEHAVIORAL_CONTRACTS,
+            cls.BOUNDARY_RESOURCE: ImportanceRank.BEHAVIORAL_CONTRACTS,
+            cls.DOCUMENTATION_STRUCTURED: ImportanceRank.BEHAVIORAL_CONTRACTS,
+            # Control flow and logic (tier 3)
+            cls.FLOW_BRANCHING: ImportanceRank.CONTROL_FLOW_LOGIC,
+            cls.FLOW_ITERATION: ImportanceRank.CONTROL_FLOW_LOGIC,
+            cls.FLOW_CONTROL: ImportanceRank.CONTROL_FLOW_LOGIC,
+            cls.FLOW_ASYNC: ImportanceRank.CONTROL_FLOW_LOGIC,
+            # Operations and expressions (tier 4)
+            cls.OPERATION_INVOCATION: ImportanceRank.OPERATIONS_EXPRESSIONS,
+            cls.OPERATION_DATA: ImportanceRank.OPERATIONS_EXPRESSIONS,
+            cls.OPERATION_OPERATOR: ImportanceRank.OPERATIONS_EXPRESSIONS,
+            cls.EXPRESSION_ANONYMOUS: ImportanceRank.OPERATIONS_EXPRESSIONS,
+            # Syntax and references (tier 5 - lowest priority)
+            cls.SYNTAX_IDENTIFIER: ImportanceRank.SYNTAX_REFERENCES,
+            cls.SYNTAX_LITERAL: ImportanceRank.SYNTAX_REFERENCES,
+            cls.SYNTAX_ANNOTATION: ImportanceRank.SYNTAX_REFERENCES,
+            cls.SYNTAX_PUNCTUATION: ImportanceRank.SYNTAX_REFERENCES,
         })
 
     @classmethod
-    def categories(cls) -> MappingProxyType[SemanticNodeCategory, SemanticCategory]:
+    def categories(cls) -> MappingProxyType[SemanticClass, SemanticCategory]:
         """Get mapping of categories to their SemanticCategory definitions."""
         if not hasattr(cls, "_categories_cache"):
             cls._categories_cache = cls._categories()
         return cls._categories_cache
 
     @classmethod
-    def _categories(cls) -> MappingProxyType[SemanticNodeCategory, SemanticCategory]:
+    def _categories(cls) -> MappingProxyType[SemanticClass, SemanticCategory]:
         """Get mapping of categories to their SemanticCategory definitions."""
         return MappingProxyType({
             cls.DEFINITION_CALLABLE: SemanticCategory(
                 name=cls.DEFINITION_CALLABLE,
                 description="Named function and method definitions with explicit declarations",
-                tier=SemanticTier.STRUCTURAL_DEFINITIONS,
+                tier=ImportanceRank.PRIMARY_DEFINITIONS,
                 importance_scores=ImportanceScores(
                     discovery=0.95,
                     comprehension=0.92,
@@ -372,7 +418,7 @@ class SemanticNodeCategory(str, BaseEnum):
             cls.DEFINITION_TYPE: SemanticCategory(
                 name=cls.DEFINITION_TYPE,
                 description="Type and class definitions including classes, structs, interfaces, traits, generics, and type aliases",
-                tier=SemanticTier.STRUCTURAL_DEFINITIONS,
+                tier=ImportanceRank.PRIMARY_DEFINITIONS,
                 importance_scores=ImportanceScores(
                     discovery=0.95,
                     comprehension=0.92,
@@ -391,7 +437,7 @@ class SemanticNodeCategory(str, BaseEnum):
             cls.DEFINITION_DATA: SemanticCategory(
                 name=cls.DEFINITION_DATA,
                 description="Named data declarations including enums, module-level constants, configuration schemas, and static data structures",
-                tier=SemanticTier.STRUCTURAL_DEFINITIONS,
+                tier=ImportanceRank.PRIMARY_DEFINITIONS,
                 importance_scores=ImportanceScores(
                     discovery=0.85,
                     comprehension=0.88,
@@ -410,7 +456,7 @@ class SemanticNodeCategory(str, BaseEnum):
             cls.DEFINITION_TEST: SemanticCategory(
                 name=cls.DEFINITION_TEST,
                 description="Test function definitions, test case declarations, test suites, and testing framework constructs",
-                tier=SemanticTier.STRUCTURAL_DEFINITIONS,
+                tier=ImportanceRank.PRIMARY_DEFINITIONS,
                 importance_scores=ImportanceScores(
                     discovery=0.88,
                     comprehension=0.90,
@@ -429,7 +475,7 @@ class SemanticNodeCategory(str, BaseEnum):
             cls.BOUNDARY_MODULE: SemanticCategory(
                 name=cls.BOUNDARY_MODULE,
                 description="Module boundary declarations including imports, exports, namespaces, and package specifications",
-                tier=SemanticTier.BEHAVIORAL_CONTRACTS,
+                tier=ImportanceRank.BEHAVIORAL_CONTRACTS,
                 importance_scores=ImportanceScores(
                     discovery=0.85,
                     comprehension=0.80,
@@ -449,7 +495,7 @@ class SemanticNodeCategory(str, BaseEnum):
             cls.BOUNDARY_ERROR: SemanticCategory(
                 name=cls.BOUNDARY_ERROR,
                 description="Error type definitions, exception class declarations, and error boundary specifications",
-                tier=SemanticTier.BEHAVIORAL_CONTRACTS,
+                tier=ImportanceRank.BEHAVIORAL_CONTRACTS,
                 importance_scores=ImportanceScores(
                     discovery=0.70,
                     comprehension=0.85,
@@ -467,7 +513,7 @@ class SemanticNodeCategory(str, BaseEnum):
             cls.BOUNDARY_RESOURCE: SemanticCategory(
                 name=cls.BOUNDARY_RESOURCE,
                 description="Resource acquisition and lifecycle declarations including file handles, database connections, memory allocators, and cleanup specifications",
-                tier=SemanticTier.BEHAVIORAL_CONTRACTS,
+                tier=ImportanceRank.BEHAVIORAL_CONTRACTS,
                 importance_scores=ImportanceScores(
                     discovery=0.65,
                     comprehension=0.80,
@@ -486,7 +532,7 @@ class SemanticNodeCategory(str, BaseEnum):
             cls.DOCUMENTATION_STRUCTURED: SemanticCategory(
                 name=cls.DOCUMENTATION_STRUCTURED,
                 description="Structured documentation with formal syntax including API documentation, docstrings, JSDoc comments, and contract specifications",
-                tier=SemanticTier.BEHAVIORAL_CONTRACTS,
+                tier=ImportanceRank.BEHAVIORAL_CONTRACTS,
                 importance_scores=ImportanceScores(
                     discovery=0.55,
                     comprehension=0.75,
@@ -505,7 +551,7 @@ class SemanticNodeCategory(str, BaseEnum):
             cls.FLOW_BRANCHING: SemanticCategory(
                 name=cls.FLOW_BRANCHING,
                 description="Conditional and pattern-based control flow including if statements, switch expressions, and pattern matching",
-                tier=SemanticTier.CONTROL_FLOW_LOGIC,
+                tier=ImportanceRank.CONTROL_FLOW_LOGIC,
                 importance_scores=ImportanceScores(
                     discovery=0.60,
                     comprehension=0.75,
@@ -524,7 +570,7 @@ class SemanticNodeCategory(str, BaseEnum):
             cls.FLOW_ITERATION: SemanticCategory(
                 name=cls.FLOW_ITERATION,
                 description="Iterative control flow including loops and iteration constructs",
-                tier=SemanticTier.CONTROL_FLOW_LOGIC,
+                tier=ImportanceRank.CONTROL_FLOW_LOGIC,
                 importance_scores=ImportanceScores(
                     discovery=0.50,
                     comprehension=0.70,
@@ -543,7 +589,7 @@ class SemanticNodeCategory(str, BaseEnum):
             cls.FLOW_CONTROL: SemanticCategory(
                 name=cls.FLOW_CONTROL,
                 description="Explicit control flow statements including return, break, continue, and goto statements",
-                tier=SemanticTier.CONTROL_FLOW_LOGIC,
+                tier=ImportanceRank.CONTROL_FLOW_LOGIC,
                 importance_scores=ImportanceScores(
                     discovery=0.45,
                     comprehension=0.65,
@@ -562,7 +608,7 @@ class SemanticNodeCategory(str, BaseEnum):
             cls.FLOW_ASYNC: SemanticCategory(
                 name=cls.FLOW_ASYNC,
                 description="Asynchronous control flow including async/await expressions, futures, promises, and coroutine constructs",
-                tier=SemanticTier.CONTROL_FLOW_LOGIC,
+                tier=ImportanceRank.CONTROL_FLOW_LOGIC,
                 importance_scores=ImportanceScores(
                     discovery=0.65,
                     comprehension=0.80,
@@ -581,7 +627,7 @@ class SemanticNodeCategory(str, BaseEnum):
             cls.OPERATION_INVOCATION: SemanticCategory(
                 name=cls.OPERATION_INVOCATION,
                 description="Function and method invocations including calls, constructor invocations, and operator calls",
-                tier=SemanticTier.OPERATIONS_EXPRESSIONS,
+                tier=ImportanceRank.OPERATIONS_EXPRESSIONS,
                 importance_scores=ImportanceScores(
                     discovery=0.45,
                     comprehension=0.65,
@@ -600,7 +646,7 @@ class SemanticNodeCategory(str, BaseEnum):
             cls.OPERATION_DATA: SemanticCategory(
                 name=cls.OPERATION_DATA,
                 description="Variable assignments, property access, field modifications, and data structure operations",
-                tier=SemanticTier.OPERATIONS_EXPRESSIONS,
+                tier=ImportanceRank.OPERATIONS_EXPRESSIONS,
                 importance_scores=ImportanceScores(
                     discovery=0.35,
                     comprehension=0.55,
@@ -616,10 +662,10 @@ class SemanticNodeCategory(str, BaseEnum):
                     "destructuring assignments",
                 ),
             ),
-            cls.OPERATION_COMPUTATION: SemanticCategory(
-                name=cls.OPERATION_COMPUTATION,
+            cls.OPERATION_OPERATOR: SemanticCategory(
+                name=cls.OPERATION_OPERATOR,
                 description="Mathematical and logical computation operations including arithmetic, comparisons, and boolean logic",
-                tier=SemanticTier.OPERATIONS_EXPRESSIONS,
+                tier=ImportanceRank.OPERATIONS_EXPRESSIONS,
                 importance_scores=ImportanceScores(
                     discovery=0.25,
                     comprehension=0.45,
@@ -638,7 +684,7 @@ class SemanticNodeCategory(str, BaseEnum):
             cls.EXPRESSION_ANONYMOUS: SemanticCategory(
                 name=cls.EXPRESSION_ANONYMOUS,
                 description="Anonymous function expressions including lambdas, closures, arrow functions, and inline function literals",
-                tier=SemanticTier.OPERATIONS_EXPRESSIONS,
+                tier=ImportanceRank.OPERATIONS_EXPRESSIONS,
                 importance_scores=ImportanceScores(
                     discovery=0.40,
                     comprehension=0.65,
@@ -654,10 +700,10 @@ class SemanticNodeCategory(str, BaseEnum):
                     "function expressions",
                 ),
             ),
-            cls.REFERENCE_IDENTIFIER: SemanticCategory(
-                name=cls.REFERENCE_IDENTIFIER,
+            cls.SYNTAX_IDENTIFIER: SemanticCategory(
+                name=cls.SYNTAX_IDENTIFIER,
                 description="Variable names, type names, and symbol references excluding literals and operators",
-                tier=SemanticTier.SYNTAX_REFERENCES,
+                tier=ImportanceRank.SYNTAX_REFERENCES,
                 importance_scores=ImportanceScores(
                     discovery=0.25,
                     comprehension=0.40,
@@ -673,10 +719,10 @@ class SemanticNodeCategory(str, BaseEnum):
                     "symbol identifiers",
                 ),
             ),
-            cls.LITERAL_VALUE: SemanticCategory(
-                name=cls.LITERAL_VALUE,
+            cls.SYNTAX_LITERAL: SemanticCategory(
+                name=cls.SYNTAX_LITERAL,
                 description="Literal constant values including strings, numbers, booleans, and null values",
-                tier=SemanticTier.SYNTAX_REFERENCES,
+                tier=ImportanceRank.SYNTAX_REFERENCES,
                 importance_scores=ImportanceScores(
                     discovery=0.15,
                     comprehension=0.20,
@@ -692,10 +738,10 @@ class SemanticNodeCategory(str, BaseEnum):
                     "character literals ('a')",
                 ),
             ),
-            cls.ANNOTATION_METADATA: SemanticCategory(
-                name=cls.ANNOTATION_METADATA,
+            cls.SYNTAX_ANNOTATION: SemanticCategory(
+                name=cls.SYNTAX_ANNOTATION,
                 description="Metadata annotations including decorators, attributes, pragmas, and compiler directives",
-                tier=SemanticTier.SYNTAX_REFERENCES,
+                tier=ImportanceRank.SYNTAX_REFERENCES,
                 importance_scores=ImportanceScores(
                     discovery=0.35,
                     comprehension=0.45,
@@ -711,10 +757,10 @@ class SemanticNodeCategory(str, BaseEnum):
                     "compiler pragmas (#pragma)",
                 ),
             ),
-            cls.SYNTAX_STRUCTURAL: SemanticCategory(
-                name=cls.SYNTAX_STRUCTURAL,
+            cls.SYNTAX_PUNCTUATION: SemanticCategory(
+                name=cls.SYNTAX_PUNCTUATION,
                 description="Structural syntax elements including braces, parentheses, delimiters, and punctuation marks",
-                tier=SemanticTier.SYNTAX_REFERENCES,
+                tier=ImportanceRank.SYNTAX_REFERENCES,
                 importance_scores=ImportanceScores(
                     discovery=0.01,
                     comprehension=0.02,
@@ -755,7 +801,7 @@ class SemanticNodeCategory(str, BaseEnum):
         cls,
         language: SemanticSearchLanguage | str,
         category: SemanticCategory | SemanticCategoryDict,
-    ) -> SemanticNodeCategory:
+    ) -> SemanticClass:
         """Add a new language-specific semantic category."""
         if not isinstance(language, SemanticSearchLanguage):
             language = SemanticSearchLanguage.from_string(language)
@@ -881,14 +927,14 @@ def _validate_categories(
             value.args[1],
             MappingProxyType(
                 nxt(
-                    dict(value.args[2])
+                    dict(value.args[2])  # type: ignore
                     if isinstance(value.args[2], MappingProxyType)
                     else value.args[2]
                 )
             ),
         )  # type: ignore
     if isinstance(value, MappingProxyType) and all(
-        isinstance(k, SemanticNodeCategory) and isinstance(v, SemanticCategory)
+        isinstance(k, SemanticClass) and isinstance(v, SemanticCategory)
         for k, v in value.items()  # type: ignore
         if k and v  # type: ignore
     ):
@@ -905,13 +951,13 @@ class CategoryRegistry(DataclassSerializationMixin):
     """Registry for core and language-specific semantic categories."""
 
     _extensions: Annotated[
-        dict[SemanticSearchLanguage, dict[SemanticNodeCategory, SemanticCategory]],
+        dict[SemanticSearchLanguage, dict[SemanticClass, SemanticCategory]],
         Field(
             default_factory=dict, description="Language-specific category extensions", init=False
         ),
     ]
     _mappings: Annotated[
-        dict[SemanticSearchLanguage, dict[str, SemanticNodeCategory]],
+        dict[SemanticSearchLanguage, dict[str, SemanticClass]],
         Field(
             default_factory=dict,
             description="Language-specific mappings from node types to categories",
@@ -920,9 +966,9 @@ class CategoryRegistry(DataclassSerializationMixin):
     ]
 
     _core_categories: Annotated[
-        MappingProxyType[SemanticNodeCategory, SemanticCategory],
+        MappingProxyType[SemanticClass, SemanticCategory],
         Field(
-            default_factory=SemanticNodeCategory.categories,
+            default_factory=SemanticClass.categories,
             description="Core semantic categories",
             init=False,
         ),
@@ -930,16 +976,14 @@ class CategoryRegistry(DataclassSerializationMixin):
 
     def __post_init__(self) -> None:
         """Setup the category registry."""
-        self._extensions: dict[
-            SemanticSearchLanguage, dict[SemanticNodeCategory, SemanticCategory]
-        ] = {}
+        self._extensions: dict[SemanticSearchLanguage, dict[SemanticClass, SemanticCategory]] = {}
         self._mappings: dict[
-            SemanticSearchLanguage, dict[str, SemanticNodeCategory]
+            SemanticSearchLanguage, dict[str, SemanticClass]
         ] = {}  # language -> {node_type -> category}
 
     def register_core(
         self, category: SemanticCategory | SemanticCategoryDict
-    ) -> MappingProxyType[SemanticNodeCategory, SemanticCategory]:
+    ) -> MappingProxyType[SemanticClass, SemanticCategory]:
         """Register a new core category."""
         if isinstance(category, dict):
             if category.get("language_specific", False):
@@ -947,14 +991,12 @@ class CategoryRegistry(DataclassSerializationMixin):
             if category.get("language") is not None:
                 raise ValueError("Core categories cannot have a specific language.")
             category = SemanticCategory.model_validate(category)
-        if not isinstance(category.name, SemanticNodeCategory):  # type: ignore
-            node = SemanticNodeCategory.add_member(
-                category.name.upper(), textcase.snake(category.name)
-            )
+        if not isinstance(category.name, SemanticClass):  # type: ignore
+            node = SemanticClass.add_member(category.name.upper(), textcase.snake(category.name))
             category = category.model_copy(update={"name": node})
-            SemanticNodeCategory._update_categories(category)  # pyright: ignore[reportPrivateUsage]
-            SemanticNodeCategory._update_tier_map(category)  # pyright: ignore[reportPrivateUsage]
-        self._core_categories = SemanticNodeCategory.categories()
+            SemanticClass._update_categories(category)  # pyright: ignore[reportPrivateUsage]
+            SemanticClass._update_tier_map(category)  # pyright: ignore[reportPrivateUsage]
+        self._core_categories = SemanticClass.categories()
         return self._core_categories
 
     def register_extension(
@@ -977,7 +1019,7 @@ class CategoryRegistry(DataclassSerializationMixin):
         self._extensions[language][category.name] = category
 
     def register_mapping(
-        self, language: SemanticSearchLanguage, node_type: str, category_name: SemanticNodeCategory
+        self, language: SemanticSearchLanguage, node_type: str, category_name: SemanticClass
     ) -> None:
         """Register mapping from tree-sitter node type to semantic category."""
         if language not in self._mappings:
@@ -986,14 +1028,14 @@ class CategoryRegistry(DataclassSerializationMixin):
 
     def get_category(
         self,
-        category_name: str | SemanticNodeCategory,
+        category_name: str | SemanticClass,
         language: SemanticSearchLanguage | str | None = None,
     ) -> SemanticCategory | None:
         """Get category by name, checking language extensions first."""
         if not isinstance(language, SemanticSearchLanguage) and language is not None:
             language = SemanticSearchLanguage.from_string(language)
-        if not isinstance(category_name, SemanticNodeCategory):
-            category_name = SemanticNodeCategory.from_string(category_name)
+        if not isinstance(category_name, SemanticClass):
+            category_name = SemanticClass.from_string(category_name)
         if (
             language
             and language in self._extensions
@@ -1022,11 +1064,11 @@ class CategoryRegistry(DataclassSerializationMixin):
 
         # Function/method patterns
         if any(pattern in node_lower for pattern in {"function", "method", "procedure", "def"}):
-            return self._core_categories[SemanticNodeCategory.DEFINITION_CALLABLE]
+            return self._core_categories[SemanticClass.DEFINITION_CALLABLE]
 
         # Class/type patterns
         if any(pattern in node_lower for pattern in {"class", "struct", "interface", "type"}):
-            return self._core_categories[SemanticNodeCategory.DEFINITION_TYPE]
+            return self._core_categories[SemanticClass.DEFINITION_TYPE]
 
         # Control flow patterns
         if any(
@@ -1043,15 +1085,15 @@ class CategoryRegistry(DataclassSerializationMixin):
                 "guard",
             }
         ):
-            return self._core_categories[SemanticNodeCategory.FLOW_BRANCHING]
+            return self._core_categories[SemanticClass.FLOW_BRANCHING]
 
         # Loop patterns
         if any(pattern in node_lower for pattern in {"for", "while", "loop", "repeat"}):
-            return self._core_categories[SemanticNodeCategory.FLOW_ITERATION]
+            return self._core_categories[SemanticClass.FLOW_ITERATION]
 
         # Import/export patterns
         if any(pattern in node_lower for pattern in {"import", "export", "require", "use"}):
-            return self._core_categories[SemanticNodeCategory.BOUNDARY_MODULE]
+            return self._core_categories[SemanticClass.BOUNDARY_MODULE]
 
         # Default to unknown
         return None
@@ -1079,11 +1121,11 @@ class CategoryRegistry(DataclassSerializationMixin):
         "_core_categories",
         mode="plain",
         when_used="json",
-        return_type=dict[SemanticNodeCategory, SemanticCategory],
+        return_type=dict[SemanticClass, SemanticCategory],
     )
     def _serialize_core_categories(
         self,
-        value: MappingProxyType[SemanticNodeCategory, SemanticCategory],
+        value: MappingProxyType[SemanticClass, SemanticCategory],
         _info: FieldSerializationInfo,
     ) -> str:
         """Serialize core categories for JSON output."""
@@ -1099,7 +1141,7 @@ class CategoryRegistry(DataclassSerializationMixin):
 class CoverageReport(DataclassSerializationMixin):
     """Report on coverage of semantic categories."""
 
-    covered_categories: Sequence[SemanticNodeCategory]
+    covered_categories: Sequence[SemanticClass]
     language: SemanticSearchLanguage
 
     @computed_field
@@ -1110,13 +1152,11 @@ class CoverageReport(DataclassSerializationMixin):
 
     @computed_field
     @cached_property
-    def possible_categories(self) -> tuple[SemanticNodeCategory, ...]:
+    def possible_categories(self) -> tuple[SemanticClass, ...]:
         """Get a list of all possible categories for the language."""
-        cores = [cat for cat in SemanticNodeCategory if cat.is_core]
+        cores = [cat for cat in SemanticClass if cat.is_core]
         cores.extend([
-            cat
-            for cat in SemanticNodeCategory
-            if cat.is_extension and cat.for_language == self.language
+            cat for cat in SemanticClass if cat.is_extension and cat.for_language == self.language
         ])
         return tuple(cores)
 
@@ -1136,7 +1176,7 @@ class CoverageReport(DataclassSerializationMixin):
 
     @computed_field
     @cached_property
-    def uncovered_categories(self) -> tuple[SemanticNodeCategory, ...]:
+    def uncovered_categories(self) -> tuple[SemanticClass, ...]:
         """Get a list of uncovered categories."""
         return tuple(cat for cat in self.possible_categories if cat not in self.covered_categories)
 
@@ -1145,7 +1185,7 @@ class CoverageReport(DataclassSerializationMixin):
 class UsageMetrics(DataclassSerializationMixin):
     """Metrics on real-world usage of semantic categories."""
 
-    category_usage_counts: Counter[SemanticNodeCategory]
+    category_usage_counts: Counter[SemanticClass]
 
     @computed_field
     @property
@@ -1155,7 +1195,7 @@ class UsageMetrics(DataclassSerializationMixin):
 
     @computed_field
     @property
-    def usage_frequencies(self) -> dict[SemanticNodeCategory, NonNegativeFloat]:
+    def usage_frequencies(self) -> dict[SemanticClass, NonNegativeFloat]:
         """Calculate usage frequency for each category."""
         if self.total_use == 0:
             return dict.fromkeys(self.category_usage_counts, 0.0)
@@ -1164,7 +1204,7 @@ class UsageMetrics(DataclassSerializationMixin):
             for cat, count in self.category_usage_counts.items()
         }
 
-    def add_uses(self, categories: Sequence[SemanticNodeCategory]) -> None:
+    def add_uses(self, categories: Sequence[SemanticClass]) -> None:
         """Add usage counts for a list of categories."""
         self.category_usage_counts.update(categories)
 
@@ -1196,7 +1236,7 @@ class ScoreValidation(DataclassSerializationMixin):
 
     @computed_field
     @property
-    def discrepancies(self) -> dict[SemanticNodeCategory, float]:
+    def discrepancies(self) -> dict[SemanticClass, float]:
         """Identify categories with significant discrepancies."""
         # Placeholder for actual discrepancy identification
         return {}
@@ -1237,12 +1277,12 @@ class CategoryValidationSuite:
 # =============================================================================
 
 # Example: Rust-specific extensions
-RUST_DEFINITION_TRAIT_IMPL = SemanticNodeCategory.add_language_member(
+RUST_DEFINITION_TRAIT_IMPL = SemanticClass.add_language_member(
     SemanticSearchLanguage.RUST,
     SemanticCategoryDict(
         name="RUST_DEFINITION_TRAIT_IMPL",
         description="Rust trait implementations",
-        tier=SemanticTier.STRUCTURAL_DEFINITIONS,
+        tier=ImportanceRank.PRIMARY_DEFINITIONS,
         parent_category="DEFINITION_TYPE",
         language_specific=True,
         language=SemanticSearchLanguage.RUST,
@@ -1257,12 +1297,12 @@ RUST_DEFINITION_TRAIT_IMPL = SemanticNodeCategory.add_language_member(
     ),
 )
 
-RUST_ANNOTATION_LIFETIME = SemanticNodeCategory.add_language_member(
+RUST_ANNOTATION_LIFETIME = SemanticClass.add_language_member(
     SemanticSearchLanguage.RUST,
     SemanticCategoryDict(
         name="RUST_ANNOTATION_LIFETIME",
         description="Rust lifetime annotations",
-        tier=SemanticTier.STRUCTURAL_DEFINITIONS,
+        tier=ImportanceRank.PRIMARY_DEFINITIONS,
         parent_category="DEFINITION_TYPE",
         language_specific=True,
         language=SemanticSearchLanguage.RUST,
@@ -1282,12 +1322,12 @@ RUST_EXTENSIONS = {
     RUST_ANNOTATION_LIFETIME.name: RUST_ANNOTATION_LIFETIME,
 }
 
-REACT_DEFINITION_COMPONENT = SemanticNodeCategory.add_language_member(
+REACT_DEFINITION_COMPONENT = SemanticClass.add_language_member(
     SemanticSearchLanguage.JSX,
     SemanticCategoryDict(
         name="REACT_DEFINITION_COMPONENT",
         description="React component definitions",
-        tier=SemanticTier.STRUCTURAL_DEFINITIONS,
+        tier=ImportanceRank.PRIMARY_DEFINITIONS,
         parent_category="DEFINITION_CALLABLE",
         language_specific=True,
         language=SemanticSearchLanguage.JSX,
@@ -1302,12 +1342,12 @@ REACT_DEFINITION_COMPONENT = SemanticNodeCategory.add_language_member(
     ),
 )
 
-REACT_OPERATION_HOOK = SemanticNodeCategory.add_language_member(
+REACT_OPERATION_HOOK = SemanticClass.add_language_member(
     SemanticSearchLanguage.JSX,
     SemanticCategoryDict(
         name="REACT_OPERATION_HOOK",
         description="React hook usage",
-        tier=SemanticTier.OPERATIONS_EXPRESSIONS,
+        tier=ImportanceRank.OPERATIONS_EXPRESSIONS,
         parent_category="OPERATION_INVOCATION",
         language_specific=True,
         language=SemanticSearchLanguage.JSX,
@@ -1328,13 +1368,13 @@ REACT_EXTENSIONS = {
 }
 
 TSX_REACT = [
-    SemanticNodeCategory.add_language_member(
+    SemanticClass.add_language_member(
         SemanticSearchLanguage.TSX,
         REACT_DEFINITION_COMPONENT.category.model_copy(
             update={"language": SemanticSearchLanguage.TSX}
         ),
     ),
-    SemanticNodeCategory.add_language_member(
+    SemanticClass.add_language_member(
         SemanticSearchLanguage.TSX,
         REACT_OPERATION_HOOK.category.model_copy(update={"language": SemanticSearchLanguage.TSX}),
     ),
@@ -1349,7 +1389,7 @@ TSX_REACT_EXTENSIONS = {cat.name: cat for cat in TSX_REACT}
 
 def create_default_registry() -> CategoryRegistry:
     """Create a CategoryRegistry with all core categories registered."""
-    registry = CategoryRegistry({}, {}, SemanticNodeCategory.categories())
+    registry = CategoryRegistry({}, {}, SemanticClass.categories())
 
     # Core categories are in the class definition
 

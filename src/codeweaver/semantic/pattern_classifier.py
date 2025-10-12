@@ -18,7 +18,7 @@ from dataclasses import dataclass
 
 from codeweaver._common import BaseEnum, DataclassSerializationMixin
 from codeweaver.language import SemanticSearchLanguage
-from codeweaver.semantic.categories import SemanticNodeCategory, SemanticTier
+from codeweaver.semantic.categories import ImportanceRank, SemanticClass
 from codeweaver.semantic.patterns import get_compiled_patterns, match_tier_patterns_cached
 from codeweaver.semantic.syntactic import SyntacticClassifier
 
@@ -39,13 +39,13 @@ class ClassificationPhase(BaseEnum):
 class ClassificationResult(DataclassSerializationMixin):
     """Result of semantic node classification."""
 
-    category: SemanticNodeCategory
+    category: SemanticClass
     confidence: float
     phase: ClassificationPhase
-    tier: SemanticTier
+    tier: ImportanceRank
     node: str | None = None
     matched_pattern: str | None = None
-    alternative_categories: list[SemanticNodeCategory] | None = None
+    alternative_categories: list[SemanticClass] | None = None
 
     @property
     def is_high_confidence(self) -> bool:
@@ -114,7 +114,7 @@ class PatternBasedClassifier:
     ) -> ClassificationResult | None:
         """Phase 2: Tier-based classification using semantic patterns."""
         # Try each tier from highest to lowest priority
-        for tier in SemanticTier:
+        for tier in ImportanceRank:
             tier_categories = self._get_categories_for_tier(tier)
 
             for category in tier_categories:
@@ -137,7 +137,7 @@ class PatternBasedClassifier:
     def _apply_language_confidence_boost(
         self,
         base_confidence: float,
-        category: SemanticNodeCategory,
+        category: SemanticClass,
         language: SemanticSearchLanguage,
         node_type: str,
     ) -> float:
@@ -145,35 +145,35 @@ class PatternBasedClassifier:
         # Language-specific node type patterns that increase confidence
         language_specific_boosts = {
             SemanticSearchLanguage.PYTHON: {
-                "def": (SemanticNodeCategory.DEFINITION_CALLABLE, 0.15),
-                "class": (SemanticNodeCategory.DEFINITION_TYPE, 0.15),
-                "import": (SemanticNodeCategory.BOUNDARY_MODULE, 0.2),
-                "lambda": (SemanticNodeCategory.EXPRESSION_ANONYMOUS, 0.1),
-                "type": (SemanticNodeCategory.DEFINITION_TYPE, 0.1),
+                "def": (SemanticClass.DEFINITION_CALLABLE, 0.15),
+                "class": (SemanticClass.DEFINITION_TYPE, 0.15),
+                "import": (SemanticClass.BOUNDARY_MODULE, 0.2),
+                "lambda": (SemanticClass.EXPRESSION_ANONYMOUS, 0.1),
+                "type": (SemanticClass.DEFINITION_TYPE, 0.1),
             },
             SemanticSearchLanguage.JAVASCRIPT: {
-                "function": (SemanticNodeCategory.DEFINITION_CALLABLE, 0.15),
-                "class": (SemanticNodeCategory.DEFINITION_TYPE, 0.15),
-                "import": (SemanticNodeCategory.BOUNDARY_MODULE, 0.2),
-                "arrow_function": (SemanticNodeCategory.EXPRESSION_ANONYMOUS, 0.1),
+                "function": (SemanticClass.DEFINITION_CALLABLE, 0.15),
+                "class": (SemanticClass.DEFINITION_TYPE, 0.15),
+                "import": (SemanticClass.BOUNDARY_MODULE, 0.2),
+                "arrow_function": (SemanticClass.EXPRESSION_ANONYMOUS, 0.1),
             },
             SemanticSearchLanguage.TYPESCRIPT: {
-                "interface": (SemanticNodeCategory.DOCUMENTATION_STRUCTURED, 0.2),
-                "type_alias": (SemanticNodeCategory.DEFINITION_TYPE, 0.15),
-                "enum": (SemanticNodeCategory.DEFINITION_TYPE, 0.15),
+                "interface": (SemanticClass.DOCUMENTATION_STRUCTURED, 0.2),
+                "type_alias": (SemanticClass.DEFINITION_TYPE, 0.15),
+                "enum": (SemanticClass.DEFINITION_TYPE, 0.15),
             },
             SemanticSearchLanguage.RUST: {
-                "fn": (SemanticNodeCategory.DEFINITION_CALLABLE, 0.15),
-                "struct": (SemanticNodeCategory.DEFINITION_TYPE, 0.15),
-                "enum": (SemanticNodeCategory.DEFINITION_TYPE, 0.15),
-                "trait": (SemanticNodeCategory.DOCUMENTATION_STRUCTURED, 0.2),
-                "mod": (SemanticNodeCategory.BOUNDARY_MODULE, 0.2),
+                "fn": (SemanticClass.DEFINITION_CALLABLE, 0.15),
+                "struct": (SemanticClass.DEFINITION_TYPE, 0.15),
+                "enum": (SemanticClass.DEFINITION_TYPE, 0.15),
+                "trait": (SemanticClass.DOCUMENTATION_STRUCTURED, 0.2),
+                "mod": (SemanticClass.BOUNDARY_MODULE, 0.2),
             },
             SemanticSearchLanguage.GO: {
-                "func": (SemanticNodeCategory.DEFINITION_CALLABLE, 0.15),
-                "type": (SemanticNodeCategory.DEFINITION_TYPE, 0.15),
-                "interface": (SemanticNodeCategory.DOCUMENTATION_STRUCTURED, 0.2),
-                "package": (SemanticNodeCategory.BOUNDARY_MODULE, 0.2),
+                "func": (SemanticClass.DEFINITION_CALLABLE, 0.15),
+                "type": (SemanticClass.DEFINITION_TYPE, 0.15),
+                "interface": (SemanticClass.DOCUMENTATION_STRUCTURED, 0.2),
+                "package": (SemanticClass.BOUNDARY_MODULE, 0.2),
             },
         }
 
@@ -225,10 +225,10 @@ class PatternBasedClassifier:
         # Check for common identifier patterns
         if node_lower in {"identifier", "name", "id"}:
             return ClassificationResult(
-                category=SemanticNodeCategory.REFERENCE_IDENTIFIER,
+                category=SemanticClass.SYNTAX_IDENTIFIER,
                 confidence=0.85,
                 phase=ClassificationPhase.PATTERN_MATCH,
-                tier=SemanticTier.SYNTAX_REFERENCES,
+                tier=ImportanceRank.SYNTAX_REFERENCES,
                 matched_pattern=f"identifier_heuristic:{node_type}",
             )
 
@@ -264,39 +264,39 @@ class PatternBasedClassifier:
 
     def _classify_statement_with_context(
         self, node_lower: str, context_hints: dict[str, bool]
-    ) -> SemanticNodeCategory:
+    ) -> SemanticClass:
         """Classify statement nodes using context hints."""
         # Use context to make more informed decisions
         if context_hints.get("has_control_flow", False):
-            return SemanticNodeCategory.FLOW_BRANCHING
+            return SemanticClass.FLOW_BRANCHING
         if context_hints.get("has_error_handling", False):
-            return SemanticNodeCategory.BOUNDARY_ERROR
+            return SemanticClass.BOUNDARY_ERROR
         if context_hints.get("has_assignment", False):
-            return SemanticNodeCategory.OPERATION_DATA
-        return SemanticNodeCategory.FLOW_CONTROL
+            return SemanticClass.OPERATION_DATA
+        return SemanticClass.FLOW_CONTROL
 
     def _classify_expression_with_context(
         self, node_lower: str, context_hints: dict[str, bool]
-    ) -> SemanticNodeCategory:
+    ) -> SemanticClass:
         """Classify expression nodes using context hints."""
         # Use context to make more informed decisions
         if context_hints.get("has_arithmetic", False) or context_hints.get("has_comparison", False):
-            return SemanticNodeCategory.OPERATION_COMPUTATION
+            return SemanticClass.OPERATION_OPERATOR
         if context_hints.get("has_assignment", False):
-            return SemanticNodeCategory.OPERATION_DATA
+            return SemanticClass.OPERATION_DATA
         if context_hints.get("has_function_def", False):
-            return SemanticNodeCategory.EXPRESSION_ANONYMOUS
-        return SemanticNodeCategory.OPERATION_COMPUTATION
+            return SemanticClass.EXPRESSION_ANONYMOUS
+        return SemanticClass.OPERATION_OPERATOR
 
     def _classify_fallback_phase(self, node_type: str) -> ClassificationResult:
         """Phase 4: Final fallback classification."""
         # Default to most generic category based on simple heuristics
         if any(char.isalpha() for char in node_type):
             # Has letters, likely some form of identifier or reference
-            fallback_category = SemanticNodeCategory.REFERENCE_IDENTIFIER
+            fallback_category = SemanticClass.SYNTAX_IDENTIFIER
         else:
             # No letters, likely punctuation
-            fallback_category = SemanticNodeCategory.SYNTAX_STRUCTURAL
+            fallback_category = SemanticClass.SYNTAX_PUNCTUATION
 
         return ClassificationResult(
             category=fallback_category,
@@ -306,7 +306,7 @@ class PatternBasedClassifier:
             matched_pattern=f"fallback:{node_type}",
         )
 
-    def _get_categories_for_tier(self, tier: SemanticTier) -> tuple[SemanticNodeCategory, ...]:
+    def _get_categories_for_tier(self, tier: ImportanceRank) -> tuple[SemanticClass, ...]:
         """Get all categories belonging to a specific tier."""
         return tier.semantic_categories
 
@@ -332,7 +332,7 @@ class PatternBasedClassifier:
         # This could be expanded to try multiple patterns/tiers
         if primary.confidence < 0.8:  # Only look for alternatives if not highly confident
             # Try each category directly and see if any patterns match
-            for category in SemanticNodeCategory:
+            for category in SemanticClass:
                 if category == primary.category:
                     continue
                 if result := match_tier_patterns_cached(node_type, category):

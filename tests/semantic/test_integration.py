@@ -70,11 +70,14 @@ class TestFullPipelineFlow:
         assert result.tier == SemanticTier.STRUCTURAL_DEFINITIONS
         assert result.confidence > 0
 
-    @pytest.mark.parametrize("node_type,expected_category", [
-        ("function_definition", SemanticNodeCategory.DEFINITION_CALLABLE),
-        ("class_definition", SemanticNodeCategory.DEFINITION_TYPE),
-        ("if_statement", SemanticNodeCategory.CONTROL_FLOW_CONDITIONAL),
-    ])
+    @pytest.mark.parametrize(
+        "node_type,expected_category",
+        [
+            ("function_definition", SemanticNodeCategory.DEFINITION_CALLABLE),
+            ("class_definition", SemanticNodeCategory.DEFINITION_TYPE),
+            ("if_statement", SemanticNodeCategory.CONTROL_FLOW_CONDITIONAL),
+        ],
+    )
     def test_common_nodes_classified_correctly(self, classifier, node_type, expected_category):
         """Test that common nodes are classified correctly."""
         result = classifier.classify_node(node_type, "python")
@@ -86,12 +89,7 @@ class TestFullPipelineFlow:
 class TestMultiLanguageIntegration:
     """Tests for multi-language classification integration."""
 
-    @pytest.mark.parametrize("language", [
-        "python",
-        "javascript",
-        "rust",
-        "java",
-    ])
+    @pytest.mark.parametrize("language", ["python", "javascript", "rust", "java"])
     def test_grammar_classification_across_languages(self, classifier, language):
         """Test that grammar-based classification works across languages."""
         # Different node type names per language
@@ -216,11 +214,7 @@ class TestQualityAnalysis:
 
     def test_language_coverage_validation(self, classifier):
         """Test language coverage validation."""
-        sample_nodes = [
-            "function_definition",
-            "class_definition",
-            "if_statement",
-        ]
+        sample_nodes = ["function_definition", "class_definition", "if_statement"]
 
         coverage = classifier.validate_language_coverage("python", sample_nodes)
 

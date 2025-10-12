@@ -16,14 +16,14 @@ from pathlib import Path
 from typing import cast
 
 from codeweaver.language import SemanticSearchLanguage
-from codeweaver.semantic.categories import SemanticNodeCategory
+from codeweaver.semantic.categories import SemanticClass
 from codeweaver.semantic.mapper import NodeMapper, get_node_mapper
 from codeweaver.semantic.node_type_parser import LanguageNodeType, NodeTypeInfo, NodeTypeParser
 
 
 type ProjectNodeTypes = Sequence[dict[SemanticSearchLanguage, Sequence[LanguageNodeType]]]
 type PatternLanguages = dict[str, list[SemanticSearchLanguage]]
-type ConfidenceRow = tuple[str, SemanticNodeCategory, float, int]
+type ConfidenceRow = tuple[str, SemanticClass, float, int]
 
 
 def locate_node_types() -> Path:
@@ -84,9 +84,9 @@ def print_confidence_rows(title: str, rows: Iterable[ConfidenceRow], limit: int 
         for r in rows
         if r[1]
         not in (
-            SemanticNodeCategory.SYNTAX_STRUCTURAL,
-            SemanticNodeCategory.ANNOTATION_METADATA,
-            SemanticNodeCategory.OPERATION_INVOCATION,
+            SemanticClass.SYNTAX_PUNCTUATION,
+            SemanticClass.SYNTAX_ANNOTATION,
+            SemanticClass.OPERATION_INVOCATION,
         )
     ]
     print(f"\n{title} ({len(rows)}):")
@@ -159,7 +159,7 @@ def compute_statistics(
     total_node_types = len(parser.get_all_node_types())
     print(f"Total unique node types across all languages: {total_node_types}")
 
-    distribution: dict[SemanticNodeCategory, int] = {}
+    distribution: dict[SemanticClass, int] = {}
     for pattern, languages in common_patterns.items():
         for language in languages:
             cat = mapper.classify_node_type(pattern, language)
@@ -177,7 +177,7 @@ def suggest_overrides(
     print("\n=== Suggested Manual Overrides ===")
     print("The following node types have low classification confidence and may need manual review:")
 
-    overrides_by_language: dict[str, dict[str, SemanticNodeCategory]] = {}
+    overrides_by_language: dict[str, dict[str, SemanticClass]] = {}
     nodes = down_to_node_types(node_types)
     for lang_name, node_type in nodes.items():
         node_type_names = getattr(node_type, "node_type", {}).keys()
@@ -192,7 +192,7 @@ def suggest_overrides(
             continue
         print(f"\n{lang_name}:")
         for node_type, category in list(overrides.items())[:top_n]:
-            print(f"  '{node_type}': SemanticNodeCategory.{category.name}")
+            print(f"  '{node_type}': SemanticClass.{category.name}")
 
 
 def analyze_node_types_and_generate_mappings() -> None:

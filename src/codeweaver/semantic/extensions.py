@@ -20,7 +20,7 @@ from codeweaver.semantic.categories import (
     CategoryRegistry,
     ImportanceScoresDict,
     SemanticCategoryDict,
-    SemanticNodeCategory,
+    SemanticClass,
     create_default_registry,
 )
 from codeweaver.semantic.pattern_classifier import ClassificationPhase, ClassificationResult
@@ -34,7 +34,7 @@ class LanguagePattern(NamedTuple):
     """Pattern for specialized language classification."""
 
     pattern: re.Pattern[str]
-    category: SemanticNodeCategory
+    category: SemanticClass
     group_name: Annotated[str, Field(max_length=50)]
 
 
@@ -42,7 +42,7 @@ class LanguagePattern(NamedTuple):
 class ExtensionResult(DataclassSerializationMixin):
     """Result from language extension classification."""
 
-    category: SemanticNodeCategory
+    category: SemanticClass
     confidence: NonNegativeFloat
     source: Literal["registry_mapping", "specialized_pattern", "heuristic"]
     matched_pattern: str | None = None
@@ -50,7 +50,7 @@ class ExtensionResult(DataclassSerializationMixin):
 
 def _check_registry_mapping_cached(
     node_type: str, language_name: SemanticSearchLanguage | str, registry: CategoryRegistry
-) -> tuple[SemanticNodeCategory | None, float, str | None]:
+) -> tuple[SemanticClass | None, float, str | None]:
     """Registry mapping check - caching moved to instance level to avoid unhashable issues."""
     if not isinstance(language_name, SemanticSearchLanguage):
         language_name = SemanticSearchLanguage.from_string(language_name)
@@ -74,9 +74,7 @@ class LanguageExtensionManager:
             type(self).special_patterns = self._compile_specialized_patterns()
         self.specialized_patterns = type(self).special_patterns
         # Instance-level cache to avoid unhashable registry issues
-        self._registry_cache: dict[
-            CacheKey, tuple[SemanticNodeCategory | None, float, str | None]
-        ] = {}
+        self._registry_cache: dict[CacheKey, tuple[SemanticClass | None, float, str | None]] = {}
 
     def _compile_specialized_patterns(
         self,
@@ -86,7 +84,7 @@ class LanguageExtensionManager:
         jsx_patterns = (
             LanguagePattern(
                 pattern=re.compile(r"(?P<jsx_element>(j|t)sx.*element)", re.IGNORECASE),
-                category=SemanticNodeCategory.add_language_member(
+                category=SemanticClass.add_language_member(
                     SemanticSearchLanguage.JSX,
                     SemanticCategoryDict(
                         name="jsx_markup_element",
@@ -99,7 +97,7 @@ class LanguageExtensionManager:
                             debugging=0.55,
                             documentation=0.35,
                         ),
-                        parent_category=SemanticNodeCategory.DEFINITION_CALLABLE,
+                        parent_category=SemanticClass.DEFINITION_CALLABLE,
                         language_specific=True,
                         language=SemanticSearchLanguage.JSX,
                         examples=("JSX element", "TSX element", "react element"),
@@ -109,17 +107,17 @@ class LanguageExtensionManager:
             ),
             LanguagePattern(
                 pattern=re.compile(r"(?P<react_hook>use[A-Z][a-zA-Z]*)", re.IGNORECASE),
-                category=SemanticNodeCategory.OPERATION_INVOCATION,
+                category=SemanticClass.OPERATION_INVOCATION,
                 group_name="react_hook",
             ),
             LanguagePattern(
                 pattern=re.compile(r"(?P<component_name>.*Component$)", re.IGNORECASE),
-                category=SemanticNodeCategory.DEFINITION_CALLABLE,
+                category=SemanticClass.DEFINITION_CALLABLE,
                 group_name="component_name",
             ),
             LanguagePattern(
                 pattern=re.compile(r".*Hook$", re.IGNORECASE),
-                category=SemanticNodeCategory.REFERENCE_IDENTIFIER,
+                category=SemanticClass.SYNTAX_IDENTIFIER,
                 group_name="hook_name",
             ),
         )
@@ -131,17 +129,17 @@ class LanguageExtensionManager:
                         pattern=re.compile(
                             r"(?P<trait_or_impl_item>(impl|trait|struct|enum).*item)", re.IGNORECASE
                         ),
-                        category=SemanticNodeCategory.DEFINITION_TYPE,
+                        category=SemanticClass.DEFINITION_TYPE,
                         group_name="trait_or_impl_item",
                     ),
                     LanguagePattern(
                         pattern=re.compile(r"(?P<lifetime>.*lifetime.*)", re.IGNORECASE),
-                        category=SemanticNodeCategory.ANNOTATION_METADATA,
+                        category=SemanticClass.SYNTAX_ANNOTATION,
                         group_name="lifetime",
                     ),
                     LanguagePattern(
                         pattern=re.compile(r"(?P<generic_param>generic.*param)", re.IGNORECASE),
-                        category=SemanticNodeCategory.DEFINITION_TYPE,
+                        category=SemanticClass.DEFINITION_TYPE,
                         group_name="generic_param",
                     ),
                 )
@@ -153,12 +151,12 @@ class LanguageExtensionManager:
                             r"(?P<comprehension>(list|set|dict|mapping|generator|tuple).*(comprehension|expression))",
                             re.IGNORECASE,
                         ),
-                        category=SemanticNodeCategory.EXPRESSION_ANONYMOUS,
+                        category=SemanticClass.EXPRESSION_ANONYMOUS,
                         group_name="comprehension",
                     ),
                     LanguagePattern(
                         pattern=re.compile(r"with.*statement", re.IGNORECASE),
-                        category=SemanticNodeCategory.BOUNDARY_RESOURCE,
+                        category=SemanticClass.BOUNDARY_RESOURCE,
                         group_name="with_statement",
                     ),
                 )
@@ -168,17 +166,17 @@ class LanguageExtensionManager:
                     # Go patterns
                     LanguagePattern(
                         pattern=re.compile(r"package.*clause", re.IGNORECASE),
-                        category=SemanticNodeCategory.BOUNDARY_MODULE,
+                        category=SemanticClass.BOUNDARY_MODULE,
                         group_name="package",
                     ),
                     LanguagePattern(
                         pattern=re.compile(r"type.*decl", re.IGNORECASE),
-                        category=SemanticNodeCategory.DEFINITION_TYPE,
+                        category=SemanticClass.DEFINITION_TYPE,
                         group_name="type_decl",
                     ),
                     LanguagePattern(
                         pattern=re.compile(r"defer.*statement", re.IGNORECASE),
-                        category=SemanticNodeCategory.BOUNDARY_RESOURCE,
+                        category=SemanticClass.BOUNDARY_RESOURCE,
                         group_name="defer",
                     ),
                 )
@@ -293,7 +291,7 @@ class LanguageExtensionManager:
 
     def _check_language_refinement(
         self,
-        base_category: SemanticNodeCategory,
+        base_category: SemanticClass,
         language: SemanticSearchLanguage,
         matched_pattern: str | None,
     ) -> ExtensionResult | None:
@@ -334,9 +332,9 @@ class LanguageExtensionManager:
 
     def get_available_extensions(
         self, language: SemanticSearchLanguage
-    ) -> dict[str, SemanticNodeCategory]:
+    ) -> dict[str, SemanticClass]:
         """Get all available extensions for a language."""
-        extensions: dict[str, SemanticNodeCategory] = {}
+        extensions: dict[str, SemanticClass] = {}
 
         # Get registered extensions from the registry
         if hasattr(self.registry, "_extensions") and language in self.registry._extensions:  # type: ignore
@@ -459,10 +457,7 @@ class ContextualExtensionManager(LanguageExtensionManager):
         return confidence
 
     def _apply_sibling_heuristics(
-        self,
-        confidence: float,
-        result_category: SemanticNodeCategory,
-        sibling_types: list[str] | None,
+        self, confidence: float, result_category: SemanticClass, sibling_types: list[str] | None
     ) -> float:
         """Sibling-based confidence adjustments."""
         if not sibling_types:
@@ -522,7 +517,7 @@ def refine_with_extensions(
     return _extension_manager.refine_classification(base_result, language, context)
 
 
-def get_language_extensions(language: SemanticSearchLanguage) -> dict[str, SemanticNodeCategory]:
+def get_language_extensions(language: SemanticSearchLanguage) -> dict[str, SemanticClass]:
     """Get available extensions for a language."""
     return _extension_manager.get_available_extensions(language)
 

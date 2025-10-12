@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from codeweaver.language import SemanticSearchLanguage
-from codeweaver.semantic.categories import ImportanceScoresDict, SemanticNodeCategory
+from codeweaver.semantic.categories import ImportanceScoresDict, SemanticClass
 from codeweaver.semantic.classifier import (
     CoverageReport,
     EnhancedClassificationResult,
@@ -26,7 +26,7 @@ class NodeMapper:
 
     def classify_node_type(
         self, node_type: str, language: SemanticSearchLanguage | str, context: str | None = None
-    ) -> SemanticNodeCategory:
+    ) -> SemanticClass:
         """Classify a node type into a semantic category.
 
         Args:
@@ -167,7 +167,7 @@ def get_node_mapper() -> NodeMapper:
 # Convenient functions that mirror the old API but use the new system
 def classify_node_type(
     node_type: str, language: SemanticSearchLanguage | str, context: str | None = None
-) -> SemanticNodeCategory:
+) -> SemanticClass:
     """Convenient function to classify a single node type."""
     return get_node_mapper().classify_node_type(node_type, language, context)
 

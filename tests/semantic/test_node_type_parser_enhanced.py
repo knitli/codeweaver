@@ -129,7 +129,7 @@ class TestGetNodeSemanticInfo:
         # Try with a language we know exists
         info = parser.get_node_semantic_info(
             "program",  # Common root node
-            SemanticSearchLanguage.PYTHON
+            SemanticSearchLanguage.PYTHON,
         )
 
         # May or may not exist, just test that it doesn't error
@@ -200,8 +200,7 @@ class TestGetSupertypeHierarchy:
     def test_hierarchy_with_language_enum(self, parser):
         """Test hierarchy with SemanticSearchLanguage enum."""
         hierarchy = parser.get_supertype_hierarchy(
-            "binary_expression",
-            SemanticSearchLanguage.PYTHON
+            "binary_expression", SemanticSearchLanguage.PYTHON
         )
 
         # May or may not exist, just test that it doesn't error

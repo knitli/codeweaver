@@ -25,33 +25,38 @@ from codeweaver.semantic.pattern_classifier import ClassificationPhase, PatternB
 class TestCoreClassifications:
     """Regression tests for core node type classifications."""
 
-    @pytest.mark.parametrize("node_type,language,expected_category,min_confidence", [
-        # Python
-        ("function_definition", "python", SemanticNodeCategory.DEFINITION_CALLABLE, 0.80),
-        ("class_definition", "python", SemanticNodeCategory.DEFINITION_TYPE, 0.80),
-        ("if_statement", "python", SemanticNodeCategory.CONTROL_FLOW_CONDITIONAL, 0.75),
-        ("for_statement", "python", SemanticNodeCategory.CONTROL_FLOW_ITERATION, 0.75),
-        ("while_statement", "python", SemanticNodeCategory.CONTROL_FLOW_ITERATION, 0.75),
-        ("return_statement", "python", SemanticNodeCategory.CONTROL_FLOW_RETURN, 0.75),
-        ("import_statement", "python", SemanticNodeCategory.DEFINITION_MODULE_IMPORT, 0.75),
-
-        # JavaScript
-        ("function_declaration", "javascript", SemanticNodeCategory.DEFINITION_CALLABLE, 0.75),
-        ("class_declaration", "javascript", SemanticNodeCategory.DEFINITION_TYPE, 0.75),
-        ("if_statement", "javascript", SemanticNodeCategory.CONTROL_FLOW_CONDITIONAL, 0.70),
-
-        # Rust
-        ("function_item", "rust", SemanticNodeCategory.DEFINITION_CALLABLE, 0.70),
-        ("struct_item", "rust", SemanticNodeCategory.DEFINITION_TYPE, 0.70),
-    ])
-    def test_classification_consistency(self, node_type, language, expected_category, min_confidence):
+    @pytest.mark.parametrize(
+        "node_type,language,expected_category,min_confidence",
+        [
+            # Python
+            ("function_definition", "python", SemanticNodeCategory.DEFINITION_CALLABLE, 0.80),
+            ("class_definition", "python", SemanticNodeCategory.DEFINITION_TYPE, 0.80),
+            ("if_statement", "python", SemanticNodeCategory.CONTROL_FLOW_CONDITIONAL, 0.75),
+            ("for_statement", "python", SemanticNodeCategory.CONTROL_FLOW_ITERATION, 0.75),
+            ("while_statement", "python", SemanticNodeCategory.CONTROL_FLOW_ITERATION, 0.75),
+            ("return_statement", "python", SemanticNodeCategory.CONTROL_FLOW_RETURN, 0.75),
+            ("import_statement", "python", SemanticNodeCategory.DEFINITION_MODULE_IMPORT, 0.75),
+            # JavaScript
+            ("function_declaration", "javascript", SemanticNodeCategory.DEFINITION_CALLABLE, 0.75),
+            ("class_declaration", "javascript", SemanticNodeCategory.DEFINITION_TYPE, 0.75),
+            ("if_statement", "javascript", SemanticNodeCategory.CONTROL_FLOW_CONDITIONAL, 0.70),
+            # Rust
+            ("function_item", "rust", SemanticNodeCategory.DEFINITION_CALLABLE, 0.70),
+            ("struct_item", "rust", SemanticNodeCategory.DEFINITION_TYPE, 0.70),
+        ],
+    )
+    def test_classification_consistency(
+        self, node_type, language, expected_category, min_confidence
+    ):
         """Test that classifications remain consistent after refactor."""
         result = classify_semantic_node(node_type, language)
 
-        assert result.category == expected_category, \
+        assert result.category == expected_category, (
             f"Classification changed for {node_type} in {language}"
-        assert result.confidence >= min_confidence, \
+        )
+        assert result.confidence >= min_confidence, (
             f"Confidence dropped below threshold for {node_type} in {language}"
+        )
 
 
 class TestAPIBackwardCompatibility:
@@ -92,18 +97,22 @@ class TestAPIBackwardCompatibility:
 class TestTierAssignments:
     """Regression tests for tier assignments."""
 
-    @pytest.mark.parametrize("node_type,language,expected_tier", [
-        ("function_definition", "python", SemanticTier.STRUCTURAL_DEFINITIONS),
-        ("class_definition", "python", SemanticTier.STRUCTURAL_DEFINITIONS),
-        ("if_statement", "python", SemanticTier.CONTROL_FLOW_LOGIC),
-        ("binary_expression", "python", SemanticTier.OPERATIONS_EXPRESSIONS),
-    ])
+    @pytest.mark.parametrize(
+        "node_type,language,expected_tier",
+        [
+            ("function_definition", "python", SemanticTier.STRUCTURAL_DEFINITIONS),
+            ("class_definition", "python", SemanticTier.STRUCTURAL_DEFINITIONS),
+            ("if_statement", "python", SemanticTier.CONTROL_FLOW_LOGIC),
+            ("binary_expression", "python", SemanticTier.OPERATIONS_EXPRESSIONS),
+        ],
+    )
     def test_tier_consistency(self, node_type, language, expected_tier):
         """Test that tier assignments remain consistent."""
         result = classify_semantic_node(node_type, language)
 
-        assert result.tier == expected_tier, \
+        assert result.tier == expected_tier, (
             f"Tier assignment changed for {node_type} in {language}"
+        )
 
 
 class TestBatchOperations:
@@ -119,9 +128,7 @@ class TestBatchOperations:
 
         classifier = get_default_classifier()
         batch_results = classifier.classify_batch(node_types)
-        individual_results = [
-            classifier.classify_node(nt, lang) for nt, lang in node_types
-        ]
+        individual_results = [classifier.classify_node(nt, lang) for nt, lang in node_types]
 
         assert len(batch_results) == len(individual_results)
         for batch_res, indiv_res in zip(batch_results, individual_results, strict=False):
@@ -171,8 +178,9 @@ class TestConfidenceImprovements:
             result = classify_semantic_node(node_type, language)
 
             if result.extension_source == "grammar":
-                assert result.confidence >= 0.80, \
+                assert result.confidence >= 0.80, (
                     f"Grammar-based classification should have high confidence for {node_type}"
+                )
 
     def test_no_regression_in_confidence(self):
         """Test that confidence hasn't regressed for common nodes."""
@@ -184,8 +192,9 @@ class TestConfidenceImprovements:
 
         for node_type, language, min_confidence in baseline_nodes:
             result = classify_semantic_node(node_type, language)
-            assert result.confidence >= min_confidence, \
+            assert result.confidence >= min_confidence, (
                 f"Confidence regressed for {node_type} in {language}"
+            )
 
 
 class TestEdgeCases:
@@ -251,8 +260,9 @@ class TestNoBreakingChanges:
         ]
 
         for category_name in expected_categories:
-            assert hasattr(SemanticNodeCategory, category_name), \
+            assert hasattr(SemanticNodeCategory, category_name), (
                 f"Missing category: {category_name}"
+            )
 
     def test_semantic_tier_enum(self):
         """Test that SemanticTier enum is unchanged."""
@@ -265,5 +275,4 @@ class TestNoBreakingChanges:
         ]
 
         for tier_name in expected_tiers:
-            assert hasattr(SemanticTier, tier_name), \
-                f"Missing tier: {tier_name}"
+            assert hasattr(SemanticTier, tier_name), f"Missing tier: {tier_name}"
