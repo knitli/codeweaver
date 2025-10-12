@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, cast
 
-from codeweaver.semantic.categories import (
+from codeweaver.semantic.classifications import (
     AgentTask,
     ImportanceScores,
     ImportanceScoresDict,
@@ -81,7 +81,8 @@ class ConfidenceScorer:
             context_weights = self.default_context
         base_confidence = self._get_base_confidence(result.phase)
         importance_multiplier = _calculate_importance_multiplier(
-            result.category, ImportanceScores.validate_python(cast(dict[str, Any], context_weights))
+            result.classification,
+            ImportanceScores.validate_python(cast(dict[str, Any], context_weights)),
         )
         pattern_multiplier = self._calculate_pattern_multiplier(result, pattern_specificity)
         context_multiplier = 1.0
@@ -131,10 +132,10 @@ class ConfidenceScorer:
         """Create an enhanced result with updated confidence score."""
         metrics = self.calculate_confidence(result, context_weights, pattern_specificity)
         return ClassificationResult(
-            category=result.category,
+            classification=result.classification,
             confidence=metrics.final_confidence,
             phase=result.phase,
-            tier=result.tier,
+            rank=result.rank,
             matched_pattern=result.matched_pattern,
             alternative_categories=result.alternative_categories,
         )
@@ -187,7 +188,7 @@ class ContextualScorer(ConfidenceScorer):
 
     def _adjust_for_parent_context(self, result: ClassificationResult, parent_type: str) -> float:
         """Adjust confidence based on parent node type."""
-        if result.category == SemanticClass.OPERATION_OPERATOR:
+        if result.classification == SemanticClass.OPERATION_OPERATOR:
             if "expression" in parent_type.lower():
                 return 1.1
             if "statement" in parent_type.lower():
@@ -198,7 +199,7 @@ class ContextualScorer(ConfidenceScorer):
         self, result: ClassificationResult, sibling_types: list[str]
     ) -> float:
         """Adjust confidence based on sibling node types."""
-        if result.category == SemanticClass.SYNTAX_PUNCTUATION:
+        if result.classification == SemanticClass.SYNTAX_PUNCTUATION:
             structural_siblings = sum(
                 any(punct in s.lower() for punct in [",", ";", "(", ")", "[", "]"])
                 for s in sibling_types

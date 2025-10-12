@@ -16,12 +16,11 @@ from pathlib import Path
 from typing import cast
 
 from codeweaver.language import SemanticSearchLanguage
-from codeweaver.semantic.categories import SemanticClass
+from codeweaver.semantic.classifications import SemanticClass
 from codeweaver.semantic.mapper import NodeMapper, get_node_mapper
-from codeweaver.semantic.node_type_parser import LanguageNodeType, NodeTypeInfo, NodeTypeParser
+from codeweaver.semantic.node_type_parser import NodeTypeParser, ThingOrCategoryType
 
 
-type ProjectNodeTypes = Sequence[dict[SemanticSearchLanguage, Sequence[LanguageNodeType]]]
 type PatternLanguages = dict[str, list[SemanticSearchLanguage]]
 type ConfidenceRow = tuple[str, SemanticClass, float, int]
 
@@ -37,10 +36,11 @@ def locate_node_types() -> Path:
 
 def parse_node_types(
     node_types_dir: Path,
-) -> Mapping[SemanticSearchLanguage, Sequence[NodeTypeInfo]]:
+) -> Mapping[SemanticSearchLanguage, Sequence[ThingOrCategoryType]]:
     """Parse the node types from the specified directory."""
-    parser = NodeTypeParser(node_types_dir=node_types_dir)
-    return parser.flatten()
+    parser = NodeTypeParser()
+    _ = parser.parse_all_nodes()
+    return parser
 
 
 def display_common_patterns(common_patterns: PatternLanguages, top: int = 20) -> None:

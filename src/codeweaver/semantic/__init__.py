@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from codeweaver.semantic.categories import ImportanceScores, SemanticClass
+from codeweaver.semantic.classifications import ImportanceScores, SemanticClass
 from codeweaver.semantic.mapper import NodeMapper, get_node_mapper
 from codeweaver.semantic.scoring import SemanticScorer
 

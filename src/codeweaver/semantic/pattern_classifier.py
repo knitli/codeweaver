@@ -6,7 +6,7 @@
 
 This module provides pattern-based classification as a fallback when grammar-based
 classification is not available. It uses regex patterns and heuristics to infer
-semantic categories for:
+semantic classifications for:
 - Languages without abstract type information
 - Nodes without fields or structural information
 - Dynamically loaded grammars (future feature)
@@ -15,12 +15,17 @@ semantic categories for:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from codeweaver._common import BaseEnum, DataclassSerializationMixin
 from codeweaver.language import SemanticSearchLanguage
-from codeweaver.semantic.categories import ImportanceRank, SemanticClass
-from codeweaver.semantic.patterns import get_compiled_patterns, match_tier_patterns_cached
+from codeweaver.semantic.classifications import ImportanceRank, SemanticClass
+from codeweaver.semantic.patterns import get_compiled_patterns, match_rank_patterns_cached
 from codeweaver.semantic.syntactic import SyntacticClassifier
+
+
+if TYPE_CHECKING:
+    from codeweaver.semantic._types import ThingName
 
 
 class ClassificationPhase(BaseEnum):
@@ -29,7 +34,7 @@ class ClassificationPhase(BaseEnum):
     GRAMMAR = "grammar"  # pre-defined grammar patterns inferred from tree-sitter grammars
 
     SYNTACTIC = "syntactic"
-    TIER_MATCH = "tier_match"
+    TIER_MATCH = "rank_match"
     PATTERN_MATCH = "pattern_match"
     LANGUAGE_EXT = "language_extension"
     FALLBACK = "fallback"
@@ -39,11 +44,11 @@ class ClassificationPhase(BaseEnum):
 class ClassificationResult(DataclassSerializationMixin):
     """Result of semantic node classification."""
 
-    category: SemanticClass
+    classification: SemanticClass
     confidence: float
     phase: ClassificationPhase
-    tier: ImportanceRank
-    node: str | None = None
+    rank: ImportanceRank
+    thing: ThingName | None = None
     matched_pattern: str | None = None
     alternative_categories: list[SemanticClass] | None = None
 
@@ -74,61 +79,61 @@ class PatternBasedClassifier:
         self.syntactic_classifier = SyntacticClassifier()
         self.compiled_patterns = get_compiled_patterns()
 
-    def classify_node(
-        self, node_type: str, language: SemanticSearchLanguage, context: str | None = None
+    def classify_thing(
+        self, thing_name: ThingName, language: SemanticSearchLanguage, context: str | None = None
     ) -> ClassificationResult:
         """Main classification entry point using pattern-based pipeline.
 
         This is used as a fallback when grammar-based classification is not available.
         """
         # Phase 1: Syntactic fast-path classification
-        if syntactic_result := self._classify_syntactic_phase(node_type):
+        if syntactic_result := self._classify_syntactic_phase(thing_name):
             return syntactic_result
 
         # Phase 2: Tier-based classification
-        if tier_result := self._classify_tier_phase(node_type, language):
-            return tier_result
+        if rank_result := self._classify_rank_phase(thing_name, language):
+            return rank_result
 
         # Phase 3: Pattern-based fallback
-        if pattern_result := self._classify_pattern_phase(node_type, context):
+        if pattern_result := self._classify_pattern_phase(thing_name, context):
             return pattern_result
 
         # Phase 4: Ultimate fallback
-        return self._classify_fallback_phase(node_type)
+        return self._classify_fallback_phase(thing_name)
 
-    def _classify_syntactic_phase(self, node_type: str) -> ClassificationResult | None:
+    def _classify_syntactic_phase(self, thing_name: ThingName) -> ClassificationResult | None:
         """Phase 1: Fast syntactic classification for non-letter nodes."""
-        if syntactic_result := self.syntactic_classifier.classify_syntactic(node_type):
+        if syntactic_result := self.syntactic_classifier.classify_syntactic(thing_name):
             return ClassificationResult(
-                category=syntactic_result.category,
+                classification=syntactic_result.semantic_classification,
                 confidence=syntactic_result.confidence,
                 phase=ClassificationPhase.SYNTACTIC,
-                tier=syntactic_result.tier,
-                node=syntactic_result.node,
+                rank=syntactic_result.rank,
+                thing=syntactic_result.thing,
                 matched_pattern=syntactic_result.matched_pattern,
             )
         return None
 
-    def _classify_tier_phase(
-        self, node_type: str, language: SemanticSearchLanguage
+    def _classify_rank_phase(
+        self, thing_name: ThingName, language: SemanticSearchLanguage
     ) -> ClassificationResult | None:
         """Phase 2: Tier-based classification using semantic patterns."""
-        # Try each tier from highest to lowest priority
-        for tier in ImportanceRank:
-            tier_categories = self._get_categories_for_tier(tier)
+        # Try each rank from highest to lowest priority
+        for rank in ImportanceRank:
+            rank_classifications = self._get_classifications_for_rank(rank)
 
-            for category in tier_categories:
-                if matched := match_tier_patterns_cached(node_type, category.name):
+            for classification in rank_classifications:
+                if matched := match_rank_patterns_cached(thing_name, classification.name):
                     # Apply language-specific confidence adjustments
                     adjusted_confidence = self._apply_language_confidence_boost(
-                        matched.confidence, category, language, node_type
+                        matched.confidence, classification, language, thing_name
                     )
 
                     return ClassificationResult(
-                        category=category,
+                        classification=classification,
                         confidence=adjusted_confidence,
                         phase=ClassificationPhase.TIER_MATCH,
-                        tier=tier,
+                        rank=rank,
                         matched_pattern=None,
                     )
 
@@ -137,9 +142,9 @@ class PatternBasedClassifier:
     def _apply_language_confidence_boost(
         self,
         base_confidence: float,
-        category: SemanticClass,
+        classification: SemanticClass,
         language: SemanticSearchLanguage,
-        node_type: str,
+        thing_name: str,
     ) -> float:
         """Apply language-specific confidence adjustments to improve accuracy."""
         # Language-specific node type patterns that increase confidence
@@ -177,59 +182,61 @@ class PatternBasedClassifier:
             },
         }
 
-        node_lower = node_type.lower()
+        node_lower = thing_name.lower()
         if language in language_specific_boosts:
-            for pattern, (expected_category, boost) in language_specific_boosts[language].items():
-                if pattern in node_lower and category == expected_category:
+            for pattern, (expected_classification, boost) in language_specific_boosts[
+                language
+            ].items():
+                if pattern in node_lower and classification == expected_classification:
                     return min(0.95, base_confidence + boost)
 
         return base_confidence
 
     def _classify_pattern_phase(
-        self, node_type: str, context: str | None = None
+        self, thing_name: str, context: str | None = None
     ) -> ClassificationResult | None:
         """Phase 3: Generic pattern matching as fallback."""
         # Try some basic heuristics
-        node_lower = node_type.lower()
+        node_lower = thing_name.lower()
 
         # Use context to improve classification accuracy
         context_hints = self._extract_context_hints(context) if context else {}
 
-        # Common patterns that might not be caught by tier patterns
+        # Common patterns that might not be caught by rank patterns
         if any(keyword in node_lower for keyword in ["statement", "expr", "expression"]):
             if "statement" in node_lower:
                 # Context-aware statement classification
-                category = self._classify_statement_with_context(node_lower, context_hints)
+                classification = self._classify_statement_with_context(node_lower, context_hints)
                 confidence = 0.40 + (0.1 if context_hints else 0.0)
 
                 return ClassificationResult(
-                    category=category,
+                    classification=classification,
                     confidence=confidence,
                     phase=ClassificationPhase.PATTERN_MATCH,
-                    tier=category.tier,
-                    matched_pattern=f"statement_heuristic:{node_type}",
+                    rank=classification.rank,
+                    matched_pattern=f"statement_heuristic:{thing_name}",
                 )
 
             # Context-aware expression classification
-            category = self._classify_expression_with_context(node_lower, context_hints)
+            classification = self._classify_expression_with_context(node_lower, context_hints)
             confidence = 0.40 + (0.1 if context_hints else 0.0)
 
             return ClassificationResult(
-                category=category,
+                classification=classification,
                 confidence=confidence,
                 phase=ClassificationPhase.PATTERN_MATCH,
-                tier=category.tier,
-                matched_pattern=f"expression_heuristic:{node_type}",
+                rank=classification.rank,
+                matched_pattern=f"expression_heuristic:{thing_name}",
             )
 
         # Check for common identifier patterns
         if node_lower in {"identifier", "name", "id"}:
             return ClassificationResult(
-                category=SemanticClass.SYNTAX_IDENTIFIER,
+                classification=SemanticClass.SYNTAX_IDENTIFIER,
                 confidence=0.85,
                 phase=ClassificationPhase.PATTERN_MATCH,
-                tier=ImportanceRank.SYNTAX_REFERENCES,
-                matched_pattern=f"identifier_heuristic:{node_type}",
+                rank=ImportanceRank.SYNTAX_REFERENCES,
+                matched_pattern=f"identifier_heuristic:{thing_name}",
             )
 
         return None
@@ -263,7 +270,7 @@ class PatternBasedClassifier:
         }
 
     def _classify_statement_with_context(
-        self, node_lower: str, context_hints: dict[str, bool]
+        self, _node_lower: str, context_hints: dict[str, bool]
     ) -> SemanticClass:
         """Classify statement nodes using context hints."""
         # Use context to make more informed decisions
@@ -276,7 +283,7 @@ class PatternBasedClassifier:
         return SemanticClass.FLOW_CONTROL
 
     def _classify_expression_with_context(
-        self, node_lower: str, context_hints: dict[str, bool]
+        self, _node_lower: str, context_hints: dict[str, bool]
     ) -> SemanticClass:
         """Classify expression nodes using context hints."""
         # Use context to make more informed decisions
@@ -288,64 +295,67 @@ class PatternBasedClassifier:
             return SemanticClass.EXPRESSION_ANONYMOUS
         return SemanticClass.OPERATION_OPERATOR
 
-    def _classify_fallback_phase(self, node_type: str) -> ClassificationResult:
+    def _classify_fallback_phase(self, thing_name: str) -> ClassificationResult:
         """Phase 4: Final fallback classification."""
-        # Default to most generic category based on simple heuristics
-        if any(char.isalpha() for char in node_type):
+        # Default to most generic classification based on simple heuristics
+        if any(char.isalpha() for char in thing_name):
             # Has letters, likely some form of identifier or reference
-            fallback_category = SemanticClass.SYNTAX_IDENTIFIER
+            fallback_classification = SemanticClass.SYNTAX_IDENTIFIER
         else:
             # No letters, likely punctuation
-            fallback_category = SemanticClass.SYNTAX_PUNCTUATION
+            fallback_classification = SemanticClass.SYNTAX_PUNCTUATION
 
         return ClassificationResult(
-            category=fallback_category,
+            classification=fallback_classification,
             confidence=0.30,  # Low confidence for fallback
             phase=ClassificationPhase.FALLBACK,
-            tier=fallback_category.tier,
-            matched_pattern=f"fallback:{node_type}",
+            rank=fallback_classification.rank,
+            matched_pattern=f"fallback:{thing_name}",
         )
 
-    def _get_categories_for_tier(self, tier: ImportanceRank) -> tuple[SemanticClass, ...]:
-        """Get all categories belonging to a specific tier."""
-        return tier.semantic_categories
+    def _get_classifications_for_rank(self, rank: ImportanceRank) -> tuple[SemanticClass, ...]:
+        """Get all classifications belonging to a specific rank."""
+        return rank.semantic_classifications
 
     def classify_batch(
-        self, node_types: list[tuple[str, SemanticSearchLanguage]], context: str | None = None
+        self,
+        thing_names: list[tuple[ThingName, SemanticSearchLanguage]],
+        context: str | None = None,
     ) -> list[ClassificationResult]:
         """Batch classification for performance."""
         return [
-            self.classify_node(node_type, language, context) for node_type, language in node_types
+            self.classify_thing(thing_name, language, context)
+            for thing_name, language in thing_names
         ]
 
     def get_classification_alternatives(
-        self, node_type: str, language: SemanticSearchLanguage, threshold: float = 0.3
+        self, thing_name: ThingName, language: SemanticSearchLanguage, threshold: float = 0.3
     ) -> list[ClassificationResult]:
         """Get alternative classifications above confidence threshold."""
         alternatives: list[ClassificationResult] = []
 
         # Get the primary classification
-        primary = self.classify_node(node_type, language)
+        primary = self.classify_thing(thing_name, language)
         alternatives.append(primary)
 
         # Try other potential classifications
-        # This could be expanded to try multiple patterns/tiers
+        # This could be expanded to try multiple patterns/ranks
         if primary.confidence < 0.8:  # Only look for alternatives if not highly confident
-            # Try each category directly and see if any patterns match
-            for category in SemanticClass:
-                if category == primary.category:
+            # Try each classification directly and see if any patterns match
+            for classification in SemanticClass:
+                if classification == primary.classification:
                     continue
-                if result := match_tier_patterns_cached(node_type, category):
-                    category, confidence, matched, _match_obj, pattern = result
+                if result := match_rank_patterns_cached(thing_name, classification):
+                    classification, confidence, matched, _match_obj, pattern = result
 
                     if matched and confidence >= threshold:
                         alternatives.append(
                             ClassificationResult(
-                                category=category,
+                                classification=classification,
                                 confidence=confidence,
                                 phase=ClassificationPhase.PATTERN_MATCH,
-                                tier=category.tier,
-                                node=node_type,
+                                rank=classification.rank,
+                                thing=thing_name,
                                 matched_pattern=pattern,
                             )
                         )
@@ -363,21 +373,21 @@ _pattern_classifier = PatternBasedClassifier()
 _hierarchical_mapper = _pattern_classifier  # Backward compatibility
 
 
-def classify_node_hierarchical(
-    node_type: str, language: SemanticSearchLanguage, context: str | None = None
+def classify_thing_hierarchical(
+    thing_name: ThingName, language: SemanticSearchLanguage, context: str | None = None
 ) -> ClassificationResult:
-    """Convenient function for pattern-based classification.
+    """Convenient function for hierarchical classification.
 
     Note: This is a fallback classifier. Grammar-based classification is preferred.
     """
-    return _pattern_classifier.classify_node(node_type, language, context)
+    return _pattern_classifier.classify_thing(thing_name, language, context)
 
 
 def classify_batch_hierarchical(
-    node_types: list[tuple[str, SemanticSearchLanguage]], context: str | None = None
+    thing_names: list[tuple[ThingName, SemanticSearchLanguage]], context: str | None = None
 ) -> list[ClassificationResult]:
     """Convenient function for batch pattern-based classification.
 
     Note: This is a fallback classifier. Grammar-based classification is preferred.
     """
-    return _pattern_classifier.classify_batch(node_types, context)
+    return _pattern_classifier.classify_batch(thing_names, context)

@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, NamedTuple
 
 from codeweaver._common import BaseEnum
 from codeweaver.language import SemanticSearchLanguage
-from codeweaver.semantic.categories import ImportanceRank, SemanticClass
+from codeweaver.semantic.classifications import ImportanceRank, SemanticClass
 
 
 if TYPE_CHECKING:
@@ -44,15 +44,15 @@ class GrammarClassificationResult(NamedTuple):
     """Result of grammar-based classification.
 
     Attributes:
-        category: Semantic category assigned to the node
-        tier: Semantic tier (importance level)
+        classification: Semantic classification assigned to the node
+        rank: Semantic rank (importance level)
         confidence: Confidence score (0.0-1.0)
         classification_method: Method used for classification
         evidence: Human-readable explanation of classification reasoning
     """
 
-    category: SemanticClass
-    tier: ImportanceRank
+    classification: SemanticClass
+    rank: ImportanceRank
     confidence: float
     classification_method: ClassificationMethod
     evidence: str  # Human-readable explanation of classification reasoning
@@ -76,7 +76,57 @@ class GrammarBasedClassifier:
         self.parser = parser or NodeTypeParser()
 
         # Build Category name → SemanticClass mapping
-        self._category_map = self._build_category_to_semantic_map()
+        self._classification_map = self._build_category_to_semantic_map()
+
+    def _classify_by_can_be_anywhere(
+        self, thing: CompositeThing | Token, language: SemanticSearchLanguage | str
+    ) -> GrammarClassificationResult | None:
+        """Classify a Thing based on can_be_anywhere flag.
+
+        Args:
+            thing: The Thing instance
+            language: The programming language
+        """
+        if not thing.can_be_anywhere:
+            return None
+        # Method 1: can_be_anywhere flag (confidence: 0.95)
+        if "comment" in str(thing.name).lower() and "line" not in str(thing.name).lower():
+            # Special case: comments are always DOCUMENTATION_STRUCTURED
+            return GrammarClassificationResult(
+                classification=SemanticClass.DOCUMENTATION_STRUCTURED,
+                rank=ImportanceRank.BEHAVIORAL_CONTRACTS,
+                confidence=0.99,
+                classification_method=ClassificationMethod.ANYWHERE,
+                evidence="Thing marked as can_be_anywhere and name contains 'comment' and is not an explicit line comment.",
+            )
+        if "comment" in str(thing.name).lower() and "line" in str(thing.name).lower():
+            # Special case: line comments are SYNTAX_ANNOTATION
+            return GrammarClassificationResult(
+                classification=SemanticClass.SYNTAX_ANNOTATION,
+                rank=ImportanceRank.SYNTAX_REFERENCES,
+                confidence=0.99,
+                classification_method=ClassificationMethod.ANYWHERE,
+                evidence="Thing marked as can_be_anywhere and name contains 'line_comment'",
+            )
+        if str(thing.name).lower() == "line_continuation":
+            # Special case: line_continuation is SYNTAX_PUNCTUATION
+            return GrammarClassificationResult(
+                classification=SemanticClass.SYNTAX_PUNCTUATION,
+                rank=ImportanceRank.SYNTAX_REFERENCES,
+                confidence=0.99,
+                classification_method=ClassificationMethod.ANYWHERE,
+                evidence="Thing marked as can_be_anywhere and name is 'line_continuation'",
+            )
+        if str(thing.name).lower() == "text_interpolation":
+            # Special case: text_interpolation is SYNTAX_IDENTIFIER
+            return GrammarClassificationResult(
+                classification=SemanticClass.SYNTAX_IDENTIFIER,
+                rank=ImportanceRank.SYNTAX_REFERENCES,
+                confidence=0.99,
+                classification_method=ClassificationMethod.ANYWHERE,
+                evidence="Through deduction, this is PHP's 'text_interpolation' thing.",
+            )
+        return None
 
     def classify_thing(
         self, thing_name: ThingName, language: SemanticSearchLanguage | str
@@ -110,35 +160,9 @@ class GrammarBasedClassifier:
             return None  # Unsupported Thing type
 
         # Classification pipeline (highest to lowest confidence)
-        # Method 1: can_be_anywhere flag (confidence: 0.95)
-        if thing.can_be_anywhere and "comment" in str(thing_name).lower():
-            # Special case: comments are always DOCUMENTATION_STRUCTURED
-            return GrammarClassificationResult(
-                category=SemanticClass.DOCUMENTATION_STRUCTURED,
-                tier=ImportanceRank.BEHAVIORAL_CONTRACTS,
-                confidence=0.99,
-                classification_method=ClassificationMethod.ANYWHERE,
-                evidence="Thing marked as can_be_anywhere and name contains 'comment'",
-            )
-        if thing.can_be_anywhere:
-            if str(thing_name).lower() == "line_continuation":
-                # Special case: line_continuation is SYNTAX_PUNCTUATION
-                return GrammarClassificationResult(
-                    category=SemanticClass.SYNTAX_PUNCTUATION,
-                    tier=ImportanceRank.SYNTAX_REFERENCES,
-                    confidence=0.99,
-                    classification_method=ClassificationMethod.ANYWHERE,
-                    evidence="Thing marked as can_be_anywhere and name is 'line_continuation'",
-                )
-            if str(thing_name).lower() == "text_interpolation":
-                # Special case: text_interpolation is SYNTAX_IDENTIFIER
-                return GrammarClassificationResult(
-                    category=SemanticClass.SYNTAX_IDENTIFIER,
-                    tier=ImportanceRank.SYNTAX_REFERENCES,
-                    confidence=0.99,
-                    classification_method=ClassificationMethod.ANYWHERE,
-                    evidence="Through deduction, this is PHP's 'text_interpolation' thing.",
-                )
+        # Method 1: can_be_anywhere flag (confidence: 0.99)
+        if result := self._classify_by_can_be_anywhere(thing, language):
+            return result
 
         # Method 2: Category membership (confidence: 0.90)
         if result := self._classify_from_category(thing):
@@ -218,13 +242,13 @@ class GrammarBasedClassifier:
             return self._classify_from_primary_category(thing)
         # For multi-category Things (13.5% of Things), try all Categories
         for category in thing.categories:
-            if semantic_category := self._category_map.get(category.name):
-                tier = ImportanceRank.from_category(semantic_category)
+            if semantic_classification := self._classification_map.get(category.name):
+                rank = ImportanceRank.from_classification(semantic_classification)
 
                 category_names = sorted(cat.name for cat in thing.categories)
                 return GrammarClassificationResult(
-                    category=semantic_category,
-                    tier=tier,
+                    classification=semantic_classification,
+                    rank=rank,
                     confidence=0.85,  # Lower confidence for multi-category
                     classification_method=ClassificationMethod.CATEGORY,
                     evidence=f"Member of multiple Categories: {category_names}",
@@ -240,15 +264,15 @@ class GrammarBasedClassifier:
         if primary_category is None:
             return None  # Shouldn't happen but be defensive
 
-        semantic_category = self._category_map.get(primary_category.name)
-        if not semantic_category:
+        semantic_classification = self._classification_map.get(primary_category.name)
+        if not semantic_classification:
             return None
 
-        tier = ImportanceRank.from_category(semantic_category)
+        rank = ImportanceRank.from_classification(semantic_classification)
 
         return GrammarClassificationResult(
-            category=semantic_category,
-            tier=tier,
+            classification=semantic_classification,
+            rank=rank,
             confidence=0.90,
             classification_method=ClassificationMethod.CATEGORY,
             evidence=f"Member of '{primary_category.name}' Category",
@@ -274,41 +298,41 @@ class GrammarBasedClassifier:
         roles = frozenset(str(conn.role) for conn in thing.direct_connections)
 
         # Pattern matching on Role combinations
-        category: SemanticClass | None = None
+        classification: SemanticClass | None = None
 
         # Callable definitions: have 'body' and 'name' Roles
         if {"body", "name"}.issubset(roles):
-            category = SemanticClass.DEFINITION_CALLABLE
+            classification = SemanticClass.DEFINITION_CALLABLE
 
         # Branching control flow: have 'condition' Role
         elif {"condition", "consequence"}.issubset(roles) or {"condition", "body"}.issubset(roles):
-            category = SemanticClass.FLOW_BRANCHING
+            classification = SemanticClass.FLOW_BRANCHING
 
         # Binary operations: have 'left', 'right', 'operator' Roles
         elif {"left", "right", "operator"}.issubset(roles):
-            category = SemanticClass.OPERATION_OPERATOR
+            classification = SemanticClass.OPERATION_OPERATOR
 
         # Type definitions: have 'name' and 'body' but also 'superclass' or 'interfaces'
         elif {"name", "body"}.issubset(roles) and (
             "superclass" in roles or "interfaces" in roles or "base" in roles
         ):
-            category = SemanticClass.DEFINITION_TYPE
+            classification = SemanticClass.DEFINITION_TYPE
 
         # Variable/data definitions: have 'type' and 'declarator' or 'value'
         elif {"type"}.issubset(roles) and (
             "declarator" in roles or "value" in roles or "default" in roles
         ):
-            category = SemanticClass.DEFINITION_DATA
+            classification = SemanticClass.DEFINITION_DATA
 
-        if category is None:
+        if classification is None:
             return None
 
-        tier = ImportanceRank.from_category(category)
+        rank = ImportanceRank.from_classification(classification)
         role_names = sorted(roles)
 
         return GrammarClassificationResult(
-            category=category,
-            tier=tier,
+            classification=classification,
+            rank=rank,
             confidence=0.85,
             classification_method=ClassificationMethod.CONNECTION_INFERENCE,
             evidence=f"DirectConnection Roles: {role_names}",
@@ -334,8 +358,8 @@ class GrammarBasedClassifier:
         # PositionalConnections are likely structural control flow nodes
         if thing.direct_connections:
             return GrammarClassificationResult(
-                category=SemanticClass.FLOW_BRANCHING,
-                tier=ImportanceRank.CONTROL_FLOW_LOGIC,
+                classification=SemanticClass.FLOW_BRANCHING,
+                rank=ImportanceRank.CONTROL_FLOW_LOGIC,
                 confidence=0.70,
                 classification_method=ClassificationMethod.POSITIONAL,
                 evidence="Has both DirectConnections and PositionalConnections (structural pattern)",
@@ -343,8 +367,8 @@ class GrammarBasedClassifier:
 
         # Just PositionalConnections, likely a container/expression/list node
         return GrammarClassificationResult(
-            category=SemanticClass.SYNTAX_IDENTIFIER,
-            tier=ImportanceRank.SYNTAX_REFERENCES,
+            classification=SemanticClass.SYNTAX_IDENTIFIER,
+            rank=ImportanceRank.SYNTAX_REFERENCES,
             confidence=0.65,
             classification_method=ClassificationMethod.POSITIONAL,
             evidence="Has PositionalConnections only (composite structure)",

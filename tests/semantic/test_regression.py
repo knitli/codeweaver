@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 import pytest
 
 from codeweaver.language import SemanticSearchLanguage
-from codeweaver.semantic.categories import SemanticNodeCategory, SemanticTier
+from codeweaver.semantic.classifications import SemanticNodeCategory, SemanticTier
 from codeweaver.semantic.classifier import (
     SemanticNodeClassifier,
     classify_semantic_node,

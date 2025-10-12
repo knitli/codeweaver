@@ -16,8 +16,8 @@ from pydantic import Field, NonNegativeFloat
 
 from codeweaver._common import DataclassSerializationMixin
 from codeweaver.language import SemanticSearchLanguage
-from codeweaver.semantic.categories import (
-    CategoryRegistry,
+from codeweaver.semantic.classifications import (
+    ClassificationRegistry,
     ImportanceScoresDict,
     SemanticCategoryDict,
     SemanticClass,
@@ -49,7 +49,7 @@ class ExtensionResult(DataclassSerializationMixin):
 
 
 def _check_registry_mapping_cached(
-    node_type: str, language_name: SemanticSearchLanguage | str, registry: CategoryRegistry
+    node_type: str, language_name: SemanticSearchLanguage | str, registry: ClassificationRegistry
 ) -> tuple[SemanticClass | None, float, str | None]:
     """Registry mapping check - caching moved to instance level to avoid unhashable issues."""
     if not isinstance(language_name, SemanticSearchLanguage):
@@ -67,7 +67,7 @@ class LanguageExtensionManager:
         None
     )
 
-    def __init__(self, registry: CategoryRegistry | None = None) -> None:
+    def __init__(self, registry: ClassificationRegistry | None = None) -> None:
         """Initialize the extension manager with a category registry."""
         self.registry = registry or create_default_registry()
         if not type(self).special_patterns:
@@ -89,7 +89,7 @@ class LanguageExtensionManager:
                     SemanticCategoryDict(
                         name="jsx_markup_element",
                         description="A JSX or TSX element or markup component",
-                        tier=3,
+                        rank=3,
                         importance_scores=ImportanceScoresDict(
                             discovery=0.70,
                             comprehension=0.60,
@@ -97,7 +97,7 @@ class LanguageExtensionManager:
                             debugging=0.55,
                             documentation=0.35,
                         ),
-                        parent_category=SemanticClass.DEFINITION_CALLABLE,
+                        parent_classification=SemanticClass.DEFINITION_CALLABLE,
                         language_specific=True,
                         language=SemanticSearchLanguage.JSX,
                         examples=("JSX element", "TSX element", "react element"),
@@ -190,20 +190,20 @@ class LanguageExtensionManager:
         # Phase 1: Direct registry mapping (highest priority)
         if registry_result := self._check_registry_mapping(node_type, language):
             return ClassificationResult(
-                category=registry_result.category,
+                classification=registry_result.category,
                 confidence=registry_result.confidence,
                 phase=ClassificationPhase.LANGUAGE_EXT,
-                tier=registry_result.category.tier,
+                rank=registry_result.category.rank,
                 matched_pattern=registry_result.matched_pattern,
             )
 
         # Phase 2: Specialized pattern matching
         if pattern_result := self._check_specialized_patterns(node_type, language):
             return ClassificationResult(
-                category=pattern_result.category,
+                classification=pattern_result.category,
                 confidence=pattern_result.confidence,
                 phase=ClassificationPhase.LANGUAGE_EXT,
-                tier=pattern_result.category.tier,
+                rank=pattern_result.category.rank,
                 matched_pattern=pattern_result.matched_pattern,
             )
 
@@ -218,15 +218,15 @@ class LanguageExtensionManager:
         """Refine base classification with language-specific knowledge."""
         # Check if we can upgrade the base result with language-specific information
         extension_result = self._check_language_refinement(
-            base_result.category, language, base_result.matched_pattern
+            base_result.classification, language, base_result.matched_pattern
         )
 
         if extension_result and extension_result.confidence > base_result.confidence:
             return ClassificationResult(
-                category=extension_result.category,
+                classification=extension_result.category,
                 confidence=extension_result.confidence,
                 phase=ClassificationPhase.LANGUAGE_EXT,
-                tier=extension_result.category.tier,
+                rank=extension_result.category.rank,
                 matched_pattern=extension_result.matched_pattern,
                 alternative_categories=base_result.alternative_categories,
             )
@@ -357,7 +357,7 @@ class LanguageExtensionManager:
         for node_type in node_types:
             result = self.check_extensions_first(node_type, language)
             if result:
-                coverage[node_type] = f"{result.category.name} ({result.confidence:.2f})"
+                coverage[node_type] = f"{result.classification.name} ({result.confidence:.2f})"
             else:
                 coverage[node_type] = "No extension coverage"
 
@@ -386,10 +386,10 @@ class ContextualExtensionManager(LanguageExtensionManager):
         )
 
         return ClassificationResult(
-            category=base_result.category,
+            classification=base_result.classification,
             confidence=enhanced_confidence,
             phase=base_result.phase,
-            tier=base_result.tier,
+            rank=base_result.rank,
             matched_pattern=base_result.matched_pattern,
             alternative_categories=base_result.alternative_categories,
         )
@@ -399,7 +399,11 @@ class ContextualExtensionManager(LanguageExtensionManager):
         return value.lower() if isinstance(value, str) else ""
 
     def _apply_file_path_heuristics(
-        self, confidence: float, category_name: str, parent_type: str | None, file_path: str | None
+        self,
+        confidence: float,
+        classification_name: str,
+        parent_type: str | None,
+        file_path: str | None,
     ) -> float:
         """File-path based confidence adjustments."""
         if not file_path:
@@ -409,14 +413,14 @@ class ContextualExtensionManager(LanguageExtensionManager):
 
         # JSX/TSX signals in path or parent_type
         jsx_path_indicators = ("component", "react", "ui", "frontend")
-        jsx_category = (
-            category_name.startswith(("tsx", "jsx"))
-            or "jsx" in category_name
-            or "react" in category_name
+        jsx_classification = (
+            classification_name.lower().startswith(("tsx", "jsx"))
+            or "jsx" in classification_name
+            or "react" in classification_name
         )
         parent_lower = self._safe_lower(parent_type)
 
-        if jsx_category and (
+        if jsx_classification and (
             any(ind in fp_lower for ind in jsx_path_indicators)
             or "component" in parent_lower
             or "react" in parent_lower
@@ -432,7 +436,7 @@ class ContextualExtensionManager(LanguageExtensionManager):
             confidence = min(0.98, confidence * 1.1)
 
         # Rust-specific heuristics
-        if category_name.startswith("rust"):
+        if classification_name.lower().startswith("rust"):
             rust_exts = SemanticSearchLanguage.RUST.extensions or (".rs",)
             if any(fp_lower.endswith(ext) for ext in rust_exts):
                 confidence = min(0.95, confidence * 1.05)
@@ -482,18 +486,20 @@ class ContextualExtensionManager(LanguageExtensionManager):
     ) -> float:
         """Enhance confidence based on contextual information (refactored)."""
         confidence = float(result.confidence)
-        # Prefer category.name if available, else fallback to str(category)
-        if hasattr(result.category, "name"):
-            category_name = self._safe_lower(getattr(result.category, "name", None))
+        # Prefer category.name if available, else fallback to str(classification)
+        if hasattr(result.classification, "name"):
+            category_name = self._safe_lower(getattr(result.classification, "name", None))
         else:
-            category_name = self._safe_lower(str(result.category))
+            category_name = self._safe_lower(str(result.classification))
 
         # Apply heuristics in sequence
         confidence = self._apply_file_path_heuristics(
             confidence, category_name, parent_type, file_path
         )
         confidence = self._apply_parent_heuristics(confidence, category_name, parent_type)
-        confidence = self._apply_sibling_heuristics(confidence, result.category, sibling_types)
+        confidence = self._apply_sibling_heuristics(
+            confidence, result.classification, sibling_types
+        )
 
         return float(confidence)
 

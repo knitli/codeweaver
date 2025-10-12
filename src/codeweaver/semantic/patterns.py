@@ -17,13 +17,13 @@ import textcase
 
 from pydantic import NonNegativeFloat
 
-from codeweaver.semantic.categories import ImportanceRank, SemanticClass
+from codeweaver.semantic.classifications import ImportanceRank, SemanticClass
 
 
 class Matched(NamedTuple):
     """Result of a regex match with additional metadata."""
 
-    category: SemanticClass
+    classification: SemanticClass
     confidence: NonNegativeFloat
     text: str | None
     obj: re.Match[str] | None
@@ -59,21 +59,21 @@ class Matched(NamedTuple):
                         match[group_key],
                     )
                 case _:
-                    category = SemanticClass.from_string(group_key)
-                    # `codeweaver.semantic.categories.ImportanceRank` is an int enum from 1 (highest tier, structural definitions) to 5 (lowest tier, syntax references).
+                    classification = SemanticClass.from_string(group_key)
+                    # `codeweaver.semantic.classifications.ImportanceRank` is an int enum from 1 (highest rank, structural definitions) to 5 (lowest rank, syntax references).
                     # We map this to a confidence score between 0.5 and 0.9
                     # Tier 1 -> 0.5 + 0.1 * 1 = 0.6
                     # Tier 5 -> 0.5 + 0.1 * 5 = 1.0 (capped at 0.9)
-                    confidence = min(category.tier * 0.1 + 0.4, 0.9)
+                    confidence = min(classification.rank * 0.1 + 0.4, 0.9)
                     if from_search:
                         confidence = confidence - 0.25
                     return cls(
-                        category,
+                        classification,
                         confidence,
                         match[group_key],
                         match,
                         Matcher.pattern_from_match(
-                            match, "tier", category=category, group_key=group_key
+                            match, "rank", classification=classification, group_key=group_key
                         ),
                     )
         return None
@@ -90,7 +90,7 @@ class Matcher:
 
     _operators_group: ClassVar[tuple[str, ...]] = ()
     _punctuation_group: ClassVar[tuple[str, ...]] = ()
-    _tiered_group: ClassVar[tuple[str, ...]] = ()
+    _ranked_group: ClassVar[tuple[str, ...]] = ()
 
     _group_matcher: ClassVar[Pattern[str]] = re.compile(r"\(\?P<(?P<name>\w+)>", re.IGNORECASE)
 
@@ -101,7 +101,7 @@ class Matcher:
         multi_char_operators = self._compile_multi_char_operators()
         single_char_operators = self._compile_single_char_operators()
         pure_punctuation = self._compile_pure_punctuation()
-        tier_patterns = self._compile_tier_patterns()
+        rank_patterns = self._compile_rank_patterns()
         l_parens = r"("
         r_parens = r")"
         assembled_operators = self._as_named_group(
@@ -115,7 +115,7 @@ class Matcher:
             f"{l_parens}{assembled_operators}|{assembled_punctuation}{r_parens}", re.IGNORECASE
         )
         type(self)._pattern = re.compile(
-            f"{assembled_operators}|{assembled_punctuation}|{tier_patterns}", re.IGNORECASE
+            f"{assembled_operators}|{assembled_punctuation}|{rank_patterns}", re.IGNORECASE
         )
 
     # ================================================
@@ -160,17 +160,17 @@ class Matcher:
     def pattern_from_match(
         cls,
         match: re.Match[str],
-        kind: Literal["operator", "punctuation", "tier"],
+        kind: Literal["operator", "punctuation", "rank"],
         *,
-        category: SemanticClass | None = None,
+        classification: SemanticClass | None = None,
         group_key: str | None = None,
     ) -> str:  # sourcery skip: no-complex-if-expressions, use-getitem-for-re-match-groups
         """Get the regex pattern string for a specific match kind.
 
         Args:
             match: The regex match object.
-            kind: The kind of pattern to retrieve ("operator", "punctuation", or "tier").
-            category: Optional SemanticClass to narrow down the tier pattern.
+            kind: The kind of pattern to retrieve ("operator", "punctuation", or "rank").
+            classification: Optional SemanticClass to narrow down the rank pattern.
             group_key: Optional specific group key to look for in the match.
 
         While compiling a large regex is more efficient for matching, you lose the ability to extract individual patterns for specific categories. This method allows you to retrieve the specific pattern string for a given kind of match.
@@ -179,31 +179,35 @@ class Matcher:
         """
         if kind in ("operator", "punctuation") and match.group(kind):
             return match.group(kind)
-        if kind != "tier":
+        if kind != "rank":
             raise ValueError(
-                "Kind must be 'operator', 'punctuation', or 'tier' with a valid match."
+                "Kind must be 'operator', 'punctuation', or 'rank' with a valid match."
             )
         if (
             not cls._pattern
             or not cls._operators_group
             or not cls._punctuation_group
-            or not cls._tiered_group
+            or not cls._ranked_group
         ):
             _ = cls()  # Ensure patterns are compiled
             assert cls._pattern  # noqa: S101
-            assert cls._tiered_group  # noqa: S101
-        cat = textcase.snake(str(category)) if category else ""
+            assert cls._ranked_group  # noqa: S101
+        cat = textcase.snake(str(classification)) if classification else ""
         key = (
             group_key
-            or (cat if cat and category and any(v for v in cls._tiered_group if cat in v) else None)
+            or (
+                cat
+                if cat and classification and any(v for v in cls._ranked_group if cat in v)
+                else None
+            )
             or next((k for k in match.groupdict() if k != "0" and match[k]), None)
         )
         if not key:
-            raise ValueError("Cannot determine group key for tier pattern.")
+            raise ValueError("Cannot determine group key for rank pattern.")
         search_values = next(
             (
                 v
-                for v in cls._tiered_group
+                for v in cls._ranked_group
                 if cls._group_matcher.search(v)
                 and cast(re.Match[str], v).groupdict()["name"] == key
             ),
@@ -469,16 +473,16 @@ class Matcher:
             type(self)._punctuation_group = tuple(sorted(punctuation, key=len, reverse=True))
         return "|".join(punctuation)
 
-    def _compile_tier_patterns(self) -> str:
-        """Tier-based patterns for semantic categories."""
-        # Define patterns for each semantic category
-        category_patterns = {
-            # Tier 1: PRIMARY_DEFINITIONS
+    def _compile_rank_patterns(self) -> str:
+        """Rank-based patterns for semantic classifications."""
+        # Define patterns for each semantic classification
+        classification_patterns = {
+            # Rank 1: PRIMARY_DEFINITIONS
             SemanticClass.DEFINITION_CALLABLE: r"(function|fn|proc\w*|def(inition)?|subroutine|procedure|method|constr\w+|init\w*|factory|creator).*(def(inition)?|declaration|statement)|.*function(?!_call)|class.*constructor|.*method(?!_call)|arrow_function|def.*function|def.*callable|callable.*def|def.*method|^def_\w+",
             SemanticClass.DEFINITION_TYPE: r".*(protocol|trait|generic|variatic|covariant|struct|variant|union|enum|interface|record|abstract|signature).*|.*(type|class).*(def\w+|declaration|statement|alias)|.*_type$|.*type.*alias.*",
             SemanticClass.DEFINITION_DATA: r"(constant|config\w*|schema|enum\w*|settings?).*(def(inition)?|class|type|declaration|statement)",
             SemanticClass.DEFINITION_TEST: r"(describe|fixture|test|case|scenario|spec|it).*|test.*(def(inition)?|class|case|scenario|spec|it)",
-            # Tier 2: BEHAVIORAL_CONTRACTS
+            # Rank 2: BEHAVIORAL_CONTRACTS
             SemanticClass.BOUNDARY_MODULE: r"(import\w*|from|source|export\w*|extern|req\w*|include|use).*(def(inition)?|declaration|statement)|(library|mod\w*|package|program|namespace|resource|file|compilation.*(def(inition)?|declaration|statement|unit|import|export|extern|req\w*|use)).*",
             SemanticClass.BOUNDARY_ERROR: r"(try|catch|except|finally|throw(able)?|unwrap|suppress(ion)?|raise|rescue|panic|abort|ensure).*(def(inition)?|declaration|statement|block|expression|type|class|handler?)",
             # spellchecker:off
@@ -486,28 +490,30 @@ class Matcher:
             # spellchecker:on
             SemanticClass.DOCUMENTATION_STRUCTURED: r"(docstrings?|jsdoc|api|javadoc|r(ust)?doc|kdoc|contract|doc$|specification|spec|comments?|func(tion)?|method|class|interface|trait|protocol|abstract|signature|document.*)\w*(def(inition)?|declaration|statement|block|header|section|comments?)|.*swagger\w*|\w*openapi\w*|\w*apidoc\w*|\w*raml\w*|\w*apiary\w*|\w*postman\w*|\w*json\w*schema\w*",
             # Import/dependency patterns are handled by BOUNDARY_MODULE above
-            # Tier 3: CONTROL_FLOW_LOGIC
+            # Rank 3: CONTROL_FLOW_LOGIC
             SemanticClass.FLOW_BRANCHING: r"(<branching>|if\s?then|then|if\s?else|else\s?if|if|else|elif|switch|case|match|condition(al)?|guard|when|and\s?then)\w+(def(inition)?|declaration|statement|block|expression)",
             SemanticClass.FLOW_ITERATION: r"(<looping>|for\s?each|for|for\s?in|iter(at(e|or|ion))?|for\s?to|for|while|par\s?each|chain|loop|for\s?each|repeat|until|do\s?while|do|gen(er(at(e|or|ion)))?).*(def(inition)?|declaration|statement|block|expression)",
             # Around here we can start being more aggressive with matching, because false positives will have less impact due to weighting
             SemanticClass.FLOW_CONTROL: r".*(return|yield|yield\s?(while|for|until|from)|break|control|stop|continue|goto|exit|abort).*",
             SemanticClass.FLOW_ASYNC: r".*(async\w+|await|defer|aexit|aenter|spawn|tasks?|coroutine|channel|select|promise|future|concurrent|parallel|multiproc\w+|workers?|thread(ing)?s?|mutex|lock|semaphore|atomic).*",
-            # Tier 4: OPERATIONS_EXPRESSIONS
+            # Rank 4: OPERATIONS_EXPRESSIONS
             SemanticClass.OPERATION_INVOCATION: r".*(call\w*|invoke\w*|apply\w*|exec\w*|run\w*|perform\w*|signal|start|emit\w*|dispatch\w*|trigger\w*|spawn\w*|send\w*|post\w*).*",
             SemanticClass.OPERATION_DATA: r".*(let|var\w*|const\w*|declare|define|properties|private|public|pub\w+|hidden|name||access\w*|assign\w*|update\w*|set\w*|get\w*|fetch\w*|put\w*|insert\w*|delete\w*|remove\w*|pop\w*|push\w*|append\w*|prepend\w*|slice\w*|index\w*|map\w*|filter\w*|reduce\w*|fold\w*|collect\w*|collect|concat\w*).*",
+            # spellchecker:off
             SemanticClass.OPERATION_OPERATOR: r".*(binary|unary|arith(metic|matic)|comparison|integral|diff|matrix|matric\w*|array\w*|logical|bitwise|math\w*|calc\w*|compute\w*|eval\w*|sum\w*|subtract\w*|multiply\w*|divide\w*|modulo\w*|exponent\w*|increment\w*|decrement\w*|negate\w*|compare\w*|equal\w*|less\w*|greater\w*|and\w*|or\w*|not\w*|xor\w*|shift\w*|count|enumerate|pipe|expand|expansion|un(wind|pack|wrap)).*",
+            # spellchecker:on
             SemanticClass.EXPRESSION_ANONYMOUS: r".*(lambda|closure|block|inline|immediate|self-invoking|self-executing|iife|anon|unnamed|let\s?while).*",
-            # Tier 5: SYNTAX_REFERENCES
+            # Rank 5: SYNTAX_REFERENCES
             SemanticClass.SYNTAX_IDENTIFIER: r"\w*(var\w*|let\w*|const\w*|id\w*|val\w*|name|sym.*|attr\w*|access\w*|field\w*|prop\w*|prop\w*|index\w*|idx|key\w*|key\w*|param\w*|arg\w*(?!.+list)|kwarg\w*)\w*",
             SemanticClass.SYNTAX_LITERAL: r"\w*(str|char|int|float|double|bool(ean)?|true|literal|int.+|float.+|false|null|nil|none|undef(ined)?|void|number|numeric|bigint|byte|long|array|bytes?|array\w*|list\w*|dict\w*|map\w*|set\w*|tuple\w*|obj\w*|struct\w*|enum\w*|variant\w*|date.*|time.*|size.*|\u0000|empty\w*|zero|complex|decimal)\w+",
             SemanticClass.SYNTAX_ANNOTATION: r".*(attr\w*|annotation|annotate\w*|decorator|decoration|meta\w*|tag\w*|mark\w*|note\w*|comment\w*|doc\w*|inline|override|\[attribute\]).*",
             SemanticClass.SYNTAX_PUNCTUATION: r".*(punctuation|delimiter|bracket|paren|semicolon|comma|list|arguments|argument_list|args|brace|caret|quot(e|ation)|colon|space|tab|tag|newline|carriage|indent|dedent|backtick|asterix|at|slash|hyphen).*",
         }
         named_groups = {
-            cat: self._as_named_group(pat, str(cat)) for cat, pat in category_patterns.items()
+            cat: self._as_named_group(pat, str(cat)) for cat, pat in classification_patterns.items()
         }
-        if not type(self)._tiered_group:
-            type(self)._tiered_group = tuple(named_groups.values())
+        if not type(self)._ranked_group:
+            type(self)._ranked_group = tuple(named_groups.values())
         return "|".join(named_groups.values())
 
 
@@ -517,26 +523,26 @@ _matcher: Matcher | None = None
 
 
 @lru_cache(maxsize=1024)
-def match_tier_patterns_cached(
-    node_type: str, tier_category: str | ImportanceRank, *, only_syntactic: bool = False
+def match_rank_patterns_cached(
+    node_type: str, rank_classification: str | ImportanceRank, *, only_syntactic: bool = False
 ) -> Matched | None:
-    """Cached tier pattern matching utility."""
+    """Cached rank pattern matching utility."""
     with contextlib.suppress(AttributeError, ValueError):
-        tier = (
-            ImportanceRank.from_string(tier_category)
-            if isinstance(tier_category, str)
-            else (tier_category or None)
+        rank = (
+            ImportanceRank.from_string(rank_classification)
+            if isinstance(rank_classification, str)
+            else (rank_classification or None)
         )
         matcher = get_compiled_patterns()
         if (match := matcher.match(node_type, only_syntactic=only_syntactic)) or (
             match := matcher.search(node_type, only_syntactic=only_syntactic)
         ):
-            # lower tier number means higher importance (1 is highest, 5 is lowest)
-            if tier is None or match.category.tier >= tier:
+            # lower rank number means higher importance (1 is highest, 5 is lowest)
+            if rank is None or match.classification.rank >= rank:
                 return match
-            # penalize confidence with tier upgrade
+            # penalize confidence with rank upgrade
             return Matched(
-                match.category, match.confidence * 0.75, match.text, match.obj, match.pattern
+                match.classification, match.confidence * 0.75, match.text, match.obj, match.pattern
             )
     return None
 

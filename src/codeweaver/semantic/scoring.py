@@ -16,7 +16,7 @@ from codeweaver._common import BasedModel
 
 if TYPE_CHECKING:
     from codeweaver.semantic._ast_grep import AstNode
-    from codeweaver.semantic.categories import ImportanceScores, SemanticClass
+    from codeweaver.semantic.classifications import ImportanceScores, SemanticClass
 
 
 class SemanticScorer(BasedModel):
@@ -117,3 +117,6 @@ class SemanticScorer(BasedModel):
             "namespace",
         }
         return any(keyword in kind for keyword in definition_keywords)
+
+
+__all__ = ("SemanticScorer",)

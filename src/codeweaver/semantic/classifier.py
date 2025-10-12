@@ -10,14 +10,14 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Literal, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 
-from pydantic import NonNegativeFloat, computed_field
+from pydantic import NonNegativeFloat, NonNegativeInt, computed_field
 
 from codeweaver._common import DataclassSerializationMixin
 from codeweaver.language import SemanticSearchLanguage
-from codeweaver.semantic.categories import (
-    CategoryRegistry,
+from codeweaver.semantic.classifications import (
+    ClassificationRegistry,
     ImportanceRank,
     ImportanceScoresDict,
     SemanticClass,
@@ -33,14 +33,38 @@ from codeweaver.semantic.pattern_classifier import (
 )
 
 
+if TYPE_CHECKING:
+    from codeweaver.semantic._types import ThingName
+
+
+class CoverageReport(TypedDict):
+    """Report on classification coverage for a language."""
+
+    classification: SemanticClass
+    confidence: NonNegativeFloat
+    phase: ClassificationPhase
+    grade: Literal["A", "B", "C", "D", "F"]
+
+
+class ThingClassificationReport(TypedDict):
+    """Report on classification quality metrics."""
+
+    total_classifications: NonNegativeInt
+    high_confidence_percentage: NonNegativeFloat
+    syntactic_fast_path_percentage: NonNegativeFloat
+    language_specific_percentage: NonNegativeFloat
+    average_confidence: NonNegativeFloat
+    phase_distribution: dict[ClassificationPhase, NonNegativeFloat]
+
+
 @dataclass(frozen=True)
 class EnhancedClassificationResult(DataclassSerializationMixin):
     """Enhanced result with full classification details."""
 
-    category: SemanticClass
+    classification: SemanticClass
     confidence: float
     phase: ClassificationPhase
-    tier: ImportanceRank
+    rank: ImportanceRank
     matched_pattern: str | None = None
     alternative_categories: list[SemanticClass] | None = None
     confidence_metrics: ConfidenceMetrics | None = None
@@ -74,32 +98,12 @@ class EnhancedClassificationResult(DataclassSerializationMixin):
         return "D" if self.confidence >= 0.60 else "F"
 
 
-class CoverageReport(TypedDict):
-    """Report on classification coverage for a language."""
-
-    category: SemanticClass
-    confidence: NonNegativeFloat
-    phase: ClassificationPhase
-    grade: Literal["A", "B", "C", "D", "F"]
-
-
-class NodeClassificationReport(TypedDict):
-    """Report on classification quality metrics."""
-
-    total_classifications: int
-    high_confidence_percentage: NonNegativeFloat
-    syntactic_fast_path_percentage: NonNegativeFloat
-    language_specific_percentage: NonNegativeFloat
-    average_confidence: NonNegativeFloat
-    phase_distribution: dict[ClassificationPhase, NonNegativeFloat]
-
-
-class SemanticNodeClassifier:
+class SemanticThingClassifier:
     """Unified semantic node classification system."""
 
     def __init__(
         self,
-        registry: CategoryRegistry | None = None,
+        registry: ClassificationRegistry | None = None,
         *,
         enable_contextual_extensions: bool = True,
         enable_confidence_scoring: bool = True,
@@ -123,9 +127,9 @@ class SemanticNodeClassifier:
             self.confidence_scorer = ConfidenceScorer()
             self.contextual_scorer = ContextualScorer()
 
-    def classify_node(
+    def classify_thing(
         self,
-        node_type: str,
+        thing_name: ThingName,
         language: SemanticSearchLanguage | str,
         context: str | None = None,
         context_weights: ImportanceScoresDict | None = None,
@@ -140,10 +144,10 @@ class SemanticNodeClassifier:
         # Phase 1: Check language-specific extensions first
         if (
             ext_result := self.extension_manager.classify_with_context(  # type: ignore
-                node_type, language, parent_type, sibling_types, file_path
+                thing_name, language, parent_type, sibling_types, file_path
             )
             if hasattr(self.extension_manager, "classify_with_context")
-            else self.extension_manager.check_extensions_first(node_type, language)
+            else self.extension_manager.check_extensions_first(thing_name, language)
         ):
             return self._enhance_result_with_confidence(
                 cast(ClassificationResult, ext_result),
@@ -155,11 +159,11 @@ class SemanticNodeClassifier:
             )
 
         # Phase 2: Grammar-based classification (NEW - primary path)
-        if grammar_result := self.grammar_classifier.classify_node(node_type, language):
+        if grammar_result := self.grammar_classifier.classify_thing(thing_name, language):
             # Convert GrammarClassificationResult to ClassificationResult
             base_result = ClassificationResult(
-                category=grammar_result.category,
-                tier=grammar_result.tier,
+                classification=grammar_result.classification,
+                rank=grammar_result.rank,
                 confidence=grammar_result.confidence,
                 phase=ClassificationPhase.GRAMMAR,
                 matched_pattern=f"grammar_{grammar_result.classification_method}",
@@ -176,7 +180,7 @@ class SemanticNodeClassifier:
             )
 
         # Phase 3: Pattern-based classification (fallback)
-        base_result = self.pattern_fallback.classify_node(node_type, language, context)
+        base_result = self.pattern_fallback.classify_thing(thing_name, language, context)
 
         # Phase 4: Apply language-specific refinements
         refined_result = self.extension_manager.refine_classification(
@@ -189,26 +193,26 @@ class SemanticNodeClassifier:
 
     def classify_batch(
         self,
-        node_types: list[tuple[str, SemanticSearchLanguage | str]],
+        thing_names: list[tuple[ThingName, SemanticSearchLanguage | str]],
         context: str | None = None,
         context_weights: ImportanceScoresDict | None = None,
     ) -> list[EnhancedClassificationResult]:
         """Batch classification for performance."""
         return [
-            self.classify_node(
-                node_type,
+            self.classify_thing(
+                thing_name,
                 language
                 if isinstance(language, SemanticSearchLanguage)
                 else SemanticSearchLanguage.from_string(language),
                 context,
                 context_weights,
             )
-            for node_type, language in node_types
+            for thing_name, language in thing_names
         ]
 
     def get_classification_alternatives(
         self,
-        node_type: str,
+        thing_name: ThingName,
         language: SemanticSearchLanguage | str,
         threshold: float = 0.3,
         max_alternatives: int = 5,
@@ -218,16 +222,16 @@ class SemanticNodeClassifier:
             language = SemanticSearchLanguage.from_string(language)
 
         # Get primary classification
-        primary = self.classify_node(node_type, language)
+        primary = self.classify_thing(thing_name, language)
         alternatives = [primary]
         # Get alternatives from pattern-based classifier
         if hasattr(self.pattern_fallback, "get_classification_alternatives"):
             pattern_alternatives = self.pattern_fallback.get_classification_alternatives(
-                node_type, language, threshold
+                thing_name, language, threshold
             )
 
             for alt in pattern_alternatives:
-                if alt.category != primary.category and alt.confidence >= threshold:
+                if alt.classification != primary.classification and alt.confidence >= threshold:
                     enhanced_alt = self._enhance_result_with_confidence(
                         alt, None, None, None, None, "alternative"
                     )
@@ -268,10 +272,10 @@ class SemanticNodeClassifier:
             final_confidence = confidence_metrics.final_confidence
 
         return EnhancedClassificationResult(
-            category=result.category,
+            classification=result.classification,
             confidence=final_confidence,
             phase=result.phase,
-            tier=result.category.tier,
+            rank=result.classification.rank,
             matched_pattern=result.matched_pattern,
             alternative_categories=result.alternative_categories,
             confidence_metrics=confidence_metrics,
@@ -279,10 +283,10 @@ class SemanticNodeClassifier:
         )
 
     def analyze_classification_quality(
-        self, node_types: list[tuple[str, SemanticSearchLanguage | str]]
-    ) -> NodeClassificationReport:
+        self, thing_names: list[tuple[ThingName, SemanticSearchLanguage | str]]
+    ) -> ThingClassificationReport:
         """Analyze classification quality across a set of node types."""
-        results = self.classify_batch(node_types)
+        results = self.classify_batch(thing_names)
 
         # Calculate quality metrics
         total_results = len(results)
@@ -297,7 +301,7 @@ class SemanticNodeClassifier:
         # Phase distribution
         phase_counts = Counter(result.phase for result in results)
 
-        return NodeClassificationReport(
+        return ThingClassificationReport(
             total_classifications=total_results,
             high_confidence_percentage=(high_confidence / total_results) * 100
             if total_results > 0
@@ -326,17 +330,17 @@ class SemanticNodeClassifier:
         return supported
 
     def validate_language_coverage(
-        self, language: SemanticSearchLanguage | str, sample_node_types: list[str]
+        self, language: SemanticSearchLanguage | str, sample_thing_names: list[ThingName]
     ) -> dict[str, CoverageReport]:
         """Validate classification coverage for a language."""
         if not isinstance(language, SemanticSearchLanguage):
             language = SemanticSearchLanguage.from_string(language)
 
         coverage: dict[str, CoverageReport] = {}
-        for node_type in sample_node_types:
-            result = self.classify_node(node_type, language)
-            coverage[node_type] = CoverageReport(
-                category=result.category,
+        for thing_name in sample_thing_names:
+            result = self.classify_thing(thing_name, language)
+            coverage[thing_name] = CoverageReport(
+                classification=result.classification,
                 confidence=result.confidence,
                 phase=result.phase,
                 grade=result.confidence_grade,
@@ -345,7 +349,7 @@ class SemanticNodeClassifier:
         return coverage
 
 
-class BatchClassifier(SemanticNodeClassifier):
+class BatchClassifier(SemanticThingClassifier):
     """Optimized classifier for large-scale batch operations."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -357,7 +361,7 @@ class BatchClassifier(SemanticNodeClassifier):
 
     def classify_batch_optimized(
         self,
-        node_types: list[tuple[str, SemanticSearchLanguage | str]],
+        thing_names: list[tuple[ThingName, SemanticSearchLanguage | str]],
         *,
         use_cache: bool = True,
         context: str | None = None,
@@ -366,16 +370,16 @@ class BatchClassifier(SemanticNodeClassifier):
         """Optimized batch classification with caching."""
         results: list[EnhancedClassificationResult] = []
 
-        for node_type, language in node_types:
+        for thing_name, language in thing_names:
             if not isinstance(language, SemanticSearchLanguage):
                 language = SemanticSearchLanguage.from_string(language)
 
-            cache_key = (node_type, language.name, context) if use_cache else None
+            cache_key = (thing_name, language.name, context) if use_cache else None
 
             if cache_key and cache_key in self._classification_cache:
                 results.append(self._classification_cache[cache_key])
             else:
-                result = self.classify_node(node_type, language, context, context_weights)
+                result = self.classify_thing(thing_name, language, context, context_weights)
                 results.append(result)
 
                 if cache_key:
@@ -397,22 +401,22 @@ class BatchClassifier(SemanticNodeClassifier):
 
 
 # Global instances for convenient access
-_default_classifier = SemanticNodeClassifier()
+_default_classifier = SemanticThingClassifier()
 _batch_classifier = BatchClassifier()
 
 
-def classify_semantic_node(
-    node_type: str,
+def classify_thing(
+    thing_name: ThingName,
     language: SemanticSearchLanguage | str,
     context: str | None = None,
     context_weights: ImportanceScoresDict | None = None,
 ) -> EnhancedClassificationResult:
-    """Convenient function for semantic node classification."""
-    return _default_classifier.classify_node(node_type, language, context, context_weights)
+    """Convenient function for semantic thing classification."""
+    return _default_classifier.classify_thing(thing_name, language, context, context_weights)
 
 
-def classify_nodes_batch(
-    node_types: list[tuple[str, SemanticSearchLanguage | str]],
+def classify_things_batch(
+    sample_thing_names: list[tuple[ThingName, SemanticSearchLanguage | str]],
     context: str | None = None,
     context_weights: ImportanceScoresDict | None = None,
     *,
@@ -420,32 +424,32 @@ def classify_nodes_batch(
 ) -> list[EnhancedClassificationResult]:
     """Convenient function for batch semantic node classification."""
     return _batch_classifier.classify_batch_optimized(
-        node_types, use_cache=use_cache, context=context, context_weights=context_weights
+        sample_thing_names, use_cache=use_cache, context=context, context_weights=context_weights
     )
 
 
 def get_classification_alternatives(
-    node_type: str, language: SemanticSearchLanguage | str, threshold: float = 0.3
+    thing_name: ThingName, language: SemanticSearchLanguage | str, threshold: float = 0.3
 ) -> list[EnhancedClassificationResult]:
-    """Get alternative classifications for a node type."""
-    return _default_classifier.get_classification_alternatives(node_type, language, threshold)
+    """Get alternative classifications for a thing."""
+    return _default_classifier.get_classification_alternatives(thing_name, language, threshold)
 
 
 def analyze_classification_quality(
-    node_types: list[tuple[str, SemanticSearchLanguage | str]],
-) -> NodeClassificationReport:
+    thing_names: list[tuple[ThingName, SemanticSearchLanguage | str]],
+) -> ThingClassificationReport:
     """Analyze classification quality metrics."""
-    return _default_classifier.analyze_classification_quality(node_types)
+    return _default_classifier.analyze_classification_quality(thing_names)
 
 
 def validate_language_coverage(
-    language: SemanticSearchLanguage | str, sample_node_types: list[str]
+    language: SemanticSearchLanguage | str, sample_thing_names: list[ThingName]
 ) -> dict[str, CoverageReport]:
     """Validate classification coverage for a language."""
-    return _default_classifier.validate_language_coverage(language, sample_node_types)
+    return _default_classifier.validate_language_coverage(language, sample_thing_names)
 
 
-def get_default_classifier() -> SemanticNodeClassifier:
+def get_default_classifier() -> SemanticThingClassifier:
     """Get the default classifier instance."""
     return _default_classifier
 
@@ -453,3 +457,18 @@ def get_default_classifier() -> SemanticNodeClassifier:
 def get_batch_classifier() -> BatchClassifier:
     """Get the batch classifier instance."""
     return _batch_classifier
+
+
+__all__ = (
+    "BatchClassifier",
+    "EnhancedClassificationResult",
+    "SemanticThingClassifier",
+    "ThingClassificationReport",
+    "analyze_classification_quality",
+    "classify_thing",
+    "classify_things_batch",
+    "get_batch_classifier",
+    "get_classification_alternatives",
+    "get_default_classifier",
+    "validate_language_coverage",
+)
