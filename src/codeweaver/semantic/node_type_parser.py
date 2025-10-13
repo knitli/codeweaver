@@ -1,4 +1,4 @@
-# sourcery skip: lambdas-should-be-short
+# sourcery skip: avoid-builtin-shadow, lambdas-should-be-short, no-complex-if-expressions
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -156,17 +156,19 @@ type constraints:
 
 - **is_explicit_rule** (bool)
   - Whether the Thing has a dedicated named production rule in the grammar
-  - True: Named grammar rule (appears with semantic name)
+  - True: Named grammar rule (represented in grammar with semantic name)
   - False: Anonymous grammar construct or synthesized node
-  - **Tree-sitter equivalent**: `named = True/False`
+  - **Tree-sitter equivalent**: `named = True/False` (i.e. 'named nodes')
   - **Note**: Included for completeness; limited practical utility for semantic analysis
+    in practice, most significant nodes are named, and most unnamed nodes are trivial (punctuation, formatting), but it's not a perfect correlation. Other tools and libraries tend to treat unnamed nodes
+    as synonymous with "insignificant", but we don't make that assumption here.
 
 - **kind** (ThingKind enum)
   - Classification of Thing type: TOKEN or COMPOSITE
   - TOKEN: Leaf Thing with no structural children
   - COMPOSITE: Non-leaf Thing with structural children
 
-- **is_start** (bool, Composite only)
+- **is_file** (bool, Composite only)
   - Whether this Composite is the root of the parse tree (i.e., the start symbol)
 
 - **is_significant** (bool, Token only)
@@ -216,7 +218,7 @@ For developers familiar with tree-sitter terminology:
 | `named` attribute | `is_explicit_rule` | Has named grammar rule |
 | `multiple` attribute | `allows_multiple` | Upper cardinality bound |
 | `required` attribute | `requires_presence` | Lower cardinality bound |
-| 'root' attribute | `is_start` | The starting node of the parse tree |
+| 'root' attribute | `is_file` | The starting node of the parse tree |
 
 ## Design Rationale
 
@@ -245,1067 +247,53 @@ from __future__ import annotations
 
 import logging
 
-from collections import defaultdict
-from collections.abc import Generator, Iterable, Iterator, Sequence
+from collections.abc import Sequence
 from functools import cached_property
 from itertools import groupby
 from pathlib import Path
-from types import MappingProxyType
-from typing import Annotated, Any, ClassVar, Literal, TypedDict, cast, overload, override
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, cast, overload
 
-from pydantic import (
-    ConfigDict,
-    DirectoryPath,
-    Field,
-    FilePath,
-    NonNegativeInt,
-    computed_field,
-    field_validator,
-)
+from pydantic import DirectoryPath, Field, FilePath
 from pydantic_core import from_json
 
-from codeweaver._common import BasedModel, LiteralStringT, RootedRoot
+from codeweaver._common import RootedRoot
+from codeweaver._utils import lazy_importer
 from codeweaver.language import SemanticSearchLanguage
-from codeweaver.semantic._types import (
-    CategoryName,
-    ConnectionClass,
-    ConnectionConstraint,
-    NodeTypeDTO,
-    Role,
-    SimpleNodeTypeDTO,
-    ThingKind,
-    ThingName,
-    ThingOrCategoryNameType,
-    TokenPurpose,
-)
+from codeweaver.semantic._types import CategoryName, NodeTypeDTO, ThingName
+
+
+registry_module = lazy_importer("codeweaver.semantic.thing_registry")
+
+if TYPE_CHECKING:
+    from codeweaver.semantic.grammar_things import (
+        Category,
+        CompositeThing,
+        DirectConnection,
+        PositionalConnections,
+        ThingOrCategoryType,
+        ThingType,
+        Token,
+    )
+    from codeweaver.semantic.thing_registry import ThingRegistry
+else:
+    grammar_module = lazy_importer("codeweaver.semantic.grammar_things")
+    Category = grammar_module.Category
+    CompositeThing = grammar_module.CompositeThing
+    DirectConnection = grammar_module.DirectConnection
+    PositionalConnections = grammar_module.PositionalConnections
+    ThingOrCategoryType = grammar_module.ThingOrCategoryType
+    ThingType = grammar_module.ThingType
+    Token = grammar_module.Token
 
 
 logger = logging.getLogger()
 
 
-def name_normalizer(name: str) -> str:
-    """Normalize names by stripping leading underscores."""
-    return name.lower().strip().lstrip("_")
-
-
-def cat_name_normalizer(name: LiteralStringT | CategoryName) -> CategoryName:
-    """Normalize category names by stripping leading underscores."""
-    return CategoryName(name_normalizer(str(name)))  # pyright: ignore[reportArgumentType]
-
-
-def thing_name_normalizer(name: LiteralStringT | ThingName) -> ThingName:
-    """Normalize thing names by stripping leading underscores."""
-    return ThingName(name_normalizer(str(name)))  # pyright: ignore[reportArgumentType]
-
-
-def role_name_normalizer(name: LiteralStringT | Role) -> Role:
-    """Normalize role names by stripping leading underscores."""
-    return Role(name_normalizer(str(name)))  # pyright: ignore[reportArgumentType]
-
-
-class AllThingsDict(TypedDict):
-    """TypedDict for all Things and Tokens in a grammar."""
-
-    composite_things: dict[ThingName, CompositeThing]
-    tokens: dict[ThingName, Token]
-
-
-class Thing(BasedModel):
-    """Base class for Things (Things and Tokens -- also called Composites and Tokens)).
-
-    There are two kinds of Things: Token (leaf) or Composite (non-leaf). Things are what you actually see in the AST produced by parsing code. A token is what you literally see in the source code (keywords, identifiers, literals, punctuation). A Composite represents complex structures like functions, classes, and expressions, which have direct and/or positional connections to child Things.
-
-    We keep Token as a separate class for clarity, type safety, and to enforce that Tokens cannot have children.
-
-    """
-
-    model_config = BasedModel.model_config | ConfigDict(frozen=True)
-
-    name: Annotated[ThingName, Field(description="The name of the Thing.")]
-
-    language: Annotated[
-        SemanticSearchLanguage, Field(description="The programming language this Thing belongs to.")
-    ]
-
-    category_names: Annotated[
-        frozenset[CategoryName],
-        Field(description="Names of Categories this Thing belongs to.", default_factory=frozenset),
-    ]
-
-    is_explicit_rule: Annotated[
-        bool,
-        Field(
-            description="""
-            Whether this Thing has a dedicated named production rule in the grammar.
-
-            Tree-sitter: `named = True/False`
-            True: Named grammar rule (appears with semantic name)
-            False: Anonymous construct or synthesized node
-
-            Note: Limited utility for semantic analysis; included for completeness.
-            """,
-            validation_alias="named",
-        ),
-    ] = True
-
-    can_be_anywhere: (
-        Annotated[
-            bool,
-            Field(
-                description="""
-            Whether the target Thing can appear anywhere in the parse tree. Corresponds to tree-sitter's `extra` attribute.
-            """
-            ),
-        ]
-        | None
-    ) = None
-
-    _kind: ClassVar[Literal[ThingKind.TOKEN, ThingKind.COMPOSITE]]
-
-    def __init__(self, **data: Any) -> None:
-        """Initialize a Thing (Token or Composite)."""
-        for key in ("is_explicit_rule", "can_be_anywhere"):
-            if key not in data or data[key] is None:
-                data[key] = False
-        if not data.get("category_names"):
-            data["category_names"] = frozenset()
-        super().__init__(**data)
-
-    @property
-    def categories(self) -> frozenset[Category]:
-        """Resolve Categories from registry by name."""
-        registry = get_registry()
-        return frozenset(
-            cat
-            for name in self.category_names
-            if (cat := registry.get_category_by_name(name, language=self.language))
-        )
-
-    @classmethod
-    def from_node_dto(cls, node_dto: NodeTypeDTO, category_names: frozenset[CategoryName]) -> Thing:
-        """Create a Thing (Token or Composite) from a NodeTypeDTO and category names."""
-        if node_dto.is_category:
-            raise ValueError("Cannot create Thing from Category node")
-        thing_cls: type[Thing] = CompositeThing if node_dto.is_composite else Token
-        thing_kwargs: dict[str, Any] = {
-            "name": ThingName(node_dto.node),
-            "language": node_dto.language,
-            "is_explicit_rule": node_dto.named,
-            "can_be_anywhere": node_dto.extra,
-            "category_names": category_names,
-        }
-        if not node_dto.is_composite:
-            thing_kwargs["purpose"] = TokenPurpose.from_node_dto(node_dto)
-        if thing_cls is CompositeThing:
-            thing_kwargs["is_start"] = node_dto.root
-        return thing_cls.model_validate(thing_kwargs)
-
-    @property
-    def is_multi_category(self) -> bool:
-        """Check if this Thing belongs to multiple Categories."""
-        return len(self.categories) > 1
-
-    @property
-    def is_single_category(self) -> bool:
-        """Check if this Thing belongs to exactly one Category."""
-        return len(self.categories) == 1
-
-    @property
-    def primary_category(self) -> Category | None:
-        """Get the primary Category of this Thing, if it exists.
-
-        Returns the single Category if the Thing belongs to exactly one; otherwise, returns None.
-        """
-        return next(iter(self.categories)) if self.is_single_category else None
-
-    @property
-    def kind(self) -> Literal[ThingKind.TOKEN, ThingKind.COMPOSITE]:
-        """The kind of this Thing (TOKEN or COMPOSITE)."""
-        return self._kind
-
-    @property
-    def is_token(self) -> bool:
-        """Whether this Thing is a Token."""
-        return self._kind == ThingKind.TOKEN
-
-    @property
-    def is_composite(self) -> bool:
-        """Whether this Thing is a Composite."""
-        return self._kind == ThingKind.COMPOSITE
-
-    def __str__(self) -> str:
-        """String representation of the Thing."""
-        if self.primary_category:
-            return f"Thing: {self.name}, Category: {self.primary_category}, Language: {self.language.variable}"
-        return f"Thing: {self.name}, Categories: {list(self.categories)}, Language: {self.language.variable}"
-
-
-class CompositeThing(Thing):
-    """A CompositeThing is a concrete element that appears in the parse tree. A Token is a Thing, but a CompositeThing (this class) is not a Token.
-
-    Tree-sitter equivalent: Node with fields and/or children
-
-    Attributes:
-        name: Thing identifier (e.g., "if_statement", "identifier")
-        kind: Structural classification (always COMPOSITE)
-        language: Programming language this Thing belongs to
-        categories: Set of Category names this Thing belongs to
-        is_explicit_rule: Whether has named grammar rule
-
-    Relationships:
-        - Thing → Many Categories (via categories attribute)
-        - Categories reference Things via their `member_things` attribute
-
-    A CompositeThing represents complex structures like functions, classes, and expressions, which have direct and/or positional connections to child Things.
-
-    Empirical findings:
-        - Average 3-5 Direct Connections per CompositeThing
-        - Average 1-2 Positional Connections per CompositeThing
-    """
-
-    is_start: (
-        Annotated[
-            bool,
-            Field(
-                description="Whether this Composite is the root of the parse tree (i.e., the start symbol).",
-                validation_alias="root",
-            ),
-        ]
-        | None
-    ) = None
-
-    _kind: ClassVar[Literal[ThingKind.COMPOSITE]] = ThingKind.COMPOSITE  # type: ignore
-
-    def __init__(self, **data: Any) -> None:
-        """Initialize a CompositeThing."""
-        if "is_start" not in data or data["is_start"] is None:
-            data["is_start"] = False
-        super().__init__(**data)
-
-    @property
-    def direct_connections(self) -> frozenset[DirectConnection]:
-        """Resolve DirectConnections from registry by source Thing name."""
-        registry = get_registry()
-        connections = registry.get_direct_connections_by_source(self.name, language=self.language)
-        return frozenset(connections)
-
-    @property
-    def positional_connections(self) -> PositionalConnection | None:
-        """Resolve PositionalConnections from registry by source Thing name.
-
-        Note: There can be at most one PositionalConnection per CompositeThing, since children are ordered. The PositionalConnection itself can reference multiple target Things. **Not all CompositeThings have PositionalConnections.**
-        """
-        registry = get_registry()
-        # direct=False guarantees PositionalConnection
-        return registry.get_positional_connections_by_source(self.name, language=self.language)
-
-    @property
-    def kind(self) -> Literal[ThingKind.COMPOSITE]:
-        """The kind of this Thing (always COMPOSITE)."""
-        return self._kind
-
-    @property
-    def is_token(self) -> Literal[False]:
-        """Whether this Thing is a Token (always False)."""
-        return False
-
-    @property
-    def is_composite(self) -> Literal[True]:
-        """Whether this Thing is a Composite (always True)."""
-        return True
-
-    def __str__(self) -> str:
-        """String representation of the CompositeThing."""
-        if self.primary_category:
-            return f"CompositeThing: {self.name}, Category: {self.primary_category}, Language: {self.language.variable}"
-        return f"CompositeThing: {self.name}, Categories: {list(self.categories)}, Language: {self.language.variable}"
-
-
-class Token(Thing):
-    """A Token is a leaf Thing with no structural children.
-
-    A Token represents keywords, identifiers, literals, and punctuation -- what you literally see in the source code. Tokens are classified by their purpose, indicating whether they carry semantic or structural meaning versus being mere formatting trivia.
-    """
-
-    purpose: Annotated[
-        TokenPurpose,
-        Field(
-            description="""
-            Semantic importance classification.
-
-            KEYWORD: Keywords, operators, delimiters (if, {, +)
-            IDENTIFIER: Variable/function/class names
-            LITERAL: String/number/boolean values
-            PUNCTUATION: Whitespace, line continuations (insignificant)
-            COMMENT: Code comments (significant but not code)
-
-            Used for filtering: include KEYWORD/IDENTIFIER/LITERAL for semantic analysis,
-            include all for formatting/reconstruction.
-        """
-        ),
-    ]
-
-    _kind: ClassVar[Literal[ThingKind.TOKEN]] = ThingKind.TOKEN  # type: ignore
-
-    @property
-    def kind(self) -> Literal[ThingKind.TOKEN]:
-        """The kind of this Thing (always TOKEN)."""
-        return self._kind
-
-    @property
-    def is_token(self) -> Literal[True]:
-        """Whether this Thing is a Token (always True)."""
-        return True
-
-    @property
-    def is_composite(self) -> Literal[False]:
-        """Whether this Thing is a Composite (always False)."""
-        return False
-
-    def __str__(self) -> str:
-        """String representation of the Token."""
-        return f"Token: {self.name}, Purpose: {self.purpose.as_title}, Language: {self.language.as_title}"
-
-
-class Category(BasedModel):
-    """A Category is an abstract classification that groups Things with shared characteristics.
-
-    Categories do not appear in parse trees. They are primarily for classification of related Things. For example, `expression` is a Category containing `binary_expression`,
-    `unary_expression`, etc.
-    """
-
-    model_config = BasedModel.model_config | ConfigDict(frozen=True)
-
-    name: Annotated[
-        CategoryName,
-        Field(
-            description="The name of the Category.",
-            default_factory=lambda name: cat_name_normalizer(name)
-            if isinstance(name, str)
-            else cat_name_normalizer(name["name"]),  # type: ignore
-        ),
-    ]
-
-    language: Annotated[
-        SemanticSearchLanguage,
-        Field(description="The programming language this Category belongs to."),
-    ]
-
-    member_thing_names: Annotated[
-        frozenset[ThingName],
-        Field(
-            description="Names of Things that are members of this Category.",
-            default_factory=frozenset,
-        ),
-    ]
-
-    @classmethod
-    def from_node_dto(cls, node_dto: NodeTypeDTO) -> Category:
-        """Create a Category from the given node DTOs."""
-        member_names = frozenset(
-            ThingName(node["node"]) for node in cast(list[SimpleNodeTypeDTO], node_dto.subtypes)
-        )
-        return cls.model_validate({
-            "name": CategoryName(node_dto.node),
-            "language": node_dto.language,
-            "member_thing_names": member_names,
-        })
-
-    @field_validator("language", mode="after")
-    @classmethod
-    def _validate_language(cls, value: Any) -> SemanticSearchLanguage:
-        """Validate that the language is a SemanticSearchLanguage that has defined Categories in its grammar."""
-        if not isinstance(value, SemanticSearchLanguage):
-            raise TypeError("Invalid language")
-        if value in (
-            SemanticSearchLanguage.CSS,
-            SemanticSearchLanguage.ELIXIR,
-            SemanticSearchLanguage.HTML,
-            SemanticSearchLanguage.SOLIDITY,
-            SemanticSearchLanguage.SWIFT,
-            SemanticSearchLanguage.YAML,
-        ):
-            logger.warning(
-                """Something doesn't look right here. You provided %s and that language has no Categories. We're going to let it go because the grammar could have changed. Please submit an issue at https://github.com/knitli/codeweaver-mcp/issues/ to let us look into it more deeply.""",
-                value.variable,
-            )
-        return value
-
-    @cached_property
-    def member_things(self) -> frozenset[CompositeThing | Token]:
-        """Resolve member Things from registry by name."""
-        registry = get_registry()
-        return frozenset(
-            thing
-            for name in self.member_thing_names
-            if (thing := registry.get_thing_by_name(name, language=self.language))
-            and not isinstance(thing, Category)
-        )
-
-    def __str__(self) -> str:
-        """String representation of the Category."""
-        return f"Category: {self.name}, Language: {self.language.variable}, Members: [{', '.join(sorted(thing.name for thing in self.member_things), key=str.lower)}]"  # pyright: ignore[reportCallIssue]
-
-    @property
-    def short_str(self) -> str:
-        """Short string representation of the Category."""
-        return f"Category: {self.name} <<{self.language!s}>>"
-
-    def __contains__(self, thing: CompositeThing | Token) -> bool:
-        """Check if this Category contains the specified Thing."""
-        return thing in self.member_things
-
-    @override
-    def __iter__(self) -> Iterator[CompositeThing | Token]:  # pyright: ignore[reportIncompatibleMethodOverride]
-        """Iterate over the member Things in this Category."""
-        return iter(self.member_things)
-
-    def __len__(self) -> int:
-        """Get the number of member Things in this Category."""
-        return len(self.member_things)
-
-    def includes(self, thing_name: ThingName) -> bool:
-        """Check if this Category includes the specified Thing name."""
-        return thing_name in self.member_thing_names
-
-    def overlap_with(self, other: Category) -> frozenset[ThingOrCategoryType]:
-        """Check if this Category shares any member Things with another Category. Returns the overlapping member Thing names.
-
-        Used for analyzing multi-category membership.
-        """
-        return self.member_things & other.member_things
-
-
-class Connection(BasedModel):
-    """Base class for Connections between Things in a parse tree.
-
-    A Connection is a relationship from a parent Thing to child Thing(s) (an 'edge' in graph terminology). There are three classes of Connections: Direct or Positional. Direct and Positional Connections describe structure.
-
-    Attributes:
-        connection_class: Classification of connection type (DIRECT, POSITIONAL)
-        target_thing_names: Set of names of target Things this Connection can point to
-        allows_multiple: Whether this Connection permits multiple children of specified type(s)
-        requires_presence: Whether at least one child of specified type(s) MUST be present
-
-    Relationships:
-        - Connection → Many Things (via target_thing_names attribute)
-        - Things reference Connections via their `direct_connections` or `positional_connections` attributes
-
-    Empirical findings:
-        - Average 3-5 Direct Connections per CompositeThing
-        - Average 1-2 Positional Connections per CompositeThing
-    """
-
-    model_config = BasedModel.model_config | ConfigDict(frozen=True)
-
-    source_thing: Annotated[
-        ThingName,
-        Field(description="The name of the source Thing this Connection originates from."),
-    ]
-
-    target_thing_names: Annotated[
-        tuple[ThingOrCategoryNameType, ...],
-        Field(
-            description="Names of target Things or Categories this Connection can point to.",
-            default_factory=tuple,
-        ),
-    ]
-
-    allows_multiple: Annotated[
-        bool,
-        Field(
-            description="""
-            Whether connection permits multiple children of specified types.
-
-            Defines upper cardinality bound:
-            - False: at most 1 child (0 or 1)
-            - True: any number of children (0 or many)
-
-            Tree-sitter: `multiple = True/False`
-            """
-        ),
-    ] = False
-
-    requires_presence: Annotated[
-        bool,
-        Field(
-            description="""
-            Whether at least one child of specified types MUST be present.
-
-            Defines lower cardinality bound (0 or 1 vs 1 or many).
-
-            Tree-sitter: `required = True/False`
-            """
-        ),
-    ] = False
-
-    language: Annotated[
-        SemanticSearchLanguage,
-        Field(description="The programming language this Connection belongs to."),
-    ]
-
-    _connection_class: ClassVar[Literal[ConnectionClass.DIRECT, ConnectionClass.POSITIONAL]]
-
-    @property
-    def target_things(self) -> frozenset[ThingOrCategoryType]:
-        """Resolve target Things/Categories from registry by name."""
-        registry = get_registry()
-        return frozenset(
-            thing
-            for name in self.target_thing_names
-            if (thing := registry.get_thing_by_name(name, language=self.language))
-        )
-
-    def __contains__(self, thing: ThingOrCategoryType | ThingOrCategoryNameType) -> bool:
-        """Check if this Connection can point to the specified Thing or Category by name or instance."""
-        if isinstance(thing, CompositeThing | Token | Category):
-            return thing in self.target_things
-        return thing in self.target_thing_names
-
-    def __len__(self) -> int:
-        """Get the number of target Things/Categories this Connection can point to."""
-        return len(self.target_thing_names)
-
-    @property
-    def _cardinality(self) -> tuple[Literal[0, 1], Literal[-1, 1]]:
-        """Get human-readable cardinality description."""
-        min_card = 1 if self.requires_presence else 0
-        max_card = -1 if self.allows_multiple else 1  # -1 indicates unbounded
-        return (min_card, max_card)
-
-    @computed_field
-    @property
-    def constraints(self) -> ConnectionConstraint:
-        """Get ConnectionConstraint flags for this Connection."""
-        return ConnectionConstraint.from_cardinality(*self._cardinality)
-
-    def can_connect_to(self, thing: ThingOrCategoryType | ThingOrCategoryNameType) -> bool:
-        """Check if this Connection can point to the specified Thing.
-
-        This method differs slightly from using __contains__ because it treats Things that can be anywhere (extra) as always connectable.
-        """
-        if (
-            not isinstance(thing, str)
-            and hasattr(thing, "can_be_anywhere")
-            and cast(Thing | Token, thing).can_be_anywhere
-        ):
-            return True
-        return thing in self
-
-    @computed_field
-    @property
-    def connection_count(self) -> NonNegativeInt:
-        """Get the number of target Things this Connection can point to."""
-        return len(self)
-
-    @property
-    def connection_class(self) -> Literal[ConnectionClass.DIRECT, ConnectionClass.POSITIONAL]:
-        """Get the connection class of this Connection (DIRECT or POSITIONAL)."""
-        return self._connection_class
-
-
-class DirectConnection(Connection):
-    """A DirectConnection is a named semantic relationship with a Role.
-
-    Tree-sitter equivalent: Grammar "fields".
-
-    Attributes:
-        role: Semantic function name (e.g., "condition", "body")
-        _connection_class: Always ConnectionClass.DIRECT
-
-
-    Characteristics:
-        - Most precise type of structural relationship
-        - Role describes what purpose the child serves
-        - Only Direct connections have Roles
-
-    Empirical findings:
-        - ~90 unique role names across all languages
-        - Most common: name (381), body (281), type (217), condition (102)
-        - Average 3-5 Direct connections per Composite Thing
-    """
-
-    role: Annotated[
-        Role,
-        Field(
-            description="""
-            The semantic function of this DirectConnection.
-
-            Describes what purpose a child serves, not just that it exists.
-            Examples: "condition", "body", "parameters", "left", "right", "operator"
-
-            Tree-sitter equivalent: Field name in grammar
-            """,
-            default_factory=lambda name: role_name_normalizer(name)  # type: ignore
-            if isinstance(name, str)
-            else role_name_normalizer(name["role"]),  # type: ignore
-        ),
-    ]
-
-    _connection_class: ClassVar[Literal[ConnectionClass.DIRECT]] = ConnectionClass.DIRECT  # type: ignore
-    # pylance complains because the base class is a union of both DIRECT and POSITIONAL, but this is exactly what we want
-    # We have clear segregation between DirectConnection and PositionalConnection via this class variable and separate subclasses
-
-    @classmethod
-    def from_node_dto(cls, node_dto: NodeTypeDTO) -> list[DirectConnection]:
-        """Create DirectConnections from the given node DTOs."""
-        if not node_dto.fields:
-            return []
-        return [
-            cls.model_validate({
-                "source_thing": ThingName(node_dto.node),
-                "role": Role(role),
-                "target_thing_names": tuple(ThingName(t["node"]) for t in child_type.types),
-                "allows_multiple": child_type.multiple,
-                "requires_presence": child_type.required,
-                "language": node_dto.language,
-            })
-            for role, child_type in node_dto.fields.items()
-        ]
-
-    def __str__(self) -> str:
-        """String representation of the DirectConnection."""
-        targets = ", ".join(sorted(str(name) for name in self.target_thing_names))
-        return f"DirectConnection: {self.source_thing} --[{self.role}]--{self.constraints.variable}--> [{targets}] (Language: {self.language.variable})"
-
-
-class PositionalConnection(Connection):
-    """A PositionalConnection is an ordered structural relationship without a Role.
-
-    Tree-sitter equivalent: Grammar "children".
-
-    Characteristics:
-        - Less precise than DirectConnection (no Role)
-        - Ordered relationship (position may imply role)
-        - No Role; may have implied role from position
-
-    Empirical findings:
-        - Average 1-2 Positional connections per Composite Thing
-    """
-
-    _connection_class: ClassVar[  # type: ignore
-        Literal[ConnectionClass.POSITIONAL]
-    ] = ConnectionClass.POSITIONAL  # type: ignore
-    # pylance complains because the base class is a union of both DIRECT and POSITIONAL, but this is exactly what we want
-
-    @classmethod
-    def from_node_dto(cls, node_dto: NodeTypeDTO) -> PositionalConnection | None:
-        """Create PositionalConnections from the given node DTOs."""
-        if not node_dto.children:
-            return None
-        child_type = node_dto.children
-        target_names = tuple(ThingName(t["node"]) for t in child_type.types)
-        # Create a single PositionalConnection with all targets
-        # Position indices are managed at parse-time, not stored per connection
-        return cls.model_validate({
-            "source_thing": ThingName(node_dto.node),
-            "target_thing_names": target_names,
-            "allows_multiple": child_type.multiple,
-            "requires_presence": child_type.required,
-            "language": node_dto.language,
-        })
-
-    def __str__(self) -> str:
-        """String representation of the PositionalConnection."""
-        targets = ", ".join(sorted(str(name) for name in self.target_thing_names))
-        return f"PositionalConnections: {self.source_thing} --{self.constraints.variable}--> [{targets}] (Language: {self.language.variable})"
-
-
-def _get_types_files_in_directory(directory: DirectoryPath) -> list[FilePath]:
-    """Get list of node types files in a directory.
-
-    Args:
-        directory: Directory to search for node types files
-
-    Returns:
-        List of node types file paths
-    """
-    return [
-        path
-        for path in directory.iterdir()
-        if path.is_file() and path.name.endswith("node-types.json")
-    ]
-
-
-_registry: _ThingRegistry | None = None
-
-type ThingType = CompositeThing | Token
-
-type ThingOrCategoryType = CompositeThing | Token | Category
-
-type _TokenDict = dict[ThingName, Token]
-type _CompositeThingDict = dict[ThingName, CompositeThing]
-type _CategoryDict = dict[CategoryName, Category]
-
-
-def get_registry() -> _ThingRegistry:
-    """Get the ThingRegistry instance."""
-    global _registry
-    if _registry is None:
-        _registry = _ThingRegistry()
-    return _registry
-
-
-class _ThingRegistry:
-    """Registry for managing Things and Categories for programming languages.
-
-    Responsibilities:
-        - A simple store for constructed Things and Categories
-        - Along with ThingGenerator, provides lazy access to Things by name
-
-    """
-
-    _tokens: dict[SemanticSearchLanguage, _TokenDict]
-    _composite_things: dict[SemanticSearchLanguage, _CompositeThingDict]
-    _categories: dict[SemanticSearchLanguage, _CategoryDict]
-
-    _contents: tuple[
-        dict[SemanticSearchLanguage, _TokenDict],
-        dict[SemanticSearchLanguage, _CompositeThingDict],
-        dict[SemanticSearchLanguage, _CategoryDict],
-    ]
-
-    _direct_connections: dict[SemanticSearchLanguage, dict[ThingName, list[DirectConnection]]]
-    """Direct connections by source Thing name."""
-    _positional_connections: dict[SemanticSearchLanguage, dict[ThingName, PositionalConnection]]
-    """Positional connections by source Thing name."""
-
-    _connections: tuple[
-        dict[SemanticSearchLanguage, dict[ThingName, list[DirectConnection]]],
-        dict[SemanticSearchLanguage, dict[ThingName, PositionalConnection]],
-    ]
-
-    def __init__(self) -> None:
-        """Initialize the ThingRegistry."""
-        (
-            self._tokens,
-            self._categories,
-            self._composite_things,
-            self._direct_connections,
-            self._positional_connections,
-        ) = {}, {}, {}, {}, {}
-        for lang in SemanticSearchLanguage:
-            # pylance complains because the defaultdict isn't the TypedDict
-            self._tokens[lang] = defaultdict(dict)  # type: ignore
-            self._composite_things[lang] = defaultdict(dict)  # type: ignore
-            self._categories[lang] = defaultdict(dict)  # type: ignore
-            self._direct_connections[lang] = defaultdict(dict)  # type: ignore
-            self._positional_connections[lang] = defaultdict(dict)  # type: ignore
-
-        self._contents = self._tokens, self._composite_things, self._categories
-        self._connections = self._direct_connections, self._positional_connections
-
-    def _language_content(
-        self, language: SemanticSearchLanguage
-    ) -> MappingProxyType[ThingOrCategoryNameType, ThingOrCategoryType]:
-        """Provides a combined read-only view of all Things for a specific language."""
-        return MappingProxyType(
-            self._tokens[language] | self._composite_things[language] | self._categories[language]
-        )
-
-    def _register_category(self, category: Category) -> None:
-        """Register a Category."""
-        self._categories[category.language][category.name] = category
-        if category.language == SemanticSearchLanguage.JAVASCRIPT:
-            self._categories[SemanticSearchLanguage.JSX][category.name] = Category.model_construct(
-                category.model_fields_set,
-                **(
-                    category.model_dump(mode="python", exclude={"language", "member_things"})
-                    | {"language": SemanticSearchLanguage.JSX}
-                ),
-            )
-        logger.debug("Registered %s", category)
-
-    def _register_token(self, token: Token) -> None:
-        """Register a Token."""
-        self._tokens[token.language][token.name] = token
-        if token.language == SemanticSearchLanguage.JAVASCRIPT:
-            self._tokens[SemanticSearchLanguage.JSX][token.name] = Token.model_construct(
-                token.model_fields_set,
-                **(
-                    token.model_dump(mode="python", exclude={"language", "categories"})
-                    | {"language": SemanticSearchLanguage.JSX}
-                ),
-            )
-        logger.debug("Registered %s", token)
-
-    def lookup_normalized_category_name(
-        self,
-        name: CategoryName | str | LiteralStringT,
-        language: SemanticSearchLanguage | None = None,
-    ) -> Category | None:
-        """Lookup a Category by its normalized name across all languages or a specific language.
-
-        Normalized means we consider it a match regardless of leading underscores.
-        """
-        if language:
-            content = self._categories[language]
-            for cat in content.values():
-                if cat.name.normalized == name or cat.name == name:
-                    return cat
-            return None
-        for content in self._categories.values():
-            for cat in content.values():
-                if cat.name.normalized == name or cat.name == name:
-                    return cat
-        return None
-
-    def register_thing(self, thing: ThingOrCategoryType) -> None:
-        """Register a Thing in the appropriate category."""
-        if isinstance(thing, Category):
-            self._register_category(thing)
-            return
-        if isinstance(thing, Token):
-            self._register_token(thing)
-            return
-        self._composite_things[thing.language][thing.name] = thing
-        if thing.language == SemanticSearchLanguage.JAVASCRIPT:
-            self._composite_things[SemanticSearchLanguage.JSX][thing.name] = (
-                CompositeThing.model_construct(  # type: ignore
-                    thing.model_fields_set,
-                    **(
-                        thing.model_dump(
-                            mode="python",
-                            exclude={
-                                "language",
-                                "direct_connections",
-                                "positional_connections",
-                                "categories",
-                            },
-                        )
-                        | {"language": SemanticSearchLanguage.JSX}
-                    ),
-                )
-            )
-        logger.debug("Registered %s", thing)
-
-    def _register_positional_connection(self, connection: PositionalConnection) -> None:
-        """Register a PositionalConnection."""
-        if connection.source_thing in self._positional_connections[connection.language]:
-            return
-        self._positional_connections[connection.language][connection.source_thing] = connection
-        logger.debug("Registered %s", connection)
-        if connection.language == SemanticSearchLanguage.JAVASCRIPT:
-            js_connection = PositionalConnection.model_construct(
-                connection.model_fields_set,
-                **(
-                    connection.model_dump(
-                        mode="python",
-                        exclude={
-                            "language",
-                            "constraints",
-                            "target_things",
-                            "connection_count",
-                            "connection_class",
-                        },
-                    )
-                    | {"language": SemanticSearchLanguage.JSX}
-                ),
-            )
-            if (
-                connection.source_thing
-                not in self._positional_connections[SemanticSearchLanguage.JSX]
-            ):
-                self._positional_connections[SemanticSearchLanguage.JSX][
-                    js_connection.source_thing
-                ] = js_connection
-                logger.debug("Registered %s", js_connection)
-
-    def register_connection(self, connection: DirectConnection | PositionalConnection) -> None:
-        """Register a Connection in the appropriate category."""
-        if isinstance(connection, PositionalConnection):
-            self._register_positional_connection(connection)
-            return
-        assert isinstance(connection, DirectConnection)  # noqa: S101
-        if connection.source_thing not in self._direct_connections[connection.language]:
-            self._direct_connections[connection.language][connection.source_thing] = []
-        self._direct_connections[connection.language][connection.source_thing].append(connection)  # type: ignore
-        logger.debug("Registered %s", connection)
-        if connection.language == SemanticSearchLanguage.JAVASCRIPT:
-            js_connection = DirectConnection.model_construct(
-                connection.model_fields_set,
-                **(
-                    connection.model_dump(
-                        mode="python",
-                        exclude={
-                            "language",
-                            "constraints",
-                            "target_things",
-                            "connection_count",
-                            "connection_class",
-                        },
-                    )
-                    | {"language": SemanticSearchLanguage.JSX}
-                ),
-            )
-            if (
-                not self._direct_connections[SemanticSearchLanguage.JSX]
-                or js_connection.source_thing
-                not in self._direct_connections[SemanticSearchLanguage.JSX]
-            ):
-                self._direct_connections[SemanticSearchLanguage.JSX][
-                    js_connection.source_thing
-                ] = []
-            self._direct_connections[SemanticSearchLanguage.JSX][js_connection.source_thing].append(
-                js_connection
-            )  # type: ignore
-            logger.debug("Registered %s", js_connection)
-
-    def register_connections(
-        self, connections: Iterable[DirectConnection] | PositionalConnection | None
-    ) -> None:
-        """Register multiple Connections."""
-        if connections is None:
-            return
-        if isinstance(connections, Connection):
-            self.register_connection(connections)
-            return
-        for connection in connections:
-            self.register_connection(connection)
-
-    def get_thing_by_name(
-        self, name: ThingOrCategoryNameType, *, language: SemanticSearchLanguage | None = None
-    ) -> ThingOrCategoryType | None:
-        """Get a Thing by its name across all languages."""
-        if language and name in (content := self._language_content(language)):
-            return content[name]
-        if not language:
-            for content in self._contents:
-                for language in content:
-                    if name in content[language]:
-                        return content[language][name]  # type: ignore
-        return None
-
-    def get_category_by_name(
-        self, name: CategoryName, *, language: SemanticSearchLanguage | None = None
-    ) -> Category | None:
-        """Get a Category by its name across all languages."""
-        if language and name in (content := self._categories[language]):
-            return content[name]
-        if not language:
-            for content in self._categories:
-                for language, cats in self._categories.items():
-                    if name in cats:
-                        return content[language][name]  # type: ignore
-        return None
-
-    def _get_direct_connections_by_source(
-        self, source: ThingName, *, language: SemanticSearchLanguage | None = None
-    ) -> Generator[DirectConnection]:
-        """Get DirectConnections by their source Thing name across all languages."""
-        if language:
-            yield from self.direct_connections[language].get(source, [])
-        yield from (
-            next(
-                (
-                    conns
-                    for content in self._direct_connections.values()
-                    for con_name, conns in content.items()
-                    if con_name == source
-                ),
-                [],  # type: ignore
-            )
-        )
-
-    def _get_positional_connections_by_source(
-        self, source: ThingName, *, language: SemanticSearchLanguage | None = None
-    ) -> PositionalConnection | None:
-        """Get PositionalConnections by their source Thing name across all languages."""
-        if language:
-            return self.positional_connections[language].get(source)
-        return next(
-            (
-                conn
-                for content in self._positional_connections.values()
-                for con_name, conn in content.items()
-                if con_name == source
-            ),
-            None,
-        )
-
-    def get_positional_connections_by_source(
-        self, source: ThingName, *, language: SemanticSearchLanguage | None = None
-    ) -> PositionalConnection | None:
-        """Get PositionalConnections by their source Thing name across all languages."""
-        return self._get_positional_connections_by_source(source, language=language)
-
-    def get_direct_connections_by_source(
-        self, source: ThingName, *, language: SemanticSearchLanguage | None = None
-    ) -> Generator[DirectConnection]:
-        """Get DirectConnections by their source Thing name across all languages."""
-        yield from self._get_direct_connections_by_source(source, language=language)
-
-    def register_things(self, things: Iterable[ThingOrCategoryType]) -> None:
-        """Register multiple Things."""
-        for thing in things:
-            self.register_thing(thing)
-
-    @property
-    def tokens(self) -> MappingProxyType[SemanticSearchLanguage, _TokenDict]:
-        """Get all registered Tokens."""
-        return MappingProxyType(self._tokens)
-
-    @property
-    def composite_things(self) -> MappingProxyType[SemanticSearchLanguage, _CompositeThingDict]:
-        """Get all registered CompositeThings."""
-        return MappingProxyType(self._composite_things)
-
-    @property
-    def categories(self) -> MappingProxyType[SemanticSearchLanguage, _CategoryDict]:
-        """Get all registered Categories."""
-        return MappingProxyType(self._categories)
-
-    @property
-    def connections(
-        self,
-    ) -> tuple[
-        MappingProxyType[SemanticSearchLanguage, dict[ThingName, list[DirectConnection]]],
-        MappingProxyType[SemanticSearchLanguage, dict[ThingName, PositionalConnection]],
-    ]:
-        """Get all registered Connections."""
-        return (
-            MappingProxyType(self._direct_connections),
-            MappingProxyType(self._positional_connections),
-        )
-
-    @property
-    def all_cats_and_things(
-        self,
-    ) -> MappingProxyType[
-        SemanticSearchLanguage, MappingProxyType[ThingOrCategoryNameType, ThingOrCategoryType]
-    ]:
-        """Get all registered Things and Categories combined."""
-        return MappingProxyType({
-            lang: self._language_content(lang)
-            for lang in SemanticSearchLanguage
-            if self.has_language(lang)
-        })
-
-    @property
-    def direct_connections(
-        self,
-    ) -> MappingProxyType[SemanticSearchLanguage, dict[ThingName, list[DirectConnection]]]:
-        """Get all registered DirectConnections."""
-        return MappingProxyType(self._direct_connections)
-
-    @property
-    def positional_connections(
-        self,
-    ) -> MappingProxyType[SemanticSearchLanguage, dict[ThingName, PositionalConnection]]:
-        """Get all registered PositionalConnections."""
-        return MappingProxyType(self._positional_connections)
-
-    def has_language(self, language: SemanticSearchLanguage) -> bool:
-        """Check if the registry has any Things or Categories for the specified language."""
-        return bool(
-            self._tokens.get(language)
-            or self._composite_things.get(language)
-            or self._categories.get(language)
-        )
-
-
 # ===========================================================================
 #  Translating Node Types Files to CodeWeaver
+#
+#  CodeWeaver's internal types are in `codeweaver.semantic.grammar_things`
+#  That module also has a detailed explanation of the terminology and design.
 #
 # - The downside of adopting your own vocabulary and structure is that you
 #   have to translate between your internal representation and the external
@@ -1352,7 +340,7 @@ class _ThingRegistry:
 #  - requires_presence: maps from `required` (in child type objects)
 #  - target_things: the `types` array in fields/children
 #  - source_thing: the `type` of the containing node
-#  - is_start: maps from `root`
+#  - is_file: maps from `root`
 #  - can_appear_anywhere: maps from `extra` (marks Things that can appear
 #    as children of any node)
 #
@@ -1367,6 +355,22 @@ class _ThingRegistry:
 # Approach: DTO classes for JSON structure, then conversion functions to keep pydantic validation
 # cleanly separated from parsing logic. We'll use NamedTuple for DTOs to keep them lightweight, but allow for methods if needed (unlike TypedDict).
 # ===========================================================================
+
+
+def _get_types_files_in_directory(directory: DirectoryPath) -> list[FilePath]:
+    """Get list of node types files in a directory.
+
+    Args:
+        directory: Directory to search for node types files
+
+    Returns:
+        List of node types file paths
+    """
+    return [
+        path
+        for path in directory.iterdir()
+        if path.is_file() and path.name.endswith("node-types.json")
+    ]
 
 
 class NodeArray(RootedRoot[list[NodeTypeDTO]]):
@@ -1515,7 +519,7 @@ class NodeTypeParser:
 
         self._loader = NodeTypeFileLoader()
 
-        self._registry: _ThingRegistry = get_registry()
+        self._registry: ThingRegistry = registry_module.get_registry()
 
     # we don't start the process until explicitly called
 
@@ -1612,11 +616,11 @@ class NodeTypeParser:
         # Create and register DirectConnections
         if node_dto.fields:
             direct_conns = DirectConnection.from_node_dto(node_dto)
-            self._registry.register_connections(direct_conns)
+            self._registry.register_connections(direct_conns)  # type: ignore
         # Create and register PositionalConnections
         if node_dto.children:
-            positional_conns = PositionalConnection.from_node_dto(node_dto)
-            self._registry.register_connections(positional_conns)
+            positional_conns = PositionalConnections.from_node_dto(node_dto)
+            self._registry.register_connections(positional_conns)  # type: ignore
         return composite  # type: ignore
 
     @overload
@@ -1676,6 +680,7 @@ def get_things(
     Returns:
         List of Things and Categories matching the specified languages.
     """
+    from codeweaver.semantic.thing_registry import get_registry
 
     def fetch_for_lang(language: SemanticSearchLanguage) -> list[ThingOrCategoryType]:
         parser = NodeTypeParser(languages=[language])
@@ -1697,16 +702,6 @@ def get_things(
         for language in languages:
             things.extend(fetch_for_lang(language))
     return things
-
-
-# ==========================================================================
-#                       Other Notes from Grammar Analysis
-# ==========================================================================
-#   - Most 'unnamed' *fields* (direct connections) are punctuation or operator symbols (e.g., "=", "+", ";", ",") (81%). The unnamed fields with alpha characters are keywords (e.g., "else", "catch", "finally", "return").
-#  - **All** 'named' *fields* (direct connections) are alpha characters (keywords or semantic names).
-#  - All *children* (positional connections) are 'named' (is_explicit_rule = True).
-#
-# ==========================================================================
 
 
 # Debug harness

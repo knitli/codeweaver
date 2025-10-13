@@ -9,12 +9,12 @@ from __future__ import annotations
 import contextlib
 import re
 
-from dataclasses import dataclass
 from typing import Annotated, ClassVar, Literal, NamedTuple
 
 from pydantic import Field, NonNegativeFloat
+from pydantic.dataclasses import dataclass
 
-from codeweaver._common import DataclassSerializationMixin
+from codeweaver._common import FROZEN_DATACLASS_CONFIG, DataclassSerializationMixin
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.semantic.classifications import (
     ClassificationRegistry,
@@ -38,7 +38,7 @@ class LanguagePattern(NamedTuple):
     group_name: Annotated[str, Field(max_length=50)]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, config=FROZEN_DATACLASS_CONFIG)
 class ExtensionResult(DataclassSerializationMixin):
     """Result from language extension classification."""
 

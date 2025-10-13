@@ -14,10 +14,11 @@ semantic classifications for:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from codeweaver._common import BaseEnum, DataclassSerializationMixin
+from pydantic.dataclasses import dataclass
+
+from codeweaver._common import FROZEN_DATACLASS_CONFIG, BaseEnum, DataclassSerializationMixin
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.semantic.classifications import ImportanceRank, SemanticClass
 from codeweaver.semantic.patterns import get_compiled_patterns, match_rank_patterns_cached
@@ -40,7 +41,7 @@ class ClassificationPhase(BaseEnum):
     FALLBACK = "fallback"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, config=FROZEN_DATACLASS_CONFIG)
 class ClassificationResult(DataclassSerializationMixin):
     """Result of semantic node classification."""
 

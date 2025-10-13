@@ -103,6 +103,8 @@ class FastMcpServerSettingsDict(TypedDict, total=False):
     """TypedDict for FastMCP server settings.
 
     Not intended to be used directly; used for internal type checking and validation.
+
+    Other notes: FastMCP seems to be moving towards using direct run arguments, particularly for server transport settings (like host/port). It seems like everytime we bump versions a new setting is deprecated.
     """
 
     name: NotRequired[str]

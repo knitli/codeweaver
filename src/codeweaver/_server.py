@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
 """Initialize the FastMCP application with default middleware and settings."""
 
 from __future__ import annotations
@@ -33,7 +37,7 @@ from pydantic.dataclasses import dataclass
 from pydantic_core import to_json
 
 from codeweaver import __version__ as version
-from codeweaver._common import BasedModel, BaseEnum, DataclassSerializationMixin, DictView
+from codeweaver._common import DATACLASS_CONFIG, BaseEnum, DataclassSerializationMixin, DictView
 from codeweaver._logger import setup_logger
 from codeweaver._utils import get_project_root, lazy_importer, rpartial
 from codeweaver.exceptions import InitializationError
@@ -117,7 +121,7 @@ def _get_available_features_and_services() -> Iterator[tuple[Feature, ServiceCar
     )
 
 
-@dataclass(order=True, kw_only=True, config=BasedModel.model_config | ConfigDict(extra="forbid"))
+@dataclass(order=True, kw_only=True, config=DATACLASS_CONFIG | ConfigDict(extra="forbid"))
 class HealthInfo(DataclassSerializationMixin):
     """Health information for the CodeWeaver server.
 
@@ -131,7 +135,7 @@ class HealthInfo(DataclassSerializationMixin):
     )
     version: Annotated[str, Field(description="Version of the CodeWeaver server")] = version
     startup_time: Annotated[float, Field(description="Startup time of the server")] = time.time()
-    error: Annotated[str | None, Field(description="Error message if any")] = None
+    error: Annotated[str | bytes | None, Field(description="Error message if any")] = None
 
     @classmethod
     def initialize(cls) -> HealthInfo:
@@ -186,10 +190,7 @@ def get_health_info() -> HealthInfo:
 
 
 @dataclass(
-    order=True,
-    kw_only=True,
-    config=BasedModel.model_config
-    | ConfigDict(extra="forbid", arbitrary_types_allowed=True, defer_build=True),
+    order=True, kw_only=True, config=DATACLASS_CONFIG | ConfigDict(extra="forbid", defer_build=True)
 )
 class AppState(DataclassSerializationMixin):
     """Application state for CodeWeaver server."""
@@ -261,14 +262,14 @@ class AppState(DataclassSerializationMixin):
 
     def __post_init__(self) -> None:
         global _STATE
-        _STATE = self
+        _STATE = self  # type: ignore
 
     @computed_field
     @property
     def request_count(self) -> NonNegativeInt:
         """Computed field for the number of requests handled by the server."""
         if self.statistics:
-            return self.statistics._total_requests + (self.statistics._total_http_requests or 0)
+            return self.statistics.total_requests + (self.statistics.total_http_requests or 0)
         return 0
 
 
@@ -286,7 +287,7 @@ async def lifespan(
     statistics = statistics or _get_session_statistics()
     settings = settings or get_settings()
     if not hasattr(app, "state"):
-        app.state = AppState(
+        app.state = AppState(  # type: ignore
             initialized=False,
             settings=settings,
             health=get_health_info(),
@@ -298,7 +299,7 @@ async def lifespan(
             model_registry=get_model_registry(),
             middleware_stack=tuple(getattr(app, "middleware", ())),
         )
-    state: AppState = app.state
+    state: AppState = app.state  # type: ignore
     if not isinstance(state, AppState):
         raise InitializationError(
             "AppState should be an instance of AppState, but isn't. Something is wrong. Please report this issue.",
@@ -506,24 +507,24 @@ def _integrate_user_settings(
     for key in additional_keys:
         replacement_key = key.replace("additional_", "")
         if not base_fast_mcp_settings.get(replacement_key):
-            base_fast_mcp_settings[replacement_key] = []
-        if not base_fast_mcp_settings[replacement_key] and base_fast_mcp_settings.get(key):
-            base_fast_mcp_settings[replacement_key] = [
+            base_fast_mcp_settings[replacement_key] = []  # type: ignore
+        if not base_fast_mcp_settings[replacement_key] and base_fast_mcp_settings.get(key):  # type: ignore
+            base_fast_mcp_settings[replacement_key] = [  # type: ignore
                 string_to_class(s) if isinstance(s, str) else s
-                for s in base_fast_mcp_settings[key]
+                for s in base_fast_mcp_settings[key]  # type: ignore
                 if s
             ]
         if key in base_fast_mcp_settings:
             _ = base_fast_mcp_settings.pop(key, None)
         if (value := getattr(settings, key, None)) and isinstance(value, list):
-            base_fast_mcp_settings[replacement_key].extend(
+            base_fast_mcp_settings[replacement_key].extend(  # type: ignore
                 string_to_class(item) if isinstance(item, str) else item
-                for item in value
-                if item and item not in base_fast_mcp_settings[replacement_key]
+                for item in value  # type: ignore
+                if item and item not in base_fast_mcp_settings[replacement_key]  # type: ignore
             )
-        base_fast_mcp_settings[replacement_key] = (
-            list(set(base_fast_mcp_settings[replacement_key]))
-            if base_fast_mcp_settings[replacement_key]
+        base_fast_mcp_settings[replacement_key] = (  # type: ignore
+            list(set(base_fast_mcp_settings[replacement_key]))  # type: ignore
+            if base_fast_mcp_settings[replacement_key]  # type: ignore
             else []
         )
     return base_fast_mcp_settings
@@ -613,7 +614,7 @@ def build_app() -> ServerSetup:
     host = base_fast_mcp_settings.pop("host", "127.0.0.1")
     port = base_fast_mcp_settings.pop("port", 9328)
     http_path = base_fast_mcp_settings.pop("streamable_http_path", "/codeweaver")
-    server = FastMCP[AppState](name="CodeWeaver", **base_fast_mcp_settings)
+    server = FastMCP[AppState](name="CodeWeaver", **base_fast_mcp_settings)  # type: ignore
     local_logger.info("FastMCP application initialized successfully.")
     return ServerSetup(
         app=server,

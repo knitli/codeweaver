@@ -39,7 +39,7 @@ from pydantic import (
 from pydantic.dataclasses import dataclass
 from starlette.responses import PlainTextResponse
 
-from codeweaver._common import BasedModel, BaseEnum, DataclassSerializationMixin
+from codeweaver._common import DATACLASS_CONFIG, BaseEnum, DataclassSerializationMixin
 from codeweaver._data_structures import ChunkKind, ExtKind
 from codeweaver._utils import uuid7
 from codeweaver.language import ConfigLanguage, SemanticSearchLanguage
@@ -120,7 +120,7 @@ type SummaryKey = Literal["total_operations", "unique_files"]
 type CategoryKey = Literal["code", "config", "docs", "other"]
 
 
-@dataclass(config=BasedModel.model_config | ConfigDict(extra="forbid", defer_build=True))
+@dataclass(config=DATACLASS_CONFIG | ConfigDict(extra="forbid", defer_build=True))
 class TimingStatistics(DataclassSerializationMixin):
     """By-operation timing statistics for CodeWeaver operations."""
 
@@ -393,7 +393,7 @@ class TimingStatistics(DataclassSerializationMixin):
 
 
 @dataclass(
-    config=BasedModel.model_config
+    config=DATACLASS_CONFIG
     | ConfigDict(
         extra="forbid", json_schema_extra={"noTelemetryProps": ["unique_files"]}, defer_build=True
     )
@@ -470,7 +470,7 @@ def normalize_language(language: str) -> str | SemanticSearchLanguage | ConfigLa
 
 
 @dataclass(
-    config=BasedModel.model_config
+    config=DATACLASS_CONFIG
     | ConfigDict(
         extra="forbid", json_schema_extra={"noTelemetryProps": ["unique_files"]}, defer_build=True
     )
@@ -612,7 +612,7 @@ class _CategoryStatistics(DataclassSerializationMixin):
 
 
 @dataclass(
-    config=BasedModel.model_config
+    config=DATACLASS_CONFIG
     | ConfigDict(
         extra="forbid", json_schema_extra={"noTelemetryProps": ["_other_files"]}, defer_build=True
     )
@@ -869,7 +869,7 @@ class TokenCounter(Counter[TokenCategory]):
 
 
 type UUID7_STR = Annotated[
-    str, Field(pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+    str, Field(pattern=r"^[0-9a-f]{8}-?[0-9a-f]{4}-?7[0-9a-f]{3}-?[89ab][0-9a-f]{3}-?[0-9a-f]{12}$")
 ]
 
 
@@ -892,10 +892,7 @@ class Identifier(NamedTuple):
         return datetime.fromtimestamp(self.timestamp / 1_000, tz=UTC)
 
 
-@dataclass(
-    kw_only=True,
-    config=BasedModel.model_config | ConfigDict(arbitrary_types_allowed=True, defer_build=True),
-)
+@dataclass(kw_only=True, config=DATACLASS_CONFIG | ConfigDict(defer_build=True))
 class SessionStatistics(DataclassSerializationMixin):
     """Statistics for tracking session performance and usage."""
 

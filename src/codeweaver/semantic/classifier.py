@@ -3,18 +3,18 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-"""Unified semantic node classification system."""
+"""Unified semantic thing classification system."""
 
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 
 from pydantic import NonNegativeFloat, NonNegativeInt, computed_field
+from pydantic.dataclasses import dataclass
 
-from codeweaver._common import DataclassSerializationMixin
+from codeweaver._common import FROZEN_DATACLASS_CONFIG, DataclassSerializationMixin
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.semantic.classifications import (
     ClassificationRegistry,
@@ -57,12 +57,12 @@ class ThingClassificationReport(TypedDict):
     phase_distribution: dict[ClassificationPhase, NonNegativeFloat]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=FROZEN_DATACLASS_CONFIG)
 class EnhancedClassificationResult(DataclassSerializationMixin):
     """Enhanced result with full classification details."""
 
     classification: SemanticClass
-    confidence: float
+    confidence: NonNegativeFloat
     phase: ClassificationPhase
     rank: ImportanceRank
     matched_pattern: str | None = None

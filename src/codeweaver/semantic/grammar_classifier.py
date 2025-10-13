@@ -84,10 +84,8 @@ class EvidenceKind(int, BaseEnum):
         Returns:
             Confidence score from 0.0 to 1.0
         """
-        if not kinds and not adjustment:
-            return 0.0
-        if not kinds and adjustment:
-            return min(max(adjustment / 100.0, 0.0), 1.0)
+        if not kinds:
+            return min(max(adjustment / 100.0, 0.0), 1.0) if adjustment else 0.0
         # We get total adjusted strength by summing the evidence kinds and adding any adjustment
         # Note: This can exceed 100, so we clamp the final confidence to 1.0
         total_strength = sum(kinds) + adjustment
@@ -416,9 +414,9 @@ class GrammarBasedClassifier:
                     EvidenceKind.SIMPLE_NAME_PATTERN,
                 ),
                 adjustment=90,  # very high confidence
-                differentiator=lambda node: (
+                differentiator=lambda thing: (  # type: ignore
                     SemanticClass.DOCUMENTATION_STRUCTURED
-                    if node.text.strip().startswith(("/**", "///", "//!", "#[doc", "#![doc"))  # type: ignore
+                    if thing.text.strip().startswith(("/**", "///", "//!", "#[doc", "#![doc"))  # type: ignore
                     else SemanticClass.SYNTAX_ANNOTATION
                 ),  # type: ignore
             )
@@ -702,7 +700,7 @@ class GrammarBasedClassifier:
     def _classify_from_positional_connections(
         self, thing: CompositeThing | Token, _language: SemanticSearchLanguage
     ) -> GrammarClassificationResult | None:
-        """Classify based on PositionalConnection patterns.
+        """Classify based on PositionalConnections patterns.
 
         Moderate confidence classification method (0.65-0.70) using structural patterns.
 

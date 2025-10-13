@@ -179,20 +179,27 @@ def generate_field_title(name: str, info: FieldInfo | ComputedFieldInfo) -> str:
     return textcase.sentence(name)
 
 
+DATACLASS_CONFIG = ConfigDict(
+    arbitrary_types_allowed=True,
+    cache_strings="keys",
+    field_title_generator=generate_field_title,
+    model_title_generator=generate_title,
+    serialize_by_alias=True,
+    str_strip_whitespace=True,
+    use_attribute_docstrings=True,
+    validate_by_alias=True,
+    validate_by_name=True,
+)
+
+FROZEN_DATACLASS_CONFIG = DATACLASS_CONFIG | ConfigDict(frozen=True)
+
+BASEDMODEL_CONFIG = DATACLASS_CONFIG | ConfigDict(cache_strings="all")
+
+
 class RootedRoot[RootType: Sequence[Any]](RootModel[Sequence[Any]]):
     """A pre-customized pydantic RootModel with common configuration for CodeWeaver."""
 
-    model_config = ConfigDict(
-        arbitrary_types_allowed=False,
-        cache_strings="all",
-        serialize_by_alias=True,
-        str_strip_whitespace=True,
-        field_title_generator=generate_field_title,
-        model_title_generator=generate_title,
-        use_attribute_docstrings=True,
-        validate_by_alias=True,
-        validate_by_name=True,
-    )
+    model_config = BASEDMODEL_CONFIG
 
     root: RootType  # pyright: ignore[reportIncompatibleVariableOverride]
 
@@ -221,17 +228,7 @@ class RootedRoot[RootType: Sequence[Any]](RootModel[Sequence[Any]]):
 class BasedModel(BaseModel):
     """A baser `BaseModel` for all models in the CodeWeaver project."""
 
-    model_config = ConfigDict(
-        arbitrary_types_allowed=True,
-        cache_strings="all",
-        field_title_generator=generate_field_title,
-        model_title_generator=generate_title,
-        serialize_by_alias=True,
-        str_strip_whitespace=True,
-        use_attribute_docstrings=True,
-        validate_by_alias=True,
-        validate_by_name=True,
-    )
+    model_config = BASEDMODEL_CONFIG
 
 
 @unique
@@ -635,6 +632,9 @@ class DictView[TypedDictT: (Mapping[str, Any])](Mapping[str, Any]):
 
 
 __all__ = (
+    "BASEDMODEL_CONFIG",
+    "DATACLASS_CONFIG",
+    "FROZEN_DATACLASS_CONFIG",
     "UNSET",
     "AbstractNodeName",
     "BaseEnum",

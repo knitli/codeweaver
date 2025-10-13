@@ -5,7 +5,7 @@
 # sourcery skip: 'comment:docstrings-for-functions'
 """Custom wrappers around ast-grep's core types to add functionality and serialization.
 
-Like the rest of CodeWeaver, we use our specific vocabulary for concepts to make roles and relationships more clear. See [codeweaver.semantic.node_type_parser] for more details.
+Like the rest of CodeWeaver, we use our specific vocabulary for concepts to make roles and relationships more clear. See [codeweaver.semantic.grammar_things] for more details.
 
 ## The Short(er) Version
 
@@ -24,7 +24,7 @@ Like the rest of CodeWeaver, we use our specific vocabulary for concepts to make
 | `named` attribute | `is_explicit_rule` | Has named grammar rule |
 | `multiple` attribute | `allows_multiple` | Upper cardinality bound |
 | `required` attribute | `requires_presence` | Lower cardinality bound |
-| 'root' attribute | `is_start` | The starting node of the parse tree |
+| 'root' attribute | `is_file` | It's the file. |
 
 ### What These Things Are
 
@@ -33,17 +33,16 @@ Like the rest of CodeWeaver, we use our specific vocabulary for concepts to make
 - **CompositeThing**: A CompositeThing is a thing that has fields and/or children (direct or positional connections). CompositeThings are the "phrases" of the programming language, like expressions, statements, and declarations. CompositeThings are always made up of other Things (Tokens or CompositeThings).
 - **Category**: A Category is an abstract type that can have multiple subtypes. Categories do not appear in the parse tree, but they are used to group related Things together. For example, the Category "expression" might include the subtypes "binary_expression", "call_expression", and "literal". While they don't appear in the parse tree, they can be used in search patterns to match any of their subtypes. Since there aren't very many categories, they can be an easy way to write patterns that target specific functional parts of the code.
 - **Direct Connection**: A Direct Connection is a named field in a CompositeThing that has a specific semantic Role. For example, in a function declaration, the "name" field is a Direct Connection with the Role "function_name". Direct Connections are not ordered, and they can be optional or required (the `constraints` attribute provides this information, which is based on the `allows_multiple` and `requires_presence` attributes). A CompositeThing can have multiple Direct Connections, and each connection can be to more than one target (its `target_things` attribute), and they can be of different types (Token, CompositeThing, and even Category), but it must have at least one *possible* Direct Connection. Depending on constraints, a CompositeThing may appear in the AST without an connections of any kind.
-- **Positional Connection**: A Positional Connection is a child of a CompositeThing that does not have a specific semantic Role. Positional Connections are ordered, and they can be optional or required (the `constraints` attribute provides this information, which is based on the `allows_multiple` and `requires_presence` attributes). Because of their ordered nature, a CompositeThing will either have 1 or none of a PositionalConnection type. A PositionalConnection may reference multiple types (its `target_things` attribute), which is ordered.
+- **Positional Connection**: A Positional Connection is a child of a CompositeThing that does not have a specific semantic Role. Positional Connections are ordered, and they can be optional or required (the `constraints` attribute provides this information, which is based on the `allows_multiple` and `requires_presence` attributes). Because of their ordered nature, a CompositeThing will either have 1 or none of a PositionalConnections type. A PositionalConnections may reference multiple types (its `target_things` attribute), which is ordered.
 - **Role**: A Role is the semantic function of a Direct Connection, like 'name' for a function's name, or 'condition' for an if statement's condition.
 - **Meta Variable**: A Meta Variable is a special syntax used in search patterns to capture nodes in the AST. Meta Variables are prefixed with a `$` symbol, and they can be named or unnamed. Named Meta Variables are used to capture specific nodes, while unnamed Meta Variables are used to capture any node. There are also Multi-Capture Meta Variables that can capture multiple nodes. See [the ast-grep documentation](https://ast-grep.github.io/docs/patterns/metavars/) for more details.
+- **Rules** - Ast-grep provides a rich rule system for defining more complex search patterns than what you can do with just meta variables. See [the ast-grep documentation](https://ast-grep.github.io/guide/rule-config.html) for more details.
 
 ## Connections and Navigation
 
-**All connections defined in the grammar are optional.** (One exception: a small set of nodes require at least one connection, and also may only have one connection and one possible target. It's very rare. One example in some languages would be an 'if/else' statement where the 'if' must have an 'else' branch.) Direct and positional connections define *what can be* in the AST, not what *is* in a particular instance of the AST. This is a crucial distinction. For example, a function declaration may have a "body" direct connection that points to a block statement, but if the function is declared without a body (e.g., in an interface or abstract class), then the body connection won't be in the AST:
+**All connections defined in the grammar are optional.** Sort of. For direct connections, about 36% of them require exactly one target with only one possible target type, so if one of those is present, then so will its target (and probably vice versa). Only about 8% of positional connections require exactly one target with only one possible target type, so positional connections are much more likely to be absent. But in general, you should always code defensively and assume that any connection may be absent.
 
-```python
-def placeholder_function():  # <-- No *body* here
-```
+A common way to move ("traverse") through the AST is to start at the root node (the FileThing) and then move down through its children, and then their children, and so on. You can also move up the tree to a node's parent, or sideways to its siblings. Each AstThing has methods for moving in these directions, as well as properties for accessing its connections.
 """
 
 from __future__ import annotations
@@ -53,6 +52,7 @@ import contextlib
 from collections.abc import Iterator
 from functools import cached_property
 from pathlib import Path
+from types import ModuleType
 from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, Unpack, cast, overload
 
 from ast_grep_py import (
@@ -73,16 +73,20 @@ from ast_grep_py import SgRoot as AstGrepRoot
 from pydantic import UUID7, ConfigDict, Field, NonNegativeInt, PositiveInt, computed_field
 
 from codeweaver._common import BasedModel, BaseEnum, LiteralStringT
-from codeweaver._utils import uuid7
+from codeweaver._utils import lazy_importer, uuid7
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.semantic._types import ThingName
 from codeweaver.services.textify import humanize
 
 
-# Lazy imports to avoid circular dependencies
+# type-only imports
 if TYPE_CHECKING:
     from codeweaver.semantic.classifications import ImportanceScores, SemanticClass
-    from codeweaver.semantic.node_type_parser import CompositeThing, Token
+    from codeweaver.semantic.node_type_parser import (
+        CompositeThing,
+        ThingRegistry,  # type: ignore
+        Token,
+    )
 
 
 # re-export Ast Grep's rules and config types:
@@ -97,6 +101,11 @@ AstGrepSearchTypes = (
     Relation,
     CustomLang,
 )
+
+
+def get_node_types_module() -> ModuleType:
+    """Lazy import the node types module to avoid circular imports."""
+    return lazy_importer("codeweaver.semantic.node_type_parser")
 
 
 class MetaVar(str, BaseEnum):
@@ -127,15 +136,15 @@ class Strictness(str, BaseEnum):
     """Represents the strictness level for code analysis."""
 
     CST = "cst"
-    """Concrete Syntax Tree - very strict, matches exact syntax including whitespace and comments."""
+    """Concrete Syntax Tree - strictest. All things in the pattern and target code must match; doesn't skip things."""
     SMART = "smart"
-    """Smart - balances strictness and flexibility, ignores insignificant whitespace and comments."""
+    """Smart - default. Must match all things in the pattern, but skips unnamed things in the target code."""
     AST = "ast"
-    """Abstract Syntax Tree - very flexible, focuses on structural elements and ignores most syntax details."""
+    """Abstract Syntax Tree - more flexible. Skips unnamed things in both the pattern and target code."""
     RELAXED = "relaxed"
-    """Relaxed - extremely flexible, allows for significant variations in syntax and structure."""
+    """Relaxed - like AST, but also ignores comments."""
     SIGNATURE = "signature"
-    """Signature - focuses on function/method signatures, ignoring bodies and other details."""
+    """Signature - *only* matches named things' *names* (kinds) and ignores everything else."""
 
     __slots__ = ()
 
@@ -186,10 +195,10 @@ class Range(NamedTuple):
 
 # This may not be the doctrinal way to use a generic,
 # but: 1) It makes type checkers happy, 2) It makes it very clear what's going on.
-class StartNode[SgRoot: (AstGrepRoot)](BasedModel):
+class FileThing[SgRoot: (AstGrepRoot)](BasedModel):
     """Wrapper for SgRoot to make it serializable and provide additional functionality.
 
-    The root node of an AST, representing the entire source file. It provides access to the filename and the root node of the AST. We call it a StartNode to make its role as the start of a file's syntax tree more explicit.
+    `FileThing` is the root node of an AST, representing the entire source file. It provides access to the filename and the root node of the AST. We call it a FileThing to make its role as the start of a file's syntax tree more explicit (because... root... of what?). It is a file, and a Thing.
     """
 
     model_config = BasedModel.model_config | ConfigDict(arbitrary_types_allowed=True)
@@ -197,13 +206,13 @@ class StartNode[SgRoot: (AstGrepRoot)](BasedModel):
     _root: Annotated[AstGrepRoot, Field(description="""The underlying SgRoot""", exclude=True)]
 
     @classmethod
-    def from_sg_root(cls, sg_root: AstGrepRoot) -> StartNode[SgRoot]:
-        """Create a StartNode from an ast-grep SgRoot."""
+    def from_sg_root(cls, sg_root: AstGrepRoot) -> FileThing[SgRoot]:
+        """Create a FileThing from an ast-grep SgRoot."""
         return cls(_root=sg_root)
 
     @classmethod
-    def from_sg_node(cls, sg_node: AstGrepNode) -> StartNode[SgRoot]:
-        """Create a StartNode from an ast-grep SgNode."""
+    def from_sg_node(cls, sg_node: AstGrepNode) -> FileThing[SgRoot]:
+        """Create a FileThing from an ast-grep SgNode."""
         return cls(_root=sg_node.get_root())
 
     @computed_field
@@ -214,13 +223,13 @@ class StartNode[SgRoot: (AstGrepRoot)](BasedModel):
 
     @computed_field()
     @cached_property
-    def root(self) -> StartNode[SgRoot]:
-        """Return the parent root node, also wrapped as a StartNode."""
+    def root(self) -> FileThing[SgRoot]:
+        """Return the parent root node, also wrapped as a FileThing."""
         return type(self).from_sg_node(self._root.root())
 
     @classmethod
-    def from_file(cls, file_path: Path) -> StartNode[SgRoot]:
-        """Create a StartNode from a file."""
+    def from_file(cls, file_path: Path) -> FileThing[SgRoot]:
+        """Create a FileThing from a file."""
         from codeweaver.language import SemanticSearchLanguage
 
         content = file_path.read_text()
@@ -235,7 +244,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
 
     Other notable improvements over raw `SgNode`:
     - Serialization support via Pydantic
-    - Unique identifiers for nodes (`node_id` and `parent_node_id`)
+    - Unique identifiers for nodes (`thing_id` and `parent_thing_id`)
     - Cached properties for potentially expensive operations (like `text`, `kind`, `range`, etc.)
     - Integration with CodeWeaver's semantic classification and scoring system
         - Each Thing can determine its semantic classification and importance score, providing richer context for search and analysis.
@@ -251,26 +260,30 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
 
     _node: Annotated[AstGrepNode, Field(description="""The underlying SgNode""", exclude=True)]
 
-    node_id: Annotated[UUID7, Field(description="""The unique ID of the node""")] = uuid7()
+    thing_id: Annotated[UUID7, Field(description="""The unique ID of the node""")] = uuid7()
 
-    parent_node_id: Annotated[UUID7 | None, Field(description="""The ID of the parent node""")] = (
+    parent_thing_id: Annotated[UUID7 | None, Field(description="""The ID of the parent node""")] = (
         None
+    )
+
+    _registry: Annotated[ThingRegistry, Field(exclude=True)] = (
+        get_node_types_module().get_registry()
     )
 
     def __init__(
         self,
         node: AstGrepNode,
         language: SemanticSearchLanguage | None = None,
-        node_id: UUID7 | None = None,
-        parent_node_id: UUID7 | None = None,
+        thing_id: UUID7 | None = None,
+        parent_thing_id: UUID7 | None = None,
     ) -> None:
-        """Initialize the AstThing and set the parent_node_id if applicable."""
-        node_id = node_id or uuid7()
-        if parent_node_id is None and (parent_node := self.parent):
-            parent_node_id = getattr(parent_node, "node_id", None)
-            if parent_node_id is None:
-                parent_node_id = uuid7()
-                parent_node.node_id = parent_node_id
+        """Initialize the AstThing and set the parent_thing_id if applicable."""
+        thing_id = thing_id or uuid7()
+        if parent_thing_id is None and (parent_node := self.parent):
+            parent_thing_id = getattr(parent_node, "thing_id", None)
+            if parent_thing_id is None:
+                parent_thing_id = uuid7()
+                parent_node.thing_id = parent_thing_id
         if language is None:
             with contextlib.suppress(Exception):
                 language = SemanticSearchLanguage.from_extension(
@@ -282,8 +295,8 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
             )
         self.language = language
         self._node = node
-        self.node_id = node_id
-        self.parent_node_id = parent_node_id
+        self.thing_id = thing_id
+        self.parent_thing_id = parent_thing_id
         super().__init__()
 
     @classmethod
@@ -293,16 +306,18 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         """Create an AstThing from an ast-grep `SgNode`."""
         return cls(language=language, node=sg_node)
 
+    # ================================================
+    # *      Identity and Metadata Properties       *
+    # ================================================
+
     @computed_field
     @cached_property
     def thing(self) -> CompositeThing | Token:
         """Get the grammar Thing that this node represents."""
-        from codeweaver.semantic.node_type_parser import get_registry
-
-        registry = get_registry()
         thing_name: ThingName = self.name  # type: ignore
         return cast(
-            CompositeThing | Token, registry.get_thing_by_name(thing_name, language=self.language)
+            CompositeThing | Token,
+            self._registry.get_thing_by_name(thing_name, language=self.language),
         )
 
     @computed_field
@@ -337,20 +352,26 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
 
     @computed_field
     @cached_property
-    def is_leaf(self) -> bool:
-        """Check if the node is a leaf."""
+    def is_token(self) -> bool:
+        """Check if the node is a token(leaf)."""
         return self._node.is_leaf()
 
     @computed_field
     @cached_property
-    def is_named(self) -> bool:
+    def is_composite(self) -> bool:
+        """Check if the node is a composite (non-leaf)."""
+        return not self.is_token
+
+    @computed_field
+    @cached_property
+    def has_explicit_rule(self) -> bool:
         """Check if the node is named."""
         return self._node.is_named()
 
     @computed_field
     @cached_property
-    def is_named_leaf(self) -> bool:
-        """Check if the node is a named leaf."""
+    def is_explicit_rule_token(self) -> bool:
+        """Check if the node is an token defined with a specific rule (a named leaf)."""
         return self._node.is_named_leaf()
 
     @computed_field
@@ -367,9 +388,25 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
 
     @computed_field
     @cached_property
-    def _root(self) -> StartNode[AstGrepRoot]:
+    def _root(self) -> FileThing[AstGrepRoot]:
         """Get the root of the node."""
-        return cast(StartNode[AstGrepRoot], StartNode.from_sg_root(self._node.get_root()))
+        return cast(FileThing[AstGrepRoot], FileThing.from_sg_root(self._node.get_root()))
+
+    # Semantic classification and scoring methods
+
+    @computed_field
+    @cached_property
+    def importance_score(self) -> ImportanceScores:
+        """Calculate the importance score for this node."""
+        from codeweaver.semantic import SemanticScorer
+
+        scorer = SemanticScorer(
+            depth_penalty_factor=0.02,
+            size_bonus_threshold=50,
+            size_bonus_factor=0.1,
+            root_bonus=0.07,
+        )
+        return scorer.calculate_importance_score(self.semantic_classification, self)  # pyright: ignore[reportArgumentType]
 
     def __getitem__(self, meta_var: str) -> AstThing[SgNode]:
         """Get the child node for the given meta variable."""
@@ -443,13 +480,17 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         )
 
     # traversal API
-    def get_root(self) -> StartNode[AstGrepRoot]:
+    def get_root(self) -> FileThing[AstGrepRoot]:
         """Get the root of the node."""
         return self._root
 
     def child(self, nth: NonNegativeInt) -> AstThing[SgNode] | None:
         """Get the nth child of the node."""
-        return tuple(self.children)[nth] if nth < len(tuple(self.children)) else None
+        return (
+            tuple(self.positional_connections)[nth]
+            if nth < len(tuple(self.positional_connections))
+            else None
+        )
 
     @computed_field
     @cached_property
@@ -467,8 +508,8 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
 
     @computed_field
     @cached_property
-    def children(self) -> Iterator[AstThing[SgNode]]:
-        """Get the children of the node."""
+    def positional_connections(self) -> Iterator[AstThing[SgNode]]:
+        """Get the things positionally connected to this thing (its children)."""
         yield from (
             type(self).from_sg_node(child, self.language) for child in self._node.children()
         )
@@ -476,12 +517,12 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     @computed_field
     @cached_property
     def parent(self) -> AstThing[SgNode] | None:
-        """Get the parent of the node."""
+        """Get the parent of the thing."""
         parent_node = self._node.parent()
         return type(self).from_sg_node(parent_node, self.language) if parent_node else None
 
     def next(self) -> AstThing[SgNode] | None:
-        """Get the next sibling of the node."""
+        """Get the next sibling of the thing."""
         if not self._node.next():
             return None
         return type(self).from_sg_node(cast(SgNode, self._node.next()), self.language)
@@ -500,22 +541,6 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         """Get all previous siblings of the node."""
         yield from (type(self).from_sg_node(p, self.language) for p in self._node.prev_all())
 
-    # Semantic classification and scoring methods
-
-    @computed_field
-    @cached_property
-    def importance_score(self) -> ImportanceScores:
-        """Calculate the importance score for this node."""
-        from codeweaver.semantic import SemanticScorer
-
-        scorer = SemanticScorer(
-            depth_penalty_factor=0.02,
-            size_bonus_threshold=50,
-            size_bonus_factor=0.1,
-            root_bonus=0.07,
-        )
-        return scorer.calculate_importance_score(self.semantic_classification, self)  # pyright: ignore[reportArgumentType]
-
     def replace(self, _new_text: str) -> str:
         """Replace the text of the node with new_text."""
         raise NotImplementedError("Edit functionality is not implemented yet.")
@@ -529,6 +554,7 @@ __all__ = (
     "AstThing",
     "Config",
     "CustomLang",
+    "FileThing",
     "NthChild",
     "Pattern",
     "Pos",
@@ -539,5 +565,4 @@ __all__ = (
     "Relation",
     "Rule",
     "RuleWithoutNot",
-    "StartNode",
 )

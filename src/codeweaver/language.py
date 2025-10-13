@@ -715,6 +715,47 @@ class SemanticSearchLanguage(str, BaseEnum):
             case _:
                 return None
 
+    @classmethod
+    def injection_languages(cls) -> tuple[SemanticSearchLanguage, ...]:
+        """
+        Returns supported languages that commonly contain embedded code snippets from other languages.
+        """
+        return (cls.HTML, cls.JAVASCRIPT, cls.JSX, cls.TYPESCRIPT, cls.TSX, cls.PHP)
+
+    @property
+    def is_injection_language(self) -> bool:
+        """
+        Returns True if this language commonly contains embedded code snippets from other languages.
+        """
+        return self in type(self).injection_languages()
+
+    @property
+    def injected_languages(self) -> tuple[SemanticSearchLanguage, ...] | None:
+        """
+        Returns the languages commonly injected into this language, if any.
+        """
+        return {
+            SemanticSearchLanguage.HTML: (
+                SemanticSearchLanguage.CSS,
+                SemanticSearchLanguage.JAVASCRIPT,
+            ),
+            SemanticSearchLanguage.JAVASCRIPT: (
+                SemanticSearchLanguage.HTML,
+                SemanticSearchLanguage.CSS,
+            ),
+            SemanticSearchLanguage.JSX: (SemanticSearchLanguage.HTML, SemanticSearchLanguage.CSS),
+            SemanticSearchLanguage.TYPESCRIPT: (
+                SemanticSearchLanguage.HTML,
+                SemanticSearchLanguage.CSS,
+            ),
+            SemanticSearchLanguage.TSX: (SemanticSearchLanguage.HTML, SemanticSearchLanguage.CSS),
+            SemanticSearchLanguage.PHP: (
+                SemanticSearchLanguage.HTML,
+                SemanticSearchLanguage.JAVASCRIPT,
+                SemanticSearchLanguage.CSS,
+            ),
+        }.get(self)
+
     @property
     def is_config_language(self) -> bool:
         """

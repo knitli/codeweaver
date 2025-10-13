@@ -55,7 +55,7 @@ from pydantic.dataclasses import dataclass
 from pydantic_core import to_json
 from typing_extensions import TypeIs
 
-from codeweaver._common import BasedModel, BaseEnum, DataclassSerializationMixin
+from codeweaver._common import DATACLASS_CONFIG, BasedModel, BaseEnum, DataclassSerializationMixin
 from codeweaver._constants import get_ext_lang_pairs
 from codeweaver._utils import (
     ensure_iterable,
@@ -136,8 +136,8 @@ class SemanticMetadata(BasedModel):
         SemanticSearchLanguage | str,
         Field(description="""The programming language of the code chunk"""),
     ]
-    primary_node: AstThing[SgNode] | None
-    children: tuple[AstThing[SgNode], ...] = ()
+    primary_thing: AstThing[SgNode] | None
+    positional_things: tuple[AstThing[SgNode], ...] = ()
     # TODO: Logic for symbol extraction from AST nodes
     symbol: Annotated[
         str | None,
@@ -146,8 +146,8 @@ class SemanticMetadata(BasedModel):
             default_factory=lambda data: data["primary_node"],
         ),
     ] = None
-    node_id: UUID7 = uuid7()
-    parent_node_id: UUID7 | None = None
+    thing_id: UUID7 = uuid7()
+    parent_thing_id: UUID7 | None = None
     is_partial_node: Annotated[
         bool,
         Field(
@@ -162,27 +162,25 @@ class SemanticMetadata(BasedModel):
         """Create a SemanticMetadata instance from a parent SemanticMetadata instance."""
         return cls(
             language=parent_meta.language,
-            primary_node=child,
-            children=tuple(child.children),
-            node_id=child.node_id or uuid7(),
-            parent_node_id=parent_meta.node_id,
+            primary_thing=child,
+            positional_things=tuple(child.positional_connections),
+            thing_id=child.thing_id or uuid7(),
+            parent_thing_id=parent_meta.thing_id,
             **overrides,
         )
 
     @classmethod
-    def from_node(
-        cls, node: AstThing[SgNode] | SgNode, language: SemanticSearchLanguage | None
-    ) -> Self:
+    def from_node(cls, thing: AstThing[SgNode] | SgNode, language: SemanticSearchLanguage) -> Self:
         """Create a SemanticMetadata instance from an AST node."""
-        if isinstance(node, SgNode):
-            node = AstThing.from_sg_node(node, language=language)  # pyright: ignore[reportUnknownVariableType]
+        if isinstance(thing, SgNode):
+            thing = AstThing.from_sg_node(thing, language=language)  # pyright: ignore[reportUnknownVariableType]
         return cls(
-            language=language or node.language or "",
-            primary_node=node,
-            children=tuple(node.children),
-            node_id=node.node_id,
-            symbol=node.symbol,
-            parent_node_id=node.parent_node_id,
+            language=language or thing.language or "",
+            primary_thing=thing,
+            positional_things=tuple(thing.positional_connections),
+            thing_id=thing.thing_id,
+            symbol=thing.symbol,
+            parent_thing_id=thing.parent_thing_id,
             is_partial_node=False,  # if we're creating from a full node, it's not partial
         )
 
@@ -242,7 +240,7 @@ ONE_LINE = 1
 """Represents a single line span."""
 
 
-@dataclass(frozen=True, slots=True, config=BasedModel.model_config)
+@dataclass(frozen=True, slots=True, config=DATACLASS_CONFIG | ConfigDict(frozen=True))
 class Span(DataclassSerializationMixin):
     """
     An immutable span of lines in a file, defined by a start and end line number, and a source identifier.
@@ -393,7 +391,7 @@ class Span(DataclassSerializationMixin):
         return isinstance(span, tuple) and len(span) == 3 and hasattr(span[2], "hex")
 
     @staticmethod
-    def _is_start_end_tuple(
+    def _is_file_end_tuple(
         span: Span
         | SpanTuple
         | tuple[PositiveInt, PositiveInt]
@@ -428,7 +426,7 @@ class Span(DataclassSerializationMixin):
             return self._is_contained(span)
         if isinstance(span, tuple) and len(span) == 3 and self._is_span_tuple(span):
             return bool(self & Span.from_tuple(span))
-        if self._is_start_end_tuple(span):
+        if self._is_file_end_tuple(span):
             start, end = span[:2]
             return self._is_contained(start) or self._is_contained(end)
         return bool(self & span) if isinstance(span, Span) else False
@@ -516,7 +514,7 @@ class Span(DataclassSerializationMixin):
         )
 
 
-@dataclass(slots=True, config=BasedModel.model_config)
+@dataclass(slots=True, config=DATACLASS_CONFIG)
 class SpanGroup(DataclassSerializationMixin):
     """A group of spans that can be manipulated as a single unit.
 
@@ -845,7 +843,7 @@ class CodeChunk(BasedModel):
                 yield result.decode("utf-8") if isinstance(result, bytes | bytearray) else result
 
 
-@dataclass(frozen=True, slots=True, config=BasedModel.model_config)
+@dataclass(frozen=True, slots=True, config=DATACLASS_CONFIG)
 class DiscoveredFile(DataclassSerializationMixin):
     """Represents a file discovered during project scanning.
 

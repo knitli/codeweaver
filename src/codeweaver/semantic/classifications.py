@@ -32,12 +32,12 @@ from pydantic import (
 from pydantic.dataclasses import dataclass
 from pydantic_core import ArgsKwargs, core_schema
 
-from codeweaver._common import BasedModel, BaseEnum, DataclassSerializationMixin
+from codeweaver._common import DATACLASS_CONFIG, BasedModel, BaseEnum, DataclassSerializationMixin
 from codeweaver.language import SemanticSearchLanguage
 
 
 if TYPE_CHECKING:
-    from codeweaver.semantic.node_type_parser import TokenPurpose
+    from codeweaver.semantic.grammar_things import TokenPurpose
 
 
 # =============================================================================
@@ -75,7 +75,7 @@ class ImportanceScoresDict(TypedDict):
     ]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, config=DATACLASS_CONFIG)
 class ImportanceScores(DataclassSerializationMixin):
     """Multi-dimensional importance scoring for AI assistant contexts."""
 
@@ -151,7 +151,7 @@ class ImportanceRank(int, BaseEnum):
     @classmethod
     def from_token_purpose(cls, purpose: TokenPurpose) -> ImportanceRank:
         """Map token purpose to an approximate importance rank."""
-        from codeweaver.semantic.node_type_parser import TokenPurpose
+        from codeweaver.semantic.grammar_things import TokenPurpose
 
         if purpose == TokenPurpose.OPERATOR:
             return ImportanceRank.OPERATIONS_EXPRESSIONS
@@ -336,7 +336,7 @@ class SemanticClass(str, BaseEnum):
     def from_token_purpose(cls, purpose: TokenPurpose, token_name: str) -> SemanticClass:
         """Map token purpose to an approximate semantic category."""
         from codeweaver.semantic._constants import IS_ANNOTATION
-        from codeweaver.semantic.node_type_parser import TokenPurpose
+        from codeweaver.semantic.grammar_things import TokenPurpose
 
         if (purpose == TokenPurpose.COMMENT and token_name == "line_comment") or (  # noqa: S105
             purpose == TokenPurpose.KEYWORD and IS_ANNOTATION.match(token_name)
@@ -971,7 +971,7 @@ def _validate_categories(
     raise ValueError("Invalid type for core_categories")
 
 
-@dataclass
+@dataclass(config=DATACLASS_CONFIG)
 class ClassificationRegistry(DataclassSerializationMixin):
     """Registry for core and language-specific semantic categories."""
 
@@ -1158,7 +1158,7 @@ class ClassificationRegistry(DataclassSerializationMixin):
 # =============================================================================
 
 
-@dataclass
+@dataclass(config=DATACLASS_CONFIG)
 class CoverageReport(DataclassSerializationMixin):
     """Report on coverage of semantic categories."""
 
@@ -1202,7 +1202,7 @@ class CoverageReport(DataclassSerializationMixin):
         return tuple(cat for cat in self.possible_categories if cat not in self.covered_categories)
 
 
-@dataclass
+@dataclass(config=DATACLASS_CONFIG)
 class UsageMetrics(DataclassSerializationMixin):
     """Metrics on real-world usage of semantic categories."""
 
@@ -1230,7 +1230,7 @@ class UsageMetrics(DataclassSerializationMixin):
         self.category_usage_counts.update(categories)
 
 
-@dataclass
+@dataclass(config=DATACLASS_CONFIG)
 class ScoreValidation(DataclassSerializationMixin):
     """Validation results for importance score accuracy."""
 
