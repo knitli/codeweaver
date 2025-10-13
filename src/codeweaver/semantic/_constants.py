@@ -149,7 +149,11 @@ LANGUAGE_SPECIFIC_TOKEN_EXCEPTIONS = MappingProxyType({
         "r": "keyword",  # Regex prefix
         "ri": "keyword",  # Combined
     },
-    SemanticSearchLanguage.RUST: {"macro_rule!": "keyword"},
+    SemanticSearchLanguage.RUST: {
+        "macro_rule!": "keyword",
+        "inner_doc_comment_marker": "literal",
+        "outer_doc_comment_marker": "literal",
+    },
     SemanticSearchLanguage.SOLIDITY: {
         "evmasm": "keyword",
         "int": "keyword",

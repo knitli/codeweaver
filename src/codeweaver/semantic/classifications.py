@@ -305,6 +305,33 @@ class SemanticClass(str, BaseEnum):
 
     __slots__ = ()
 
+    @property
+    def simple_rank(self) -> int:
+        """Get a simple integer rank for this category (lower is more important)."""
+        return {
+            type(self).DEFINITION_CALLABLE: 1,
+            type(self).DEFINITION_TYPE: 2,
+            type(self).DEFINITION_DATA: 3,
+            type(self).DEFINITION_TEST: 4,
+            type(self).BOUNDARY_MODULE: 5,
+            type(self).BOUNDARY_ERROR: 6,
+            type(self).BOUNDARY_RESOURCE: 7,
+            type(self).DOCUMENTATION_STRUCTURED: 8,
+            type(self).FLOW_BRANCHING: 9,
+            type(self).FLOW_ITERATION: 10,
+            type(self).FLOW_CONTROL: 11,
+            type(self).FLOW_ASYNC: 12,
+            type(self).OPERATION_INVOCATION: 13,
+            type(self).OPERATION_DATA: 14,
+            type(self).OPERATION_OPERATOR: 15,
+            type(self).EXPRESSION_ANONYMOUS: 16,
+            type(self).SYNTAX_KEYWORD: 17,
+            type(self).SYNTAX_IDENTIFIER: 18,
+            type(self).SYNTAX_LITERAL: 19,
+            type(self).SYNTAX_ANNOTATION: 20,
+            type(self).SYNTAX_PUNCTUATION: 21,
+        }[self]
+
     @classmethod
     def from_token_purpose(cls, purpose: TokenPurpose, token_name: str) -> SemanticClass:
         """Map token purpose to an approximate semantic category."""

@@ -208,11 +208,11 @@ For developers familiar with tree-sitter terminology:
 | Abstract type (with subtypes) | Category | Doesn't appear in parse trees |
 | Named/unnamed node | Thing | Concrete parse tree node |
 | Node with no fields | Token | Leaf node |
-| Node with fields/children | Composite Node | Non-leaf node |
+| Node with fields/children | Composite Thing | Non-leaf node |
 | Field | Direct Connection | Has semantic Role |
 | Child | Positional Connection | Ordered, no Role |
-| Extra | Loose Connection | Can appear anywhere |
 | Field name | Role | Semantic function |
+| Extra | `can_be_anywhere`  | Can be anywhere in the AST |
 | `named` attribute | `is_explicit_rule` | Has named grammar rule |
 | `multiple` attribute | `allows_multiple` | Upper cardinality bound |
 | `required` attribute | `requires_presence` | Lower cardinality bound |
@@ -264,7 +264,7 @@ from pydantic import (
 )
 from pydantic_core import from_json
 
-from codeweaver._common import BasedModel, RootedRoot
+from codeweaver._common import BasedModel, LiteralStringT, RootedRoot
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.semantic._types import (
     CategoryName,
@@ -281,6 +281,26 @@ from codeweaver.semantic._types import (
 
 
 logger = logging.getLogger()
+
+
+def name_normalizer(name: str) -> str:
+    """Normalize names by stripping leading underscores."""
+    return name.lower().strip().lstrip("_")
+
+
+def cat_name_normalizer(name: LiteralStringT | CategoryName) -> CategoryName:
+    """Normalize category names by stripping leading underscores."""
+    return CategoryName(name_normalizer(str(name)))  # pyright: ignore[reportArgumentType]
+
+
+def thing_name_normalizer(name: LiteralStringT | ThingName) -> ThingName:
+    """Normalize thing names by stripping leading underscores."""
+    return ThingName(name_normalizer(str(name)))  # pyright: ignore[reportArgumentType]
+
+
+def role_name_normalizer(name: LiteralStringT | Role) -> Role:
+    """Normalize role names by stripping leading underscores."""
+    return Role(name_normalizer(str(name)))  # pyright: ignore[reportArgumentType]
 
 
 class AllThingsDict(TypedDict):
@@ -556,7 +576,15 @@ class Category(BasedModel):
 
     model_config = BasedModel.model_config | ConfigDict(frozen=True)
 
-    name: Annotated[CategoryName, Field(description="The name of the Category.")]
+    name: Annotated[
+        CategoryName,
+        Field(
+            description="The name of the Category.",
+            default_factory=lambda name: cat_name_normalizer(name)
+            if isinstance(name, str)
+            else cat_name_normalizer(name["name"]),  # type: ignore
+        ),
+    ]
 
     language: Annotated[
         SemanticSearchLanguage,
@@ -808,7 +836,9 @@ class DirectConnection(Connection):
 
             Tree-sitter equivalent: Field name in grammar
             """,
-            default_factory=Role,
+            default_factory=lambda name: role_name_normalizer(name)  # type: ignore
+            if isinstance(name, str)
+            else role_name_normalizer(name["role"]),  # type: ignore
         ),
     ]
 
@@ -832,6 +862,11 @@ class DirectConnection(Connection):
             })
             for role, child_type in node_dto.fields.items()
         ]
+
+    def __str__(self) -> str:
+        """String representation of the DirectConnection."""
+        targets = ", ".join(sorted(str(name) for name in self.target_thing_names))
+        return f"DirectConnection: {self.source_thing} --[{self.role}]--{self.constraints.variable}--> [{targets}] (Language: {self.language.variable})"
 
 
 class PositionalConnection(Connection):
@@ -869,6 +904,11 @@ class PositionalConnection(Connection):
             "requires_presence": child_type.required,
             "language": node_dto.language,
         })
+
+    def __str__(self) -> str:
+        """String representation of the PositionalConnection."""
+        targets = ", ".join(sorted(str(name) for name in self.target_thing_names))
+        return f"PositionalConnections: {self.source_thing} --{self.constraints.variable}--> [{targets}] (Language: {self.language.variable})"
 
 
 def _get_types_files_in_directory(directory: DirectoryPath) -> list[FilePath]:
@@ -988,6 +1028,27 @@ class _ThingRegistry:
                 ),
             )
         logger.debug("Registered %s", token)
+
+    def lookup_normalized_category_name(
+        self,
+        name: CategoryName | str | LiteralStringT,
+        language: SemanticSearchLanguage | None = None,
+    ) -> Category | None:
+        """Lookup a Category by its normalized name across all languages or a specific language.
+
+        Normalized means we consider it a match regardless of leading underscores.
+        """
+        if language:
+            content = self._categories[language]
+            for cat in content.values():
+                if cat.name.normalized == name or cat.name == name:
+                    return cat
+            return None
+        for content in self._categories.values():
+            for cat in content.values():
+                if cat.name.normalized == name or cat.name == name:
+                    return cat
+        return None
 
     def register_thing(self, thing: ThingOrCategoryType) -> None:
         """Register a Thing in the appropriate category."""

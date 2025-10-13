@@ -15,7 +15,7 @@ from codeweaver._common import BasedModel
 
 
 if TYPE_CHECKING:
-    from codeweaver.semantic._ast_grep import AstNode
+    from codeweaver.semantic._ast_grep import AstThing
     from codeweaver.semantic.classifications import ImportanceScores, SemanticClass
 
 
@@ -49,7 +49,7 @@ class SemanticScorer(BasedModel):
     ]
 
     def calculate_importance_score(
-        self, semantic_category: SemanticClass, node: AstNode[SgNode]
+        self, semantic_category: SemanticClass, node: AstThing[SgNode]
     ) -> ImportanceScores:
         """Calculate the final importance score for a node.
 
@@ -71,7 +71,7 @@ class SemanticScorer(BasedModel):
         # Clamp to valid range
         return ImportanceScores.validate_python(corrected_scores)
 
-    def _apply_contextual_adjustments(self, node: AstNode[SgNode]) -> float:
+    def _apply_contextual_adjustments(self, node: AstThing[SgNode]) -> float:
         """Calculates an adjustment to apply to an importance score based on context.
 
         Adjustments include:
@@ -99,7 +99,7 @@ class SemanticScorer(BasedModel):
 
         return adjusted_score - 1.0
 
-    def _is_definition_node(self, node: AstNode[SgNode]) -> bool:
+    def _is_definition_node(self, node: AstThing[SgNode]) -> bool:
         """Check if a node represents a definition (class, function, etc.)."""
         # This is a heuristic based on common node kinds
         # Could be enhanced with semantic category checking once integrated

@@ -50,7 +50,7 @@ from codeweaver.reranking.capabilities.base import RerankingModelCapabilities
 
 
 if TYPE_CHECKING:
-    from codeweaver.semantic._ast_grep import AstNode
+    from codeweaver.semantic._ast_grep import AstThing
 
 
 SAFETY_MARGIN = 0.1
@@ -370,7 +370,7 @@ class ChunkMicroManager:
 
     def _chunk_with_ast(self, file: DiscoveredFile, content: str) -> list[CodeChunk]:
         """Chunk using AST-based semantic analysis."""
-        from codeweaver.semantic._ast_grep import AstNode
+        from codeweaver.semantic._ast_grep import AstThing
         from codeweaver.services.chunker.registry import source_id_for
 
         logger = logging.getLogger(__name__)
@@ -385,7 +385,7 @@ class ChunkMicroManager:
             from ast_grep_py import SgRoot as AstGrepRoot
 
             root = AstGrepRoot(content, str(language))
-            ast_node: AstNode[SgNode] = AstNode.from_sg_node(root.root(), language)  # type: ignore
+            ast_node: AstThing[SgNode] = AstThing.from_sg_node(root.root(), language)  # type: ignore
 
             # Calculate effective limits with safety margin
             effective_chunk_limit = int(self._governor.chunk_limit * (1 - SAFETY_MARGIN))
@@ -410,7 +410,7 @@ class ChunkMicroManager:
 
     def _extract_semantic_chunks(
         self,
-        root_node: AstNode[SgNode],
+        root_node: AstThing[SgNode],
         content: str,
         file: DiscoveredFile,
         source_id: UUID7,
@@ -421,7 +421,7 @@ class ChunkMicroManager:
         content_lines = content.splitlines(keepends=True)
 
         # Collect all meaningful nodes using modern semantic analysis
-        candidate_nodes: list[AstNode[SgNode]] = []
+        candidate_nodes: list[AstThing[SgNode]] = []
         self._collect_semantic_nodes(root_node, candidate_nodes)
 
         if not candidate_nodes:
@@ -445,7 +445,7 @@ class ChunkMicroManager:
         return self._fill_gaps_with_fallback(chunks, content, file, source_id, effective_limit)
 
     def _collect_semantic_nodes(
-        self, root_node: AstNode[SgNode], candidate_nodes: list[AstNode[SgNode]]
+        self, root_node: AstThing[SgNode], candidate_nodes: list[AstThing[SgNode]]
     ) -> None:
         """Recursively collect all meaningful AST nodes for semantic analysis."""
         # Add current node if it's named and meaningful
@@ -457,8 +457,8 @@ class ChunkMicroManager:
             self._collect_semantic_nodes(child, candidate_nodes)
 
     def _score_and_prioritize_nodes(
-        self, nodes: list[AstNode[SgNode]]
-    ) -> list[tuple[AstNode[SgNode], float]]:
+        self, nodes: list[AstThing[SgNode]]
+    ) -> list[tuple[AstThing[SgNode], float]]:
         """Score nodes by importance and return them sorted by priority and position."""
         scored_nodes = [
             (node, node.importance_score) for node in nodes if hasattr(node, "importance_score")
@@ -466,11 +466,11 @@ class ChunkMicroManager:
 
         # Sort by importance (descending) then by position (ascending)
         scored_nodes.sort(key=lambda x: (-x[1], x[0].range.start.line, x[0].range.start.column))
-        return cast(list[tuple[AstNode[SgNode], float]], scored_nodes)
+        return cast(list[tuple[AstThing[SgNode], float]], scored_nodes)
 
     def _process_semantic_node_with_importance(
         self,
-        node: AstNode[SgNode],
+        node: AstThing[SgNode],
         importance_score: float,
         content_lines: list[str],
         file: DiscoveredFile,
@@ -540,7 +540,7 @@ class ChunkMicroManager:
 
     def _process_semantic_node(
         self,
-        node: AstNode[SgNode],
+        node: AstThing[SgNode],
         content_lines: list[str],
         file: DiscoveredFile,
         source_id: UUID7,
@@ -561,7 +561,7 @@ class ChunkMicroManager:
 
     def _split_large_semantic_node(
         self,
-        node: AstNode[SgNode],
+        node: AstThing[SgNode],
         content_lines: list[str],
         file: DiscoveredFile,
         source_id: UUID7,
@@ -653,7 +653,7 @@ class ChunkMicroManager:
         return chunks
 
     def _create_semantic_chunk_from_node(
-        self, node: AstNode[SgNode], file: DiscoveredFile, source_id: UUID7
+        self, node: AstThing[SgNode], file: DiscoveredFile, source_id: UUID7
     ) -> CodeChunk:
         """Create a CodeChunk from an AST node with semantic metadata."""
         # Convert ast-grep Range to line numbers
@@ -693,7 +693,7 @@ class ChunkMicroManager:
             chunk_type=ChunkType.SEMANTIC,
         )
 
-    def _extract_function_name(self, node: AstNode[SgNode]) -> str | None:
+    def _extract_function_name(self, node: AstThing[SgNode]) -> str | None:
         """Extract function name from node."""
         name_node = node.get_match("name")
         if name_node:
@@ -708,7 +708,7 @@ class ChunkMicroManager:
             None,
         )
 
-    def _extract_class_name(self, node: AstNode[SgNode]) -> str | None:
+    def _extract_class_name(self, node: AstThing[SgNode]) -> str | None:
         """Extract class name from node."""
         name_node = node.get_match("name")
         if name_node:
@@ -723,12 +723,12 @@ class ChunkMicroManager:
             None,
         )
 
-    def _extract_import_name(self, node: AstNode[SgNode]) -> str | None:
+    def _extract_import_name(self, node: AstThing[SgNode]) -> str | None:
         """Extract import name from node."""
         text = node.text.strip()
         return text.split("\n")[0] if text else None
 
-    def _extract_context_info(self, node: AstNode[SgNode]) -> dict[str, Any] | None:
+    def _extract_context_info(self, node: AstThing[SgNode]) -> dict[str, Any] | None:
         """Extract additional context information from the node."""
         try:
             context: dict[str, Any] = {}

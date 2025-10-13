@@ -66,7 +66,7 @@ from codeweaver._utils import (
     set_relative_path,
     uuid7,
 )
-from codeweaver.semantic._ast_grep import AstNode
+from codeweaver.semantic._ast_grep import AstThing
 
 
 if TYPE_CHECKING:
@@ -136,8 +136,8 @@ class SemanticMetadata(BasedModel):
         SemanticSearchLanguage | str,
         Field(description="""The programming language of the code chunk"""),
     ]
-    primary_node: AstNode[SgNode] | None
-    children: tuple[AstNode[SgNode], ...] = ()
+    primary_node: AstThing[SgNode] | None
+    children: tuple[AstThing[SgNode], ...] = ()
     # TODO: Logic for symbol extraction from AST nodes
     symbol: Annotated[
         str | None,
@@ -157,7 +157,7 @@ class SemanticMetadata(BasedModel):
 
     @classmethod
     def from_parent_meta(
-        cls, child: AstNode[SgNode], parent_meta: SemanticMetadata, **overrides: Any
+        cls, child: AstThing[SgNode], parent_meta: SemanticMetadata, **overrides: Any
     ) -> Self:
         """Create a SemanticMetadata instance from a parent SemanticMetadata instance."""
         return cls(
@@ -171,11 +171,11 @@ class SemanticMetadata(BasedModel):
 
     @classmethod
     def from_node(
-        cls, node: AstNode[SgNode] | SgNode, language: SemanticSearchLanguage | None
+        cls, node: AstThing[SgNode] | SgNode, language: SemanticSearchLanguage | None
     ) -> Self:
         """Create a SemanticMetadata instance from an AST node."""
         if isinstance(node, SgNode):
-            node = AstNode.from_sg_node(node, language=language)  # pyright: ignore[reportUnknownVariableType]
+            node = AstThing.from_sg_node(node, language=language)  # pyright: ignore[reportUnknownVariableType]
         return cls(
             language=language or node.language or "",
             primary_node=node,
