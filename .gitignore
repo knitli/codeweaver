@@ -31,6 +31,19 @@ hk.local.pkl.license
 !.vscode/launch.json
 !.vscode/launch.json.license
 
+# Leave settings.json and workspace zshrc/init public
+!.vscode/tasks.json
+!.vscode/tasks.json.license
+!.vscode/extensions.json
+!.vscode/extensions.json.license
+!.vscode/mcp.json
+!.vscode/mcp.json.license
+!.vscode/settings.json
+!.vscode/settings.json.license
+!.vscode/terminal.extra.zsh
+!.vscode/terminal.extra.zsh.example
+!.vscode/zsh/.zshrc
+
 # Playwright
 logs
 _.log

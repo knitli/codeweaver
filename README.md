@@ -77,7 +77,7 @@ Features at a glance
 Quickstart
 
 Requirements
-- Python 3.12+ (tested primarily on 3.12)
+- Python 3.11+ (tested primarily on 3.12)
 - Optional: Qdrant for vector storage (in progress), API keys for cloud providers if you choose them
 
 Install
@@ -143,6 +143,12 @@ Span-based core
 Semantic metadata
 - ExtKind enumerates language and chunk types.
 - SemanticMetadata tracks AST nodes and classifications to improve chunk boundaries and ranking.
+- Extensive semantic metadata classification and task-based priority ranking system for nuanced searches
+- Supports 26 programming languages
+
+*Backup Code-Aware Chunking Support for 170+ languages!
+- CodeWeaver's backup chunking system is not semantically aware, but it does have sophisticated heuristics to identify context-relevant code blocks based on language-specific patterns found in 170+ programming languages.
+- This allows CodeWeaver to approximate semantic context for even obscure or aging codebases. Have a repo with assembly or 
 
 Provider ecosystem
 - Embedding providers: VoyageAI, fastembed, sentence-transformers, etc.

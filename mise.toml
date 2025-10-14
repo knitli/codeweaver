@@ -77,14 +77,14 @@ cdroot || true && source .venv/bin/activate
 
 # Development setup
 setup = """
-#!/bin/bash
+#!/usr/bin/env zsh
+echo "Setting up development environment..."
 mise trust -y &&
 mise install -y &&
 mise reshim &&
 mise activate &&
 echo "Initializing CodeWeaver MCP..."
 hk init --mise &> /dev/null || true &&
-echo "Setting up development environment..."
 uv venv --allow-existing .venv &&
 source .venv/bin/activate
 mise run sync &&
