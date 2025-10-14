@@ -252,7 +252,7 @@ from collections.abc import Sequence
 from functools import cached_property
 from itertools import groupby
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, ClassVar, cast, overload
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, TypedDict, cast, overload
 
 from pydantic import DirectoryPath, Field, FilePath
 from pydantic_core import from_json
@@ -263,7 +263,6 @@ from codeweaver.language import SemanticSearchLanguage
 from codeweaver.semantic._types import CategoryName, NodeTypeDTO, ThingName
 
 
-registry_module = lazy_importer("codeweaver.semantic.thing_registry")
 grammar_module = lazy_importer("codeweaver.semantic.grammar_things")
 
 
@@ -397,6 +396,13 @@ class NodeArray(RootedRoot[list[NodeTypeDTO]]):
         nodes = [NodeTypeDTO.model_validate({**node, "language": language}) for node in nodes_data]
         return cls.model_validate(nodes)
 
+    @property
+    def language(self) -> SemanticSearchLanguage:
+        """Get the language of the NodeArray."""
+        if not self.root:
+            raise ValueError("NodeArray is empty, cannot determine language.")
+        return self.root[0].language
+
 
 class NodeTypeFileLoader:
     """Container for node types files in a directory structure.
@@ -505,10 +511,24 @@ class NodeTypeFileLoader:
         return type(self)._nodes
 
 
+class _ThingCacheDict(TypedDict):
+    """TypedDict used to cache created Things before registration."""
+
+    categories: list[Category]
+    tokens: list[Token]
+    composites: list[CompositeThing]
+    connections: list[DirectConnection | PositionalConnections]
+
+
 class NodeTypeParser:
     """Parses and translates node types files into CodeWeaver's internal representation."""
 
     _initialized: bool = False
+
+    _registration_cache: ClassVar[dict[SemanticSearchLanguage, _ThingCacheDict]] = dict.fromkeys(
+        iter(SemanticSearchLanguage),
+        _ThingCacheDict(categories=[], tokens=[], composites=[], connections=[]),
+    )
 
     def __init__(self, languages: Sequence[SemanticSearchLanguage] | None = None) -> None:
         """Initialize NodeTypeParser with an optional NodeTypeFileLoader.
@@ -517,7 +537,7 @@ class NodeTypeParser:
             languages: Optional pre-loaded list of languages to parse; if None, will load all available languages.
         """
         self._languages: frozenset[SemanticSearchLanguage] = frozenset(
-            languages or SemanticSearchLanguage
+            languages or iter(SemanticSearchLanguage)
         )
 
         self._loader = NodeTypeFileLoader()
@@ -568,11 +588,16 @@ class NodeTypeParser:
         Returns:
             List of parsed and translated node types for the specified languages.
         """
-        assembled_things: list[ThingOrCategoryType] = []
         for language in languages or self._languages:
             if array := self._loader.get_node(language):
-                assembled_things.extend(self._parse_node_array(array) or [])
-        return assembled_things
+                _ = self._parse_node_array(array)
+        return [
+            thing
+            for lang in (languages or self._languages)
+            for thing in self._registration_cache.get(lang, {}).get("categories", [])
+            + self._registration_cache.get(lang, {}).get("tokens", [])
+            + self._registration_cache.get(lang, {}).get("composites", [])
+        ]
 
     def _create_category(self, node_dto: NodeTypeDTO) -> Category:
         """Create a Category from a NodeTypeDTO and add it to the internal mapping.
@@ -580,13 +605,7 @@ class NodeTypeParser:
         Args:
             node_dto: NodeTypeDTO representing the category to create.
         """
-        if not self._registry:
-            from codeweaver.semantic.thing_registry import get_registry
-
-            self._registry = get_registry()
-        category = Category.from_node_dto(node_dto)
-        self._registry.register_thing(category)
-        return category
+        return Category.from_node_dto(node_dto)
 
     def _create_token(self, node_dto: NodeTypeDTO) -> Token:
         """Create a Token from a NodeTypeDTO and add it to the internal mapping.
@@ -605,14 +624,9 @@ class NodeTypeParser:
         Returns:
             Set of Categories the node belongs to.
         """
-        if not self._registry:
-            from codeweaver.semantic.thing_registry import get_registry
-
-            self._registry = get_registry()
+        categories = type(self)._registration_cache.get(node_dto.language, {}).get("categories", [])
         return frozenset(
-            cat_name
-            for cat_name, category in self._registry.categories.get(node_dto.language, {}).items()
-            if category.includes(ThingName(node_dto.node))
+            category.name for category in categories if category.includes(ThingName(node_dto.node))
         )
 
     def _create_composite(self, node_dto: NodeTypeDTO) -> CompositeThing:
@@ -631,14 +645,8 @@ class NodeTypeParser:
     ) -> CompositeThing: ...
     def _build_thing(self, node_dto: NodeTypeDTO, thing: type[ThingType]) -> ThingType:
         """Build a Thing (Token or CompositeThing) from a NodeTypeDTO and register it."""
-        if not self._registry:
-            from codeweaver.semantic.thing_registry import get_registry
-
-            self._registry = get_registry()
         category_names = self._get_node_categories(node_dto)
-        result = thing.from_node_dto(node_dto, category_names=category_names)
-        self._registry.register_thing(cast(ThingOrCategoryType, result))
-        return result  # type: ignore
+        return thing.from_node_dto(node_dto, category_names=category_names)  # type: ignore
 
     def _parse_node_array(self, node_array: NodeArray) -> list[ThingOrCategoryType]:
         """Parse and translate a single node types file into internal representation.
@@ -646,7 +654,6 @@ class NodeTypeParser:
         Args:
             node_array: NodeArray containing the list of NodeTypeDTOs to parse.
         """
-        assembled_things: list[ThingOrCategoryType] = []
         category_nodes: list[NodeTypeDTO] = []
         token_nodes: list[NodeTypeDTO] = []
         composite_nodes: list[NodeTypeDTO] = []
@@ -664,14 +671,22 @@ class NodeTypeParser:
                 case _:
                     logger.warning("Skipping unclassified node types: %s", list(group))
         if category_nodes:
-            assembled_things.extend(self._create_category(node_dto) for node_dto in category_nodes)
+            type(self)._registration_cache[node_array.language]["categories"].extend(
+                self._create_category(node_dto) for node_dto in category_nodes
+            )
         if token_nodes:
-            assembled_things.extend(self._create_token(node_dto) for node_dto in token_nodes)
+            type(self)._registration_cache[node_array.language]["tokens"].extend(
+                self._create_token(node_dto) for node_dto in token_nodes
+            )
         if composite_nodes:
-            assembled_things.extend(
+            type(self)._registration_cache[node_array.language]["composites"].extend(
                 self._create_composite(node_dto) for node_dto in composite_nodes
             )
-        return assembled_things
+        return list(
+            self._registration_cache.get(node_array.language, {}).get("categories", [])
+            + self._registration_cache.get(node_array.language, {}).get("tokens", [])
+            + self._registration_cache.get(node_array.language, {}).get("composites", [])
+        )
 
 
 _parser: NodeTypeParser | None = None

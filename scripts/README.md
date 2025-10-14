@@ -47,7 +47,9 @@ Installs or updates the mise task runner (version 2025.7.0).
 ./scripts/install-mise.sh version   # Check version
 ```
 
-**Referenced in:** `.github/workflows/copilot-setup-steps.yml`
+**Referenced in:** 
+- `.github/workflows/copilot-setup-steps.yml`
+- `.vscode/terminal.extra.zsh`
 
 ### dev-shell-init.zsh
 
@@ -392,7 +394,7 @@ Scripts with proper shebangs can be run directly:
 Some scripts are designed to be called through mise or hk tasks:
 
 ```bash
-mise run fix-ruff-patterns
+mise run fix
 hk fix
 ```
 
@@ -400,6 +402,6 @@ hk fix
 
 ## Maintenance
 
-Last Updated: 2025-01-14
+Last Updated: 2025-10-13
 
-For issues or questions about specific scripts, refer to inline comments or contact the maintainers.
+For issues or questions about specific scripts, refer to inline comments or contact Adam.

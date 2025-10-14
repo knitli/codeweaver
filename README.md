@@ -19,7 +19,7 @@ Extensible context platform and MCP server for hybrid semantic code search and t
 2. **Eliminate 'cognitive load' on coding agents trying to get context on the codebase.**
 
   **How**
-  - **Reduces all operations to a single simple tool** -- `find_code` -- allowing your coding agent to request what it needs, explain what it's trying to do, and get exactly the information it needs in response.
+  - **Reduces all operations to a single, simple, plain language tool** -- `find_code` -- allowing your coding agent to request what it needs, explain what it's trying to do, and get exactly the information it needs in response.
   - Uses **mcp sampling** to search and curate context for your coding agent -- using your coding agent! (also supports this outside of an MCP context where sampling isn't enabled or MCP is not available). CodeWeaver uses a *different instance* of your agent to evaluate your agent's needs and curate a response, keeping your agent unburdened with all the associated context from searching.
 
 3. **Significantly cut context bloat, and costs**. This also helps keep agents razor focused on their tasks.
@@ -27,6 +27,11 @@ Extensible context platform and MCP server for hybrid semantic code search and t
   **How**
   - CodeWeaver aims to *restrict* context to your coding agent to *only the information it needs*. Of course, that's not easy to do, but we hope to get close.
   - By reducing the context that's returned to your Agent, your Agent no longer has to "carry" all of that extra, unused, context with them -- reducing token use *with every turn* and reducing its exponential growth.
+
+## Design Principles
+
+- Goal: **precise**, **task-aware**, **exact**, and **completely relevant** **code context**.
+- (TODO: articulate the rest :)
 
 ## Overview
 
@@ -140,15 +145,17 @@ Span-based core
 - Immutable, set-like operations enable accurate merging of results across passes (text, semantic, AST).
 - CodeChunk and CodeMatch carry spans and metadata, enabling token-aware, context-safe assembly.
 
-Semantic metadata
+Semantic metadata from AST-Aware indexing
 - ExtKind enumerates language and chunk types.
 - SemanticMetadata tracks AST nodes and classifications to improve chunk boundaries and ranking.
 - Extensive semantic metadata classification and task-based priority ranking system for nuanced searches
 - Supports 26 programming languages
 
-*Backup Code-Aware Chunking Support for 170+ languages!
+*Backup Code-Aware Indexing Support for 170+ languages! [^1]
 - CodeWeaver's backup chunking system is not semantically aware, but it does have sophisticated heuristics to identify context-relevant code blocks based on language-specific patterns found in 170+ programming languages.
-- This allows CodeWeaver to approximate semantic context for even obscure or aging codebases. Have a repo with assembly or 
+- Allows CodeWeaver to approximate semantic context for even obscure or aging codebases. If you maintain a codebase with legacy "it just works so keep it" code, this is for you -- assembly, cobol, pascal, perl -- we've got you!
+- From Agda, Beef, Coq, Dhall, and Factor to SAS, Smali, Xaml and Zig -- your language is probably supported.
+- Really not supported? Define some delimiters with metadata and file extensions in your config and CodeWeaver will take care of the rest! (or, just associate it with file extensions and a family pattern like C style, python, ML, lisp, markup, shell, functional latex, ruby, or matlab and it'll 'just work'.)
 
 Provider ecosystem
 - Embedding providers: VoyageAI, fastembed, sentence-transformers, etc.
@@ -166,7 +173,6 @@ Configuration and settings
 - Multi-source configuration via pydantic-settings.
 - Capability-based provider selection and dynamic instantiation (registry completing).
 - Token budgeting and caching strategies planned.
-
 
 
 Providers and optional extras
@@ -188,7 +194,6 @@ A-la-carte extras (compose what you need)
 - Data sources: source-filesystem, source-tavily, source-duckduckgo
 
 See pyproject.toml for exact versions and groups.
-
 
 
 Current tool surface (MCP + CLI)
@@ -218,21 +223,25 @@ What’s built
 - Capability-based provider selection scaffolding
 - CLI (server, search, config) with rich output and robust error handling
 - Vendored filtering system that’s production-ready and provider-agnostic
+- FastMCP middleware and application state management
+- File discovery + indexing: rignore-based discovery; background indexing with watchfiles
+- Provider registry (_registry.py) and final glue code
+- Authentication and authorization middleware
 
 What’s ~97% complete
 - Embedding, reranking, and agentic capabilities (provider integrations and orchestration)
 - Agent handling is implemented but needs to be tied fully into the pipelines
+- Rich semantic grammar context system to provide detailed and precise information about syntax nodes 
+- Semantically aware chunking
+- Heuristically driven semantic-like backup chunking system.
+
 
 What’s in progress / planned
-- Provider registry (_registry.py) and final glue code
-- FastMCP middleware and application state management
 - Vector stores: Qdrant implementation (span-aware); in-memory baseline
-- File discovery + indexing: rignore-based discovery; background indexing with watchfiles
 - Pipelines and strategies: orchestration via pydantic-graph
 - Hybrid search with unified ranking across signals
 - Query intent analysis via agents
 - Performance, caching, and comprehensive test coverage
-- Authentication and authorization middleware
 
 
 
@@ -296,8 +305,8 @@ Notes:
 Telemetry and auth middleware
 
 Telemetry
-- PostHog integration is available in recommended extras (we take great care to avoid capturing identifying or proprietary data -- we will only use this telemetry for improving CodeWeaver). If you're unsure, please look at our implementation for yourself so you can see what we collect.
-- Use recommended-no-telemetry to exclude telemetry from install
+- Default installation includes privacy and proprietary-information-preserving telemetry with Posthog. We take *extreme* care not to collect any information that could reveal your identity or projects. If you're unsure, please look at our implementation for yourself so you can see what we collect.
+- You can also optionally use the `recommended-no-telemetry` install flag for a telemetry-free install (or just disable in settings or an environment variable)
 
 Auth middleware (optional)
 - Permit.io (permit-fastmcp), Eunomia (eunomia-mcp), and AuthKit integrations are scaffolded through FastMCP
@@ -326,3 +335,5 @@ Notes
 - Python package name: codeweaver-mcp
 - CLI entry point: codeweaver (module: codeweaver.cli.app:main)
 - Requires Python >= 3.11 (classifiers include 3.12–3.14)
+
+[^1]: CodeWeaver **will not index an unknown file extension**. If you want it to index an unsupported extension, then you **must** add it to your config file! If we don't know what it is, we don't want to add noise to your agent's context!

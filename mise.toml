@@ -7,6 +7,7 @@ idiomatic_version_file_enable_tools = []
 
 [tools]
 ast-grep = "latest"
+"cargo:rust-parallel" = "latest"
 "cargo:tree-sitter-cli" = "latest"
 gh = "latest"
 gitsign = "latest"
@@ -79,15 +80,16 @@ cdroot || true && source .venv/bin/activate
 setup = """
 #!/usr/bin/env zsh
 echo "Setting up development environment..."
-mise trust -y &&
-mise install -y &&
-mise reshim &&
-mise activate &&
+mise --silent -y trust &&
+mise --silent -y install &>/dev/null || true &&
+mise --silent reshim &&
+eval "$(mise --silent activate zsh)" &&
+eval "$(mise --silent env -s zsh)" &&
 echo "Initializing CodeWeaver MCP..."
-hk init --mise &> /dev/null || true &&
+hk init --mise &>/dev/null || true &&
 uv venv --allow-existing .venv &&
-source .venv/bin/activate
-mise run sync &&
+source .venv/bin/activate &
+mise --silent -y run sync &
 git config alias.root 'rev-parse --show-toplevel' &&
 alias cdroot='cd $(git root)'
 # Determine if we're in CI
@@ -102,10 +104,10 @@ echo "✅ Development environment ready!"
 update-tools = """
 #!/bin/bash
 echo "Updating tools..."
-mise upgrade -yq &&
-mise self-update -yq &&
-mise reshim &&
-mise prune -yq
+mise --silent -y upgrade &&
+mise --silent self-update -yq &&
+mise --silent reshim &&
+mise --silent -y prune
 """
 
 install = "uv sync --all-groups"
@@ -148,6 +150,14 @@ format-fix = """
 #!/bin/bash
 echo "Applying formatting..."
 uv run ruff format .
+files="$(git ls-files '*.yaml' '*.yml' '*.json' 2>/dev/null)"
+if [ -n "$files" ]; then
+    echo "$files" | xargs yq -iP --indent=2 '.' 2>/dev/null || true
+fi
+files="$(git ls-files '*.toml' 2>/dev/null)"
+if [ -n "$files" ]; then
+    taplo format --in-place $files 2>/dev/null || true
+fi
 """
 
 # Testing

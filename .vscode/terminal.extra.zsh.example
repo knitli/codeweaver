@@ -1,0 +1,8 @@
+# Workspace extras for VS Code integrated terminal (zsh)
+# Copy to .vscode/terminal.extra.zsh to enable; this file is gitignored.
+
+# Examples:
+# echo "Welcome to CodeWeaver dev shell"
+# export PYTHONWARNINGS=default
+# alias pt="pytest -q"
+# uv pip install -e .[dev]

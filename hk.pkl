@@ -7,12 +7,11 @@ local linters = new Mapping<String, Step> {
 
     ["taplo"] = Builtins.taplo
         // yaml
-    ["ymlfmt"] = new Step {
-      workspace_indicator = ".yamlfmt.yml"
-      glob = List( "*.{.yaml,yml}")
-      batch = true
-      check  = "yamlfmt -conf {{ workspace_indicator }} -lint {{ files }}"
-      fix = "yamlfmt -conf {{ workspace_indicator }} {{ files }}"
+    ["yq"] = new Step {
+      glob = List( "*.{.yaml,yml,yaml,.yml,json,jsonc,.json,.jsonc}")
+      batch = false
+      check  = "echo {{ files }} | xargs -n1 yq eval --prettyPrint --exitStatus . >/dev/null"
+      fix = "echo {{ files }} | rust-parallel -d stderr -i - --no-run-if-empty yq -iP --indent=2 '.' "
     }
 
     ["typos"] = new Step {

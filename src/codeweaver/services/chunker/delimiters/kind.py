@@ -21,7 +21,7 @@ class LineStrategy(NamedTuple):
 
 
 class DelimiterKind(str, BaseEnum):
-    """Delimiter metadata that provide semantic information on the resulting chunk. These are used to help with prompt engineering and understanding the context of a chunk."""
+    """Delimiter metadata that provide semantic information on the resulting chunk. Used to provide semantic metadata and meaning to the chunk, approximating its role in the code."""
 
     FUNCTION = "function"
     CLASS = "class"

@@ -1,20 +1,6 @@
 {
-    "inputs": [
-        {
-            "description": "GitHub Personal Access Token",
-            "id": "github_mcp_pat",
-            "password": true,
-            "type": "promptString"
-        },
-        {
-            "description": "Tavily API Key",
-            "id": "tavily_api_key",
-            "password": true,
-            "type": "promptString"
-        }
-    ],
     "servers": {
-        "browser-debug-tools": {
+        "browserDebugTools": {
             "args": [
                 "--bun",
                 "@agentdeskai/browser-tools-server@latest"
@@ -30,13 +16,7 @@
             "command": "bunx",
             "type": "stdio"
         },
-        "fetch": {
-            "args": [
-                "mcp-server-fetch"
-            ],
-            "command": "uvx"
-        },
-        "sequential-thinking": {
+        "sequentialThinking": {
             "args": [
                 "--bun",
                 "@modelcontextprotocol/server-sequential-thinking"
@@ -51,7 +31,7 @@
                 "tavily-mcp@latest"
             ],
             "env": {
-                "TAVILY_API_KEY": "${env:tavily_api_key}",
+                "TAVILY_API_KEY": "${env:TAVILY_API_KEY}",
             }
         },
         "serena": {
@@ -62,7 +42,7 @@
                 "start-mcp-server"
             ]
         },
-        "morph-llm-fast-edit": {
+        "morphLlmFastApply": {
             "args": [
                 "--bun",
                 "@morph-llm/morph-fast-apply@latest"
