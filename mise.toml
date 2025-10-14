@@ -149,10 +149,11 @@ uv run ruff format --check .
 format-fix = """
 #!/bin/bash
 echo "Applying formatting..."
+mise run fix-patterns &&
 uv run ruff format .
 files="$(git ls-files '*.yaml' '*.yml' '*.json' 2>/dev/null)"
 if [ -n "$files" ]; then
-    echo "$files" | xargs yq -iP --indent=2 '.' 2>/dev/null || true
+    echo "$files" | rust-parallel -d stderr -i - --no-run-if-empty yq -iP --indent=2 '.' || true
 fi
 files="$(git ls-files '*.toml' 2>/dev/null)"
 if [ -n "$files" ]; then

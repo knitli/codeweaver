@@ -1,30 +1,4 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc. <knitli@knit.li>
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-#
-# SPDX-License-Identifier: MIT OR Apache-2.0
-
-[default]
-locale = "en-us"
-check-file = true
-check-filename = true
-extend-ignore-re = [
-  "(?s)(#|//)\\s*spellchecker:off.*?\\n\\s*(#|//)\\s*spellchecker:on",
-]
-[default.extend-words]
-edn = "edn"
-i18n = "i18n"
-i18n-t = "i18n-t"
-i18n-tc = "i18n-tc"
-i18next = "i18next"
-iif = "iif"
-iife = "iife"
-mak = "mak"
-strat = "strat"
-typ = "typ"
-
 [files]
-ignore-hidden = false
-ignore-files = true
 extend-exclude = [
   ".git",
   ".venv/**/*",
@@ -39,8 +13,443 @@ extend-exclude = [
   "license-list-data",
   "mkdocs-material",
   "node_modules",
+  "scripts/hf_models.json",
   "src/assets/fonts/**/*",
   "src/assets/images/**/*",
   "src/assets/videos/**/*",
   "vendor",
 ]
+ignore-hidden = false
+ignore-files = true
+
+[default]
+binary = false
+check-filename = true
+check-file = true
+unicode = true
+ignore-hex = true
+identifier-leading-digits = false
+locale = "en-us"
+extend-ignore-identifiers-re = []
+extend-ignore-words-re = []
+extend-ignore-re = [
+  '(?s)(#|//)\s*spellchecker:off.*?\n\s*(#|//)\s*spellchecker:on',
+]
+
+[default.extend-identifiers]
+
+[default.extend-words]
+typ = "typ"
+edn = "edn"
+i18n-t = "i18n-t"
+i18next = "i18next"
+i18n-tc = "i18n-tc"
+iife = "iife"
+strat = "strat"
+iif = "iif"
+i18n = "i18n"
+mak = "mak"
+
+[type.py]
+extend-glob = []
+binary = false
+check-filename = true
+check-file = true
+unicode = true
+ignore-hex = true
+identifier-leading-digits = false
+locale = "en-us"
+extend-ignore-identifiers-re = []
+extend-ignore-words-re = []
+extend-ignore-re = [
+  '(?s)(#|//)\s*spellchecker:off.*?\n\s*(#|//)\s*spellchecker:on',
+]
+
+[type.py.extend-identifiers]
+NDArray = "NDArray"
+arange = "arange"
+EOFError = "EOFError"
+
+[type.py.extend-words]
+i18n-tc = "i18n-tc"
+i18next = "i18next"
+edn = "edn"
+typ = "typ"
+i18n = "i18n"
+i18n-t = "i18n-t"
+mak = "mak"
+strat = "strat"
+iife = "iife"
+iif = "iif"
+
+[type.md]
+extend-glob = []
+binary = false
+check-filename = true
+check-file = true
+unicode = true
+ignore-hex = true
+identifier-leading-digits = false
+locale = "en-us"
+extend-ignore-identifiers-re = []
+extend-ignore-words-re = ['GUD']
+extend-ignore-re = [
+  '(?s)(#|//)\s*spellchecker:off.*?\n\s*(#|//)\s*spellchecker:on',
+]
+
+[type.cert]
+extend-glob = []
+binary = false
+check-filename = true
+check-file = false
+unicode = true
+ignore-hex = true
+identifier-leading-digits = false
+locale = "en-us"
+extend-ignore-identifiers-re = []
+extend-ignore-words-re = []
+extend-ignore-re = [
+  '(?s)(#|//)\s*spellchecker:off.*?\n\s*(#|//)\s*spellchecker:on',
+]
+
+[type.json]
+extend-glob = []
+binary = false
+check-filename = true
+check-file = true
+unicode = true
+ignore-hex = true
+identifier-leading-digits = false
+locale = "en-us"
+extend-ignore-identifiers-re = []
+extend-ignore-words-re = ['tha|bre']
+extend-ignore-re = [
+  '(?s)(#|//)\s*spellchecker:off.*?\n\s*(#|//)\s*spellchecker:on',
+]
+
+[type.cert.extend-identifiers]
+
+[type.cert.extend-words]
+typ = "typ"
+i18n = "i18n"
+i18n-tc = "i18n-tc"
+iife = "iife"
+strat = "strat"
+edn = "edn"
+iif = "iif"
+i18n-t = "i18n-t"
+mak = "mak"
+i18next = "i18next"
+
+[type.bitbake]
+extend-glob = []
+binary = false
+check-filename = true
+check-file = true
+unicode = true
+ignore-hex = true
+identifier-leading-digits = false
+locale = "en-us"
+extend-ignore-identifiers-re = []
+extend-ignore-words-re = []
+extend-ignore-re = [
+  '(?s)(#|//)\s*spellchecker:off.*?\n\s*(#|//)\s*spellchecker:on',
+]
+
+[type.bitbake.extend-identifiers]
+
+[type.bitbake.extend-words]
+i18n = "i18n"
+i18n-tc = "i18n-tc"
+mak = "mak"
+i18next = "i18next"
+edn = "edn"
+strat = "strat"
+iif = "iif"
+typ = "typ"
+iife = "iife"
+PN = "PN"
+i18n-t = "i18n-t"
+
+[type.rust]
+extend-glob = []
+binary = false
+check-filename = true
+check-file = true
+unicode = true
+ignore-hex = true
+identifier-leading-digits = false
+locale = "en-us"
+extend-ignore-identifiers-re = []
+extend-ignore-words-re = []
+extend-ignore-re = [
+  '(?s)(#|//)\s*spellchecker:off.*?\n\s*(#|//)\s*spellchecker:on',
+]
+
+[type.rust.extend-identifiers]
+ratatui = "ratatui"
+flate2 = "flate2"
+
+[type.rust.extend-words]
+ser = "ser"
+i18next = "i18next"
+i18n-t = "i18n-t"
+i18n = "i18n"
+iife = "iife"
+mak = "mak"
+strat = "strat"
+edn = "edn"
+typ = "typ"
+i18n-tc = "i18n-tc"
+iif = "iif"
+
+[type.sh]
+extend-glob = []
+binary = false
+check-filename = true
+check-file = true
+unicode = true
+ignore-hex = true
+identifier-leading-digits = false
+locale = "en-us"
+extend-ignore-identifiers-re = []
+extend-ignore-words-re = []
+extend-ignore-re = [
+  '(?s)(#|//)\s*spellchecker:off.*?\n\s*(#|//)\s*spellchecker:on',
+]
+
+[type.sh.extend-identifiers]
+ot = "ot"
+stap = "stap"
+
+[type.sh.extend-words]
+i18n = "i18n"
+typ = "typ"
+i18next = "i18next"
+i18n-tc = "i18n-tc"
+iif = "iif"
+mak = "mak"
+iife = "iife"
+edn = "edn"
+i18n-t = "i18n-t"
+strat = "strat"
+
+[type.man]
+extend-glob = []
+binary = false
+check-filename = true
+check-file = true
+unicode = true
+ignore-hex = true
+identifier-leading-digits = false
+locale = "en-us"
+extend-ignore-identifiers-re = []
+extend-ignore-words-re = []
+extend-ignore-re = [
+  '(?s)(#|//)\s*spellchecker:off.*?\n\s*(#|//)\s*spellchecker:on',
+]
+
+[type.man.extend-identifiers]
+Nd = "Nd"
+
+[type.man.extend-words]
+iife = "iife"
+typ = "typ"
+i18next = "i18next"
+i18n = "i18n"
+i18n-t = "i18n-t"
+i18n-tc = "i18n-tc"
+edn = "edn"
+strat = "strat"
+iif = "iif"
+mak = "mak"
+
+[type.jl]
+extend-glob = []
+binary = false
+check-filename = true
+check-file = true
+unicode = true
+ignore-hex = true
+identifier-leading-digits = false
+locale = "en-us"
+extend-ignore-identifiers-re = []
+extend-ignore-words-re = []
+extend-ignore-re = [
+  '(?s)(#|//)\s*spellchecker:off.*?\n\s*(#|//)\s*spellchecker:on',
+]
+
+[type.jl.extend-identifiers]
+
+[type.jl.extend-words]
+i18n-t = "i18n-t"
+i18next = "i18next"
+modul = "modul"
+iif = "iif"
+i18n = "i18n"
+egal = "egal"
+egals = "egals"
+usig = "usig"
+typ = "typ"
+mak = "mak"
+strat = "strat"
+i18n-tc = "i18n-tc"
+iife = "iife"
+edn = "edn"
+
+[type.cpp]
+extend-glob = []
+binary = false
+check-filename = true
+check-file = true
+unicode = true
+ignore-hex = true
+identifier-leading-digits = false
+locale = "en-us"
+extend-ignore-identifiers-re = []
+extend-ignore-words-re = []
+extend-ignore-re = [
+  '(?s)(#|//)\s*spellchecker:off.*?\n\s*(#|//)\s*spellchecker:on',
+]
+
+[type.cpp.extend-identifiers]
+countr_one = "countr_one"
+
+[type.cpp.extend-words]
+typ = "typ"
+edn = "edn"
+mak = "mak"
+strat = "strat"
+iif = "iif"
+i18n-tc = "i18n-tc"
+i18n-t = "i18n-t"
+i18next = "i18next"
+iife = "iife"
+i18n = "i18n"
+
+[type.vimscript]
+extend-glob = []
+binary = false
+check-filename = true
+check-file = true
+unicode = true
+ignore-hex = true
+identifier-leading-digits = false
+locale = "en-us"
+extend-ignore-identifiers-re = []
+extend-ignore-words-re = []
+extend-ignore-re = [
+  '(?s)(#|//)\s*spellchecker:off.*?\n\s*(#|//)\s*spellchecker:on',
+]
+
+[type.vimscript.extend-identifiers]
+windo = "windo"
+
+[type.vimscript.extend-words]
+iife = "iife"
+strat = "strat"
+typ = "typ"
+mak = "mak"
+iif = "iif"
+edn = "edn"
+i18n-t = "i18n-t"
+i18n = "i18n"
+i18next = "i18next"
+i18n-tc = "i18n-tc"
+
+[type.css]
+extend-glob = []
+binary = false
+check-filename = true
+check-file = true
+unicode = true
+ignore-hex = true
+identifier-leading-digits = false
+locale = "en-us"
+extend-ignore-identifiers-re = []
+extend-ignore-words-re = []
+extend-ignore-re = [
+  '(?s)(#|//)\s*spellchecker:off.*?\n\s*(#|//)\s*spellchecker:on',
+]
+
+[type.css.extend-identifiers]
+nd = "nd"
+
+[type.css.extend-words]
+i18next = "i18next"
+i18n-tc = "i18n-tc"
+strat = "strat"
+iife = "iife"
+typ = "typ"
+iif = "iif"
+i18n = "i18n"
+edn = "edn"
+i18n-t = "i18n-t"
+mak = "mak"
+
+[type.go]
+extend-glob = []
+binary = false
+check-filename = true
+check-file = true
+unicode = true
+ignore-hex = true
+identifier-leading-digits = false
+locale = "en-us"
+extend-ignore-identifiers-re = []
+extend-ignore-words-re = []
+extend-ignore-re = [
+  '(?s)(#|//)\s*spellchecker:off.*?\n\s*(#|//)\s*spellchecker:on',
+]
+
+[type.go.extend-identifiers]
+O_WRONLY = "O_WRONLY"
+TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA = "TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA"
+Rela64 = "Rela64"
+NOTE_FFOR = "NOTE_FFOR"
+Rela32 = "Rela32"
+NewCFBEncrypter = "NewCFBEncrypter"
+TLS_RSA_WITH_3DES_EDE_CBC_SHA = "TLS_RSA_WITH_3DES_EDE_CBC_SHA"
+NewCBCEncrypter = "NewCBCEncrypter"
+flate = "flate"
+
+[type.go.extend-words]
+i18n-t = "i18n-t"
+iife = "iife"
+typ = "typ"
+edn = "edn"
+iif = "iif"
+mak = "mak"
+i18n = "i18n"
+i18n-tc = "i18n-tc"
+i18next = "i18next"
+strat = "strat"
+
+[type.lock]
+extend-glob = []
+binary = false
+check-filename = true
+check-file = false
+unicode = true
+ignore-hex = true
+identifier-leading-digits = false
+locale = "en-us"
+extend-ignore-identifiers-re = []
+extend-ignore-words-re = []
+extend-ignore-re = [
+  '(?s)(#|//)\s*spellchecker:off.*?\n\s*(#|//)\s*spellchecker:on',
+]
+
+[type.lock.extend-identifiers]
+
+[type.lock.extend-words]
+edn = "edn"
+i18n = "i18n"
+i18n-tc = "i18n-tc"
+iife = "iife"
+i18n-t = "i18n-t"
+mak = "mak"
+strat = "strat"
+iif = "iif"
+i18next = "i18next"
+typ = "typ"

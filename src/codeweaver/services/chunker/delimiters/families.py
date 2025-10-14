@@ -128,6 +128,7 @@ _LANGUAGE_TO_FAMILY: dict[str, LanguageFamily] = {
     "csh": LanguageFamily.SHELL_STYLE,
     "csharp": LanguageFamily.C_STYLE,
     "css": LanguageFamily.C_STYLE,  # C-style comments and blocks
+    "cuda": LanguageFamily.C_STYLE,
     "cue": LanguageFamily.C_STYLE,
     "cython": LanguageFamily.PYTHON_STYLE,
     "dart": LanguageFamily.C_STYLE,

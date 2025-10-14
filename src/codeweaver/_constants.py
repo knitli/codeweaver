@@ -319,6 +319,8 @@ CODE_FILES_EXTENSIONS: tuple[ExtLangPair, ...] = (
     ExtLangPair(ext=".cobol", language="cobol"),
     ExtLangPair(ext=".coffee", language="coffeescript"),
     ExtLangPair(ext=".cr", language="crystal"),
+    ExtLangPair(ext=".cu", language="cuda"),
+    ExtLangPair(ext=".cuh", language="cuda"),
     ExtLangPair(ext=".cue", language="cue"),
     ExtLangPair(ext=".d", language="dlang"),
     ExtLangPair(ext=".dart", language="dart"),
