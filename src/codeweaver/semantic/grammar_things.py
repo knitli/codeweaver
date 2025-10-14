@@ -267,9 +267,6 @@ from codeweaver.semantic._types import (
 )
 
 
-thing_registry_module = lazy_importer("codeweaver.semantic.thing_registry")
-get_registry = thing_registry_module.get_registry
-
 logger = logging.getLogger()
 
 
@@ -371,7 +368,8 @@ class Thing(BasedModel):
     @property
     def categories(self) -> frozenset[Category]:
         """Resolve Categories from registry by name."""
-        registry = get_registry()
+        registry_module = lazy_importer("codeweaver.semantic.thing_registry")
+        registry = registry_module.get_registry()
         return frozenset(
             cat
             for name in self.category_names
@@ -482,6 +480,8 @@ class CompositeThing(Thing):
     @property
     def direct_connections(self) -> frozenset[DirectConnection]:
         """Resolve DirectConnections from registry by source Thing name."""
+        from codeweaver.semantic.thing_registry import get_registry
+
         registry = get_registry()
         connections = registry.get_direct_connections_by_source(self.name, language=self.language)
         return frozenset(connections)
@@ -492,6 +492,8 @@ class CompositeThing(Thing):
 
         Note: There can be at most one PositionalConnections per CompositeThing, since children are ordered. The PositionalConnections itself can reference multiple target Things. **Not all CompositeThings have PositionalConnections.**
         """
+        from codeweaver.semantic.thing_registry import get_registry
+
         registry = get_registry()
         # direct=False guarantees PositionalConnections
         return registry.get_positional_connections_by_source(self.name, language=self.language)
@@ -630,6 +632,8 @@ class Category(BasedModel):
     @cached_property
     def member_things(self) -> frozenset[CompositeThing | Token]:
         """Resolve member Things from registry by name."""
+        from codeweaver.semantic.thing_registry import get_registry
+
         registry = get_registry()
         return frozenset(
             thing
@@ -744,6 +748,8 @@ class Connection(BasedModel):
 
     def __init__(self, **data: Any) -> None:
         """Initialize a Connection."""
+        from codeweaver.semantic.thing_registry import get_registry
+
         registry = get_registry()
         if data["target_thing_names"]:
             data["target_thing_names"] = tuple(
@@ -759,6 +765,8 @@ class Connection(BasedModel):
     @property
     def target_things(self) -> frozenset[ThingOrCategoryType]:
         """Resolve target Things/Categories from registry by name."""
+        from codeweaver.semantic.thing_registry import get_registry
+
         registry = get_registry()
         return frozenset(
             thing
@@ -889,6 +897,8 @@ class DirectConnection(Connection):
     def specific_target(self) -> ThingOrCategoryType | None:
         """Get the specific target Thing if this DirectConnection requires exactly one specific target; otherwise, return None."""
         if self.requires_specific_target:
+            from codeweaver.semantic.thing_registry import get_registry
+
             registry = get_registry()
             target_name = self.target_thing_names[0]
             return registry.get_thing_by_name(target_name, language=self.language)

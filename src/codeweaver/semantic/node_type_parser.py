@@ -243,6 +243,7 @@ For developers familiar with tree-sitter terminology:
 - **Future-proof**: Accommodates real-world patterns (multi-category, polymorphic references)
 """
 
+# ruff: noqa: B009
 from __future__ import annotations
 
 import logging
@@ -263,6 +264,8 @@ from codeweaver.semantic._types import CategoryName, NodeTypeDTO, ThingName
 
 
 registry_module = lazy_importer("codeweaver.semantic.thing_registry")
+grammar_module = lazy_importer("codeweaver.semantic.grammar_things")
+
 
 if TYPE_CHECKING:
     from codeweaver.semantic.grammar_things import (
@@ -274,25 +277,23 @@ if TYPE_CHECKING:
         ThingType,
         Token,
     )
-    from codeweaver.semantic.thing_registry import ThingRegistry
 else:
-    grammar_module = lazy_importer("codeweaver.semantic.grammar_things")
-    Category = grammar_module.Category
-    CompositeThing = grammar_module.CompositeThing
-    DirectConnection = grammar_module.DirectConnection
-    PositionalConnections = grammar_module.PositionalConnections
-    ThingOrCategoryType = grammar_module.ThingOrCategoryType
-    ThingType = grammar_module.ThingType
-    Token = grammar_module.Token
+    Category = getattr(grammar_module, "Category")
+    CompositeThing = getattr(grammar_module, "CompositeThing")
+    Connection = getattr(grammar_module, "Connection")
+    DirectConnection = getattr(grammar_module, "DirectConnection")
+    PositionalConnections = getattr(grammar_module, "PositionalConnections")
+    Token = getattr(grammar_module, "Token")
+    ThingOrCategoryType = getattr(grammar_module, "ThingOrCategoryType")
 
 
 logger = logging.getLogger()
 
 
 # ===========================================================================
-#  Translating Node Types Files to CodeWeaver
+# *  Translating Node Types Files to CodeWeaver
 #
-#  CodeWeaver's internal types are in `codeweaver.semantic.grammar_things`
+# *  CodeWeaver's internal types are in `codeweaver.semantic.grammar_things`
 #  That module also has a detailed explanation of the terminology and design.
 #
 # - The downside of adopting your own vocabulary and structure is that you
@@ -301,13 +302,13 @@ logger = logging.getLogger()
 # - Once the JSON for each language is loaded, we need to translate it into
 #   our internal representation.
 #
-# node-types.json Structure:
+# * node-types.json Structure:
 # - An array of 'node type' objects with:
 #   - Always: `type` (str), `named` (bool)
 #   - Sometimes: `root` (bool), `fields` (object), `children` (object),
 #     `subtypes` (array), `extra` (bool)
 #
-#   Field Details:
+# *   Field Details:
 #   - subtypes: array of objects with `type` (str) and `named` (bool)
 #   - children: a 'child type' object with `multiple` (bool), `required`
 #     (bool), and `types` (array of objects with `type` and `named`)
@@ -315,9 +316,9 @@ logger = logging.getLogger()
 #     (same structure as children)
 #   - extra: boolean indicating this node can appear anywhere in the tree
 #
-# Mapping to CodeWeaver:
+#! Mapping to CodeWeaver:
 #
-# Node Classification:
+# * Node Classification:
 #  - Categories: node types that HAVE `subtypes` (abstract groupings like
 #    "expression"); the nodes listed in the subtypes array become the
 #    Category's member_things
@@ -325,7 +326,7 @@ logger = logging.getLogger()
 #  - Composites: nodes with fields OR children (non-leaf nodes)
 #  - Note: Categories, Tokens, and Composites can ALL have `extra: true`
 #
-# Connection Types:
+# * Connection Types:
 #  - Direct connections: derived from `fields` (semantic relationships with
 #    named Roles)
 #  - Positional connections: derived from `children` (ordered relationships,
@@ -333,7 +334,7 @@ logger = logging.getLogger()
 #  - Note: The `extra` flag doesn't create connections; it marks Things that
 #    can appear as children anywhere in the tree
 #
-# Field Mappings:
+# * Field Mappings:
 #  - Role: the key name in the `fields` object (e.g., "condition", "body")
 #  - is_explicit_rule: maps from `named`
 #  - allows_multiple: maps from `multiple` (in child type objects)
@@ -344,7 +345,7 @@ logger = logging.getLogger()
 #  - can_appear_anywhere: maps from `extra` (marks Things that can appear
 #    as children of any node)
 #
-# Translation Algorithm:
+# * Translation Algorithm:
 #  - We use a lazy registry pattern to manage Things and Categories, so they can hold references to each other while being constructed and immutable.
 #  - First pass: parse the JSON into intermediate DTO structures (NamedTuples and BasedModels)
 #    that mirror the JSON structure but are easier to work with in Python.
@@ -352,7 +353,7 @@ logger = logging.getLogger()
 #    using the registry to resolve references by name.
 #  - For composite things, we create DirectConnections and PositionalConnections using the same registry and generator system we use for thing and category membership.
 #
-# Approach: DTO classes for JSON structure, then conversion functions to keep pydantic validation
+# * Approach: DTO classes for JSON structure, then conversion functions to keep pydantic validation
 # cleanly separated from parsing logic. We'll use NamedTuple for DTOs to keep them lightweight, but allow for methods if needed (unlike TypedDict).
 # ===========================================================================
 
@@ -507,6 +508,8 @@ class NodeTypeFileLoader:
 class NodeTypeParser:
     """Parses and translates node types files into CodeWeaver's internal representation."""
 
+    _initialized: bool = False
+
     def __init__(self, languages: Sequence[SemanticSearchLanguage] | None = None) -> None:
         """Initialize NodeTypeParser with an optional NodeTypeFileLoader.
 
@@ -518,8 +521,6 @@ class NodeTypeParser:
         )
 
         self._loader = NodeTypeFileLoader()
-
-        self._registry: ThingRegistry = registry_module.get_registry()
 
     # we don't start the process until explicitly called
 
@@ -579,6 +580,10 @@ class NodeTypeParser:
         Args:
             node_dto: NodeTypeDTO representing the category to create.
         """
+        if not self._registry:
+            from codeweaver.semantic.thing_registry import get_registry
+
+            self._registry = get_registry()
         category = Category.from_node_dto(node_dto)
         self._registry.register_thing(category)
         return category
@@ -600,6 +605,10 @@ class NodeTypeParser:
         Returns:
             Set of Categories the node belongs to.
         """
+        if not self._registry:
+            from codeweaver.semantic.thing_registry import get_registry
+
+            self._registry = get_registry()
         return frozenset(
             cat_name
             for cat_name, category in self._registry.categories.get(node_dto.language, {}).items()
@@ -612,16 +621,7 @@ class NodeTypeParser:
         Args:
             node_dto: NodeTypeDTO representing the composite to create.
         """
-        composite = self._build_thing(node_dto, CompositeThing)
-        # Create and register DirectConnections
-        if node_dto.fields:
-            direct_conns = DirectConnection.from_node_dto(node_dto)
-            self._registry.register_connections(direct_conns)  # type: ignore
-        # Create and register PositionalConnections
-        if node_dto.children:
-            positional_conns = PositionalConnections.from_node_dto(node_dto)
-            self._registry.register_connections(positional_conns)  # type: ignore
-        return composite  # type: ignore
+        return self._build_thing(node_dto, CompositeThing)
 
     @overload
     def _build_thing(self, node_dto: NodeTypeDTO, thing: type[Token]) -> Token: ...
@@ -630,6 +630,11 @@ class NodeTypeParser:
         self, node_dto: NodeTypeDTO, thing: type[CompositeThing]
     ) -> CompositeThing: ...
     def _build_thing(self, node_dto: NodeTypeDTO, thing: type[ThingType]) -> ThingType:
+        """Build a Thing (Token or CompositeThing) from a NodeTypeDTO and register it."""
+        if not self._registry:
+            from codeweaver.semantic.thing_registry import get_registry
+
+            self._registry = get_registry()
         category_names = self._get_node_categories(node_dto)
         result = thing.from_node_dto(node_dto, category_names=category_names)
         self._registry.register_thing(cast(ThingOrCategoryType, result))
@@ -669,6 +674,9 @@ class NodeTypeParser:
         return assembled_things
 
 
+_parser: NodeTypeParser | None = None
+
+
 def get_things(
     *, languages: Sequence[SemanticSearchLanguage] | None = None
 ) -> list[ThingOrCategoryType]:
@@ -680,28 +688,10 @@ def get_things(
     Returns:
         List of Things and Categories matching the specified languages.
     """
-    from codeweaver.semantic.thing_registry import get_registry
-
-    def fetch_for_lang(language: SemanticSearchLanguage) -> list[ThingOrCategoryType]:
-        parser = NodeTypeParser(languages=[language])
-        return parser.parse_for_language(language)
-
-    things: list[ThingOrCategoryType] = []
-    registry = get_registry()
-    languages = languages or list(SemanticSearchLanguage)
-    if any(registry.has_language(lang) for lang in languages):
-        cached_languages = {lang for lang in languages if registry.has_language(lang)}
-        if remaining_languages := set(languages) - cached_languages:
-            things.extend([thing for lang in remaining_languages for thing in fetch_for_lang(lang)])
-        things.extend(
-            thing
-            for lang in cached_languages
-            for thing in registry.all_cats_and_things.get(lang, {}).values()
-        )
-    else:
-        for language in languages:
-            things.extend(fetch_for_lang(language))
-    return things
+    global _parser
+    if _parser is None:
+        _parser = NodeTypeParser(languages=languages or list(SemanticSearchLanguage))
+    return _parser.parse_languages(languages=languages or list(SemanticSearchLanguage))
 
 
 # Debug harness
@@ -738,3 +728,6 @@ if __name__ == "__main__":
         if has_rich
         else f"Total: {len(all_things)} Things and Categories"
     )  # type: ignore
+
+
+__all__ = ("NodeArray", "NodeTypeFileLoader", "NodeTypeParser", "get_things")

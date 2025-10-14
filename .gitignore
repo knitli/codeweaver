@@ -143,6 +143,7 @@ bld/
 *.rsp
 *.sbr
 *.tlb
+.vscode/terminal.extra.zsh
 *.tli
 *.tlh
 *.tmp

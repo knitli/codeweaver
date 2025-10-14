@@ -12,9 +12,12 @@ from collections.abc import Generator, Iterable
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
+from codeweaver._utils import lazy_importer
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.semantic._types import CategoryName, ThingName, ThingOrCategoryNameType
 
+
+grammar_module = lazy_importer("codeweaver.semantic.grammar_things")
 
 if TYPE_CHECKING:
     from codeweaver.semantic.grammar_things import (
@@ -26,6 +29,14 @@ if TYPE_CHECKING:
         ThingOrCategoryType,
         Token,
     )
+else:
+    Category = grammar_module.Category
+    CompositeThing = grammar_module.CompositeThing
+    Connection = grammar_module.Connection
+    DirectConnection = grammar_module.DirectConnection
+    PositionalConnections = grammar_module.PositionalConnections
+    Token = grammar_module.Token
+    ThingOrCategoryType = grammar_module.ThingOrCategoryType
 
 
 logger = logging.getLogger(__name__)
@@ -380,6 +391,18 @@ def get_registry() -> ThingRegistry:
     global _registry
     if _registry is None:
         _registry = ThingRegistry()
+        # we need to make sure NodeTypeParser isn't the caller, because that would cause infinite recursion
+        # And it will call this function to get the registry to populate it
+        import inspect
+
+        caller = inspect.stack()[1]
+        if "NodeTypeParser" in caller.filename or "node_type_parser" in caller.filename:
+            return _registry
+        if not any(_registry.has_language(lang) for lang in SemanticSearchLanguage):
+            from codeweaver.semantic.node_type_parser import NodeTypeParser
+
+            parser = NodeTypeParser()
+            _ = parser.parse_all_nodes()
     return _registry
 
 

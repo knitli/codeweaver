@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 
 from pydantic.dataclasses import dataclass
 
-from codeweaver._common import FROZEN_DATACLASS_CONFIG, BaseEnum, DataclassSerializationMixin
+from codeweaver._common import DATACLASS_CONFIG, BaseEnum, DataclassSerializationMixin
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.semantic.classifications import ImportanceRank, SemanticClass
 from codeweaver.semantic.patterns import get_compiled_patterns, match_rank_patterns_cached
@@ -41,7 +41,7 @@ class ClassificationPhase(BaseEnum):
     FALLBACK = "fallback"
 
 
-@dataclass(frozen=True, slots=True, config=FROZEN_DATACLASS_CONFIG)
+@dataclass(frozen=True, slots=True, config=DATACLASS_CONFIG)
 class ClassificationResult(DataclassSerializationMixin):
     """Result of semantic node classification."""
 

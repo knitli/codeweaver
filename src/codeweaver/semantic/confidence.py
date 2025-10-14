@@ -7,7 +7,7 @@ from typing import Any, cast
 
 from pydantic.dataclasses import dataclass
 
-from codeweaver._common import FROZEN_DATACLASS_CONFIG, DataclassSerializationMixin
+from codeweaver._common import DATACLASS_CONFIG, DataclassSerializationMixin
 from codeweaver.semantic.classifications import (
     AgentTask,
     ImportanceScores,
@@ -17,7 +17,7 @@ from codeweaver.semantic.classifications import (
 from codeweaver.semantic.pattern_classifier import ClassificationPhase, ClassificationResult
 
 
-@dataclass(frozen=True, slots=True, config=FROZEN_DATACLASS_CONFIG)
+@dataclass(frozen=True, slots=True, config=DATACLASS_CONFIG)
 class ConfidenceMetrics(DataclassSerializationMixin):
     """Detailed confidence metrics for a classification."""
 

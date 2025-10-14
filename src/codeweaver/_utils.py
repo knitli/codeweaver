@@ -93,6 +93,14 @@ def lazy_importer(module_name: str) -> ModuleType:
     return module
 
 
+def lazy_getter(module_name: str, attr_name: str) -> Any:
+    """Lazily import a module and get an attribute from it."""
+    module = lazy_importer(module_name)
+    if not hasattr(module, attr_name):
+        raise AttributeError(f"Module {module_name} has no attribute {attr_name}")
+    return getattr(module, attr_name)
+
+
 def is_pydantic_basemodel(model: Any) -> TypeIs[type[BaseModel] | BaseModel]:
     """Check if a model is a Pydantic BaseModel."""
     return isinstance(model, type) and (
@@ -150,7 +158,7 @@ def has_package(package_name: str) -> bool:
 # You can't combine `TypeVarTuple` with `ParamSpec`, or use `Concatenate` to
 # express combining some args and some kwargs, particularly from the right.
 def rpartial[**P, R](func: Callable[P, R], *args: object, **kwargs: object) -> Callable[P, R]:
-    """Return a new function that behaves like func called with the given arguments.
+    """Return a new function that behaves like func called with the given arguments from the right.
 
     `rpartial` is like `functools.partial`, but it appends the given arguments to the right.
     It's useful for functions that take a variable number of arguments, especially when you want to fix keywords and modifier-type arguments, which tend to come at the end of the argument list.
@@ -304,7 +312,7 @@ def _get_git_dir(directory: Path) -> Path | Missing:
 def get_git_revision(directory: Path) -> str | Missing:
     """Get the SHA-1 of the HEAD of a git repository.
 
-    This is a precursor for future functionality. We'd like to be able to associate indexes and other artifacts with a specific git commit. Because there's nothing worse than an Agent working from a totally different context than the one you expect.
+    TODO: (big one): This is a precursor for future functionality. We'd like to be able to associate indexes and other artifacts with a specific git commit. Because there's nothing worse than an Agent working from a totally different context than the one you expect. We need to track changes across commits, branches, etc. This is a first step. We'll need to figure out how manage partial indexes, diffs, etc. later.
     """
     git_dir = _get_git_dir(directory)
     if git_dir is MISSING:

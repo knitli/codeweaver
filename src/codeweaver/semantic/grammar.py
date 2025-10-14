@@ -8,14 +8,13 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Callable
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Annotated
 
 from pydantic import Field, NonNegativeInt, computed_field
 from pydantic.dataclasses import dataclass
 
-from codeweaver._common import FROZEN_DATACLASS_CONFIG, DataclassSerializationMixin
+from codeweaver._common import DATACLASS_CONFIG, DataclassSerializationMixin
 from codeweaver._utils import lazy_importer
 from codeweaver.language import SemanticSearchLanguage
 
@@ -32,11 +31,8 @@ if TYPE_CHECKING:
     )
     from codeweaver.semantic.thing_registry import ThingRegistry
 
-registry_module = lazy_importer("codeweaver.semantic.thing_registry")
-get_registry: Callable[..., ThingRegistry] = registry_module.get_registry
 
-
-@dataclass(frozen=True, config=FROZEN_DATACLASS_CONFIG, slots=True)
+@dataclass(frozen=True, config=DATACLASS_CONFIG, slots=True)
 class Grammar(DataclassSerializationMixin):
     """A grammar represents the complete set of Things, Categories, and Connections for a specific programming language.
 
@@ -61,7 +57,6 @@ class Grammar(DataclassSerializationMixin):
     _positional_connections: Annotated[
         frozenset[PositionalConnections], Field(exclude=True, default=frozenset)
     ]
-    _registry: Annotated[ThingRegistry, Field(exclude=True)] = get_registry()
 
     @classmethod
     def from_registry(cls, language: SemanticSearchLanguage) -> Grammar:
@@ -73,20 +68,44 @@ class Grammar(DataclassSerializationMixin):
         Returns:
             A Grammar instance for the specified language.
         """
-        registry: ThingRegistry = get_registry()
-        if not registry.has_language(language):
-            raise ValueError(f"No grammar found for language: {language}")
+        try:
+            from codeweaver.semantic.thing_registry import get_registry
 
-        return cls(
-            language=language,
-            _tokens=frozenset(registry.tokens[language].values()),
-            _composite_things=frozenset(registry.composite_things[language].values()),
-            _categories=frozenset(registry.categories[language].values()),
-            _direct_connections=frozenset(
-                conn for lst in registry.direct_connections[language].values() for conn in lst
-            ),
-            _positional_connections=frozenset(registry.positional_connections[language].values()),
-        )
+            registry: ThingRegistry = get_registry()
+
+        except Exception:
+            from codeweaver.semantic.node_type_parser import NodeTypeParser
+
+            parser = NodeTypeParser()
+            results = parser.parse_languages([language])
+            direct: list[DirectConnection] = []
+            positional: list[PositionalConnections] = []
+            for result in results:
+                if isinstance(result, CompositeThing):
+                    direct.extend(iter(result.direct_connections))
+                    if result.positional_connections:
+                        positional.append(result.positional_connections)
+            return cls(
+                language=language,
+                _tokens=frozenset(t for t in results if isinstance(t, Token)),
+                _composite_things=frozenset(t for t in results if isinstance(t, CompositeThing)),
+                _categories=frozenset(t for t in results if isinstance(t, Category)),
+                _direct_connections=frozenset(direct),
+                _positional_connections=frozenset(positional),
+            )
+        else:
+            return cls(
+                language=language,
+                _tokens=frozenset(registry.tokens[language].values()),
+                _composite_things=frozenset(registry.composite_things[language].values()),
+                _categories=frozenset(registry.categories[language].values()),
+                _direct_connections=frozenset(
+                    conn for lst in registry.direct_connections[language].values() for conn in lst
+                ),
+                _positional_connections=frozenset(
+                    registry.positional_connections[language].values()
+                ),
+            )
 
     @computed_field(repr=False)
     @property
@@ -127,14 +146,18 @@ class Grammar(DataclassSerializationMixin):
     @property
     def direct_connections_by_source(self) -> MappingProxyType[ThingName, list[DirectConnection]]:
         """Get DirectConnections grouped by source Thing name."""
-        return MappingProxyType(self._registry.direct_connections[self.language])
+        from codeweaver.semantic.thing_registry import get_registry
+
+        return MappingProxyType(get_registry().direct_connections[self.language])
 
     @property
     def positional_connections_by_source(
         self,
     ) -> MappingProxyType[ThingName, PositionalConnections]:
         """Get PositionalConnections grouped by source Thing name."""
-        return MappingProxyType(self._registry.positional_connections[self.language])
+        from codeweaver.semantic.thing_registry import get_registry
+
+        return MappingProxyType(get_registry().positional_connections[self.language])
 
     @property
     def category_groups(self) -> MappingProxyType[CategoryName, frozenset[ThingType]]:
@@ -199,7 +222,21 @@ def get_grammar(language: SemanticSearchLanguage) -> Grammar:
     Returns:
         Grammar: The Grammar for the specified programming language.
     """
+    Category = lazy_importer("codeweaver.semantic.grammar_things").Category  # pyright: ignore[reportUnusedVariable] # noqa: N806,F841
+    Token = lazy_importer("codeweaver.semantic.grammar_things").Token  # pyright: ignore[reportUnusedVariable] # noqa: N806,F841
+    CompositeThing = lazy_importer("codeweaver.semantic.grammar_things").CompositeThing  # pyright: ignore[reportUnusedVariable] # noqa: N806,F841
+    DirectConnection = lazy_importer("codeweaver.semantic.grammar_things").DirectConnection  # pyright: ignore[reportUnusedVariable] # noqa: N806,F841
+    PositionalConnections = lazy_importer(  # pyright: ignore[reportUnusedVariable] # noqa: N806,F841
+        "codeweaver.semantic.grammar_things"
+    ).PositionalConnections
+    ThingType = lazy_importer("codeweaver.semantic.grammar_things").ThingType  # pyright: ignore[reportUnusedVariable] # noqa: N806,F841
     return Grammar.from_registry(language)
 
 
 __all__ = ("Grammar", "get_grammar")
+
+
+if __name__ == "__main__":
+    grammar = get_grammar(SemanticSearchLanguage.PYTHON)
+    rich_console = lazy_importer("rich.console").Console()
+    rich_console.print_json(grammar.dump_json())

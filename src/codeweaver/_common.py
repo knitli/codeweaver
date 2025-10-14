@@ -191,9 +191,8 @@ DATACLASS_CONFIG = ConfigDict(
     validate_by_name=True,
 )
 
-FROZEN_DATACLASS_CONFIG = DATACLASS_CONFIG | ConfigDict(frozen=True)
-
 BASEDMODEL_CONFIG = DATACLASS_CONFIG | ConfigDict(cache_strings="all")
+FROZEN_BASEDMODEL_CONFIG = BASEDMODEL_CONFIG | ConfigDict(frozen=True)
 
 
 class RootedRoot[RootType: Sequence[Any]](RootModel[Sequence[Any]]):
@@ -634,7 +633,7 @@ class DictView[TypedDictT: (Mapping[str, Any])](Mapping[str, Any]):
 __all__ = (
     "BASEDMODEL_CONFIG",
     "DATACLASS_CONFIG",
-    "FROZEN_DATACLASS_CONFIG",
+    "FROZEN_BASEDMODEL_CONFIG",
     "UNSET",
     "AbstractNodeName",
     "BaseEnum",

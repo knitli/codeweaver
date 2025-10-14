@@ -273,6 +273,20 @@ Contribution notes
 - A contributors agreement is included; please review CONTRIBUTORS_LICENSE_AGREEMENT.py
 - Issues and PRs welcome—especially for providers, vector stores, pipelines, and indexing (or anything else)
 
+VS Code terminal: auto-activate .venv (first terminal too)
+
+This workspace makes the very first integrated terminal auto-activate the repo `.venv` and lets you run extra commands.
+
+How it works:
+- `.vscode/settings.json` sets `ZDOTDIR` to `.vscode/zsh`, so zsh loads the workspace-local `.zshrc`.
+- `.vscode/zsh/.zshrc` sources `scripts/dev-shell-init.zsh` (idempotent), which activates `.venv` and optionally sources `.vscode/terminal.extra.zsh` if present.
+- Create `.vscode/terminal.extra.zsh` (see `.vscode/terminal.extra.zsh.example`) for your own exports/aliases and startup commands. This file is gitignored.
+
+Notes:
+- If `.venv` is missing, you'll see a hint. Create it with: `uv venv && uv sync`.
+- We disable automatic terminal activation from the Python extension to avoid double activation.
+- To opt out for a single terminal: `unset ZDOTDIR` before launching a new zsh.
+
 Telemetry and auth middleware
 
 Telemetry

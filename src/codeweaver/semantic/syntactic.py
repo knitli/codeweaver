@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from pydantic.dataclasses import dataclass
 
-from codeweaver._common import FROZEN_DATACLASS_CONFIG
+from codeweaver._common import DATACLASS_CONFIG
 from codeweaver.semantic.classifications import ImportanceRank, SemanticClass
 from codeweaver.semantic.patterns import match_rank_patterns_cached
 
@@ -31,7 +31,7 @@ class SyntacticClassification(Enum):
     UNKNOWN_NON_LETTER = "unknown_non_letter"
 
 
-@dataclass(frozen=True, config=FROZEN_DATACLASS_CONFIG, slots=True)
+@dataclass(frozen=True, config=DATACLASS_CONFIG, slots=True)
 class SyntacticResult:
     """Result of syntactic node classification."""
 

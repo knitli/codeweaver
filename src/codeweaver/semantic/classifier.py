@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 from pydantic import NonNegativeFloat, NonNegativeInt, computed_field
 from pydantic.dataclasses import dataclass
 
-from codeweaver._common import FROZEN_DATACLASS_CONFIG, DataclassSerializationMixin
+from codeweaver._common import DATACLASS_CONFIG, DataclassSerializationMixin
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.semantic.classifications import (
     ClassificationRegistry,
@@ -57,7 +57,7 @@ class ThingClassificationReport(TypedDict):
     phase_distribution: dict[ClassificationPhase, NonNegativeFloat]
 
 
-@dataclass(frozen=True, config=FROZEN_DATACLASS_CONFIG)
+@dataclass(frozen=True, config=DATACLASS_CONFIG)
 class EnhancedClassificationResult(DataclassSerializationMixin):
     """Enhanced result with full classification details."""
 
