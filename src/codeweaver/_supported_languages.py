@@ -28,6 +28,7 @@ type SecondarySupportedLanguage = Literal[
     "crystal",
     "csv",
     "cue",
+    "cuda",
     "cython",
     "dart",
     "data",

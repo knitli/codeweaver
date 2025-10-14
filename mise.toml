@@ -38,13 +38,11 @@ GH_REPO = "knitli/codeweaver-mcp"
 enter = """
 #!/bin/bash
 echo "Setting up CodeWeaver MCP environment..."
-chmod +x scripts/*.{sh,py} &>/dev/null && mise run activate &&
-mise run setup &&
-mise run update-tools &&
+# Set up git aliases
 alias jj='jj --no-pager' &&
 alias git='git --no-pager' &&
 alias cdroot='cd $(git root)' &&
-if [ "$GITHUB_ACTIONS" == true ]; then
+if [ "$GITHUB_ACTIONS" = true ]; then
     export CI=true
 else
     export CI=false

@@ -103,9 +103,9 @@ AstGrepSearchTypes = (
 )
 
 
-def get_node_types_module() -> ModuleType:
+def get_registry_module() -> ModuleType:
     """Lazy import the node types module to avoid circular imports."""
-    return lazy_importer("codeweaver.semantic.node_type_parser")
+    return lazy_importer("codeweaver.semantic.thing_registry")
 
 
 class MetaVar(str, BaseEnum):
@@ -266,9 +266,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         None
     )
 
-    _registry: Annotated[ThingRegistry, Field(exclude=True)] = (
-        get_node_types_module().get_registry()
-    )
+    _registry: Annotated[ThingRegistry, Field(exclude=True)] = get_registry_module().get_registry()
 
     def __init__(
         self,

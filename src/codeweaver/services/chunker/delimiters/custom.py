@@ -14,13 +14,21 @@ Example:
 
 from __future__ import annotations
 
+import re
+
 from functools import cache
 from types import MappingProxyType
 
 import textcase
 
 from codeweaver.services.chunker.delimiters.kind import DelimiterKind
-from codeweaver.services.chunker.delimiters.patterns import DelimiterPattern
+from codeweaver.services.chunker.delimiters.patterns import (
+    EMPTY_PATTERN,
+    NEWLINE_PATTERN,
+    PARAGRAPH_PATTERN,
+    WHITESPACE_PATTERN,
+    DelimiterPattern,
+)
 
 
 # Bash-specific patterns (unique loop syntax with 'done')
@@ -383,8 +391,85 @@ PKL_DOC_COMMENT_PATTERN = DelimiterPattern(
     nestable=False,
 )
 
+_rtf_markup_regex = re.compile(r"\\[a-z]+\s?")
+
+
+def _rtf_formatter(text: str) -> str:
+    """Formatter to strip RTF markup from text."""
+    return _rtf_markup_regex.sub(" ", text.strip()).strip()
+
+
+RTF_PARAGRAPH_PATTERN = PARAGRAPH_PATTERN._replace(formatter=_rtf_formatter)
+RTF_LINE_PATTERN = NEWLINE_PATTERN._replace(formatter=_rtf_formatter)
+RTF_WHITESPACE_PATTERN = WHITESPACE_PATTERN._replace(formatter=_rtf_formatter)
+RTF_EMPTY_PATTERN = EMPTY_PATTERN._replace(formatter=_rtf_formatter)
+
+POD_SECTION_PATTERN = DelimiterPattern(
+    starts=["=pod", "=begin"],
+    ends=["=cut", "=end"],
+    kind=DelimiterKind.DOCSTRING,
+    inclusive=True,
+    take_whole_lines=True,
+    nestable=False,
+    formatter=lambda text: text.strip().replace("\n\n", "\n").strip(),  # type: ignore
+)
+
+POD_SUB_PATTERN = DelimiterPattern(
+    starts=["=item", "=over", "=back", "=head1", "=head2", "=head3", "=head4", "=head5", "=head6"],
+    ends=[
+        "=cut",
+        "=end",
+        "=pod",
+        "=begin",
+        "=item",
+        "=over",
+        "=back",
+        "=head1",
+        "=head2",
+        "=head3",
+        "=head4",
+        "=head5",
+        "=head6",
+    ],
+    kind=DelimiterKind.DOCSTRING,
+    inclusive=True,
+    take_whole_lines=True,
+    nestable=False,
+)
+
+TEXINFO_BLOCK_PATTERN = DelimiterPattern(
+    starts=["@node", "@chapter", "@section", "@subsection", "@subsubsection", "@top", "@chapter"],
+    ends=["\n\n", "\r\n\r\n"],
+    kind=DelimiterKind.BLOCK,
+    inclusive=True,
+    take_whole_lines=True,
+    nestable=True,
+)
+
+CSV_PATTERN = DelimiterPattern(
+    starts=[","],
+    ends=["\n", "\r\n"],
+    kind=DelimiterKind.ARRAY,
+    priority_override=30,
+    inclusive=False,
+    take_whole_lines=True,
+    nestable=False,
+)
+
+TSV_PATTERN = DelimiterPattern(
+    starts=["\t"],
+    ends=["\n", "\r\n"],
+    kind=DelimiterKind.ARRAY,
+    priority_override=30,
+    inclusive=False,
+    take_whole_lines=True,
+    nestable=False,
+)
+
+
 # Language-specific pattern collections
 CUSTOM_PATTERNS: MappingProxyType[str, list[DelimiterPattern]] = MappingProxyType({
+    "csv": [CSV_PATTERN],
     "bash": [
         BASH_WHILE_PATTERN,
         BASH_UNTIL_PATTERN,
@@ -415,8 +500,10 @@ CUSTOM_PATTERNS: MappingProxyType[str, list[DelimiterPattern]] = MappingProxyTyp
         BASH_IF_PATTERN,
         BASH_CASE_PATTERN,
     ],
+    "perl": [POD_SECTION_PATTERN, POD_SUB_PATTERN],
     "python": [PYTHON_DECORATOR_AT_PATTERN],
     "pkl": [PKL_IMPORT_PATTERN, PKL_DOC_COMMENT_PATTERN],
+    "pod": [POD_SECTION_PATTERN, POD_SUB_PATTERN],
     "rust": [RUST_MACRO_PATTERN, RUST_ATTRIBUTE_PATTERN, RUST_IMPL_PATTERN, RUST_TYPE_PATTERN],
     "go": [GO_DEFER_PATTERN, GO_GO_PATTERN, GO_TYPE_PATTERN],
     "ruby": [RUBY_DO_END_PATTERN],
@@ -443,6 +530,9 @@ CUSTOM_PATTERNS: MappingProxyType[str, list[DelimiterPattern]] = MappingProxyTyp
         COBOL_INLINE_COMMENT_PATTERN,
         COBOL_ASTERISK_COMMENT_PATTERN,
     ],
+    "rtf": [RTF_PARAGRAPH_PATTERN, RTF_LINE_PATTERN, RTF_WHITESPACE_PATTERN, RTF_EMPTY_PATTERN],
+    "texinfo": [TEXINFO_BLOCK_PATTERN],
+    "tsv": [TSV_PATTERN],
 })
 
 _pattern_registry: dict[str, list[DelimiterPattern]] = {}

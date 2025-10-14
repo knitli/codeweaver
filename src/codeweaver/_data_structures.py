@@ -240,7 +240,7 @@ ONE_LINE = 1
 """Represents a single line span."""
 
 
-@dataclass(frozen=True, slots=True, config=DATACLASS_CONFIG | ConfigDict(frozen=True))
+@dataclass(frozen=True, slots=True, config=DATACLASS_CONFIG)
 class Span(DataclassSerializationMixin):
     """
     An immutable span of lines in a file, defined by a start and end line number, and a source identifier.
@@ -873,7 +873,7 @@ class DiscoveredFile(DataclassSerializationMixin):
             description="""Git branch the file was discovered in, if detected.""",
             init=False,
         ),
-    ] = None
+    ]
 
     @classmethod
     def from_path(cls, path: Path, *, file_hash: BlakeKey | None = None) -> DiscoveredFile | None:

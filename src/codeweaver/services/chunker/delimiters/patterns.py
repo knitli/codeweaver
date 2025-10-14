@@ -21,6 +21,7 @@ Example:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from functools import cached_property
 from itertools import product
 from typing import Annotated, Literal, NamedTuple, NotRequired, Required, TypedDict, overload
@@ -120,6 +121,13 @@ class DelimiterPattern(NamedTuple):
         ),
     ] = None
 
+    formatter: Annotated[
+        Callable[[str], str] | None,
+        Field(
+            exclude=True, description="An optional formatter function to apply to the chunk text."
+        ),
+    ] = None
+
     @cached_property
     def as_dicts(self) -> tuple[DelimiterDict, ...]:
         """Return a dictionary representation of the pattern with lists converted to strings.
@@ -144,6 +152,19 @@ class DelimiterPattern(NamedTuple):
                 strict=True,
             )
         )
+
+    def format(self, text: str) -> str:
+        """Apply the optional formatter function to the given text.
+
+        If no formatter is defined, returns the text unchanged.
+
+        Args:
+            text: The text to format
+
+        Returns:
+            The formatted text, or the original text if no formatter is defined.
+        """
+        return self.formatter(text) if self.formatter else text
 
 
 def expand_pattern(pattern: DelimiterPattern) -> list[DelimiterDict]:

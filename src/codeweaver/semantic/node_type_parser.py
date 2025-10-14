@@ -563,6 +563,8 @@ class NodeTypeParser:
         assembled_things: list[ThingOrCategoryType] = []
         for node_array in self.nodes:
             assembled_things.extend(self._parse_node_array(node_array) or [])
+        if not type(self)._initialized:
+            self._register_everything()
         return assembled_things
 
     def parse_for_language(self, language: SemanticSearchLanguage) -> list[ThingOrCategoryType]:
@@ -591,6 +593,8 @@ class NodeTypeParser:
         for language in languages or self._languages:
             if array := self._loader.get_node(language):
                 _ = self._parse_node_array(array)
+        if not type(self)._initialized:
+            self._register_everything()
         return [
             thing
             for lang in (languages or self._languages)
@@ -598,6 +602,31 @@ class NodeTypeParser:
             + self._registration_cache.get(lang, {}).get("tokens", [])
             + self._registration_cache.get(lang, {}).get("composites", [])
         ]
+
+    def _register_everything(self) -> None:
+        """Register all Things and Categories in the internal mapping."""
+        if not type(self)._registration_cache:
+            _ = self.parse_all_nodes()
+        from codeweaver.semantic.thing_registry import get_registry
+
+        registry = get_registry()
+        for language in self._languages:
+            for category in type(self)._registration_cache.get(language, {}).get("categories", []):
+                registry.register_thing(category)
+            for token in type(self)._registration_cache.get(language, {}).get("tokens", []):
+                registry.register_thing(token)
+            for composite in (
+                type(self)
+                ._registration_cache.get(language, {})
+                .get(language, {})
+                .get("composites", [])
+            ):
+                registry.register_thing(composite)
+            for connection in (
+                type(self)._registration_cache.get(language, {}).get("connections", [])
+            ):
+                registry.register_connection(connection)
+        type(self)._initialized = True
 
     def _create_category(self, node_dto: NodeTypeDTO) -> Category:
         """Create a Category from a NodeTypeDTO and add it to the internal mapping.
@@ -635,7 +664,16 @@ class NodeTypeParser:
         Args:
             node_dto: NodeTypeDTO representing the composite to create.
         """
-        return self._build_thing(node_dto, CompositeThing)
+        composite_thing = self._build_thing(node_dto, CompositeThing)
+        connections: list[DirectConnection | PositionalConnections] = []
+        if node_dto.fields:
+            connections.extend(DirectConnection.from_node_dto(node_dto=node_dto))
+        if node_dto.children:
+            connections.append(
+                cast(PositionalConnections, PositionalConnections.from_node_dto(node_dto=node_dto))
+            )
+        type(self)._registration_cache[node_dto.language]["connections"].extend(connections)
+        return composite_thing
 
     @overload
     def _build_thing(self, node_dto: NodeTypeDTO, thing: type[Token]) -> Token: ...

@@ -44,15 +44,16 @@ class LanguageFamily(str, BaseEnum):
     """
 
     C_STYLE = "c_style"  # C, C++, Java, JavaScript, Rust, Go, C#, Swift
-    PYTHON_STYLE = "python_style"  # Python, CoffeeScript, Nim
-    ML_STYLE = "ml_style"  # OCaml, F#, Standard ML, Reason
-    LISP_STYLE = "lisp_style"  # Lisp, Scheme, Clojure, Racket
-    MARKUP_STYLE = "markup_style"  # HTML, XML, JSX, Vue, Svelte
-    SHELL_STYLE = "shell_style"  # Bash, Zsh, Fish, PowerShell
     FUNCTIONAL_STYLE = "functional_style"  # Haskell, Elm, PureScript, Agda
     LATEX_STYLE = "latex_style"  # TeX, LaTeX, ConTeXt
-    RUBY_STYLE = "ruby_style"  # Ruby, Crystal
+    LISP_STYLE = "lisp_style"  # Lisp, Scheme, Clojure, Racket
+    MARKUP_STYLE = "markup_style"  # HTML, XML, JSX, Vue, Svelte
     MATLAB_STYLE = "matlab_style"  # MATLAB, Octave
+    ML_STYLE = "ml_style"  # OCaml, F#, Standard ML, Reason
+    PLAIN_TEXT = "plain_text"  # Plain text, config files, logs
+    PYTHON_STYLE = "python_style"  # Python, CoffeeScript, Nim
+    RUBY_STYLE = "ruby_style"  # Ruby, Crystal
+    SHELL_STYLE = "shell_style"  # Bash, Zsh, Fish, PowerShell
     UNKNOWN = "unknown"  # Unclassified or insufficient information
 
     __slots__ = ()
@@ -124,10 +125,12 @@ _LANGUAGE_TO_FAMILY: dict[str, LanguageFamily] = {
     "context": LanguageFamily.LATEX_STYLE,
     "coq": LanguageFamily.ML_STYLE,
     "cpp": LanguageFamily.C_STYLE,
+    "creole": LanguageFamily.MARKUP_STYLE,
     "crystal": LanguageFamily.RUBY_STYLE,
     "csh": LanguageFamily.SHELL_STYLE,
     "csharp": LanguageFamily.C_STYLE,
     "css": LanguageFamily.C_STYLE,  # C-style comments and blocks
+    "csv": LanguageFamily.PLAIN_TEXT,
     "cuda": LanguageFamily.C_STYLE,
     "cue": LanguageFamily.C_STYLE,
     "cython": LanguageFamily.PYTHON_STYLE,
@@ -135,8 +138,15 @@ _LANGUAGE_TO_FAMILY: dict[str, LanguageFamily] = {
     "devicetree": LanguageFamily.C_STYLE,
     "dhall": LanguageFamily.FUNCTIONAL_STYLE,
     "dlang": LanguageFamily.C_STYLE,
+    "docbook": LanguageFamily.MARKUP_STYLE,
     "docker": LanguageFamily.SHELL_STYLE,
     "dockerfile": LanguageFamily.SHELL_STYLE,
+    "duck": LanguageFamily.FUNCTIONAL_STYLE,
+    "dyck": LanguageFamily.LISP_STYLE,  # Dyck language (parenthesis-based)
+    "ecl": LanguageFamily.LISP_STYLE,
+    "eclisp": LanguageFamily.LISP_STYLE,
+    "eiffel": LanguageFamily.ML_STYLE,
+    "elixirscript": LanguageFamily.RUBY_STYLE,
     "elisp": LanguageFamily.LISP_STYLE,
     "elixir": LanguageFamily.RUBY_STYLE,  # Similar syntax to Ruby
     "elm": LanguageFamily.FUNCTIONAL_STYLE,
@@ -145,6 +155,7 @@ _LANGUAGE_TO_FAMILY: dict[str, LanguageFamily] = {
     "emacs": LanguageFamily.LISP_STYLE,
     "erlang": LanguageFamily.FUNCTIONAL_STYLE,
     "eta": LanguageFamily.FUNCTIONAL_STYLE,
+    "excel": LanguageFamily.MARKUP_STYLE,  # Formulas and XML-based files
     "f#": LanguageFamily.ML_STYLE,
     "factor": LanguageFamily.LISP_STYLE,
     "fish": LanguageFamily.SHELL_STYLE,
@@ -160,6 +171,7 @@ _LANGUAGE_TO_FAMILY: dict[str, LanguageFamily] = {
     "hack": LanguageFamily.C_STYLE,
     "haskell": LanguageFamily.FUNCTIONAL_STYLE,
     "hcl": LanguageFamily.SHELL_STYLE,
+    "help": LanguageFamily.MARKUP_STYLE,
     "hjson": LanguageFamily.MARKUP_STYLE,
     "hlsl": LanguageFamily.C_STYLE,
     "html": LanguageFamily.MARKUP_STYLE,
@@ -167,15 +179,19 @@ _LANGUAGE_TO_FAMILY: dict[str, LanguageFamily] = {
     "idris": LanguageFamily.FUNCTIONAL_STYLE,
     "imba": LanguageFamily.C_STYLE,
     "ini": LanguageFamily.SHELL_STYLE,  # # comments
+    "info": LanguageFamily.MARKUP_STYLE,  # .info files
     "io": LanguageFamily.LISP_STYLE,
     "janet": LanguageFamily.LISP_STYLE,
     "java": LanguageFamily.C_STYLE,
     "javascript": LanguageFamily.C_STYLE,
+    "jelly": LanguageFamily.MARKUP_STYLE,
+    "jinja": LanguageFamily.MARKUP_STYLE,
     "jruby": LanguageFamily.RUBY_STYLE,
     "json": LanguageFamily.MARKUP_STYLE,
     "jsx": LanguageFamily.MARKUP_STYLE,
     "jule": LanguageFamily.C_STYLE,
     "julia": LanguageFamily.MATLAB_STYLE,
+    "jupyter": LanguageFamily.PYTHON_STYLE,  # Primarily Python, but can contain other languages and is JSON-based
     "just": LanguageFamily.SHELL_STYLE,
     "kotlin": LanguageFamily.C_STYLE,
     "lagda": LanguageFamily.FUNCTIONAL_STYLE,  # Literate Agda
@@ -188,15 +204,19 @@ _LANGUAGE_TO_FAMILY: dict[str, LanguageFamily] = {
     "lualatex": LanguageFamily.LATEX_STYLE,
     "lucee": LanguageFamily.C_STYLE,
     "make": LanguageFamily.SHELL_STYLE,
+    "man": LanguageFamily.MARKUP_STYLE,  # manpages (i.e. '.1', '.2' files)
     "markdown": LanguageFamily.MARKUP_STYLE,
     "matlab": LanguageFamily.MATLAB_STYLE,
     "mediawiki": LanguageFamily.MARKUP_STYLE,
     "mojo": LanguageFamily.PYTHON_STYLE,
     "move": LanguageFamily.C_STYLE,
     "mruby": LanguageFamily.RUBY_STYLE,
+    "newick": LanguageFamily.PLAIN_TEXT,  # Newick format for tree visualization with minimal syntax
     "nim": LanguageFamily.PYTHON_STYLE,
+    "nimble": LanguageFamily.PYTHON_STYLE,
     "nix": LanguageFamily.FUNCTIONAL_STYLE,
     "nushell": LanguageFamily.C_STYLE,  # hard to classify, leaning C-style despite being a shell language
+    "objective-c": LanguageFamily.C_STYLE,
     "objective_c": LanguageFamily.C_STYLE,
     "objectivec": LanguageFamily.C_STYLE,
     "ocaml": LanguageFamily.ML_STYLE,
@@ -220,8 +240,10 @@ _LANGUAGE_TO_FAMILY: dict[str, LanguageFamily] = {
     "qml": LanguageFamily.C_STYLE,
     "r": LanguageFamily.MATLAB_STYLE,
     "racket": LanguageFamily.LISP_STYLE,
+    "rake": LanguageFamily.RUBY_STYLE,
     "raku": LanguageFamily.FUNCTIONAL_STYLE,
     "rakudo": LanguageFamily.SHELL_STYLE,
+    "rdoc": LanguageFamily.MARKUP_STYLE,
     "reason": LanguageFamily.ML_STYLE,
     "reasonml": LanguageFamily.ML_STYLE,
     "red": LanguageFamily.LISP_STYLE,
@@ -233,6 +255,7 @@ _LANGUAGE_TO_FAMILY: dict[str, LanguageFamily] = {
     "rnw": LanguageFamily.LATEX_STYLE,  # R + LaTeX
     "ruby": LanguageFamily.RUBY_STYLE,
     "rust": LanguageFamily.C_STYLE,
+    "rtf": LanguageFamily.PLAIN_TEXT,
     "sas": LanguageFamily.MATLAB_STYLE,
     "sass": LanguageFamily.PYTHON_STYLE,  # Indentation-based
     "scala": LanguageFamily.C_STYLE,
@@ -251,10 +274,14 @@ _LANGUAGE_TO_FAMILY: dict[str, LanguageFamily] = {
     "svg": LanguageFamily.MARKUP_STYLE,
     "swift": LanguageFamily.C_STYLE,
     "tex": LanguageFamily.LATEX_STYLE,
+    "texinfo": LanguageFamily.MARKUP_STYLE,
+    "text": LanguageFamily.PLAIN_TEXT,
     "textile": LanguageFamily.MARKUP_STYLE,
     "toml": LanguageFamily.MARKUP_STYLE,
     "tsx": LanguageFamily.MARKUP_STYLE,
+    "tsv": LanguageFamily.PLAIN_TEXT,
     "typescript": LanguageFamily.C_STYLE,
+    "txt": LanguageFamily.PLAIN_TEXT,
     "vala": LanguageFamily.C_STYLE,
     "vale": LanguageFamily.FUNCTIONAL_STYLE,
     "vbscript": LanguageFamily.UNKNOWN,  # Unique syntax
@@ -269,6 +296,9 @@ _LANGUAGE_TO_FAMILY: dict[str, LanguageFamily] = {
     "xml": LanguageFamily.MARKUP_STYLE,
     "xonsh": LanguageFamily.PYTHON_STYLE,
     "yaml": LanguageFamily.MARKUP_STYLE,
+    "yml": LanguageFamily.MARKUP_STYLE,
+    "yard": LanguageFamily.MARKUP_STYLE,
+    "yardoc": LanguageFamily.MARKUP_STYLE,
     "zig": LanguageFamily.C_STYLE,
     "zsh": LanguageFamily.SHELL_STYLE,
 }
@@ -382,6 +412,13 @@ def _get_family_patterns() -> dict[LanguageFamily, list[DelimiterPattern]]:
             PRAGMA_PATTERN,
             STRING_QUOTE_PATTERN,
             STRING_RAW_PATTERN,
+            # Special
+            PARAGRAPH_PATTERN,
+            NEWLINE_PATTERN,
+            WHITESPACE_PATTERN,
+            EMPTY_PATTERN,
+        ],
+        LanguageFamily.PLAIN_TEXT: [
             # Special
             PARAGRAPH_PATTERN,
             NEWLINE_PATTERN,

@@ -26,9 +26,7 @@ full_setup() {
   mise -q reshim || {
     print -P "%F{red}[codeweaver]%f Failed to reshim the Mise environment!"
   }
-  mise --silent run setup || {
-    print -P "%F{red}[codeweaver]%f Failed to run 'mise run setup'!"
-  }
+  # Skip 'mise run setup' to avoid circular activation
 }
 
 # Make sure Mise is installed and available
@@ -53,9 +51,5 @@ else
     }
     full_setup
 fi
-# If Mise is available, ensure the workspace's .mise environment is activated
-if command -v mise >/dev/null 2>&1; then
-  setup_env
-else
-  print -P "%F{red}[codeweaver]%f Mise command not found! Please try to install it manually either by running the install script: %F{cyan}${REPO_ROOT}/scripts/install-mise.sh%f or visiting https://mise.jdx.dev for instructions."
-fi
+# Mise activation already handled above, no need to repeat
+# This prevents double-activation which could cause loops

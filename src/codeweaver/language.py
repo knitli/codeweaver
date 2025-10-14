@@ -240,6 +240,7 @@ class ConfigLanguage(BaseEnum):
         Note: We won't provide extensions that are not commonly used for configuration files, not all extensions associated with the language.
         """
         return {
+            # Clearly not all bash, but they are posix shell config files and we can treat them as bash for our purposes
             ConfigLanguage.BASH: (
                 ".bashrc",
                 ".zshrc",
@@ -348,14 +349,20 @@ class SemanticSearchLanguage(str, BaseEnum):
         """
         return MappingProxyType({
             cls.BASH: (
-                ".sh",
                 ".bash",
-                ".zsh",
-                ".bashrc",
                 ".bash_profile",
-                ".zshrc",
-                ".profile",
+                ".bashrc",
+                ".csh",
+                ".cshrc",
                 ".ksh",
+                ".kshrc",
+                ".profile",
+                ".sh",
+                ".tcsh",
+                ".tcshrc",
+                ".zprofile",
+                ".zsh",
+                ".zshrc",
             ),
             cls.C_LANG: (".c", ".h"),
             cls.C_PLUS_PLUS: (".cpp", ".hpp", ".cc", ".cxx"),
