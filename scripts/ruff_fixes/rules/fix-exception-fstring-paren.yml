@@ -3,9 +3,9 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 id: fix-exception-fstring-paren
-message: "Remove redundant exception from parentheses in f-string logging"
+message: Remove redundant exception from parentheses in f-string logging
 severity: info
 language: python
 rule:
-  pattern: '$LOGGER.exception(f"$PREFIX ({$EXC})")'
-fix: '$LOGGER.exception("$PREFIX")'
+  pattern: $LOGGER.exception(f"$PREFIX ({$EXC})")
+fix: $LOGGER.exception("$PREFIX")

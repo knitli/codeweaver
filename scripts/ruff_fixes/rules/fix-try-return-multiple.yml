@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # TRY300: Multiple except blocks
 id: fix-try-return-multiple
-message: "Move return statement from try to else block (multiple except)"
+message: Move return statement from try to else block (multiple except)
 severity: info
 language: python
 rule:

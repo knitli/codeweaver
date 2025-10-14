@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # TRY300: Move return from try to else block - simple case
 id: fix-try-return-simple
-message: "Move return statement from try to else block"
+message: Move return statement from try to else block
 severity: info
 language: python
 rule:

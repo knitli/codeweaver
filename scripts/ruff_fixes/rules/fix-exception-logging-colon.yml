@@ -3,11 +3,11 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 id: fix-exception-logging-colon
-message: "Remove redundant exception and trailing colon from logging"
+message: Remove redundant exception and trailing colon from logging
 severity: info
 language: python
 rule:
   any:
     - pattern: '$LOGGER.exception("$MSG: %s", $EXC)'
-    - pattern: '$LOGGER.exception("$MSG:%s", $EXC)'
-fix: '$LOGGER.exception("$MSG")'
+    - pattern: $LOGGER.exception("$MSG:%s", $EXC)
+fix: $LOGGER.exception("$MSG")

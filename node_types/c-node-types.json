@@ -278,11 +278,11 @@
         "named": true
       },
       {
-        "type": "seh_leave_statement",
+        "type": "she_leave_statement",
         "named": true
       },
       {
-        "type": "seh_try_statement",
+        "type": "she_try_statement",
         "named": true
       },
       {
@@ -984,11 +984,11 @@
           "named": true
         },
         {
-          "type": "seh_leave_statement",
+          "type": "she_leave_statement",
           "named": true
         },
         {
-          "type": "seh_try_statement",
+          "type": "she_try_statement",
           "named": true
         },
         {
@@ -3332,7 +3332,7 @@
     }
   },
   {
-    "type": "seh_except_clause",
+    "type": "she_except_clause",
     "named": true,
     "fields": {
       "body": {
@@ -3358,7 +3358,7 @@
     }
   },
   {
-    "type": "seh_finally_clause",
+    "type": "she_finally_clause",
     "named": true,
     "fields": {
       "body": {
@@ -3374,12 +3374,12 @@
     }
   },
   {
-    "type": "seh_leave_statement",
+    "type": "she_leave_statement",
     "named": true,
     "fields": {}
   },
   {
-    "type": "seh_try_statement",
+    "type": "she_try_statement",
     "named": true,
     "fields": {
       "body": {
@@ -3398,11 +3398,11 @@
       "required": true,
       "types": [
         {
-          "type": "seh_except_clause",
+          "type": "she_except_clause",
           "named": true
         },
         {
-          "type": "seh_finally_clause",
+          "type": "she_finally_clause",
           "named": true
         }
       ]

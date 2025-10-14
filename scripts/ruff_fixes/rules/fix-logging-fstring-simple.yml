@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # G004: Fix simple f-strings in logging calls
 id: fix-logging-fstring-simple
-message: "Convert f-string to % formatting in logging call"
+message: Convert f-string to % formatting in logging call
 severity: info
 language: python
 rule:
@@ -12,8 +12,8 @@ rule:
     $LOGGER.$METHOD(f"$$")
   constraints:
     LOGGER:
-      regex: "^(logger|logging|log)$"
+      regex: ^(logger|logging|log)$
     METHOD:
-      regex: "^(debug|info|warning|error|critical|exception)$"
+      regex: ^(debug|info|warning|error|critical|exception)$
 # Note: ast-grep doesn't easily handle f-string variable extraction
 # This rule will match but manual fixes might be needed for complex cases

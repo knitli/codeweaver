@@ -1,11 +1,8 @@
 {
-    // Ensure the first VS Code terminal sources the repo's .venv and extras.
-    // We set ZDOTDIR so zsh loads a workspace-local .zshrc that activates .venv.
-    "terminal.integrated.defaultProfile.linux": "zsh",
-    "terminal.integrated.env.linux": {
-        "ZDOTDIR": "${workspaceFolder}/.vscode/zsh",
-        "CODEWEAVER_IN_VSCODE": "1"
-    },
-    // Avoid double-activation if Python extension tries to activate as well.
-    "python.terminal.activateEnvironment": false
+  "terminal.integrated.defaultProfile.linux": "zsh",
+  "terminal.integrated.env.linux": {
+    "ZDOTDIR": "${workspaceFolder}/.vscode/zsh",
+    "CODEWEAVER_IN_VSCODE": "1"
+  },
+  "python.terminal.activateEnvironment": false
 }

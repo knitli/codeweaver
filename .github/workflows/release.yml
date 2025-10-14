@@ -4,230 +4,204 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
 name: Release
-
 on:
   push:
     tags:
-      - 'v*'
+      - v*
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release'
+        description: Tag to release
         required: true
         type: string
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
-
 jobs:
   build:
     name: Build Distribution
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
-
-    - name: Cache UV dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/uv
-        key: uv-release-${{ runner.os }}-${{ hashFiles('uv.lock') }}
-        restore-keys: |
-          uv-release-${{ runner.os }}-
-
-    - name: Install UV and build tools
-      run: |
-        python -m pip install uv twine
-
-    - name: Install dependencies
-      run: |
-        uv sync
-
-    - name: Verify version matches tag
-      if: github.event_name == 'push'
-      run: |
-        TAG_VERSION=${GITHUB_REF#refs/tags/v}
-        PROJECT_VERSION=$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
-        echo "Tag version: $TAG_VERSION"
-        echo "Project version: $PROJECT_VERSION"
-        if [ "$TAG_VERSION" != "$PROJECT_VERSION" ]; then
-          echo "❌ Version mismatch: tag $TAG_VERSION != project $PROJECT_VERSION"
-          exit 1
-        fi
-        echo "✅ Version match confirmed"
-
-    - name: Run tests before build
-      run: |
-        uv run pytest tests/ -x --tb=short
-
-    - name: Build package
-      run: |
-        uv build
-
-    - name: Verify build artifacts
-      run: |
-        ls -la dist/
-        echo "Built packages:"
-        for file in dist/*; do
-          echo "📦 $(basename "$file")"
-        done
-
-    - name: Check package integrity
-      run: |
-        uv run python -m twine check dist/*
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: python-package-distributions
-        path: dist/
-
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Cache UV dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-release-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-release-${{ runner.os }}-
+      - name: Install UV and build tools
+        run: |
+          python -m pip install uv twine
+      - name: Install dependencies
+        run: |
+          uv sync
+      - name: Verify version matches tag
+        if: github.event_name == 'push'
+        run: |
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          PROJECT_VERSION=$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          echo "Tag version: $TAG_VERSION"
+          echo "Project version: $PROJECT_VERSION"
+          if [ "$TAG_VERSION" != "$PROJECT_VERSION" ]; then
+            echo "❌ Version mismatch: tag $TAG_VERSION != project $PROJECT_VERSION"
+            exit 1
+          fi
+          echo "✅ Version match confirmed"
+      - name: Run tests before build
+        run: |
+          uv run pytest tests/ -x --tb=short
+      - name: Build package
+        run: |
+          uv build
+      - name: Verify build artifacts
+        run: "ls -la dist/\necho \"Built packages:\"\nfor file in dist/*; do\n  echo \"\U0001F4E6 $(basename \"$file\")\"\ndone\n"
+      - name: Check package integrity
+        run: |
+          uv run python -m twine check dist/*
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
   github-release:
     name: Create GitHub Release
-    needs: [build]
+    needs:
+      - build
     runs-on: ubuntu-latest
     permissions:
       contents: write
       discussions: write
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+      - name: Extract version from tag
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.tag }}"
+            VERSION="${VERSION#v}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          # Get the latest release tag (before current)
+          PREVIOUS_TAG="$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | head -2 | tail -1 || echo "")"
+          CURRENT_TAG="${{ steps.version.outputs.tag }}"
 
-    - name: Download artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: python-package-distributions
-        path: dist/
+          echo "Previous tag: $PREVIOUS_TAG"
+          echo "Current tag: $CURRENT_TAG"
 
-    - name: Extract version from tag
-      id: version
-      run: |
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          VERSION="${{ github.event.inputs.tag }}"
-          VERSION=${VERSION#v}
-        else
-          VERSION=${GITHUB_REF#refs/tags/v}
-        fi
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          # Generate changelog
+          cat > release_notes.md << 'EOF'
+          ## What's Changed
 
-    - name: Generate release notes
-      id: release_notes
-      run: |
-        # Get the latest release tag (before current)
-        PREVIOUS_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | head -2 | tail -1 || echo "")
-        CURRENT_TAG="${{ steps.version.outputs.tag }}"
+          EOF
 
-        echo "Previous tag: $PREVIOUS_TAG"
-        echo "Current tag: $CURRENT_TAG"
+          if [ -n "$PREVIOUS_TAG" ] && [ "$PREVIOUS_TAG" != "$CURRENT_TAG" ]; then
+            # Get commits since last release
+            git log --pretty=format:"- %s (%h)" --no-merges "$PREVIOUS_TAG..$CURRENT_TAG" >> release_notes.md
+          else
+            echo "- Initial release" >> release_notes.md
+          fi
 
-        # Generate changelog
-        cat > release_notes.md << 'EOF'
-        ## What's Changed
+          cat >> release_notes.md << 'EOF'
 
-        EOF
+          ## Installation
 
-        if [ -n "$PREVIOUS_TAG" ] && [ "$PREVIOUS_TAG" != "$CURRENT_TAG" ]; then
-          # Get commits since last release
-          git log --pretty=format:"- %s (%h)" --no-merges "$PREVIOUS_TAG..$CURRENT_TAG" >> release_notes.md
-        else
-          echo "- Initial release" >> release_notes.md
-        fi
+          Install from PyPI:
+          ```bash
+          pip install codeweaver
+          ```
 
-        cat >> release_notes.md << 'EOF'
+          Or download the wheel/source distribution from the assets below.
 
-        ## Installation
+          ## Verification
 
-        Install from PyPI:
-        ```bash
-        pip install codeweaver
-        ```
+          All release artifacts are built from source and include:
+          - 📦 Wheel distribution (.whl)
+          - 📦 Source distribution (.tar.gz)
 
-        Or download the wheel/source distribution from the assets below.
+          **Full Changelog**: "https://github.com/knitli/code-weaver-mcp/compare/$PREVIOUS_TAG...$CURRENT_TAG"
+          EOF
 
-        ## Verification
-
-        All release artifacts are built from source and include:
-        - 📦 Wheel distribution (.whl)
-        - 📦 Source distribution (.tar.gz)
-
-        **Full Changelog**: https://github.com/knitli/codeweaver-mcp/compare/$PREVIOUS_TAG...$CURRENT_TAG
-        EOF
-
-        if [ -z "$PREVIOUS_TAG" ]; then
-          sed -i 's|**Full Changelog**: .*|**Full Changelog**: https://github.com/knitli/codeweaver-mcp/commits/'$CURRENT_TAG'|' release_notes.md
-        fi
-
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: ${{ steps.version.outputs.tag }}
-        name: CodeWeaver ${{ steps.version.outputs.version }}
-        body_path: release_notes.md
-        files: |
-          dist/*.whl
-          dist/*.tar.gz
-        draft: false
-        prerelease: ${{ contains(steps.version.outputs.version, 'a') || contains(steps.version.outputs.version, 'b') || contains(steps.version.outputs.version, 'rc') }}
-        make_latest: true
-        generate_release_notes: false
-
-  # PyPI publishing - commented out initially as requested
-  # Uncomment and configure when ready to publish to PyPI
-  #
-  # publish-to-pypi:
-  #   name: Publish to PyPI
-  #   needs: [github-release]
-  #   runs-on: ubuntu-latest
-  #   environment:
-  #     name: pypi
-  #     url: https://pypi.org/p/codeweaver
-  #   permissions:
-  #     id-token: write
-  #
-  #   steps:
-  #   - name: Download artifacts
-  #     uses: actions/download-artifact@v4
-  #     with:
-  #       name: python-package-distributions
-  #       path: dist/
-  #
-  #   - name: Publish to PyPI
-  #     uses: pypa/gh-action-pypi-publish@release/v1
-  #     with:
-  #       attestations: true
-  #
-  # publish-to-testpypi:
-  #   name: Publish to TestPyPI
-  #   needs: [build]
-  #   runs-on: ubuntu-latest
-  #   environment:
-  #     name: testpypi
-  #     url: https://test.pypi.org/p/codeweaver
-  #   permissions:
-  #     id-token: write
-  #
-  #   steps:
-  #   - name: Download artifacts
-  #     uses: actions/download-artifact@v4
-  #     with:
-  #       name: python-package-distributions
-  #       path: dist/
-  #
-  #   - name: Publish to TestPyPI
-  #     uses: pypa/gh-action-pypi-publish@release/v1
-  #     with:
-  #       repository-url: https://test.pypi.org/legacy/
-  #       attestations: true
+          if [ -z "$PREVIOUS_TAG" ]; then
+            sed -i 's|**Full Changelog**: .*|**Full Changelog**: https://github.com/knitli/code-weaver-mcp/commits/'$CURRENT_TAG'|' release_notes.md
+          fi
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: CodeWeaver ${{ steps.version.outputs.version }}
+          body_path: release_notes.md
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, 'a') || contains(steps.version.outputs.version, 'b') || contains(steps.version.outputs.version, 'rc') }}
+          generate_release_notes: false
+# PyPI publishing - commented out initially as requested
+# Uncomment and configure when ready to publish to PyPI
+#
+# publish-to-pypi:
+#   name: Publish to PyPI
+#   needs: [github-release]
+#   runs-on: ubuntu-latest
+#   environment:
+#     name: pypi
+#     url: https://pypi.org/p/codeweaver
+#   permissions:
+#     id-token: write
+#
+#   steps:
+#   - name: Download artifacts
+#     uses: actions/download-artifact@v4
+#     with:
+#       name: python-package-distributions
+#       path: dist/
+#
+#   - name: Publish to PyPI
+#     uses: pypa/gh-action-pypi-publish@release/v1
+#     with:
+#       attestations: true
+#
+# publish-to-testpypi:
+#   name: Publish to TestPyPI
+#   needs: [build]
+#   runs-on: ubuntu-latest
+#   environment:
+#     name: testpypi
+#     url: https://test.pypi.org/p/codeweaver
+#   permissions:
+#     id-token: write
+#
+#   steps:
+#   - name: Download artifacts
+#     uses: actions/download-artifact@v4
+#     with:
+#       name: python-package-distributions
+#       path: dist/
+#
+#   - name: Publish to TestPyPI
+#     uses: pypa/gh-action-pypi-publish@release/v1
+#     with:
+#       repository-url: https://test.pypi.org/legacy/
+#       attestations: true

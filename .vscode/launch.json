@@ -1,61 +1,61 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Debug MTEB Conversion Tool",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/scripts/mteb_to_codeweaver.py",
-            "console": "integratedTerminal",
-            "justMyCode": true,
-            "stopOnEntry": true,
-        },
-        {
-            "name": "Debug CodeWeaver CLI",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/codeweaver/cli/app.py",
-            "args": [
-                "server"
-            ],
-            "console": "integratedTerminal",
-            "justMyCode": false
-        },
-        {
-            "name": "CW Module As Script",
-            "type": "debugpy",
-            "program": "${file}",
-            "request": "launch",
-            "console": "integratedTerminal",
-            "justMyCode": true,
-            "stopOnEntry": true,
-            "args": "${command:pickArgs}"
-        },
-        {
-            "name": "Debug Selection",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${selectedText}",
-            "console": "integratedTerminal",
-            "justMyCode": true,
-            "stopOnEntry": true,
-            "args": "${command:pickArgs}",
-            "showReturnValue": true
-        },
-        {
-            "name": "Debug Fetch Grammars Script",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/scripts/fetch_grammars.py",
-            "console": "integratedTerminal",
-        },
-        {
-            "name": "Debug Lang Mapper Script",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/scripts/build_language_mappings.py",
-            "console": "integratedTerminal",
-            "justMyCode": true
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug MTEB Conversion Tool",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/mteb_to_codeweaver.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "stopOnEntry": true
+    },
+    {
+      "name": "Debug CodeWeaver CLI",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/codeweaver/cli/app.py",
+      "args": [
+        "server"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "CW Module As Script",
+      "type": "debugpy",
+      "program": "${file}",
+      "request": "launch",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "args": "${command:pickArgs}"
+    },
+    {
+      "name": "Debug Selection",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${selectedText}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "stopOnEntry": true,
+      "args": "${command:pickArgs}",
+      "showReturnValue": true
+    },
+    {
+      "name": "Debug Fetch Grammars Script",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/fetch_grammars.py",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Debug Lang Mapper Script",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/build_language_mappings.py",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ]
 }

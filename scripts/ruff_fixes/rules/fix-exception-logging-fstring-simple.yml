@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 id: fix-exception-logging-fstring-simple
-message: "Remove redundant exception from f-string logging"
+message: Remove redundant exception from f-string logging
 severity: info
 language: python
 rule:

@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 id: fix-exception-logging-fstring-exc
-message: "Remove redundant exception from f-string logging"
+message: Remove redundant exception from f-string logging
 severity: info
 language: python
 rule:
@@ -11,6 +11,6 @@ rule:
     $LOGGER.exception(f"$PREFIX{exc}$SUFFIX")
   constraints:
     LOGGER:
-      regex: "^(logger|logging|log)$"
+      regex: ^(logger|logging|log)$
 fix: |
   $LOGGER.exception(f"$PREFIX$SUFFIX")

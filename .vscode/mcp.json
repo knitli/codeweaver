@@ -1,58 +1,58 @@
 {
-    "servers": {
-        "browserDebugTools": {
-            "args": [
-                "--bun",
-                "@agentdeskai/browser-tools-server@latest"
-            ],
-            "command": "bunx",
-            "type": "stdio"
-        },
-        "context7": {
-            "args": [
-                "--bun",
-                "@upstash/context7-mcp@latest"
-            ],
-            "command": "bunx",
-            "type": "stdio"
-        },
-        "sequentialThinking": {
-            "args": [
-                "--bun",
-                "@modelcontextprotocol/server-sequential-thinking"
-            ],
-            "command": "bunx",
-            "type": "stdio"
-        },
-        "tavily": {
-            "command": "bunx",
-            "args": [
-                "--bun",
-                "tavily-mcp@latest"
-            ],
-            "env": {
-                "TAVILY_API_KEY": "${env:TAVILY_API_KEY}",
-            }
-        },
-        "serena": {
-            "command": "uv",
-            "args": [
-                "run",
-                "serena",
-                "start-mcp-server"
-            ]
-        },
-        "morphLlmFastApply": {
-            "args": [
-                "--bun",
-                "@morph-llm/morph-fast-apply@latest"
-            ],
-            "env": {
-                "MORPH_API_KEY": "${env:MORPH_API_KEY}",
-                "ALL_TOOLS": "false"
-            },
-            "command": "bunx",
-            "type": "stdio"
-        },
+  "servers": {
+    "browserDebugTools": {
+      "args": [
+        "--bun",
+        "@agentdeskai/browser-tools-server@latest"
+      ],
+      "command": "bunx",
+      "type": "stdio"
+    },
+    "context7": {
+      "args": [
+        "--bun",
+        "@upstash/context7-mcp@latest"
+      ],
+      "command": "bunx",
+      "type": "stdio"
+    },
+    "sequentialThinking": {
+      "args": [
+        "--bun",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "command": "bunx",
+      "type": "stdio"
+    },
+    "tavily": {
+      "command": "bunx",
+      "args": [
+        "--bun",
+        "tavily-mcp@latest"
+      ],
+      "env": {
+        "TAVILY_API_KEY": "${env:TAVILY_API_KEY}"
+      }
+    },
+    "serena": {
+      "command": "uv",
+      "args": [
+        "run",
+        "serena",
+        "start-mcp-server"
+      ]
+    },
+    "morphLlmFastApply": {
+      "args": [
+        "--bun",
+        "@morph-llm/morph-fast-apply@latest"
+      ],
+      "env": {
+        "MORPH_API_KEY": "${env:MORPH_API_KEY}",
+        "ALL_TOOLS": "false"
+      },
+      "command": "bunx",
+      "type": "stdio"
     }
+  }
 }

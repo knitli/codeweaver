@@ -3,8 +3,7 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
-name: "Copilot Setup Steps"
-
+name: Copilot Setup Steps
 # Automatically run the setup steps when they are changed to allow for easy validation, and
 # allow manual testing through the repository's "Actions" tab
 on:
@@ -15,29 +14,24 @@ on:
   pull_request:
     paths:
       - .github/workflows/copilot-setup-steps.yml
-
 jobs:
   # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot.
   copilot-setup-steps:
     runs-on: ubuntu-latest
-
     # Set the permissions to the lowest permissions possible needed for your steps.
     # Copilot will be given its own token for its operations.
     permissions:
       # If you want to clone the repository as part of your setup steps, for example to install dependencies, you'll need the `contents: read` permission. If you don't clone the repository in your setup steps, Copilot will do this for you automatically after the steps complete.
       contents: read
-
-
     # You can define any steps you want, and they will run before the agent starts.
     # If you do not check out your code, Copilot will do this for you.
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Setup Mise
         run: |
-          current_dir=$(pwd)
-          if [[ $current_dir != *codeweaver-mcp ]]; then
+          current_dir="$(pwd)"
+          if [[ "$current_dir" != *codeweaver-mcp ]]; then
             cd codeweaver-mcp
           fi
           chmod -R +x scripts
@@ -48,14 +42,14 @@ jobs:
           last_year="$((year - 1))"
           # Find mise binary with corrected pattern matching
           # In some temporary environments, the mise binary might be in ~/.cache/mise/
-          cache_files="$(ls -la ~/.cache/mise/ 2>/dev/null || echo '')"
-          if [[ $cache_files == *mise-$year* ]]; then
-            mise_bin="$(ls ~/.cache/mise/mise-$year* 2>/dev/null | head -1)"
-          elif [[ $cache_files == *mise-$last_year* ]]; then
-            mise_bin="$(ls ~/.cache/mise/mise-$last_year* 2>/dev/null | head -1)"
+          cache_files="$(find "$HOME/.cache/mise/" -maxdepth 1 -minddepth 1 -type f -name 'mise-*' 2>/dev/null || echo '')"
+          if [[ "$cache_files" == *mise-$year* ]]; then
+            mise_bin="$(find "$HOME/.cache/mise/" -maxdepth 1 -minddepth 1 -type f -name "mise-$year*" 2>/dev/null | head -1)"
+          elif [[ "$cache_files" == *mise-$last_year* ]]; then
+            mise_bin="$(find "$HOME/.cache/mise/" -maxdepth 1 -minddepth 1 -type f -name "mise-$last_year*" 2>/dev/null | head -1)"
           else
             mise_bin="$(which mise 2>/dev/null)"
-            mise_bin="${mise_bin:-~/.local/bin/mise}"
+            mise_bin="${mise_bin:-"$HOME/.local/bin/mise"}"
           fi
           if [[ ! -f "$mise_bin" ]]; then
             echo "ERROR: Could not find mise binary"
@@ -63,15 +57,15 @@ jobs:
           fi
           MISE="${mise_bin}"
 
-          echo "Using mise binary: $mise_bin"
+          echo "Using mise binary: $MISE"
           "$MISE" version
 
           # Trust the mise configuration
-          "$MISE" trust -yq
+          "$MISE" -yq trust
 
           # Try to install tools, but don't fail if network issues occur
           echo "Installing mise tools (allowing failures due to network limitations)..."
-          if ! "$MISE" install --quiet 2>/dev/null; then
+          if ! "$MISE" -yq install 2>/dev/null; then
             echo "Warning: Some tools failed to install due to network limitations in CI environment"
           fi
 
@@ -79,6 +73,6 @@ jobs:
           echo "Activating mise environment..."
           eval "$("$MISE" activate bash)" || echo "Warning: mise activate had issues, but continuing"
 
-          echo "Mise setup completed successfully"
+          echo "Mise setup completed"
         env:
-          MISE: "${{ vars.MISE }}"
+          MISE: ${{ vars.MISE }}
