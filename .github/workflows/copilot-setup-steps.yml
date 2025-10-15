@@ -37,7 +37,7 @@ jobs:
           chmod -R +x scripts
 
           # Install mise - the script may show help and exit with code 2, which is expected
-          ./scripts/install-mise.sh version || true
+          ./scripts/dev-env/install-mise.sh version || true
           year="$(date +%Y)"
           last_year="$((year - 1))"
           # Find mise binary with corrected pattern matching

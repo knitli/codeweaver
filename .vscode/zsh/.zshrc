@@ -7,9 +7,9 @@ if [[ -n "${VSCODE_CWD:-}" ]]; then
   REPO_ROOT="${VSCODE_CWD}"
 fi
 
-if [[ -f "${REPO_ROOT}/scripts/dev-shell-init.zsh" ]]; then
+if [[ -f "${REPO_ROOT}/scripts/dev-env/dev-shell-init.zsh" ]]; then
   # shellcheck disable=SC1090
-  source "${REPO_ROOT}/scripts/dev-shell-init.zsh"
+  source "${REPO_ROOT}/scripts/dev-env/dev-shell-init.zsh"
 fi
 
 # After workspace init, source the user's real ~/.zshrc if it exists

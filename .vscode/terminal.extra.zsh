@@ -47,8 +47,8 @@ else
       print -P "%F{red}[codeweaver] Failed to make install scripts executable!%f"
     }
     print -P "%F{209}[codeweaver]%f Installing Mise for the first time..."
-    "${REPO_ROOT}/scripts/install-mise.sh" || {
-      print -P "%F{red}[codeweaver] Failed to install Mise!%f Try running the install script manually: %F{cyan}${REPO_ROOT}/scripts/install-mise.sh%f"
+    "${REPO_ROOT}/scripts/dev-env/install-mise.sh" || {
+      print -P "%F{red}[codeweaver] Failed to install Mise!%f Try running the install script manually: %F{cyan}${REPO_ROOT}/scripts/dev-env/install-mise.sh%f"
     }
     full_setup
 fi

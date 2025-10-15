@@ -66,7 +66,7 @@ TOTAL_FILES_PROCESSED=0
 
 # Get script directory for relative paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SUBSCRIPT_DIR="$SCRIPT_DIR/ruff_fixes"
+SUBSCRIPT_DIR="$SCRIPT_DIR/ruff-fixes"
 
 # Function to calculate file checksums for change detection
 calculate_checksums()

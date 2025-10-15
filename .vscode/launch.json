@@ -5,7 +5,7 @@
       "name": "Debug MTEB Conversion Tool",
       "type": "debugpy",
       "request": "launch",
-      "program": "${workspaceFolder}/scripts/mteb_to_codeweaver.py",
+      "program": "${workspaceFolder}/scripts/model-data/mteb-to-codeweaver.py",
       "console": "integratedTerminal",
       "justMyCode": true,
       "stopOnEntry": true
@@ -46,14 +46,14 @@
       "name": "Debug Fetch Grammars Script",
       "type": "debugpy",
       "request": "launch",
-      "program": "${workspaceFolder}/scripts/fetch_grammars.py",
+      "program": "${workspaceFolder}/scripts/language-support/get-langs.py",
       "console": "integratedTerminal"
     },
     {
       "name": "Debug Lang Mapper Script",
       "type": "debugpy",
       "request": "launch",
-      "program": "${workspaceFolder}/scripts/build_language_mappings.py",
+      "program": "${workspaceFolder}/scripts/language-support/build-language-mappings.py",
       "console": "integratedTerminal",
       "justMyCode": true
     }

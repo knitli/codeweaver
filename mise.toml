@@ -118,7 +118,7 @@ fix = """
 print -P "%F{209}[codeweaver]%f Fixing code issues..."
 ruff check --select I --fix . &&
 ruff check --fix --unsafe-fixes src/ &&
-scripts/fix-ruff-patterns.sh src/ &&
+scripts/code-quality/fix-ruff-patterns.sh src/ &&
 ruff format . &&
 hk fix &&
 print -P "%F{209}[codeweaver]%f ✅ Code fixes applied!"
@@ -214,13 +214,13 @@ uv run --group docs mkdocs build
 fix-patterns = """
 #!/bin/bash
 echo "Running ruff pattern fixer..."
-./scripts/fix-ruff-patterns.sh
+./scripts/code-quality/fix-ruff-patterns.sh
 """
 
 update-licenses = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Updating %F{209}CodeWeaver%f license headers :..."
-uv run scripts/update-licenses.py --interactive "${*}"
+uv run scripts/code-quality/update-licenses.py --interactive "${*}"
 """
 
 # Release and maintenance

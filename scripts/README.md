@@ -6,76 +6,43 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 # Scripts Directory
 
-This directory contains development and build scripts for the CodeWeaver project. Scripts are organized by purpose and referenced by various build tools.
+This directory contains development and build scripts for the CodeWeaver project, organized by functional area for improved discoverability and maintainability.
+
+## Directory Organization
+
+Scripts are organized into functional categories:
+
+```
+scripts/
+├── code-quality/          # Code formatting, linting, and licensing
+├── dev-env/              # Development environment setup
+├── docs/                 # Documentation generation
+├── language-support/     # Tree-sitter grammars and language mappings
+├── model-data/          # Model metadata and data conversions
+├── testing/             # Test management and benchmarking
+└── utils/               # Shared utilities and debugging tools
+```
 
 ## Quick Reference
 
-### Referenced by Build Tools
+### Scripts Referenced by Build Tools
 
 These scripts are called by project tooling (pyproject.toml, mise.toml, hk.pkl, or GitHub workflows):
 
-- **[fix-ruff-patterns.sh](#fix-ruff-patternssh)** - Auto-fix ruff violations (TRY401, G004, TRY300)
-  - Referenced in: `mise.toml`, `hk.pkl`
-- **[apply_test_marks.py](#apply_test_markspy)** - Apply pytest marks to test files
-  - Referenced in: `hk.pkl`
-- **[update-licenses.py](#update-licensespy)** - Update REUSE license headers
-  - Referenced in: `mise.toml`, `hk.pkl`
-- **[install-mise.sh](#install-misesh)** - Install mise task runner
-  - Referenced in: `.github/workflows/copilot-setup-steps.yml`
-
-### Script Categories
-
-- **[Development & Environment](#development--environment)** - Shell initialization and setup
-- **[Code Quality & Linting](#code-quality--linting)** - Formatting, linting, and fixing code
-- **[Testing](#testing)** - Test marking and organization
-- **[Language Support](#language-support)** - Tree-sitter grammar and language mapping
-- **[Documentation](#documentation)** - API docs and markdown processing
-- **[Model & Data](#model--data)** - Model metadata and data conversion
-- **[Utilities](#utilities)** - Analysis and debugging tools
+| Script | Purpose | Referenced By |
+|--------|---------|---------------|
+| **[code-quality/fix-ruff-patterns.sh](#fix-ruff-patternssh)** | Auto-fix ruff violations (TRY401, G004, TRY300) | mise.toml, hk.pkl |
+| **[code-quality/update-licenses.py](#update-licensespy)** | Update REUSE license headers | mise.toml, hk.pkl |
+| **[testing/apply-test-marks.py](#apply-test-markspy)** | Apply pytest marks to test files | hk.pkl |
+| **[dev-env/install-mise.sh](#install-misesh)** | Install mise task runner | .github/workflows |
 
 ---
 
-## Development & Environment
-
-### install-mise.sh
-
-Installs or updates the mise task runner (version 2025.7.0).
-
-**Usage:**
-```bash
-./scripts/install-mise.sh           # Install mise
-./scripts/install-mise.sh version   # Check version
-```
-
-**Referenced in:** 
-- `.github/workflows/copilot-setup-steps.yml`
-- `.vscode/terminal.extra.zsh`
-
-### dev-shell-init.zsh
-
-Zsh initialization script for development shells. Idempotently activates the project's `.venv` and sources workspace-specific commands.
-
-**Usage:**
-- Automatically sourced by configured shells
-- Manual: `source scripts/dev-shell-init.zsh`
-
-**Features:**
-- Idempotent venv activation
-- Resolves repo root from multiple locations
-- Only runs once per shell session
-
-### vscode-terminal-bootstrap.sh
-
-Launches an interactive zsh terminal with dev-shell-init pre-sourced for VS Code terminal integration.
-
-**Usage:**
-- Automatically called by VS Code terminal configuration
-
----
-
-## Code Quality & Linting
+## Code Quality
 
 ### fix-ruff-patterns.sh
+
+**Location:** `scripts/code-quality/fix-ruff-patterns.sh`
 
 Main orchestration script that automatically fixes common ruff linting violations that can't be auto-fixed by ruff itself.
 
@@ -87,42 +54,44 @@ Main orchestration script that automatically fixes common ruff linting violation
 **Usage:**
 ```bash
 # Fix patterns in current directory
-./scripts/fix-ruff-patterns.sh
+./scripts/code-quality/fix-ruff-patterns.sh
 
 # Fix specific files/directories
-./scripts/fix-ruff-patterns.sh src/ tests/ main.py
+./scripts/code-quality/fix-ruff-patterns.sh src/ tests/ main.py
 
 # Skip verification (if ruff hangs)
-./scripts/fix-ruff-patterns.sh --skip-verify src/
+./scripts/code-quality/fix-ruff-patterns.sh --skip-verify src/
 
 # Dry run mode
-./scripts/fix-ruff-patterns.sh --dry-run src/
+./scripts/code-quality/fix-ruff-patterns.sh --dry-run src/
 
 # Debug mode
-./scripts/fix-ruff-patterns.sh --debug src/
+./scripts/code-quality/fix-ruff-patterns.sh --debug src/
 ```
 
 **Referenced in:** `mise.toml`, `hk.pkl`
 
-**See also:** [ruff_fixes/README.md](ruff_fixes/README.md) for detailed architecture and examples.
+**See also:** [code-quality/ruff-fixes/README.md](code-quality/ruff-fixes/README.md) for detailed architecture and examples.
 
 ### update-licenses.py
+
+**Location:** `scripts/code-quality/update-licenses.py`
 
 Updates REUSE-compliant license headers for files in the repository.
 
 **Usage:**
 ```bash
 # Add/update licenses interactively
-uv run python scripts/update-licenses.py add --interactive
+uv run python scripts/code-quality/update-licenses.py add --interactive
 
 # Add licenses to specific files
-uv run python scripts/update-licenses.py add file1.py file2.py
+uv run python scripts/code-quality/update-licenses.py add file1.py file2.py
 
 # Add licenses to staged git files
-uv run python scripts/update-licenses.py add --staged
+uv run python scripts/code-quality/update-licenses.py add --staged
 
 # Use specific contributors
-uv run python scripts/update-licenses.py add --contributor "Name <email>"
+uv run python scripts/code-quality/update-licenses.py add --contributor "Name <email>"
 ```
 
 **Referenced in:** `mise.toml`, `hk.pkl`
@@ -133,21 +102,81 @@ uv run python scripts/update-licenses.py add --contributor "Name <email>"
 - Filters files using rignore (respects .gitignore)
 - Concurrent processing
 
+### ruff-fixes/
+
+**Location:** `scripts/code-quality/ruff-fixes/`
+
+Contains scripts and rules for fixing ruff linting violations. See [ruff-fixes/README.md](code-quality/ruff-fixes/README.md) for detailed documentation.
+
+**Contents:**
+- `f_string_converter.py` - AST-based f-string to `%` format converter
+- `punctuation_cleaner.py` - Smart punctuation cleanup for exception logging
+- `ruff_fixer.py` - Core ruff fixing logic
+- `try_return_fixer.py` - Fixes TRY300 violations
+- `test_fix_patterns.py` - Tests for pattern fixing
+- `rules/` - AST-grep rule definitions (YAML files)
+
+---
+
+## Development Environment
+
+### install-mise.sh
+
+**Location:** `scripts/dev-env/install-mise.sh`
+
+Installs or updates the mise task runner (version 2025.7.0).
+
+**Usage:**
+```bash
+./scripts/dev-env/install-mise.sh           # Install mise
+./scripts/dev-env/install-mise.sh version   # Check version
+```
+
+**Referenced in:** 
+- `.github/workflows/copilot-setup-steps.yml`
+- `.vscode/terminal.extra.zsh`
+
+### dev-shell-init.zsh
+
+**Location:** `scripts/dev-env/dev-shell-init.zsh`
+
+Zsh initialization script for development shells. Idempotently activates the project's `.venv` and sources workspace-specific commands.
+
+**Usage:**
+- Automatically sourced by configured shells
+- Manual: `source scripts/dev-env/dev-shell-init.zsh`
+
+**Features:**
+- Idempotent venv activation
+- Resolves repo root from multiple locations
+- Only runs once per shell session
+
+### vscode-terminal-bootstrap.sh
+
+**Location:** `scripts/dev-env/vscode-terminal-bootstrap.sh`
+
+Launches an interactive zsh terminal with dev-shell-init pre-sourced for VS Code terminal integration.
+
+**Usage:**
+- Automatically called by VS Code terminal configuration
+
 ---
 
 ## Testing
 
-### apply_test_marks.py
+### apply-test-marks.py
+
+**Location:** `scripts/testing/apply-test-marks.py`
 
 Automatically applies pytest marks to test files based on their location and naming patterns.
 
 **Usage:**
 ```bash
 # Process all test files
-./scripts/apply_test_marks.py
+./scripts/testing/apply-test-marks.py
 
 # Process specific test files
-./scripts/apply_test_marks.py tests/unit/test_config.py
+./scripts/testing/apply-test-marks.py tests/unit/test_config.py
 
 # Run tests with marks
 pytest -m unit                    # Run only unit tests
@@ -166,17 +195,34 @@ pytest -m config                  # Configuration tests only
 - `test_telemetry` → `@pytest.mark.telemetry`
 - And more...
 
+### benchmark-detection.py
+
+**Location:** `scripts/testing/benchmark-detection.py`
+
+Benchmarks language family detection performance.
+
+**Usage:**
+```bash
+uv run -s scripts/testing/benchmark-detection.py
+```
+
+**Features:**
+- PEP 723 inline dependencies: `rich`
+- Performance profiling for language detection
+
 ---
 
 ## Language Support
 
-### get_langs.py
+### get-langs.py
+
+**Location:** `scripts/language-support/get-langs.py`
 
 Fetches tree-sitter grammars from their repositories and updates local grammar files.
 
 **Usage:**
 ```bash
-uv run scripts/get_langs.py [languages...]
+uv run scripts/language-support/get-langs.py [languages...]
 ```
 
 **Features:**
@@ -184,60 +230,70 @@ uv run scripts/get_langs.py [languages...]
 - Fetches from GitHub repositories
 - Updates tree-sitter grammar files
 
-### build_language_mappings.py
+### build-language-mappings.py
+
+**Location:** `scripts/language-support/build-language-mappings.py`
 
 Builds language mapping files from tree-sitter `node-types.json` files.
 
 **Usage:**
 ```bash
-uv run -s scripts/build_language_mappings.py
+uv run -s scripts/language-support/build-language-mappings.py
 ```
 
 **Features:**
 - PEP 723 inline dependencies: `pydantic`
 - Generates language-specific mappings
 
-### generate_supported_languages.py
+### generate-supported-languages.py
+
+**Location:** `scripts/language-support/generate-supported-languages.py`
 
 Generates the list of supported languages for the build system and documentation.
 
 **Usage:**
 ```bash
-uv run scripts/generate_supported_languages.py
+uv run scripts/language-support/generate-supported-languages.py
 ```
 
 **Features:**
 - PEP 723 inline dependencies: `black`, `textcase`
 - Updates build configuration
 
-### analyze_grammar_structure.py
+### analyze-grammar-structure.py
+
+**Location:** `scripts/language-support/analyze-grammar-structure.py`
 
 Analyzes grammar structure patterns across all supported languages.
 
 **Usage:**
 ```bash
-./scripts/analyze_grammar_structure.py
+./scripts/language-support/analyze-grammar-structure.py
 ```
 
-### generate_delimiters.py
+### generate-delimiters.py
+
+**Location:** `scripts/language-support/generate-delimiters.py`
 
 Generates language delimiter definitions from patterns.
 
 **Usage:**
 ```bash
-uv run -s scripts/generate_delimiters.py
+uv run -s scripts/language-support/generate-delimiters.py
 ```
 
 **Features:**
 - PEP 723 inline dependencies: `rich`
 
-### compare_delimiters.py
+### compare-delimiters.py
+
+**Location:** `scripts/language-support/compare-delimiters.py`
 
 Compares manually-defined delimiters with pattern-generated ones to ensure consistency.
 
 **Usage:**
 ```bash
-uv run -s scripts/compare_delimiters.py
+uv run -s scripts/language-support/compare-delimiters.py
 ```
 
 **Features:**
@@ -247,42 +303,52 @@ uv run -s scripts/compare_delimiters.py
 
 ## Documentation
 
-### gen_ref_pages.py
+### gen-ref-pages.py
+
+**Location:** `scripts/docs/gen-ref-pages.py`
 
 Generates API documentation pages and navigation for CodeWeaver. Triggered by `mkdocs-gen-files` during the documentation build process.
 
 **Usage:**
 - Automatically called by MkDocs build
-- Manual: `./scripts/gen_ref_pages.py`
+- Manual: `./scripts/docs/gen-ref-pages.py`
 
 **Features:**
 - Generates docs from source code
 - Creates navigation structure
 - Skips `__init__.py` and `__main__.py`
 
-### add_plaintext_to_codeblock.py
+**Referenced in:** `mkdocs.yml`
+
+### add-plaintext-to-codeblock.py
+
+**Location:** `scripts/docs/add-plaintext-to-codeblock.py`
 
 Finds codeblocks in Markdown files with no language specified and adds 'plaintext' to them.
 
 **Usage:**
 ```bash
-./scripts/add_plaintext_to_codeblock.py [files...]
+./scripts/docs/add-plaintext-to-codeblock.py [files...]
 ```
 
 ---
 
 ## Model & Data
 
-### mteb_to_codeweaver.py
+### mteb-to-codeweaver.py
+
+**Location:** `scripts/model-data/mteb-to-codeweaver.py`
 
 Converts MTEB (Massive Text Embedding Benchmark) model metadata to CodeWeaver embedding capabilities format.
 
 **Usage:**
 ```bash
-uv run -s scripts/mteb_to_codeweaver.py
+uv run -s scripts/model-data/mteb-to-codeweaver.py
 ```
 
-### hf_models.json
+### hf-models.json
+
+**Location:** `scripts/model-data/hf-models.json`
 
 Contains Hugging Face model metadata. Used for embedding model configuration.
 
@@ -292,39 +358,21 @@ Contains Hugging Face model metadata. Used for embedding model configuration.
 
 ## Utilities
 
-### benchmark_detection.py
+### colors.py
 
-Benchmarks language family detection performance.
+**Location:** `scripts/utils/colors.py`
 
-**Usage:**
-```bash
-uv run -s scripts/benchmark_detection.py
-```
+Shared color definitions for script output formatting.
 
-**Features:**
-- PEP 723 inline dependencies: `rich`
-- Performance profiling for language detection
+### check-imports.py
 
-### get_all_exceptions.py
-
-Retrieves all exceptions available in the CodeWeaver codebase and all used exceptions.
-
-**Usage:**
-```bash
-./scripts/get_all_exceptions.py
-```
-
-**Features:**
-- Scans codebase for exception definitions
-- Lists used exceptions
-
-### check_imports.py
+**Location:** `scripts/utils/check-imports.py`
 
 Simple import checker to identify missing dependencies.
 
 **Usage:**
 ```bash
-./scripts/check_imports.py
+./scripts/utils/check-imports.py
 ```
 
 **Features:**
@@ -334,28 +382,28 @@ Simple import checker to identify missing dependencies.
 
 **Note:** Currently has empty `MODULES_TO_CHECK` tuple - add modules to check as needed.
 
----
+### get-all-exceptions.py
 
-## Subdirectories
+**Location:** `scripts/utils/get-all-exceptions.py`
 
-### ruff_fixes/
+Retrieves all exceptions available in the CodeWeaver codebase and all used exceptions.
 
-Contains scripts and rules for fixing ruff linting violations. See [ruff_fixes/README.md](ruff_fixes/README.md) for detailed documentation.
+**Usage:**
+```bash
+./scripts/utils/get-all-exceptions.py
+```
 
-**Contents:**
-- `f_string_converter.py` - AST-based f-string to `%` format converter
-- `punctuation_cleaner.py` - Smart punctuation cleanup for exception logging
-- `ruff_fixer.py` - Core ruff fixing logic
-- `try_return_fixer.py` - Fixes TRY300 violations
-- `test_fix_patterns.py` - Tests for pattern fixing
-- `rules/` - AST-grep rule definitions (10 YAML files)
+**Features:**
+- Scans codebase for exception definitions
+- Lists used exceptions
 
 ---
 
 ## Script Naming Conventions
 
-- **Python scripts**: Use `snake_case.py`
+- **Python scripts**: Use `kebab-case.py` for executables
 - **Shell scripts**: Use `kebab-case.sh`
+- **Directories**: Use `kebab-case/`
 - **Executable scripts**: Should have shebang and execute permission
 - **PEP 723 scripts**: Use `#!/usr/bin/env -S uv run -s` for inline dependencies
 
@@ -363,12 +411,14 @@ Contains scripts and rules for fixing ruff linting violations. See [ruff_fixes/R
 
 When adding new scripts:
 
-1. **Add appropriate license header** (use `update-licenses.py`)
-2. **Include docstring** explaining purpose and usage
-3. **Update this README** in the appropriate category
-4. **Add to Quick Reference** if called by build tools
-5. **Document CLI arguments** and examples
-6. **Use PEP 723** for scripts with external dependencies
+1. **Choose the appropriate category directory** based on the script's primary purpose
+2. **Add appropriate license header** (use `update-licenses.py`)
+3. **Include docstring** explaining purpose and usage
+4. **Update this README** in the appropriate category section
+5. **Add to Quick Reference** if called by build tools
+6. **Document CLI arguments** and examples
+7. **Use PEP 723** for scripts with external dependencies
+8. **Follow naming conventions** (kebab-case for executable scripts)
 
 ## Running Scripts
 
@@ -377,7 +427,7 @@ When adding new scripts:
 Many scripts use PEP 723 inline script metadata and should be run with `uv`:
 
 ```bash
-uv run -s scripts/script_name.py
+uv run -s scripts/<category>/<script-name>.py
 ```
 
 ### Direct execution
@@ -385,8 +435,8 @@ uv run -s scripts/script_name.py
 Scripts with proper shebangs can be run directly:
 
 ```bash
-./scripts/script_name.py
-./scripts/script-name.sh
+./scripts/<category>/<script-name>.py
+./scripts/<category>/<script-name>.sh
 ```
 
 ### Through mise/hk
@@ -400,8 +450,12 @@ hk fix
 
 ---
 
+## Organization Design
+
+See [ORGANIZATION.md](ORGANIZATION.md) for the detailed design rationale and migration mapping.
+
 ## Maintenance
 
-Last Updated: 2025-10-13
+Last Updated: 2025-10-15
 
-For issues or questions about specific scripts, refer to inline comments or contact Adam.
+For issues or questions about specific scripts, refer to inline comments or contact the team.

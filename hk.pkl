@@ -23,8 +23,8 @@ local linters = new Mapping<String, Step> {
 
     ["fix-ruff-patterns"] = new Step {
         glob = "src/**/*.py"
-        fix = "./scripts/fix-ruff-patterns.sh {{ files }}"
-        check = "./scripts/fix-ruff-patterns.sh --dry-run {{ files }}"
+        fix = "./scripts/code-quality/fix-ruff-patterns.sh {{ files }}"
+        check = "./scripts/code-quality/fix-ruff-patterns.sh --dry-run {{ files }}"
     }
 
     ["ruff"] = (Builtins.ruff) {
@@ -34,7 +34,7 @@ local linters = new Mapping<String, Step> {
     ["reuse"] = new Step {
         check = "reuse lint"
         interactive = true
-        fix = "./scripts/update-licenses.py add --interactive {{ files }}"
+        fix = "./scripts/code-quality/update-licenses.py add --interactive {{ files }}"
     }
 
     ["shellcheck"] = new Step {
@@ -53,7 +53,7 @@ local linters = new Mapping<String, Step> {
 
     ["add-marks"] = new Step {
         glob = "tests/**/*.py"
-        fix = "./scripts/apply_test_marks.py {{ files }}"
+        fix = "./scripts/testing/apply-test-marks.py {{ files }}"
     }
 
 }
