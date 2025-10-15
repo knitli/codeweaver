@@ -36,8 +36,8 @@ GH_REPO = "knitli/codeweaver-mcp"
 
 [hooks]
 enter = """
-#!/bin/bash
-echo "Setting up CodeWeaver MCP environment..."
+#!/usr/bin/env zsh
+print -P "%F{magenta}[codeweaver]%f Setting up %F{magenta}CodeWeaver%f environment..."
 # Set up git aliases
 alias jj='jj --no-pager' &&
 alias git='git --no-pager' &&
@@ -50,9 +50,9 @@ fi
 """
 
 leave = """
-echo "Exiting CodeWeaver MCP environment..."
+print -P "%F{magenta}[codeweaver]%f Exiting CodeWeaver environment..."
 eval "$(mise deactivate)" &>/dev/null &&
-echo "Environment deactivated."
+print -P "%F{magenta}[codeweaver]%f Environment deactivated."
 """
 
 [tasks]
@@ -64,26 +64,28 @@ uv sync --extra all --group all-dev
 """
 
 update-dependencies = """
-#!/bin/bash
-echo "Updating dependencies..."
+#!/usr/bin/env zsh
+print -P "%F{magenta}[codeweaver]%f Updating dependencies..."
 uv sync --extra all --group all-dev -U
 """
 
 source = """
-#!/bin/
+#!/usr/bin/env zsh
+# Source the virtual environment
+print -P "%F{magenta}[codeweaver]%f Sourcing virtual environment..."
 cdroot || true && source .venv/bin/activate
 """
 
 # Development setup
 setup = """
 #!/usr/bin/env zsh
-echo "Setting up development environment..."
+print -P "%F{magenta}[codeweaver]%f Setting up development environment for the first time..."
 mise --silent -y trust &&
 mise --silent -y install &>/dev/null || true &&
 mise --silent reshim &&
 eval "$(mise --silent activate zsh)" &&
 eval "$(mise --silent env -s zsh)" &&
-echo "Initializing CodeWeaver MCP..."
+print -P "%F{magenta}[codeweaver]%f Initializing %F{magenta}CodeWeaver%f..."
 hk init --mise &>/dev/null || true &&
 uv venv --allow-existing .venv &&
 source .venv/bin/activate &
@@ -96,35 +98,36 @@ if [ "$GITHUB_ACTIONS" == true ]; then
 else
     export CI=false
 fi
-echo "✅ Development environment ready!"
+print -P "%F{magenta}[codeweaver]%f ✅ Development environment ready!"
 """
 
 update-tools = """
-#!/bin/bash
-echo "Updating tools..."
+#!/usr/bin/env zsh
+print -P "%F{magenta}[codeweaver]%f Updating tools..."
 mise --silent -y upgrade &&
 mise --silent self-update -yq &&
 mise --silent reshim &&
 mise --silent -y prune
+print -P "%F{magenta}[codeweaver]%f ✅ Tools updated! 🧰"
 """
 
 install = "uv sync --all-groups"
 
 # Code quality and formatting
 fix = """
-#!/bin/bash
-echo "Fixing code issues..."
+#!/usr/bin/env zsh
+print -P "%F{magenta}[codeweaver]%f Fixing code issues..."
 ruff check --select I --fix . &&
 ruff check --fix --unsafe-fixes src/ &&
 scripts/fix-ruff-patterns.sh src/ &&
 ruff format . &&
 hk fix &&
-echo "✅ Code fixes applied!"
+print -P "%F{magenta}[codeweaver]%f ✅ Code fixes applied!"
 """
 
 check = """
-#!/bin/bash
-echo "Running quality checks..."
+#!/usr/bin/env zsh
+print -P "%F{magenta}[codeweaver]%f Running quality checks..."
 hk check
 """
 
@@ -139,14 +142,14 @@ fi
 """
 
 format = """
-#!/bin/bash
-echo "Running formatting checks..."
-uv run ruff format --check .
+#!/usr/bin/env zsh
+print -P "%F{magenta}[codeweaver]%f Running formatting checks..."
+hk check
 """
 
 format-fix = """
-#!/bin/bash
-echo "Applying formatting..."
+#!/usr/bin/env zsh
+print -P "%F{magenta}[codeweaver]%f Applying formatting...hold onto your butts...🦖 "
 mise run fix-patterns &&
 uv run ruff format .
 files="$(git ls-files '*.yaml' '*.yml' '*.json' 2>/dev/null)"
@@ -197,8 +200,8 @@ echo "✅ Build artifacts cleaned!"
 
 # Documentation
 docs-serve = """
-#!/bin/bash
-echo "Starting documentation server..."
+#!/usr/bin/env zsh
+print -P "%F{magenta}[codeweaver]%f Starting %F{magenta}CodeWeaver%f documentation server..."
 uv run --group docs mkdocs serve
 """
 
@@ -216,44 +219,46 @@ echo "Running ruff pattern fixer..."
 """
 
 update-licenses = """
-#!/bin/bash
-echo "Updating license headers..."
-uv run python scripts/update-licenses.py "${*}"
+#!/usr/bin/env zsh
+print -P "%F{magenta}[codeweaver]%f Updating %F{magenta}CodeWeaver%f license headers :..."
+uv run scripts/update-licenses.py --interactive "${*}"
 """
 
 # Release and maintenance
 version = """
-#!/bin/bash
-echo "CodeWeaver version information:"
-echo "Package version: $(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")"
-echo "Python version: $(python --version)"
-echo "UV version: $(uv --version)"
+#!/usr/bin/env zsh
+print -P "%F{magenta}[codeweaver] CodeWeaver%f version information:"
+print -P "%F{magenta}[codeweaver]%f 📦 Package version: $(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")"
+print -P "%F{magenta}[codeweaver]%f 🐍 Python version: $(python --version)"
+print -P "%F{magenta}[codeweaver]%f 🌞 UV version: $(uv --version)"
 """
 
 changelog = """
-#!/bin/bash
-echo "Generating changelog..."
+#!/usr/bin/env zsh
+print -P "%F{magenta}[codeweaver]%f Generating changelog..."
 npm exec changeset version
 """
 
 # Combined workflows
 ci = """
-#!/bin/bash
-echo "Running full CI pipeline locally..."
+#!/usr/bin/env zsh
+print -P "%F{magenta}[codeweaver]%f Running full CI pipeline locally..."
 mise run check &&
 mise run lint &&
 mise run format &&
 mise run test-cov &&
 mise run build &&
-echo "✅ All CI checks passed!"
+print -P "%F{magenta}[codeweaver]%f ✅ All CI checks passed!"
 """
 
 pre-commit = """
-#!/bin/bash
-echo "Running pre-commit checks..."
-hk fix &&
+#!/usr/bin/env bash
+print -P "%F{magenta}[codeweaver]%f Running %F{magenta}CodeWeaver%f pre-commit checks 🪝... %F{green} Thanks for your contributions! You're pretty cool.%f 🚀" &&
+hk fix || print -P "%F{magenta}[codeweaver]%f ⚠️  %F{red}You need to fix some issues before committing. Do not pass go, do not collect $200.%f 💸 😦" && exit 1
 git add . &&
-hk check
+hk check || print -P "%F{magenta}[codeweaver]%f ⚠️  %F{red}You need to fix some issues before committing. Almost there!%f" && exit 1
+git add . &&
+print -P "%F{magenta}[codeweaver]%f ✅ All pre-commit checks passed! You're awesome! 🎉 ... and they said the Kobiyashi Maru was unwinnable! 🖖"
 """
 
 [tasks.activate]

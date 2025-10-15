@@ -558,6 +558,16 @@ class NodeTypeParser:
             ],
         )
 
+    def _flattened_nodes_for_language(
+        self, language: SemanticSearchLanguage
+    ) -> list[ThingOrCategoryType]:
+        """Get a flattened list of all Things and Categories for a specific language."""
+        return [
+            *self._registration_cache[language]["categories"],
+            *self._registration_cache[language]["tokens"],
+            *self._registration_cache[language]["composites"],
+        ]
+
     def parse_all_nodes(self) -> list[ThingOrCategoryType]:
         """Parse and translate all node types files into internal representation."""
         assembled_things: list[ThingOrCategoryType] = []
@@ -576,8 +586,14 @@ class NodeTypeParser:
         Returns:
             List of parsed and translated node types for the specified language.
         """
-        array = self._loader.get_node(language)
-        return self._parse_node_array(array) if array else []
+        if language not in self._languages:
+            self._languages = frozenset([language]) | self._languages
+        if not type(self)._registration_cache[language]["tokens"] and (
+            array := self._loader.get_node(language)
+        ):
+            _ = self._parse_node_array(array)
+        self._register_everything()
+        return self._flattened_nodes_for_language(language)
 
     def parse_languages(
         self, languages: Sequence[SemanticSearchLanguage] | None = None
@@ -590,17 +606,19 @@ class NodeTypeParser:
         Returns:
             List of parsed and translated node types for the specified languages.
         """
+        self._languages = frozenset(languages or iter(SemanticSearchLanguage)) | self._languages
         for language in languages or self._languages:
-            if array := self._loader.get_node(language):
+            # no tokens, no grammar
+            if not self._registration_cache[language]["tokens"] and (
+                array := self._loader.get_node(language)
+            ):
                 _ = self._parse_node_array(array)
         if not type(self)._initialized:
             self._register_everything()
         return [
             thing
             for lang in (languages or self._languages)
-            for thing in self._registration_cache.get(lang, {}).get("categories", [])
-            + self._registration_cache.get(lang, {}).get("tokens", [])
-            + self._registration_cache.get(lang, {}).get("composites", [])
+            for thing in self._flattened_nodes_for_language(lang)
         ]
 
     def _register_everything(self) -> None:
@@ -611,20 +629,9 @@ class NodeTypeParser:
 
         registry = get_registry()
         for language in self._languages:
-            for category in type(self)._registration_cache.get(language, {}).get("categories", []):
-                registry.register_thing(category)
-            for token in type(self)._registration_cache.get(language, {}).get("tokens", []):
-                registry.register_thing(token)
-            for composite in (
-                type(self)
-                ._registration_cache.get(language, {})
-                .get(language, {})
-                .get("composites", [])
-            ):
-                registry.register_thing(composite)
-            for connection in (
-                type(self)._registration_cache.get(language, {}).get("connections", [])
-            ):
+            for thing in self._flattened_nodes_for_language(language):
+                registry.register_thing(thing)
+            for connection in type(self)._registration_cache[language]["connections"]:
                 registry.register_connection(connection)
         type(self)._initialized = True
 
@@ -660,6 +667,8 @@ class NodeTypeParser:
 
     def _create_composite(self, node_dto: NodeTypeDTO) -> CompositeThing:
         """Create a CompositeThing from a NodeTypeDTO and add it to the internal mapping.
+
+        Also creates and registers any DirectConnections and PositionalConnections. Note that these connections *behave* like they belong to the CompositeThing, but they are registered globally in the registry.
 
         Args:
             node_dto: NodeTypeDTO representing the composite to create.
@@ -720,11 +729,7 @@ class NodeTypeParser:
             type(self)._registration_cache[node_array.language]["composites"].extend(
                 self._create_composite(node_dto) for node_dto in composite_nodes
             )
-        return list(
-            self._registration_cache.get(node_array.language, {}).get("categories", [])
-            + self._registration_cache.get(node_array.language, {}).get("tokens", [])
-            + self._registration_cache.get(node_array.language, {}).get("composites", [])
-        )
+        return self._flattened_nodes_for_language(node_array.language)
 
 
 _parser: NodeTypeParser | None = None
