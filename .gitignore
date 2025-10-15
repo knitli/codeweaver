@@ -12,6 +12,8 @@ mise.local.toml.license
 hk.local.pkl.license
 .ruff_cache
 .roo/mcp.json
+# local terminal zsh config -- can contain sensitive info
+.vscode/terminal.local.zsh
 
 # non-public working files
 .workbench/*
