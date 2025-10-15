@@ -27,7 +27,7 @@ type ConfidenceRow = tuple[str, SemanticClass, float, int]
 
 def locate_node_types() -> Path:
     """Locate the node_types directory relative to this script."""
-    project_root = Path(__file__).parent.parent
+    project_root = Path(__file__).parent.parent.parent
     node_types_dir = project_root / "node_types"
     if not node_types_dir.exists():
         raise FileNotFoundError(f"Node types directory not found: {node_types_dir}")

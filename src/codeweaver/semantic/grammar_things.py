@@ -999,6 +999,37 @@ class Grammar(DataclassSerializationMixin):
         frozenset[PositionalConnections], Field(exclude=True, default=frozenset)
     ]
 
+    def __iter__(self) -> Iterator[ThingType]:
+        """Iterate over all Things (CompositeThings and Tokens) in this Grammar."""
+        yield from self.things
+
+    def __len__(self) -> int:
+        """Get the total number of Things (CompositeThings and Tokens) in this Grammar."""
+        return self.total_thing_count
+
+    def __contains__(
+        self,
+        thing: ThingType
+        | Category
+        | DirectConnection
+        | PositionalConnections
+        | ThingName
+        | CategoryName
+        | Role,
+    ) -> bool:
+        """Check if this Grammar contains the specified Thing by instance or name."""
+        if isinstance(thing, CompositeThing | Token):
+            return thing in self.things
+        if isinstance(thing, Category):
+            return thing in self.categories
+        if isinstance(thing, DirectConnection | PositionalConnections):
+            return thing in self.direct_connections or thing in self.positional_connections
+        return (
+            any(t.name == thing for t in self.things)
+            or any(c.name == thing for c in self.categories)
+            or any(dc.role == thing for dc in self.direct_connections)
+        )
+
     @classmethod
     def from_registry(cls, language: SemanticSearchLanguage) -> Grammar:
         """Create a Grammar for the specified language from the ThingRegistry.
@@ -1119,6 +1150,12 @@ class Grammar(DataclassSerializationMixin):
 
     @computed_field
     @property
+    def total_thing_count(self) -> NonNegativeInt:
+        """Get the total number of Things (CompositeThings and Tokens) in this Grammar."""
+        return len(self.things)
+
+    @computed_field
+    @property
     def composite_count(self) -> NonNegativeInt:
         """Get the number of CompositeThings in this Grammar."""
         return len(self._composite_things)
@@ -1182,6 +1219,43 @@ class Grammar(DataclassSerializationMixin):
             f"- DirectConnections: {self.direct_connection_count!s}\n"
             f"- PositionalConnections: {self.positional_connection_count!s}\n"
         )
+
+    @property
+    def print(self) -> None:
+        """Prints a detailed, pretty-formatted, human-readable summary of the Grammar."""
+        rich_console = lazy_importer("rich.console").Console(markup=True, emoji=True)
+        table = lazy_importer("rich.table").Table(title=f"Grammar for {self.language.as_title}")
+        table.add_column("Aspect", style="cyan", no_wrap=True)
+        table.add_column("Count", style="magenta")
+        table.add_row("CompositeThings", str(self.composite_count))
+        table.add_row("Tokens", str(self.token_count))
+        table.add_row("AnywhereThings", str(len(self.anywhere_things)))
+        table.add_row("Categories", str(self.category_count))
+        table.add_row("DirectConnections", str(self.direct_connection_count))
+        table.add_row("PositionalConnections", str(self.positional_connection_count))
+
+        all_data: list[str] = []
+        if self.categories:
+            all_data.append(f"[bold]Categories:[/bold] {self.category_count}")
+            all_data.extend(
+                f"  - {category.short_str} ({len(category)} members)"
+                for category in sorted(self.categories, key=lambda c: c.name)
+            )
+        if self.composite_things:
+            all_data.append(f"\n[bold]CompositeThings:[/bold] {self.composite_count}")
+            all_data.extend(
+                f"  - {thing.name} ({len(thing.direct_connections)} direct,\n  - {len(thing.positional_connections.target_thing_names) if thing.positional_connections else 0} positional connections)"
+                for thing in sorted(self.composite_things, key=lambda t: t.name)
+            )
+        if self.tokens:
+            all_data.append(f"\n[bold]Tokens:[/bold] {self.token_count}")
+            all_data.extend(
+                f"  - {token.name} ({token.purpose.as_title})"
+                for token in sorted(self.tokens, key=lambda t: t.name)
+            )
+        rich_console.print(table)
+        if all_data:
+            rich_console.print("\n".join(all_data))
 
 
 def get_grammar(language: SemanticSearchLanguage) -> Grammar:

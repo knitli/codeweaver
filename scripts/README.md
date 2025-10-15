@@ -214,9 +214,9 @@ uv run -s scripts/testing/benchmark-detection.py
 
 ## Language Support
 
-### get-langs.py
+### download-ts-grammars.py
 
-**Location:** `scripts/language-support/get-langs.py`
+**Location:** `scripts/language-support/download-ts-grammars.py`
 
 Fetches tree-sitter grammars from their repositories and updates local grammar files.
 
@@ -412,15 +412,20 @@ Retrieves all exceptions available in the CodeWeaver codebase and all used excep
 When adding new scripts:
 
 1. **Choose the appropriate category directory** based on the script's primary purpose
-2. **Add appropriate license header** (use `update-licenses.py`)
+2. **Add appropriate license header** (use `update-licenses.py` or copy/paste from another file)
 3. **Include docstring** explaining purpose and usage
 4. **Update this README** in the appropriate category section
 5. **Add to Quick Reference** if called by build tools
 6. **Document CLI arguments** and examples
 7. **Use PEP 723** for scripts with external dependencies
 8. **Follow naming conventions** (kebab-case for executable scripts)
+9. **Add a `mise run` alias (task) definition to `mise.toml` using the filename as the name of the task (e.g. the task for `language-support/generate-delimiters.py` is `mise run generate-delimiters`)
 
 ## Running Scripts
+
+### Primary -- Through Mise Alias/Task
+
+All scripts have a corresponding mise task matching the name of the file without its extension. This is the primary way to run them -- removing any thoughts about what tool to use and how to call it.
 
 ### With uv (PEP 723 scripts)
 
@@ -441,12 +446,14 @@ Scripts with proper shebangs can be run directly:
 
 ### Through mise/hk
 
-Some scripts are designed to be called through mise or hk tasks:
+Some scripts are primarily intended for use in a parent mise or hk task workflow, like `mise run format-fix`:
 
 ```bash
 mise run fix
 hk fix
 ```
+
+But **all** scripts have a mise alias (e.g. `mise run download-ts-grammars`)
 
 ---
 

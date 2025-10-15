@@ -24,7 +24,7 @@ from codeweaver.language import SemanticSearchLanguage
 
 ALL_LANGUAGES = sorted(ALL_LANGUAGES)
 
-CW_ROOT = Path(__file__).parent.parent
+CW_ROOT = Path(__file__).parent.parent.parent
 
 MARKDOWN_PATH = CW_ROOT / "overrides" / "partials" / "languages.md"
 

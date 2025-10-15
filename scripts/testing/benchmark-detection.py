@@ -25,7 +25,7 @@ from rich.table import Table
 
 
 # Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from codeweaver.services.chunker.delimiters import LanguageFamily, detect_language_family
 

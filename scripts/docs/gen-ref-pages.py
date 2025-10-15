@@ -100,7 +100,7 @@ def build_navigation(nav_items: tuple[str, str], *, debug: bool = False) -> None
 
 def main(*, debug: bool = True) -> None:
     """Main function to generate API documentation pages."""
-    root = Path(__file__).parent.parent
+    root = Path(__file__).parent.parent.parent
     src = root / "src" / "codeweaver"
 
     if debug:

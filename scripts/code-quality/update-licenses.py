@@ -27,7 +27,7 @@ import rignore
 from cyclopts import App, Group, Parameter, validators
 
 
-BASE_PATH = Path(__file__).parent.parent
+BASE_PATH = Path(__file__).parent.parent.parent
 __version__ = "0.1.3"
 CONTRIBUTORS_GROUP = Group(
     "Contributors",

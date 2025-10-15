@@ -101,7 +101,7 @@ class GrammarStructureAnalyzer:
         """Initialize analyzer with node types directory."""
         if node_types_dir is None:
             # Default to project structure
-            node_types_dir = Path(__file__).parent.parent / "node_types"
+            node_types_dir = Path(__file__).parent.parent.parent / "node_types"
         self.node_types_dir = node_types_dir
         self.stats: dict[SemanticSearchLanguage, GrammarStructureStats] = {}
         # Map from enum values to actual file names
@@ -586,7 +586,7 @@ def main() -> None:
     _stats = analyzer.analyze_all_languages()
 
     # Generate report
-    output_dir = Path(__file__).parent.parent / "claudedocs"
+    output_dir = Path(__file__).parent.parent.parent / "claudedocs"
     output_dir.mkdir(exist_ok=True)
     output_file = output_dir / "grammar_structure_analysis.md"
 

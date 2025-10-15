@@ -67,7 +67,7 @@ MULTIPLIER = (
     1 if GH_TOKEN else 3
 )  # increase wait time if no token is provided to avoid hitting rate limits
 
-SAVE_DIR = Path(__file__).parent.parent / "grammars"
+SAVE_DIR = Path(__file__).parent.parent.parent / "grammars"
 
 
 @cache

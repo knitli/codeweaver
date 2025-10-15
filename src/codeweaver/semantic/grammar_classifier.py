@@ -72,7 +72,9 @@ class EvidenceKind(int, BaseEnum):
     SPECIFIC_THING = 90
     """Evidence based on a specific instance of a Thing. This is based on empirical knowledge of specific Things in specific languages."""
     PURPOSE = 95
-    """Evidence based on a Token's purpose classification. CodeWeaver's token purpose classification is very robust and high-confidence, so this is a strong form of evidence."""
+    """Evidence based on a Token's purpose classification. CodeWeaver's token purpose classification is robust and high-confidence.
+
+    It relies on extensive regex patterns custom fit to each language //LINK - /src/codeweaver/semantic/_constants.py , so this is a strong form of evidence."""
 
     @classmethod
     def confidence(cls, kinds: Sequence[EvidenceKind], adjustment: NonNegativeInt = 0) -> float:

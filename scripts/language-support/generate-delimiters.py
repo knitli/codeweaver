@@ -29,7 +29,7 @@ from rich.console import Console
 
 
 # Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from codeweaver.services.chunker.delimiters import LanguageFamily, expand_pattern
 from codeweaver.services.chunker.delimiters.custom import get_custom_patterns
