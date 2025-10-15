@@ -14,18 +14,18 @@ setup_env() {
   eval "$(mise -q env -s zsh)"
   print -P "%F{209}[codeweaver]%f %F{148}Mise environment activated.%f This may take a moment while we reshim Mise..."
   mise -q reshim || {
-    print -P "%F{red}[codeweaver]%f Failed to reshim Mise!"
+    print -P "%F{209}[codeweaver]%f %F{red}Failed to reshim Mise!%f"
   }
-  print -P "%F{209}[codeweaver]%f %F{148}You are good to go!%f (once you get your terminal back) Happy coding!"
+  print -P "%F{209}[codeweaver]%f %F{148}All done on our end!%f We're going to re-init your local environment, so it may take a moment depending on your setup. You're good to go once you get your terminal back. Happy coding!"
 }
 
 full_setup() {
   setup_env
   mise -q trust -y || {
-    print -P "%F{red}[codeweaver]%f Failed to trust the Mise environment!"
+    print -P "%F{209}[codeweaver]%f %F{red}Failed to trust the Mise environment!%f"
   }
   mise -q reshim || {
-    print -P "%F{red}[codeweaver]%f Failed to reshim the Mise environment!"
+    print -P "%F{209}[codeweaver]%f %F{red}Failed to reshim the Mise environment!%f"
   }
   # Skip 'mise run setup' to avoid circular activation
 }
@@ -36,7 +36,7 @@ print -P "%F{209}[codeweaver]%f If you run into any issues, please visit %F{cyan
 print -P "%F{209}[codeweaver]%f We're going to set up your environment now..."
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
 cd "$REPO_ROOT" || {
-  print -P "%F{red}[codeweaver] Failed to change directory to the repository root!%f"
+  print -P "%F{209}[codeweaver]%f %F{red}Failed to change directory to the repository root!%f"
 }
 if command -v mise >/dev/null 2>&1; then
   # We have Mise installed, check if it's initialized for this workspace
@@ -44,11 +44,11 @@ if command -v mise >/dev/null 2>&1; then
 else
   # Mise is not installed, run the install script
     chmod -R +x "${REPO_ROOT}/scripts" || {
-      print -P "%F{red}[codeweaver] Failed to make install scripts executable!%f"
+      print -P "%F{209}[codeweaver]%f %F{red}Failed to make install scripts executable!%f"
     }
     print -P "%F{209}[codeweaver]%f Installing Mise for the first time..."
-    "${REPO_ROOT}/scripts/dev-env/install-mise.sh" || {
-      print -P "%F{red}[codeweaver] Failed to install Mise!%f Try running the install script manually: %F{cyan}${REPO_ROOT}/scripts/dev-env/install-mise.sh%f"
+    "${REPO_ROOT}/scripts/install-mise.sh" || {
+      print -P "%F{209}[codeweaver]%f %F{red}Failed to install Mise!%f Try running the install script manually: %F{cyan}${REPO_ROOT}/scripts/install-mise.sh%f"
     }
     full_setup
 fi
