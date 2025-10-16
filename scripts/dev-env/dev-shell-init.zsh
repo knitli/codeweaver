@@ -15,7 +15,7 @@ __cw_script_dir="$(__cw_dirname "$__cw_this_file")"
 
 # Compute repo root (script lives in <repo>/scripts)
 if [[ -n "$__cw_script_dir" ]]; then
-  REPO_ROOT="$(builtin cd "${__cw_script_dir}/.." 2>/dev/null && pwd)"
+  REPO_ROOT="$(builtin cd "${__cw_script_dir}/../.." 2>/dev/null && pwd)"
 fi
 
 # Fallback: try git if above failed
