@@ -358,9 +358,9 @@ Contains Hugging Face model metadata. Used for embedding model configuration.
 
 ## Utilities
 
-### colors.py
+### ansi-color-tests.py
 
-**Location:** `scripts/utils/colors.py`
+**Location:** `scripts/utils/ansi-color-tests.py`
 
 Shared color definitions for script output formatting.
 

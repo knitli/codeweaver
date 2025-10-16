@@ -66,7 +66,7 @@ scripts/
 │   └── hf-models.json.license
 │
 ├── utils/                             # Shared utilities and debugging
-│   ├── colors.py
+│   ├── ansi-color-tests.py
 │   ├── check-imports.py
 │   └── get-all-exceptions.py
 │
