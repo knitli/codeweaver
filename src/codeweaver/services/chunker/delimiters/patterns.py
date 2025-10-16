@@ -31,6 +31,10 @@ from pydantic import Field, PositiveInt
 from codeweaver.services.chunker.delimiters.kind import DelimiterKind
 
 
+PARAGRAPH_BREAK = ["\n\n", "\r\n\r\n", "\r\r"]  # Cross-platform paragraph breaks
+LINEBREAK = ["\n", "\r\n", "\r"]  # Cross-platform line endings
+
+
 class DelimiterDict(TypedDict, total=False):
     """A dictionary representation of a Delimiter.
 
@@ -351,42 +355,42 @@ CONTEXT_MANAGER_PATTERN = DelimiterPattern(
 
 # Commentary patterns with cross-platform line ending support
 HASH_COMMENT_PATTERN = DelimiterPattern(
-    starts=["#"], ends=["\n", "\r\n", "\r"], kind=DelimiterKind.COMMENT_LINE
+    starts=["#"], ends=LINEBREAK, kind=DelimiterKind.COMMENT_LINE
 )
 
 SLASH_COMMENT_PATTERN = DelimiterPattern(
-    starts=["//"], ends=["\n", "\r\n", "\r"], kind=DelimiterKind.COMMENT_LINE
+    starts=["//"], ends=LINEBREAK, kind=DelimiterKind.COMMENT_LINE
 )
 
 DASH_COMMENT_PATTERN = DelimiterPattern(
-    starts=["--"], ends=["\n", "\r\n", "\r"], kind=DelimiterKind.COMMENT_LINE
+    starts=["--"], ends=LINEBREAK, kind=DelimiterKind.COMMENT_LINE
 )
 
 SEMICOLON_COMMENT_PATTERN = DelimiterPattern(
-    starts=[";"], ends=["\n", "\r\n", "\r"], kind=DelimiterKind.COMMENT_LINE
+    starts=[";"], ends=LINEBREAK, kind=DelimiterKind.COMMENT_LINE
 )
 
 PERCENT_COMMENT_PATTERN = DelimiterPattern(
-    starts=["%"], ends=["\n", "\r\n", "\r"], kind=DelimiterKind.COMMENT_LINE
+    starts=["%"], ends=LINEBREAK, kind=DelimiterKind.COMMENT_LINE
 )
 
 EXCLAMATION_COMMENT_PATTERN = DelimiterPattern(
-    starts=["!"], ends=["\n", "\r\n", "\r"], kind=DelimiterKind.COMMENT_LINE
+    starts=["!"], ends=LINEBREAK, kind=DelimiterKind.COMMENT_LINE
 )
 
 STAR_COMMENT_PATTERN = DelimiterPattern(starts=["*"], ends=[";\n"], kind=DelimiterKind.COMMENT_LINE)
 
 # Docstring patterns
 DOCSTRING_SLASH_PATTERN = DelimiterPattern(
-    starts=["///", "/**"], ends=["\n", "\r\n", "\r"], kind=DelimiterKind.DOCSTRING
+    starts=["///", "/**"], ends=LINEBREAK, kind=DelimiterKind.DOCSTRING
 )
 
 DOCSTRING_SEMICOLON_PATTERN = DelimiterPattern(
-    starts=[";;;", ";;"], ends=["\n", "\r\n", "\r"], kind=DelimiterKind.DOCSTRING
+    starts=[";;;", ";;"], ends=LINEBREAK, kind=DelimiterKind.DOCSTRING
 )
 
 DOCSTRING_HASH_PATTERN = DelimiterPattern(
-    starts=["###"], ends=["\n", "\r\n", "\r"], kind=DelimiterKind.DOCSTRING
+    starts=["###"], ends=LINEBREAK, kind=DelimiterKind.DOCSTRING
 )
 
 DOCSTRING_QUOTE_PATTERN = DelimiterPattern(
@@ -455,8 +459,102 @@ PROOF_BLOCK_PATTERN = DelimiterPattern(
     starts=["proof"], ends=["qed", "defined", "admitted"], kind=DelimiterKind.BLOCK
 )
 
-LATEX_BLOCK_PATTERN = DelimiterPattern(
-    starts=[r"\begin{"], ends=[r"\end{"], kind=DelimiterKind.BLOCK
+
+def generate_latex_patterns(
+    starts: list[str], kind: DelimiterKind, override: int
+) -> list[DelimiterPattern]:
+    """Generate LaTeX delimiter patterns for given starts and ends.
+
+    Args:
+        starts: List of LaTeX start commands
+        ends: List of LaTeX end commands
+        kind: DelimiterKind for the patterns
+
+    Returns:
+        List of DelimiterPattern instances
+
+    """
+    ends = [word.replace("begin", "end") for word in starts]
+    patterns = zip(starts, ends, strict=True)
+    return [
+        DelimiterPattern(
+            starts=[start],
+            ends=[end],
+            kind=kind,
+            priority_override=override,
+            inclusive=True,
+            take_whole_lines=True,
+        )
+        for start, end in patterns
+    ]
+
+
+LATEX_SECTION_PATTERN = DelimiterPattern(
+    starts=[r"\\chapter{", r"\\section{", r"\\subsection{", r"\\subsubsection{"],
+    ends=["}"],
+    inclusive=True,
+    take_whole_lines=True,
+    kind=DelimiterKind.BLOCK,
+    priority_override=70,
+)
+
+LATEX_BLOCK_PATTERNS = generate_latex_patterns(
+    starts=[
+        r"\\begin{enumerate}",
+        r"\\begin{itemize}",
+        r"\\begin{description}",
+        r"\\begin{figure}",
+    ],
+    kind=DelimiterKind.BLOCK,
+    override=60,
+)
+
+LATEX_ARRAY_PATTERNS = generate_latex_patterns(
+    starts=[
+        r"\\begin{list}",
+        r"\\begin{array}",
+        r"\\begin{bmatrix}",
+        r"\\begin{pmatrix}",
+        r"\\begin{vmatrix}",
+        r"\\begin{Vmatrix}",
+    ],
+    kind=DelimiterKind.ARRAY,
+    override=40,
+)
+
+LATEX_ALIGN_PATTERNS = generate_latex_patterns(
+    starts=[r"\\begin{align}"], kind=DelimiterKind.PARAGRAPH, override=30
+)
+
+LATEX_LITERALS_PATTERNS = generate_latex_patterns(
+    starts=[
+        r"\\begin{quote}",
+        r"\\begin{quotation}",
+        r"\\begin{verse}",
+        r"\\begin{verbatim}",
+        r"\\begin{lstlisting}",
+        r"\\begin{minted}",
+    ],
+    kind=DelimiterKind.STRING,
+    override=20,
+)
+
+LATEX_ENV_PATTERN = DelimiterPattern(
+    starts=["$$", "$"],
+    ends=["$$", "$"],
+    inclusive=True,
+    take_whole_lines=True,
+    kind=DelimiterKind.PARAGRAPH,
+    priority_override=30,
+)
+
+LATEX_STRING_PATTERN = DelimiterPattern(
+    starts=[r"\\text{", r"\\mathrm{", r"\\mathbf{", r"\\mathbb{"],
+    ends=["}"],
+    inclusive=False,
+    take_whole_lines=False,
+    kind=DelimiterKind.STRING,
+    priority_override=20,
 )
 
 ARRAY_PATTERN = DelimiterPattern(starts=["["], ends=["]"], kind=DelimiterKind.ARRAY)
@@ -465,16 +563,16 @@ TUPLE_PATTERN = DelimiterPattern(starts=["("], ends=[")"], kind=DelimiterKind.BL
 
 # Data patterns
 PRAGMA_PATTERN = DelimiterPattern(
-    starts=["pragma", "#pragma"], ends=[";", "", "\n"], kind=DelimiterKind.ANNOTATION
+    starts=["pragma", "#pragma"], ends=[";", "", *LINEBREAK], kind=DelimiterKind.ANNOTATION
 )
 
 DECORATOR_PATTERN = DelimiterPattern(
-    starts=["@@", "@", "decorator"], ends=["\n"], kind=DelimiterKind.DECORATOR
+    starts=["@@", "@", "decorator"], ends=LINEBREAK, kind=DelimiterKind.DECORATOR
 )
 
 PROPERTY_PATTERN = DelimiterPattern(
     starts=["@property", "@classmethod", "@staticmethod"],
-    ends=["\n"],
+    ends=LINEBREAK,
     kind=DelimiterKind.PROPERTY,
     priority_override=65,
 )
@@ -553,8 +651,8 @@ STRING_STAR_PATTERN = DelimiterPattern(starts=["*"], ends=[";"], kind=DelimiterK
 
 # Special case: Paragraph delimiter with custom priority
 PARAGRAPH_PATTERN = DelimiterPattern(
-    starts=["\n\n", "\r\n\r\n"],
-    ends=["\n\n", "\r\n\r\n"],
+    starts=PARAGRAPH_BREAK,
+    ends=PARAGRAPH_BREAK,
     kind=DelimiterKind.PARAGRAPH,
     priority_override=40,  # Between COMMENT_BLOCK:45 and BLOCK:30
     inclusive=False,
@@ -563,15 +661,15 @@ PARAGRAPH_PATTERN = DelimiterPattern(
 )
 
 # Whitespace patterns
-NEWLINE_PATTERN = DelimiterPattern(
-    starts=["\n", "\r\n", "\r"], ends=["\n", "\r\n", "\r"], kind=DelimiterKind.WHITESPACE
-)
+NEWLINE_PATTERN = DelimiterPattern(starts=LINEBREAK, ends=LINEBREAK, kind=DelimiterKind.WHITESPACE)
 
 WHITESPACE_PATTERN = DelimiterPattern(
     starts=[" ", "\t", "    ", "  "], ends=[" ", "\t", "   ", "  "], kind=DelimiterKind.WHITESPACE
 )
 
-EMPTY_PATTERN = DelimiterPattern(starts=["", "\n"], ends=["\n", ""], kind=DelimiterKind.WHITESPACE)
+EMPTY_PATTERN = DelimiterPattern(
+    starts=["", *LINEBREAK], ends=[*LINEBREAK, ""], kind=DelimiterKind.WHITESPACE
+)
 
 # Collection of all patterns for iteration and lookup
 ALL_PATTERNS: list[DelimiterPattern] = [
@@ -586,6 +684,7 @@ ALL_PATTERNS: list[DelimiterPattern] = [
     IMPL_PATTERN,
     EXTENSION_PATTERN,
     MODULE_BOUNDARY_PATTERN,
+    LATEX_SECTION_PATTERN,
     # Control flow
     CONDITIONAL_PATTERN,
     CONDITIONAL_TEX_PATTERN,
@@ -622,7 +721,12 @@ ALL_PATTERNS: list[DelimiterPattern] = [
     LET_END_BLOCK_PATTERN,
     BEGIN_END_BLOCK_PATTERN,
     PROOF_BLOCK_PATTERN,
-    LATEX_BLOCK_PATTERN,
+    *LATEX_ALIGN_PATTERNS,
+    LATEX_SECTION_PATTERN,
+    *LATEX_BLOCK_PATTERNS,
+    *LATEX_ARRAY_PATTERNS,
+    *LATEX_ALIGN_PATTERNS,
+    LATEX_ENV_PATTERN,
     ARRAY_PATTERN,
     TUPLE_PATTERN,
     # Data
@@ -638,6 +742,8 @@ ALL_PATTERNS: list[DelimiterPattern] = [
     TEMPLATE_TILDE_PATTERN,
     TEMPLATE_BACKTICK_PATTERN,
     # Strings
+    *LATEX_LITERALS_PATTERNS,
+    LATEX_STRING_PATTERN,
     STRING_QUOTE_PATTERN,
     STRING_RAW_PATTERN,
     STRING_FORMATTED_PATTERN,
@@ -716,7 +822,6 @@ __all__ = (
     "ENUM_PATTERN",
     "EXCLAMATION_COMMENT_PATTERN",
     "EXTENSION_PATTERN",
-    # Core patterns
     "FUNCTION_PATTERN",
     "HASH_COMMENT_PATTERN",
     "HASKELL_BLOCK_COMMENT_PATTERN",
@@ -724,8 +829,15 @@ __all__ = (
     "IMPL_PATTERN",
     "INTERFACE_PATTERN",
     "JULIA_BLOCK_COMMENT_PATTERN",
-    "LATEX_BLOCK_PATTERN",
+    "LATEX_ALIGN_PATTERNS",
+    "LATEX_ARRAY_PATTERNS",
+    "LATEX_BLOCK_PATTERNS",
+    "LATEX_ENV_PATTERN",
+    "LATEX_LITERALS_PATTERNS",
+    "LATEX_SECTION_PATTERN",
+    "LATEX_STRING_PATTERN",
     "LET_END_BLOCK_PATTERN",
+    "LINEBREAK",
     "LISP_BLOCK_COMMENT_PATTERN",
     "LOOP_PATTERN",
     "ML_BLOCK_COMMENT_PATTERN",
@@ -733,6 +845,7 @@ __all__ = (
     "MODULE_PATTERN",
     "NEWLINE_PATTERN",
     "NIM_BLOCK_COMMENT_PATTERN",
+    "PARAGRAPH_BREAK",
     "PARAGRAPH_PATTERN",
     "PERCENT_COMMENT_PATTERN",
     "PRAGMA_PATTERN",

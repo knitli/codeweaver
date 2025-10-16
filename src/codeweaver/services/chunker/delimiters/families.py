@@ -350,7 +350,13 @@ def _get_family_patterns() -> dict[LanguageFamily, list[DelimiterPattern]]:
         HTML_COMMENT_PATTERN,
         IMPL_PATTERN,
         INTERFACE_PATTERN,
-        LATEX_BLOCK_PATTERN,
+        LATEX_ALIGN_PATTERNS,
+        LATEX_ARRAY_PATTERNS,
+        LATEX_BLOCK_PATTERNS,
+        LATEX_ENV_PATTERN,
+        LATEX_LITERALS_PATTERNS,
+        LATEX_SECTION_PATTERN,
+        LATEX_STRING_PATTERN,
         LET_END_BLOCK_PATTERN,
         LISP_BLOCK_COMMENT_PATTERN,
         LOOP_PATTERN,
@@ -563,15 +569,22 @@ def _get_family_patterns() -> dict[LanguageFamily, list[DelimiterPattern]]:
             EMPTY_PATTERN,
         ],
         LanguageFamily.LATEX_STYLE: [
+            LATEX_SECTION_PATTERN,
             # Control flow
             CONDITIONAL_TEX_PATTERN,
             # Commentary
             PERCENT_COMMENT_PATTERN,
             # Structural
-            LATEX_BLOCK_PATTERN,
+            *LATEX_BLOCK_PATTERNS,
+            LATEX_ENV_PATTERN,
+            *LATEX_ARRAY_PATTERNS,
+            *LATEX_ALIGN_PATTERNS,
+            # Data
             BRACE_BLOCK_PATTERN,
             ARRAY_PATTERN,
             # Special
+            *LATEX_LITERALS_PATTERNS,
+            LATEX_STRING_PATTERN,
             PARAGRAPH_PATTERN,
             NEWLINE_PATTERN,
             WHITESPACE_PATTERN,

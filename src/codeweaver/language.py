@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 
 from collections.abc import Generator, Iterable
@@ -305,7 +306,7 @@ class SemanticSearchLanguage(str, BaseEnum):
     HTML = "html"
     JAVA = "java"
     JAVASCRIPT = "javascript"
-    JSX = "jsx"
+    JSX = "jsx"  # The JavaScript grammar includes JSX support, but we separate it here for clarity
     JSON = "json"
     KOTLIN = "kotlin"
     LUA = "lua"
@@ -317,6 +318,8 @@ class SemanticSearchLanguage(str, BaseEnum):
     SCALA = "scala"
     SOLIDITY = "solidity"
     SWIFT = "swift"
+    # Unlike JSX, the TSX grammar is a separate grammar, but in the same repo and with shared common definitions.
+    # While they usually come bundled, they can be separated, so we treat them as separate languages here (and for clarity like with JS/JSX).
     TYPESCRIPT = "typescript"
     TSX = "tsx"
     YAML = "yaml"
@@ -348,6 +351,7 @@ class SemanticSearchLanguage(str, BaseEnum):
         This is used to quickly look up the language based on file extension.
         """
         return MappingProxyType({
+            # the bash grammar is pretty tolerant of posix shell scripts, so we include common shell script extensions here
             cls.BASH: (
                 ".bash",
                 ".bash_profile",
@@ -380,7 +384,7 @@ class SemanticSearchLanguage(str, BaseEnum):
             cls.LUA: (".lua",),
             cls.NIX: (".nix",),
             cls.PHP: (".php", ".phtml"),
-            cls.PYTHON: (".py", ".pyi", ".py3", ".bzl"),
+            cls.PYTHON: (".py", ".pyi", ".py3", ".bzl", ".ipynb"),
             cls.RUBY: (".rb", ".gemspec", ".rake", ".ru"),
             cls.RUST: (".rs",),
             cls.SCALA: (".scala", ".sc", ".sbt"),
@@ -1009,9 +1013,10 @@ class Chunker(int, BaseEnum):
     LANGCHAIN_RECURSIVE = 0
     """The final fallback chunker, `langchain_text_splitters.RecursiveCharacterTextSplitter`"""
     LANGCHAIN_SPECIAL = 1
-    """A language-specific chunker provided by `langchain_text_splitters`, such as for markdown."""
+    """A language-specific chunker provided by `langchain_text_splitters`, such as for markdown. These chunkers are more robust than the generic recursive chunker, but not as robust as CodeWeaver's semantic chunker, with the exception of the experimental markdown chunker which is quite good -- we use it for markdown files before our own. That is the only langchain splitter that takes priority over our own chunkers."""
+    # TODO: We included the langchain dependency before we got ... carried away ... with our own chunkers. Ours are much more robust. We'd need to improve markdown handling, but otherwise, we can probably drop the langchain dependency and remove this chunker.
     BUILTIN_DELIMITER = 2
-    """CodeWeaver's delimiter-based text chunkers; delimiters are defined here."""
+    """CodeWeaver's delimiter-based text chunkers; delimiters are defined in //LINK - src/codeweaver/services/chunker/delimiters/families.py"""
     USER_DELIMITER = 3
     """A user-defined delimiter, using our delimiter-based chunker. Defined in config files and registered at runtime."""
     SEMANTIC = 4
@@ -1020,6 +1025,44 @@ class Chunker(int, BaseEnum):
     def _chunkers(self) -> list[CustomDelimiter]:
         global _custom_delimiters
         return _custom_delimiters
+
+    @classmethod
+    def for_language(cls, language: LiteralStringT) -> Chunker:
+        """
+        Returns the most robust chunker that supports the given language.
+
+        Args:
+            language (str): The programming language to find a chunker for.
+
+        Returns:
+            Chunker: The most robust chunker that supports the given language.
+
+        Raises:
+            ValueError: If no chunker supports the given language.
+        """
+        with contextlib.suppress(AttributeError, ValueError):
+            # try to interpret the language as a SemanticSearchLanguage first
+            language = SemanticSearchLanguage.from_string(language)  # type: ignore
+        if not isinstance(language, SemanticSearchLanguage):
+            with contextlib.suppress(AttributeError, ValueError):
+                # try to interpret the language as a ConfigLanguage next
+                language = ConfigLanguage.from_string(language)  # type: ignore
+        # now language is either a SemanticSearchLanguage, ConfigLanguage, or a str that doesn't match either enum
+        if not isinstance(
+            language, SemanticSearchLanguage | ConfigLanguage
+        ) and language.lower() in ("markdown", "md"):
+            # markdown and latex have special chunkers in langchain
+            return cls.LANGCHAIN_SPECIAL
+        if isinstance(language, SemanticSearchLanguage) or (
+            isinstance(language, ConfigLanguage)
+            and (language == ConfigLanguage.SELF or language.is_semantic_search_language)
+        ):  # type: ignore
+            return cls.SEMANTIC
+        if cls.custom_delimiters() and next(
+            (d for d in cls.custom_delimiters() if d.language == language), None
+        ):
+            return cls.USER_DELIMITER
+        return cls.BUILTIN_DELIMITER
 
     @staticmethod
     def _as_literal_tuple(values: Iterable[str]) -> tuple[LiteralStringT, ...]:
@@ -1114,35 +1157,15 @@ class Chunker(int, BaseEnum):
         return frozenset(languages)
 
     @classmethod
-    def register_custom_chunker(cls, chunker: CustomDelimiter) -> None:
+    def register_custom_delimiter(cls, delimiter: CustomDelimiter) -> None:
         """
-        Registers a custom chunker for a given language.
+        Registers a custom delimiter for a given language.
 
         Args:
-            chunker (CustomDelimiter): The custom chunker to register.
+            delimiter (CustomDelimiter): The custom delimiter to register.
         """
         global _custom_delimiters
-        _custom_delimiters.append(chunker)
-
-    @classmethod
-    def no_special_chunker_languages(cls) -> frozenset[LiteralStringT]:
-        """
-        Returns a frozenset of languages that do not have a special chunker in LangChain, or defined in CodeWeaver.
-
-        This includes languages that are not in the `codeweaver_to_langchain` mapping.
-
-        Returns:
-            frozenset: A frozenset of language names.
-        """
-        from codeweaver.services.chunker.delimiters.families import defined_languages
-
-        known_languages = set(codeweaver_to_langchain.keys())
-        known_languages.update(defined_languages())
-        known_languages.update(cls._custom_delimiter_languages())
-        known_languages.update(lang.variable for lang in ConfigLanguage)
-        known_languages.update(lang.variable for lang in SemanticSearchLanguage)
-        all_languages = set(ALL_LANGUAGES)
-        return frozenset(all_languages - known_languages)  # pyright: ignore[reportOperatorIssue, reportUnknownArgumentType]
+        _custom_delimiters.append(delimiter)
 
     def next_chunker(self, *, language: LiteralStringT | None = None) -> Chunker | None:
         """
@@ -1151,10 +1174,10 @@ class Chunker(int, BaseEnum):
         Returns:
             Chunker | None: The next chunker, or None if this is the last chunker.
         """
-        if language and language in ("markdown", "md", "latex"):
+        if language and language.lower() in ("markdown", "md"):
             # markdown and latex have special chunkers in langchain
-            if self == Chunker.BUILTIN_DELIMITER:
-                return None
+            if self == type(self).BUILTIN_DELIMITER:
+                return type(self).LANGCHAIN_RECURSIVE
             return (
                 Chunker.LANGCHAIN_SPECIAL
                 if self != Chunker.LANGCHAIN_SPECIAL

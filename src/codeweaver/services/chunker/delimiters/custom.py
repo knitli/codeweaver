@@ -24,7 +24,9 @@ import textcase
 from codeweaver.services.chunker.delimiters.kind import DelimiterKind
 from codeweaver.services.chunker.delimiters.patterns import (
     EMPTY_PATTERN,
+    LINEBREAK,
     NEWLINE_PATTERN,
+    PARAGRAPH_BREAK,
     PARAGRAPH_PATTERN,
     WHITESPACE_PATTERN,
     DelimiterPattern,
@@ -89,7 +91,7 @@ BASH_CASE_PATTERN = DelimiterPattern(
 # Python-specific patterns (decorators, f-strings)
 PYTHON_DECORATOR_AT_PATTERN = DelimiterPattern(
     starts=["@"],
-    ends=["\n", "\r\n"],
+    ends=LINEBREAK,
     kind=DelimiterKind.DECORATOR,
     inclusive=True,
     take_whole_lines=False,
@@ -273,15 +275,131 @@ COQ_SECTION_END_PATTERN = DelimiterPattern(
     nestable=True,
 )
 
+PROTOBUF_HIERARCHY_PATTERN = DelimiterPattern(
+    starts=["message ", "service ", "import ", "package "],
+    ends=PARAGRAPH_BREAK,
+    kind=DelimiterKind.MODULE_BOUNDARY,
+    inclusive=True,
+    take_whole_lines=True,
+    nestable=False,
+)
+
+PROTOBUF_DEFINITION_PATTERN = DelimiterPattern(
+    starts=["enum ", "rpc "],
+    ends=PARAGRAPH_BREAK,
+    kind=DelimiterKind.ENUM,
+    inclusive=True,
+    take_whole_lines=True,
+    nestable=True,
+)
+
+PROTOBUF_DECLARATION_PATTERN = DelimiterPattern(
+    starts=["optional ", "repeated ", "required ", "syntax "],
+    ends=PARAGRAPH_BREAK,
+    kind=DelimiterKind.ANNOTATION,
+    inclusive=True,
+    take_whole_lines=True,
+    nestable=True,
+)
+
 # Assembly-specific (limited, mostly comments)
 ASSEMBLY_SEMICOLON_COMMENT = DelimiterPattern(
     starts=[";"],
-    ends=["\n", "\r\n"],
+    ends=LINEBREAK,
     kind=DelimiterKind.COMMENT_LINE,
     inclusive=True,
     take_whole_lines=False,
     nestable=False,
 )
+
+
+def generate_rst_character_ranges(character: str) -> list[str]:
+    """Generate a list of RST section underline characters based on a given character.
+
+    Args:
+        character: A single character to generate underline patterns for.
+
+    Returns:
+        A list of strings representing RST section underline patterns.
+
+    Example:
+        >>> generate_rst_character_ranges("=")
+        ['=', '==', '===', '====', '=====']
+    """
+    return [f"\n{character * i}" for i in range(1, 6)]  # RST supports 1-5 character underlines
+
+
+RST_SECTION_PATTERN = DelimiterPattern(
+    starts=sorted(
+        (
+            c
+            for char in ("=", "-", "*", "~", "^", '"', "+", "#", "<", ">")
+            for c in generate_rst_character_ranges(char)
+        ),
+        key=len,
+        reverse=True,
+    ),
+    ends=PARAGRAPH_BREAK,
+    kind=DelimiterKind.BLOCK,
+    inclusive=True,
+    take_whole_lines=True,
+    nestable=False,
+)
+
+RST_COMMENT_PATTERN = DelimiterPattern(
+    starts=[".. "],
+    ends=LINEBREAK,
+    kind=DelimiterKind.COMMENT_LINE,
+    inclusive=True,
+    take_whole_lines=False,
+    nestable=False,
+)
+
+HTML_TAGS_PATTERNS = [
+    DelimiterPattern(
+        starts=[f"<{tag}"],
+        ends=[f"</{tag}>"],
+        kind=DelimiterKind.BLOCK
+        if tag in ["html", "body", "main", "section", "article"]
+        else DelimiterKind.PARAGRAPH,
+        inclusive=True,
+        take_whole_lines=True,
+        nestable=True,
+    )
+    for tag in [
+        "html",
+        "body",
+        "main",
+        "section",
+        "article",
+        "div",
+        "p",
+        "span",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "ul",
+        "ol",
+        "li",
+        "table",
+        "tr",
+        "td",
+        "th",
+        "thead",
+        "tbody",
+        "footer",
+        "header",
+        "nav",
+        "head",
+        "script",
+        "style",
+        "meta",
+        "title",
+    ]
+]
 
 # COBOL-specific patterns
 # COBOL has unique divisions and sections
@@ -356,7 +474,7 @@ COBOL_SEARCH_PATTERN = DelimiterPattern(
 
 COBOL_INLINE_COMMENT_PATTERN = DelimiterPattern(
     starts=["*>"],
-    ends=["\n", "\r\n"],
+    ends=LINEBREAK,
     kind=DelimiterKind.COMMENT_LINE,
     inclusive=True,
     take_whole_lines=False,
@@ -365,7 +483,7 @@ COBOL_INLINE_COMMENT_PATTERN = DelimiterPattern(
 
 COBOL_ASTERISK_COMMENT_PATTERN = DelimiterPattern(
     starts=["*"],
-    ends=["\n", "\r\n"],
+    ends=LINEBREAK,
     kind=DelimiterKind.COMMENT_LINE,
     inclusive=True,
     take_whole_lines=True,
@@ -374,7 +492,7 @@ COBOL_ASTERISK_COMMENT_PATTERN = DelimiterPattern(
 
 PKL_IMPORT_PATTERN = DelimiterPattern(
     starts=['amends "', 'extends "', 'import "'],
-    ends=["\n\n", "\r\n\r\n"],
+    ends=PARAGRAPH_BREAK,
     kind=DelimiterKind.MODULE_BOUNDARY,
     inclusive=True,
     take_whole_lines=True,
@@ -383,7 +501,7 @@ PKL_IMPORT_PATTERN = DelimiterPattern(
 
 PKL_DOC_COMMENT_PATTERN = DelimiterPattern(
     starts=["/// "],
-    ends=["\n", "\r\n"],
+    ends=LINEBREAK,
     priority_override=70,
     kind=DelimiterKind.DOCSTRING,
     inclusive=True,
@@ -439,7 +557,7 @@ POD_SUB_PATTERN = DelimiterPattern(
 
 TEXINFO_BLOCK_PATTERN = DelimiterPattern(
     starts=["@node", "@chapter", "@section", "@subsection", "@subsubsection", "@top", "@chapter"],
-    ends=["\n\n", "\r\n\r\n"],
+    ends=PARAGRAPH_BREAK,
     kind=DelimiterKind.BLOCK,
     inclusive=True,
     take_whole_lines=True,
@@ -448,7 +566,7 @@ TEXINFO_BLOCK_PATTERN = DelimiterPattern(
 
 CSV_PATTERN = DelimiterPattern(
     starts=[","],
-    ends=["\n", "\r\n"],
+    ends=LINEBREAK,
     kind=DelimiterKind.ARRAY,
     priority_override=30,
     inclusive=False,
@@ -458,7 +576,7 @@ CSV_PATTERN = DelimiterPattern(
 
 TSV_PATTERN = DelimiterPattern(
     starts=["\t"],
-    ends=["\n", "\r\n"],
+    ends=LINEBREAK,
     kind=DelimiterKind.ARRAY,
     priority_override=30,
     inclusive=False,
@@ -500,6 +618,7 @@ CUSTOM_PATTERNS: MappingProxyType[str, list[DelimiterPattern]] = MappingProxyTyp
         BASH_IF_PATTERN,
         BASH_CASE_PATTERN,
     ],
+    "html": HTML_TAGS_PATTERNS,
     "perl": [POD_SECTION_PATTERN, POD_SUB_PATTERN],
     "python": [PYTHON_DECORATOR_AT_PATTERN],
     "pkl": [PKL_IMPORT_PATTERN, PKL_DOC_COMMENT_PATTERN],
@@ -530,7 +649,13 @@ CUSTOM_PATTERNS: MappingProxyType[str, list[DelimiterPattern]] = MappingProxyTyp
         COBOL_INLINE_COMMENT_PATTERN,
         COBOL_ASTERISK_COMMENT_PATTERN,
     ],
+    "protobuf": [
+        PROTOBUF_HIERARCHY_PATTERN,
+        PROTOBUF_DEFINITION_PATTERN,
+        PROTOBUF_DECLARATION_PATTERN,
+    ],
     "rtf": [RTF_PARAGRAPH_PATTERN, RTF_LINE_PATTERN, RTF_WHITESPACE_PATTERN, RTF_EMPTY_PATTERN],
+    "rst": [RST_SECTION_PATTERN, RST_COMMENT_PATTERN],
     "texinfo": [TEXINFO_BLOCK_PATTERN],
     "tsv": [TSV_PATTERN],
 })
@@ -573,3 +698,6 @@ def get_custom_patterns(language: str) -> list[DelimiterPattern]:
     else:
         _pattern_registry[language] = [*delimiters, *_pattern_registry[language]]
     return _pattern_registry.get(language, [])
+
+
+__all__ = ("CUSTOM_PATTERNS", "get_custom_patterns")
