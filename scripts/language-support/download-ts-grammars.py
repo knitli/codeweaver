@@ -552,8 +552,9 @@ class AstGrepSupportedLanguage(Enum):
     def repos(cls, **kwargs: Any) -> Generator[TreeSitterRepo, None, None]:
         """Yields TreeSitterRepo items only (never tuples)."""
         for lang in cls.members():
-            rt = lang.repo_tuple
-            yield TreeSitterRepo.from_tuple(rt, **kwargs)
+            yield from (
+                lang.repo_tuple if isinstance(lang.repo_tuple, tuple) else (lang.repo_tuple,)
+            )
 
 
 def is_grammar_result(result: Any) -> TypeGuard[TreeSitterGrammarResult]:

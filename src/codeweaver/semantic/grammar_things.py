@@ -246,7 +246,6 @@ import logging
 
 from collections import defaultdict
 from collections.abc import Iterator
-from functools import cached_property
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal, TypedDict, cast, override
 
@@ -376,6 +375,12 @@ class Thing(BasedModel):
             data["category_names"] = frozenset(cat_name_normalizer(name) for name in cat_names)
         super().__init__(**data)
 
+    def __contains__(self, category: Category | CategoryName) -> bool:
+        """Check if this Thing belongs to the specified Category."""
+        if isinstance(category, Category):
+            return category in self.categories if self.has_categories else False
+        return category in self.category_names if self.has_categories else False
+
     @property
     def categories(self) -> frozenset[Category]:
         """Resolve Categories from registry by name."""
@@ -386,6 +391,11 @@ class Thing(BasedModel):
             for name in self.category_names
             if (cat := registry.get_category_by_name(name, language=self.language))
         )
+
+    @property
+    def has_categories(self) -> bool:
+        """Check if this Thing belongs to any Categories."""
+        return bool(self.category_names)
 
     @classmethod
     def from_node_dto(cls, node_dto: NodeTypeDTO, category_names: frozenset[CategoryName]) -> Thing:
@@ -653,7 +663,7 @@ class Category(BasedModel):
             )
         return value
 
-    @cached_property
+    @property
     def member_things(self) -> frozenset[CompositeThing | Token]:
         """Resolve member Things from registry by name."""
         from codeweaver.semantic.thing_registry import get_registry
@@ -1078,6 +1088,28 @@ class Grammar(DataclassSerializationMixin):
                     registry.positional_connections[language].values()
                 ),
             )
+
+    def get_category_by_name(self, name: CategoryName) -> Category | None:
+        """Get a Category by its name in this Grammar.
+
+        Args:
+            name: The name of the Category to retrieve.
+
+        Returns:
+            The Category instance if found; otherwise, None.
+        """
+        return next((cat for cat in self.categories if cat.name == name), None)
+
+    def get_thing_by_name(self, name: ThingName) -> ThingType | None:
+        """Get a Thing (CompositeThing or Token) by its name in this Grammar.
+
+        Args:
+            name: The name of the Thing to retrieve.
+
+        Returns:
+            The Thing instance if found; otherwise, None.
+        """
+        return next((thing for thing in self.things if thing.name == name), None)
 
     @computed_field(repr=False)
     @property

@@ -1,3 +1,4 @@
+# sourcery skip: lambdas-should-be-short
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -6,10 +7,22 @@
 
 import re
 
+from collections.abc import Callable
 from types import MappingProxyType
+from typing import TYPE_CHECKING, NamedTuple
 
+from codeweaver._utils import lazy_importer
 from codeweaver.language import SemanticSearchLanguage
 
+
+if TYPE_CHECKING:
+    from codeweaver.semantic._types import ThingName
+    from codeweaver.semantic.classifications import SemanticClass
+    from codeweaver.semantic.grammar_things import CompositeThing, Token
+else:
+    SemanticClass = lazy_importer("codeweaver.semantic.classifications").SemanticClass
+    CompositeThing = lazy_importer("codeweaver.semantic.grammar_things").CompositeThing
+    Token = lazy_importer("codeweaver.semantic.grammar_things").Token
 
 NAMED_NODE_COUNTS = MappingProxyType({
     231: SemanticSearchLanguage.C_PLUS_PLUS,
@@ -37,7 +50,7 @@ NAMED_NODE_COUNTS = MappingProxyType({
     14: SemanticSearchLanguage.JSON,
     6: SemanticSearchLanguage.YAML,
 })
-"""Count of top-level named nodes in each language's grammar. It took me awhile to come to this approach, but it's fast, reliable, and way less complicated than anything else I tried."""
+"""Count of top-level named nodes in each language's grammar. It took me awhile to come to this approach, but it's fast, reliable, and way less complicated than anything else I tried. (used to identify language based on tree structure)"""
 
 LANGUAGE_SPECIFIC_TOKEN_EXCEPTIONS = MappingProxyType({
     SemanticSearchLanguage.BASH: {
@@ -218,11 +231,8 @@ LANGUAGE_SPECIFIC_TOKEN_EXCEPTIONS = MappingProxyType({
         "uri_expression": "literal",
     },
 })
-"""Exceptions to the general rules for token classification. These are language-specific tokens that would otherwise be misclassified by the general regex patterns below and other classification logic."""
+"""Exceptions to the general rules for token classification. These are language-specific tokens that would otherwise be misclassified by the regex patterns below and other classification logic."""
 
-"""
-The only potential issue is if the nodes are not a complete set.
-"""
 # spellchecker:off
 IS_OPERATOR = re.compile(
     r"""^
@@ -592,7 +602,189 @@ IS_KEYWORD = re.compile(
 """Comprehensive keyword pattern covering all supported languages. (7300 characters!)"""
 # spellchecker:on
 
+
+class CompositeCheck(NamedTuple):
+    """A class for checking specific patterns in CompositeThing names, optionally filtered by language and/or an additional predicate."""
+
+    name_pattern: re.Pattern[str]
+    """A regex pattern to match names."""
+    classification: SemanticClass
+    """The semantic classification to assign if this check matches."""
+    languages: frozenset[SemanticSearchLanguage] | None = None
+    """Languages to which this check applies. If None, applies to all languages."""
+    predicate: Callable[[CompositeThing], SemanticClass | None] | None = None
+    """An optional additional predicate to apply to the CompositeThing. Only applied if the name matches the pattern. Should return a SemanticClass if the thing matches, or None if it doesn't. Can be used to discern between different things with the same name (which does happen)."""
+
+    def classify(
+        self, thing: CompositeThing | ThingName, *, language: SemanticSearchLanguage | None = None
+    ) -> SemanticClass | None:
+        """Check if the given thing matches this composite check. Optionally provide a language (only helpful if thing is a ThingName)."""
+        if isinstance(thing, str):
+            name = thing
+            language = language
+        else:
+            name = thing.name
+            language = thing.language
+
+        if self.name_pattern.match(name) and (self.languages is None or language in self.languages):
+            if self.predicate is not None and isinstance(thing, CompositeThing):
+                return self.predicate(thing)
+            return self.classification
+        return None
+
+
+TypeScriptLangs = frozenset({SemanticSearchLanguage.TYPESCRIPT, SemanticSearchLanguage.TSX})
+JavaScriptLangs = frozenset({SemanticSearchLanguage.JAVASCRIPT, SemanticSearchLanguage.JSX})
+JavaScriptFamily = TypeScriptLangs.union(JavaScriptLangs)
+
+COMPOSITE_CHECKS: frozenset[CompositeCheck] = frozenset({
+    CompositeCheck(
+        name_pattern=re.compile(r"^annotation$"),
+        classification=SemanticClass.SYNTAX_ANNOTATION,
+        languages=frozenset({SemanticSearchLanguage.JAVA, SemanticSearchLanguage.SCALA}),
+    ),
+    CompositeCheck(
+        name_pattern=re.compile(r"^assignment_pattern$"),
+        classification=SemanticClass.SYNTAX_IDENTIFIER,
+        languages=JavaScriptFamily,
+    ),
+    CompositeCheck(
+        name_pattern=re.compile(r"^call_signature$"),
+        classification=SemanticClass.OPERATION_INVOCATION,
+        languages=TypeScriptLangs,
+    ),
+    CompositeCheck(
+        name_pattern=re.compile(r"^catch_(clause|declaration)$"),
+        classification=SemanticClass.FLOW_BRANCHING,
+        languages=JavaScriptFamily
+        | frozenset({SemanticSearchLanguage.C_PLUS_PLUS, SemanticSearchLanguage.C_SHARP}),
+    ),
+    CompositeCheck(
+        name_pattern=re.compile(r"^class_(body|declarations?)$"),
+        classification=SemanticClass.DEFINITION_TYPE,
+        languages=JavaScriptLangs | frozenset({SemanticSearchLanguage.HASKELL}),
+    ),
+    CompositeCheck(
+        name_pattern=re.compile(r"^class_static_block$"),
+        classification=SemanticClass.DEFINITION_DATA,
+        languages=JavaScriptFamily,
+    ),
+    CompositeCheck(
+        name_pattern=re.compile(r"^(construct_signature|data_constructors?)$"),
+        classification=SemanticClass.OPERATION_INVOCATION,
+        languages=TypeScriptLangs | frozenset({SemanticSearchLanguage.HASKELL}),
+    ),
+    CompositeCheck(
+        name_pattern=re.compile(r"^do_(block|module)$"),
+        classification=SemanticClass.FLOW_ITERATION,
+        languages=frozenset({SemanticSearchLanguage.HASKELL, SemanticSearchLanguage.RUBY}),
+    ),
+    CompositeCheck(
+        name_pattern=re.compile(r"^else_(clause|statement)$"),
+        classification=SemanticClass.FLOW_BRANCHING,
+        languages=frozenset({
+            SemanticSearchLanguage.PHP,
+            SemanticSearchLanguage.PYTHON,
+            SemanticSearchLanguage.LUA,
+        }),
+    ),
+    CompositeCheck(
+        name_pattern=re.compile(r"^(full_)?enum(erator|_case|_assignment)$"),
+        classification=SemanticClass.DEFINITION_TYPE,
+        languages=JavaScriptFamily
+        | frozenset({SemanticSearchLanguage.HASKELL, SemanticSearchLanguage.SCALA}),
+    ),
+    CompositeCheck(
+        name_pattern=re.compile(r"^(module_)?export(_specifier)?$"),
+        classification=SemanticClass.BOUNDARY_MODULE,
+        languages=JavaScriptFamily | frozenset({SemanticSearchLanguage.HASKELL}),
+        predicate=lambda thing: SemanticClass.SYNTAX_KEYWORD  # type: ignore
+        if isinstance(thing, Token)
+        else SemanticClass.BOUNDARY_MODULE,
+    ),
+    CompositeCheck(
+        name_pattern=re.compile(r"^finally_clause$"),
+        classification=SemanticClass.FLOW_BRANCHING,
+        languages=JavaScriptFamily | frozenset({SemanticSearchLanguage.PHP}),
+    ),
+    CompositeCheck(
+        name_pattern=re.compile(r"^for(_clause|_in_clause|_numeric_clause)?$"),
+        classification=SemanticClass.FLOW_ITERATION,
+        languages=frozenset({
+            SemanticSearchLanguage.PYTHON,
+            SemanticSearchLanguage.GO,
+            SemanticSearchLanguage.LUA,
+        }),
+    ),
+    CompositeCheck(
+        name_pattern=re.compile(r"^(if_)?guards?$"),
+        classification=SemanticClass.FLOW_BRANCHING,
+        languages=JavaScriptFamily
+        | frozenset({SemanticSearchLanguage.HASKELL, SemanticSearchLanguage.SCALA}),
+    ),
+    CompositeCheck(
+        name_pattern=re.compile(
+            r"^(imports?(_(directive|list|name|specifier))?|linkage_specification)$"
+        ),
+        classification=SemanticClass.BOUNDARY_MODULE,
+        languages=JavaScriptFamily
+        | frozenset({
+            SemanticSearchLanguage.HASKELL,
+            SemanticSearchLanguage.SOLIDITY,
+            SemanticSearchLanguage.GO,
+            SemanticSearchLanguage.C_PLUS_PLUS,
+            SemanticSearchLanguage.C_LANG,
+        }),
+    ),
+    CompositeCheck(
+        name_pattern=re.compile(r"^jsx_(closing|opening)_element$"),
+        classification=SemanticClass.SYNTAX_LITERAL,
+        languages=JavaScriptFamily,
+    ),
+    CompositeCheck(
+        name_pattern=re.compile(r"^lifetime_parameter$"),
+        classification=SemanticClass.DEFINITION_TYPE,
+        languages=frozenset({SemanticSearchLanguage.RUST}),
+    ),
+    CompositeCheck(
+        name_pattern=re.compile(r"^match(_conditional_expression|_default_expression)$"),
+        classification=SemanticClass.FLOW_BRANCHING,
+        languages=frozenset({SemanticSearchLanguage.HASKELL, SemanticSearchLanguage.PHP}),
+    ),
+    CompositeCheck(
+        name_pattern=re.compile(r"^pair(_pattern)?$"),
+        classification=SemanticClass.SYNTAX_IDENTIFIER,
+        languages=JavaScriptFamily
+        | frozenset({
+            SemanticSearchLanguage.ELIXIR,
+            SemanticSearchLanguage.PYTHON,
+            SemanticSearchLanguage.RUBY,
+        }),
+    ),
+    # TODO: preproc variants
+    CompositeCheck(
+        name_pattern=re.compile(r"^(switch(_case|_default)|she_(except|finally)_clause))$"),
+        classification=SemanticClass.FLOW_BRANCHING,
+        languages=JavaScriptFamily
+        | frozenset({SemanticSearchLanguage.C_LANG, SemanticSearchLanguage.C_PLUS_PLUS}),
+    ),
+    CompositeCheck(
+        name_pattern=re.compile(
+            r"^(variable(_declarator|_declaration|_list))|value_binding_pattern$"
+        ),
+        classification=SemanticClass.SYNTAX_IDENTIFIER,
+        languages=JavaScriptFamily
+        | frozenset({
+            SemanticSearchLanguage.SWIFT,
+            SemanticSearchLanguage.SOLIDITY,
+            SemanticSearchLanguage.JAVA,
+            SemanticSearchLanguage.LUA,
+        }),
+    ),
+})
+
 __all__ = (
+    "COMPOSITE_CHECKS",
     "IS_ANNOTATION",
     "IS_IDENTIFIER",
     "IS_KEYWORD",

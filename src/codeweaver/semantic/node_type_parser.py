@@ -248,8 +248,7 @@ from __future__ import annotations
 
 import logging
 
-from collections.abc import Sequence
-from functools import cached_property
+from collections.abc import Callable, Sequence
 from itertools import groupby
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, ClassVar, TypedDict, cast, overload
@@ -523,12 +522,12 @@ class _ThingCacheDict(TypedDict):
 class NodeTypeParser:
     """Parses and translates node types files into CodeWeaver's internal representation."""
 
-    _initialized: bool = False
+    _initialized: Callable[..., bool] = lambda: False
 
-    _registration_cache: ClassVar[dict[SemanticSearchLanguage, _ThingCacheDict]] = dict.fromkeys(
-        iter(SemanticSearchLanguage),
-        _ThingCacheDict(categories=[], tokens=[], composites=[], connections=[]),
-    )
+    _registration_cache: ClassVar[dict[SemanticSearchLanguage, _ThingCacheDict]] = {
+        lang: _ThingCacheDict(categories=[], tokens=[], composites=[], connections=[]).copy()
+        for lang in SemanticSearchLanguage
+    }
 
     def __init__(self, languages: Sequence[SemanticSearchLanguage] | None = None) -> None:
         """Initialize NodeTypeParser with an optional NodeTypeFileLoader.
@@ -542,9 +541,11 @@ class NodeTypeParser:
 
         self._loader = NodeTypeFileLoader()
 
+        self._initialized = lambda: self.cache_complete()
+
     # we don't start the process until explicitly called
 
-    @cached_property
+    @property
     def nodes(self) -> list[NodeArray]:
         """Get the list of NodeArray to parse."""
         if len(self._languages) == len(SemanticSearchLanguage):
@@ -573,8 +574,7 @@ class NodeTypeParser:
         assembled_things: list[ThingOrCategoryType] = []
         for node_array in self.nodes:
             assembled_things.extend(self._parse_node_array(node_array) or [])
-        if not type(self)._initialized:
-            self._register_everything()
+        self._register_everything()
         return assembled_things
 
     def parse_for_language(self, language: SemanticSearchLanguage) -> list[ThingOrCategoryType]:
@@ -613,13 +613,20 @@ class NodeTypeParser:
                 array := self._loader.get_node(language)
             ):
                 _ = self._parse_node_array(array)
-        if not type(self)._initialized:
-            self._register_everything()
+        self._register_everything()
         return [
             thing
             for lang in (languages or self._languages)
             for thing in self._flattened_nodes_for_language(lang)
         ]
+
+    def cache_complete(self) -> bool:
+        """Check if the internal cache is fully populated for all specified languages."""
+        return all(
+            len(type(self)._registration_cache[lang]["tokens"]) > 0
+            and len(type(self)._registration_cache[lang]["composites"]) > 0
+            for lang in self._languages
+        )
 
     def _register_everything(self) -> None:
         """Register all Things and Categories in the internal mapping."""
@@ -633,7 +640,6 @@ class NodeTypeParser:
                 registry.register_thing(thing)
             for connection in type(self)._registration_cache[language]["connections"]:
                 registry.register_connection(connection)
-        type(self)._initialized = True
 
     def _create_category(self, node_dto: NodeTypeDTO) -> Category:
         """Create a Category from a NodeTypeDTO and add it to the internal mapping.
@@ -730,6 +736,32 @@ class NodeTypeParser:
                 self._create_composite(node_dto) for node_dto in composite_nodes
             )
         return self._flattened_nodes_for_language(node_array.language)
+
+    def _validate(self) -> None:
+        """Validate the internal state of the parser."""
+        from codeweaver.semantic.thing_registry import get_registry
+
+        registry = get_registry()
+        for language in self._languages:
+            if len(self._registration_cache[language]["composites"]) > 0:
+                for thing in self._flattened_nodes_for_language(language):
+                    if thing not in registry:
+                        raise ValueError(f"Thing {thing.name} not registered in registry.")
+                    if (
+                        isinstance(thing, CompositeThing | Token)
+                        and thing.has_categories
+                        and not thing.categories
+                    ):
+                        raise ValueError(f"Thing {thing.name} should have categories but has none.")
+                    if isinstance(thing, CompositeThing) and (
+                        not thing.direct_connections or not thing.positional_connections
+                    ):
+                        raise ValueError(
+                            f"CompositeThing {thing.name} should have direct or positional connections but has none."
+                        )
+            logger.warning(
+                "No composites found for language %s during validation.", language.as_title
+            )
 
 
 _parser: NodeTypeParser | None = None

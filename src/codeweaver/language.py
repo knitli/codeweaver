@@ -122,7 +122,7 @@ class ExtensionRegistry(BasedModel):
     @overload
     def register(
         self, *, ext_tuple: ExtLangPair | ExtPair | ConfigNamePair | ConfigPathPair
-    ) -> None: ...
+    ) -> None: ...  # sourcery skip: docstrings-for-functions
     @overload
     def register(
         self,
@@ -132,7 +132,7 @@ class ExtensionRegistry(BasedModel):
         | ConfigLanguage
         | SecondarySupportedLanguage
         | LiteralStringT,
-    ) -> None: ...
+    ) -> None: ...  # sourcery skip: docstrings-for-functions
     def register(
         self,
         *,
@@ -1055,7 +1055,10 @@ class Chunker(int, BaseEnum):
             return cls.LANGCHAIN_SPECIAL
         if isinstance(language, SemanticSearchLanguage) or (
             isinstance(language, ConfigLanguage)
-            and (language == ConfigLanguage.SELF or language.is_semantic_search_language)
+            and (
+                cast(ConfigLanguage, language) == ConfigLanguage.SELF
+                or language.is_semantic_search_language
+            )
         ):  # type: ignore
             return cls.SEMANTIC
         if cls.custom_delimiters() and next(

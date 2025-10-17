@@ -9,12 +9,13 @@ import logging
 
 from collections import defaultdict
 from collections.abc import Generator, Iterable
+from itertools import chain
 from types import MappingProxyType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from codeweaver._utils import lazy_importer
 from codeweaver.language import SemanticSearchLanguage
-from codeweaver.semantic._types import CategoryName, ThingName, ThingOrCategoryNameType
+from codeweaver.semantic._types import CategoryName, Role, ThingName, ThingOrCategoryNameType
 
 
 grammar_module = lazy_importer("codeweaver.semantic.grammar_things")
@@ -94,6 +95,38 @@ class ThingRegistry:
 
         self._contents = self._tokens, self._composite_things, self._categories
         self._connections = self._direct_connections, self._positional_connections
+
+    def __contains__(
+        self,
+        obj: ThingOrCategoryType
+        | ThingOrCategoryNameType
+        | PositionalConnections
+        | DirectConnection
+        | Role,
+    ) -> bool:
+        """Check if a thing, category, or connection is registered -- by instance or name."""
+        if isinstance(obj, Category | Token | CompositeThing):
+            return self.is_registered(obj)
+        if isinstance(obj, DirectConnection | PositionalConnections):
+            if isinstance(obj, DirectConnection):
+                return obj.source_thing in self._direct_connections.get(obj.language, {})
+            return obj.source_thing in self._positional_connections.get(obj.language, {})
+        scan = [thing for thing in self.everything if not isinstance(thing, PositionalConnections)]
+        names: list[ThingOrCategoryNameType | Role] = [
+            cast(ThingOrCategoryType, thing).name
+            if hasattr(thing, "name")
+            else cast(DirectConnection, thing).role
+            for thing in scan
+        ]
+        return obj in names
+
+    def is_registered(self, thing: ThingOrCategoryType) -> bool:
+        """Check if a Thing or Category is already registered."""
+        if isinstance(thing, Category):
+            return thing.name in self._categories.get(thing.language, {})
+        if isinstance(thing, Token):
+            return thing.name in self._tokens.get(thing.language, {})
+        return thing.name in self._composite_things.get(thing.language, {})
 
     def _language_content(
         self, language: SemanticSearchLanguage
@@ -359,6 +392,22 @@ class ThingRegistry:
             for lang in SemanticSearchLanguage
             if self.has_language(lang)
         })
+
+    @property
+    def everything(
+        self,
+    ) -> list[CompositeThing | Token | Category | PositionalConnections | DirectConnection]:
+        """Get all registered Things, Categories, and Connections as a flat list."""
+        direct = [
+            v
+            for val in self._direct_connections.values()
+            for v in chain.from_iterable(val.values())
+        ]
+        positional = [v for val in self._positional_connections.values() for v in val.values()]
+        categories = [v for val in self._categories.values() for v in val.values()]
+        tokens = [v for val in self._tokens.values() for v in val.values()]
+        composite = [v for val in self._composite_things.values() for v in val.values()]
+        return direct + positional + categories + tokens + composite
 
     @property
     def direct_connections(

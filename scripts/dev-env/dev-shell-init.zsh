@@ -42,7 +42,7 @@ else
   # Helpful hint if .venv is missing (non-fatal)
   if [[ -z "${CODEWEAVER_SILENT_SHELL:-}" ]]; then
     print -P "%F{yellow}[codeweaver]%f .venv not found at %F{cyan}${_cw_repo_venv_path}%f"
-    print -P "%F{yellow}[codeweaver]%f Create it with: uv venv && uv sync  (requires uv)"
+    print -P "%F{yellow}[codeweaver]%f Create it with: %F{green}uv venv "$REPO_ROOT/.venv" && uv sync%f  (requires uv)"
   fi
 fi
 
@@ -51,6 +51,14 @@ _cw_extras="${REPO_ROOT}/.vscode/terminal.extra.zsh"
 if [[ -f "${_cw_extras}" ]]; then
   # shellcheck disable=SC1090
   source "${_cw_extras}"
+fi
+
+# source optional (per-user) local workspace extras if provided
+# this file is gitignored
+_cw_local="${REPO_ROOT}/.vscode/terminal.local.zsh"
+if [[ -f "${_cw_local}" ]]; then
+  # shellcheck disable=SC1090
+  source "${_cw_local}"
 fi
 
 unset __cw_this_file __cw_script_dir _cw_repo_venv_path _cw_venv_activate _cw_extras
