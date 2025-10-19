@@ -17,7 +17,7 @@ CodeWeaver is an extensible MCP (Model Context Protocol) server for semantic cod
 
 ## Project Constitution (DEFINITIVE GUIDANCE)
 
-**This project is governed by the CodeWeaver Constitution at `.specify/memory/constitution.md`.**
+**This project is governed by the CodeWeaver Constitution at `.specify/memory/constitution.md`.** (path relative to repo root)
 
 All development decisions, code reviews, and technical choices MUST comply with the constitutional principles. When in doubt, consult the constitution first.
 
@@ -29,7 +29,7 @@ All development decisions, code reviews, and technical choices MUST comply with 
 4. **Testing Philosophy**: Effectiveness over coverage - focus on user-affecting behavior
 5. **Simplicity Through Architecture**: Clear, flat structure with obvious purpose
 
-**Full Constitutional Text**: See `.specify/memory/constitution.md` v2.0.0
+**Full Constitutional Text**: See `.specify/memory/constitution.md` v2.0.1
 
 ## Development Commands
 

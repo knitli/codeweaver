@@ -2,7 +2,7 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-# sourcery skip: 'comment:docstrings-for-functions'
+# sourcery skip: comment:docstrings-for-functions
 """Custom wrappers around ast-grep's core types to add functionality and serialization.
 
 Like the rest of CodeWeaver, we use our specific vocabulary for concepts to make roles and relationships more clear. See [codeweaver.semantic.grammar_things] for more details.
@@ -53,7 +53,7 @@ from collections.abc import Iterator
 from functools import cached_property
 from pathlib import Path
 from types import ModuleType
-from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, Unpack, cast, overload
+from typing import TYPE_CHECKING, Annotated, Any, Literal, NamedTuple, Unpack, cast, overload
 
 from ast_grep_py import (
     Config,
@@ -70,7 +70,15 @@ from ast_grep_py import (
 from ast_grep_py import Range as SgRange
 from ast_grep_py import SgNode as AstGrepNode
 from ast_grep_py import SgRoot as AstGrepRoot
-from pydantic import UUID7, ConfigDict, Field, NonNegativeInt, PositiveInt, computed_field
+from pydantic import (
+    UUID7,
+    ConfigDict,
+    Field,
+    NonNegativeInt,
+    PositiveFloat,
+    PositiveInt,
+    computed_field,
+)
 
 from codeweaver._common import BasedModel, BaseEnum, LiteralStringT
 from codeweaver._utils import lazy_importer, uuid7
@@ -81,12 +89,16 @@ from codeweaver.services.textify import humanize
 
 # type-only imports
 if TYPE_CHECKING:
-    from codeweaver.semantic.classifications import ImportanceScores, SemanticClass
-    from codeweaver.semantic.node_type_parser import (
-        CompositeThing,
-        ThingRegistry,  # type: ignore
-        Token,
-    )
+    from codeweaver.semantic._node_type_parser import CompositeThing, Token
+    from codeweaver.semantic.classifications import AgentTask, ImportanceScores, ThingClass
+    from codeweaver.semantic.registry import ThingRegistry
+else:
+    CompositeThing = lazy_importer("codeweaver.semantic.grammar").CompositeThing
+    Token = lazy_importer("codeweaver.semantic.grammar").Token
+    AgentTask = lazy_importer("codeweaver.semantic.classifications").AgentTask
+    ImportanceScores = lazy_importer("codeweaver.semantic.classifications").ImportanceScores
+    ThingClass = lazy_importer("codeweaver.semantic.classifications").ThingClass
+    ThingRegistry = lazy_importer("codeweaver.semantic.registry").ThingRegistry
 
 
 # re-export Ast Grep's rules and config types:
@@ -105,7 +117,7 @@ AstGrepSearchTypes = (
 
 def get_registry_module() -> ModuleType:
     """Lazy import the node types module to avoid circular imports."""
-    return lazy_importer("codeweaver.semantic.thing_registry")
+    return lazy_importer("codeweaver.semantic.registry")
 
 
 class MetaVar(str, BaseEnum):
@@ -221,7 +233,7 @@ class FileThing[SgRoot: (AstGrepRoot)](BasedModel):
         """Get the filename from the SgRoot."""
         return Path(self._root.filename())
 
-    @computed_field()
+    @computed_field
     @cached_property
     def root(self) -> FileThing[SgRoot]:
         """Return the parent root node, also wrapped as a FileThing."""
@@ -234,7 +246,9 @@ class FileThing[SgRoot: (AstGrepRoot)](BasedModel):
 
         content = file_path.read_text()
         language = SemanticSearchLanguage.from_extension(file_path.suffix)
-        return cls.from_sg_root(AstGrepRoot(content, str(language)))
+        return cls.from_sg_root(
+            AstGrepRoot(content, cast(SemanticSearchLanguage, language).variable)
+        )
 
 
 class AstThing[SgNode: (AstGrepNode)](BasedModel):
@@ -309,23 +323,41 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     # ================================================
 
     @computed_field
-    @cached_property
+    @property
     def thing(self) -> CompositeThing | Token:
         """Get the grammar Thing that this node represents."""
         thing_name: ThingName = self.name  # type: ignore
-        return cast(
-            CompositeThing | Token,
-            self._registry.get_thing_by_name(thing_name, language=self.language),
+        registry_module = get_registry_module()
+        if thing := registry_module.get_registry().get_thing_by_name(
+            thing_name, language=self.language
+        ):
+            return cast(CompositeThing | Token, thing)
+        raise ValueError(
+            f"Thing '{thing_name}' not found in registry for language '{self.language.name}'."
         )
 
     @computed_field
-    @cached_property
-    def semantic_classification(self) -> SemanticClass:
-        """Get the semantic classification of the node."""
-        # TODO: Once we refactor the Thing Classification system, we'll pull this from the Thing directly.
+    @property
+    def is_file_thing(self) -> bool:
+        """Check if the node is the root file thing."""
+        if not self.thing.is_composite:
+            return False
+        assert isinstance(self.thing, CompositeThing)  # noqa: S101
+        return cast(bool, self.thing.is_file)
 
     @computed_field
+    @property
+    def classification(self) -> ThingClass | None:
+        """Get the semantic classification of the node."""
+        return self.thing.classification
+
     @cached_property
+    def importance(self) -> ImportanceScores | None:
+        """Get the base importance scores of the node."""
+        return self.classification.importance_scores if self.classification else None
+
+    @computed_field
+    @property
     def symbol(self) -> str:
         """Get a symbolic representation of the node."""
         raise NotImplementedError("Symbol generation is not implemented yet.")
@@ -336,13 +368,16 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         """Get a human-readable title for the node."""
         name = humanize(self.name)
         language = humanize(str(self.language))
+        classification = (
+            humanize(self.classification.name.as_title) if self.classification else "Not classified"
+        )
         text_snippet = humanize(self.text.strip().splitlines()[0])
         if len(text_snippet) > 25:
             text_snippet = f"{text_snippet[:22]}..."
-        return f"{language}-{name}: '{text_snippet}'"
+        return f"{language}-{name}-{classification}: '{text_snippet}'"
 
     @computed_field
-    @cached_property
+    @property
     def range(self) -> Range:
         """Get the range of the node."""
         node_range: SgRange = self._node.range()
@@ -355,7 +390,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         return self._node.is_leaf()
 
     @computed_field
-    @cached_property
+    @property
     def is_composite(self) -> bool:
         """Check if the node is a composite (non-leaf)."""
         return not self.is_token
@@ -385,7 +420,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         return self._node.text()
 
     @computed_field
-    @cached_property
+    @property
     def _root(self) -> FileThing[AstGrepRoot]:
         """Get the root of the node."""
         return cast(FileThing[AstGrepRoot], FileThing.from_sg_root(self._node.get_root()))
@@ -393,18 +428,27 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     # Semantic classification and scoring methods
 
     @computed_field
-    @cached_property
-    def importance_score(self) -> ImportanceScores:
+    @property
+    def base_score(self) -> ImportanceScores:
         """Calculate the importance score for this node."""
-        from codeweaver.semantic import SemanticScorer
+        from codeweaver.semantic.scoring import SemanticScorer
 
-        scorer = SemanticScorer(
-            depth_penalty_factor=0.02,
-            size_bonus_threshold=50,
-            size_bonus_factor=0.1,
-            root_bonus=0.07,
-        )
-        return scorer.calculate_importance_score(self.semantic_classification, self)  # pyright: ignore[reportArgumentType]
+        scorer = SemanticScorer()
+        return scorer.calculate_importance_score(self)  # pyright: ignore[reportArgumentType]
+
+    def importance_for_task(self, task: AgentTask) -> ImportanceScores:
+        """Calculate the importance score for this node for a specific task."""
+        return self.base_score.weighted_score(task.profile)
+
+    def importance_for_context(
+        self,
+        context: Literal[
+            "discovery", "comprehension", "modification", "debugging", "documentation"
+        ],
+        task: AgentTask,
+    ) -> PositiveFloat:
+        """Calculate the importance score for this node for a specific context."""
+        return self.importance_for_task(task).as_dict()[context]
 
     def __getitem__(self, meta_var: str) -> AstThing[SgNode]:
         """Get the child node for the given meta variable."""
@@ -491,7 +535,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         )
 
     @computed_field
-    @cached_property
+    @property
     def _ancestor_list(self) -> tuple[AstThing[SgNode], ...]:
         """Get the ancestors of the node."""
         return tuple(

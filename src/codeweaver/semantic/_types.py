@@ -14,14 +14,11 @@ from __future__ import annotations
 import re
 
 from enum import Flag, auto
-from functools import cache
-from types import MappingProxyType
-from typing import Annotated, Literal, NamedTuple, NewType, TypedDict
+from typing import Annotated, Literal, NamedTuple, NewType, TypedDict, cast
 
-from pydantic import ConfigDict, Field, PositiveInt, PrivateAttr, computed_field
+from pydantic import ConfigDict, Field, PrivateAttr, computed_field
 
 from codeweaver._common import BasedModel, BaseEnum, LiteralStringT
-from codeweaver._utils import lazy_importer
 from codeweaver.language import SemanticSearchLanguage
 
 
@@ -30,36 +27,6 @@ CategoryName = NewType("CategoryName", LiteralStringT)
 ThingName = NewType("ThingName", LiteralStringT)
 
 type ThingOrCategoryNameType = ThingName | CategoryName
-
-type ConstantsGroup = tuple[
-    MappingProxyType[PositiveInt, SemanticSearchLanguage],
-    MappingProxyType[
-        SemanticSearchLanguage, dict[LiteralStringT, Literal["keyword", "operator", "identifier"]]
-    ],
-    re.Pattern[str],
-    re.Pattern[str],
-    re.Pattern[str],
-    re.Pattern[str],
-    re.Pattern[str],
-]
-
-
-@cache
-def get_constants() -> ConstantsGroup:
-    """Retrieves constants from the _constants module. Uses lazy importing to avoid compiling regexes until needed."""
-    _constants_module = lazy_importer("codeweaver.semantic._constants")
-    return tuple(
-        getattr(_constants_module, key)
-        for key in (
-            "NAMED_NODE_COUNTS",
-            "LANGUAGE_SPECIFIC_TOKEN_EXCEPTIONS",
-            "IS_IDENTIFIER",
-            "IS_OPERATOR",
-            "NOT_SYMBOL",
-            "IS_LITERAL",
-            "IS_KEYWORD",
-        )
-    )
 
 
 class SimpleNodeTypeDTO(TypedDict):
@@ -183,14 +150,24 @@ class NodeTypeDTO(BasedModel):
         """Check if this node type is a Symbol Token (a Token that is not an identifier or literal)."""
         if not self.is_token:
             return False
-        not_symbol = get_constants()[4]
+        from codeweaver.semantic._constants import get_token_patterns_sync
+
+        patterns = get_token_patterns_sync()
+        not_symbol = patterns["not_symbol"]
+        if not_symbol is None:
+            raise ValueError("Token patterns have not been initialized.")
         return self.is_token and not not_symbol.match(self.node)
 
     @computed_field
     @property
     def is_operator_token(self) -> bool:
         """Check if this node type is an Operator Token (a Token that is an operator)."""
-        return self.is_symbol_token and get_constants()[3].match(self.node) is not None
+        from codeweaver.semantic._constants import get_token_patterns_sync
+
+        patterns = get_token_patterns_sync()
+        if patterns["operator"] is None:
+            raise ValueError("Token patterns have not been initialized.")
+        return self.is_symbol_token and patterns["operator"].match(self.node) is not None
 
     @computed_field
     @property
@@ -344,33 +321,38 @@ class TokenPurpose(BaseEnum):
         """Create TokenPurpose from NodeTypeDTO."""
         if node_dto.is_composite or node_dto.is_category:
             raise ValueError("Cannot determine TokenPurpose for Composite or Category nodes")
-        (
-            _,
-            language_specific_exceptions,
-            is_identifier,
-            is_operator,
-            _not_symbol,
-            is_literal,
-            is_keyword,
-        ) = get_constants()
+        from codeweaver.semantic._constants import (
+            LANGUAGE_SPECIFIC_TOKEN_EXCEPTIONS,
+            get_token_patterns_sync,
+        )
+
         if (
-            node_dto.language in language_specific_exceptions
-            and node_dto.node in language_specific_exceptions[node_dto.language]
+            node_dto.language in LANGUAGE_SPECIFIC_TOKEN_EXCEPTIONS
+            and node_dto.node in LANGUAGE_SPECIFIC_TOKEN_EXCEPTIONS[node_dto.language]
         ):
-            return cls.from_string(language_specific_exceptions[node_dto.language][node_dto.node])
+            return cls.from_string(
+                LANGUAGE_SPECIFIC_TOKEN_EXCEPTIONS[node_dto.language][node_dto.node]
+            )
         if "comment" in node_dto.node.lower() or node_dto.node.lower() == "comment":
             return cls.COMMENT
+        patterns = get_token_patterns_sync()
+        if any(pattern for pattern in patterns.values() if pattern is None):
+            raise ValueError("Token patterns have not been initialized.")
         if (
             "identifier" in node_dto.node.lower()
             or node_dto.node.lower() == "identifier"
-            or is_identifier.match(node_dto.node)
+            or cast(re.Pattern[str], patterns["identifier"]).match(node_dto.node)
         ):
             return cls.IDENTIFIER
-        if is_keyword.match(node_dto.node):
+        if cast(re.Pattern[str], patterns["keyword"]).match(node_dto.node):
             return cls.KEYWORD
-        if is_operator.match(node_dto.node):
+        if cast(re.Pattern[str], patterns["operator"]).match(node_dto.node):
             return cls.OPERATOR
-        return cls.LITERAL if is_literal.match(node_dto.node) else cls.PUNCTUATION
+        return (
+            cls.LITERAL
+            if cast(re.Pattern[str], patterns["literal"]).match(node_dto.node)
+            else cls.PUNCTUATION
+        )
 
 
 class ConnectionConstraint(Flag, BaseEnum):  # type:ignore  # we intentionally override BaseEnum where there's overlap with Flag

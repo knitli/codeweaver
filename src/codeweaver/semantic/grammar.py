@@ -246,10 +246,18 @@ import logging
 
 from collections import defaultdict
 from collections.abc import Iterator
+from functools import cached_property
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal, TypedDict, cast, override
 
-from pydantic import ConfigDict, Field, NonNegativeInt, computed_field, field_validator
+from pydantic import (
+    ConfigDict,
+    Field,
+    NonNegativeFloat,
+    NonNegativeInt,
+    computed_field,
+    field_validator,
+)
 from pydantic.dataclasses import dataclass
 
 from codeweaver._common import (
@@ -275,7 +283,18 @@ from codeweaver.semantic._types import (
 
 
 if TYPE_CHECKING:
-    from codeweaver.semantic.thing_registry import ThingRegistry
+    from codeweaver.semantic.classifications import ThingClass
+    from codeweaver.semantic.classifier import GrammarBasedClassifier, GrammarClassificationResult
+    from codeweaver.semantic.registry import ThingRegistry
+else:
+    ThingRegistry = lazy_importer("codeweaver.semantic.registry", "ThingRegistry")
+    ThingClass = lazy_importer("codeweaver.semantic.classifications", "ThingClass")
+    GrammarBasedClassifier = lazy_importer(
+        "codeweaver.semantic.classifier", "GrammarBasedClassifier"
+    )
+    GrammarClassificationResult = lazy_importer(
+        "codeweaver.semantic.classifier", "GrammarClassificationResult"
+    )
 
 logger = logging.getLogger()
 
@@ -283,6 +302,18 @@ logger = logging.getLogger()
 type ThingType = CompositeThing | Token
 
 type ThingOrCategoryType = CompositeThing | Token | Category
+
+_classifier: GrammarBasedClassifier | None = None
+
+
+def _get_classifier() -> GrammarBasedClassifier:
+    """Lazily import and return the global GrammarBasedClassifier instance."""
+    global _classifier
+    if _classifier is None:
+        from codeweaver.semantic.classifier import GrammarBasedClassifier
+
+        _classifier = GrammarBasedClassifier()
+    return _classifier
 
 
 def name_normalizer(name: str) -> str:
@@ -384,7 +415,7 @@ class Thing(BasedModel):
     @property
     def categories(self) -> frozenset[Category]:
         """Resolve Categories from registry by name."""
-        registry_module = lazy_importer("codeweaver.semantic.thing_registry")
+        registry_module = lazy_importer("codeweaver.semantic.registry")
         registry = registry_module.get_registry()
         return frozenset(
             cat
@@ -416,6 +447,27 @@ class Thing(BasedModel):
             thing_kwargs["purpose"] = TokenPurpose.from_node_dto(node_dto)
 
         return thing_cls.model_validate(thing_kwargs)
+
+    @cached_property
+    def classification_result(self) -> GrammarClassificationResult | None:
+        """Get the GrammarClassificationResult of this Thing based on its Categories."""
+        classifier = _get_classifier()
+        return classifier.classify_thing(self.name, self.language)
+
+    @computed_field
+    @property
+    def classification(self) -> ThingClass | None:
+        """Get the ThingClass of this Thing based on its Categories."""
+        if classification := self.classification_result:
+            return classification.classification.category
+        return None
+
+    @computed_field
+    def classification_confidence(self) -> NonNegativeFloat | None:
+        """Get the confidence score of this Thing's classification."""
+        if classification := self.classification_result:
+            return classification.confidence
+        return None
 
     @property
     def is_multi_category(self) -> bool:
@@ -504,7 +556,7 @@ class CompositeThing(Thing):
     @property
     def direct_connections(self) -> frozenset[DirectConnection]:
         """Resolve DirectConnections from registry by source Thing name."""
-        from codeweaver.semantic.thing_registry import get_registry
+        from codeweaver.semantic.registry import get_registry
 
         registry = get_registry()
         connections = registry.get_direct_connections_by_source(self.name, language=self.language)
@@ -516,7 +568,7 @@ class CompositeThing(Thing):
 
         Note: There can be at most one PositionalConnections per CompositeThing, since children are ordered. The PositionalConnections itself can reference multiple target Things. **Not all CompositeThings have PositionalConnections.**
         """
-        from codeweaver.semantic.thing_registry import get_registry
+        from codeweaver.semantic.registry import get_registry
 
         registry = get_registry()
         # direct=False guarantees PositionalConnections
@@ -666,7 +718,7 @@ class Category(BasedModel):
     @property
     def member_things(self) -> frozenset[CompositeThing | Token]:
         """Resolve member Things from registry by name."""
-        from codeweaver.semantic.thing_registry import get_registry
+        from codeweaver.semantic.registry import get_registry
 
         registry = get_registry()
         return frozenset(
@@ -782,7 +834,7 @@ class Connection(BasedModel):
 
     def __init__(self, **data: Any) -> None:
         """Initialize a Connection."""
-        from codeweaver.semantic.thing_registry import get_registry
+        from codeweaver.semantic.registry import get_registry
 
         registry = get_registry()
         if data["target_thing_names"]:
@@ -799,7 +851,7 @@ class Connection(BasedModel):
     @property
     def target_things(self) -> frozenset[ThingOrCategoryType]:
         """Resolve target Things/Categories from registry by name."""
-        from codeweaver.semantic.thing_registry import get_registry
+        from codeweaver.semantic.registry import get_registry
 
         registry = get_registry()
         return frozenset(
@@ -931,7 +983,7 @@ class DirectConnection(Connection):
     def specific_target(self) -> ThingOrCategoryType | None:
         """Get the specific target Thing if this DirectConnection requires exactly one specific target; otherwise, return None."""
         if self.requires_specific_target:
-            from codeweaver.semantic.thing_registry import get_registry
+            from codeweaver.semantic.registry import get_registry
 
             registry = get_registry()
             target_name = self.target_thing_names[0]
@@ -1051,12 +1103,12 @@ class Grammar(DataclassSerializationMixin):
             A Grammar instance for the specified language.
         """
         try:
-            from codeweaver.semantic.thing_registry import get_registry
+            from codeweaver.semantic.registry import get_registry
 
             registry: ThingRegistry = get_registry()
 
         except Exception:
-            from codeweaver.semantic.node_type_parser import NodeTypeParser
+            from codeweaver.semantic._node_type_parser import NodeTypeParser
 
             parser = NodeTypeParser()
             results = parser.parse_languages([language])
@@ -1164,7 +1216,7 @@ class Grammar(DataclassSerializationMixin):
     @property
     def direct_connections_by_source(self) -> MappingProxyType[ThingName, list[DirectConnection]]:
         """Get DirectConnections grouped by source Thing name."""
-        from codeweaver.semantic.thing_registry import get_registry
+        from codeweaver.semantic.registry import get_registry
 
         return MappingProxyType(get_registry().direct_connections[self.language])
 
@@ -1173,7 +1225,7 @@ class Grammar(DataclassSerializationMixin):
         self,
     ) -> MappingProxyType[ThingName, PositionalConnections]:
         """Get PositionalConnections grouped by source Thing name."""
-        from codeweaver.semantic.thing_registry import get_registry
+        from codeweaver.semantic.registry import get_registry
 
         return MappingProxyType(get_registry().positional_connections[self.language])
 

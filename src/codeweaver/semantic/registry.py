@@ -21,7 +21,7 @@ from codeweaver.semantic._types import CategoryName, Role, ThingName, ThingOrCat
 grammar_module = lazy_importer("codeweaver.semantic.grammar_things")
 
 if TYPE_CHECKING:
-    from codeweaver.semantic.grammar_things import (
+    from codeweaver.semantic.grammar import (
         Category,
         CompositeThing,
         Connection,
@@ -448,7 +448,7 @@ def get_registry() -> ThingRegistry:
         if "NodeTypeParser" in caller.filename or "node_type_parser" in caller.filename:
             return _registry
         if not any(_registry.has_language(lang) for lang in SemanticSearchLanguage):
-            from codeweaver.semantic.node_type_parser import NodeTypeParser
+            from codeweaver.semantic._node_type_parser import NodeTypeParser
 
             parser = NodeTypeParser()
             _ = parser.parse_all_nodes()

@@ -266,7 +266,7 @@ grammar_module = lazy_importer("codeweaver.semantic.grammar_things")
 
 
 if TYPE_CHECKING:
-    from codeweaver.semantic.grammar_things import (
+    from codeweaver.semantic.grammar import (
         Category,
         CompositeThing,
         DirectConnection,
@@ -632,7 +632,7 @@ class NodeTypeParser:
         """Register all Things and Categories in the internal mapping."""
         if not type(self)._registration_cache:
             _ = self.parse_all_nodes()
-        from codeweaver.semantic.thing_registry import get_registry
+        from codeweaver.semantic.registry import get_registry
 
         registry = get_registry()
         for language in self._languages:
@@ -739,7 +739,7 @@ class NodeTypeParser:
 
     def _validate(self) -> None:
         """Validate the internal state of the parser."""
-        from codeweaver.semantic.thing_registry import get_registry
+        from codeweaver.semantic.registry import get_registry
 
         registry = get_registry()
         for language in self._languages:

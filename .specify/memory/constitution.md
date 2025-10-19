@@ -65,7 +65,7 @@ Hierarchical configuration via `pydantic-settings` with environment variables an
 - Documentation updates for public interfaces
 
 ### Quality Standards
-- Google docstring convention with plain language and active voice
+- Google docstring convention written in plain language with active voice
 - 100-character line length limit
 - Modern Python typing (>=3.11) with latest syntax patterns
 - Ruff auto-formatting and linting compliance
@@ -88,4 +88,4 @@ This constitution supersedes all other development practices. All code reviews, 
 
 **Complexity Justification**: Any deviation from these principles must be documented with specific rationale and simpler alternatives considered. Technical debt must be explicitly tracked and addressed.
 
-**Version**: 2.0.0 | **Ratified**: 2025-09-23 | **Last Amended**: 2025-09-23
+**Version**: 2.0.1 | **Ratified**: 2025-09-23 | **Last Amended**: 2025-10-18

@@ -9,7 +9,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 ## Project Constitution (MANDATORY COMPLIANCE)
 
-**This project is governed by the CodeWeaver Constitution at `.specify/memory/constitution.md`.**
+**This project is governed by the CodeWeaver Constitution at [`.specify/memory/constitution.md`](.specify/memory/constitution.md).** (path relative to repo root)
 
 ALL development work MUST comply with constitutional principles. This constitution supersedes all other guidelines and practices. When any conflict arises between these guidelines and the constitution, the constitution takes precedence.
 

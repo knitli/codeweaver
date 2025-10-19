@@ -515,6 +515,7 @@ include = [
   "README.md",
   "context7.json",
   "context7.json.license",
+  "node_types/**",
   "pyproject.toml",
   "sbom.spdx",
   "src/**",
@@ -614,7 +615,7 @@ pythonPlatform = "Linux"
 pythonVersion = "3.12"
 reportArgumentType = "information"
 reportImplicitStringConcatenation = "error"
-reportImportCycles = "warning"
+reportImportCycles = "none"  # this is overly noisy and doesn't account for lazy imports
 reportPrivateImportUsage = "none"
 reportPrivateUsage = "none" # It's our own internal use...
 reportPropertyTypeMismatch = "error"

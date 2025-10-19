@@ -66,11 +66,14 @@ from codeweaver._utils import (
     set_relative_path,
     uuid7,
 )
-from codeweaver.semantic._ast_grep import AstThing
+from codeweaver.semantic.ast_grep import AstThing
 
 
 if TYPE_CHECKING:
+    from ast_grep_py import SgRoot
+
     from codeweaver.language import ConfigLanguage, SemanticSearchLanguage
+    from codeweaver.semantic.ast_grep import FileThing
 else:
     # this prevents a very big circular import situation
     # While they're only type annotations, because of pydantic serialization/deserialization/validation, we need the types at runtime
@@ -136,8 +139,8 @@ class SemanticMetadata(BasedModel):
         SemanticSearchLanguage | str,
         Field(description="""The programming language of the code chunk"""),
     ]
-    primary_thing: AstThing[SgNode] | None
-    positional_things: tuple[AstThing[SgNode], ...] = ()
+    thing: AstThing[SgNode] | None
+    positional_connections: tuple[AstThing[SgNode], ...] = ()
     # TODO: Logic for symbol extraction from AST nodes
     symbol: Annotated[
         str | None,
@@ -162,8 +165,8 @@ class SemanticMetadata(BasedModel):
         """Create a SemanticMetadata instance from a parent SemanticMetadata instance."""
         return cls(
             language=parent_meta.language,
-            primary_thing=child,
-            positional_things=tuple(child.positional_connections),
+            thing=child,
+            positional_connections=tuple(child.positional_connections),
             thing_id=child.thing_id or uuid7(),
             parent_thing_id=parent_meta.thing_id,
             **overrides,
@@ -176,8 +179,8 @@ class SemanticMetadata(BasedModel):
             thing = AstThing.from_sg_node(thing, language=language)  # pyright: ignore[reportUnknownVariableType]
         return cls(
             language=language or thing.language or "",
-            primary_thing=thing,
-            positional_things=tuple(thing.positional_connections),
+            thing=thing,
+            positional_connections=tuple(thing.positional_connections),
             thing_id=thing.thing_id,
             symbol=thing.symbol,
             parent_thing_id=thing.parent_thing_id,
@@ -947,6 +950,26 @@ class DiscoveredFile(DataclassSerializationMixin):
         with contextlib.suppress(Exception):
             return self.normalize_content(self.path.read_text(errors="replace"))
         return ""
+
+    @property
+    def raw_contents(self) -> bytes:
+        """Return the raw contents of the file."""
+        with contextlib.suppress(Exception):
+            return self.path.read_bytes()
+        return b""
+
+    @property
+    def ast(self) -> FileThing[SgRoot] | None:
+        """Return the AST of the file, if applicable."""
+        if (
+            self.is_text
+            and self.ext_kind.language in SemanticSearchLanguage
+            and isinstance(self.ext_kind.language, SemanticSearchLanguage)
+        ):
+            from codeweaver.semantic.ast_grep import FileThing
+
+            return cast(FileThing[SgRoot], FileThing.from_file(self.path))
+        return None
 
     @staticmethod
     def normalize_content(content: str | bytes | bytearray) -> str:
