@@ -211,6 +211,12 @@ class LanguageConfigFile(NamedTuple):
     - `dependency_key_paths=(("LDFLAGS",),)`   # for C Makefiles
     """
 
+    def exists(self) -> bool:
+        """
+        Checks if the configuration file exists at the specified path.
+        """
+        return self.path.exists()
+
 
 class ConfigLanguage(BaseEnum):
     """
@@ -230,6 +236,16 @@ class ConfigLanguage(BaseEnum):
     TOML = "toml"
     XML = "xml"
     YAML = "yaml"
+
+    @classmethod
+    def from_extension(cls, ext: str) -> ConfigLanguage | None:
+        """
+        Returns the ConfigLanguage associated with the given file extension.
+        """
+        ext = ext.lower() if ext.startswith(".") else ext
+        if ext in cls.all_extensions():
+            return next((language for language in cls if ext in language.extensions), None)
+        return None
 
     @property
     def extensions(self) -> tuple[str, ...]:
@@ -763,6 +779,10 @@ class SemanticSearchLanguage(str, BaseEnum):
             SemanticSearchLanguage.PHP: (
                 SemanticSearchLanguage.HTML,
                 SemanticSearchLanguage.JAVASCRIPT,
+                SemanticSearchLanguage.CSS,
+            ),
+            SemanticSearchLanguage.TYPESCRIPT: (
+                SemanticSearchLanguage.HTML,
                 SemanticSearchLanguage.CSS,
             ),
         }.get(self)

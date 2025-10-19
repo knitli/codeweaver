@@ -959,6 +959,11 @@ class DiscoveredFile(DataclassSerializationMixin):
         return b""
 
     @property
+    def is_config_file(self) -> bool:
+        """Return True if the file is a recognized configuration file."""
+        return _is_semantic_config_ext(self.path.suffix)
+
+    @property
     def ast(self) -> FileThing[SgRoot] | None:
         """Return the AST of the file, if applicable."""
         if (

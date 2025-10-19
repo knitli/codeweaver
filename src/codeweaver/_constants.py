@@ -543,6 +543,94 @@ CODE_FILES_EXTENSIONS: tuple[ExtLangPair, ...] = (
 # spellchecker:on
 """A tuple of `ExtLangPair`."""
 
+COMMON_TOOLING_PATHS: tuple[tuple[LiteralStringT, tuple[Path, ...]], ...] = (
+    (
+        "docker",
+        (
+            Path("Dockerfile"),
+            Path("docker-compose.yml"),
+            Path("docker-compose.yaml"),
+            Path("docker"),
+        ),
+    ),
+    (
+        "devcontainer",
+        (
+            Path(".devcontainer"),
+            Path(".devcontainer/devcontainer.json"),
+            Path(".devcontainer/devcontainer.local.json"),
+        ),
+    ),
+    ("bazel", (Path("WORKSPACE"), Path("BUILD.bazel"), Path("BUILD"))),
+    (
+        "cmake",
+        (
+            Path("CMakeLists.txt"),
+            Path("CMakeCache.txt"),
+            Path("cmake-build-debug"),
+            Path("CMakeFiles"),
+        ),
+    ),
+    ("esbuild", (Path("esbuild.config.js"), Path("esbuild.config.ts"))),
+    (
+        "gradle",
+        (
+            Path("build.gradle"),
+            Path("build.gradle.kts"),
+            Path("gradlew"),
+            Path("gradlew.bat"),
+            Path("gradle"),
+        ),
+    ),
+    ("hk", (Path("hk.pkl"),)),
+    ("intellij", (Path(".idea"), Path(".idea/misc.xml"), Path(".idea/modules.xml"))),
+    ("just", (Path("Justfile"), Path("justfile"))),
+    ("moon", (Path("moon.yml"), Path("moon.yaml"), Path(".moon"))),
+    ("maven", (Path("pom.xml"), Path("settings.xml"), Path(".mvn"))),
+    ("mise", (Path("mise.toml"),)),
+    (
+        "proto",
+        (Path("proto.toml"), Path("proto.pkl"), Path("prototools.toml"), Path("prototools.pkl")),
+    ),
+    ("rollup", (Path("rollup.config.js"), Path("rollup.config.ts"))),
+    ("vite", (Path("vite.config.js"), Path("vite.config.ts"))),
+    ("vscode", (Path(".vscode"), Path(".vscode/settings.json"), Path(".vscode/launch.json"))),
+    ("webpack", (Path("webpack.config.js"), Path("webpack.config.ts"))),
+    ("xtask", (Path("xtask"), Path("xtask/src/main.rs"))),
+)
+"""Common paths for build and development tooling used in projects. This needs expansion, pull requests are welcome!"""
+
+COMMON_LLM_TOOLING_PATHS: tuple[tuple[LiteralStringT, tuple[Path, ...]], ...] = (
+    ("agents", (Path("AGENTS.md"),)),
+    ("codex", (Path(".codex"),)),
+    ("claude", (Path("CLAUDE.md"), Path(".claude"), Path("claudedocs"), Path(".claude/commands"))),
+    (
+        "codeweaver",
+        (
+            Path("codeweaver.local.toml"),
+            Path("codeweaver.local.yaml"),
+            Path("codeweaver.local.json"),
+            Path(".codeweaver"),
+        ),
+    ),
+    ("continue", (Path(".continue"),)),
+    ("copilot", (Path(".github/chatmodes"), Path(".github/prompts"))),
+    ("cursor", (Path(".cursor"), Path(".cursor/config.yml"))),
+    ("mcp", (Path(".mcp.json"), Path("mcp.json"), Path(".roo/mcp.json"), Path(".vscode/mcp.json"))),
+    ("roo", (Path(".roo"), Path(".roomodes"), Path(".roo/commands"))),
+    ("serena", (Path(".serena"), Path(".serena/project.yml"))),
+    (
+        "specify",
+        (
+            Path(".specify"),
+            Path(".specify/memory"),
+            Path(".specify/scripts/bash"),
+            Path(".specify/templates"),
+        ),
+    ),
+)
+"""Common paths for LLM tooling used in projects. This needs expansion -- right now it's literally just what I've used."""
+
 
 class FallBackTestDef(TypedDict):
     """Definition for a fallback test based on file content."""
