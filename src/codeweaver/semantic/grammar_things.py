@@ -1076,18 +1076,32 @@ class Grammar(DataclassSerializationMixin):
                 _positional_connections=frozenset(positional),
             )
         else:
-            return cls(
-                language=language,
-                _tokens=frozenset(registry.tokens[language].values()),
-                _composite_things=frozenset(registry.composite_things[language].values()),
-                _categories=frozenset(registry.categories[language].values()),
-                _direct_connections=frozenset(
+            # Manually construct Grammar bypassing validation since registry objects are already validated
+            # For pydantic dataclasses, we use object.__new__ and manually set attributes
+            instance = object.__new__(cls)
+            object.__setattr__(instance, "language", language)
+            object.__setattr__(instance, "_tokens", frozenset(registry.tokens[language].values()))
+            object.__setattr__(
+                instance,
+                "_composite_things",
+                frozenset(registry.composite_things[language].values()),
+            )
+            object.__setattr__(
+                instance, "_categories", frozenset(registry.categories[language].values())
+            )
+            object.__setattr__(
+                instance,
+                "_direct_connections",
+                frozenset(
                     conn for lst in registry.direct_connections[language].values() for conn in lst
                 ),
-                _positional_connections=frozenset(
-                    registry.positional_connections[language].values()
-                ),
             )
+            object.__setattr__(
+                instance,
+                "_positional_connections",
+                frozenset(registry.positional_connections[language].values()),
+            )
+            return instance
 
     def get_category_by_name(self, name: CategoryName) -> Category | None:
         """Get a Category by its name in this Grammar.
@@ -1314,10 +1328,11 @@ def get_all_grammars() -> MappingProxyType[SemanticSearchLanguage, Grammar]:
 
 
 if __name__ == "__main__":
-    grammar = get_grammar(SemanticSearchLanguage.PYTHON)
-    rich_console = lazy_importer("rich.console").Console()
-    rich_console.print_json(grammar.dump_json())
-
+    grammars = get_all_grammars()
+    rich_console = lazy_importer("rich.console").Console(markup=True, emoji=True)
+    for language, grammar in grammars.items():
+        print(f"\n=== Grammar for {language.as_title} ===")
+        rich_console.print(grammar.print)
 
 __all__ = (
     "Category",

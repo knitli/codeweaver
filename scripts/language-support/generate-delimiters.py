@@ -31,9 +31,10 @@ from rich.console import Console
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
+from codeweaver.services.chunker.delimiters.delimiter import Delimiter, DelimiterDict
+
 from codeweaver.services.chunker.delimiters import LanguageFamily, expand_pattern
 from codeweaver.services.chunker.delimiters.custom import get_custom_patterns
-from codeweaver.services.chunker.delimiters.delimiter import Delimiter, DelimiterDict
 from codeweaver.services.chunker.delimiters.families import get_family_patterns
 from codeweaver.services.chunker.delimiters.kind import DelimiterKind
 from codeweaver.services.chunker.delimiters.patterns import kind_from_delimiter_tuple

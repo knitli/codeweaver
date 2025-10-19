@@ -1,4 +1,4 @@
-# sourcery skip: lambdas-should-be-short
+# sourcery skip: lambdas-should-be-short, no-complex-if-expressions
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -7,7 +7,7 @@
 
 import re
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from types import MappingProxyType
 from typing import TYPE_CHECKING, NamedTuple
 
@@ -23,6 +23,7 @@ else:
     SemanticClass = lazy_importer("codeweaver.semantic.classifications").SemanticClass
     CompositeThing = lazy_importer("codeweaver.semantic.grammar_things").CompositeThing
     Token = lazy_importer("codeweaver.semantic.grammar_things").Token
+    ThingName = lazy_importer("codeweaver.semantic._types").ThingName
 
 NAMED_NODE_COUNTS = MappingProxyType({
     231: SemanticSearchLanguage.C_PLUS_PLUS,
@@ -411,67 +412,67 @@ IS_KEYWORD = re.compile(
         (Alignas|Alignof|Atomic|Generic|Nonnull|Noreturn|alignof|expression|modify|unaligned)
         |
     # Calling conventions (C#/Windows)
-    (Cdecl|Fastcall|Stdcall|Thiscall|staticcall|Vectorcall)
+    Cdecl|Fastcall|Stdcall|Thiscall|staticcall|Vectorcall
         |
     # Swift-specific
-    (Protocol|Type|associatedtype|bang|borrowing|canImport|consuming|convenience|deinit|didSet|distributed|dsohandle|externalMacro|fileID|filePath|indirect|init|mutating|nonisolated|nonmutating|ownership_modifier|postfix|precedencegroup|prefix|some|subscript|swift|targetEnvironment|throw_keyword|unavailable|willSet|arch|available|column|compiler|diagnostic|line|os)
+    Protocol|Type|associatedtype|bang|borrowing|canImport|consuming|convenience|deinit|didSet|distributed|dsohandle|externalMacro|fileID|filePath|indirect|init|mutating|nonisolated|nonmutating|ownership_modifier|postfix|precedencegroup|prefix|some|subscript|swift|targetEnvironment|throw_keyword|unavailable|willSet|arch|available|column|compiler|diagnostic|line|os
         |
     # Solidity-specific
-    (anonymous|any_source_type|basefee|blobbasefee|blobfee|blobhash|call(code|data(copy|load|size)?|value)?|caller|chainid|coinbase|contract|create2?|delegatecall|emit|enum_value|error|ether|event|extcode(copy|hash|size)|fallback|finney|gas(limit|price)?|gwei|immutable|indexed|invalid|iszero|keccak256|layout|library|log[0-9]|mapping|mcopy|memory|modifier|m(load|size|store8?)|mul(mod)?|number_unit|origin|pop|pragma_value|prevrandao|receive|returndata(copy|size)|returns?|revert|s(ar|elfbalance|elfdestruct|gt|hl|hr|ignextend|load|lt|mod|olidity(_version)?|taticall|store|top|ub|torage)|szabo|t(imestamp|load|store)|ufixed|unicode|visibility|wei|yul_(boolean|break|continue|decimal_number|evm_builtin|hex_number|leave)|days|hours|minutes|seconds|weeks|years)
+    anonymous|any_source_type|basefee|blobbasefee|blobfee|blobhash|call(code|data(copy|load|size)?|value)?|caller|chainid|coinbase|contract|create2?|delegatecall|emit|enum_value|error|ether|event|extcode(copy|hash|size)|fallback|finney|gas(limit|price)?|gwei|immutable|indexed|invalid|iszero|keccak256|layout|library|log[0-9]|mapping|mcopy|memory|modifier|m(load|size|store8?)|mul(mod)?|number_unit|origin|pop|pragma_value|prevrandao|receive|returndata(copy|size)|returns?|revert|s(ar|elfbalance|elfdestruct|gt|hl|hr|ignextend|load|lt|mod|olidity(_version)?|t(imestamp|load|store)|ufixed|unicode|visibility|wei|yul_(boolean|break|continue|decimal_number|evm_builtin|hex_number|leave)|days|hours|minutes|seconds|weeks|years
         |
     # Haskell-specific
-    (abstract_family|all_names|anyclass|calling_convention|cases|cpp|d|data|deriving(_strategy)?|e|empty_list|family|foreign|forall|group|haddock|implicit_variable|import_package|infix[lr]?|instance|label|layout|mdo|module_id|name|newtype|nominal|pattern|phantom|prefix_(list|tuple|unboxed_(sum|tuple))|qualified|quasiquote_body|rec|representational|role|safety|star|stock|t|type_role|unit|variable)
+    abstract_family|all_names|anyclass|calling_convention|cases|cpp|d|data|deriving(_strategy)?|e|empty_list|family|foreign|forall|group|haddock|implicit_variable|import_package|infix[lr]?|instance|label|layout|mdo|module_id|name|newtype|nominal|pattern|phantom|prefix_(list|tuple|unboxed_(sum|tuple))|qualified|quasiquote_body|rec|representational|role|safety|star|stock|t|type_role|unit|variable
         |
     # Kotlin-specific
-    (actual|annotation|companion|crossinline|data|delegate|expect|field|final|infix|init|inner|internal|lateinit|noinline|operator|out|param|receiver|reified|reification_modifier|sealed|suspend|tailrec|use_site_target|val|value|vararg)
+    actual|annotation|companion|crossinline|data|delegate|expect|field|final|infix|init|inner|internal|lateinit|noinline|operator|out|param|receiver|reified|reification_modifier|sealed|suspend|tailrec|use_site_target|val|value|vararg
         |
     # Scala-specific
-    (derives|end|erroneous_end_tag_name|extension|final|given|implicit|inline_modifier|into_modifier|macro|namespace_wildcard|opaque(_modifier)?|open(_modifier)?|tracked(_modifier)?|transparent_modifier|using_directive_(key|value))
+    derives|end|erroneous_end_tag_name|extension|final|given|implicit|inline_modifier|into_modifier|macro|namespace_wildcard|opaque(_modifier)?|open(_modifier)?|tracked(_modifier)?|transparent_modifier|using_directive_(key|value)
         |
     # Ruby-specific
-    (BEGIN|END|alias|class_variable|ensure|forward_(argument|parameter)|global_variable|hash_(key_symbol|splat_nil)|heredoc_beginning|next|redo|rescue|retry|undef|uninterpreted)
+    BEGIN|END|alias|class_variable|ensure|forward_(argument|parameter)|global_variable|hash_(key_symbol|splat_nil)|heredoc_beginning|next|redo|rescue|retry|undef|uninterpreted
         |
     # PHP-specific
-    (bottom_type|cast_type|enddeclare|endfor|endforeach|endif|endswitch|endwhile|final(_modifier)?|include_once|operation|parent|php_(end_)?tag|readonly_modifier|relative_scope|require_once|strict_types|ticks|var_modifier|variadic_placeholder)
+    bottom_type|cast_type|enddeclare|endfor|endforeach|endif|endswitch|endwhile|final(_modifier)?|include_once|operation|parent|php_(end_)?tag|readonly_modifier|relative_scope|require_once|strict_types|ticks|var_modifier|variadic_placeholder
         |
     # Rust-specific
-    (block|crate|dyn|expr(_20[1-2][0-9])?|fragment_specifier|ident|item|metavariable|mutable_specifier|never_type|pat(_param)?|path|pub|raw|remaining_field_pattern|shebang|stmt|tt|ty|unit_(expression|type)|vis)
+    block|crate|dyn|expr(_20[1-2][0-9])?|fragment_specifier|ident|item|not|metavariable|mutable_specifier|never_type|pat(_param)?|path|pub|raw|remaining_field_pattern|shebang|stmt|tt|ty|unit_(expression|type)|vis
         |
     # Go-specific
-    (dot|fallthrough_statement|go|iota|label_name|range)
+    dot|fallthrough_statement|go|iota|label_name|range
         |
     # Elixir-specific
-    (after|alias|atom|end|rescue|sigil_modifiers|when)
+    after|alias|atom|end|rescue|sigil_modifiers|when
         |
     # Bash-specific
-    (file_descriptor|k|special_variable_name|u|variable_name|word)
+    file_descriptor|k|special_variable_name|u|variable_name|word
         |
     # C#-specific
-    (accessibility_modifier|alias|annotations|attribute_target_specifier|checked|checksum|constructor_constraint|delegate|descending|discard|empty_statement|enable|equals|field|fixed|group|implicit(_parameter|_type)?|internal|join|managed|modifier|notnull|on|orderby|param|params|partial|record|remove|required|restore|scoped|shebang_directive|sizeof|typevar|unmanaged|warning|warnings|when)
+    accessibility_modifier|alias|annotations|attribute_target_specifier|checked|checksum|constructor_constraint|delegate|descending|discard|empty_statement|enable|equals|field|fixed|group|implicit(_parameter|_type)?|internal|join|managed|modifier|notnull|on|orderby|param|params|partial|record|remove|required|restore|scoped|shebang_directive|sizeof|typevar|unmanaged|warning|warnings|when
         |
     # Nix-specific
-    (rec|recursion)
+    rec|recursion
         |
     # Lua-specific
-    (end|vararg_expression)
+    end|vararg_expression
         |
     # CSS-specific
-    (at_keyword|feature_name|important_value|keyword_query)
+    at_keyword|feature_name|important_value|keyword_query
         |
     # HTML-specific
-    (attribute_value|doctype)
+    attribute_value|doctype
         |
     # JavaScript/TypeScript-specific
-    (accessibility_modifier|asserts|debugger_statement|existential_type|infer|meta_property|never|override_modifier|satisfies|target|this(_type)?|unknown)
+    accessibility_modifier|asserts|debugger_statement|existential_type|infer|meta_property|never|override_modifier|satisfies|target|this(_type)?|unknown
         |
     # Java-specific
-    (asterisk|exports|final|permits|provides|record|requires_modifier|strictfp|underscore_pattern|uses|when)
+    asterisk|exports|final|permits|provides|record|requires_modifier|strictfp|underscore_pattern|uses|when
         |
     # Modifiers (cross-language patterns)
     \w*_modifier|access_specifier|function_modifier|inheritance_modifier|member_modifier|parameter_modifier|platform_modifier|property(_behavior)?_modifier|state_(location|mutability)|storage_class_specifier|usage_modifier|variance_modifier|visibility_modifier
         |
     # Statement patterns
-    (break|continue|debugger|empty|fallthrough|pass|seh_leave)(_statement)?
+    break|continue|debugger|empty|fallthrough|pass|seh_leave)(_statement)?
         |
     # Method/function clauses
     (default|delete|pure_virtual)(_method)?_clause|gnu_asm_qualifier
@@ -526,7 +527,7 @@ IS_KEYWORD = re.compile(
         |
     float|fn|func|function
         |
-    for(ever|each|member|modifier)?
+    for(ever|each|modifier)?
         |
     from
         |
@@ -541,7 +542,7 @@ IS_KEYWORD = re.compile(
         |
     instance(of)?|instead|integer|interface|into
         |
-    key|keyOf|keyPath|keyframes?|keyframe_name|keyword
+    key|keyof|keyPath|keyframes?|keyframe_name|keyword
         |
     lambda|lambda_default_capture|lambda_specifier
         |
@@ -635,65 +636,670 @@ class CompositeCheck(NamedTuple):
 
 TypeScriptLangs = frozenset({SemanticSearchLanguage.TYPESCRIPT, SemanticSearchLanguage.TSX})
 JavaScriptLangs = frozenset({SemanticSearchLanguage.JAVASCRIPT, SemanticSearchLanguage.JSX})
-JavaScriptFamily = TypeScriptLangs.union(JavaScriptLangs)
+JavaScriptFamily = TypeScriptLangs | JavaScriptLangs
 
-COMPOSITE_CHECKS: frozenset[CompositeCheck] = frozenset({
-    CompositeCheck(
-        name_pattern=re.compile(r"^annotation$"),
-        classification=SemanticClass.SYNTAX_ANNOTATION,
-        languages=frozenset({SemanticSearchLanguage.JAVA, SemanticSearchLanguage.SCALA}),
+# ========== OPTIMIZED COMPOSITE CHECK PATTERNS ==========
+# Grouped by language and classification for ~10-15x faster classification
+# Original: 145 individual checks | Optimized: 26 language groups + 10 generic patterns + 2 predicates
+
+# Language-specific pattern groups
+# Structure: {Language: tuple[(SemanticClass, compiled_pattern), ...]}
+LANG_SPECIFIC_PATTERNS: dict[
+    SemanticSearchLanguage, tuple[tuple[SemanticClass, re.Pattern[str]], ...]
+] = {
+    SemanticSearchLanguage.BASH: (
+        (
+            SemanticClass.SYNTAX_KEYWORD,
+            re.compile(r"^(?:(?:(command_name|do_group|case_item|herestring_redirect)))$"),
+        ),
+        (SemanticClass.SYNTAX_PUNCTUATION, re.compile(r"^(?:(?:(file_redirect|subscript)))$")),
     ),
-    CompositeCheck(
-        name_pattern=re.compile(r"^assignment_pattern$"),
-        classification=SemanticClass.SYNTAX_IDENTIFIER,
-        languages=JavaScriptFamily,
+    SemanticSearchLanguage.C_LANG: (
+        (
+            SemanticClass.BOUNDARY_MODULE,
+            re.compile(
+                r"^(?:(?:(imports?(_(directive|list|name|specifier))?|linkage_specification)))$"
+            ),
+        ),
+        (
+            SemanticClass.DEFINITION_DATA,
+            re.compile(
+                r"^(?:(?:(init_declarator|initializer_pair|subscript_range_designator|preproc_params))|(?:.+_designator))$"
+            ),
+        ),
+        (SemanticClass.DEFINITION_TYPE, re.compile(r"^(?:(?:(enumerator|bitfield_clause)))$")),
+        (
+            SemanticClass.FLOW_BRANCHING,
+            # spellchecker:off
+            re.compile(r"^(?:(?:(switch(_case|_default)|seh_(except|finally)_clause)))$"),
+            # spellchecker:on
+        ),
+        (SemanticClass.BOUNDARY_ERROR, re.compile(r"^(?:(?:she_except_clause))$")),
+        (SemanticClass.BOUNDARY_RESOURCE, re.compile(r"^(?:(?:she_finally_clause))$")),
+        (SemanticClass.OPERATION_OPERATOR, re.compile(r"^(?:(?:comma_expression))$")),
+        (
+            SemanticClass.SYNTAX_ANNOTATION,
+            re.compile(
+                r"^(?:(?:gnu_asm_(clobber_list|goto_list|input_operand(_list)?|output_operand(_list)?))|(?:(preproc_(call|def|function_def|include|else))))$"
+            ),
+        ),
     ),
-    CompositeCheck(
-        name_pattern=re.compile(r"^call_signature$"),
-        classification=SemanticClass.OPERATION_INVOCATION,
-        languages=TypeScriptLangs,
+    SemanticSearchLanguage.C_PLUS_PLUS: (
+        (
+            SemanticClass.BOUNDARY_MODULE,
+            re.compile(
+                r"^(?:(?:(imports?(_(directive|list|name|specifier))?|linkage_specification)))$"
+            ),
+        ),
+        (
+            SemanticClass.DEFINITION_DATA,
+            re.compile(
+                r"^(?:(?:(lambda_capture_initializer|preproc_params))|(?:(init_declarator|initializer_pair|subscript_range_designator))|(?:.+_designator))$"
+            ),
+        ),
+        (
+            SemanticClass.DEFINITION_TYPE,
+            re.compile(
+                r"^(?:(?:(alias_declaration|concept_definition|new_declarator|pointer_type_declarator|namespace_alias_definition|lambda_declarator|friend_declaration|simple_requirement|init_statement|module_(name|partition)|trailing_return_type|explicit_object_parameter_declaration|base_class_clause|bitfield_clause|dependent_name|compound_requirement|requirement_seq|variadic_declarator))|(?:optional_type_parameter_declaration)|(?:enumerator))$"
+            ),
+        ),
+        (
+            SemanticClass.FLOW_BRANCHING,
+            # spellchecker:off
+            re.compile(
+                r"^(?:(?:(switch(_case|_default)|seh_(except|finally)_clause))|(?:catch_(clause|declaration))|(?:condition_clause))$"
+                # spellchecker:on
+            ),
+        ),
+        (SemanticClass.BOUNDARY_ERROR, re.compile(r"^(?:(?:she_except_clause))$")),
+        (SemanticClass.BOUNDARY_RESOURCE, re.compile(r"^(?:(?:she_finally_clause))$")),
+        (SemanticClass.OPERATION_OPERATOR, re.compile(r"^(?:(?:comma_expression))$")),
+        (
+            SemanticClass.SYNTAX_ANNOTATION,
+            re.compile(
+                r"^(?:(?:gnu_asm_(clobber_list|goto_list|input_operand(_list)?|output_operand(_list)?))|(?:(consteval_block|static_assert)_declaration)|(?:preproc_(call|def|function_def|include)))$"
+            ),
+        ),
     ),
-    CompositeCheck(
-        name_pattern=re.compile(r"^catch_(clause|declaration)$"),
-        classification=SemanticClass.FLOW_BRANCHING,
-        languages=JavaScriptFamily
-        | frozenset({SemanticSearchLanguage.C_PLUS_PLUS, SemanticSearchLanguage.C_SHARP}),
+    SemanticSearchLanguage.C_SHARP: (
+        (SemanticClass.BOUNDARY_MODULE, re.compile(r"^(?:(?:file_scoped_namespace_declaration))$")),
+        (SemanticClass.DEFINITION_TYPE, re.compile(r"^(?:(?:type_parameter_constraints_clause))$")),
+        (SemanticClass.FLOW_BRANCHING, re.compile(r"^(?:(?:catch_(clause|declaration)))$")),
+        (SemanticClass.OPERATION_OPERATOR, re.compile(r"^(?:(?:(unary|declaration)_expression))$")),
+        (
+            SemanticClass.SYNTAX_ANNOTATION,
+            re.compile(r"^(?:(?:preproc_(region|endregion|define|else)))$"),
+        ),
+        (
+            SemanticClass.SYNTAX_IDENTIFIER,
+            re.compile(r"^(?:(?:member_binding_expression|tuple_element))$"),
+        ),
+        (
+            SemanticClass.SYNTAX_KEYWORD,
+            re.compile(
+                r"^(?:(?:primary_constructor_base_type|parenthesized_variable_designation|arrow_expression_clause|subpattern|positional_pattern_clause|property_pattern_clause|interpolation_alignment_clause|argument|global_attribute|join_into_clause))$"
+            ),
+        ),
     ),
-    CompositeCheck(
-        name_pattern=re.compile(r"^class_(body|declarations?)$"),
-        classification=SemanticClass.DEFINITION_TYPE,
-        languages=JavaScriptLangs | frozenset({SemanticSearchLanguage.HASKELL}),
+    SemanticSearchLanguage.CSS: (
+        (SemanticClass.SYNTAX_IDENTIFIER, re.compile(r"^(?:(?:.+_selector))$")),
+        (
+            SemanticClass.SYNTAX_KEYWORD,
+            re.compile(r"^(?:(?:at_rule|class_name|rule_set|selectors))$"),
+        ),
+        (SemanticClass.SYNTAX_LITERAL, re.compile(r"^(?:(?:.+_(query|statement|value)))$")),
     ),
-    CompositeCheck(
-        name_pattern=re.compile(r"^class_static_block$"),
-        classification=SemanticClass.DEFINITION_DATA,
-        languages=JavaScriptFamily,
+    SemanticSearchLanguage.ELIXIR: (
+        (SemanticClass.OPERATION_OPERATOR, re.compile(r"^(?:(?:(access_call|unary_operator)))$")),
+        (SemanticClass.SYNTAX_IDENTIFIER, re.compile(r"^(?:(?:pair(_pattern)?))$")),
+        (
+            SemanticClass.SYNTAX_LITERAL,
+            re.compile(
+                r"^(?:(?:(bitstring|body|charlist|keywords|map_content|sigil|source|quoted_(atom|keyword))))$"
+            ),
+        ),
     ),
-    CompositeCheck(
-        name_pattern=re.compile(r"^(construct_signature|data_constructors?)$"),
-        classification=SemanticClass.OPERATION_INVOCATION,
-        languages=TypeScriptLangs | frozenset({SemanticSearchLanguage.HASKELL}),
+    SemanticSearchLanguage.GO: (
+        (
+            SemanticClass.BOUNDARY_MODULE,
+            re.compile(
+                r"^(?:(?:(imports?(_(directive|list|name|specifier))?|linkage_specification)))$"
+            ),
+        ),
+        (
+            SemanticClass.DEFINITION_TYPE,
+            re.compile(r"^(?:(?:(implicit_length_array_type|method_elem|keyed_element)))$"),
+        ),
+        (
+            SemanticClass.FLOW_BRANCHING,
+            re.compile(r"^(?:(?:communication_case|default_case|literal_(element|value))))$"),
+        ),
+        (
+            SemanticClass.FLOW_ITERATION,
+            re.compile(
+                r"^(?:(?:for(_clause|_in_clause|_numeric_clause)?)|(?:(range_clause|receive_statement)))$"
+            ),
+        ),
     ),
-    CompositeCheck(
-        name_pattern=re.compile(r"^do_(block|module)$"),
-        classification=SemanticClass.FLOW_ITERATION,
-        languages=frozenset({SemanticSearchLanguage.HASKELL, SemanticSearchLanguage.RUBY}),
+    SemanticSearchLanguage.HASKELL: (
+        (
+            SemanticClass.BOUNDARY_MODULE,
+            re.compile(
+                r"^(?:(?:(imports?(_(directive|list|name|specifier))?|linkage_specification)))$"
+            ),
+        ),
+        (
+            SemanticClass.DEFINITION_DATA,
+            re.compile(
+                r"^(?:(?:(lazy|strict)_field)|(?:(binding|binding_set|binding_list|local_binds))|(?:(equations|children|fields|header|match|prefix|qualifiers|quoted_decls)))$"
+            ),
+        ),
+        (
+            SemanticClass.DEFINITION_TYPE,
+            re.compile(
+                r"^(?:(?:(fundep|fundeps|kind_application|field_path))|(?:(full_)?enum(erators?|_case|_assignment|_entry))|(?:instance_declarations)|(?:class_(body|declarations?))|(?:(associated_type|constructor_synonym|explicit_type|gadt_constructor(s)?|newtype_constructor)))$"
+            ),
+        ),
+        (
+            SemanticClass.FLOW_BRANCHING,
+            re.compile(
+                r"^(?:(?:match(_conditional_expression|_default_expression))|(?:(alternative|alternatives)))$"
+            ),
+        ),
+        (SemanticClass.FLOW_ITERATION, re.compile(r"^(?:(?:do_(block|module)))$")),
+        (
+            SemanticClass.OPERATION_INVOCATION,
+            re.compile(r"^(?:(?:(construct_signature|data_constructors?)))$"),
+        ),
+        (
+            SemanticClass.SYNTAX_KEYWORD,
+            re.compile(
+                r"^(?:(?:(annotated|constructor_synonyms|equation|quoter|field_(name|update)|function_head_parens|haskell|inferred|infix_id|special|quantified_variables|type_(params?|patterns?)|guards?)))$"
+            ),
+        ),
     ),
-    CompositeCheck(
-        name_pattern=re.compile(r"^else_(clause|statement)$"),
-        classification=SemanticClass.FLOW_BRANCHING,
-        languages=frozenset({
-            SemanticSearchLanguage.PHP,
-            SemanticSearchLanguage.PYTHON,
-            SemanticSearchLanguage.LUA,
-        }),
+    SemanticSearchLanguage.HTML: (
+        (
+            SemanticClass.SYNTAX_ANNOTATION,
+            re.compile(r"^(?:(?:(attribute|quoted_attribute_value)))$"),
+        ),
+        (
+            SemanticClass.SYNTAX_PUNCTUATION,
+            re.compile(
+                r"^(?:(?:(element|script_element|style_element))|(?:erroneous_end_tag)|(?:(start|end|self_closing)_tag))$"
+            ),
+        ),
     ),
-    CompositeCheck(
-        name_pattern=re.compile(r"^(full_)?enum(erator|_case|_assignment)$"),
-        classification=SemanticClass.DEFINITION_TYPE,
-        languages=JavaScriptFamily
-        | frozenset({SemanticSearchLanguage.HASKELL, SemanticSearchLanguage.SCALA}),
+    SemanticSearchLanguage.TYPESCRIPT: (
+        (
+            SemanticClass.BOUNDARY_MODULE,
+            re.compile(
+                r"^(?:(?:(imports?(_(directive|list|name|specifier))?|linkage_specification)))$"
+            ),
+        ),
+        (SemanticClass.DEFINITION_DATA, re.compile(r"^(?:(?:class_static_block))$")),
+        (
+            SemanticClass.DEFINITION_TYPE,
+            re.compile(
+                r"^(?:(?:(full_)?enum(erators?|_case|_assignment|_entry))|(?:class_(body|declarations?)))$"
+            ),
+        ),
+        (
+            SemanticClass.FLOW_BRANCHING,
+            re.compile(
+                # spellchecker:off
+                r"^(?:(?:finally_clause)|(?:(switch(_case|_default)|seh_(except|finally)_clause))|(?:catch_(clause|declaration)))$"
+                # spellchecker:on
+            ),
+        ),
+        (
+            SemanticClass.SYNTAX_IDENTIFIER,
+            re.compile(
+                r"^(?:(?:assignment_pattern)|(?:(variable(_declarator|_declaration|_list))|value_binding_pattern)|(?:(nested_identifier|field_definition|object_assignment_pattern))|(?:(jsx_(attribute|expression|namespace_name)|namespace_(import|export)|named_imports|import_require_clause|constraint|default_type|rest_type|class_heritage|computed_property_name|sequence_expression))|(?:pair(_pattern)?))$"
+            ),
+        ),
+        (SemanticClass.SYNTAX_LITERAL, re.compile(r"^(?:(?:jsx_(closing|opening)_element))$")),
     ),
+    SemanticSearchLanguage.JSX: (
+        (
+            SemanticClass.BOUNDARY_MODULE,
+            re.compile(
+                r"^(?:(?:(imports?(_(directive|list|name|specifier))?|linkage_specification)))$"
+            ),
+        ),
+        (SemanticClass.DEFINITION_DATA, re.compile(r"^(?:(?:class_static_block))$")),
+        (
+            SemanticClass.DEFINITION_TYPE,
+            re.compile(
+                r"^(?:(?:(full_)?enum(erators?|_case|_assignment|_entry))|(?:class_(body|declarations?)))$"
+            ),
+        ),
+        (
+            SemanticClass.FLOW_BRANCHING,
+            re.compile(
+                # spellchecker:off
+                r"^(?:(?:finally_clause)|(?:(switch(_case|_default)|seh_(except|finally)_clause))|(?:catch_(clause|declaration)))$"
+                # spellchecker:on
+            ),
+        ),
+        (
+            SemanticClass.SYNTAX_IDENTIFIER,
+            re.compile(
+                r"^(?:(?:assignment_pattern)|(?:(variable(_declarator|_declaration|_list))|value_binding_pattern)|(?:(nested_identifier|field_definition|object_assignment_pattern))|(?:(jsx_(attribute|expression|namespace_name)|namespace_(import|export)|named_imports|import_require_clause|constraint|default_type|rest_type|class_heritage|computed_property_name|sequence_expression))|(?:pair(_pattern)?))$"
+            ),
+        ),
+        (SemanticClass.SYNTAX_LITERAL, re.compile(r"^(?:(?:jsx_(closing|opening)_element))$")),
+    ),
+    SemanticSearchLanguage.JAVASCRIPT: (
+        (
+            SemanticClass.BOUNDARY_MODULE,
+            re.compile(
+                r"^(?:(?:(imports?(_(directive|list|name|specifier))?|linkage_specification)))$"
+            ),
+        ),
+        (SemanticClass.DEFINITION_DATA, re.compile(r"^(?:(?:class_static_block))$")),
+        (
+            SemanticClass.DEFINITION_TYPE,
+            re.compile(
+                r"^(?:(?:(full_)?enum(erators?|_case|_assignment|_entry))|(?:class_(body|declarations?)))$"
+            ),
+        ),
+        (
+            SemanticClass.FLOW_BRANCHING,
+            re.compile(
+                # spellchecker:off
+                r"^(?:(?:finally_clause)|(?:(switch(_case|_default)|seh_(except|finally)_clause))|(?:catch_(clause|declaration)))$"
+                # spellchecker:on
+            ),
+        ),
+        (
+            SemanticClass.SYNTAX_IDENTIFIER,
+            re.compile(
+                r"^(?:(?:assignment_pattern)|(?:(variable(_declarator|_declaration|_list))|value_binding_pattern)|(?:(nested_identifier|field_definition|object_assignment_pattern))|(?:(jsx_(attribute|expression|namespace_name)|namespace_(import|export)|named_imports|import_require_clause|constraint|default_type|rest_type|class_heritage|computed_property_name|sequence_expression))|(?:pair(_pattern)?))$"
+            ),
+        ),
+        (SemanticClass.SYNTAX_LITERAL, re.compile(r"^(?:(?:jsx_(closing|opening)_element))$")),
+    ),
+    SemanticSearchLanguage.JSON: (
+        (SemanticClass.SYNTAX_IDENTIFIER, re.compile(r"^(?:(?:pair))$")),
+    ),
+    SemanticSearchLanguage.JSX: (
+        (
+            SemanticClass.BOUNDARY_MODULE,
+            re.compile(
+                r"^(?:(?:(imports?(_(directive|list|name|specifier))?|linkage_specification)))$"
+            ),
+        ),
+        (SemanticClass.DEFINITION_DATA, re.compile(r"^(?:(?:class_static_block))$")),
+        (
+            SemanticClass.DEFINITION_TYPE,
+            re.compile(
+                r"^(?:(?:(full_)?enum(erators?|_case|_assignment|_entry))|(?:class_(body|declarations?)))$"
+            ),
+        ),
+        (
+            SemanticClass.FLOW_BRANCHING,
+            re.compile(
+                # spellchecker:off
+                r"^(?:(?:finally_clause)|(?:(switch(_case|_default)|seh_(except|finally)_clause))|(?:catch_(clause|declaration)))$"
+                # spellchecker:on
+            ),
+        ),
+        (
+            SemanticClass.SYNTAX_IDENTIFIER,
+            re.compile(
+                r"^(?:(?:assignment_pattern)|(?:(variable(_declarator|_declaration|_list))|value_binding_pattern)|(?:(nested_identifier|field_definition|object_assignment_pattern))|(?:(jsx_(attribute|expression|namespace_name)|namespace_(import|export)|named_imports|import_require_clause|constraint|default_type|rest_type|class_heritage|computed_property_name|sequence_expression))|(?:pair(_pattern)?))$"
+            ),
+        ),
+        (SemanticClass.SYNTAX_LITERAL, re.compile(r"^(?:(?:jsx_(closing|opening)_element))$")),
+    ),
+    SemanticSearchLanguage.KOTLIN: (
+        (
+            SemanticClass.DEFINITION_DATA,
+            re.compile(
+                r"^(?:(?:(primary_constructor|when_(subject|entry)|annotated_lambda|multi_variable_declaration|property_delegate|range_test|getter|function_type_parameters)))$"
+            ),
+        ),
+        (
+            SemanticClass.DEFINITION_TYPE,
+            re.compile(r"^(?:(?:(full_)?enum(erators?|_case|_assignment|_entry)))$"),
+        ),
+        (
+            SemanticClass.EXPRESSION_ANONYMOUS,
+            re.compile(
+                r"^(?:(?:(annotated_lambda|anonymous_class|anonymous_function_use_clause)))$"
+            ),
+        ),
+    ),
+    SemanticSearchLanguage.LUA: (
+        (
+            SemanticClass.FLOW_BRANCHING,
+            re.compile(r"^(?:(?:(if_)?guards?)|(?:else_(clause|statement)))$"),
+        ),
+        (
+            SemanticClass.FLOW_ITERATION,
+            re.compile(
+                r"^(?:(?:for_generic_clause)|(?:for(_clause|_in_clause|_numeric_clause)?))$"
+            ),
+        ),
+        (SemanticClass.OPERATION_INVOCATION, re.compile(r"^(?:(?:method_index_expression))$")),
+        (
+            SemanticClass.SYNTAX_IDENTIFIER,
+            re.compile(r"^(?:(?:variable(_declarator|_declaration|_list))|value_binding_pattern)$"),
+        ),
+    ),
+    SemanticSearchLanguage.NIX: (
+        (
+            SemanticClass.DEFINITION_DATA,
+            re.compile(r"^(?:(?:(binding|binding_set|binding_list|local_binds)))$"),
+        ),
+        (
+            SemanticClass.SYNTAX_IDENTIFIER,
+            re.compile(
+                r"^(?:(?:(attrpath|formal|formals|inherit_from|inherited_attrs|interpolation|source_code)))$"
+            ),
+        ),
+    ),
+    SemanticSearchLanguage.PHP: (
+        (
+            SemanticClass.DEFINITION_DATA,
+            re.compile(r"^(?:(?:property_element|static_variable_declaration))$"),
+        ),
+        (SemanticClass.DEFINITION_TYPE, re.compile(r"^(?:(?:(simple_)?enum_case))$")),
+        (
+            SemanticClass.EXPRESSION_ANONYMOUS,
+            re.compile(
+                r"^(?:(?:(annotated_lambda|anonymous_class|anonymous_function_use_clause)))$"
+            ),
+        ),
+        (
+            SemanticClass.FLOW_BRANCHING,
+            re.compile(
+                r"^(?:(?:(finally_clause|default_statement))|(?:match(_conditional_expression|_default_expression))|(?:else_(clause|statement)))$"
+            ),
+        ),
+        (SemanticClass.SYNTAX_ANNOTATION, re.compile(r"^(?:(?:attribute_group))$")),
+        (
+            SemanticClass.SYNTAX_IDENTIFIER,
+            re.compile(r"^(?:(?:variable(_declarator|_declaration|_list))|value_binding_pattern)$"),
+        ),
+        (
+            SemanticClass.SYNTAX_KEYWORD,
+            re.compile(
+                r"^(?:(?:(anonymous_class|use_instead_of_clause|property_(hook|promotion_parameter)|class_interface_clause|const_element|by_ref|declare_directive|list_literal)))$"
+            ),
+        ),
+    ),
+    SemanticSearchLanguage.PYTHON: (
+        (SemanticClass.BOUNDARY_RESOURCE, re.compile(r"^(?:(?:with_item))$")),
+        (
+            SemanticClass.FLOW_BRANCHING,
+            re.compile(r"^(?:(?:(if|unless)_guard|(block|in_clause|rescue|case_clause)))$"),
+        ),
+        (SemanticClass.FLOW_ITERATION, re.compile(r"^(?:(?:(do_(block|module)|for_in_clause)))$")),
+        (SemanticClass.OPERATION_OPERATOR, re.compile(r"^(?:(?:dictionary_splat))$")),
+        (
+            SemanticClass.SYNTAX_IDENTIFIER,
+            re.compile(
+                r"^(?:(?:(exception_variable|exceptions|destructured_(left_assignment|parameter)|rest_assignment|method_parameters|block_parameters|body_statement|bare_(string|symbol)|dotted_name))|(?:pair(_pattern)?))$"
+            ),
+        ),
+        (
+            SemanticClass.SYNTAX_KEYWORD,
+            re.compile(
+                r"^(?:(?:constrained_type|member_type|parenthesized_list_splat|chevron|if_clause|slice|relative_import|except_clause))$"
+            ),
+        ),
+        (SemanticClass.SYNTAX_LITERAL, re.compile(r"^(?:(?:format_expression))$")),
+    ),
+    SemanticSearchLanguage.RUBY: (
+        (
+            SemanticClass.FLOW_BRANCHING,
+            re.compile(r"^(?:(?:(if|unless)_guard)|(?:(block|in_clause|rescue)))$"),
+        ),
+        (SemanticClass.FLOW_ITERATION, re.compile(r"^(?:(?:do_(block|module)))$")),
+        (
+            SemanticClass.SYNTAX_IDENTIFIER,
+            re.compile(
+                r"^(?:(?:(exception_variable|exceptions|destructured_(left_assignment|parameter)|rest_assignment|method_parameters|block_parameters|body_statement|bare_(string|symbol)))|(?:pair(_pattern)?))$"
+            ),
+        ),
+    ),
+    SemanticSearchLanguage.RUST: (
+        (
+            SemanticClass.BOUNDARY_MODULE,
+            re.compile(r"^(?:(?:(macro_rule|scoped_use_list|use_as_clause)))$"),
+        ),
+        (
+            SemanticClass.DEFINITION_TYPE,
+            re.compile(
+                r"^(?:(?:lifetime_parameter)|(?:(use_(wildcard|bounds)|trait_bounds|self_parameter|token_(tree|repetition)|for_lifetimes|match_arm|let_chain))|(?:(higher_ranked_trait_bound|generic_type_with_turbofish|where_predicate)))$"
+            ),
+        ),
+        (SemanticClass.FLOW_BRANCHING, re.compile(r"^(?:(?:let_condition))$")),
+    ),
+    SemanticSearchLanguage.SCALA: (
+        (
+            SemanticClass.DEFINITION_TYPE,
+            re.compile(
+                r"^(?:(?:(lazy|repeated)_parameter_type)|(?:(contravariant|covariant)_type_parameter)|(?:(simple_)?enum_case)|(?:(full_)?enum(erators?|_case|_assignment|_entry))|(?:(compound_type|applied_constructor_type|named_tuple_type|structural_type|match_type|singleton_type|type_case_clause|self_type|stable_type_identifier|identifiers|bindings|refinement|namespace_selectors|given_conditional|annotated_lambda|indented_cases|literal_type|parameter_types|access_(modifier|qualifier)))|(?:(name_and_type|view_bound))|(?:(context|lower|upper)_bound))$"
+            ),
+        ),
+        (SemanticClass.SYNTAX_ANNOTATION, re.compile(r"^(?:(?:annotation))$")),
+        (SemanticClass.SYNTAX_IDENTIFIER, re.compile(r"^(?:(?:arrow|as)_renamed_identifier)$")),
+    ),
+    SemanticSearchLanguage.SOLIDITY: (
+        (
+            SemanticClass.BOUNDARY_MODULE,
+            re.compile(
+                r"^(?:(?:(imports?(_(directive|list|name|specifier))?|linkage_specification)))$"
+            ),
+        ),
+        (
+            SemanticClass.DEFINITION_DATA,
+            re.compile(
+                r"^(?:(?:(call_struct_argument|parameter))|(?:(struct_field_assignment|struct_member)))$"
+            ),
+        ),
+        (
+            SemanticClass.DEFINITION_TYPE,
+            re.compile(r"^(?:(?:(full_)?enum(erators?|_case|_assignment|_entry)))$"),
+        ),
+        (
+            SemanticClass.OPERATION_OPERATOR,
+            re.compile(
+                r"^(?:(?:update_expression)|(?:member_expression)|(?:(array|slice)_access)|(?:(unary|declaration)_expression))$"
+            ),
+        ),
+        (
+            SemanticClass.SYNTAX_ANNOTATION,
+            re.compile(
+                r"^(?:(?:solidity_pragma_token)|(?:(pragma_directive|assembly_statement|revert_(statement|arguments)|emit_statement)))$"
+            ),
+        ),
+        (
+            SemanticClass.SYNTAX_IDENTIFIER,
+            re.compile(r"^(?:(?:variable(_declarator|_declaration|_list))|value_binding_pattern)$"),
+        ),
+        (
+            SemanticClass.SYNTAX_KEYWORD,
+            re.compile(
+                r"^(?:(?:(error_declaration|event_definition|constructor_definition|fallback_receive_definition|meta_type_expression|constructor_conversion_expression|inline_array_expression|user_defined_type(_definition)?|using_alias|return_type_definition|assembly_flags|any_pragma_token|type_name|expression|statement|block_statement))|(?:yul_.+))$"
+            ),
+        ),
+    ),
+    SemanticSearchLanguage.SWIFT: (
+        (
+            SemanticClass.DEFINITION_TYPE,
+            re.compile(
+                r"^(?:(?:protocol_(body|function_declaration|property_declaration|property_requirements)))$"
+            ),
+        ),
+        (
+            SemanticClass.OPERATION_OPERATOR,
+            re.compile(
+                r"^(?:(?:bitwise_operation)|(?:(additive|multiplicative|bitwise_operation|comparison|equality|conjunction|disjunction)_expression)|(?:(unary|declaration)_expression))$"
+            ),
+        ),
+        (
+            SemanticClass.SYNTAX_ANNOTATION,
+            re.compile(r"^(?:(?:navigation_suffix|suppressed_constraint))$"),
+        ),
+        (
+            SemanticClass.SYNTAX_IDENTIFIER,
+            re.compile(r"^(?:(?:variable(_declarator|_declaration|_list))|value_binding_pattern)$"),
+        ),
+        (
+            SemanticClass.SYNTAX_KEYWORD,
+            re.compile(
+                r"^(?:(?:computed_(getter|setter|modify|property)|call_suffix|capture_list_item|key_path_(expression|string_expression)|constructor_(expression|suffix)|typealias_declaration|precedence_group_(declaration|attribute|attributes)|playground_literal|raw_str_interpolation|interpolated_expression|deinit_declaration|directly_assignable_expression|guard_statement|repeat_while_statement|availability_condition|directive|control_transfer_statement|statements|associatedtype_declaration|external_macro_definition|macro_declaration|macro_invocation|enum_type_parameters|equality_constraint|subscript_declaration|tuple_type_item|value_(argument_label|pack_expansion|parameter_pack)|type_pack_expansion|type_parameter_pack|opaque_type|protocol_composition_type|metatype))$"
+            ),
+        ),
+        (
+            SemanticClass.SYNTAX_LITERAL,
+            re.compile(
+                r"^(?:(?:array|dictionary)_literal)|(?:(line|multi_line)_string_literal)|(?:(tuple|array_literal|dictionary_literal|nil_coalescing|open_(end|start)_range|range)_expression)$"
+            ),
+        ),
+    ),
+    SemanticSearchLanguage.TSX: (
+        (
+            SemanticClass.BOUNDARY_MODULE,
+            re.compile(
+                r"^(?:(?:(imports?(_(directive|list|name|specifier))?|linkage_specification)))$"
+            ),
+        ),
+        (SemanticClass.DEFINITION_DATA, re.compile(r"^(?:(?:class_static_block))$")),
+        (
+            SemanticClass.DEFINITION_TYPE,
+            re.compile(
+                r"^(?:(?:mapped_type_clause)|(?:(full_)?enum(erators?|_case|_assignment|_entry)))$"
+            ),
+        ),
+        (
+            SemanticClass.FLOW_BRANCHING,
+            re.compile(
+                # spellchecker:off
+                r"^(?:(?:finally_clause)|(?:(switch(_case|_default)|seh_(except|finally)_clause))|(?:catch_(clause|declaration)))$"
+                # spellchecker:on
+            ),
+        ),
+        (
+            SemanticClass.OPERATION_INVOCATION,
+            re.compile(r"^(?:(?:call_signature)|(?:(construct_signature|data_constructors?)))$"),
+        ),
+        (
+            SemanticClass.SYNTAX_IDENTIFIER,
+            re.compile(
+                r"^(?:(?:assignment_pattern)|(?:(variable(_declarator|_declaration|_list))|value_binding_pattern)|(?:(nested_identifier|field_definition|object_assignment_pattern))|(?:(jsx_(attribute|expression|namespace_name)|namespace_(import|export)|named_imports|import_require_clause|constraint|default_type|rest_type|class_heritage|computed_property_name|sequence_expression))|(?:pair(_pattern)?))$"
+            ),
+        ),
+        (SemanticClass.SYNTAX_LITERAL, re.compile(r"^(?:(?:jsx_(closing|opening)_element))$")),
+    ),
+    SemanticSearchLanguage.TYPESCRIPT: (
+        (
+            SemanticClass.BOUNDARY_MODULE,
+            re.compile(
+                r"^(?:(?:(imports?(_(directive|list|name|specifier))?|linkage_specification)))$"
+            ),
+        ),
+        (SemanticClass.DEFINITION_DATA, re.compile(r"^(?:(?:class_static_block))$")),
+        (
+            SemanticClass.DEFINITION_TYPE,
+            re.compile(
+                r"^(?:(?:mapped_type_clause)|(?:(full_)?enum(erators?|_case|_assignment|_entry)))$"
+            ),
+        ),
+        (
+            SemanticClass.FLOW_BRANCHING,
+            re.compile(
+                # spellchecker:off
+                r"^(?:(?:finally_clause)|(?:(switch(_case|_default)|seh_(except|finally)_clause))|(?:catch_(clause|declaration)))$"
+                # spellchecker:on
+            ),
+        ),
+        (
+            SemanticClass.OPERATION_INVOCATION,
+            re.compile(r"^(?:(?:call_signature)|(?:(construct_signature|data_constructors?)))$"),
+        ),
+        (
+            SemanticClass.SYNTAX_IDENTIFIER,
+            re.compile(
+                r"^(?:(?:assignment_pattern)|(?:(variable(_declarator|_declaration|_list))|value_binding_pattern)|(?:(nested_identifier|field_definition|object_assignment_pattern))|(?:(jsx_(attribute|expression|namespace_name)|namespace_(import|export)|named_imports|import_require_clause|constraint|default_type|rest_type|class_heritage|computed_property_name|sequence_expression))|(?:pair(_pattern)?))$"
+            ),
+        ),
+        (SemanticClass.SYNTAX_LITERAL, re.compile(r"^(?:(?:jsx_(closing|opening)_element))$")),
+    ),
+    SemanticSearchLanguage.YAML: ((SemanticClass.SYNTAX_LITERAL, re.compile(r"^(?:(?:scalar))$")),),
+}
+
+# Generic cross-language patterns
+# Structure: tuple[(SemanticClass, compiled_pattern), ...]
+GENERIC_PATTERNS: tuple[tuple[SemanticClass, re.Pattern[str]], ...] = (
+    (
+        SemanticClass.BOUNDARY_MODULE,
+        re.compile(
+            r"^(?:(?:(aliased_import|extern_alias_directive|import_spec))|(?:(import|export|namespace)_(clause|attribute|spec_list|use_clause|use_group)))$"
+        ),
+    ),
+    (
+        SemanticClass.DEFINITION_CALLABLE,
+        re.compile(r"^(?:(?:(method|property|function|abstract_method|index)_signature))$"),
+    ),
+    (
+        SemanticClass.DEFINITION_DATA,
+        re.compile(
+            r"^(?:(?:(formal|lambda|class|function_value|bracketed)_parameters?)|(?:(block|error|event|return|call_struct_argument|function_pointer|hash_splat|keyword|optional|simple|splat|variadic|yul_variable_declaration)_parameter)|(?:.+_declaration)|(?:.+_initializer(_list)?))$"
+        ),
+    ),
+    (
+        SemanticClass.DEFINITION_TYPE,
+        re.compile(
+            r"^(?:(?:type_(argument|parameter|constraint|projection|bound|test|case|requirement|elem)s?(_list)?)|(?:(adding|omitting|opting|asserts|type_predicate)_type_annotation)|(?:(extends_type_clause|derives_clause|inheritance_specifier))|(?:(array|dictionary|optional|function|generic|projected|qualified)_type)|(?:template_(argument_list|parameter_list|declaration|body|substitution|template_parameter_declaration))|(?:type_(alias|annotation|application|binder|binding|lambda|parameter(_declaration)?|predicate|spec|family_(result|injectivity)))|(?:(extends|implements|base|super|delegation)_(clause|list|interfaces|class|specifiers?))|(?:.+_constraint))$"
+        ),
+    ),
+    (
+        SemanticClass.FLOW_BRANCHING,
+        re.compile(
+            r"^(?:(?:(switch|case)_(body|block|entry|section|label|rule|expression_arm|pattern|block_statement_group))|(?:(keyword|token_binding|view)_pattern)|(?:(catch|finally|rescue|after|else)_(block|clause|formal_parameter))|(?:(with|from|where|let|join|order_by|group|select|when|catch_filter)_clause)|(?:.+_pattern))$"
+        ),
+    ),
+    (
+        SemanticClass.OPERATION_OPERATOR,
+        re.compile(
+            r"^(?:(?:(spread|splat|hash_splat|dictionary_splat|variadic)_(element|argument|parameter|unpacking|pattern|type))|(?:(prefix|postfix|navigation|check)_expression))$"
+        ),
+    ),
+    (
+        SemanticClass.OPERATION_INVOCATION,
+        re.compile(
+            r"^(?:(?:(getter|setter|modify|didset|willset)_(specifier|clause))|(?:.+_invocation))$"
+        ),
+    ),
+    (
+        SemanticClass.SYNTAX_ANNOTATION,
+        re.compile(
+            r"^(?:(?:decorator)|(?:preproc_(elif|ifdef|elifdef|defined|error|line|pragma|undef|warning))|(?:.+_(modifier|modifiers|specifier|qualifier)))$"
+        ),
+    ),
+    (
+        SemanticClass.SYNTAX_LITERAL,
+        re.compile(
+            r"^(?:(?:(heredoc|nowdoc)_(body|redirect))|(?:(bare|quoted)_(string|symbol|atom|keyword|expression|pattern|type)))$"
+        ),
+    ),
+    (
+        SemanticClass.SYNTAX_PUNCTUATION,
+        re.compile(
+            r"^(?:(?:(field|ordered_field)_declaration_list)|(?:(expression|statement)_(list|case))|(?:(arguments?|parameters))|(?:(program|source_file|compilation_unit|translation_unit|document|stylesheet|chunk))|(?:.+_(list|arguments?))|(?:.+_(body|block|block_list)))$"
+        ),
+    ),
+)
+
+# Predicate-based special cases (preserved from original COMPOSITE_CHECKS)
+# These require runtime predicates and cannot be converted to pure regex patterns
+PREDICATE_CHECKS: tuple[CompositeCheck, ...] = (
+    # Export pattern - Token vs CompositeThing classification
     CompositeCheck(
         name_pattern=re.compile(r"^(module_)?export(_specifier)?$"),
         classification=SemanticClass.BOUNDARY_MODULE,
@@ -702,95 +1308,68 @@ COMPOSITE_CHECKS: frozenset[CompositeCheck] = frozenset({
         if isinstance(thing, Token)
         else SemanticClass.BOUNDARY_MODULE,
     ),
+    # Constructor pattern - Conditional classification based on name content
     CompositeCheck(
-        name_pattern=re.compile(r"^finally_clause$"),
-        classification=SemanticClass.FLOW_BRANCHING,
-        languages=JavaScriptFamily | frozenset({SemanticSearchLanguage.PHP}),
-    ),
-    CompositeCheck(
-        name_pattern=re.compile(r"^for(_clause|_in_clause|_numeric_clause)?$"),
-        classification=SemanticClass.FLOW_ITERATION,
+        name_pattern=re.compile(
+            r"^(constructor_(definition|delegation_call|expression|invocation|suffix|synonyms))$"
+        ),
+        classification=SemanticClass.DEFINITION_DATA,
         languages=frozenset({
-            SemanticSearchLanguage.PYTHON,
-            SemanticSearchLanguage.GO,
-            SemanticSearchLanguage.LUA,
-        }),
-    ),
-    CompositeCheck(
-        name_pattern=re.compile(r"^(if_)?guards?$"),
-        classification=SemanticClass.FLOW_BRANCHING,
-        languages=JavaScriptFamily
-        | frozenset({SemanticSearchLanguage.HASKELL, SemanticSearchLanguage.SCALA}),
-    ),
-    CompositeCheck(
-        name_pattern=re.compile(
-            r"^(imports?(_(directive|list|name|specifier))?|linkage_specification)$"
-        ),
-        classification=SemanticClass.BOUNDARY_MODULE,
-        languages=JavaScriptFamily
-        | frozenset({
-            SemanticSearchLanguage.HASKELL,
             SemanticSearchLanguage.SOLIDITY,
-            SemanticSearchLanguage.GO,
-            SemanticSearchLanguage.C_PLUS_PLUS,
-            SemanticSearchLanguage.C_LANG,
-        }),
-    ),
-    CompositeCheck(
-        name_pattern=re.compile(r"^jsx_(closing|opening)_element$"),
-        classification=SemanticClass.SYNTAX_LITERAL,
-        languages=JavaScriptFamily,
-    ),
-    CompositeCheck(
-        name_pattern=re.compile(r"^lifetime_parameter$"),
-        classification=SemanticClass.DEFINITION_TYPE,
-        languages=frozenset({SemanticSearchLanguage.RUST}),
-    ),
-    CompositeCheck(
-        name_pattern=re.compile(r"^match(_conditional_expression|_default_expression)$"),
-        classification=SemanticClass.FLOW_BRANCHING,
-        languages=frozenset({SemanticSearchLanguage.HASKELL, SemanticSearchLanguage.PHP}),
-    ),
-    CompositeCheck(
-        name_pattern=re.compile(r"^pair(_pattern)?$"),
-        classification=SemanticClass.SYNTAX_IDENTIFIER,
-        languages=JavaScriptFamily
-        | frozenset({
-            SemanticSearchLanguage.ELIXIR,
-            SemanticSearchLanguage.PYTHON,
-            SemanticSearchLanguage.RUBY,
-        }),
-    ),
-    # TODO: preproc variants
-    CompositeCheck(
-        name_pattern=re.compile(r"^(switch(_case|_default)|she_(except|finally)_clause))$"),
-        classification=SemanticClass.FLOW_BRANCHING,
-        languages=JavaScriptFamily
-        | frozenset({SemanticSearchLanguage.C_LANG, SemanticSearchLanguage.C_PLUS_PLUS}),
-    ),
-    CompositeCheck(
-        name_pattern=re.compile(
-            r"^(variable(_declarator|_declaration|_list))|value_binding_pattern$"
-        ),
-        classification=SemanticClass.SYNTAX_IDENTIFIER,
-        languages=JavaScriptFamily
-        | frozenset({
+            SemanticSearchLanguage.KOTLIN,
             SemanticSearchLanguage.SWIFT,
-            SemanticSearchLanguage.SOLIDITY,
-            SemanticSearchLanguage.JAVA,
-            SemanticSearchLanguage.LUA,
+            SemanticSearchLanguage.HASKELL,
         }),
+        predicate=lambda thing: SemanticClass.OPERATION_DATA
+        if "suffix" in thing.name or "synonyms" in thing.name
+        else SemanticClass.OPERATION_INVOCATION
+        if "invocation" in thing.name or "delegation_call" in thing.name
+        else SemanticClass.DEFINITION_DATA,  # type: ignore
     ),
-})
+)
+
+
+def get_checks(thing_name: str, language: SemanticSearchLanguage) -> Iterator[SemanticClass]:
+    """Get all classifications for a thing name using optimized tiered lookup.
+
+    Tiered lookup strategy (language is always known):
+    1. Language-specific patterns (fastest, most specific)
+    2. Generic cross-language patterns (broader coverage)
+    3. Predicate-based checks (slowest, for special cases)
+
+    Args:
+        thing_name: The name of the thing to classify
+        language: The programming language (always known per user confirmation)
+
+    Yields:
+        Matching SemanticClass values
+    """
+    # Tier 1: Language-specific patterns (if available for this language)
+    if lang_patterns := LANG_SPECIFIC_PATTERNS.get(language):
+        for classification, pattern in lang_patterns:
+            if pattern.match(thing_name):
+                yield classification
+
+    # Tier 2: Generic cross-language patterns
+    for classification, pattern in GENERIC_PATTERNS:
+        if pattern.match(thing_name):
+            yield classification
+
+    # Tier 3: Predicate-based special cases (note: requires full CompositeThing, not just name)
+    # These will be handled in the classifier where we have access to the full CompositeThing
+
 
 __all__ = (
-    "COMPOSITE_CHECKS",
+    "GENERIC_PATTERNS",
     "IS_ANNOTATION",
     "IS_IDENTIFIER",
     "IS_KEYWORD",
     "IS_LITERAL",
     "IS_OPERATOR",
     "LANGUAGE_SPECIFIC_TOKEN_EXCEPTIONS",
+    "LANG_SPECIFIC_PATTERNS",
     "NAMED_NODE_COUNTS",
     "NOT_SYMBOL",
+    "PREDICATE_CHECKS",
+    "get_checks",
 )

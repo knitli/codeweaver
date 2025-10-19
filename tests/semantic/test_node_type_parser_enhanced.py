@@ -4,8 +4,9 @@
 
 import pytest
 
-from codeweaver.language import SemanticSearchLanguage
 from codeweaver.semantic.grammar_types import AbstractTypeInfo, FieldInfo, NodeSemanticInfo
+
+from codeweaver.language import SemanticSearchLanguage
 from codeweaver.semantic.node_type_parser import NodeTypeParser
 
 
