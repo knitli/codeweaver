@@ -35,7 +35,7 @@ jobs:
             cd codeweaver-mcp
           fi
           chmod -R +x scripts
-
+          sudo apt-get update && sudo apt-get install -y zsh curl git
           # Install mise - the script may show help and exit with code 2, which is expected
           ./scripts/dev-env/install-mise.sh version || true
           year="$(date +%Y)"

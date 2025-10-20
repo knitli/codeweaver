@@ -34,6 +34,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y zsh
       - name: Cache mise tools
         uses: actions/cache@v4
         with:
