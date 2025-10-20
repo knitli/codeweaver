@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import sys as _sys
 
 from collections.abc import (
@@ -44,12 +45,15 @@ from aenum import extend_enum  # pyright: ignore[reportMissingTypeStubs, reportU
 from pydantic import (
     BaseModel,
     ConfigDict,
+    Field,
     GetCoreSchemaHandler,
     GetPydanticSchema,
     PrivateAttr,
     RootModel,
     TypeAdapter,
+    computed_field,
 )
+from pydantic.dataclasses import dataclass
 from pydantic.fields import ComputedFieldInfo, FieldInfo
 from pydantic.main import IncEx
 from pydantic_core import core_schema
@@ -230,6 +234,173 @@ class BasedModel(BaseModel):
     model_config = BASEDMODEL_CONFIG
 
 
+# TODO: For our larger enums with lots of property methods, like `SemanticSearchLanguage`, it probably makes sense to define it as an enum with type `dataclass` members, where most of the properties are defined on the dataclass, and the enum just holds instances of that dataclass. This would make it easier to manage and extend the enum members. See https://docs.python.org/3/howto/enum.html#dataclass-support. This would also make it easier to add new members without having to add the member to the enum methods themselves. Since attributes and properties are accessed the same way, we could do this without it being a breaking change. Classes that would benefit from this treatment:
+# *  - `SemanticSearchLanguage`
+# *  - `ConfigLanguage`
+# *  - `Chunker`
+# *  - `Provider`
+# *  - [X] `AgentTask`
+# *  - `LanguageFamily`
+# *  - Not currently an enum, but the `Capabilities` types could also benefit from this treatment (`EmbeddingModelCapabilities`, `RerankingModelCapabilities`), where the member is the model name and the dataclass holds the capabilities.
+#
+# * Here's the base implementation:
+
+
+@dataclass(config=DATACLASS_CONFIG, order=True, frozen=True)
+class BaseEnumData(DataclassSerializationMixin):
+    """A dataclass to hold enum member data.
+
+    `BaseEnumData` provides a standard structure for enum member data, including name, value, aliases, and description. Subclasses can extend this dataclass to include additional fields as needed.
+    """
+
+    _name: Annotated[
+        str,
+        Field(
+            description="The name of the enum member.",
+            default_factory=lambda x: textcase.upper(str(x)),
+        ),
+    ]
+    _value: Annotated[
+        str | int,
+        Field(
+            description="The value of the enum member.",
+            default_factory=lambda x: str(x).lower().replace(" ", "_").replace("-", "_"),
+        ),
+    ]
+    aliases: Annotated[
+        tuple[str, ...],
+        Field(description="The aliases for the enum member.", default_factory=tuple, repr=False),
+    ]
+    _description: (
+        Annotated[str | None, Field(description="The description of the enum member.")] | None
+    ) = None
+
+    # These are just generic fields, define more in subclasses as needed.
+
+    def __init__(
+        self,
+        name: str,
+        value: str | int,
+        aliases: Sequence[str] | None = None,
+        description: str | None = None,
+    ) -> None:
+        """Initialize the BaseEnumData dataclass."""
+        object.__setattr__(self, "_name", name)
+        object.__setattr__(self, "_value", value)
+        object.__setattr__(self, "aliases", tuple(aliases) if aliases is not None else ())
+        object.__setattr__(self, "_description", description)
+
+
+@unique
+class BaseDataclassEnum(Enum):
+    """A base enum class for enums with dataclass members. Does not come with its 'type' -- you must define that with `BaseEnumData` and subclass your implementation, like: `class MyDataclassEnum(MyCustomBaseEnumDataDataclass, BaseDataclassEnum): ...`."""
+
+    @staticmethod
+    def _multiply_variations(s: str) -> set[str]:
+        """Generate multiple variations of a string."""
+        return {
+            s,
+            textcase.upper(s),
+            textcase.lower(s),
+            textcase.title(s),
+            textcase.pascal(s),
+            textcase.snake(s),
+            textcase.kebab(s),
+            textcase.sentence(s),
+            textcase.middot(s),
+            textcase.camel(s),
+        }
+
+    @classmethod
+    def aliases(cls) -> MappingProxyType[str, Enum]:
+        """Return a mapping of aliases to enum members."""
+        values = {
+            alias: member
+            for member in cls
+            for alias in {
+                alias
+                for name in (
+                    member.value._name,
+                    member.value._value,
+                    *(
+                        member.value.aliases
+                        if hasattr(member.value, "aliases") and member.value.aliases is not None
+                        else ()
+                    ),
+                )
+                for alias in cls._multiply_variations(name)
+            }
+        }
+        return MappingProxyType(values)
+
+    @classmethod
+    def from_string(cls, value: str) -> Self:
+        """Convert a string to the corresponding enum member."""
+        if value in cls.__members__:
+            return cls.__members__[value]
+        if (aliases := cls.aliases()) and (found_member := aliases.get(value)):
+            assert isinstance(found_member, cls)  # noqa: S101
+            return found_member
+        raise ValueError(f"{value} is not a valid {cls.__qualname__} member")
+
+    @classmethod
+    @override
+    def _missing_(cls, value: object) -> Enum | None:
+        """Handle missing values when converting from string to enum member."""
+        if not isinstance(value, str):
+            return None
+        with contextlib.suppress(ValueError):
+            return cls.from_string(value)
+        return None
+
+    @classmethod
+    def members(cls) -> Generator[Self]:
+        """Return all members of the enum as a tuple."""
+        yield from cls
+
+    @classmethod
+    def values(cls) -> Generator[BaseEnumData]:
+        """Return all enum member values as a tuple."""
+        yield from cls._value2member_map_
+
+    @classmethod
+    def __len__(cls) -> int:
+        """Return the number of members in the enum."""
+        return len(cls.__members__)
+
+    @computed_field
+    @property
+    def description(self) -> str | None:
+        """Return the description of the enum member."""
+        return self.value._description if hasattr(self.value, "_description") else None
+
+    @computed_field
+    @property
+    def variable(self) -> str:
+        """Return the string representation of the enum member as a variable name."""
+        return (
+            textcase.snake(self.value._value)
+            if hasattr(self.value, "_value")
+            else textcase.snake(self.name)
+        )
+
+    @computed_field
+    @property
+    def as_title(self) -> str:
+        """Return the title-cased representation of the enum member."""
+        return (
+            textcase.title(self.value._value)
+            if hasattr(self.value, "_value")
+            else textcase.title(self.name)
+        )
+
+    @classmethod
+    def add_member(cls, value: BaseEnumData) -> Self:
+        """Dynamically add a new member to the enum."""
+        extend_enum(cls, textcase.upper(value._name), value)  # pyright: ignore[reportPrivateUsage, reportCallIssue, reportUnknownVariableType]
+        return cls(value)
+
+
 @unique
 class BaseEnum(Enum):
     """An enum class that provides common functionality for all enums in the CodeWeaver project. Enum members must be unique and either all strings or all integers.
@@ -305,22 +476,38 @@ class BaseEnum(Enum):
         return self._decode_name(self.name) if self.value_type is str else self.name
 
     @classmethod
-    def aliases(cls) -> dict[str, Self] | dict[int | str, Self]:
+    @override
+    def _missing_(cls, value: object) -> Self | None:
+        """Handle missing values when converting from string or int to enum member."""
+        if not isinstance(value, str | int):
+            return None
+        with contextlib.suppress(ValueError):
+            return cls.from_string(str(value))
+        return None
+
+    @classmethod
+    def _alias_map(cls) -> MappingProxyType[int, Enum] | MappingProxyType[str, Enum]:
+        """Return a mapping of aliases to enum members."""
+        if next(iter(cls))._value_type is int:
+            return MappingProxyType(cls._value2member_map_)
+        alias_map: Mapping[str, Enum] = cls._value2member_map_.copy()
+        alias_map.update({
+            alias: member for member in cls for alias in member.aka if alias not in alias_map
+        })
+        return MappingProxyType(alias_map)
+
+    @classmethod
+    def aliases(cls) -> MappingProxyType[int, Enum] | MappingProxyType[str, Enum]:
         """Provides a way to identify alternate names for a member, used in string conversion and identification."""
-        alias_map: dict[str | int, Self] = {}
-        if cls._value_type() is int:
-            for member in cls:
-                alias_map[member.value] = member
-        for member in cls:
-            for alias in member.aka:
-                if alias not in alias_map:
-                    alias_map[alias] = member
-        return alias_map
+        return cls._alias_map()
 
     @classmethod
     def from_string(cls, value: str) -> Self:
         # sourcery skip: remove-unnecessary-cast
-        """Convert a string to the corresponding enum member. Flexibly handles different cases, dashes vs underscores, and some common variations."""
+        """Convert a string to the corresponding enum member. Flexibly handles different cases, dashes vs underscores, and some common variations.
+
+        `from_string` assumes that it's usually getting valid input, so it tries to find a match in several ways before giving up and raising a `ValueError`. We're taking a "people are messy" approach here to make it easier to work with user settings. There are probably some unknown edge cases that could cause problems, such as when two members have very similar names, but we can address those as they arise (for example, if 'JAVA' didn't match on its value or name for some reason (won't happen), then the heuristic here could assign it to "JAVASCRIPT" as a last resort).
+        """
         if cls._value_type() is int and str(value).isdigit():
             return cls(int(value))
         if literal_value := next(
@@ -343,6 +530,7 @@ class BaseEnum(Enum):
                 None,
             )
         ):
+            assert isinstance(found_member, cls)  # noqa: S101
             return found_member
         value_parts = cls._deconstruct_string(value)
         if found_member := next(
@@ -357,6 +545,8 @@ class BaseEnum(Enum):
         Encode a string for use as an enum member name.
 
         Provides a fully reversible encoding to normalize enum members and values. Doesn't handle all possible cases (by a long shot), but works for what we need without harming readability.
+
+        The result isn't very human-friendly, but it's reversible and avoids collisions with common characters. We only use this for internal normalization purposes and as a fallback -- users should never see these encoded values.
         """
         return value.lower().replace("-", "__").replace(":", "___").replace(" ", "____")
 

@@ -18,7 +18,7 @@ import inspect
 import logging
 
 from collections.abc import Callable
-from functools import cached_property
+from functools import cached_property, partial
 from importlib import util
 from pathlib import Path
 from textwrap import dedent
@@ -171,14 +171,14 @@ class FileFilterSettings(BasedModel):
     excludes: Annotated[
         frozenset[str | Path],
         Field(
-            description="""Directories, files, or [glob patterns](https://docs.python.org/3/library/pathlib.html#pathlib-pattern-language) to exclude from search and indexing. This is a set of strings, so you can use glob patterns like `**/node_modules/**` or `**/*.log` to exclude directories or files."""
+            description="""Directories, files, or [glob patterns](https://docs.python.org/3/library/pathlib.html#pathlib-pattern-language) to exclude from search and indexing. This is a set of strings, so you can use glob patterns like `**/node_modules/**` or `**/*.log` to exclude directories or files. You don't need to provide gitignored paths here if `use_gitignore` is enabled (default)."""
         ),
     ] = DEFAULT_EXCLUDED_DIRS
     excluded_extensions: Annotated[
         frozenset[str], Field(description="""File extensions to exclude from search and indexing""")
     ] = DEFAULT_EXCLUDED_EXTENSIONS
     use_gitignore: Annotated[
-        bool, Field(description="""Whether to use .gitignore for filtering""")
+        bool, Field(description="""Whether to use .gitignore for filtering. Enabled by default.""")
     ] = True
     use_other_ignore_files: Annotated[
         bool,
@@ -193,7 +193,7 @@ class FileFilterSettings(BasedModel):
     include_github_dir: Annotated[
         bool,
         Field(
-            description="""Whether to include the .github directory in search and indexing. Because the .github directory is hidden, it wouldn't be included in default settings. Most people want to include it for work on GitHub Actions, workflows, and other GitHub-related files."""
+            description="""Whether to include the .github directory in search and indexing. Because the .github directory is hidden, it wouldn't be included in default settings. Most people want to include it for work on GitHub Actions, workflows, and other GitHub-related files. Note: this setting will also include `.circleci` if present. Any subdirectories or files within `.github` or `.circleci` that are gitignored will still be excluded."""
         ),
     ] = True
     include_tooling_dirs: Annotated[
@@ -213,71 +213,108 @@ class FileFilterSettings(BasedModel):
     default_rignore_settings: Annotated[
         RignoreSettings,
         Field(
-            description="""Default settings for rignore. These are used if not overridden by user settings."""
+            description="""Default settings for rignore. These are used if not overridden by user settings in `other_ignore_kwargs`."""
         ),
-    ] = RignoreSettings({"max_filesize": 5 * 1024 * 1024, "same_file_system": True})
+    ] = RignoreSettings({
+        "max_filesize": 5 * 1024 * 1024,
+        "same_file_system": True,
+        "follow_links": False,
+    })
 
     def model_post_init(self, _context: MiddlewareContext[Any] | None = None, /) -> None:
         """Post-initialization processing."""
         if self.include_github_dir:
             self.forced_includes |= {"**/.github/**"}
 
-    @staticmethod
-    def _self_to_kwargs(self_kind: FileFilterSettings | FileFilterSettingsDict) -> RignoreSettings:
+    def _as_settings(self) -> RignoreSettings:
         """Convert self, either as an instance or as a serialized python dictionary, to kwargs for rignore."""
-        if isinstance(self_kind, FileFilterSettings):
-            self_kind = FileFilterSettingsDict(**self_kind.model_dump())
         return RignoreSettings(
             **cast(
                 RignoreSettings,
                 {
+                    "path": get_settings_map()["project_path"],
+                    **self.default_rignore_settings,
+                    # The filter function handles the include_github_dir and include_tooling_dirs logic
+                    "ignore_hidden": bool(
+                        self.ignore_hidden
+                        and not (self.include_github_dir or self.include_tooling_dirs)
+                    ),
+                    "read_ignore_files": self.use_other_ignore_files,
+                    "read_git_ignore": self.use_gitignore,
+                    **(
+                        {}
+                        if isinstance(self.other_ignore_kwargs, Unset)
+                        else self.other_ignore_kwargs
+                    ),
                     "additional_ignores": [
                         *(
                             f"*.{ext}"
                             if not ext.startswith("*") or ext.startswith(".")
                             else (ext if ext.startswith("*") else f"*{ext}")
-                            for ext in self_kind.get("excluded_extensions", [])
+                            for ext in self.excluded_extensions
                         ),
-                        *self_kind.get("excludes", []),
+                        *self.excludes,
                     ],
-                    "read_git_ignore": self_kind.get("use_gitignore", True),
-                    "read_ignore_files": self_kind.get("use_other_ignore_files", False),
-                    "ignore_hidden": self_kind.get("ignore_hidden", True),
-                    **self_kind.get("default_rignore_settings", {}),
-                    **(
-                        cast(
-                            RignoreSettings,
-                            {}
-                            if isinstance(self_kind.get("other_ignore_kwargs", {}), Unset)
-                            else self_kind.get("other_ignore_kwargs", {}),
-                        )
-                    ),
+                    "should_exclude_entry": self.filter,
                 },
             )
         )
 
     def construct_filter(self) -> Callable[[Path], bool]:
-        """Constructs the filter function for rignore."""
+        """Constructs the filter function for rignore's `should_exclude_entry` parameter.
 
-        def filter_func(path: Path | str) -> bool:
-            """Filter function that respects forced includes."""
+        Returns *True* for paths that should **not** be included (i.e., excluded paths).
+        """
+
+        def filter_func(settings: FileFilterSettings, path: Path | str) -> bool:
+            """Default filter function that respects forced includes and other settings."""
             path_obj = Path(path) if isinstance(path, str) else path
-            return any(path_obj.match(str(include)) for include in self.forced_includes)
+            if settings.ignore_hidden and (
+                settings.include_github_dir or settings.include_tooling_dirs
+            ):
+                # We need to check for .github/ and tooling dirs first
+                if settings.include_github_dir and (
+                    path_obj.match("**/.github/**") or path_obj.match("**/.circleci/**")
+                ):
+                    return False
+                if settings.include_tooling_dirs:
+                    from codeweaver._constants import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
 
-        return filter_func
+                    # filter for tooling dirs that are hidden (i.e., start with .)
+                    if {
+                        p
+                        for p in {
+                            path
+                            for tool in COMMON_TOOLING_PATHS
+                            for path in tool[1]
+                            if path_obj.match(f"**/{path}/**")
+                        }
+                        | {
+                            path
+                            for tool in COMMON_LLM_TOOLING_PATHS
+                            for path in tool[1]
+                            if path_obj.match(f"**/{path}/**")
+                        }
+                        if p
+                        and (
+                            (str(p).startswith(".") or p.name.startswith("."))
+                            and ("." not in p.name[1:] or "." not in p.parts[0][1:])
+                        )
+                    }:
+                        return False
+                return True
+            return False
 
-    @cached_property
+        return partial(filter_func, self)
+
+    @property
     def filter(self) -> Callable[[Path], bool]:
         """Cached property for the filter function."""
         return self.construct_filter()
 
-    def _adjust_settings(self) -> RignoreSettings:
-        """Adjusts a few settings, primarily to reform keywords. `rignore`'s choice of keywords is a bit odd, so we wrapped them in clearer alternatives."""
-        return self._self_to_kwargs(self)
-
-    def to_kwargs(self) -> RignoreSettings:
-        """Serialize to kwargs for rignore."""
-        return self._adjust_settings()
+    def to_settings(self) -> RignoreSettings:
+        """Serialize to `RignoreSettings`."""
+        return self._as_settings()
 
 
 class ProviderSettings(BasedModel):
@@ -631,6 +668,13 @@ class CodeWeaverSettings(BaseSettings):
             description="""Enable precontext code generation. Recommended, but requires you set up an agent model. This allows CodeWeaver to call an agent model outside of an MCP tool request (it still requires either a CLI call from you or a hook you setup). This is required for our recommended *precontext workflow*. This setting dictionary is a `pydantic_ai.settings.ModelSettings` object. If you already use `pydantic_ai.settings.ModelSettings`, then you can provide the same settings here."""
         ),
     ] = False  # ! Phase 2 feature, switch to True when implemented
+
+    index_storage_path: Annotated[
+        Path,
+        Field(
+            description="""Path to store index data locally. Unless you include private files in your file filter settings (`FileFilterSettings`), we recommend you set this to a directory *inside* your project tree. This provides a single point of reference for anyone working on the repo, and prevents constant re-indexing of the same files. The default location is `.codeweaver/repo_index.json` in your project directory."""
+        ),
+    ] = Path(".codeweaver/repo_index.json")
 
     uvicorn_settings: Annotated[
         UvicornServerSettings | None,

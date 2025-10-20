@@ -19,6 +19,25 @@ if TYPE_CHECKING:
     from codeweaver.settings_types import CodeWeaverSettingsDict
 TEST_FILE_PATTERNS = ["*.test.*", "*.spec.*", "test/**/*", "spec/**/*"]
 
+_tooling_dirs: set[Path] | None = None
+
+
+def get_tooling_dirs() -> set[Path]:
+    """Get common tooling directories within the project root."""
+
+    def _is_hidden_dir(path: Path) -> bool:
+        return bool(str(path).startswith(".") and "." not in str(path)[1:])
+
+    global _tooling_dirs
+    if _tooling_dirs is None:
+        from codeweaver._constants import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
+
+        tooling_paths = {
+            path for tool in COMMON_TOOLING_PATHS for path in tool[1] if _is_hidden_dir(path)
+        } | {path for tool in COMMON_LLM_TOOLING_PATHS for path in tool[1] if _is_hidden_dir(path)}
+        _tooling_dirs = tooling_paths
+    return _tooling_dirs
+
 
 class FileDiscoveryService:
     """Service for discovering and filtering files in a codebase.
@@ -72,7 +91,7 @@ class FileDiscoveryService:
                 else self.settings["filter_settings"].use_gitignore,
                 read_ignore_files=read_ignore_files
                 or self.settings["filter_settings"].use_other_ignore_files,
-                # in all but this narrow case below below, ignore_hidden_files is False
+                # in all but this narrow case defined here, ignore_hidden_files is False
                 # otherwise we need to resolve whether to include .github/ and tooling dirs before we can discard other hidden files
                 ignore_hidden=bool(
                     self.settings["filter_settings"].ignore_hidden_files
@@ -83,7 +102,9 @@ class FileDiscoveryService:
             )
             with contextlib.suppress(ValueError):
                 discovered.extend(
-                    file_path.relative_to(self.settings["project_root"]) for file_path in walker
+                    file_path.relative_to(self.settings["project_root"])
+                    for file_path in walker
+                    if not self._is_filtered(file_path)
                 )
 
         except Exception as e:
@@ -97,6 +118,45 @@ class FileDiscoveryService:
             ) from e
         else:
             return sorted(discovered)
+
+    def _is_filtered(self, file: Path) -> bool:
+        """Filter files based on settings.
+
+        This applies an additional filtering layer after a file is found by rignore.
+
+        We need to be careful about how we assess paths, because they don't have to exist at the project root (like in a monorepo -- we can have deeply nested '.github' or similar directories).
+
+        Args:
+            files: Sequence of file paths to filter
+
+        Returns:
+            True if the file is not filtered, False otherwise
+        """
+
+        def target_dir_in_path(target_dirs: set[Path], path: Path) -> bool:
+            """Check if any target directory is in the given path."""
+            for part in path.parts:
+                if (
+                    Path(part) in target_dirs
+                    and (parent := next(p for p in target_dirs if Path(part) == p))
+                    and parent.is_dir()
+                    and parent in path.parents
+                ):
+                    return True
+            return False
+
+        if not self.settings["filter_settings"].ignore_hidden_files:
+            return False
+        return bool(
+            (
+                not self.settings["filter_settings"].include_github_dir
+                and target_dir_in_path({Path(".github"), Path(".circleci")}, file)
+            )
+            or (
+                not self.settings["filter_settings"].include_tooling_dirs
+                and target_dir_in_path(get_tooling_dirs(), file)
+            )
+        )
 
     async def get_discovered_files(self) -> tuple[tuple[DiscoveredFile, ...], tuple[Path, ...]]:
         """Get all discovered files and filtered files.

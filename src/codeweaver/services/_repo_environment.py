@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from functools import cached_property
 from pathlib import Path
 from types import MappingProxyType
-from typing import TYPE_CHECKING, ClassVar, Literal, Self, TypedDict, cast
+from typing import TYPE_CHECKING, Annotated, ClassVar, Literal, Self, TypedDict, cast
 
-from pydantic import computed_field
+from pydantic import DirectoryPath, Field, computed_field
 from pydantic.dataclasses import dataclass
 
 from codeweaver._common import (
@@ -64,6 +64,7 @@ class DirectoryPurpose(str, BaseEnum):
 
     __slots__ = ()
 
+    @property
     def alias(self) -> tuple[str, ...]:
         """Get alternative names for the directory purpose.
 
@@ -117,6 +118,38 @@ class DirectoryPurpose(str, BaseEnum):
             ),
         }
         return aliases.get(self, ())
+
+    @property
+    def validator(self) -> Callable[[Path], bool]:
+        """Get the validator function for the directory purpose.
+
+        Returns:
+            A callable that takes a Path and returns True if it matches the purpose.
+        """
+
+    @classmethod
+    def validators(cls) -> MappingProxyType[DirectoryPurpose, Callable[[Path], bool]]:
+        """Each member has its own validator to assess membership."""
+        return MappingProxyType({member: member.validator for member in cls})
+
+
+@dataclass(config=DATACLASS_CONFIG)
+class RepoDirectory(DataclassSerializationMixin):
+    """Representation of a directory in the repository with its purpose.
+
+    `RepoDirectory` also have detailed properties that are lazily evaluated, and helper methods for working with directories.
+    """
+
+    path: DirectoryPath
+    """The path to the directory."""
+
+    purpose: Annotated[DirectoryPurpose, Field(description="The main purpose of the directory.")]
+
+    _files: Sequence[Path] | None = None
+    """Cache of files in the directory."""
+
+    _subdirectories: Sequence[Path] | None = None
+    """Cache of subdirectories in the directory."""
 
 
 def get_discovery_service() -> FileDiscoveryService:

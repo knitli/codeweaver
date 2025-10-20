@@ -21,11 +21,12 @@ on:
       - submitted
 permissions:
   actions: read
-  checks: write
+  checks: read
   issues: write
   contents: write
-  discussions: read
+  discussions: write
   pull-requests: write
+  workflows: write
 jobs:
   claude-response:
     runs-on: ubuntu-latest

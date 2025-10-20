@@ -8,8 +8,9 @@
 
 # with contextlib.suppress(ImportError):
 # from watchfiles import watch
-# TODO: implement file watcher
 # TODO: register with providers registry
+
+from __future__ import annotations
 
 import contextlib
 import logging
@@ -25,7 +26,7 @@ import watchfiles
 from pydantic import PrivateAttr
 from watchfiles.main import Change, FileChange
 
-from codeweaver._common import BasedModel
+from codeweaver._common import BasedModel, DictView
 from codeweaver._constants import (
     CODE_FILES_EXTENSIONS,
     CONFIG_FILE_LANGUAGES,
@@ -35,7 +36,7 @@ from codeweaver._constants import (
 )
 from codeweaver._data_structures import BlakeStore, DiscoveredFile
 from codeweaver.language import ConfigLanguage, SemanticSearchLanguage
-from codeweaver.settings_types import RignoreSettings
+from codeweaver.settings_types import CodeWeaverSettingsDict, RignoreSettings
 
 
 logger = logging.getLogger(__name__)
@@ -98,7 +99,7 @@ class DefaultExtensionFilter(ExtensionFilter):
         self.extensions: tuple[str, ...] = (
             extensions if isinstance(extensions, tuple) else tuple(extensions)
         )
-        self.__slots__ = (*super().__slots__, "extensions")
+        self.__slots__ = (*super().__slots__, "extensions", "_ignore_paths")
         super().__init__(extensions=extensions, ignore_paths=ignore_paths)
 
     def __call__(self, change: Change, path: str) -> bool:
@@ -122,7 +123,7 @@ ConfigFilter = DefaultExtensionFilter(
 DocsFilter = DefaultExtensionFilter(tuple(pair.ext for pair in DOC_FILES_EXTENSIONS))
 
 
-class IgnoreFilter[Walker](watchfiles.DefaultFilter):
+class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
     """
     A filter that uses rignore to exclude files based on .gitignore and other rules.
 
@@ -136,7 +137,7 @@ class IgnoreFilter[Walker](watchfiles.DefaultFilter):
     seen paths.
     """
 
-    _walker: rignore.Walker
+    _walker: Walker
     _allowed: ClassVar[set[Path]] = set()
     _allowed_complete: bool = False
 
@@ -150,13 +151,14 @@ class IgnoreFilter[Walker](watchfiles.DefaultFilter):
         self,
         *,
         base_path: Path | None = None,
-        walker: rignore.Walker | None = None,
+        walker: Walker | None = None,
         settings: RignoreSettings | None = None,
     ) -> None:
         """Initialize the IgnoreFilter with either rignore settings or a pre-configured walker."""
         self.__slots__ = (*super().__slots__, "_walker", "_allowed_complete", "_allowed")
         if not walker and not (settings and base_path):
-            raise ValueError("Either settings or walker must be provided.")
+            self = type(self).from_settings()
+            return
         if walker and settings:
             # favor walker if both are provided
             logger.warning("Both settings and walker provided; using walker.")
@@ -164,20 +166,16 @@ class IgnoreFilter[Walker](watchfiles.DefaultFilter):
             self._walker = walker
         else:
             if settings is None:
-                raise ValueError("Settings must be provided if walker is not.")
+                raise ValueError("You must provide either settings or a walker.")
             if base_path is None:
                 raise ValueError("Base path must be provided if walker is not.")
-            if (filter_present := settings.pop("filter", None)) and callable(filter_present):
-                logger.warning("Filter provided in settings; it will be ignored.")
-                if settings.get("should_exclude_entry") is None or not callable(
-                    settings.get("should_exclude_entry")
-                ):
-                    settings |= {"should_exclude_entry": filter_present}  # type: ignore
-                else:
-                    settings["should_exclude_entry"] = lambda p: filter_present(p) or settings[  # type: ignore
-                        "should_exclude_entry"
-                    ](p)  # pyright: ignore[reportTypedDictNotRequiredAccess, reportUnknownLambdaType, reportCallIssue]
-            self._walker = rignore.walk(path=base_path, **cast(dict[str, Any], settings))
+            if (
+                (filter_present := settings.pop("filter", None))
+                and callable(filter_present)
+                and settings.get("should_exclude_entry") is None
+            ) or not callable(settings.get("should_exclude_entry")):
+                settings |= {"should_exclude_entry": filter_present}  # type: ignore
+            self._walker = rignore.walk(path=base_path, **cast(dict[str, Any], settings))  # type: ignore
         super().__init__()
 
     def __call__(self, change: Change, path: str) -> bool:
@@ -194,7 +192,7 @@ class IgnoreFilter[Walker](watchfiles.DefaultFilter):
     def _walkable(self, path: Path, *, is_new: bool = False, delete: bool = False) -> bool:
         """Check if a path is walkable (not ignored) using the rignore walker.
 
-        Stores previously seen paths to avoid redundant checks, avoiding redundant checks.
+        Stores previously seen paths to avoid redundant checks.
 
         This method still returns True for deleted files to allow cleanup of indexed data.
         """
@@ -218,6 +216,17 @@ class IgnoreFilter[Walker](watchfiles.DefaultFilter):
         except StopIteration:
             self._allowed_complete = True
         return False
+
+    @classmethod
+    def from_settings(
+        cls, settings: DictView[CodeWeaverSettingsDict] | None = None
+    ) -> IgnoreFilter[rignore.Walker]:
+        """Create an IgnoreFilter instance from settings."""
+        from codeweaver.settings import get_settings_map
+
+        settings = settings or get_settings_map()
+        filter_settings = settings["filter_settings"].to_settings()
+        return cls(base_path=None, settings=None, walker=rignore.walk(**filter_settings))
 
     @property
     def walker(self) -> rignore.Walker:
@@ -309,7 +318,7 @@ class Indexer(BasedModel):
         to_delete: list[Any] = []
         for key, discovered_file in list(self._store.items()):
             try:
-                if discovered_file.path == path or Path(discovered_file.path) == path:
+                if discovered_file.path.samefile(path):
                     to_delete.append(key)
             except Exception:
                 # defensive: malformed entry shouldn't break cleanup

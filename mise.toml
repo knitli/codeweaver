@@ -79,6 +79,8 @@ cdroot || true && source .venv/bin/activate
 setup = """
 #!/usr/bin/env /usr/bin/zsh
 print -P "%F{209}[codeweaver]%f Setting up development environment for the first time..."
+# Determine if we're in CI
+# This doesn't change anything yet, but it's here for future use
 if [ "$GITHUB_ACTIONS" == true ]; then
     export CI=true
 else
@@ -96,12 +98,6 @@ source .venv/bin/activate &
 mise --silent -y run sync &
 git config alias.root 'rev-parse --show-toplevel' &&
 alias cdroot='cd $(git root)'
-# Determine if we're in CI
-if [ "$GITHUB_ACTIONS" == true ]; then
-    export CI=true
-else
-    export CI=false
-fi
 print -P "%F{209}[codeweaver]%f ✅ Development environment ready!"
 """
 

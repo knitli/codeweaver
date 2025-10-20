@@ -27,7 +27,14 @@ from pydantic import (
 from pydantic.dataclasses import dataclass
 from pydantic_core import ArgsKwargs, core_schema
 
-from codeweaver._common import DATACLASS_CONFIG, BasedModel, BaseEnum, DataclassSerializationMixin
+from codeweaver._common import (
+    DATACLASS_CONFIG,
+    BaseDataclassEnum,
+    BasedModel,
+    BaseEnum,
+    BaseEnumData,
+    DataclassSerializationMixin,
+)
 from codeweaver.language import SemanticSearchLanguage
 
 
@@ -843,86 +850,94 @@ class SemanticClass(str, BaseEnum):
 # =============================================================================
 
 
-class AgentTask(str, BaseEnum):
-    """Predefined coding assistant tasks."""
+class BaseAgentTask(BaseEnumData):
+    """Base class for agent tasks with context weight profiles."""
 
-    DEBUG = "debug"
-    DEFAULT = "default"
-    DOCUMENT = "document"
-    IMPLEMENT = "implement"
-    LOCAL_EDIT = "local_edit"
-    REFACTOR = "refactor"
-    REVIEW = "review"
-    SEARCH = "search"
+    _profile: Annotated[ImportanceScoresDict, Field(description="Context weight profile")]
 
-    __slots__ = ()
+    def __init__(self, profile: ImportanceScoresDict | None, *args: Any, **kwargs: Any) -> None:
+        """Initialize BaseAgentTask with profile."""
+        self._profile = profile or ImportanceScoresDict(
+            discovery=0.25, comprehension=0.25, modification=0.2, debugging=0.15, documentation=0.15
+        )
+        super().__init__(*args, **kwargs)
+
+
+class AgentTask(BaseAgentTask, BaseDataclassEnum):
+    """Dataclass-based agent task with context weight profile.
+
+    Values are `BaseAgentTask` dataclass instances.
+    """
+
+    DEBUG = (
+        ImportanceScoresDict(
+            discovery=0.2, comprehension=0.3, modification=0.1, debugging=0.35, documentation=0.05
+        ),
+        "DEBUG",
+        "debug",
+        "Predefined task for debugging code.",
+    )
+    DEFAULT = None, "DEFAULT", "default", "Default task with balanced context weights."
+    DOCUMENT = (
+        ImportanceScoresDict(
+            discovery=0.2, comprehension=0.2, modification=0.1, debugging=0.05, documentation=0.45
+        ),
+        "DOCUMENT",
+        "document",
+        "Predefined task for documenting code.",
+    )
+    IMPLEMENT = (
+        ImportanceScoresDict(
+            discovery=0.3, comprehension=0.3, modification=0.2, debugging=0.1, documentation=0.1
+        ),
+        "IMPLEMENT",
+        "implement",
+        "Predefined task for implementing code.",
+    )
+    LOCAL_EDIT = (
+        ImportanceScoresDict(
+            discovery=0.4, comprehension=0.3, modification=0.2, debugging=0.05, documentation=0.05
+        ),
+        "LOCAL_EDIT",
+        "local_edit",
+        "Predefined task for local code edits.",
+    )
+    REFACTOR = (
+        ImportanceScoresDict(
+            discovery=0.15, comprehension=0.25, modification=0.45, debugging=0.1, documentation=0.05
+        ),
+        "REFACTOR",
+        "refactor",
+        "Predefined task for refactoring code.",
+    )
+    REVIEW = (
+        ImportanceScoresDict(
+            discovery=0.25, comprehension=0.35, modification=0.15, debugging=0.15, documentation=0.1
+        ),
+        "REVIEW",
+        "review",
+        "Predefined task for reviewing code.",
+    )
+    SEARCH = (
+        ImportanceScoresDict(
+            discovery=0.5, comprehension=0.2, modification=0.15, debugging=0.1, documentation=0.05
+        ),
+        "SEARCH",
+        "search",
+        "Predefined task for searching code.",
+    )
 
     @classmethod
-    def profiles(cls) -> MappingProxyType[AgentTask, ImportanceScoresDict]:
-        """Get list of available context weight profiles."""
+    def profiles(cls) -> MappingProxyType[str, ImportanceScoresDict]:
+        """Get the context weight profiles for all tasks."""
         return MappingProxyType({
-            cls.LOCAL_EDIT: ImportanceScoresDict(
-                discovery=0.4,
-                comprehension=0.3,
-                modification=0.2,
-                debugging=0.05,
-                documentation=0.05,
-            ),
-            cls.DEBUG: ImportanceScoresDict(
-                discovery=0.2,
-                comprehension=0.3,
-                modification=0.1,
-                debugging=0.35,
-                documentation=0.05,
-            ),
-            cls.REFACTOR: ImportanceScoresDict(
-                discovery=0.15,
-                comprehension=0.25,
-                modification=0.45,
-                debugging=0.1,
-                documentation=0.05,
-            ),
-            cls.DOCUMENT: ImportanceScoresDict(
-                discovery=0.2,
-                comprehension=0.2,
-                modification=0.1,
-                debugging=0.05,
-                documentation=0.45,
-            ),
-            cls.SEARCH: ImportanceScoresDict(
-                discovery=0.5,
-                comprehension=0.2,
-                modification=0.15,
-                debugging=0.1,
-                documentation=0.05,
-            ),
-            cls.IMPLEMENT: ImportanceScoresDict(
-                discovery=0.3,
-                comprehension=0.3,
-                modification=0.25,
-                debugging=0.1,
-                documentation=0.05,
-            ),
-            cls.REVIEW: ImportanceScoresDict(
-                discovery=0.25,
-                comprehension=0.35,
-                modification=0.15,
-                debugging=0.15,
-                documentation=0.1,
-            ),
-            cls.DEFAULT: ImportanceScoresDict(
-                discovery=0.25,
-                comprehension=0.25,
-                modification=0.2,
-                debugging=0.15,
-                documentation=0.15,
-            ),
+            task_name: task_instance.profile for task_name, task_instance in cls.__members__.items()
         })
 
     @property
     def profile(self) -> ImportanceScoresDict:
         """Get the context weight profile for this task."""
-        return self.profiles().get(self, self.profiles()[self.DEFAULT])
+        return super()._profile
 
 
 # =============================================================================

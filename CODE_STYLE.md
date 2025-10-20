@@ -9,10 +9,11 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 ## Design Principles
 
-1. **AI-First Context**: Deliver precise codebase context for plain language agent requests
+1. **AI-First Context**: Deliver precise codebase context for agent requests
+2. **Simple AI Interface**: Agents don't need to create requests that fit complex data structures. Tool calls should be in plain language with no more than one required parameter.
 2. **Transparency**: Clear, understandable processes and results for developers
 3. **Simple Modularity**: Extensible yet intuitive - purpose should be obvious
-4. **Ecosystem Alignment**: Leverage pydantic ecosystem (`pydantic`, `pydantic-settings`, `pydantic-ai`, `FastMCP`) over reinvention
+4. **Ecosystem Alignment**: Leverage pydantic ecosystem (`pydantic`, `pydantic-settings`, `pydantic-ai`, `FastMCP` (uses pydantic)) over reinvention
 5. **Proven Patterns**: Follow established abstractions - simple, powerful, well-validated interfaces
 
 ## Pydantic Architecture
@@ -27,19 +28,19 @@ Study pydantic ecosystem patterns: [pydantic](https://github.com/pydantic/pydant
 - **Smart Decorators**: Extend class/function roles cleanly (think: '`@pydantic.after_validator` or basically **all of `FastAPI`**)
 - **Dependency Injection**: Explicit dependencies, organized pipelines
 - **Flat Structure**: Group closely related modules in packages (e.g. all providers), otherwise keep root-level
-  - Core types in `__init__.py` if a subpackage (not root __init__.py)
-  - Foundations in private mirror modules (`chunking.py` ← `_chunking.py`)
-  - Extensive internal logic in an `_internals` subpackage.
+    - Core types in `__init__.py` if a subpackage (not root __init__.py)
+    - Foundations in private mirror modules (`chunking.py` ← `_chunking.py`)
+    - Extensive internal logic in an `_internals` subpackage.
 - **Types as Functionality**: Types *are* the behavior, not separate from it
 
 ## Style Standards
 
 - **Docstrings**: Google convention, plain language, active voice, present tense
-  - Start with verbs: "Adds numbers" not "This function adds numbers"
-  - **But not exacting**: Don't waste space explaining the obvious. We have strong typing that makes args/returns clear. A brief sentence may be enough. 
+    - Start with verbs: "Adds numbers" not "This function adds numbers"
+    - **But not exacting**: Don't waste space explaining the obvious. We have strong typing that makes args/returns clear. A brief sentence may be enough. 
 - **Line length**: 100 characters
 - **Auto-formatting**: Ruff configuration enabled
-- **Python typing**: Modern (≥3.12) - `typing.Self`, `typing.Literal`, piped unions (`int | str`), constructors as types (`list[str]`), `type` keyword for `typing.TypeAliasType`
+- **Python typing**: Modern (≥3.11) - `typing.Self`, `typing.Literal`, piped unions (`int | str`), constructors as types (`list[str]`), `type` keyword for `typing.TypeAliasType`.
 
 ## Lazy Evaluation & Immutability
 
@@ -48,8 +49,8 @@ Study pydantic ecosystem patterns: [pydantic](https://github.com/pydantic/pydant
 - **Sequences**: Use `Generator`/`AsyncGenerator`, `tuple`/`NamedTuple` over lists. Use `frozenset` for set-like objects
 - **Dicts**: Read-only dicts use `types.MappingProxyType`
 - **Models**: Use `frozen=True` for dataclasses/models set at instantiation
-  - Need modifications? Create new instances rather than mutating [^1]
-  - Need computed properties? Use factory functions or classmethods
+    - Need modifications? Create new instances rather than mutating [^1]
+    - Need computed properties? Use factory functions or classmethods
 
 [^1]: But be reasonable. If you really need to make a lot of incremental updates to an object, then *use a mutable type* -- it's a guideline, not a rule.
 
@@ -59,18 +60,20 @@ Study pydantic ecosystem patterns: [pydantic](https://github.com/pydantic/pydant
 
 - **Strict typing** with [opinionated pyright rules](pyproject.toml)
 - **Structured data**: Use `TypedDict`, `Protocol`, `NamedTuple`, `enum.Enum`, `typing_extensions.TypeIs` (similar to typing.TypeGuard but more flexible, typing.TypeGuard also OK)
-  - Use the project's derivative for these: 
-    - `dataclass` -> `pydantic.dataclasses.dataclass` **and** `codeweaver._common.DataclassSerializationMixin`
-    - `pydantic.BaseModel` -> `codeweaver._common.BasedModel`
-    - `enum.Enum` -> `codeweaver._common.BaseEnum`
-- **Define structures**: Don't be lazy - use `TypedDict`, `dataclass` or `BaseModel` to define structured data. Only use vague/generic types like `dict[str, Any]` when the types/structure are truly unknown or have many possibilities.
-  - Complex objects: `dataclass` or `BaseModel` descendants
-  - Need serialization/validation: `pydantic.dataclasses.dataclass`
+    - Use the project's derivative for these: 
+      - `dataclass` -> `pydantic.dataclasses.dataclass` **and** `codeweaver._common.DataclassSerializationMixin`
+      - `pydantic.BaseModel` -> `codeweaver._common.BasedModel`
+      - `pydantic.ConfigDict` -> 
+      - `enum.Enum` -> `codeweaver._common.BaseEnum`
+- **Define structures**: Don't be lazy - use `TypedDict`, `NamedTuple`, `dataclass` or `BasedModel` to define structured data. Only use vague/generic types like `dict[str, Any]` when the types/structure are truly unknown or have many possibilities.
+    - Complex objects: `dataclass` or `BaseModel` descendants
+    - Simple objects: `NamedTuple` if the object would benefit from methods or will be nested; `TypedDict` otherwise. 
 - **Generics**: Define proper generic types/protocols/guards
-  - Use newer python generics syntax: `class SomeClass[SomeGeneric]:` -- don't use `typing.Generic`
-  - Use newer `type` keyword for aliases: `type MyAlias = tuple[Literal["like this"]]` not `TypeAlias`
-- **No string literals**: Use `enum.Enum` (CLI: `cyclopts` handles enum parsing)
-  - Exception: If the type will only be used once in one small section, and there are only 1-3 valid values, `Literal` is OK, but must be typed with `Literal`
+    - Use newer python parameterized generics syntax: `class SomeClass[SomeGeneric]:` -- don't use `typing.Generic`
+    - Use newer `type` keyword for aliases: `type MyAlias = tuple[Literal["like this"]]` not `TypeAlias`
+- **Avoid string literals**: For most cases, favor `enum.Enum` (using `BaseEnum`) over `typing.Literal` (CLI: `cyclopts` handles enum parsing).
+    - Exception: If the type will only be used once in one small section, and there are only 1-3 valid values, `Literal` is OK, but must be typed with `Literal`
+    - Keep properties with their objects. Use `enum` methods to keep logic related to members with the class. You shouldn't add/define properties or attributes for members elsewhere (see `codeweaver.language.SemanticSearchLanguage` for an extreme example).
 
 ### Pydantic Models
 
@@ -110,7 +113,7 @@ class MyModel(BasedModel):
 
 ### Functions
 
-- **Type all parameters and returns**: Including `-> None`
+- **Type all call arguments/parameters and returns**: Including `-> None`
 - **Boolean kwargs only**: Use `*` separator for boolean parameters (booleans should not be positional arguments)
 
 
@@ -123,7 +126,7 @@ Follow [Google Python Style Guide](https://google.github.io/styleguide/pyguide.h
 
 ### IsInstance
 
-- Use `|` syntax, not tuple: `isinstance(value, str | int | MyClass)` (not `(str, int, MyClass)`)
+- Use `|` syntax, not tuple: `isinstance(value, str | int | MyClass)` (not `(str, int, MyClass)`) (yes, it really is valid python, I promise.)
 
 ## Testing Philosophy
 

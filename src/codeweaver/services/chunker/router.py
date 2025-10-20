@@ -30,9 +30,6 @@ class EnhancedChunkMicroManager:
         Args:
             governor: The chunk governor providing limits and configuration
         """
-        from codeweaver.services.chunker.base import ChunkMicroManager
-
-        self._micro_manager = ChunkMicroManager(governor)
 
     def chunk_file(self, file: DiscoveredFile, content: str) -> list[CodeChunk]:
         """Chunk a file using the appropriate strategy.
@@ -46,8 +43,6 @@ class EnhancedChunkMicroManager:
         """
         if not content.strip():
             return []
-
-        chunks = self._micro_manager.decide_chunking(file, content)
 
         # Perform final validation and adjustments
         return self._finalize_chunks(chunks)
@@ -132,7 +127,7 @@ class EnhancedChunkMicroManager:
             line_range=chunk.line_range,
             file_path=chunk.file_path,
             language=chunk.language,
-            chunk_type=chunk.chunk_type,
+            source=chunk.source,
             ext_kind=chunk.ext_kind,
             timestamp=chunk.timestamp,
             chunk_id=chunk.chunk_id,
@@ -187,7 +182,7 @@ class EnhancedChunkMicroManager:
                 line_range=Span(start_line, end_line, src_id),
                 file_path=chunk.file_path,
                 language=chunk.language,
-                chunk_type=chunk.chunk_type,
+                source=chunk.source,
                 ext_kind=chunk.ext_kind,
                 parent_id=src_id,
                 metadata=meta,

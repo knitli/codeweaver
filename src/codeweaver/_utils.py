@@ -458,7 +458,30 @@ def sanitize_unicode(
 
 
 # ===========================================================================
-# *                    Fastembed GPU/CPU Decision Logic                     *
+# *                File and Directory Evaluation Helpers
+# ===========================================================================
+"""Helpers for evaluating file and directory composition."""
+
+
+def file_is_binary(file_path: Path) -> bool:
+    """Check if a file is binary by reading its initial bytes."""
+    try:
+        with file_path.open("rb") as f:
+            initial_bytes = f.read(1024)
+            if b"\0" in initial_bytes:
+                return True
+            text_characters = bytearray({7, 8, 9, 10, 12, 13, 27} | set(range(0x20, 0x100)))
+            non_text = initial_bytes.translate(None, text_characters)
+            if len(non_text) / len(initial_bytes) > 0.30:
+                return True
+    except Exception as e:
+        logger.warning("Could not read file %s to determine if binary: %s", file_path, e)
+        return False
+    return False
+
+
+# ===========================================================================
+# *               Fastembed GPU/CPU Decision Logic                     *
 # ===========================================================================
 """This section conducts a series of checks to determine if Fastembed-GPU can be used.
 

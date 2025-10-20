@@ -67,9 +67,7 @@ class FilterableField(BaseModel):
     description: str = Field(
         description="""A description for the field used in the tool description"""
     )
-    field_type: Literal["keyword", "integer", "float", "boolean"] = Field(
-        description="""The type of the field"""
-    )
+    field_type: PayloadSchemaType = Field(description="""The type of the field""")
     condition: Literal["==", "!=", ">", ">=", "<", "<=", "any", "except"] | None = Field(
         default=None,
         description=(
@@ -248,21 +246,10 @@ def make_indexes(filterable_fields: dict[str, FilterableField]) -> dict[str, Pay
     """
     Create a mapping of field names to their payload schema types.
     """
-    indexes: dict[str, PayloadSchemaType] = {}
-
-    for field_name, field in filterable_fields.items():
-        if field.field_type == "keyword":
-            indexes[f"{METADATA_PATH}.{field_name}"] = PayloadSchemaType.KEYWORD
-        elif field.field_type == "integer":
-            indexes[f"{METADATA_PATH}.{field_name}"] = PayloadSchemaType.INTEGER
-        elif field.field_type == "float":
-            indexes[f"{METADATA_PATH}.{field_name}"] = PayloadSchemaType.FLOAT
-        elif field.field_type == "boolean":
-            indexes[f"{METADATA_PATH}.{field_name}"] = PayloadSchemaType.BOOL
-        else:
-            raise ValueError(f"Unsupported field type {field.field_type} for field {field_name}")
-
-    return indexes
+    return {
+        f"{METADATA_PATH}.{field_name}": field.field_type
+        for field_name, field in filterable_fields.items()
+    }
 
 
 __all__ = ("Entry", "FilterableField", "PayloadSchemaType", "make_filter", "make_indexes")

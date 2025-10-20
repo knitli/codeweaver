@@ -121,7 +121,7 @@ class ChunkKind(BaseEnum):
     OTHER = "other"
 
 
-class ChunkType(BaseEnum):
+class ChunkSource(BaseEnum):
     """Represents the type of a code chunk -- basically how it was extracted."""
 
     TEXT_BLOCK = "text_block"
@@ -292,14 +292,14 @@ class Span(DataclassSerializationMixin):
 
     __match_args__: ClassVar[tuple[str, str]] = ("start", "end")
 
-    def __hash__(self):
+    def __hash__(self) -> NonNegativeInt:
         return hash((self.start, self.end, self._source_id))
 
     def __str__(self) -> str:
         """Return a string representation of the span."""
         return f"lines {self.start}-{self.end} (source: {self._source_id})"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Return a string representation of the span."""
         return f"Span({self.start}, {self.end}, {self._source_id})"
 
@@ -669,7 +669,7 @@ class CodeChunkDict(TypedDict, total=False):
     line_range: Required[SpanTuple | Span]
     file_path: NotRequired[Path | None]
     language: NotRequired[SemanticSearchLanguage | str | None]
-    chunk_type: NotRequired[ChunkType | None]
+    source: NotRequired[ChunkSource | None]
     timestamp: NotRequired[PositiveFloat]
     chunk_id: NotRequired[UUID7]
     parent_id: NotRequired[UUID7 | None]
@@ -681,18 +681,18 @@ def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
     """Determine the ExtKind based on the validated data."""
     if "file_path" in validated_data:
         return ExtKind.from_file(validated_data["file_path"])
-    chunk_type = validated_data.get("chunk_type", ChunkType.TEXT_BLOCK)
+    source = validated_data.get("source", ChunkSource.TEXT_BLOCK)
     if (
-        chunk_type == ChunkType.SEMANTIC
+        source == ChunkSource.SEMANTIC
         and "metadata" in validated_data
         and "semantic_meta" in validated_data["metadata"]
         and (language := validated_data["metadata"]["semantic_meta"].get("language"))
     ):
         return ExtKind.from_string(language, "code")
-    if "language" in validated_data and chunk_type != chunk_type.TEXT_BLOCK:
-        if chunk_type == ChunkType.EXTERNAL:
+    if "language" in validated_data and source != source.TEXT_BLOCK:
+        if source == ChunkSource.EXTERNAL:
             return ExtKind.from_string(validated_data["language"], ChunkKind.OTHER)
-        if chunk_type in (ChunkType.FILE):
+        if source in (ChunkSource.FILE):
             return ExtKind.from_string(validated_data["language"], "docs")
         return ExtKind.from_string(validated_data["language"], "code")
     return None
@@ -711,7 +711,7 @@ class CodeChunk(BasedModel):
         AfterValidator(set_relative_path),
     ] = None
     language: SemanticSearchLanguage | str | None = None
-    chunk_type: ChunkType = ChunkType.TEXT_BLOCK
+    source: ChunkSource = ChunkSource.TEXT_BLOCK
     ext_kind: Annotated[
         ExtKind | None,
         Field(
@@ -780,7 +780,7 @@ class CodeChunk(BasedModel):
             "line_range": self_map.get("line_range"),
             "ext_kind": str(self_map.get("ext_kind")),
             "language": self_map.get("language"),
-            "chunk_type": self_map.get("chunk_type"),
+            "source": self_map.get("source"),
             "chunk_version": self._version,
         }
 
@@ -801,8 +801,8 @@ class CodeChunk(BasedModel):
             title_parts.append(f"Filename: {self.file_path.name}")
         if self.language:
             title_parts.append(f"Language: {str(self.language).capitalize()}")
-        if self.chunk_type:
-            title_parts.append(f"Category: {str(self.chunk_type).capitalize()}")
+        if self.source:
+            title_parts.append(f"Category: {str(self.source).capitalize()}")
         return "\n".join(textwrap.wrap(" | ".join(title_parts), width=80, subsequent_indent="    "))
 
     @computed_field

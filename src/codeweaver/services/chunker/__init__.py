@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Chunker services for embeddings and vector storage."""
 
-from codeweaver.services.chunker.base import ChunkGovernor, ChunkMicroManager
+from codeweaver.services.chunker.base import ChunkGovernor
 from codeweaver.services.chunker.registry import (
     SourceIdRegistry,
     clear_registry,
@@ -16,7 +16,6 @@ from codeweaver.services.chunker.router import EnhancedChunkMicroManager
 
 __all__ = [
     "ChunkGovernor",
-    "ChunkMicroManager",
     "EnhancedChunkMicroManager",
     "SourceIdRegistry",
     "clear_registry",
