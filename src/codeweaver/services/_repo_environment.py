@@ -11,7 +11,13 @@ from typing import TYPE_CHECKING, ClassVar, Literal, Self, TypedDict, cast
 from pydantic import computed_field
 from pydantic.dataclasses import dataclass
 
-from codeweaver._common import DATACLASS_CONFIG, DataclassSerializationMixin, LiteralStringT
+from codeweaver._common import (
+    DATACLASS_CONFIG,
+    BaseEnum,
+    DataclassSerializationMixin,
+    LiteralStringT,
+)
+from codeweaver._constants import COMMON_TOOLING_PATHS, TEST_DIR_NAMES
 from codeweaver.language import ConfigLanguage, SemanticSearchLanguage
 
 
@@ -22,6 +28,95 @@ _discovery: FileDiscoveryService | None = None
 
 type PathOrFalse = Path | Literal[False]
 """A return type that can either be a Path or False."""
+
+
+class DirectoryPurpose(str, BaseEnum):
+    """Enum for common directory purposes in a repository."""
+
+    APPS = "apps"
+    """Applications or app directory, or similar workspaces like 'crates'."""
+    BACKEND = "backend"
+    """Backend or server directory."""
+    BUILD = "build"
+    """Build artifacts or output directory."""
+    CI = "ci"
+    """Continuous integration configuration directory."""
+    DOCS = "docs"
+    """Documentation or examples directory."""
+    FRONTEND = "frontend"
+    """Frontend/ui or client directory."""
+    INFRA = "infra"
+    """Infrastructure or cloud-related directory."""
+    LIB = "libraries"
+    """Library or shared code directory."""
+    LLM_TOOLS = "llm_tools"
+    """LLM (Large Language Model) tools directory."""
+    SCRIPTS = "scripts"
+    """Scripts or automation tools directory."""
+    SRC = "source code"
+    """Source code directory."""
+    SUB_REPO = "sub-repository"
+    """Sub-repository or module directory. (These are what is inside `APPS`)"""
+    TESTS = "tests"
+    """Tests directory, including fixtures."""
+    TOOLING = "tooling"
+    """Developer tooling or similar tool configuration (linting, formatting, cli tools). Not scripts/automation tools, which are `SCRIPTS`."""
+
+    __slots__ = ()
+
+    def alias(self) -> tuple[str, ...]:
+        """Get alternative names for the directory purpose.
+
+        (Should it be `aliases`? Yes. But that's a classmethod for `BaseEnum` that relies on this being 'alias`.)
+
+        Returns:
+            A tuple of alternative names.
+        """
+        aliases: dict[DirectoryPurpose, tuple[str, ...]] = {
+            DirectoryPurpose.APPS: (
+                "app",
+                "applications",
+                "application",
+                "crates",
+                "modules",
+                "packages",
+                "services",
+                "pkgs",
+                "mods",
+                "workspaces",
+                "pkgspaces",
+                "svcs",
+            ),
+            DirectoryPurpose.BACKEND: ("back-end",),
+            DirectoryPurpose.BUILD: (),
+            DirectoryPurpose.CI: (
+                ".github",
+                ".circleci",
+                ".ci",
+                "ci",
+                "cd",
+                ".cd",
+                "ci-cd",
+                ".ci-cd",
+                "ci_cd",
+                ".ci_cd",
+            ),
+            DirectoryPurpose.DOCS: ("documentation", "examples", "doc"),
+            DirectoryPurpose.FRONTEND: ("front-end", "ui", "web", "www"),
+            DirectoryPurpose.INFRA: ("infrastructure",),
+            DirectoryPurpose.LIB: ("library", "libs", "libraries"),
+            DirectoryPurpose.SCRIPTS: ("bin", "bins", "tools", ".tools"),
+            DirectoryPurpose.SRC: ("source", "Sources", "Source"),
+            DirectoryPurpose.SUB_REPO: (),  # found heuristically
+            DirectoryPurpose.TESTS: (*TEST_DIR_NAMES, "fixtures"),
+            DirectoryPurpose.TOOLING: tuple(
+                str(path)
+                for paths in COMMON_TOOLING_PATHS
+                for path in paths[1]
+                if "." not in str(path)[1:] or "/" not in str(path)
+            ),
+        }
+        return aliases.get(self, ())
 
 
 def get_discovery_service() -> FileDiscoveryService:
@@ -142,22 +237,13 @@ class RepoChecklist(DataclassSerializationMixin):
 
     # Directory name variants for common directories with alternate naming conventions
     _DIR_VARIANTS: ClassVar[MappingProxyType[str, set[str]]] = MappingProxyType({
-        "apps": {"apps", "app", "applications", "application"},
+        "apps": {"apps", "app", "applications", "application", "crates"},
         "ci": {"ci", ".ci", "cd", ".cd", "ci-cd", ".ci-cd", ".ci_cd", "ci_cd"},
         "lib": {"lib", "library", "libs", "libraries"},
-        "tests": {
-            "test",
-            "tests",
-            "spec",
-            "specs",
-            "__test__",
-            "__tests__",
-            "__spec__",
-            "__specs__",
-        },
+        "tests": {*TEST_DIR_NAMES},
         "src": {"src", "source"},
         "packages": {"packages", "pkg", "pkgs"},
-        "modules": {"modules", "mod", "mods"},
+        "modules": {"modules", "mod", "mods", "workspaces", "pkgspaces", "services", "svcs"},
     })
 
     @classmethod
@@ -484,24 +570,3 @@ class RepoChecklist(DataclassSerializationMixin):
             if dir_path is not False:
                 app_dirs.extend(d for d in dir_path.iterdir() if d.is_dir())
         return app_dirs
-
-
-class RepoContextDetector:
-    """Detects the context and topography of a code repository.
-
-    Uses heuristic methods to analyze the structure and contents
-    of the repository to determine its characteristics.
-    """
-
-    async def __init__(self) -> None:
-        """Initialize the RepoContextDetector."""
-        self.discovery_service = get_discovery_service()
-        self.project_root = self.discovery_service.settings["project_root"]
-        self.files = await self.discovery_service.get_discovered_files()
-
-    async def detect(self):
-        """Detect repository context characteristics.
-
-        Returns:
-            A dictionary with detected characteristics.
-        """

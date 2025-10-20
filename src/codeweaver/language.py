@@ -14,10 +14,10 @@ from collections.abc import Generator, Iterable
 from functools import cache
 from pathlib import Path
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, cast, overload
+from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, TypedDict, cast, overload
 
 from langchain_text_splitters import Language as LC_Language
-from pydantic import Field
+from pydantic import Field, computed_field
 
 from codeweaver._common import BasedModel, BaseEnum, LiteralStringT
 from codeweaver._constants import ALL_LANGUAGES, ExtLangPair, get_ext_lang_pairs
@@ -302,6 +302,30 @@ class ConfigLanguage(BaseEnum):
         Returns all file extensions for all configuration languages.
         """
         yield from (ext for lang in cls for ext in lang.extensions if ext and ext != "SELF")
+
+
+class RepoConventions(TypedDict, total=False):
+    """
+    A TypedDict representing common repository conventions for a language.
+    """
+
+    source_dirs: tuple[LiteralStringT, ...]
+    """Directories that typically contain source code files."""
+    test_dirs: tuple[LiteralStringT, ...]
+    """Directories that typically contain test files."""
+    test_patterns: tuple[LiteralStringT, ...]
+    """File name patterns commonly used for test files."""
+    binary_dirs: tuple[LiteralStringT, ...]
+    """Directories that typically contain compiled binaries or build artifacts."""
+    private_package_dirs: tuple[LiteralStringT, ...]
+    workspace_dirs: tuple[LiteralStringT, ...]
+    """Directories that indicate a workspace, monorepo, or multi-package repository structure or that are used to group packages under a language's conventions."""
+    workspace_files: tuple[LiteralStringT, ...]
+    """Files that indicate a workspace, monorepo, or multi-package repository structure or that are used to group packages under a language's conventions."""
+    workspace_defined_in_file: bool
+    """Indicates whether the workspace is defined in a specific file (e.g., `settings.gradle.kts` for Kotlin)."""
+    workspace_definition_files: tuple[tuple[LiteralStringT, tuple[LiteralStringT, ...]], ...]
+    """Tuple of files and keys or paths within those files that specify the workspace structure."""
 
 
 class SemanticSearchLanguage(str, BaseEnum):
@@ -958,6 +982,361 @@ class SemanticSearchLanguage(str, BaseEnum):
             ),
             None,
         )
+
+    @computed_field
+    @property
+    def repo_conventions(self) -> RepoConventions:
+        """
+        Returns the repository conventions associated with this language.
+        """
+        defaults = RepoConventions(
+            source_dirs=("src", "source", "lib"),
+            test_dirs=("tests", "test", "spec"),
+            test_patterns=("test_", "_test"),
+            binary_dirs=("build", "bin", "obj"),
+            workspace_defined_in_file=False,
+        )
+        return {
+            SemanticSearchLanguage.BASH: defaults
+            | RepoConventions(
+                source_dirs=("scripts", "bin", "lib"),
+                test_dirs=("tests", "test"),
+                test_patterns=("test_", "_test.sh", ".bats"),
+                binary_dirs=(),
+            ),
+            SemanticSearchLanguage.C_LANG: defaults
+            | RepoConventions(
+                source_dirs=("src",),
+                test_dirs=("tests", "test"),
+                test_patterns=("test_", "_test.c"),
+                binary_dirs=("build", "bin", "obj", ".o"),
+                workspace_files=("CMakeLists.txt", "Makefile"),
+            ),
+            SemanticSearchLanguage.C_PLUS_PLUS: defaults
+            | RepoConventions(
+                source_dirs=("src", "include"),
+                test_dirs=("tests", "test"),
+                test_patterns=("test_", "_test.cpp", "_test.cc"),
+                binary_dirs=("build", "bin", "obj", "cmake-build-debug", "cmake-build-release"),
+                workspace_files=("CMakeLists.txt", "Makefile"),
+            ),
+            SemanticSearchLanguage.C_SHARP: defaults
+            | RepoConventions(
+                source_dirs=("src",),
+                test_dirs=("tests", "test"),
+                test_patterns=("Test.cs", "Tests.cs"),
+                binary_dirs=("bin", "obj"),
+                workspace_files=("*.sln",),
+                workspace_defined_in_file=True,
+                workspace_definition_files=(
+                    ("*.sln", ("Project",)),  # Solution files list projects
+                ),
+            ),
+            SemanticSearchLanguage.CSS: defaults
+            | RepoConventions(
+                source_dirs=("src", "styles", "css", "assets"),
+                test_dirs=(),  # CSS rarely has dedicated test directories
+                test_patterns=(),
+                binary_dirs=("dist", "build"),
+            ),
+            SemanticSearchLanguage.ELIXIR: defaults
+            | RepoConventions(
+                source_dirs=("lib",),
+                test_dirs=("test",),
+                test_patterns=("_test.exs",),
+                binary_dirs=("_build", "deps"),
+                workspace_dirs=("apps",),
+                workspace_files=("mix.exs",),
+                workspace_defined_in_file=True,
+                workspace_definition_files=(
+                    ("mix.exs", ("umbrella",)),  # umbrella: true in mix.exs
+                ),
+            ),
+            SemanticSearchLanguage.GO: defaults
+            | RepoConventions(
+                source_dirs=("internal", "pkg", "cmd"),
+                test_dirs=("tests", "test"),
+                test_patterns=("_test.go",),
+                binary_dirs=("bin", "build"),
+                private_package_dirs=("internal",),  # Compiler-enforced
+                workspace_files=("go.work", "go.mod"),
+                workspace_defined_in_file=True,
+                workspace_definition_files=(
+                    ("go.work", ("use",)),  # go.work lists workspace members
+                ),
+            ),
+            SemanticSearchLanguage.HASKELL: defaults
+            | RepoConventions(
+                source_dirs=("src",),
+                test_dirs=("test",),
+                test_patterns=("Spec.hs", "Test.hs", "*Spec.hs", "*Test.hs"),
+                binary_dirs=("dist", "dist-newstyle", ".stack-work"),
+                workspace_dirs=("app", "apps"),
+                workspace_files=("cabal.project", "stack.yaml", "package.yaml"),
+                workspace_defined_in_file=True,
+                workspace_definition_files=(
+                    ("cabal.project", ("packages",)),
+                    ("stack.yaml", ("packages",)),
+                ),
+            ),
+            SemanticSearchLanguage.HTML: defaults
+            | RepoConventions(
+                source_dirs=("src", "public", "static"),
+                test_dirs=(),
+                test_patterns=(),
+                binary_dirs=("dist", "build"),
+            ),
+            SemanticSearchLanguage.JAVA: defaults
+            | RepoConventions(
+                source_dirs=("src/main/java", "src"),
+                test_dirs=("src/test/java", "tests", "test"),
+                test_patterns=("Test.java", "*Test.java"),
+                binary_dirs=("target", "build", "out", "bin"),
+                workspace_files=(
+                    "settings.gradle",
+                    "settings.gradle.kts",
+                    "pom.xml",
+                    "build.gradle",
+                    "build.gradle.kts",
+                ),
+                workspace_defined_in_file=True,
+                workspace_definition_files=(
+                    ("settings.gradle", ("include",)),
+                    ("settings.gradle.kts", ("include",)),
+                    ("pom.xml", ("modules",)),
+                ),
+            ),
+            SemanticSearchLanguage.JAVASCRIPT: defaults
+            | RepoConventions(
+                source_dirs=("src", "lib"),
+                test_dirs=("tests", "test", "__tests__"),
+                test_patterns=(".*.test.js", ".*.spec.js", "test/*", "spec/*"),
+                binary_dirs=("node_modules", "dist", "build"),
+                private_package_dirs=("node_modules",),
+                workspace_dirs=("packages", "apps"),
+                workspace_files=(
+                    "package.json",
+                    "lerna.json",
+                    "pnpm-workspace.yaml",
+                    "turbo.json",
+                    "nx.json",
+                ),
+                workspace_defined_in_file=True,
+                workspace_definition_files=(
+                    ("package.json", ("workspaces",)),
+                    ("lerna.json", ("packages",)),
+                    ("pnpm-workspace.yaml", ("packages",)),
+                ),
+            ),
+            SemanticSearchLanguage.JSX: defaults
+            | RepoConventions(
+                source_dirs=("src", "lib", "components"),
+                test_dirs=("tests", "test", "__tests__"),
+                test_patterns=(".*.test.jsx", ".*.spec.jsx", "test/*", "spec/*"),
+                binary_dirs=("node_modules", "dist", "build"),
+                private_package_dirs=("node_modules",),
+                workspace_dirs=("packages", "apps"),
+                workspace_files=(
+                    "package.json",
+                    "lerna.json",
+                    "pnpm-workspace.yaml",
+                    "turbo.json",
+                    "nx.json",
+                ),
+                workspace_defined_in_file=True,
+                workspace_definition_files=(
+                    ("package.json", ("workspaces",)),
+                    ("lerna.json", ("packages",)),
+                    ("pnpm-workspace.yaml", ("packages",)),
+                ),
+            ),
+            SemanticSearchLanguage.JSON: defaults
+            | RepoConventions(
+                source_dirs=("config", "data", "schemas"),
+                test_dirs=(),
+                test_patterns=(),
+                binary_dirs=(),
+            ),
+            SemanticSearchLanguage.KOTLIN: defaults
+            | RepoConventions(
+                source_dirs=("src/main/kotlin", "src"),
+                test_dirs=("src/test/kotlin", "tests", "test"),
+                test_patterns=("Test.kt", "*Test.kt"),
+                binary_dirs=("target", "build", "out"),
+                workspace_files=("settings.gradle", "settings.gradle.kts", "build.gradle.kts"),
+                workspace_defined_in_file=True,
+                workspace_definition_files=(
+                    ("settings.gradle", ("include",)),
+                    ("settings.gradle.kts", ("include",)),
+                ),
+            ),
+            SemanticSearchLanguage.LUA: defaults
+            | RepoConventions(
+                source_dirs=("src", "lib"),
+                test_dirs=("test", "spec"),
+                test_patterns=("_spec.lua", "_test.lua"),
+                workspace_files=("*.rockspec",),
+            ),
+            SemanticSearchLanguage.NIX: defaults
+            | RepoConventions(
+                source_dirs=(".",),  # Nix files are often at root or in various locations
+                test_dirs=("tests",),
+                test_patterns=("test.nix",),
+                binary_dirs=("result",),  # Nix build output symlink
+            ),
+            SemanticSearchLanguage.PHP: defaults
+            | RepoConventions(
+                source_dirs=("src", "lib", "app"),
+                test_dirs=("tests",),
+                test_patterns=("Test.php", "*Test.php"),
+                binary_dirs=("vendor", "build"),
+                private_package_dirs=("vendor",),
+                workspace_files=("composer.json",),
+                workspace_defined_in_file=True,
+                workspace_definition_files=(
+                    ("composer.json", ("repositories",)),  # Path repositories for monorepos
+                ),
+            ),
+            SemanticSearchLanguage.PYTHON: defaults
+            | RepoConventions(
+                source_dirs=("src", "lib"),
+                test_dirs=("tests", "test"),
+                test_patterns=("test_", "_test.py"),
+                binary_dirs=(
+                    "build",
+                    "dist",
+                    "__pycache__",
+                    ".pytest_cache",
+                    ".mypy_cache",
+                    "*.egg-info",
+                ),
+                private_package_dirs=(".venv", "venv", ".env", "env", "virtualenv"),
+                workspace_files=("pyproject.toml", "setup.py"),
+                workspace_defined_in_file=True,
+                workspace_definition_files=(
+                    ("pyproject.toml", ("tool.poetry",)),
+                    ("pyproject.toml", ("tool.hatch",)),  # Poetry/Hatch workspaces
+                ),
+            ),
+            SemanticSearchLanguage.RUBY: defaults
+            | RepoConventions(
+                source_dirs=("lib",),
+                test_dirs=("spec", "test"),
+                test_patterns=("_spec.rb", "_test.rb"),
+                binary_dirs=("vendor", "bundle"),
+                private_package_dirs=("vendor",),
+                workspace_files=("Gemfile", "*.gemspec"),
+                workspace_defined_in_file=True,
+                workspace_definition_files=(
+                    ("Gemfile", ("path:",)),  # Local gems via path: option
+                ),
+            ),
+            SemanticSearchLanguage.RUST: defaults
+            | RepoConventions(
+                source_dirs=("src", "crates"),
+                test_dirs=("tests",),
+                test_patterns=("test_", "_test.rs"),
+                binary_dirs=("target",),
+                workspace_dirs=("crates",),
+                workspace_files=("Cargo.toml",),
+                workspace_defined_in_file=True,
+                workspace_definition_files=(
+                    ("Cargo.toml", ("workspace",)),  # [workspace] section
+                ),
+            ),
+            SemanticSearchLanguage.SCALA: defaults
+            | RepoConventions(
+                source_dirs=("src/main/scala",),
+                test_dirs=("src/test/scala",),
+                test_patterns=("Test.scala", "*Test.scala", "*Spec.scala"),
+                binary_dirs=("target", "project/target"),
+                workspace_files=("build.sbt",),
+                workspace_defined_in_file=True,
+                workspace_definition_files=(
+                    (
+                        "build.sbt",
+                        ("lazy val",),
+                    ),  # Multiple lazy val definitions indicate subprojects
+                ),
+            ),
+            SemanticSearchLanguage.SOLIDITY: defaults
+            | RepoConventions(
+                source_dirs=("contracts", "src"),
+                test_dirs=("test",),
+                test_patterns=(".*.test.sol", ".*.t.sol"),  # Foundry uses .t.sol
+                binary_dirs=("artifacts", "cache", "out"),
+                workspace_files=(
+                    "hardhat.config.js",
+                    "hardhat.config.ts",
+                    "foundry.toml",
+                    "truffle-config.js",
+                ),
+            ),
+            SemanticSearchLanguage.SWIFT: defaults
+            | RepoConventions(
+                source_dirs=("Sources", "src"),
+                test_dirs=("Tests",),
+                test_patterns=("Tests.swift", "*Tests.swift"),
+                binary_dirs=(".build", "build"),
+                workspace_files=("Package.swift", "*.xcodeproj", "*.xcworkspace"),
+                workspace_defined_in_file=True,
+                workspace_definition_files=(
+                    ("Package.swift", ("targets",)),  # SPM defines targets
+                ),
+            ),
+            SemanticSearchLanguage.TYPESCRIPT: defaults
+            | RepoConventions(
+                source_dirs=("src", "lib"),
+                test_dirs=("tests", "test", "__tests__"),
+                test_patterns=(".*.test.ts", ".*.spec.ts", "test/*", "spec/*"),
+                binary_dirs=("node_modules", "dist", "build"),
+                private_package_dirs=("node_modules",),
+                workspace_dirs=("packages", "apps"),
+                workspace_files=(
+                    "package.json",
+                    "lerna.json",
+                    "pnpm-workspace.yaml",
+                    "turbo.json",
+                    "nx.json",
+                    "tsconfig.json",
+                ),
+                workspace_defined_in_file=True,
+                workspace_definition_files=(
+                    ("package.json", ("workspaces",)),
+                    ("lerna.json", ("packages",)),
+                    ("pnpm-workspace.yaml", ("packages",)),
+                ),
+            ),
+            SemanticSearchLanguage.TSX: defaults
+            | RepoConventions(
+                source_dirs=("src", "lib", "components"),
+                test_dirs=("tests", "test", "__tests__"),
+                test_patterns=(".*.test.tsx", ".*.spec.tsx", "test/*", "spec/*"),
+                binary_dirs=("node_modules", "dist", "build"),
+                private_package_dirs=("node_modules",),
+                workspace_dirs=("packages", "apps"),
+                workspace_files=(
+                    "package.json",
+                    "lerna.json",
+                    "pnpm-workspace.yaml",
+                    "turbo.json",
+                    "nx.json",
+                ),
+                workspace_defined_in_file=True,
+                workspace_definition_files=(
+                    ("package.json", ("workspaces",)),
+                    ("lerna.json", ("packages",)),
+                    ("pnpm-workspace.yaml", ("packages",)),
+                ),
+            ),
+            SemanticSearchLanguage.YAML: defaults
+            | RepoConventions(
+                source_dirs=("config", "ci", ".github", ".gitlab-ci.yml"),
+                test_dirs=(),
+                test_patterns=(),
+                binary_dirs=(),
+            ),
+        }.get(self, RepoConventions())
 
 
 # Helper functions

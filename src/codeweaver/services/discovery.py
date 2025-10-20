@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextlib
+
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -41,7 +43,6 @@ class FileDiscoveryService:
         max_file_size: int | None = None,
         read_git_ignore: bool | None = None,
         read_ignore_files: bool | None = None,
-        ignore_hidden: bool | None = None,
         additional_ignore_paths: list[Path] | None = None,
     ) -> list[Path]:
         """Discover files using rignore integration with filtering.
@@ -66,19 +67,25 @@ class FileDiscoveryService:
                 self.settings["project_root"],
                 max_filesize=max_file_size or self.settings["max_file_size"],
                 case_insensitive=True,
-                read_git_ignore=read_git_ignore or self.settings["filter_settings"].use_gitignore,
+                read_git_ignore=read_git_ignore
+                if read_git_ignore in (True, False)
+                else self.settings["filter_settings"].use_gitignore,
                 read_ignore_files=read_ignore_files
                 or self.settings["filter_settings"].use_other_ignore_files,
-                ignore_hidden=ignore_hidden or self.settings["filter_settings"].ignore_hidden,
+                # in all but this narrow case below below, ignore_hidden_files is False
+                # otherwise we need to resolve whether to include .github/ and tooling dirs before we can discard other hidden files
+                ignore_hidden=bool(
+                    self.settings["filter_settings"].ignore_hidden_files
+                    and self.settings["filter_settings"].include_github_dir is False
+                    and self.settings["filter_settings"].include_tooling_dirs is False
+                ),
                 additional_ignore_paths=extra_ignores,
             )
-            for file_path in walker:
-                if file_path.is_file():
-                    try:
-                        relative_path = file_path.relative_to(self.settings["project_root"])
-                        discovered.append(relative_path)
-                    except ValueError:
-                        continue
+            with contextlib.suppress(ValueError):
+                discovered.extend(
+                    file_path.relative_to(self.settings["project_root"]) for file_path in walker
+                )
+
         except Exception as e:
             raise IndexingError(
                 f"Failed to discover files in {self.settings['project_root']}",

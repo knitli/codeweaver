@@ -99,7 +99,6 @@ class ExtLangPair(NamedTuple):
 DEFAULT_EXCLUDED_DIRS: frozenset[LiteralStringT] = frozenset({
     ".DS_Store",
     ".cache",
-    ".claude",
     ".eslintcache",
     ".git",
     ".hg",
@@ -108,7 +107,6 @@ DEFAULT_EXCLUDED_DIRS: frozenset[LiteralStringT] = frozenset({
     ".jj",
     ".next",
     ".nuxt",
-    ".roo",
     ".ruff_cache",
     ".svn",
     ".temp",
@@ -116,7 +114,6 @@ DEFAULT_EXCLUDED_DIRS: frozenset[LiteralStringT] = frozenset({
     ".tsbuildinfo",
     ".venv",
     ".vs",
-    ".vscode",
     "Debug",
     "Release",
     "Releases",
@@ -126,10 +123,7 @@ DEFAULT_EXCLUDED_DIRS: frozenset[LiteralStringT] = frozenset({
     "aarch64",
     "arm",
     "arm64",
-    "bin",
-    "bld",
     "bower_components",
-    "build",
     "debug",
     "dist",
     "htmlcov",
@@ -145,6 +139,8 @@ DEFAULT_EXCLUDED_DIRS: frozenset[LiteralStringT] = frozenset({
     "site",
     "target",
     "temp",
+    "tmp",
+    "vendor",
     "venv",
     "win32",
     "win64",
@@ -543,7 +539,23 @@ CODE_FILES_EXTENSIONS: tuple[ExtLangPair, ...] = (
 # spellchecker:on
 """A tuple of `ExtLangPair`."""
 
+TEST_DIR_NAMES: tuple[LiteralStringT, ...] = (
+    "__tests__",
+    "__specs__",
+    "test",
+    "tests",
+    "spec",
+    "specs",
+    "test-*",
+    "spec-*",
+    "Tests",  # swift
+)
+
+TEST_FILE_PATTERNS: tuple[LiteralStringT, ...] = ("*.test.*", "*.spec.*", "*_test.*", "*_spec.*")
+
 COMMON_TOOLING_PATHS: tuple[tuple[LiteralStringT, tuple[Path, ...]], ...] = (
+    ("ast-grep", (Path("sgconfig.yml"),)),
+    ("cargo", (Path("Cargo.toml"), Path("Cargo.lock"), Path(".cargo"))),
     (
         "docker",
         (
@@ -571,6 +583,9 @@ COMMON_TOOLING_PATHS: tuple[tuple[LiteralStringT, tuple[Path, ...]], ...] = (
             Path("CMakeFiles"),
         ),
     ),
+    ("bun", (Path("bun.lockb"), Path("bunfig.toml"), Path("bunfig.json"), Path("bun.lock"))),
+    ("changesets", (Path(".changeset"),)),
+    ("composer", (Path("composer.json"), Path("composer.lock"))),
     ("esbuild", (Path("esbuild.config.js"), Path("esbuild.config.ts"))),
     (
         "gradle",
@@ -580,23 +595,59 @@ COMMON_TOOLING_PATHS: tuple[tuple[LiteralStringT, tuple[Path, ...]], ...] = (
             Path("gradlew"),
             Path("gradlew.bat"),
             Path("gradle"),
+            Path("settings.gradle"),
+            Path("settings.gradle.kts"),
         ),
     ),
+    ("deno", (Path("deno.json"), Path("deno.jsonc"), Path("deno.lock"))),
+    ("hardhat", (Path("hardhat.config.js"), Path("hardhat.config.ts"))),
     ("hk", (Path("hk.pkl"),)),
+    ("husky", (Path(".husky"), Path(".husky/pre-commit"), Path(".husky/pre-push"))),
     ("intellij", (Path(".idea"), Path(".idea/misc.xml"), Path(".idea/modules.xml"))),
     ("just", (Path("Justfile"), Path("justfile"))),
-    ("moon", (Path("moon.yml"), Path("moon.yaml"), Path(".moon"))),
-    ("maven", (Path("pom.xml"), Path("settings.xml"), Path(".mvn"))),
+    ("lerna", (Path("lerna.json"),)),
+    (
+        "maven",
+        (Path("pom.xml"), Path("settings.xml"), Path(".mvn"), Path("mvnw"), Path("mvnw.cmd")),
+    ),
     ("mise", (Path("mise.toml"),)),
+    ("moon", (Path("moon.yml"), Path("moon.yaml"), Path(".moon"))),
+    ("nextjs", (Path("next.config.js"), Path("next.config.ts"))),
+    ("npm", (Path("package-lock.json"), Path(".npmrc"))),
+    ("nuxt", (Path("nuxt.config.js"), Path("nuxt.config.ts"))),
+    ("nx", (Path("nx.json"), Path("workspace.json"), Path("angular.json"))),
+    ("pnpm", (Path("pnpm-lock.yaml"), Path("pnpm-workspace.yaml"))),
+    ("poetry", (Path("poetry.lock"),)),
+    ("pre-commit", (Path(".pre-commit-config.yaml"), Path(".pre-commit-config.yml"))),
     (
         "proto",
         (Path("proto.toml"), Path("proto.pkl"), Path("prototools.toml"), Path("prototools.pkl")),
     ),
+    ("rollbar", (Path("rollbar.config.js"), Path("rollbar.config.ts"))),
     ("rollup", (Path("rollup.config.js"), Path("rollup.config.ts"))),
+    ("ruff", (Path("ruff.toml"), Path(".ruff.toml"))),
+    ("rush", (Path("rush.json"),)),
+    ("sbt", (Path("build.sbt"), Path("project/build.properties"), Path("project/plugins.sbt"))),
+    ("skaffold", (Path("skaffold.yaml"), Path("skaffold.yml"))),
+    (
+        "stylelint",
+        (
+            Path(".stylelintrc"),
+            Path(".stylelintrc.json"),
+            Path(".stylelintrc.yaml"),
+            Path(".stylelintrc.yml"),
+        ),
+    ),
+    ("tailwind", (Path("tailwind.config.js"), Path("tailwind.config.ts"))),
+    ("typos", (Path("_typos.toml"), Path(".typos.toml"), Path("typos.toml"))),
+    ("turborepo", (Path("turbo.json"),)),
+    ("uv", (Path("uv.toml"), Path("uv.lock"))),
     ("vite", (Path("vite.config.js"), Path("vite.config.ts"))),
+    ("vitest", (Path("vitest.config.js"), Path("vitest.config.ts"))),
     ("vscode", (Path(".vscode"), Path(".vscode/settings.json"), Path(".vscode/launch.json"))),
     ("webpack", (Path("webpack.config.js"), Path("webpack.config.ts"))),
     ("xtask", (Path("xtask"), Path("xtask/src/main.rs"))),
+    ("yarn", (Path("yarn.lock"), Path(".yarn"), Path(".yarnrc"), Path(".yarnrc.yml"))),
 )
 """Common paths for build and development tooling used in projects. This needs expansion, pull requests are welcome!"""
 
@@ -630,6 +681,73 @@ COMMON_LLM_TOOLING_PATHS: tuple[tuple[LiteralStringT, tuple[Path, ...]], ...] = 
     ),
 )
 """Common paths for LLM tooling used in projects. This needs expansion -- right now it's literally just what I've used."""
+
+_js_fam_paths = (
+    Path("package.json"),
+    Path("package-lock.json"),
+    Path("yarn.lock"),
+    Path("pnpm-lock.yaml"),
+    Path("node_modules"),
+    Path("bun.lockb"),
+    Path("bun.lock"),
+)
+
+LANGUAGE_SPECIFIC_PATHS: MappingProxyType[LiteralStringT, tuple[Path, ...]] = MappingProxyType({
+    "csharp": (Path("*.csproj"), Path("*.sln")),
+    "elixir": (Path("mix.exs"), Path("mix.lock")),
+    "erlang": (Path("rebar.config"), Path("rebar.lock")),
+    "go": (Path("go.mod"), Path("go.sum"), Path("go.work"), Path("cmd"), Path("internal")),
+    "haskell": (Path("stack.yaml"), Path("cabal.project"), Path("package.yaml")),
+    "java": (
+        Path("build.gradle"),
+        Path("build.gradle.kts"),
+        Path("pom.xml"),
+        Path("pom.xml"),
+        Path("src/main/java"),
+        Path("src/main/tests"),
+    ),
+    "javascript": _js_fam_paths,
+    "jsx": _js_fam_paths,
+    "kotlin": (Path("src/main/kotlin"), Path("src/test/kotlin")),
+    "lua": (Path("*.rockspec"),),
+    "php": (Path("composer.json"), Path("composer.lock")),
+    "python": (
+        Path("Pipfile"),
+        Path("Pipfile.lock"),
+        Path("pyproject.toml"),
+        Path("requirements-dev.txt"),
+        Path("requirements.txt"),
+        Path("setup.cfg"),
+        Path("setup.py"),
+    ),
+    "ruby": (
+        Path("*.gemspec"),
+        Path("Gemfile"),
+        Path("Gemfile.lock"),
+        Path("Rakefile"),
+        Path("config.ru"),
+        Path("spec"),
+    ),
+    "rust": (Path("Cargo.toml"), Path("Cargo.lock")),
+    "scala": (
+        Path("build.sbt"),
+        Path("project/build.properties"),
+        Path("project/plugins.sbt"),
+        Path("src/main/scala"),
+        Path("src/test/scala"),
+    ),
+    "solidity": (
+        Path("contracts"),
+        Path("foundry.toml"),
+        Path("hardhat.config.js"),
+        Path("hardhat.config.ts"),
+        Path("truffle-config.js"),
+        Path("truffle-config.ts"),
+    ),
+    "swift": (Path("Package.swift"), Path(".xcodeproj"), Path(".xcworkspace")),
+    "typescript": _js_fam_paths,
+    "tsx": _js_fam_paths,
+})
 
 
 class FallBackTestDef(TypedDict):
@@ -698,45 +816,6 @@ def _get_languages_helper() -> tuple[
 CODE_LANGUAGES, DATA_LANGUAGES, DOCS_LANGUAGES, ALL_LANGUAGES = _get_languages_helper()
 """Frozen sets of languages for code, data, documentation, and all combined."""
 
-SEMANTIC_KINDS = MappingProxyType({
-    "python": {
-        "function_definition",
-        "class_definition",
-        "import_statement",
-        "import_from_statement",
-    },
-    "javascript": {
-        "function_declaration",
-        "function_expression",
-        "class_declaration",
-        "method_definition",
-        "import_statement",
-    },
-    "typescript": {
-        "function_declaration",
-        "function_expression",
-        "class_declaration",
-        "method_definition",
-        "interface_declaration",
-        "import_statement",
-    },
-    "java": {
-        "method_declaration",
-        "class_declaration",
-        "interface_declaration",
-        "import_declaration",
-    },
-    "rust": {"function_item", "struct_item", "impl_item", "trait_item", "use_declaration"},
-    "go": {"function_declaration", "method_declaration", "type_declaration", "import_declaration"},
-    "cpp": {
-        "function_definition",
-        "class_specifier",
-        "namespace_definition",
-        "template_declaration",
-    },
-    "c": {"function_definition", "struct_specifier", "typedef_declaration"},
-})
-
 
 def get_ext_lang_pairs(*, include_data: bool = False) -> Generator[ExtLangPair]:
     """Yield all `ExtLangPair` instances for code, config, and docs files."""
@@ -794,6 +873,8 @@ __all__ = (
     "ALL_LANGUAGES",
     "CODE_FILES_EXTENSIONS",
     "CODE_LANGUAGES",
+    "COMMON_LLM_TOOLING_PATHS",
+    "COMMON_TOOLING_PATHS",
     "CONFIG_FILE_LANGUAGES",
     "DATA_FILES_EXTENSIONS",
     "DATA_LANGUAGES",
@@ -802,6 +883,8 @@ __all__ = (
     "DOCS_LANGUAGES",
     "DOC_FILES_EXTENSIONS",
     "FALLBACK_TEST",
+    "TEST_DIR_NAMES",
+    "TEST_FILE_PATTERNS",
     "ExtLangPair",
     "FallBackTestDef",
     "get_ext_lang_pairs",

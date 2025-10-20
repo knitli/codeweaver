@@ -276,7 +276,10 @@ class BaseEnum(Enum):
                 self.as_title,
             }
             if hasattr(self, "alias") and (alias := getattr(self, "alias", None)):
-                names.add(alias)
+                if isinstance(alias, str):
+                    names.add(alias)
+                elif isinstance(alias, list | tuple):
+                    names |= set(alias)  # type: ignore
             names |= {n for name in names.copy() for n in self._multiply_variations(name)}
             return tuple(sorted(names))
         return (self.value, self.name, self.variable, self.as_title)

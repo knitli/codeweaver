@@ -588,6 +588,7 @@ class FileFilterSettingsDict(TypedDict, total=False):
     use_other_ignore_files: NotRequired[bool]
     ignore_hidden: NotRequired[bool]
     include_github_dir: NotRequired[bool]
+    include_tooling_dir: NotRequired[bool]
     other_ignore_kwargs: NotRequired[RignoreSettings | Unset]
     default_rignore_settings: NotRequired[DictView[RignoreSettings]]
 

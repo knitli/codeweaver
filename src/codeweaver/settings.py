@@ -151,6 +151,7 @@ class FileFilterSettings(BasedModel):
     - Other filters like `use_gitignore`, `use_other_ignore_files`, and `ignore_hidden` will apply to all files **not in `forced_includes`**.
       - Files in `forced_includes`, including files defined from glob patterns, will *not* be filtered by these settings.
     - if `include_github_dir` is True (default), the glob `**/.github/**` will be added to `forced_includes`.
+    - if `include_tooling_dirs` is True (default and recommended), common hidden tooling directories will be included *if they aren't .gitignored* (assuming `use_gitignore` is enabled, which is default). Any gitignored files will be excluded. This includes directories like `.vscode`, `.idea`, but also more specialized ones like `.moon`, `.husky`, and LLM-specific ones like `.codeweaver`, `.claude`, `.codex`, `.roo`, and more.
     """
 
     model_config = (
@@ -193,6 +194,12 @@ class FileFilterSettings(BasedModel):
         bool,
         Field(
             description="""Whether to include the .github directory in search and indexing. Because the .github directory is hidden, it wouldn't be included in default settings. Most people want to include it for work on GitHub Actions, workflows, and other GitHub-related files."""
+        ),
+    ] = True
+    include_tooling_dirs: Annotated[
+        bool,
+        Field(
+            description="""Whether to include common hidden tooling directories in search and indexing. This is enabled by default and recommended for most users. Still respects .gitignore rules, so any gitignored files will be excluded."""
         ),
     ] = True
     other_ignore_kwargs: Annotated[
