@@ -1,7 +1,6 @@
 ---
-mode: 'agent'
 description: 'Improve documentation with plain language, examples, and clear explanations'
-tools: ['createFile', 'createDirectory', 'editFiles', 'search', 'runTasks', 'usages', 'vscodeAPI', 'think', 'changes', 'fetch', 'githubRepo', 'extensions']
+tools: ['edit/createFile', 'edit/createDirectory', 'edit/editFiles', 'search', 'runTasks', 'usages', 'vscodeAPI', 'think', 'changes', 'fetch', 'githubRepo', 'extensions']
 ---
 <!--
 SPDX-FileCopyrightText: 2025 Knitli Inc. <knitli@knit.li>

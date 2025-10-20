@@ -1,6 +1,6 @@
 ---
 description: 'Expert in synthesizing and curating external API knowledge for precise feature integration'
-tools: ['edit', 'search', 'runInTerminal', 'getTerminalOutput', 'terminalSelection', 'usages', 'think', 'changes', 'fetch', 'pylanceSettings', 'getPythonEnvironmentInfo', 'configurePythonEnvironment']
+tools: ['edit', 'search', 'runCommands/runInTerminal', 'usages', 'think', 'changes', 'fetch', 'pylance mcp server/pylanceSettings', 'ms-python.python/getPythonEnvironmentInfo', 'ms-python.python/configurePythonEnvironment']
 ---
 <!--
 SPDX-FileCopyrightText: 2025 Knitli Inc. <knitli@knit.li>

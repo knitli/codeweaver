@@ -32,70 +32,24 @@ jobs:
     steps:
       - name: PR Review
         if: github.event_name == 'pull_request_review'
-        uses: anthropics/claude-code-action@beta
+        uses: anthropics/claude-code-action@e8bad572273ce919ba15fec95aef0ce974464753
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          trigger_phrase: '@claude'
+          trigger_phrase: "@claude"
           assignee_trigger: claude
-          mode: agent
           label_trigger: claude
-          base_branch: staging
-          max_turns: "30"
-          allowed_tools: |
-            Bash(ast-grep:*)
-            Bash(cargo:*)
-            Bash(cp:*)
-            Bash(eval 'mise activate')
-            Bash(git:*)
-            Bash(hk:*)
-            Bash(find:*)
-            Bash(install-mise.sh:*)
-            Bash(jj:*)
-            Bash(jq:*)
-            Bash(llm-edit.sh:*)
-            Bash(mise:*)
-            Bash(mkdir:*)
-            Bash(mv:*)
-            Bash(pkl:*)
-            Bash(python:*)
-            Bash(rm:*)
-            Bash(reuse:*)
-            Bash(rustup:*)
-            Bash(sed:*)
-            Bash(taplo:*)
-            Bash(uv:*)
-            Bash(yamlfmt:*)
-            Batch
-            Glob
-            Grep
-            ToDoWrite
-            View
-            mcp__context7__get-library-docs
-            mcp__context7__resolve-library-id
-            mcp__sequential-thinking__sequentialthinking
-          mcp_config: |
-            {
-              "mcpServers": {
-                "context7": {
-                  "args": [
-                    "-y",
-                    "@upstash/context7-mcp@latest"
-                  ],
-                  "command": "npx",
-                  "type": "stdio"
-                },
-                "sequential-thinking": {
-                  "args": [
-                    "-y",
-                    "@modelcontextprotocol/server-sequential-thinking"
-                  ],
-                  "command": "npx",
-                  "type": "stdio"
-                }
-              }
-            }
-          direct_prompt: |
+          base_branch: main
+          use_commit_signing: true
+
+          claude_args: |
+            --max-turns 30
+            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking
+            --mcp-config .mcp.json
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
             Please review this pull request and identify:
               - bugs
               - security issues and potential vulnerabilities
@@ -105,70 +59,23 @@ jobs:
             Keep your feedback focused, actionable, and concise.
       - name: Issue Opened
         if: github.event_name == 'issues' && github.event.action == 'opened'
-        uses: anthropics/claude-code-action@beta
+        uses: anthropics/claude-code-action@e8bad572273ce919ba15fec95aef0ce974464753
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          trigger_phrase: '@claude'
+          trigger_phrase: "@claude"
           assignee_trigger: claude
-          mode: agent
           label_trigger: claude
-          base_branch: staging
-          max_turns: "30"
-          allowed_tools: |
-            Bash(ast-grep:*)
-            Bash(cargo:*)
-            Bash(cp:*)
-            Bash(eval 'mise activate')
-            Bash(git:*)
-            Bash(hk:*)
-            Bash(find:*)
-            Bash(install-mise.sh:*)
-            Bash(jj:*)
-            Bash(jq:*)
-            Bash(llm-edit.sh:*)
-            Bash(mise:*)
-            Bash(mkdir:*)
-            Bash(mv:*)
-            Bash(pkl:*)
-            Bash(python:*)
-            Bash(rm:*)
-            Bash(reuse:*)
-            Bash(rustup:*)
-            Bash(sed:*)
-            Bash(taplo:*)
-            Bash(uv:*)
-            Bash(yamlfmt:*)
-            Batch
-            Glob
-            Grep
-            ToDoWrite
-            View
-            mcp__context7__get-library-docs
-            mcp__context7__resolve-library-id
-            mcp__sequential-thinking__sequentialthinking
-          mcp_config: |
-            {
-              "mcpServers": {
-                "context7": {
-                  "args": [
-                    "-y",
-                    "@upstash/context7-mcp@latest"
-                  ],
-                  "command": "npx",
-                  "type": "stdio"
-                },
-                "sequential-thinking": {
-                  "args": [
-                    "-y",
-                    "@modelcontextprotocol/server-sequential-thinking"
-                  ],
-                  "command": "npx",
-                  "type": "stdio"
-                }
-              }
-            }
-          direct_prompt: |
+          track_progress: true
+          use_commit_signing: true
+          base_branch: main
+          claude_args: |
+            --max-turns 30
+            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking
+            --mcp-config .mcp.json
+          prompt: |
+            REPO: ${{ github.repository }}
+            ISSUE NUMBER: ${{ github.event.issue.number }}
             When a new issue is opened:
               - Review and summarize the issue.
               - Include any relevant context or background.
@@ -179,70 +86,23 @@ jobs:
               - If it's a feature request, estimate the difficulty of implementing the feature and potential impact on existing functionality and API.
       - name: PR Review Comment
         if: github.event_name == 'pull_request_review_comment'
-        uses: anthropics/claude-code-action@beta
+        uses: anthropics/claude-code-action@e8bad572273ce919ba15fec95aef0ce974464753
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          trigger_phrase: '@claude'
+          trigger_phrase: "@claude"
           assignee_trigger: claude
           label_trigger: claude
-          mode: agent
-          base_branch: staging
-          max_turns: "30"
-          allowed_tools: |
-            Bash(ast-grep:*)
-            Bash(cargo:*)
-            Bash(cp:*)
-            Bash(eval 'mise activate')
-            Bash(git:*)
-            Bash(hk:*)
-            Bash(find:*)
-            Bash(install-mise.sh:*)
-            Bash(jj:*)
-            Bash(jq:*)
-            Bash(llm-edit.sh:*)
-            Bash(mise:*)
-            Bash(mkdir:*)
-            Bash(mv:*)
-            Bash(pkl:*)
-            Bash(python:*)
-            Bash(rm:*)
-            Bash(reuse:*)
-            Bash(rustup:*)
-            Bash(sed:*)
-            Bash(taplo:*)
-            Bash(uv:*)
-            Bash(yamlfmt:*)
-            Batch
-            Glob
-            Grep
-            ToDoWrite
-            View
-            mcp__context7__get-library-docs
-            mcp__context7__resolve-library-id
-            mcp__sequential-thinking__sequentialthinking
-          mcp_config: |
-            {
-              "mcpServers": {
-                "context7": {
-                  "args": [
-                    "-y",
-                    "@upstash/context7-mcp@latest"
-                  ],
-                  "command": "npx",
-                  "type": "stdio"
-                },
-                "sequential-thinking": {
-                  "args": [
-                    "-y",
-                    "@modelcontextprotocol/server-sequential-thinking"
-                  ],
-                  "command": "npx",
-                  "type": "stdio"
-                }
-              }
-            }
-          direct_prompt: |
+          use_commit_signing: true
+          base_branch: main
+          claude_args: |
+            --max-turns 30
+            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking
+            --mcp-config .mcp.json
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+            COMMENT ID: ${{ github.event.comment.id }}
             When you are asked to review a pull request:
               - Review the changes made in the PR.
               - Provide feedback on the code quality, functionality, and adherence to best practices.
@@ -253,70 +113,23 @@ jobs:
       - name: Issue Assigned or Labeled Claude
         if: |
           (github.event_name == 'issues' && github.event.action == 'assigned') || (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'claude')
-        uses: anthropics/claude-code-action@beta
+        uses: anthropics/claude-code-action@e8bad572273ce919ba15fec95aef0ce974464753
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          trigger_phrase: '@claude'
+          trigger_phrase: "@claude"
           assignee_trigger: claude
-          mode: agent
           label_trigger: claude
-          base_branch: staging
-          max_turns: "30"
-          allowed_tools: |
-            Bash(ast-grep:*)
-            Bash(cargo:*)
-            Bash(cp:*)
-            Bash(eval 'mise activate')
-            Bash(git:*)
-            Bash(hk:*)
-            Bash(find:*)
-            Bash(install-mise.sh:*)
-            Bash(jj:*)
-            Bash(jq:*)
-            Bash(llm-edit.sh:*)
-            Bash(mise:*)
-            Bash(mkdir:*)
-            Bash(mv:*)
-            Bash(pkl:*)
-            Bash(python:*)
-            Bash(rm:*)
-            Bash(reuse:*)
-            Bash(rustup:*)
-            Bash(sed:*)
-            Bash(taplo:*)
-            Bash(uv:*)
-            Bash(yamlfmt:*)
-            Batch
-            Glob
-            Grep
-            ToDoWrite
-            View
-            mcp__context7__get-library-docs
-            mcp__context7__resolve-library-id
-            mcp__sequential-thinking__sequentialthinking
-          mcp_config: |
-            {
-              "mcpServers": {
-                "context7": {
-                  "args": [
-                    "-y",
-                    "@upstash/context7-mcp@latest"
-                  ],
-                  "command": "npx",
-                  "type": "stdio"
-                },
-                "sequential-thinking": {
-                  "args": [
-                    "-y",
-                    "@modelcontextprotocol/server-sequential-thinking"
-                  ],
-                  "command": "npx",
-                  "type": "stdio"
-                }
-              }
-            }
-          direct_prompt: |
+          track_progress: true
+          use_commit_signing: true
+          base_branch: main
+          claude_args: |
+            --max-turns 30
+            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details
+            --mcp-config .mcp.json
+          prompt: |
+            REPO: ${{ github.repository }}
+            ISSUE NUMBER: ${{ github.event.issue.number }}
             When you are assigned an issue or it's labeled 'claude':
               - Your job is to resolve it.
               - Gather all necessary information about the issue from discussions and comments and the codebase.

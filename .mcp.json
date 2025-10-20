@@ -2,10 +2,10 @@
   "mcpServers": {
     "context7": {
       "args": [
-        "--bun",
+        "-y",
         "@upstash/context7-mcp@latest"
       ],
-      "command": "bunx",
+      "command": "npx",
       "type": "stdio"
     },
     "sequential-thinking": {
