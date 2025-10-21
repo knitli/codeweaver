@@ -27,7 +27,7 @@ from pydantic import (
 from pydantic.dataclasses import dataclass
 from pydantic_core import ArgsKwargs, core_schema
 
-from codeweaver._common import (
+from codeweaver._types import (
     DATACLASS_CONFIG,
     BaseDataclassEnum,
     BasedModel,

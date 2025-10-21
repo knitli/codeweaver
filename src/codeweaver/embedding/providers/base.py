@@ -27,7 +27,6 @@ from uuid import UUID
 from pydantic import UUID7, ConfigDict
 from pydantic.main import IncEx
 
-from codeweaver._common import BasedModel
 from codeweaver._data_structures import (
     BlakeStore,
     CodeChunk,
@@ -37,6 +36,7 @@ from codeweaver._data_structures import (
     make_blake_store,
     make_uuid_store,
 )
+from codeweaver._types import BasedModel
 from codeweaver._utils import lazy_importer, uuid7
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.provider import Provider

@@ -10,7 +10,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, NonNegativeFloat, NonNegativeInt
 
-from codeweaver._common import BasedModel, BaseEnum
+from codeweaver._types import BasedModel, BaseEnum
 
 
 class QueryComplexity(BaseEnum):

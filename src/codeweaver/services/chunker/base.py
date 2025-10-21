@@ -22,8 +22,8 @@ from typing import TYPE_CHECKING, Annotated, Any, NamedTuple
 
 from pydantic import ConfigDict, Field, PositiveInt, computed_field
 
-from codeweaver._common import BasedModel
 from codeweaver._data_structures import CodeChunk
+from codeweaver._types import BasedModel
 from codeweaver.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.language import Chunker
 from codeweaver.reranking.capabilities.base import RerankingModelCapabilities

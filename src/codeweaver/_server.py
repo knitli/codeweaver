@@ -37,8 +37,8 @@ from pydantic.dataclasses import dataclass
 from pydantic_core import to_json
 
 from codeweaver import __version__ as version
-from codeweaver._common import DATACLASS_CONFIG, BaseEnum, DataclassSerializationMixin, DictView
 from codeweaver._logger import setup_logger
+from codeweaver._types import DATACLASS_CONFIG, BaseEnum, DataclassSerializationMixin, DictView
 from codeweaver._utils import get_project_root, lazy_importer, rpartial
 from codeweaver.exceptions import InitializationError
 from codeweaver.provider import Provider as Provider
@@ -78,9 +78,12 @@ else:
     ServiceCard = codeweaver_registry.ServiceCard
     ServicesRegistry = codeweaver_registry.ServicesRegistry
     SessionStatistics = lazy_importer("codeweaver._statistics").SessionStatistics
-get_model_registry = lazy_importer("codeweaver._registry").get_model_registry
-get_provider_registry = lazy_importer("codeweaver._registry").get_provider_registry
-get_services_registry = lazy_importer("codeweaver._registry").get_services_registry
+
+# Module-level registry getters (reuse the registry module reference)
+_registry_module = lazy_importer("codeweaver._registry")
+get_model_registry = _registry_module().get_model_registry
+get_provider_registry = _registry_module().get_provider_registry
+get_services_registry = _registry_module().get_services_registry
 logger: logging.Logger
 _STATE: AppState | None = None
 _logger: logging.Logger | None = None

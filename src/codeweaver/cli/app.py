@@ -21,7 +21,7 @@ from rich import print as rich_print
 from rich.console import Console
 from rich.table import Table
 
-from codeweaver._common import DictView
+from codeweaver._types import DictView
 from codeweaver._utils import lazy_importer
 from codeweaver.exceptions import CodeWeaverError
 from codeweaver.models.core import CodeMatch, FindCodeResponseSummary

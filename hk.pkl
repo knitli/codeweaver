@@ -17,7 +17,7 @@ local linters = new Mapping<String, Step> {
     ["typos"] = new Step {
         workspace_indicator = "_typos.toml"
         glob = List( "*README", "*.{login,astro,bash,bash_logout,bashrc,browserlistrc,conf,config,csh,css,cts,fish,gitattributes,gitmodules,html,htmx,ini,j2,jinja,jinja2,json,json5,jsonc,jsonl,ksh,md,mdown,mdtext,mdtxt,mdwn,mdx,mk,mkd,mts,nix,nu,pkl,profile,py,quokka,rs,sass,scss,sh,sh,shellcheckrc,sql,sqlite,stylelintrc,svelte,tcsh,toml,ts,tsx,txt,yaml,yml,zlogin,zlogout,zprofile,zsh,zshenv,zshrc}", "*Dockerfile*", "*Makefile*", "*makefile*", "CHANGELOG*", "CODE_OF_CONDUCT*", "CONTRIBUTING*", "HACKING*", "LICENSE", "README*", "SECURITY*", "UNLICENSE").filter((f) -> !f.endsWith("hf_models.json") && !f.contains("external"))
-        check = "typos -j 8 --file-list {{ files }}"
+        check = "typos -j 8 {{ files }}"
         fix = "typos --write-changes {{ files }}"
     }
 

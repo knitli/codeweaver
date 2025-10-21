@@ -35,8 +35,9 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: dict[s
     from fastmcp import FastMCP
 
     # Pydantic will need these at runtime
-    ServerSetup: ServerSetup = lazy_importer("codeweaver._server").ServerSetup  # pyright: ignore[reportUnusedVariable] # noqa: F841, N806
-    AppState: AppState = lazy_importer("codeweaver._server").AppState  # pyright: ignore[reportUnusedVariable] # noqa: F841, N806
+    _server_module = lazy_importer("codeweaver._server")
+    ServerSetup: ServerSetup = _server_module.ServerSetup  # pyright: ignore[reportUnusedVariable] # noqa: F841, N806
+    AppState: AppState = _server_module.AppState  # pyright: ignore[reportUnusedVariable] # noqa: F841, N806
 
     app = server if isinstance(server, FastMCP) else server["app"]
     kwargs = kwargs or {}

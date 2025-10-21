@@ -26,7 +26,6 @@ import watchfiles
 from pydantic import PrivateAttr
 from watchfiles.main import Change, FileChange
 
-from codeweaver._common import BasedModel, DictView
 from codeweaver._constants import (
     CODE_FILES_EXTENSIONS,
     CONFIG_FILE_LANGUAGES,
@@ -35,6 +34,7 @@ from codeweaver._constants import (
     DOC_FILES_EXTENSIONS,
 )
 from codeweaver._data_structures import BlakeStore, DiscoveredFile
+from codeweaver._types import BasedModel, DictView
 from codeweaver.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.settings_types import CodeWeaverSettingsDict, RignoreSettings
 

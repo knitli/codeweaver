@@ -39,8 +39,8 @@ from pydantic import (
 from pydantic.dataclasses import dataclass
 from starlette.responses import PlainTextResponse
 
-from codeweaver._common import DATACLASS_CONFIG, BaseEnum, DataclassSerializationMixin
 from codeweaver._data_structures import ChunkKind, ExtKind
+from codeweaver._types import DATACLASS_CONFIG, BaseEnum, DataclassSerializationMixin
 from codeweaver._utils import uuid7
 from codeweaver.language import ConfigLanguage, SemanticSearchLanguage
 

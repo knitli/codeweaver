@@ -23,9 +23,9 @@ from pydantic_core import to_json
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
-from codeweaver._common import DictView
 from codeweaver._server import AppState, HealthInfo, get_health_info
 from codeweaver._statistics import SessionStatistics, get_session_statistics, timed_http
+from codeweaver._types import DictView
 from codeweaver.exceptions import CodeWeaverError
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.middleware.statistics import StatisticsMiddleware

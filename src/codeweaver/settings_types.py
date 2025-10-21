@@ -59,16 +59,16 @@ from uvicorn.config import (
     WSProtocolType,
 )
 
-from codeweaver._common import BasedModel, DictView
 from codeweaver._constants import ALL_LANGUAGES, ExtLangPair
 from codeweaver._supported_languages import SecondarySupportedLanguage
+from codeweaver._types import BasedModel, DictView
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.services.chunker.delimiters.families import LanguageFamily
 from codeweaver.services.chunker.delimiters.patterns import DelimiterPattern
 
 
 if TYPE_CHECKING:
-    from codeweaver._common import Unset
+    from codeweaver._types import Unset
     from codeweaver.provider import Provider
 
 
@@ -178,7 +178,7 @@ class CustomDelimiter(BasedModel):
     ] = None
 
     language: Annotated[
-        SecondarySupportedLanguage | None,
+        SecondarySupportedLanguage | str | None,
         Field(
             min_length=1,
             max_length=30,

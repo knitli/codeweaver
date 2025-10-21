@@ -19,9 +19,9 @@ from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, TypedDict, cast, o
 from langchain_text_splitters import Language as LC_Language
 from pydantic import Field, computed_field
 
-from codeweaver._common import BasedModel, BaseEnum, LiteralStringT
 from codeweaver._constants import ALL_LANGUAGES, ExtLangPair, get_ext_lang_pairs
 from codeweaver._supported_languages import SecondarySupportedLanguage
+from codeweaver._types import BasedModel, BaseEnum, LiteralStringT
 from codeweaver._utils import get_project_root
 
 
@@ -254,7 +254,7 @@ class ConfigLanguage(BaseEnum):
 
         The special value `SELF` indicates that the configuration file is written in the same language as the codebase (e.g., Kotlin, Scala).
 
-        Note: We won't provide extensions that are not commonly used for configuration files, not all extensions associated with the language.
+        Note: These are only common configuration file extensions for each language. There may be other extensions used in specific cases.
         """
         return {
             # Clearly not all bash, but they are posix shell config files and we can treat them as bash for our purposes
@@ -900,9 +900,7 @@ class SemanticSearchLanguage(str, BaseEnum):
         Returns a frozenset of tuples containing file extensions and their corresponding SemanticSearchLanguage.
         """
         for lang, exts in cls.extension_map().items():
-            yield from (
-                ExtPair(extension=cast(LiteralStringT, ext), language=lang) for ext in exts if ext
-            )
+            yield from (ExtPair(extension=ext, language=lang) for ext in exts if ext)
 
     @classmethod
     def config_pairs(cls) -> Generator[ConfigPathPair]:
@@ -941,6 +939,7 @@ class SemanticSearchLanguage(str, BaseEnum):
             # for now, we make an educated guess
             if config_file.name == "Makefile":
                 # C++ is more popular... no other reasoning here
+
                 return SemanticSearchLanguage.C_PLUS_PLUS
             # Java's more common than Kotlin, but Kotlin is more likely to use 'build.gradle.kts' ... I think. 🤷‍♂️
             return SemanticSearchLanguage.KOTLIN

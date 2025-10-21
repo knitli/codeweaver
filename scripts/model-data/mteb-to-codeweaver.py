@@ -703,7 +703,7 @@ def from_data() -> None:
         models = [
             mod
             for mod_name, mod in DATA.items()
-            if mod_name in model_names or FLATTENED_ALIASES.get(mod_name, "SENTINEL") in model_names
+            if mod_name in model_names or FLATTENED_ALIASES.get(mod_name, "") in model_names
         ]
         file = generate_capabilities_file(models, maker)
         if not file.strip():

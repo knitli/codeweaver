@@ -29,9 +29,9 @@ from typing import TYPE_CHECKING, NamedTuple, cast
 
 from pydantic import NonNegativeInt, PositiveInt
 
-from codeweaver._common import DictView
 from codeweaver._data_structures import DiscoveredFile, Span
 from codeweaver._statistics import SessionStatistics
+from codeweaver._types import DictView
 from codeweaver._utils import estimate_tokens, uuid7
 from codeweaver.exceptions import QueryError
 from codeweaver.language import SemanticSearchLanguage

@@ -10,8 +10,8 @@ from typing import Annotated, Any, Literal, NotRequired, Required, TypedDict
 
 from pydantic import Field, NonNegativeInt, PositiveInt
 
-from codeweaver._common import BasedModel
 from codeweaver._data_structures import CodeChunk, SerializedCodeChunk
+from codeweaver._types import BasedModel
 from codeweaver.provider import Provider
 from codeweaver.tokenizers.base import Tokenizer
 

@@ -45,7 +45,7 @@ from pydantic.alias_generators import to_pascal
 from pydantic_ai.models import Model
 from rich.console import Console
 
-from codeweaver._common import BasedModel, BaseEnum, DictView, LiteralStringT
+from codeweaver._types import BasedModel, BaseEnum, DictView, LiteralStringT
 from codeweaver.embedding.providers import EmbeddingProvider
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.provider import Provider, ProviderKind

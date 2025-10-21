@@ -23,7 +23,7 @@ from ast_grep_py import SgNode
 from pydantic import Field, NonNegativeFloat, NonNegativeInt, computed_field
 from typing_extensions import TypeIs
 
-from codeweaver._common import BaseEnum
+from codeweaver._types import BaseEnum
 from codeweaver._utils import rpartial
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.semantic._types import CategoryName, ThingName

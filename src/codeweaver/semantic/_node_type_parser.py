@@ -256,7 +256,7 @@ from typing import TYPE_CHECKING, Annotated, Any, ClassVar, TypedDict, cast, ove
 from pydantic import DirectoryPath, Field, FilePath
 from pydantic_core import from_json
 
-from codeweaver._common import RootedRoot
+from codeweaver._types import RootedRoot
 from codeweaver._utils import lazy_importer
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.semantic._types import CategoryName, NodeTypeDTO, ThingName

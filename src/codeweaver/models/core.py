@@ -10,8 +10,8 @@ from typing import Annotated, Any
 
 from pydantic import ConfigDict, Field, NonNegativeFloat, NonNegativeInt, model_validator
 
-from codeweaver._common import BasedModel, BaseEnum
 from codeweaver._data_structures import DiscoveredFile, Span
+from codeweaver._types import BasedModel, BaseEnum
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.models.intent import IntentType
 

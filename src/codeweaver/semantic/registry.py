@@ -18,7 +18,7 @@ from codeweaver.language import SemanticSearchLanguage
 from codeweaver.semantic._types import CategoryName, Role, ThingName, ThingOrCategoryNameType
 
 
-grammar_module = lazy_importer("codeweaver.semantic.grammar_things")
+grammar_module = lazy_importer("codeweaver.semantic.grammar")
 
 if TYPE_CHECKING:
     from codeweaver.semantic.grammar import (

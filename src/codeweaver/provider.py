@@ -25,7 +25,7 @@ import contextlib
 
 from typing import Literal, NotRequired, TypedDict, cast, is_typeddict
 
-from codeweaver._common import BaseEnum
+from codeweaver._types import BaseEnum
 from codeweaver.exceptions import ConfigurationError
 
 
@@ -364,7 +364,7 @@ class ProviderKind(BaseEnum):
     """Provider for agents (e.g. OpenAI or Anthropic)"""
 
     UNSET = "unset"
-    """A sentinel setting to identify when a `ProviderKind` is not set or is configured."""
+    """A  setting to identify when a `ProviderKind` is not set or is configured."""
 
 
 LiteralProviderKind = Literal[

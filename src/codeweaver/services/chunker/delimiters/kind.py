@@ -10,7 +10,7 @@ from typing import NamedTuple
 
 from pydantic import PositiveInt
 
-from codeweaver._common import BaseEnum
+from codeweaver._types import BaseEnum
 
 
 class LineStrategy(NamedTuple):

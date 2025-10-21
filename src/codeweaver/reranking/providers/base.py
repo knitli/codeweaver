@@ -21,8 +21,8 @@ from pydantic import ValidationError as PydanticValidationError
 from pydantic.main import IncEx
 from pydantic_core import from_json
 
-from codeweaver._common import BasedModel
 from codeweaver._data_structures import CodeChunk, StructuredDataInput
+from codeweaver._types import BasedModel
 from codeweaver.exceptions import RerankingProviderError, ValidationError
 from codeweaver.provider import Provider
 from codeweaver.reranking.capabilities.base import RerankingModelCapabilities

@@ -18,8 +18,8 @@ from typing import Annotated, Any, Literal, Self, cast
 from pydantic import AliasGenerator, ConfigDict, Field, JsonValue, PositiveInt, model_validator
 from pydantic.alias_generators import to_camel, to_snake
 
-from codeweaver._common import BasedModel
 from codeweaver._data_structures import CodeChunk
+from codeweaver._types import BasedModel
 from codeweaver.reranking.capabilities.amazon import get_amazon_reranking_capabilities
 from codeweaver.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.reranking.providers.base import (

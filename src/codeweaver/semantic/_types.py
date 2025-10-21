@@ -18,7 +18,7 @@ from typing import Annotated, Literal, NamedTuple, NewType, TypedDict, cast
 
 from pydantic import ConfigDict, Field, PrivateAttr, computed_field
 
-from codeweaver._common import BasedModel, BaseEnum, LiteralStringT
+from codeweaver._types import BasedModel, BaseEnum, LiteralStringT
 from codeweaver.language import SemanticSearchLanguage
 
 

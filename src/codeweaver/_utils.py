@@ -27,21 +27,34 @@ from typing import TYPE_CHECKING, Any, Literal, NotRequired, Required, TypedDict
 from pydantic import UUID7, BaseModel, TypeAdapter
 from typing_extensions import TypeIs
 
-from codeweaver._common import LiteralStringT, Sentinel
+from codeweaver._types import LiteralStringT, 
 
 
 if TYPE_CHECKING:
-    from codeweaver._common import AbstractNodeName
+    from codeweaver._types import AbstractNodeName
 
 
 logger = logging.getLogger(__name__)
 
+_original_exec_module = util.LazyLoader.exec_module
 
-class Missing(Sentinel):
+
+def _debug_exec_module(self: util.LazyLoader, module: ModuleType) -> None:
+    print(f"🔥 EXECUTING: {module.__name__}")
+    import traceback
+
+    traceback.print_stack(limit=5)
+    _original_exec_module(self, module)
+
+
+util.LazyLoader.exec_module = _debug_exec_module
+
+
+class Missing():
     pass
 
 
-MISSING: Missing = Missing("MISSING", "Sentinel<MISSING>", __name__)
+MISSING: Missing = Missing("MISSING", "<MISSING>", __name__)
 
 if sys.version_info < (3, 14):
     from uuid_extensions import uuid7 as uuid7_gen
@@ -80,7 +93,7 @@ def dict_set_to_tuple(d: DictInputTypesT) -> DictOutputTypesT:
 
 
 @cache
-def lazy_importer(module_name: str) -> ModuleType:
+def lazy_importer(module_name: str) -> Callable[[], ModuleType]:
     """Return a lazy importer for the given module."""
     spec = util.find_spec(module_name)
     if spec is None or not spec.loader:
@@ -89,16 +102,17 @@ def lazy_importer(module_name: str) -> ModuleType:
     spec.loader = loader
     module = util.module_from_spec(spec)
     sys.modules[module_name] = module
-    loader.exec_module(module)
-    return module
+    return lambda: loader.exec_module(module) or module
 
 
-def lazy_getter(module_name: str, attr_name: str) -> Any:
+def lazy_getter(module_name: str, attr_name: str) -> Callable[[], Any]:
     """Lazily import a module and get an attribute from it."""
-    module = lazy_importer(module_name)
-    if not hasattr(module, attr_name):
-        raise AttributeError(f"Module {module_name} has no attribute {attr_name}")
-    return getattr(module, attr_name)
+
+    def get_attr() -> Any:
+        module = lazy_importer(module_name)
+        return getattr(module(), attr_name)
+
+    return get_attr
 
 
 def is_pydantic_basemodel(model: Any) -> TypeIs[type[BaseModel] | BaseModel]:
@@ -692,7 +706,7 @@ def _set_cpu_optimizations() -> dict[
     Literal["intel_cpu", "simd_available", "simd_exts"], bool | tuple[str, ...]
 ]:
     cpuinfo = lazy_importer("cpuinfo")
-    info = cpuinfo.get_cpu_info()
+    info = cpuinfo().get_cpu_info()
     simd_exts = tuple(
         flag for flag in ("avx512_vnni", "avx512", "avx2", "arm64") if flag in info.get("flags", [])
     )

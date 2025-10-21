@@ -55,8 +55,14 @@ from pydantic.dataclasses import dataclass
 from pydantic_core import to_json
 from typing_extensions import TypeIs
 
-from codeweaver._common import DATACLASS_CONFIG, BasedModel, BaseEnum, DataclassSerializationMixin
-from codeweaver._constants import get_ext_lang_pairs
+from codeweaver._constants import LanguageName, get_ext_lang_pairs
+from codeweaver._types import (
+    DATACLASS_CONFIG,
+    BasedModel,
+    BaseEnum,
+    DataclassSerializationMixin,
+    LiteralStringT,
+)
 from codeweaver._utils import (
     ensure_iterable,
     get_git_branch,
@@ -117,6 +123,8 @@ class ChunkKind(BaseEnum):
 
     CODE = "code"
     CONFIG = "config"
+    CODE_OR_CONFIG = "code_or_config"
+    """The Chunk is either code or a config, but requires further analysis to determine which. This happens in a narrow set of cases where the file belongs to a language that is used in configs and code, usually for itself, primarily this is for Kotlin and Groovy."""
     DOCS = "docs"
     OTHER = "other"
 
@@ -688,13 +696,13 @@ def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
         and "semantic_meta" in validated_data["metadata"]
         and (language := validated_data["metadata"]["semantic_meta"].get("language"))
     ):
-        return ExtKind.from_string(language, "code")
+        return ExtKind.from_language(language, "code")
     if "language" in validated_data and source != source.TEXT_BLOCK:
         if source == ChunkSource.EXTERNAL:
-            return ExtKind.from_string(validated_data["language"], ChunkKind.OTHER)
+            return ExtKind.from_language(validated_data["language"], ChunkKind.OTHER)
         if source in (ChunkSource.FILE):
-            return ExtKind.from_string(validated_data["language"], "docs")
-        return ExtKind.from_string(validated_data["language"], "code")
+            return ExtKind.from_language(validated_data["language"], "docs")
+        return ExtKind.from_language(validated_data["language"], "code")
     return None
 
 
@@ -1002,7 +1010,7 @@ def _has_semantic_extension(ext: str) -> SemanticSearchLanguage | None:
 class ExtKind(NamedTuple):
     """Represents a file extension and its associated kind."""
 
-    language: str | SemanticSearchLanguage | ConfigLanguage
+    language: LanguageName | SemanticSearchLanguage | ConfigLanguage
     kind: ChunkKind
 
     def __str__(self) -> str:
@@ -1010,8 +1018,10 @@ class ExtKind(NamedTuple):
         return f"{self.kind}: {self.language}"
 
     @classmethod
-    def from_string(
-        cls, language: str | SemanticSearchLanguage, kind: str | ChunkKind
+    def from_language(
+        cls,
+        language: LanguageName | LiteralStringT | SemanticSearchLanguage | ConfigLanguage,
+        kind: str | ChunkKind,
     ) -> ExtKind | None:
         """Create an ExtKind from a string representation."""
         if isinstance(language, SemanticSearchLanguage):
@@ -1021,22 +1031,35 @@ class ExtKind(NamedTuple):
                 language=language,
                 kind=ChunkKind.CONFIG if language.is_config_language else ChunkKind.CODE,
             )
-        with contextlib.suppress(KeyError):
+        if isinstance(language, ConfigLanguage) and language not in (
+            ConfigLanguage.BASH,
+            ConfigLanguage.SELF,
+            ConfigLanguage.KOTLIN,
+        ):
+            return cls(
+                language=language.as_semantic_search_language or language, kind=ChunkKind.CONFIG
+            )
+        if isinstance(language, ConfigLanguage):
+            return cls(
+                language=language.as_semantic_search_language or language,
+                kind=ChunkKind.CODE_OR_CONFIG,
+            )
+        with contextlib.suppress(KeyError, ValueError, AttributeError):
             if semantic := SemanticSearchLanguage.from_string(language):
-                return cls.from_string(semantic, kind)
+                return cls.from_language(semantic, kind)
         from codeweaver._constants import CODE_LANGUAGES, CONFIG_FILE_LANGUAGES, DOCS_LANGUAGES
 
         if language in CONFIG_FILE_LANGUAGES:
-            return cls(language=language, kind=ChunkKind.CONFIG)
+            return cls(language=LanguageName(language), kind=ChunkKind.CONFIG)
         if language in CODE_LANGUAGES:
-            return cls(language=language, kind=ChunkKind.CODE)
+            return cls(language=LanguageName(language), kind=ChunkKind.CODE)
         if language in DOCS_LANGUAGES:
-            return cls(language=language, kind=ChunkKind.DOCS)
+            return cls(language=LanguageName(language), kind=ChunkKind.DOCS)
         if isinstance(kind, ChunkKind):
-            return cls(language=language, kind=kind)
+            return cls(language=LanguageName(language), kind=kind)
         if found_kind := ChunkKind.from_string(kind):
-            return cls(language=language, kind=found_kind)  # pyright: ignore[reportArgumentType]
-        return cls(language=language, kind=ChunkKind.OTHER)  # pyright: ignore[reportArgumentType]
+            return cls(language=LanguageName(language), kind=found_kind)  # pyright: ignore[reportArgumentType]
+        return cls(language=LanguageName(language), kind=ChunkKind.OTHER)  # pyright: ignore[reportArgumentType]
 
     @classmethod
     def from_file(cls, file: str | Path) -> ExtKind | None:
@@ -1063,10 +1086,10 @@ class ExtKind(NamedTuple):
         if (
             semantic_config_language := _has_semantic_extension(extension)
         ) and _is_semantic_config_ext(extension):
-            return cls(language=semantic_config_language.value, kind=ChunkKind.CONFIG)
+            return cls(language=semantic_config_language, kind=ChunkKind.CONFIG)
 
         if semantic_language := _has_semantic_extension(extension):
-            return cls(language=semantic_language.value, kind=ChunkKind.CODE)
+            return cls(language=semantic_language, kind=ChunkKind.CODE)
 
         return next(
             (

@@ -11,7 +11,7 @@ from weakref import WeakValueDictionary
 
 from pydantic import UUID7
 
-from codeweaver._common import BasedModel
+from codeweaver._types import BasedModel
 from codeweaver._utils import uuid7
 
 

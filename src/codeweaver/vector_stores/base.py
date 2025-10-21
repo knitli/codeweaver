@@ -12,8 +12,8 @@ from typing import Any
 
 from pydantic import UUID4, ConfigDict
 
-from codeweaver._common import BasedModel
 from codeweaver._data_structures import CodeChunk, SearchResult
+from codeweaver._types import BasedModel
 from codeweaver.provider import Provider
 from codeweaver.services._filter import Filter
 

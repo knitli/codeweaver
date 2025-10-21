@@ -22,15 +22,13 @@ from collections.abc import (
 )
 from enum import Enum, unique
 from functools import cached_property
-from threading import Lock as _Lock
-from types import FrameType, MappingProxyType
+from types import MappingProxyType
 from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
     Literal,
     LiteralString,
-    NewType,
     NotRequired,
     Self,
     TypedDict,
@@ -46,7 +44,6 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    GetCoreSchemaHandler,
     GetPydanticSchema,
     PrivateAttr,
     RootModel,
@@ -56,15 +53,11 @@ from pydantic import (
 from pydantic.dataclasses import dataclass
 from pydantic.fields import ComputedFieldInfo, FieldInfo
 from pydantic.main import IncEx
-from pydantic_core import core_schema
 
 
 type LiteralStringT = Annotated[
     LiteralString, GetPydanticSchema(lambda _schema, handler: handler(str))
 ]
-
-NodeName = NewType("NodeName", LiteralStringT)
-AbstractNodeName = NewType("AbstractNodeName", LiteralStringT)
 
 type EnumExtend = Callable[[Enum, str], Enum]
 extend_enum: EnumExtend = extend_enum  # pyright: ignore[reportUnknownVariableType]
@@ -658,115 +651,18 @@ class BaseEnum(Enum):
         return cls(value)
 
 
-def _get_parent_frame() -> FrameType:
-    """Get the parent frame of the caller."""
-    return _sys._getframe(2)  # pyright: ignore[reportPrivateUsage]
-
-
-type Name = LiteralStringT
-
-
-_lock = _Lock()
-_registry: dict[str, Sentinel] = {}
-
-
-class Sentinel:
-    """Create a unique sentinel object.
-    ...
-    """
-
-    _name: Name
-    _repr: str
-    _module_name: str
-
-    def __new__(cls, name: Name, repr_: str | None = None, module_name: str | None = None) -> Self:
-        """Create a new sentinel."""
-        # sourcery skip: avoid-builtin-shadow
-        name = name.strip()
-        repr_ = str(repr_) if repr_ else f"<Sentinel<{name.split('.')[-1]}>>"
-        if not module_name:
-            parent_frame = _get_parent_frame()
-            module_name = (
-                parent_frame.f_globals.get("__name__", "__main__") if parent_frame else __name__
-            )
-
-        # Include the class's module and fully qualified name in the
-        # registry key to support sub-classing.
-        registry_key = _sys.intern(f"{cls.__module__}-{cls.__qualname__}-{module_name}-{name}")
-        sentinel: Sentinel | None = _registry.get(registry_key)
-        if sentinel is not None:
-            return cast(Self, sentinel)
-        sentinel = super().__new__(cls)
-        sentinel._name = name
-        sentinel._repr = repr_
-        sentinel._module_name = module_name or __name__
-        with _lock:
-            return cast(Self, _registry.setdefault(registry_key, sentinel))
-
-    def __init__(
-        self, name: Name, repr_: str | None = None, module_name: str | None = None
-    ) -> None:
-        """Initialize a new sentinel."""
-        self._name = name
-        self._repr = repr_ or f"<Sentinel<{name.split('.')[-1]}>>"
-        self._module_name = module_name  # pyright: ignore[reportAttributeAccessIssue]
-
-    @classmethod
-    def __call__(cls, name: Name, repr_: str | None = None, module_name: str | None = None) -> Self:
-        """Create a new sentinel."""
-        return cls(name, repr_, module_name)
-
-    def __str__(self) -> str:
-        """Return a string representation of the sentinel."""
-        return self._name
-
-    def __repr__(self) -> str:
-        """Return a string representation of the sentinel."""
-        return self._repr
-
-    def __reduce__(self) -> tuple[type[Self], tuple[str, str, str]]:
-        """Return state information for pickling."""
-        return (self.__class__, (self._name, self._repr, self._module_name))
-
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls, _source_type: Any, _handler: GetCoreSchemaHandler
-    ) -> core_schema.CoreSchema:
-        """Return the Pydantic core schema for the sentinel."""
-        return core_schema.with_info_after_validator_function(
-            cls._validate,
-            core_schema.str_schema(),
-            # spellchecker:off
-            serialization=core_schema.plain_serializer_function_ser_schema(
-                # spellchecker:on
-                cls._serialize,
-                when_used="json",
-            ),
-        )
-
-    @staticmethod
-    def _validate(value: str, _info: core_schema.ValidationInfo) -> Sentinel:
-        """Validate that a value is a sentinel."""
-        name, repr_, module_name = value.split(" ")
-        return Sentinel(cast(LiteralString, name.strip()), repr_, module_name.strip())
-
-    @staticmethod
-    def _serialize(sentinel: Sentinel) -> str:
-        """Serialize a sentinel to a string."""
-        return f"{sentinel._name} {sentinel._repr} {sentinel._module_name}"
-
-
-class Unset(Sentinel):
-    """
-    A sentinel value to indicate that a value is unset.
-    """
-
-
-UNSET: Unset = Unset("UNSET")
-
-
 class DictView[TypedDictT: (Mapping[str, Any])](Mapping[str, Any]):
-    """Read-only view wrapper around a mapping (intended for TypedDict-backed dicts)."""
+    """Read-only view wrapper around a mapping (intended for TypedDict-backed dicts).
+
+    Provides a read-only view of a TypedDict (or other) mapping, preventing any modifications to the underlying data. This is useful for exposing configuration or data structures that should not be altered after creation.
+
+    Args:
+        mapping (TypedDictT): The mapping to wrap.
+        make_immutable (bool, optional): Whether to make the underlying mapping immutable using `MappingProxyType`. Defaults to `True`. Important things to understand here:
+            - DictView is always read-only, and the underlying mapping, if it is mutable, cannot be modified through the DictView interface (but can still be modified directly if the original mapping is accessible).
+            - If `make_immutable` is `True`, the underlying mapping is wrapped in a `MappingProxyType`, making it immutable. This prevents any modifications to the original mapping through any references *to this mapping* -- like DictView, MappingProxyType provides a dynamic read-only view of the original mapping. The main difference is hashability and performance: MappingProxyType is hashable and slightly faster for read operations.
+            - If `make_immutable` is `False`, the original mapping is used directly. This is useful if the original mapping is already immutable or you're not paranoid about mutability like we are.
+    """
 
     __slots__ = ("_mapping", "data")
 
@@ -775,21 +671,25 @@ class DictView[TypedDictT: (Mapping[str, Any])](Mapping[str, Any]):
 
     def __init__(self, mapping: TypedDictT, /, *, make_immutable: bool = True) -> None:
         # We keep the underlying mapping read-only via MappingProxyType by default.
-        self._mapping = MappingProxyType(dict(mapping)) if make_immutable else mapping
+        self._mapping = MappingProxyType(mapping) if make_immutable else mapping
         # Give a typed alias for callers and type checkers
         self.data = cast(TypedDictT, self._mapping) if TYPE_CHECKING else self._mapping
 
     # Mapping protocol
     def __getitem__(self, key: str) -> Any:
+        """Return the value for the given key."""
         return self._mapping[key]
 
     def __iter__(self) -> Iterator[str]:
+        """Return an iterator over the keys in the mapping."""
         return iter(self._mapping)
 
     def __len__(self) -> int:
+        """Return the number of items in the mapping."""
         return len(self._mapping)
 
     def __contains__(self, key: object) -> bool:
+        """Return whether the mapping contains the given key."""
         return key in self._mapping
 
     # Convenience / views
@@ -810,6 +710,7 @@ class DictView[TypedDictT: (Mapping[str, Any])](Mapping[str, Any]):
         return self._mapping.get(key, default)
 
     def __setattr__(self, name: str, value: Any) -> None:
+        """Prevent setting attributes on the DictView, except during __init__."""
         # allow setting during __init__, which sets _mapping and data
         if name in {"_mapping", "data"}:
             object.__setattr__(self, name, value)
@@ -817,9 +718,11 @@ class DictView[TypedDictT: (Mapping[str, Any])](Mapping[str, Any]):
         raise AttributeError("DictView is read-only")
 
     def __delattr__(self, name: str) -> None:
+        """Prevent deleting attributes on the DictView."""
         raise AttributeError("DictView is read-only")
 
     def __repr__(self) -> str:
+        """Return a string representation of the DictView."""
         return f"{type(self).__name__}({dict(self._mapping)})"
 
 
@@ -827,8 +730,6 @@ __all__ = (
     "BASEDMODEL_CONFIG",
     "DATACLASS_CONFIG",
     "FROZEN_BASEDMODEL_CONFIG",
-    "UNSET",
-    "AbstractNodeName",
     "BaseEnum",
     "BasedModel",
     "DataclassSerializationMixin",
@@ -836,7 +737,5 @@ __all__ = (
     "DictView",
     "LiteralStringT",
     "RootedRoot",
-    "Sentinel",
     "SerializationKwargs",
-    "Unset",
 )

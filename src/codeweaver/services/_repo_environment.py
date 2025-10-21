@@ -11,13 +11,13 @@ from typing import TYPE_CHECKING, Annotated, ClassVar, Literal, Self, TypedDict,
 from pydantic import DirectoryPath, Field, computed_field
 from pydantic.dataclasses import dataclass
 
-from codeweaver._common import (
+from codeweaver._constants import COMMON_TOOLING_PATHS, TEST_DIR_NAMES
+from codeweaver._types import (
     DATACLASS_CONFIG,
     BaseEnum,
     DataclassSerializationMixin,
     LiteralStringT,
 )
-from codeweaver._constants import COMMON_TOOLING_PATHS, TEST_DIR_NAMES
 from codeweaver.language import ConfigLanguage, SemanticSearchLanguage
 
 

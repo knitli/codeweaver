@@ -15,7 +15,7 @@ from codeweaver.language import SemanticSearchLanguage
 
 
 if TYPE_CHECKING:
-    from codeweaver._common import DictView
+    from codeweaver._types import DictView
     from codeweaver.settings_types import CodeWeaverSettingsDict
 TEST_FILE_PATTERNS = ["*.test.*", "*.spec.*", "test/**/*", "spec/**/*"]
 

@@ -80,7 +80,7 @@ from pydantic import (
     computed_field,
 )
 
-from codeweaver._common import BasedModel, BaseEnum, LiteralStringT
+from codeweaver._types import BasedModel, BaseEnum, LiteralStringT
 from codeweaver._utils import lazy_importer, uuid7
 from codeweaver.language import SemanticSearchLanguage
 from codeweaver.semantic._types import ThingName
@@ -93,11 +93,15 @@ if TYPE_CHECKING:
     from codeweaver.semantic.classifications import AgentTask, ImportanceScores, ThingClass
     from codeweaver.semantic.registry import ThingRegistry
 else:
-    CompositeThing = lazy_importer("codeweaver.semantic.grammar").CompositeThing
-    Token = lazy_importer("codeweaver.semantic.grammar").Token
-    AgentTask = lazy_importer("codeweaver.semantic.classifications").AgentTask
-    ImportanceScores = lazy_importer("codeweaver.semantic.classifications").ImportanceScores
-    ThingClass = lazy_importer("codeweaver.semantic.classifications").ThingClass
+    _grammar_module = lazy_importer("codeweaver.semantic.grammar")
+    CompositeThing = _grammar_module.CompositeThing
+    Token = _grammar_module.Token
+
+    _classifications_module = lazy_importer("codeweaver.semantic.classifications")
+    AgentTask = _classifications_module.AgentTask
+    ImportanceScores = _classifications_module.ImportanceScores
+    ThingClass = _classifications_module.ThingClass
+
     ThingRegistry = lazy_importer("codeweaver.semantic.registry").ThingRegistry
 
 

@@ -44,8 +44,8 @@ from pydantic_ai.settings import merge_model_settings
 from pydantic_core import from_json
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
-from codeweaver._common import UNSET, BasedModel, DictView, Unset
 from codeweaver._constants import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_EXTENSIONS
+from codeweaver._types import UNSET, BasedModel, DictView, Unset
 from codeweaver.provider import Provider
 from codeweaver.settings_types import (
     AVAILABLE_MIDDLEWARE,
