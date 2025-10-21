@@ -883,7 +883,7 @@ Bridge the gap between human expectations and AI agent capabilities through "exq
 
 ### Primary Documents
 
-- [Project Constitution](.specify/memory/constitution.md) - Authoritative governance
+- [Project Constitution](specify/memory/constitution.md) - Authoritative governance
 - [README.md](README.md) - Project overview and quickstart
 - [PRODUCT.md](PRODUCT.md) - Product vision and strategy
 - [CODE_STYLE.md](CODE_STYLE.md) - Code style and patterns
