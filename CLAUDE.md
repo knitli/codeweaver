@@ -178,6 +178,7 @@ Apply relevant pytest markers to new tests (see pyproject.toml for full list).
 - Settings: Unified config via `pydantic-settings` with env vars and TOML files
 
 ## Documentation
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Unified architectural decisions and design principles (authoritative reference)
 - Architecture specs in `plans/` directory
 - API documentation in `context/apis/` 
 - Complete docs for select external libraries are available in `context/apis/complete_docs`, currently include:
