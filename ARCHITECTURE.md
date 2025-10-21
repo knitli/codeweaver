@@ -82,28 +82,15 @@ Bridge the gap between human expectations and AI agent capabilities through "exq
 
 ### The Problem We Solve
 
-AI coding agents face a fundamental challenge: **too much irrelevant context**.
+AI coding agents face **too much irrelevant context** (70-80% unused), causing token waste, missed patterns, and hallucinations.
 
-**The Impact**:
-- 70-80% of returned code goes unused by agents
-- Token costs scale exponentially with conversation length
-- Agents miss critical patterns buried in noise
-- Developers waste time on off-target suggestions
+**Root Causes**: Tool confusion (5-20+ discovery tools), context bloat (25K-40K tokens in tool descriptions), proprietary lock-in, search fragmentation.
 
-**Root Causes**:
-1. **Tool Confusion**: 5-20+ tools for code discovery overwhelm agents with "how" instead of "what"
-2. **Context Bloat**: 25K-40K tokens (20% of context window) just for tool descriptions
-3. **Proprietary Lock-In**: Semantic search exists but stays locked behind proprietary APIs
-4. **Search Fragmentation**: Simple discovery requires orchestrating multiple tool calls
+**Our Solution**: Single `find_code` tool + agent-driven curation + hybrid search (text + semantic + AST) + platform extensibility.
 
-### Our Solution
+**Impact**: 60-80% context reduction, >90% relevance, 5x cost savings per query.
 
-**Single-Tool Simplicity**: One `find_code` tool with natural language queries  
-**Agent-Driven Curation**: Uses MCP sampling for zero-context-pollution curation  
-**Hybrid Intelligence**: Text + semantic + AST-aware analysis  
-**Platform Extensibility**: 10+ embedding providers, vendor-agnostic architecture
-
-**Impact**: 60-80% reduction in context bloat, >90% relevance, 5x cost reduction per query
+**For Complete Analysis**: See [PRODUCT.md - The Problem We Solve](PRODUCT.md#the-problem-we-solve) for detailed user impact, competitive landscape, and market positioning.
 
 ---
 
@@ -365,27 +352,19 @@ Filters: { language: "python", file_type: "code" } (optional)
 
 **Provider Types**:
 
-#### Embedding Providers
-- VoyageAI, AWS Bedrock, Cohere (including Azure), Google
-- Huggingface Hub, Mistral, FastEmbed, SentenceTransformers
-- OpenAI Compatible (OpenAI, Azure, Fireworks, Groq, Ollama, Heroku)
+#### Provider Coverage
 
-#### Rerank Providers
-- VoyageAI, AWS Bedrock, Cohere
-- FastEmbed, Sentence Transformers
+**Embedding**: 10+ providers including VoyageAI, OpenAI, Bedrock, Cohere, Google, Mistral, Hugging Face, fastembed, sentence-transformers
 
-#### Agent Providers
-- All pydantic-ai providers: OpenAI, Anthropic, Google, Mistral, Groq
-- Hugging Face, Bedrock, and more
+**Rerank**: VoyageAI, Bedrock, Cohere, fastembed, sentence-transformers
 
-#### Vector Stores
-- In-memory (development/testing)
-- Qdrant (production)
-- Others planned
+**Agent**: Full pydantic-ai ecosystem (OpenAI, Anthropic, Google, Mistral, Groq, Hugging Face, Bedrock, and more)
 
-#### Data Sources
-- **Now**: Filesystem (with file watching), Tavily, DuckDuckGo
-- **Planned**: Context7 (external API docs)
+**Vector Stores**: Qdrant (production), in-memory (development)
+
+**Data Sources**: Filesystem (with file watching), Tavily, DuckDuckGo | Planned: Context7
+
+**Complete Details**: See [README.md - Providers](README.md#providers-and-optional-extras) for installation options and [Provider Documentation](docs/providers.md) for configuration guides.
 
 **Implementation Pattern**:
 ```python
@@ -589,7 +568,7 @@ async def test_find_code_authentication_query():
 
 ### Code Quality Standards
 
-**Docstrings**: Google convention, plain language, active voice, present tense
+**Docstrings**: Google convention (loose), plain language, active voice, present tense
 - Start with verbs: "Adds numbers" not "This function adds numbers"
 - Don't waste space explaining the obvious—strong typing makes args/returns clear
 
@@ -621,7 +600,7 @@ def my_function(arg1: str, *, flag: bool = False) -> None:
     pass
 ```
 
-### Red Flag Protocol
+### Red Flag Protocol for Agents
 
 **When to Stop and Investigate**:
 - API behavior differs from expectations
@@ -696,7 +675,7 @@ Bridge the gap between human expectations and AI agent capabilities through "exq
 2. Single flexible tool (`find_code` with intent parameter)
 3. Agent-specific tools (`quick_search`, `deep_analysis`)
 
-**Decision**: Single `find_code` tool with optional intent parameter
+**Decision**: Single `find_code` tool with optional intent parameter for user's agent
 
 **Rationale** (Constitutional Principles Applied):
 - **Simplicity Through Architecture**: One interface reduces cognitive load
@@ -792,7 +771,7 @@ Bridge the gap between human expectations and AI agent capabilities through "exq
 **Decision**: MCP sampling - separate agent evaluates and curates
 
 **Rationale**:
-- **AI-First Context**: Agents best understand what agents need
+- **AI-First Context**: Well-prompted agents can better shape context delivery
 - Zero context pollution in primary agent
 - 40-60% better precision vs. heuristics
 - Leverages MCP protocol capability
@@ -802,6 +781,103 @@ Bridge the gap between human expectations and AI agent capabilities through "exq
 - No context overhead in primary agent
 - Natural language curation logic
 - Innovative use of MCP protocol
+
+### Decision: MCP-Independent Context Curation
+
+**Context**: How to ensure premium context gets delivered in the first turn? (MCP tools activate only after agents call them)
+
+**Options Considered**:
+1. MCP-only with prompting to encourage early use
+2. Independent agent handling for proactive delivery
+3. Dual approach: MCP sampling + independent agent handling + CLI exposure
+
+**Decision**: Dual approach with both MCP and independent paths
+
+**Rationale**:
+- **User Control**: Direct context retrieval via CLI before starting agent interactions
+- **Strategic Flexibility**: Not locked into MCP protocol evolution
+- **First-Turn Context**: Optimal delivery doesn't wait for agent tool selection
+- **Future-Proof**: Enables HTTP dashboards, IDE integrations, custom workflows
+- **Proven Stack**: pydantic-ai provides production-ready agent handling
+
+**Outcome**:
+- Users proactively request tailored context (CLI: `codeweaver search "auth patterns"`)
+- Agents receive context-rich initial state, biased toward CodeWeaver for follow-ups
+- MCP protocol changes don't break core functionality
+- Foundation for Phase 3 platform evolution (MCP orchestration hub)
+
+**Trade-off**: More implementation complexity → Greater strategic flexibility + better UX
+
+### Decision: Only Index Known or User-Defined File Types
+
+**Context**: Prevent irrelevant files from polluting agent context while maintaining comprehensive coverage.
+
+**Options Considered**:
+1. Index all text files (simple binary check only)
+2. Constrain to well-known paths only (src/, docs/, etc.)
+3. Comprehensive known-filetype catalog with user extensibility
+
+**Decision**: Option 3 - Catalog 300+ known extensions across 170+ languages, allow user configuration for additions
+
+**Rationale**:
+- **Quality over Coverage**: Unknown filetypes risk high-noise, low-value context pollution
+- **Smart Inference**: Finite set of common filetypes enables confident purpose/importance estimation before indexing
+- **User-Friendly**: Doesn't require users to manually configure common cases
+- **Security Benefit**: Avoids indexing hidden/unusual files that could contain injection attacks
+
+**Outcome**:
+- 300+ known code, documentation, and configuration extensions defined
+- Repository pattern mapping for type/language/purpose/importance classification
+- User extensibility via simple configuration for edge cases
+- Optimal balance: comprehensive coverage without noise
+
+**Trade-off**: More upfront cataloging work → Superior precision and user experience
+
+## Strategic Design Principles
+
+These principles guide CodeWeaver's technical decision-making and differentiate our approach from typical MCP servers.
+
+### 1. Deep Quality as Competitive Moat
+
+**Principle**: Favor time-intensive, high-quality implementations over fast iterations.
+
+**Rationale**:
+- Unknown products in crowded spaces (MCP ecosystem) must differentiate through exceptional quality
+- Technical debt is expensive for small teams - build maintainable platforms from the start
+- "Build in the open" benefits from showing polished progress vs. frequent pivots
+- Quality compounds: each well-built component makes future work easier
+
+**In Practice**:
+- Full plugin architecture instead of hardcoded providers (Decision: Full Plugin Architecture)
+- Span-based architecture with set operations vs. simple line numbers (Decision: Span-Based Architecture)
+- 170+ language support with sophisticated heuristics (not just "the big 10")
+
+**Trade-off**: Longer time to market → Higher quality at launch → Stronger positioning
+
+### 2. Principle-Driven vs. Convention-Driven Design
+
+**Principle**: Design decisions derive from constitutional principles and user needs, not "what others have done."
+
+**Rationale**:
+- MCP is young with no established "right way" yet
+- CodeWeaver is a **platform using MCP**, not an "MCP tool" - different goals require different approaches
+- Primary goal: Better development experience through exquisite context (MCP is means, not end)
+- Following conventions blindly risks optimizing for wrong outcomes
+
+**In Practice**:
+- Single-tool interface while others expose 5-20+ tools (Decision: Single-Tool Interface)
+- MCP-independent agent handling for premium context delivery (Decision: MCP-Independent Context Curation)
+- Three-tier API architecture vs. one-size-fits-all (Decision: Three-Tier API Design in PRODUCT.md)
+
+**Trade-off**: Less "idiomatic" MCP → Better user outcomes → Strategic differentiation
+
+### Connection to Product Vision
+
+These principles support CodeWeaver's evolution from search tool → context platform → unified MCP orchestration hub (see [PRODUCT.md - Product Vision](PRODUCT.md#product-vision)).
+
+**Phase 1 (Current)**: Deep quality in search establishes credibility
+**Phase 2 (2025-2026)**: Thread integration builds on solid foundation
+**Phase 3 (2026+)**: Platform play enabled by principle-driven architecture 
 
 ---
 
@@ -833,9 +909,10 @@ Bridge the gap between human expectations and AI agent capabilities through "exq
 
 **Cost**: Longer initial development time
 
-**Benefit**: No vendor lock-in, community extensibility, platform positioning
+**Benefit**: No vendor lock-in, community extensibility, platform positioning, easier maintenance, less technical debt
 
-**Justification**: Evidence from successful platforms (VS Code, FastAPI) shows early investment in extensibility pays off. Aligns with Proven Patterns principle.
+**Justification**: Evidence from successful platforms (VS Code, FastAPI) shows early investment in extensibility pays off. Aligns with Proven Patterns principle. Better long-term to keep technical debt low.
+
 
 ### Trade-off: Testing Coverage vs. Development Speed
 
@@ -875,7 +952,7 @@ Bridge the gap between human expectations and AI agent capabilities through "exq
 
 **Mitigation**: Local embedding options (fastembed), caching strategies, token budgeting
 
-**Justification**: Value proposition (60-80% context reduction) significantly outweighs embedding costs
+**Justification**: Value proposition (60-80% context reduction) significantly outweighs embedding costs; free tiers keep use free or very cheap for most independent/open source developers.
 
 ---
 
