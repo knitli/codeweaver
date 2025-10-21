@@ -23,6 +23,10 @@ ALL development work MUST comply with constitutional principles. This constituti
 
 **Before any code changes**: Validate your approach against `.specify/memory/constitution.md`.
 
+## Architecture Reference
+
+For a comprehensive understanding of CodeWeaver's design decisions, see **[ARCHITECTURE.md](ARCHITECTURE.md)** - the authoritative reference consolidating all architectural decisions, design principles, and technical philosophy.
+
 ## Code Style
 
 **PRIMARY**: Ensure constitutional compliance first (`.specify/memory/constitution.md`), then review [CODE_STYLE.md](./CODE_STYLE.md) for implementation details.

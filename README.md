@@ -100,6 +100,8 @@ Cost: $0.03-$0.06 per query
 
 See [PRODUCT.md - Three-Tier API Architecture](PRODUCT.md#three-tier-api-architecture) for detailed design rationale.
 
+**🏗️ Architecture & Design Decisions**: See [ARCHITECTURE.md](ARCHITECTURE.md) for the authoritative reference on CodeWeaver's architectural decisions, design principles, technical philosophy, and key technical decisions. This document consolidates all design decisions into a unified resource.
+
 ---
 
 ## Architectural Goals
