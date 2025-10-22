@@ -80,29 +80,20 @@ from pydantic import (
     computed_field,
 )
 
-from codeweaver._types import BasedModel, BaseEnum, LiteralStringT
 from codeweaver._utils import lazy_importer, uuid7
-from codeweaver.language import SemanticSearchLanguage
-from codeweaver.semantic._types import ThingName
-from codeweaver.services.textify import humanize
+from codeweaver.core import BasedModel, BaseEnum, LiteralStringT
+from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.engine.textify import humanize
+from codeweaver.semantic.types import ThingName
 
 
 # type-only imports
 if TYPE_CHECKING:
-    from codeweaver.semantic._node_type_parser import CompositeThing, Token
     from codeweaver.semantic.classifications import AgentTask, ImportanceScores, ThingClass
+    from codeweaver.semantic.node_type_parser import CompositeThing, Token
     from codeweaver.semantic.registry import ThingRegistry
 else:
-    _grammar_module = lazy_importer("codeweaver.semantic.grammar")
-    CompositeThing = _grammar_module.CompositeThing
-    Token = _grammar_module.Token
-
-    _classifications_module = lazy_importer("codeweaver.semantic.classifications")
-    AgentTask = _classifications_module.AgentTask
-    ImportanceScores = _classifications_module.ImportanceScores
-    ThingClass = _classifications_module.ThingClass
-
-    ThingRegistry = lazy_importer("codeweaver.semantic.registry").ThingRegistry
+    ThingRegistry = lazy_importer("codeweaver.semantic.registry")().ThingRegistry
 
 
 # re-export Ast Grep's rules and config types:
@@ -121,7 +112,7 @@ AstGrepSearchTypes = (
 
 def get_registry_module() -> ModuleType:
     """Lazy import the node types module to avoid circular imports."""
-    return lazy_importer("codeweaver.semantic.registry")
+    return lazy_importer("codeweaver.semantic.registry")()
 
 
 class MetaVar(str, BaseEnum):
@@ -246,7 +237,7 @@ class FileThing[SgRoot: (AstGrepRoot)](BasedModel):
     @classmethod
     def from_file(cls, file_path: Path) -> FileThing[SgRoot]:
         """Create a FileThing from a file."""
-        from codeweaver.language import SemanticSearchLanguage
+        from codeweaver.core.language import SemanticSearchLanguage
 
         content = file_path.read_text()
         language = SemanticSearchLanguage.from_extension(file_path.suffix)
@@ -346,6 +337,8 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         """Check if the node is the root file thing."""
         if not self.thing.is_composite:
             return False
+        from codeweaver.semantic.grammar import CompositeThing
+
         assert isinstance(self.thing, CompositeThing)  # noqa: S101
         return cast(bool, self.thing.is_file)
 

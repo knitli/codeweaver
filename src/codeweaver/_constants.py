@@ -17,7 +17,7 @@ from typing import Annotated, Literal, NamedTuple, NewType, TypedDict, cast, ove
 
 from pydantic import Field
 
-from codeweaver._types import LiteralStringT
+from codeweaver.core import LiteralStringT
 
 
 Extension = NewType("Extension", LiteralStringT)

@@ -18,8 +18,8 @@ import black
 import textcase
 
 from codeweaver._constants import ALL_LANGUAGES
-from codeweaver._types import LiteralStringT
-from codeweaver.language import SemanticSearchLanguage
+from codeweaver.core import LiteralStringT
+from codeweaver.core.language import SemanticSearchLanguage
 
 
 ALL_LANGUAGES = sorted(ALL_LANGUAGES)
@@ -28,7 +28,7 @@ CW_ROOT = Path(__file__).parent.parent.parent
 
 MARKDOWN_PATH = CW_ROOT / "overrides" / "partials" / "languages.md"
 
-LITERAL_TYPE_PATH = CW_ROOT / "src" / "codeweaver" / "_supported_languages.py"
+LITERAL_TYPE_PATH = CW_ROOT / "src" / "codeweaver" / "core" / "secondary_languages.py"
 
 
 def generate_literal_type(languages: list[LiteralStringT]) -> str:

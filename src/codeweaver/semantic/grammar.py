@@ -261,15 +261,15 @@ from pydantic import (
 )
 from pydantic.dataclasses import dataclass
 
-from codeweaver._types import (
+from codeweaver._utils import lazy_importer
+from codeweaver.core import (
     DATACLASS_CONFIG,
     BasedModel,
     DataclassSerializationMixin,
     LiteralStringT,
 )
-from codeweaver._utils import lazy_importer
-from codeweaver.language import SemanticSearchLanguage
-from codeweaver.semantic._types import (
+from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.semantic.types import (
     CategoryName,
     ConnectionClass,
     ConnectionConstraint,
@@ -1103,7 +1103,7 @@ class Grammar(DataclassSerializationMixin):
             registry: ThingRegistry = get_registry()
 
         except Exception:
-            from codeweaver.semantic._node_type_parser import NodeTypeParser
+            from codeweaver.semantic.node_type_parser import NodeTypeParser
 
             parser = NodeTypeParser()
             results = parser.parse_languages([language])

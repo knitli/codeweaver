@@ -18,7 +18,7 @@ from pydantic import FilePath
 from codeweaver._server import build_app
 from codeweaver._utils import lazy_importer
 from codeweaver.app_bindings import register_app_bindings, register_tool
-from codeweaver.provider import Provider as Provider  # needed for pydantic models
+from codeweaver.providers.provider import Provider as Provider  # needed for pydantic models
 
 
 if TYPE_CHECKING:
@@ -90,11 +90,11 @@ async def run(
     if port:
         server_setup["port"] = port
     if config_file or project_path:
-        from codeweaver.settings import get_settings
+        from codeweaver.config.settings import get_settings
 
         server_setup["settings"] = get_settings(path=config_file)
     if project_path:
-        from codeweaver.settings import update_settings
+        from codeweaver.config.settings import update_settings
 
         _ = update_settings(**{
             **server_setup["settings"].model_dump(),

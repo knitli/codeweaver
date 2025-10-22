@@ -23,11 +23,11 @@ from ast_grep_py import SgNode
 from pydantic import Field, NonNegativeFloat, NonNegativeInt, computed_field
 from typing_extensions import TypeIs
 
-from codeweaver._types import BaseEnum
 from codeweaver._utils import rpartial
-from codeweaver.language import SemanticSearchLanguage
-from codeweaver.semantic._types import CategoryName, ThingName
+from codeweaver.core import BaseEnum
+from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.semantic.classifications import ImportanceRank, SemanticClass
+from codeweaver.semantic.types import CategoryName, ThingName
 
 
 if TYPE_CHECKING:
@@ -422,7 +422,7 @@ class GrammarBasedClassifier:
         1. Language-specific grouped patterns (fastest)
         2. Generic cross-language patterns
         """
-        from codeweaver.semantic._constants import get_checks
+        from codeweaver.semantic.constants import get_checks
 
         if match := next((iter(get_checks(str(thing.name), language=language))), None):
             return self._to_classification_result(
@@ -831,7 +831,7 @@ class GrammarBasedClassifier:
 
         NOTE: There's not standardization of Categories or their meanings across languages. Commonly found Categories reflect grammars that were largely written by the same people (the tree-sitter core team). Many Categories are language-specific or only found in one or two languages. This mapping is based on empirical analysis of all categories found in the 25 languages we support, and assigning them to the closest fitting SemanticClass. This is a living document and will evolve as we analyze more languages and refine our understanding of existing ones.
         """
-        from codeweaver.semantic._types import CategoryName
+        from codeweaver.semantic.types import CategoryName
 
         return MappingProxyType({
             # Universal Categories (appear in most languages)

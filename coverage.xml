@@ -4747,7 +4747,7 @@
 				</class>
 			</classes>
 		</package>
-		<package name="src.codeweaver.embedding" line-rate="0" branch-rate="0" complexity="0">
+		<package name="src.codeweaver.providers.embedding" line-rate="0" branch-rate="0" complexity="0">
 			<classes>
 				<class name="__init__.py" filename="src/codeweaver/embedding/__init__.py" complexity="0" line-rate="0" branch-rate="0">
 					<methods/>
@@ -4804,7 +4804,7 @@
 				</class>
 			</classes>
 		</package>
-		<package name="src.codeweaver.embedding.capabilities" line-rate="0" branch-rate="0" complexity="0">
+		<package name="src.codeweaver.providers.embedding.capabilities" line-rate="0" branch-rate="0" complexity="0">
 			<classes>
 				<class name="__init__.py" filename="src/codeweaver/embedding/capabilities/__init__.py" complexity="0" line-rate="0" branch-rate="0">
 					<methods/>
@@ -5288,7 +5288,7 @@
 				</class>
 			</classes>
 		</package>
-		<package name="src.codeweaver.embedding.providers" line-rate="0" branch-rate="0" complexity="0">
+		<package name="src.codeweaver.providers.embedding.providers" line-rate="0" branch-rate="0" complexity="0">
 			<classes>
 				<class name="__init__.py" filename="src/codeweaver/embedding/providers/__init__.py" complexity="0" line-rate="0" branch-rate="0">
 					<methods/>
@@ -6586,7 +6586,7 @@
 				</class>
 			</classes>
 		</package>
-		<package name="src.codeweaver.reranking" line-rate="0" branch-rate="0" complexity="0">
+		<package name="src.codeweaver.providers.reranking" line-rate="0" branch-rate="0" complexity="0">
 			<classes>
 				<class name="__init__.py" filename="src/codeweaver/reranking/__init__.py" complexity="0" line-rate="0" branch-rate="0">
 					<methods/>
@@ -6617,7 +6617,7 @@
 				</class>
 			</classes>
 		</package>
-		<package name="src.codeweaver.reranking.capabilities" line-rate="0" branch-rate="0" complexity="0">
+		<package name="src.codeweaver.providers.reranking.capabilities" line-rate="0" branch-rate="0" complexity="0">
 			<classes>
 				<class name="__init__.py" filename="src/codeweaver/reranking/capabilities/__init__.py" complexity="0" line-rate="0" branch-rate="0">
 					<methods/>
@@ -6920,7 +6920,7 @@
 				</class>
 			</classes>
 		</package>
-		<package name="src.codeweaver.reranking.providers" line-rate="0" branch-rate="0" complexity="0">
+		<package name="src.codeweaver.providers.reranking.providers" line-rate="0" branch-rate="0" complexity="0">
 			<classes>
 				<class name="__init__.py" filename="src/codeweaver/reranking/providers/__init__.py" complexity="0" line-rate="1" branch-rate="0">
 					<methods/>

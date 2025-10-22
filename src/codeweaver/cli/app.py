@@ -21,18 +21,22 @@ from rich import print as rich_print
 from rich.console import Console
 from rich.table import Table
 
-from codeweaver._types import DictView
 from codeweaver._utils import lazy_importer
+from codeweaver.agent_api.intent import IntentType
+from codeweaver.agent_api.models import CodeMatch, FindCodeResponseSummary
+from codeweaver.config import CodeWeaverSettingsDict
+from codeweaver.core import DictView
 from codeweaver.exceptions import CodeWeaverError
-from codeweaver.models.core import CodeMatch, FindCodeResponseSummary
-from codeweaver.models.intent import IntentType
-from codeweaver.settings import get_settings_map
-from codeweaver.settings_types import CodeWeaverSettingsDict
-from codeweaver.tools.find_code import find_code_implementation
+from codeweaver.tools.find_code import find_code
 
 
 # Lazy import for performance
-settings_map: Any = lazy_importer("codeweaver.settings").get_settings_map()
+def get_settings_map() -> DictView[CodeWeaverSettingsDict]:
+    """Lazy load settings map."""
+    _settings_module = lazy_importer("codeweaver.config")()
+    _settings_map: Any = _settings_module.get_settings_map()
+    return _settings_map
+
 
 # Initialize console for rich output
 console = Console(markup=True, emoji=True)
@@ -101,7 +105,7 @@ async def search(
     try:
         settings = get_settings_map()
         if project_path:
-            from codeweaver.settings import update_settings
+            from codeweaver.config.settings import update_settings
 
             settings = update_settings(project_path=project_path)  # type: ignore
 
@@ -109,7 +113,7 @@ async def search(
         console.print(f"[blue]Query: {query}[/blue]")
 
         # Execute search
-        response = await find_code_implementation(
+        response = await find_code(
             query=query,
             settings=settings,
             intent=intent,
@@ -172,7 +176,7 @@ async def config(
     try:
         settings = get_settings_map()
         if project_path:
-            from codeweaver.settings import update_settings
+            from codeweaver.config.settings import update_settings
 
             settings = update_settings(project_path=project_path)  # type: ignore
 

@@ -14,8 +14,8 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, cast
 
 from codeweaver._utils import lazy_importer
-from codeweaver.language import SemanticSearchLanguage
-from codeweaver.semantic._types import CategoryName, Role, ThingName, ThingOrCategoryNameType
+from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.semantic.types import CategoryName, Role, ThingName, ThingOrCategoryNameType
 
 
 grammar_module = lazy_importer("codeweaver.semantic.grammar")
@@ -448,7 +448,7 @@ def get_registry() -> ThingRegistry:
         if "NodeTypeParser" in caller.filename or "node_type_parser" in caller.filename:
             return _registry
         if not any(_registry.has_language(lang) for lang in SemanticSearchLanguage):
-            from codeweaver.semantic._node_type_parser import NodeTypeParser
+            from codeweaver.semantic.node_type_parser import NodeTypeParser
 
             parser = NodeTypeParser()
             _ = parser.parse_all_nodes()

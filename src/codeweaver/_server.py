@@ -37,19 +37,16 @@ from pydantic.dataclasses import dataclass
 from pydantic_core import to_json
 
 from codeweaver import __version__ as version
-from codeweaver._logger import setup_logger
-from codeweaver._types import DATACLASS_CONFIG, BaseEnum, DataclassSerializationMixin, DictView
 from codeweaver._utils import get_project_root, lazy_importer, rpartial
-from codeweaver.exceptions import InitializationError
-from codeweaver.provider import Provider as Provider
-from codeweaver.settings import (
+from codeweaver.common.logging import setup_logger
+from codeweaver.config.settings import (
     CodeWeaverSettings,
     FastMcpServerSettings,
     FileFilterSettings,
     get_settings,
     get_settings_map,
 )
-from codeweaver.settings_types import (
+from codeweaver.config.types import (
     CodeWeaverSettingsDict,
     ErrorHandlingMiddlewareSettings,
     FastMcpServerSettingsDict,
@@ -59,17 +56,20 @@ from codeweaver.settings_types import (
     RateLimitingMiddlewareSettings,
     RetryMiddlewareSettings,
 )
+from codeweaver.core import DATACLASS_CONFIG, BaseEnum, DataclassSerializationMixin, DictView
+from codeweaver.exceptions import InitializationError
+from codeweaver.providers.provider import Provider as Provider
 
 
 if TYPE_CHECKING:
-    from codeweaver._registry import (
+    from codeweaver.common.registry import (
         Feature,
         ModelRegistry,
         ProviderRegistry,
         ServiceCard,
         ServicesRegistry,
     )
-    from codeweaver._statistics import SessionStatistics
+    from codeweaver.common.statistics import SessionStatistics
 else:
     codeweaver_registry = lazy_importer("codeweaver._registry")
     Feature = codeweaver_registry.Feature
@@ -114,7 +114,7 @@ class HealthStatus(BaseEnum):
 
 def _get_available_features_and_services() -> Iterator[tuple[Feature, ServiceCard]]:
     """Get the list of features supported by the CodeWeaver server."""
-    from codeweaver._registry import get_services_registry
+    from codeweaver.common.registry import get_services_registry
 
     services_instance = get_services_registry()
     yield from (
@@ -131,7 +131,7 @@ class HealthInfo(DataclassSerializationMixin):
     TODO: Expand to be more dynamic, computing health based on service status, etc.
     """
 
-    from codeweaver._registry import Feature, ServiceCard
+    from codeweaver.common.registry import Feature, ServiceCard
 
     status: Annotated[HealthStatus, Field(description="Health status of the server")] = (
         HealthStatus.HEALTHY

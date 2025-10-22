@@ -150,7 +150,7 @@ The CLI is already comprehensively implemented with:
 ```python
 # src/codeweaver/_registry.py
 from typing import Any
-from codeweaver.embedding.base import EmbeddingProvider
+from codeweaver.providers.embedding.base import EmbeddingProvider
 from codeweaver.vector_stores.base import VectorStoreProvider
 
 class ProviderRegistry:

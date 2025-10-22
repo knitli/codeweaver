@@ -27,7 +27,7 @@ from pydantic import (
 from pydantic.dataclasses import dataclass
 from pydantic_core import ArgsKwargs, core_schema
 
-from codeweaver._types import (
+from codeweaver.core import (
     DATACLASS_CONFIG,
     BaseDataclassEnum,
     BasedModel,
@@ -35,7 +35,7 @@ from codeweaver._types import (
     BaseEnumData,
     DataclassSerializationMixin,
 )
-from codeweaver.language import SemanticSearchLanguage
+from codeweaver.core.language import SemanticSearchLanguage
 
 
 if TYPE_CHECKING:
@@ -322,7 +322,7 @@ class SemanticClass(str, BaseEnum):
     @classmethod
     def from_token_purpose(cls, purpose: TokenPurpose, token_name: str) -> SemanticClass:
         """Map token purpose to an approximate semantic category."""
-        from codeweaver.semantic._constants import get_token_patterns_sync
+        from codeweaver.semantic.constants import get_token_patterns_sync
         from codeweaver.semantic.grammar import TokenPurpose
 
         patterns = get_token_patterns_sync()

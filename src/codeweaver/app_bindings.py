@@ -24,16 +24,16 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
 from codeweaver._server import AppState, HealthInfo, get_health_info
-from codeweaver._statistics import SessionStatistics, get_session_statistics, timed_http
-from codeweaver._types import DictView
+from codeweaver.agent_api.intent import IntentType
+from codeweaver.agent_api.models import FindCodeResponseSummary
+from codeweaver.common import SessionStatistics, get_session_statistics, timed_http
+from codeweaver.config import CodeWeaverSettingsDict, MiddlewareOptions
+from codeweaver.config.settings import get_settings_map
+from codeweaver.core import DictView
+from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.exceptions import CodeWeaverError
-from codeweaver.language import SemanticSearchLanguage
 from codeweaver.middleware.statistics import StatisticsMiddleware
-from codeweaver.models.core import FindCodeResponseSummary
-from codeweaver.models.intent import IntentType
-from codeweaver.settings import get_settings_map
-from codeweaver.settings_types import CodeWeaverSettingsDict, MiddlewareOptions
-from codeweaver.tools.find_code import find_code_implementation
+from codeweaver.tools.find_code import find_code
 
 
 _logger = logging.getLogger(__name__)
@@ -75,7 +75,7 @@ async def find_code_tool(
 ) -> FindCodeResponseSummary:
     """Use CodeWeaver to find_code in the codebase."""
     try:
-        response = await find_code_implementation(
+        response = await find_code(
             query=query,
             settings=settings(),
             intent=intent,

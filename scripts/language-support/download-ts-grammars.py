@@ -35,14 +35,16 @@ from pydantic import BaseModel, ConfigDict, Field, PastDatetime
 from rich.console import Console
 
 
-SAVE_DIR = Path.cwd() / "grammars"
+GRAMMAR_SAVE_DIR = Path(__file__).parent.parent.parent / "data" / "grammars"
+
+NODE_TYPES_SAVE_DIR = Path(__file__).parent.parent.parent / "data" / "node_types"
 
 
 class GrammarRetrievalError(Exception):
     """Raised when grammar retrieval fails."""
 
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 console = Console(markup=True, emoji=True)
 
@@ -66,8 +68,6 @@ GH_TOKEN = os.environ.get("GH_TOKEN", os.environ.get("GITHUB_TOKEN", None))
 MULTIPLIER = (
     1 if GH_TOKEN else 3
 )  # increase wait time if no token is provided to avoid hitting rate limits
-
-SAVE_DIR = Path(__file__).parent.parent.parent / "grammars"
 
 
 @cache
@@ -106,11 +106,11 @@ class TreeSitterGrammarResult:
     date: PastDatetime
     last_fetched: PastDatetime | None
 
-    def save_path(self, save_dir: Path = SAVE_DIR) -> Path:
+    def save_path(self, save_dir: Path = GRAMMAR_SAVE_DIR) -> Path:
         """The filename for saving the grammar locally."""
         extension = self.git_path.split(".")[-1]
         if "node-types" in self.git_path:
-            return save_dir / f"{self.language.value}-node-types.{extension}"
+            return NODE_TYPES_SAVE_DIR / f"{self.language.value}-node-types.{extension}"
         return save_dir / f"{self.language.value}-grammar.{extension}"
 
     async def fetch_node_types(self) -> str | None:
@@ -156,7 +156,9 @@ class TreeSitterGrammarResult:
                 f"Failed to retrieve grammar file from {self.url}: {e}"
             ) from e
 
-    async def save(self, content: str | bytes | None = None, save_dir: Path = SAVE_DIR) -> None:
+    async def save(
+        self, content: str | bytes | None = None, save_dir: Path = GRAMMAR_SAVE_DIR
+    ) -> None:
         """Saves the grammar file to the specified directory."""
         save_path = self.save_path(save_dir)
         if not save_path.parent.exists():
@@ -692,7 +694,7 @@ class Grammars(BaseModel):
             "grammars": tuple(merged_grammars),
         })
 
-    def serialize(self, save_dir: Path = SAVE_DIR) -> None:
+    def serialize(self, save_dir: Path = GRAMMAR_SAVE_DIR) -> None:
         """Saves the grammars to a JSON file."""
         if not save_dir.exists():
             save_dir.mkdir(parents=True, exist_ok=True)
@@ -768,7 +770,7 @@ def normalize_grammars() -> None:
                 "[red]tree-sitter CLI not found. Please install it to normalize grammars.[/red]"
             )
             return
-        _ = subprocess.run([ts_cli, "generate", "-b", str(SAVE_DIR)])  # noqa: S603
+        _ = subprocess.run([ts_cli, "generate", "-b", str(GRAMMAR_SAVE_DIR)])  # noqa: S603
     except FileNotFoundError:
         console.print(
             "[red]tree-sitter CLI not found. Please install it to normalize grammars.[/red]"
@@ -796,7 +798,7 @@ async def fetch_grammars(  # noqa: C901
     save_dir: Annotated[
         Path | None,
         Param(name=["-d", "--dir"], alias="dir", help="Directory to save the grammars to."),
-    ] = SAVE_DIR,
+    ] = GRAMMAR_SAVE_DIR,
     only_update: Annotated[
         bool,
         Param(
@@ -835,15 +837,15 @@ async def fetch_grammars(  # noqa: C901
     console.print(f"[cyan]DEBUG:[/cyan] languages parameter type: {type(languages)}")
     console.print(f"[cyan]DEBUG:[/cyan] languages parameter value: {languages}")
 
-    global GH_USERNAME, GH_TOKEN, MULTIPLIER, SAVE_DIR
+    global GH_USERNAME, GH_TOKEN, MULTIPLIER, GRAMMAR_SAVE_DIR
     gh_username = gh_username or GH_USERNAME
     gh_token = gh_token or GH_TOKEN
-    save_dir = save_dir or SAVE_DIR
+    save_dir = save_dir or GRAMMAR_SAVE_DIR
     MULTIPLIER = (
         1 if gh_token else 3
     )  # increase wait time if no token is provided to avoid hitting rate limits
     # adjust globals based on provided arguments
-    GH_USERNAME, GH_TOKEN, SAVE_DIR = gh_username, gh_token, save_dir
+    GH_USERNAME, GH_TOKEN, GRAMMAR_SAVE_DIR = gh_username, gh_token, save_dir
     all_ = len(languages) == 1 and languages[0] == AstGrepSupportedLanguage._ALL
     languages = languages[0].resolved_languages if all_ else languages
 

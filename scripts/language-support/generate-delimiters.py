@@ -31,29 +31,32 @@ from rich.console import Console
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from codeweaver.services.chunker.delimiters import LanguageFamily, expand_pattern
-from codeweaver.services.chunker.delimiters.custom import get_custom_patterns
-from codeweaver.services.chunker.delimiters.delimiter import Delimiter, DelimiterDict
-from codeweaver.services.chunker.delimiters.families import get_family_patterns
-from codeweaver.services.chunker.delimiters.kind import DelimiterKind
-from codeweaver.services.chunker.delimiters.patterns import kind_from_delimiter_tuple
+from codeweaver.engine.chunker.delimiters import LanguageFamily, expand_pattern
+from codeweaver.engine.chunker.delimiters.custom import get_custom_patterns
+from codeweaver.engine.chunker.delimiters.families import get_family_patterns
+from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
+from codeweaver.engine.chunker.delimiters.patterns import (
+    DelimiterDict,
+    DelimiterPattern,
+    kind_from_delimiter_tuple,
+)
 
 
 if TYPE_CHECKING:
-    from codeweaver.services.chunker.delimiters.patterns import DelimiterPattern
+    from codeweaver.engine.chunker.delimiters.patterns import DelimiterPattern
 
 
 console = Console(markup=True, emoji=True)
 
 
-def delimiter_dict_to_delimiter(d: DelimiterDict) -> Delimiter:
-    """Convert DelimiterDict to Delimiter NamedTuple."""
-    return Delimiter(
-        start=d["start"],
-        end=d["end"],
+def delimiter_dict_to_delimiter(d: DelimiterDict) -> DelimiterPattern:
+    """Convert DelimiterDict to DelimiterPattern NamedTuple."""
+    return DelimiterPattern(
+        starts=d["start"],
+        ends=d["end"],
         kind=d.get("kind", DelimiterKind.UNKNOWN),
         nestable=d.get("nestable", False),
-        priority=d.get("priority", 20),
+        priority_override=d.get("priority", 20),
         inclusive=d.get("inclusive", False),
         take_whole_lines=d.get("take_whole_lines", False),
     )
@@ -65,7 +68,7 @@ def generate_language_delimiters(
     custom_patterns: list[DelimiterPattern] | None = None,
     *,
     include_custom: bool = True,
-) -> tuple[Delimiter, ...]:
+) -> tuple[DelimiterPattern, ...]:
     """Generate delimiters for a language.
 
     Args:
@@ -75,7 +78,7 @@ def generate_language_delimiters(
         include_custom: Whether to include language-specific custom patterns
 
     Returns:
-        Tuple of Delimiter objects sorted by priority (descending)
+        Tuple of DelimiterPattern objects sorted by priority (descending)
     """
     # Auto-detect family if not provided
     if family is None:
@@ -107,19 +110,19 @@ def generate_language_delimiters(
         if key not in seen or delim.get("priority", 10) > seen[key].get("priority", 20):
             seen[key] = delim
 
-    # Convert to Delimiter objects and sort by priority
+    # Convert to DelimiterPattern objects and sort by priority
     delimiters = [delimiter_dict_to_delimiter(d) for d in seen.values()]
-    sorted_delimiters = sorted(delimiters, key=lambda d: d.priority, reverse=True)
+    sorted_delimiters = sorted(delimiters, key=lambda d: d.priority_override or 20, reverse=True)
 
     return tuple(sorted_delimiters)
 
 
-def format_delimiter_definition(language: str, delimiters: tuple[Delimiter, ...]) -> str:
+def format_delimiter_definition(language: str, delimiters: tuple[DelimiterPattern, ...]) -> str:
     """Format delimiter tuple as Python code for _constants.py.
 
     Args:
         language: Language name
-        delimiters: Tuple of Delimiter objects
+        delimiters: Tuple of DelimiterPattern objects
 
     Returns:
         Formatted Python code string
@@ -128,22 +131,22 @@ def format_delimiter_definition(language: str, delimiters: tuple[Delimiter, ...]
 
     for delim in delimiters:
         if not delim.kind:
-            delim = Delimiter(
-                start=delim.start,
-                end=delim.end,
-                kind=kind_from_delimiter_tuple(delim.start, delim.end),
+            delim = DelimiterPattern(
+                starts=delim.starts,
+                ends=delim.ends,
+                kind=kind_from_delimiter_tuple(delim.starts, delim.ends),
                 nestable=delim.nestable,
-                priority=delim.priority,
+                priority_override=delim.priority_override,
                 inclusive=delim.inclusive,
                 take_whole_lines=delim.take_whole_lines,
             )
         lines.extend((
-            "        Delimiter(",
-            f'            start="{delim.start}",',
-            f'            end="{delim.end}",',
+            "        DelimiterPattern(",
+            f'            starts="{delim.starts}",',
+            f'            ends="{delim.ends}",',
             f"            kind=DelimiterKind.{cast(DelimiterKind, delim.kind).name.upper()},",
             f"            nestable={delim.nestable},",
-            f"            priority={delim.priority},",
+            f"            priority_override={delim.priority_override},",
             f"            inclusive={delim.inclusive},",
             f"            take_whole_lines={delim.take_whole_lines},",
             "        ),",
@@ -197,7 +200,7 @@ def main() -> None:
 def _print_outcome() -> None:
     """Generate and print delimiter definitions for all languages."""
     # Generate for all languages from the family mapping
-    from codeweaver.services.chunker.delimiters.families import _LANGUAGE_TO_FAMILY
+    from codeweaver.engine.chunker.delimiters.families import _LANGUAGE_TO_FAMILY
 
     languages = sorted(_LANGUAGE_TO_FAMILY.keys())
 
@@ -210,7 +213,7 @@ def _print_outcome() -> None:
     )
     console.print()
     console.print(
-        "DELIMITERS: MappingProxyType[LiteralStringT, tuple[Delimiter, ...]] = MappingProxyType({"
+        "DELIMITERS: MappingProxyType[LiteralStringT, tuple[DelimiterPattern, ...]] = MappingProxyType({"
     )
 
     for i, lang in enumerate(languages):

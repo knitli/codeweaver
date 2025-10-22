@@ -27,11 +27,9 @@ from typing import TYPE_CHECKING, Any, Literal, NotRequired, Required, TypedDict
 from pydantic import UUID7, BaseModel, TypeAdapter
 from typing_extensions import TypeIs
 
-from codeweaver._types import LiteralStringT, 
-
 
 if TYPE_CHECKING:
-    from codeweaver._types import AbstractNodeName
+    from codeweaver.core import CategoryName, LiteralStringT
 
 
 logger = logging.getLogger(__name__)
@@ -50,7 +48,7 @@ def _debug_exec_module(self: util.LazyLoader, module: ModuleType) -> None:
 util.LazyLoader.exec_module = _debug_exec_module
 
 
-class Missing():
+class Missing:
     pass
 
 
@@ -72,15 +70,15 @@ def uuid7() -> UUID7:
 type DictInputTypesT = (
     dict[str, set[str]]
     | dict[LiteralStringT, set[LiteralStringT]]
-    | dict[AbstractNodeName, set[LiteralStringT]]
-    | dict[LiteralStringT, set[AbstractNodeName]]
+    | dict[CategoryName, set[LiteralStringT]]
+    | dict[LiteralStringT, set[CategoryName]]
 )
 
 type DictOutputTypesT = (
     dict[str, tuple[str, ...]]
     | dict[LiteralStringT, tuple[LiteralStringT, ...]]
-    | dict[AbstractNodeName, tuple[LiteralStringT, ...]]
-    | dict[LiteralStringT, tuple[AbstractNodeName, ...]]
+    | dict[CategoryName, tuple[LiteralStringT, ...]]
+    | dict[LiteralStringT, tuple[CategoryName, ...]]
 )
 
 
@@ -149,7 +147,7 @@ def _check_env_var(var_name: str) -> str | None:
 
 def get_possible_env_vars() -> tuple[tuple[str, str], ...] | None:
     """Get a tuple of any resolved environment variables for all providers and provider environment variables. If none are set, returns None."""
-    from codeweaver.provider import Provider
+    from codeweaver.providers.provider import Provider
 
     env_vars = sorted({item[1][0] for item in Provider.all_envs()})
     found_vars = tuple(
