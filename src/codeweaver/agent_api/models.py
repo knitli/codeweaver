@@ -1,3 +1,4 @@
+# sourcery skip: lambdas-should-be-short
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -11,7 +12,7 @@ from typing import Annotated, Any
 from pydantic import ConfigDict, Field, NonNegativeFloat, NonNegativeInt, model_validator
 
 from codeweaver.agent_api.intent import IntentType
-from codeweaver.core import BASEDMODEL_CONFIG, BasedModel, BaseEnum, DiscoveredFile, Span
+from codeweaver.core import BASEDMODEL_CONFIG, BasedModel, BaseEnum, CodeChunk, DiscoveredFile, Span
 from codeweaver.core.language import SemanticSearchLanguage
 
 
@@ -40,18 +41,9 @@ class CodeMatch(BasedModel):
     model_config = BASEDMODEL_CONFIG | ConfigDict(
         json_schema_extra={
             "example": {
-                "file": {
-                    "path": "src/auth/middleware.py",
-                    "language": "python",
-                    "file_hash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
-                    "file_size": 1234,
-                },
+                "file": {"path": "src/auth/middleware.py", "language": "python", "file_size": 1234},
                 "content": "class AuthMiddleware(BaseMiddleware): ...",
-                "span": [
-                    15,
-                    45,
-                    "5f6d4c46-39cc-4cf5-8477-3d5b4a9e3c31",
-                ],  # spans have a source_id for the chunk they came from
+                "span": [15, 45],  # spans have a source_id for the chunk they came from
                 "relevance_score": 0.92,
                 "match_type": "text_search",
             }
@@ -63,23 +55,35 @@ class CodeMatch(BasedModel):
     file: Annotated[DiscoveredFile, Field(description="""File information""")]
 
     # Content
-    content: Annotated[str, Field(description="""Relevant code content""")]
+    content: Annotated[CodeChunk, Field(description="""The relevant code chunk.""")]
 
     span: Annotated[Span, Field(description="""Start and end line numbers""")]
 
-    # Relevance scoring1
+    # Relevance scoring
     relevance_score: Annotated[
-        NonNegativeFloat, Field(le=1.0, description="""Relevance score (0.0-1.0)""")
+        NonNegativeFloat,
+        Field(
+            le=1.0,
+            description="""\
+        Adjusted relevance score (0.0-1.0).
+
+        This is not the raw similarity score returned by a vector database. CodeWeaver applies multiple layers of adjustments based on factors such as:
+        - Repo/code structures
+        - Weighting of different search strategies, confidence levels, and likely relevance for the task
+        - Semantic importance/significance
+        - Language-specific heuristics
+        - The goal and reason for the search (i.e., if the user or agent wants to debug a function, matches in test files with no direct connections to the function may be excluded or downranked)
+
+        The final relevance score, which is what this field represents, is a value between 0.0 and 1.0, where 1.0 indicates the highest relevance to the search query (screened results are normalized to 1, where 1 is the most relevant).
+
+        If you persistently have issues where a relevance score seems off or isn't returning quality results for a particular task, please [start a discussion](https://github.com/knitli/codeweaver-mcp/discussions) or [open an issue](https://github.com/knitli/codeweaver-mcp/issues). Results aren't perfect but we are going to try to get there!
+    """,
+        ),
     ]
 
     match_type: Annotated[
         CodeMatchType, Field(description="""The type of match for this code match""")
     ]
-
-    # Context
-    surrounding_context: Annotated[
-        str | None, Field(description="""Additional context around the match""")
-    ] = None
 
     related_symbols: Annotated[
         tuple[str],
@@ -128,7 +132,7 @@ class FindCodeResponseSummary(BasedModel):
     ]
 
     summary: Annotated[
-        str, Field(description="""High-level summary of findings""", max_length=1000)
+        str, Field(description="""High-level summary or explanation of findings""", max_length=1000)
     ]
 
     query_intent: Annotated[
@@ -136,7 +140,15 @@ class FindCodeResponseSummary(BasedModel):
     ]
 
     total_matches: Annotated[
-        NonNegativeInt, Field(description="""Total matches found before ranking""")
+        NonNegativeInt, Field(description="""Total matches found *before* ranking""")
+    ]
+
+    total_results: Annotated[
+        NonNegativeInt,
+        Field(
+            description="""Total results returned in this response""",
+            default_factory=lambda data: len(data["matches"]),
+        ),
     ]
 
     token_count: Annotated[NonNegativeInt, Field(description="""Actual tokens used in response""")]
@@ -151,7 +163,12 @@ class FindCodeResponseSummary(BasedModel):
     languages_found: Annotated[
         tuple[SemanticSearchLanguage | str, ...],
         Field(
-            description="""Programming languages in the results. If the language is supported for semantic search, it will be a `SemanticSearchLanguage`, otherwise a `str` from languages in `codeweaver._constants.py`"""
+            description="""Programming languages in the results. If the language is supported for semantic search, it will be a `SemanticSearchLanguage`, otherwise a `str` from languages in `codeweaver._constants.py`""",
+            default_factory=lambda data: tuple(
+                match.file.ext_kind.language
+                for match in data["matches"]
+                if match and match.file and match.file.ext_kind and match.file.ext_kind.language
+            ),
         ),
     ]
 
@@ -159,6 +176,28 @@ class FindCodeResponseSummary(BasedModel):
     def get_schema(cls) -> dict[str, Any]:
         """Get the JSON schema for the model as a Python dictionary."""
         return cls.model_json_schema(mode="serialization")
+
+    def _assemble_cli_summary(self) -> str:
+        """Assemble a concise CLI summary of the response."""
+        from rich.table import Table
+
+        table = Table(title="Find Code Response Summary")
+        table.add_column("Metric", justify="left", style="cyan", no_wrap=True)
+        table.add_column("Value", justify="right", style="magenta")
+
+        table.add_row("Total Matches Found", str(self.total_matches))
+        table.add_row("Total Results Returned", str(self.total_results))
+        table.add_row(
+            "Languages Found", ", ".join(str(lang) for lang in self.languages_found) or "None"
+        )
+        table.add_row(
+            "Search Strategies Used",
+            ", ".join(strategy.as_title for strategy in self.search_strategy),
+        )
+        table.add_row("Execution Time", f"{self.execution_time_ms:.2f} ms")
+        table.add_row("Token Count", str(self.token_count))
+        table.add_row("Summary", self.summary)
+        return table
 
 
 __all__ = ("CodeMatch", "CodeMatchType", "FindCodeResponseSummary", "SearchStrategy")

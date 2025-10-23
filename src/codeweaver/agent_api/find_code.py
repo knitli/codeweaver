@@ -29,7 +29,6 @@ from typing import TYPE_CHECKING, NamedTuple, cast
 
 from pydantic import NonNegativeInt, PositiveInt
 
-from codeweaver._utils import estimate_tokens, uuid7
 from codeweaver.agent_api.intent import IntentType
 from codeweaver.agent_api.models import (
     CodeMatch,
@@ -38,6 +37,7 @@ from codeweaver.agent_api.models import (
     SearchStrategy,
 )
 from codeweaver.common import SessionStatistics
+from codeweaver.common.utils.utils import estimate_tokens, uuid7
 from codeweaver.config import CodeWeaverSettingsDict
 from codeweaver.core import DictView, DiscoveredFile, Span
 from codeweaver.core.language import SemanticSearchLanguage

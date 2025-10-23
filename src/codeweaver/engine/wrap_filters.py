@@ -18,7 +18,7 @@ from typing import Annotated, Any
 
 from pydantic import Field
 
-from codeweaver.engine._filter import FilterableField, make_filter
+from codeweaver.engine.filter import FilterableField, make_filter
 
 
 def make_partial_function(
@@ -56,7 +56,7 @@ def _get_field_type(field: FilterableField) -> type:
         return int
     if field.field_type == "float":
         return float
-    if field.field_type == "boolean":
+    if field.field_type == "bool":
         return bool
     raise ValueError(f"Unsupported field type: {field.field_type}")
 

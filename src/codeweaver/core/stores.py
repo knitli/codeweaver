@@ -40,7 +40,7 @@ from pydantic import (
 )
 from typing_extensions import TypeIs
 
-from codeweaver._utils import uuid7
+from codeweaver.common.utils.utils import uuid7
 from codeweaver.core import BasedModel
 
 

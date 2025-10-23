@@ -11,7 +11,7 @@ from weakref import WeakValueDictionary
 
 from pydantic import UUID7
 
-from codeweaver._utils import uuid7
+from codeweaver.common.utils.utils import uuid7
 from codeweaver.core import BasedModel
 
 
@@ -93,3 +93,6 @@ def clear_registry() -> None:
 def get_registry() -> SourceIdRegistry:
     """Get the global registry instance."""
     return _global_registry
+
+
+__all__ = ("SourceIdRegistry", "clear_registry", "get_registry", "source_id_for")

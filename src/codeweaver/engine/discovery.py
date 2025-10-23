@@ -9,13 +9,12 @@ from typing import TYPE_CHECKING
 
 import rignore
 
-from codeweaver.core.discovery import DiscoveredFile
-from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.core import DiscoveredFile, SemanticSearchLanguage
 from codeweaver.exceptions import IndexingError
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.types import CodeWeaverSettingsDict
+    from codeweaver.config import CodeWeaverSettingsDict
     from codeweaver.core import DictView
 TEST_FILE_PATTERNS = ["*.test.*", "*.spec.*", "test/**/*", "spec/**/*"]
 
@@ -30,7 +29,7 @@ def get_tooling_dirs() -> set[Path]:
 
     global _tooling_dirs
     if _tooling_dirs is None:
-        from codeweaver._constants import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
+        from codeweaver.core.constants import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
 
         tooling_paths = {
             path for tool in COMMON_TOOLING_PATHS for path in tool[1] if _is_hidden_dir(path)
@@ -175,4 +174,4 @@ class FileDiscoveryService:
         return (tuple(discovered_files), tuple(filtered_files))
 
 
-__all__ = ("FileDiscoveryService",)
+__all__ = ("FileDiscoveryService", "get_tooling_dirs")

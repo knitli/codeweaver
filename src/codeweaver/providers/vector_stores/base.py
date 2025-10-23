@@ -13,7 +13,7 @@ from typing import Any
 from pydantic import UUID4, ConfigDict
 
 from codeweaver.core import BasedModel, CodeChunk, SearchResult
-from codeweaver.engine._filter import Filter
+from codeweaver.engine.filter import Filter
 from codeweaver.providers.provider import Provider
 
 

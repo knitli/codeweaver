@@ -12,6 +12,15 @@ from __future__ import annotations
 from typing import Any
 
 from codeweaver.config import EmbeddingModelSettings, EmbeddingProviderSettings
+from codeweaver.providers.embedding.capabilities import (
+    load_default_capabilities,
+    load_sparse_capabilities,
+)
+from codeweaver.providers.embedding.capabilities.base import (
+    EmbeddingModelCapabilities,
+    SparseEmbeddingModelCapabilities,
+)
+from codeweaver.providers.embedding.providers import EmbeddingProvider
 from codeweaver.providers.provider import Provider
 
 
@@ -75,4 +84,12 @@ def get_embedding_model_provider() -> None:  # -> EmbeddingProvider[Any]:
     """Get embedding model provider."""
 
 
-__all__ = ("get_embedding_model_provider", "user_settings_to_provider_settings")
+__all__ = (
+    "EmbeddingModelCapabilities",
+    "EmbeddingProvider",
+    "SparseEmbeddingModelCapabilities",
+    "get_embedding_model_provider",
+    "load_default_capabilities",
+    "load_sparse_capabilities",
+    "user_settings_to_provider_settings",
+)

@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import importlib
 import logging
 import os
 import re
@@ -37,28 +36,24 @@ from pydantic.dataclasses import dataclass
 from pydantic_core import to_json
 
 from codeweaver import __version__ as version
-from codeweaver._utils import get_project_root, lazy_importer, rpartial
-from codeweaver.common.logging import setup_logger
-from codeweaver.config.settings import (
+from codeweaver.common import get_project_root, lazy_import, rpartial, setup_logger
+from codeweaver.config import (
     CodeWeaverSettings,
-    FastMcpServerSettings,
-    FileFilterSettings,
-    get_settings,
-    get_settings_map,
-)
-from codeweaver.config.types import (
     CodeWeaverSettingsDict,
     ErrorHandlingMiddlewareSettings,
+    FastMcpServerSettings,
     FastMcpServerSettingsDict,
+    FileFilterSettings,
     LoggingMiddlewareSettings,
     LoggingSettings,
     MiddlewareOptions,
     RateLimitingMiddlewareSettings,
     RetryMiddlewareSettings,
+    get_settings_map,
 )
 from codeweaver.core import DATACLASS_CONFIG, BaseEnum, DataclassSerializationMixin, DictView
 from codeweaver.exceptions import InitializationError
-from codeweaver.providers.provider import Provider as Provider
+from codeweaver.providers import Provider as Provider
 
 
 if TYPE_CHECKING:
@@ -70,38 +65,47 @@ if TYPE_CHECKING:
         ServicesRegistry,
     )
     from codeweaver.common.statistics import SessionStatistics
+    from codeweaver.common.utils import LazyImport
 else:
-    codeweaver_registry = lazy_importer("codeweaver._registry")
-    Feature = codeweaver_registry.Feature
-    ModelRegistry = codeweaver_registry.ModelRegistry
-    ProviderRegistry = codeweaver_registry.ProviderRegistry
-    ServiceCard = codeweaver_registry.ServiceCard
-    ServicesRegistry = codeweaver_registry.ServicesRegistry
-    SessionStatistics = lazy_importer("codeweaver._statistics").SessionStatistics
+    # lazy types for pydantic at runtime
+    ProviderRegistry: LazyImport[ProviderRegistry] = lazy_import(
+        "codeweaver.common.registry", "ProviderRegistry"
+    )
+    ServicesRegistry: LazyImport[ServicesRegistry] = lazy_import(
+        "codeweaver.common.registry", "ServicesRegistry"
+    )
+    ModelRegistry: LazyImport[ModelRegistry] = lazy_import(
+        "codeweaver.common.registry", "ModelRegistry"
+    )
+    SessionStatistics: LazyImport[SessionStatistics] = lazy_import(
+        "codeweaver.common.statistics", "SessionStatistics"
+    )
 
-# Module-level registry getters (reuse the registry module reference)
-_registry_module = lazy_importer("codeweaver._registry")
-get_model_registry = _registry_module().get_model_registry
-get_provider_registry = _registry_module().get_provider_registry
-get_services_registry = _registry_module().get_services_registry
+# lazy imports for default factory functions
+get_provider_registry: LazyImport[ProviderRegistry] = lazy_import(
+    "codeweaver.common.registry", "get_provider_registry"
+)
+get_services_registry: LazyImport[ServicesRegistry] = lazy_import(
+    "codeweaver.common.registry", "get_services_registry"
+)
+get_model_registry: LazyImport[ModelRegistry] = lazy_import(
+    "codeweaver.common.registry", "get_model_registry"
+)
+get_session_statistics: LazyImport[SessionStatistics] = lazy_import(
+    "codeweaver.common.statistics", "get_session_statistics"
+)
+get_settings: LazyImport[CodeWeaverSettings] = lazy_import(
+    "codeweaver.config.settings", "get_settings"
+)
+
 logger: logging.Logger
-_STATE: AppState | None = None
 _logger: logging.Logger | None = None
 BRACKET_PATTERN: re.Pattern[str] = re.compile("\\[.+\\]")
 
 
-def _get_session_statistics() -> SessionStatistics:
-    """Get or create the session statistics instance."""
-    statistics = importlib.import_module("codeweaver._statistics")
-    return statistics.get_session_statistics()
-
-
-def get_state() -> AppState:
-    """Get the current application state."""
-    global _STATE
-    if _STATE is None:
-        raise RuntimeError("Application state has not been initialized.")
-    return _STATE
+# ================================================
+# *     Application State and Health
+# ================================================
 
 
 class HealthStatus(BaseEnum):
@@ -184,11 +188,14 @@ class HealthInfo(DataclassSerializationMixin):
         )
 
 
-_health_info: HealthInfo = HealthInfo.initialize()
+_health_info: HealthInfo | None = None
 
 
 def get_health_info() -> HealthInfo:
     """Get the current health information."""
+    global _health_info
+    if _health_info is None:
+        _health_info = HealthInfo.initialize()
     return _health_info
 
 
@@ -203,10 +210,7 @@ class AppState(DataclassSerializationMixin):
     ] = False
     settings: Annotated[
         CodeWeaverSettings | None,
-        Field(
-            default_factory=importlib.import_module("codeweaver.settings").get_settings,
-            description="CodeWeaver configuration settings",
-        ),
+        Field(default_factory=get_settings, description="CodeWeaver configuration settings"),
     ]
     config_path: Annotated[
         Path | None,
@@ -246,16 +250,12 @@ class AppState(DataclassSerializationMixin):
     statistics: Annotated[
         SessionStatistics,
         Field(
-            default_factory=_get_session_statistics,
+            default_factory=get_session_statistics,
             description="Session statistics and performance tracking",
         ),
     ]
     health: Annotated[
-        HealthInfo,
-        Field(
-            default_factory=lambda: _health_info or get_health_info(),
-            description="Health status information",
-        ),
+        HealthInfo, Field(default_factory=get_health_info, description="Health status information")
     ]
     middleware_stack: Annotated[
         tuple[Middleware, ...],
@@ -264,8 +264,9 @@ class AppState(DataclassSerializationMixin):
     indexer: None = None
 
     def __post_init__(self) -> None:
-        global _STATE
-        _STATE = self  # type: ignore
+        """Post-initialization to set the global state reference."""
+        global _state
+        _state = self
 
     @computed_field
     @property
@@ -274,6 +275,19 @@ class AppState(DataclassSerializationMixin):
         if self.statistics:
             return self.statistics.total_requests + (self.statistics.total_http_requests or 0)
         return 0
+
+
+_state: AppState | None = None
+
+
+def get_state() -> AppState:
+    """Get the current application state."""
+    global _state
+    if _state is None:
+        raise InitializationError(
+            "AppState has not been initialized yet. Ensure the server is properly set up before accessing the state."
+        )
+    return _state
 
 
 @asynccontextmanager
@@ -287,32 +301,37 @@ async def lifespan(
 
     console = Console(markup=True)
     console.print("[bold red]Entering lifespan context manager...[/bold red]")
-    statistics = statistics or _get_session_statistics()
-    settings = settings or get_settings()
     if not hasattr(app, "state"):
-        app.state = AppState(  # type: ignore
+        state = AppState(  # type: ignore
             initialized=False,
             settings=settings,
             health=get_health_info(),
-            statistics=statistics,
-            project_root=settings.project_root or get_project_root(),
-            config_path=settings.config_file if settings else None,
+            statistics=statistics or get_session_statistics(),
+            project_root=settings.project_root
+            if settings
+            else get_settings().project_root or get_project_root(),
+            config_path=settings.config_file if settings else get_settings().config_file,
             provider_registry=get_provider_registry(),
             services_registry=get_services_registry(),
             model_registry=get_model_registry(),
             middleware_stack=tuple(getattr(app, "middleware", ())),
         )
+        object.__setattr__(app, "state", state)
     state: AppState = app.state  # type: ignore
+    from codeweaver.common import CODEWEAVER_PREFIX
+
     if not isinstance(state, AppState):
         raise InitializationError(
             "AppState should be an instance of AppState, but isn't. Something is wrong. Please report this issue.",
             details={"state": state},
         )
     try:
-        console.print("[bold green]Ensuring services set up...[/bold green]")
+        console.print(f"{CODEWEAVER_PREFIX} [bold green]Ensuring services set up...[/bold green]")
         if not state.health:
             state.health.initialize()
-        console.print("[bold aqua]Lifespan start actions complete, server initialized.[/bold aqua]")
+        console.print(
+            f"{CODEWEAVER_PREFIX} [bold aqua]Lifespan start actions complete, server initialized.[/bold aqua]"
+        )
         state.initialized = True
         yield state
     except Exception as e:
@@ -321,6 +340,10 @@ async def lifespan(
         state.initialized = False
         raise
     finally:
+        # TODO: Add state caching/saving and cleanup logic here
+        console.print(
+            f"{CODEWEAVER_PREFIX} [bold red]Exiting CodeWeaver lifespan context manager...[/bold red]"
+        )
         state.initialized = False
 
 
@@ -426,6 +449,11 @@ def __setup_interim_logger() -> tuple[logging.Logger, int]:
 LEVEL_MAP: dict[
     Literal[0, 10, 20, 30, 40, 50], Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 ] = {0: "DEBUG", 10: "DEBUG", 20: "INFO", 30: "WARNING", 40: "ERROR", 50: "CRITICAL"}
+"""Mapping of integer log levels to FastMCP log level strings.
+
+Note: FastMCP uses string log levels, while Python's logging uses integer levels.
+This mapping helps convert between the two. FastMCP also has one less log level (no NOTSET).
+"""
 
 
 def _setup_logger(
@@ -486,12 +514,19 @@ def _create_base_fastmcp_settings() -> FastMcpServerSettingsDict:
         "instructions": "Ask a question, describe what you're trying to do, and get the exact context you need. CodeWeaver is an advanced code search and code context tool. It keeps an updated vector, AST, and text index of your codebase, and uses intelligent intent analysis to provide the most relevant context for AI Agents to complete tasks. It's just one easy-to-use tool - the `find_code` tool. To use it, you only need to provide a plain language description of what you want to find, and what you are trying to do. CodeWeaver will return the most relevant code matches, along with their context and precise locations.",
         "version": version,
         "lifespan": lifespan,
+        # CodeWeaver has three APIs:
+        #  - Human -- through config and CLI
+        #  - *User* Agent: through the `find_code` tool
+        #  - *Context* Agent: through a few internally exposed tools
+        # The include and exclude tags help differentiate between the two agent APIs.
+        # Because these are core to how CodeWeaver works, users can't change them (well, they can if they are persistent enough, but we don't recommend it).
         "include_tags": {"external", "user", "code-context"},
         "exclude_tags": {"internal", "system", "admin"},
     }
 
 
 type SettingsKey = Literal["middleware", "tools"]
+"""Type alias for `CodeWeaverSettings` keys that can have additional items."""
 
 
 def _integrate_user_settings(
@@ -574,6 +609,8 @@ def string_to_class(s: str) -> type[Any] | None:
 
 
 class ServerSetup(TypedDict):
+    """TypedDict for the CodeWeaver FastMCP server setup."""
+
     app: Required[FastMCP[AppState]]
     settings: Required[CodeWeaverSettings]
     middleware_settings: NotRequired[MiddlewareOptions]
@@ -586,7 +623,7 @@ class ServerSetup(TypedDict):
 
 def build_app() -> ServerSetup:
     """Build and configure the FastMCP application without starting it."""
-    session_statistics = _get_session_statistics()
+    session_statistics = get_session_statistics()
     app_logger, level = __setup_interim_logger()
     local_logger: logging.Logger = globals()["logger"]
     local_logger.info("Initializing CodeWeaver server. Logging set up.")

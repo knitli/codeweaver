@@ -38,7 +38,6 @@ from pydantic import (
 from pydantic.dataclasses import dataclass
 from starlette.responses import PlainTextResponse
 
-from codeweaver._utils import uuid7
 from codeweaver.common.types import (
     McpComponentRequests,
     McpOperationRequests,
@@ -49,14 +48,16 @@ from codeweaver.common.types import (
     TimingStatisticsDict,
     ToolOrPromptName,
 )
+from codeweaver.common.utils import uuid7
 from codeweaver.core import (
     DATACLASS_CONFIG,
     BaseEnum,
     ChunkKind,
+    ConfigLanguage,
     DataclassSerializationMixin,
     ExtKind,
+    SemanticSearchLanguage,
 )
-from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 
 
 @dataclass(config=DATACLASS_CONFIG | ConfigDict(extra="forbid", defer_build=True))
@@ -1127,7 +1128,7 @@ class SessionStatistics(DataclassSerializationMixin):
         if TYPE_CHECKING:
             from mcp.shared.context import RequestContext
 
-            from codeweaver._server import AppState
+            from codeweaver.server import AppState
 
         if context is None:
             return

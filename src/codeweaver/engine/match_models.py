@@ -45,11 +45,16 @@ class PayloadField(BaseModel, extra="forbid"):
 
 
 class MinShould(BaseModel, extra="forbid"):
+    """
+    Minimum number of conditions that must match."""
+
     conditions: Annotated[Sequence[Condition], Field(description="""List of conditions""")]
     min_count: Annotated[int, Field(description="""Minimum count of conditions that must match""")]
 
 
 class Filter(BaseModel, extra="forbid"):
+    """Filter conditions."""
+
     should: Annotated[
         Sequence[Condition] | Condition | None,
         Field(default=None, description="""At least one of those conditions should match"""),

@@ -19,10 +19,11 @@ from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, TypedDict, cast, o
 from langchain_text_splitters import Language as LC_Language
 from pydantic import Field, computed_field
 
-from codeweaver._constants import ALL_LANGUAGES, ExtLangPair, get_ext_lang_pairs
-from codeweaver._utils import get_project_root, normalize_ext
+from codeweaver.common import get_project_root, normalize_ext
 from codeweaver.core import BasedModel, BaseEnum, LiteralStringT
+from codeweaver.core.constants import ALL_LANGUAGES, ExtLangPair, get_ext_lang_pairs
 from codeweaver.core.secondary_languages import SecondarySupportedLanguage
+from codeweaver.core.types.aliases import FileExt, FileExtensionT, FileNameT
 
 
 if TYPE_CHECKING:
@@ -38,12 +39,12 @@ ConfigPathPair = NamedTuple(
 
 ConfigNamePair = NamedTuple(
     "ConfigNamePair",
-    (("filename", LiteralStringT), ("language", "SemanticSearchLanguage | ConfigLanguage")),
+    (("filename", FileNameT), ("language", "SemanticSearchLanguage | ConfigLanguage")),
 )
 """A tuple representing a configuration file name and its associated language, like `("pyproject.toml", SemanticSearchLanguage.PYTHON)` or `("CMakeLists.txt", ConfigLanguage.CMAKE)`."""
 
 ExtPair = NamedTuple(
-    "ExtPair", (("extension", LiteralStringT), ("language", "SemanticSearchLanguage"))
+    "ExtPair", (("extension", FileExtensionT), ("language", "SemanticSearchLanguage"))
 )
 """Nearly identical to `ExtLangPair` in `codeweaver._constants` and `ConfigNamePair`, but here we use `SemanticSearchLanguage` instead of `LiteralStringT` or `ConfigLanguage`for the language type."""
 
@@ -900,7 +901,7 @@ class SemanticSearchLanguage(str, BaseEnum):
         Returns a frozenset of tuples containing file extensions and their corresponding SemanticSearchLanguage.
         """
         for lang, exts in cls.extension_map().items():
-            yield from (ExtPair(extension=ext, language=lang) for ext in exts if ext)
+            yield from (ExtPair(extension=FileExt(ext), language=lang) for ext in exts if ext)  # type: ignore
 
     @classmethod
     def config_pairs(cls) -> Generator[ConfigPathPair]:

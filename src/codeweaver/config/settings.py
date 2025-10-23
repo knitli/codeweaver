@@ -43,7 +43,6 @@ from pydantic_ai.settings import merge_model_settings
 from pydantic_core import from_json
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
-from codeweaver._constants import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_EXTENSIONS
 from codeweaver.config.language import CustomDelimiter, CustomLanguage
 from codeweaver.config.logging import LoggingSettings
 from codeweaver.config.middleware import (
@@ -74,6 +73,7 @@ from codeweaver.config.types import (
     default_config_file_locations,
 )
 from codeweaver.core import UNSET, BasedModel, DictView, Unset
+from codeweaver.core.constants import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_EXTENSIONS
 from codeweaver.providers.provider import Provider
 
 
@@ -283,7 +283,10 @@ class FileFilterSettings(BasedModel):
                 ):
                     return False
                 if settings.include_tooling_dirs:
-                    from codeweaver._constants import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
+                    from codeweaver.core.constants import (
+                        COMMON_LLM_TOOLING_PATHS,
+                        COMMON_TOOLING_PATHS,
+                    )
 
                     # filter for tooling dirs that are hidden (i.e., start with .)
                     if {
@@ -414,7 +417,7 @@ class FastMcpServerSettings(BasedModel):
     additional_tools: Annotated[
         list[str] | None,
         Field(
-            description="""Additional tools to add to the FastMCP server. Values can be either full path import strings, like `codeweaver.tools.git.GitTool`, or just the tool name, like `GitTool`.""",
+            description="""Additional tools to add to the FastMCP server. Values can be either full path import strings, like `codeweaver.agent_api.git.GitTool`, or just the tool name, like `GitTool`.""",
             validation_alias="tools",
             serialization_alias="tools",
         ),
@@ -720,7 +723,7 @@ class CodeWeaverSettings(BaseSettings):
                 cls.model_config["yaml_file"] = path
             case _:
                 raise ValueError(f"Unsupported configuration file format: {extension}")
-        from codeweaver._utils import get_project_root
+        from codeweaver.common.utils import get_project_root
 
         return cls(project_path=get_project_root(), **{**kwargs, "config_file": path})  # type: ignore
 

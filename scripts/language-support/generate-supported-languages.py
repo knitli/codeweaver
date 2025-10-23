@@ -17,8 +17,8 @@ from textwrap import dedent
 import black
 import textcase
 
-from codeweaver._constants import ALL_LANGUAGES
 from codeweaver.core import LiteralStringT
+from codeweaver.core.constants import ALL_LANGUAGES
 from codeweaver.core.language import SemanticSearchLanguage
 
 

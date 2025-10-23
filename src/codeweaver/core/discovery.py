@@ -6,12 +6,12 @@ import contextlib
 
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, cast
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
 from pydantic import AfterValidator, Field, NonNegativeInt, computed_field
 from pydantic.dataclasses import dataclass
 
-from codeweaver._utils import get_git_branch, sanitize_unicode, set_relative_path
+from codeweaver.common.utils import get_git_branch, sanitize_unicode, set_relative_path
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import is_semantic_config_ext
 from codeweaver.core.metadata import ExtKind
@@ -161,3 +161,8 @@ class DiscoveredFile(DataclassSerializationMixin):
     def normalize_content(content: str | bytes | bytearray) -> str:
         """Normalize file content by ensuring it's a UTF-8 string."""
         return sanitize_unicode(content)
+
+    def serialize_for_cli(self) -> dict[str, Any]:
+        """Serialize the DiscoveredFile for CLI output."""
+        self.
+        return self.dump_python(round_trip=True, exclude_none=True, exclude={"file_hash"})

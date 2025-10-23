@@ -37,6 +37,7 @@ from typing import (
     NotRequired,
     Required,
     TypedDict,
+    cast,
     override,
 )
 
@@ -46,12 +47,16 @@ from pydantic_ai.models import Model
 from rich.console import Console
 
 from codeweaver.config import CodeWeaverSettingsDict, ProviderSettingsDict
-from codeweaver.core import BasedModel, BaseEnum, DictView, LiteralStringT
+from codeweaver.core import BasedModel, BaseEnum, DictView, LiteralStringT, ModelName
 from codeweaver.exceptions import ConfigurationError
-from codeweaver.providers import Provider, ProviderKind
-from codeweaver.providers.embedding.providers import EmbeddingProvider
-from codeweaver.providers.reranking.providers.base import RerankingProvider
-from codeweaver.vector_stores.base import VectorStoreProvider
+from codeweaver.providers import (
+    EmbeddingProvider,
+    Provider,
+    ProviderKind,
+    RerankingProvider,
+    SparseEmbeddingModelCapabilities,
+    VectorStoreProvider,
+)
 
 
 if TYPE_CHECKING:
@@ -436,16 +441,24 @@ class ModelRegistry(BasedModel):
             if not replace and name_key in self._embedding_capabilities.get(prov, {}):
                 continue
             if name_key not in self._embedding_capabilities.get(prov, {}):
-                self._embedding_capabilities[prov][name_key] = (cap,)
+                self._embedding_capabilities[prov][ModelName(cast(LiteralStringT, name_key))] = (
+                    cap,
+                )
             else:
-                self._embedding_capabilities[prov][name_key] += (cap,)
+                self._embedding_capabilities[prov][ModelName(cast(LiteralStringT, name_key))] += (
+                    cap,
+                )
 
     def get_embedding_capabilities(
         self, provider: Provider, name: str
     ) -> tuple[EmbeddingModelCapabilities, ...] | None:
         """Get embedding capabilities for a specific provider and model name."""
         prov_map = self._embedding_capabilities.get(provider)
-        return prov_map.get(name.strip().lower()) if prov_map else None
+        return (
+            prov_map.get(ModelName(cast(LiteralStringT, name.strip().lower())))
+            if prov_map
+            else None
+        )
 
     def list_embedding_models(
         self, provider: Provider | None = None
@@ -480,14 +493,18 @@ class ModelRegistry(BasedModel):
             prov_map = self._sparse_embedding_capabilities.setdefault(prov, {})
             if not replace and name_key in prov_map:
                 continue
-            prov_map[name_key] = (cap,)
+            prov_map[ModelName(cast(LiteralStringT, name_key))] = (cap,)
 
     def get_sparse_embedding_capabilities(
         self, provider: Provider, name: str
     ) -> tuple[SparseEmbeddingModelCapabilities, ...] | None:
         """Get sparse embedding capabilities for a specific provider and model name."""
         prov_map = self._sparse_embedding_capabilities.get(provider)
-        return prov_map.get(name.strip().lower()) if prov_map else None
+        return (
+            prov_map.get(ModelName(cast(LiteralStringT, name.strip().lower())))
+            if prov_map
+            else None
+        )
 
     def list_sparse_embedding_models(
         self, provider: Provider | None = None
@@ -524,16 +541,20 @@ class ModelRegistry(BasedModel):
             if not replace and name_key in prov_map:
                 continue
             if name_key not in prov_map:
-                prov_map[name_key] = (cap,)
+                prov_map[ModelName(cast(LiteralStringT, name_key))] = (cap,)
             else:
-                prov_map[name_key] += (cap,)
+                prov_map[ModelName(cast(LiteralStringT, name_key))] += (cap,)
 
     def get_reranking_capabilities(
         self, provider: Provider, name: str
     ) -> tuple[RerankingModelCapabilities, ...] | None:
         """Get reranking capabilities for a specific provider and model name."""
         prov_map = self._reranking_capabilities.get(provider)
-        return prov_map.get(name.strip().lower()) if prov_map else None
+        return (
+            prov_map.get(ModelName(cast(LiteralStringT, name.strip().lower())))
+            if prov_map
+            else None
+        )
 
     def list_reranking_models(
         self, provider: Provider | None = None
@@ -579,7 +600,7 @@ class ModelRegistry(BasedModel):
 
     def _register_builtin_agentic_profiles(self) -> None:
         """Register built-in agentic profiles."""
-        from codeweaver.agent_models import KnownAgentModelName, infer_model
+        from codeweaver.providers import KnownAgentModelName, infer_model
 
         model_names = KnownAgentModelName.__value__.__dict__["__args__"][:-1]
         for model_name in model_names:
@@ -689,8 +710,8 @@ class ProviderRegistry(BasedModel):
             Provider.QDRANT: f"{_vector_store_prefix}qdrant"
         }),
         ProviderKind.DATA: MappingProxyType({
-            Provider.DUCKDUCKGO: "codeweaver.tools",
-            Provider.TAVILY: "codeweaver.tools",
+            Provider.DUCKDUCKGO: "codeweaver.agent_api",
+            Provider.TAVILY: "codeweaver.agent_api",
         }),
     })
 
@@ -755,7 +776,7 @@ class ProviderRegistry(BasedModel):
                     p for p in Provider if str(p).lower() in provider_class.__name__.lower()
                 )
                 self.register(provider, ProviderKind.AGENT, provider_class)
-        tool_module = importlib.import_module("codeweaver.tools")
+        tool_module = importlib.import_module("codeweaver.agent_api")
         if tools := getattr(tool_module, "load_default_data_providers", None):
             for tool in tools:
                 provider = (

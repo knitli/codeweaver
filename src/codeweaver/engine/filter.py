@@ -18,9 +18,9 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from codeweaver._constants import METADATA_PATH
 from codeweaver.core import BaseEnum
-from codeweaver.engine._match_models import (
+from codeweaver.core.constants import METADATA_PATH
+from codeweaver.engine.match_models import (
     FieldCondition,
     Filter,
     MatchAny,
@@ -252,4 +252,16 @@ def make_indexes(filterable_fields: dict[str, FilterableField]) -> dict[str, Pay
     }
 
 
-__all__ = ("Entry", "FilterableField", "PayloadSchemaType", "make_filter", "make_indexes")
+__all__ = (
+    "ArbitraryFilter",
+    "Entry",
+    "FieldCondition",
+    "Filter",
+    "FilterableField",
+    "MatchAny",
+    "MatchExcept",
+    "MatchValue",
+    "Metadata",
+    "PayloadSchemaType",
+    "Range",
+)

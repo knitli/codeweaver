@@ -13,12 +13,10 @@ from itertools import chain
 from types import MappingProxyType
 from typing import TYPE_CHECKING, cast
 
-from codeweaver._utils import lazy_importer
-from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.common.utils import lazy_import
+from codeweaver.core import SemanticSearchLanguage
 from codeweaver.semantic.types import CategoryName, Role, ThingName, ThingOrCategoryNameType
 
-
-grammar_module = lazy_importer("codeweaver.semantic.grammar")
 
 if TYPE_CHECKING:
     from codeweaver.semantic.grammar import (
@@ -31,13 +29,14 @@ if TYPE_CHECKING:
         Token,
     )
 else:
-    Category = grammar_module.Category
-    CompositeThing = grammar_module.CompositeThing
-    Connection = grammar_module.Connection
-    DirectConnection = grammar_module.DirectConnection
-    PositionalConnections = grammar_module.PositionalConnections
-    Token = grammar_module.Token
-    ThingOrCategoryType = grammar_module.ThingOrCategoryType
+    Category = lazy_import("codeweaver.semantic.grammar", "Category")
+    grammar_module = lazy_import("codeweaver.semantic.grammar")
+    CompositeThing = lazy_import("codeweaver.semantic.grammar", "CompositeThing")
+    Connection = lazy_import("codeweaver.semantic.grammar", "Connection")
+    DirectConnection = lazy_import("codeweaver.semantic.grammar", "DirectConnection")
+    PositionalConnections = lazy_import("codeweaver.semantic.grammar", "PositionalConnections")
+    Token = lazy_import("codeweaver.semantic.grammar", "Token")
+    ThingOrCategoryType = lazy_import("codeweaver.semantic.grammar", "ThingOrCategoryType")
 
 
 logger = logging.getLogger(__name__)

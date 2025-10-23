@@ -7,7 +7,7 @@
 from typing import Any, Literal
 
 from codeweaver.providers.provider import Provider
-from codeweaver.providers.reranking.capabilities import load_default_capabilities
+from codeweaver.providers.reranking.capabilities import dependency_map, load_default_capabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider
 
 
@@ -75,6 +75,7 @@ def get_rerank_model_provider(provider: Provider) -> type[RerankingProvider[Any]
 __all__ = (
     "KnownRerankModelName",
     "RerankingProvider",
+    "dependency_map",
     "get_rerank_model_provider",
     "load_default_capabilities",
 )

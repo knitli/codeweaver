@@ -11,8 +11,8 @@ from typing import TYPE_CHECKING, Annotated, ClassVar, Literal, Self, TypedDict,
 from pydantic import DirectoryPath, Field, computed_field
 from pydantic.dataclasses import dataclass
 
-from codeweaver._constants import COMMON_TOOLING_PATHS, TEST_DIR_NAMES
 from codeweaver.core import DATACLASS_CONFIG, BaseEnum, DataclassSerializationMixin, LiteralStringT
+from codeweaver.core.constants import COMMON_TOOLING_PATHS, TEST_DIR_NAMES
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 
 
@@ -121,6 +121,7 @@ class DirectoryPurpose(str, BaseEnum):
         Returns:
             A callable that takes a Path and returns True if it matches the purpose.
         """
+        raise NotImplementedError("DirectoryPurpose.validator must be implemented per member.")
 
     @classmethod
     def validators(cls) -> MappingProxyType[DirectoryPurpose, Callable[[Path], bool]]:
@@ -422,7 +423,7 @@ class RepoChecklist(DataclassSerializationMixin):
         Returns:
             An instance of RepoChecklist with detected directories and files.
         """
-        from codeweaver._constants import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
+        from codeweaver.core.constants import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
 
         root_level_dir_names: set[str] = {
             f.name for f in files if f.parent == project_root and f.is_dir()
@@ -598,3 +599,13 @@ class RepoChecklist(DataclassSerializationMixin):
             if dir_path is not False:
                 app_dirs.extend(d for d in dir_path.iterdir() if d.is_dir())
         return app_dirs
+
+
+__all__ = (
+    "DirectoryPurpose",
+    "PathOrFalse",
+    "RepoChecklist",
+    "RepoChecklistDict",
+    "RepoDirectory",
+    "get_discovery_service",
+)

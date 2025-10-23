@@ -21,13 +21,11 @@ from rich import print as rich_print
 from rich.console import Console
 from rich.table import Table
 
-from codeweaver._utils import lazy_importer
-from codeweaver.agent_api.intent import IntentType
-from codeweaver.agent_api.models import CodeMatch, FindCodeResponseSummary
+from codeweaver.agent_api import CodeMatch, FindCodeResponseSummary, IntentType, find_code
+from codeweaver.common import CODEWEAVER_PREFIX, lazy_importer
 from codeweaver.config import CodeWeaverSettingsDict
 from codeweaver.core import DictView
 from codeweaver.exceptions import CodeWeaverError
-from codeweaver.tools.find_code import find_code
 
 
 # Lazy import for performance
@@ -80,14 +78,14 @@ async def server(
     except CodeWeaverError as e:
         console.print_exception(show_locals=True)
         if e.suggestions:
-            console.print("[yellow]Suggestions:[/yellow]")
+            console.print(f"{CODEWEAVER_PREFIX} [yellow]Suggestions:[/yellow]")
             for suggestion in e.suggestions:
                 console.print(f"  • {suggestion}")
         sys.exit(1)
     except KeyboardInterrupt:
-        console.print_exception(show_locals=False)
+        console.print_exception(show_locals=False, word_wrap=True)
     except Exception:
-        console.print_exception(show_locals=True)
+        console.print_exception(show_locals=True, word_wrap=True)
         sys.exit(1)
 
 
@@ -109,8 +107,8 @@ async def search(
 
             settings = update_settings(project_path=project_path)  # type: ignore
 
-        console.print(f"[blue]Searching in: {settings['project_root']}[/blue]")
-        console.print(f"[blue]Query: {query}[/blue]")
+        console.print(f"{CODEWEAVER_PREFIX} [blue]Searching in: {settings['project_root']}[/blue]")
+        console.print(f"{CODEWEAVER_PREFIX} [blue]Query: {query}[/blue]")
 
         # Execute search
         response = await find_code(
@@ -132,18 +130,7 @@ async def search(
                 "summary": response.summary,
                 "total_matches": response.total_matches,
                 "matches": [
-                    {
-                        "file_path": str(match.file.path),
-                        "language": match.file.ext_kind.language,
-                        "relevance_score": match.relevance_score,
-                        "line_range": match.span,
-                        "content": (
-                            f"{match.content[:200]}..."
-                            if len(match.content) > 200
-                            else match.content
-                        ),
-                    }
-                    for match in limited_matches
+                    {",\n'    '".join(match.model_dump_json() for match in limited_matches)}
                 ],
             }
             rich_print(to_json(output, indent=2))
@@ -249,7 +236,6 @@ def _display_markdown_results(
             f"**Language:** {match.file.ext_kind.language or 'unknown'} | **Score:** {match.relevance_score:.2f} | {match.span!s}"
         )
         console.print(f"```{match.file.ext_kind.language or ''}")
-        console.print(f"{match.content[:300]}..." if len(match.content) > 300 else match.content)
         console.print("```\n")
 
 

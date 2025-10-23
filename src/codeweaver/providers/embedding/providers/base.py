@@ -27,7 +27,7 @@ from uuid import UUID
 from pydantic import UUID7, ConfigDict
 from pydantic.main import IncEx
 
-from codeweaver._utils import lazy_importer, uuid7
+from codeweaver.common.utils.utils import lazy_importer, uuid7
 from codeweaver.core import (
     BasedModel,
     BlakeStore,

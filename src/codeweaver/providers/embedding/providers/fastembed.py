@@ -19,7 +19,7 @@ from typing import Any, ClassVar, cast
 
 import numpy as np
 
-from codeweaver._utils import rpartial
+from codeweaver.common.utils.utils import rpartial
 from codeweaver.core import CodeChunk
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
@@ -53,7 +53,7 @@ def fastembed_all_kwargs(**kwargs: Mapping[str, Any] | None) -> dict[str, Any]:
         if cuda == False:  # user **explicitly** disabled cuda  # noqa: E712
             return default_kwargs | kwargs
         cuda = bool(cuda)
-        from codeweaver._utils import decide_fastembed_runtime
+        from codeweaver.common.utils.utils import decide_fastembed_runtime
 
         decision = decide_fastembed_runtime(explicit_cuda=cuda, explicit_device_ids=device_ids)
         if isinstance(decision, tuple) and len(decision) == 2:

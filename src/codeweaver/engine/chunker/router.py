@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pydantic import UUID7
 
-from codeweaver._utils import estimate_tokens, uuid7
+from codeweaver.common.utils.utils import estimate_tokens, uuid7
 from codeweaver.core import CodeChunk, DiscoveredFile, Metadata, Span
 from codeweaver.engine.chunker.registry import source_id_for
 

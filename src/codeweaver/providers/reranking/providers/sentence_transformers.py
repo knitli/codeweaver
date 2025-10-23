@@ -15,7 +15,7 @@ from typing import Any, cast
 
 import numpy as np
 
-from codeweaver._utils import rpartial
+from codeweaver.common.utils.utils import rpartial
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities

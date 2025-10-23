@@ -14,6 +14,19 @@ from codeweaver.core.chunks import (
 )
 from codeweaver.core.dictview import DictView
 from codeweaver.core.discovery import DiscoveredFile
+from codeweaver.core.language import (
+    Chunker,
+    ConfigLanguage,
+    ConfigNamePair,
+    ExtPair,
+    LanguageConfigFile,
+    SemanticSearchLanguage,
+    find_config_paths,
+    has_semantic_extension,
+    is_semantic_config_ext,
+    language_from_config_file,
+    languages_present_from_configs,
+)
 from codeweaver.core.metadata import ChunkKind, ChunkSource, ExtKind, Metadata, SemanticMetadata
 from codeweaver.core.spans import Span, SpanGroup, SpanTuple
 from codeweaver.core.stores import (
@@ -60,6 +73,8 @@ from codeweaver.core.types import (
     ThingName,
     ThingNameT,
     Unset,
+    generate_field_title,
+    generate_title,
 )
 
 
@@ -80,8 +95,11 @@ __all__ = (
     "ChunkKind",
     "ChunkSequence",
     "ChunkSource",
+    "Chunker",
     "CodeChunk",
     "CodeChunkDict",
+    "ConfigLanguage",
+    "ConfigNamePair",
     "DataclassSerializationMixin",
     "DictView",
     "DirectoryPath",
@@ -90,10 +108,12 @@ __all__ = (
     "EmbeddingModelName",
     "EmbeddingModelNameT",
     "ExtKind",
+    "ExtPair",
     "FileExt",
     "FileExtensionT",
     "FilePath",
     "FilePathT",
+    "LanguageConfigFile",
     "LanguageName",
     "LanguageNameT",
     "LiteralStringT",
@@ -107,6 +127,7 @@ __all__ = (
     "RootedRoot",
     "SearchResult",
     "SemanticMetadata",
+    "SemanticSearchLanguage",
     "Sentinel",
     "SerializedCodeChunk",
     "Span",
@@ -118,6 +139,13 @@ __all__ = (
     "ThingNameT",
     "UUIDStore",
     "Unset",
+    "find_config_paths",
+    "generate_field_title",
+    "generate_title",
+    "has_semantic_extension",
+    "is_semantic_config_ext",
+    "language_from_config_file",
+    "languages_present_from_configs",
     "make_blake_store",
     "make_uuid_store",
     "to_uuid",

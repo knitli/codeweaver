@@ -1,3 +1,10 @@
+"""CodeWeaver Code Chunks and Search Results.
+
+`CodeChunk` are the core building block of all CodeWeaver operations. They are the result of code parsing
+and chunking operations, and they contain the actual code content along with metadata such as file path,
+language, line ranges, and more. `SearchResult` is the output of a vector search operation -- before it has been processed through CodeWeaver's multi-layered reranking system.
+"""
+
 from __future__ import annotations
 
 import textwrap
@@ -6,7 +13,7 @@ from collections.abc import Iterator, Sequence
 from datetime import UTC, datetime
 from functools import cached_property
 from pathlib import Path
-from typing import Annotated, NotRequired, Required, TypedDict, cast
+from typing import Annotated, Any, NotRequired, Required, TypedDict, cast, is_typeddict
 
 from pydantic import (
     UUID7,
@@ -17,14 +24,14 @@ from pydantic import (
     PositiveInt,
     computed_field,
 )
-from pydantic.dataclasses import is_typeddict
 from pydantic_core import to_json
 
-from codeweaver._utils import ensure_iterable, set_relative_path, uuid7
+from codeweaver.common import ensure_iterable, set_relative_path, uuid7
 from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.metadata import ChunkSource, ExtKind, Metadata
+from codeweaver.core.metadata import ChunkSource, ExtKind, Metadata, determine_ext_kind
 from codeweaver.core.spans import Span, SpanTuple
-from codeweaver.core.types import BasedModel
+from codeweaver.core.types import BasedModel, LanguageNameT
+from codeweaver.core.utils import truncate_text
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +97,7 @@ class CodeChunk(BasedModel):
         ),
         AfterValidator(set_relative_path),
     ] = None
-    language: SemanticSearchLanguage | str | None = None
+    language: SemanticSearchLanguage | LanguageNameT | None = None
     source: ChunkSource = ChunkSource.TEXT_BLOCK
     ext_kind: Annotated[
         ExtKind | None,
@@ -143,32 +150,73 @@ class CodeChunk(BasedModel):
         """Serialize the CodeChunk to a dictionary."""
         return self.model_dump_json(round_trip=True, exclude_none=True)
 
+    @property
+    def _serialization_order(self) -> tuple[str, ...]:
+        """Define the order of fields during serialization."""
+        return (
+            "title",
+            "content",
+            "metadata",
+            "file_path",
+            "line_range",
+            "ext_kind",
+            "language",
+            "source",
+            "chunk_version",
+        )
+
+    def _serialize_metadata_for_cli(self) -> dict[str, Any]:
+        """Serialize the metadata for CLI output."""
+        if not self.metadata:
+            return {}
+        return {
+            k: v.serialize_for_cli() if hasattr(v, "serialize_for_cli") else v  # type: ignore
+            for k, v in self.metadata.items()
+            if k in ("name", "context", "semantic_meta")
+        }  # type: ignore
+
     def serialize_for_embedding(self) -> SerializedCodeChunk[CodeChunk]:
         """Serialize the CodeChunk for embedding."""
-        self_map = self.model_dump(
-            round_trip=True,
-            exclude_unset=True,
-            exclude={"chunk_id", "timestamp", "parent_id", "_embedding_batch"},
-        )
-        if metadata := self_map.get("metadata", {}):
+        self_map = self.model_dump(round_trip=True, exclude_unset=True, exclude=self._base_excludes)
+        if metadata := self.metadata:
             metadata = {k: v for k, v in metadata.items() if k in ("name", "tags", "semantic_meta")}
-        ordered_self_map = {
-            "title": self_map.get("title"),
-            "content": self_map.get("content"),
-            "metadata": metadata,
-            "file_path": self_map.get("file_path"),
-            "line_range": self_map.get("line_range"),
-            "ext_kind": str(self_map.get("ext_kind")),
-            "language": self_map.get("language"),
-            "source": self_map.get("source"),
-            "chunk_version": self._version,
-        }
-
+        self_map["version"] = self._version
+        self_map["metadata"] = metadata
+        ordered_self_map = {k: self_map[k] for k in self._serialization_order if self_map.get(k)}
         return to_json({k: v for k, v in ordered_self_map.items() if v}, round_trip=True)
+
+    @property
+    def embedding_batch_id(self) -> UUID7 | None:
+        """Get the batch ID for the code chunk."""
+        return self._embedding_batch
+
+    @property
+    def _base_excludes(self) -> set[str]:
+        """Get the base fields to exclude during serialization."""
+        return {
+            "_version",
+            "_embedding_batch",
+            "chunk_version",
+            "timestamp",
+            "chunk_id",
+            "parent_id",
+            "length",
+        }
 
     def set_batch_id(self, batch_id: UUID7) -> None:
         """Set the batch ID for the code chunk."""
         self._embedding_batch = batch_id
+
+    def serialize_for_cli(self) -> dict[str, Any]:
+        """Serialize the CodeChunk for CLI output."""
+        self_map: dict[str, Any] = {
+            k: v for k, v in super().serialize_for_cli().items() if k not in self._base_excludes
+        }
+        if self.metadata:
+            self_map["metadata"] = self._serialize_metadata_for_cli()
+        if self_map.get("content"):
+            self_map["content"] = truncate_text(self_map["content"])
+        return self_map
 
     @computed_field
     @cached_property
@@ -194,7 +242,7 @@ class CodeChunk(BasedModel):
     @classmethod
     def chunkify(cls, text: StructuredDataInput) -> Iterator[CodeChunk]:
         """Convert text to a CodeChunk."""
-        from codeweaver._utils import ensure_iterable
+        from codeweaver.common.utils.utils import ensure_iterable
 
         yield from (
             item

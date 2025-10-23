@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, NotRequired, Requi
 from ast_grep_py import SgNode
 from pydantic import UUID7, ConfigDict, Field, PositiveFloat
 
-from codeweaver._utils import normalize_ext, uuid7
+from codeweaver.common.utils.utils import normalize_ext, uuid7
 from codeweaver.core.language import (
     ConfigLanguage,
     SemanticSearchLanguage,
@@ -71,7 +71,9 @@ class SemanticMetadata(BasedModel):
         str | None,
         Field(
             description="""The symbol represented by the node""",
-            default_factory=lambda data: data["primary_node"],
+            default_factory=lambda data: data["primary_thing"].name
+            if data.get("primary_thing")
+            else None,
         ),
     ] = None
     thing_id: UUID7 = uuid7()
@@ -82,6 +84,20 @@ class SemanticMetadata(BasedModel):
             description="""Whether the node is a partial node. Partial nodes are created when the node is too large for the context window."""
         ),
     ] = False
+
+    def _serialize_for_cli(self) -> dict[str, Any]:
+        """Serialize the SemanticMetadata for CLI output."""
+        self_map = self.model_dump(
+            mode="python",
+            round_trip=True,
+            exclude_none=True,
+            # we can exclude language because the parent classes will include it
+            exclude={"model_config", "thing_id", "parent_thing_id", "language"},
+        )
+        return {
+            k: v.serialize_for_cli() if hasattr(v, "serialize_for_cli") else v
+            for k, v in self_map.items()
+        }
 
     @classmethod
     def from_parent_meta(
@@ -217,7 +233,7 @@ class ExtKind(NamedTuple):
         with contextlib.suppress(KeyError, ValueError, AttributeError):
             if semantic := SemanticSearchLanguage.from_string(language):
                 return cls.from_language(semantic, kind)
-        from codeweaver._constants import CODE_LANGUAGES, CONFIG_FILE_LANGUAGES, DOCS_LANGUAGES
+        from codeweaver.core.constants import CODE_LANGUAGES, CONFIG_FILE_LANGUAGES, DOCS_LANGUAGES
 
         if language in CONFIG_FILE_LANGUAGES:
             return cls(language=LanguageName(language), kind=ChunkKind.CONFIG)
@@ -269,6 +285,17 @@ class ExtKind(NamedTuple):
             ),
             None,
         )
+
+    def serialize_for_cli(self) -> dict[str, Any]:
+        """Serialize the ExtKind for CLI output."""
+        return {
+            "language": str(
+                self.language.as_title
+                if isinstance(self.language, SemanticSearchLanguage)
+                else self.language
+            ),
+            "kind": str(self.kind.as_title),
+        }
 
 
 __all__ = ("ChunkKind", "ChunkSource", "ExtKind", "Metadata", "SemanticMetadata")

@@ -8,7 +8,7 @@ from typing import Annotated, Any, ClassVar, NamedTuple, Self, TypeGuard
 from pydantic import UUID7, Field, NonNegativeInt, PositiveInt, computed_field, model_validator
 from pydantic.dataclasses import dataclass
 
-from codeweaver._utils import uuid7
+from codeweaver.common.utils.utils import uuid7
 from codeweaver.core.types import DATACLASS_CONFIG, DataclassSerializationMixin
 
 

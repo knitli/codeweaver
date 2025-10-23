@@ -13,7 +13,7 @@ from typing import Any, ClassVar, cast
 
 import numpy as np
 
-from codeweaver._utils import rpartial
+from codeweaver.common.utils.utils import rpartial
 from codeweaver.core import CodeChunk
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.embedding.capabilities.base import (

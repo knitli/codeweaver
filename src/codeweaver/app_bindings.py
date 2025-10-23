@@ -23,7 +23,7 @@ from pydantic_core import to_json
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
-from codeweaver._server import AppState, HealthInfo, get_health_info
+from codeweaver.agent_api import find_code
 from codeweaver.agent_api.intent import IntentType
 from codeweaver.agent_api.models import FindCodeResponseSummary
 from codeweaver.common import SessionStatistics, get_session_statistics, timed_http
@@ -33,7 +33,7 @@ from codeweaver.core import DictView
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.exceptions import CodeWeaverError
 from codeweaver.middleware.statistics import StatisticsMiddleware
-from codeweaver.tools.find_code import find_code
+from codeweaver.server import AppState, HealthInfo, get_health_info
 
 
 _logger = logging.getLogger(__name__)
@@ -164,7 +164,7 @@ async def version_info(_request: Request) -> PlainTextResponse:
 @timed_http("state")
 async def state_info(_request: Request) -> PlainTextResponse:
     """Return the complete application state as JSON."""
-    from codeweaver._server import get_state
+    from codeweaver.server import get_state
 
     state = get_state()
     return PlainTextResponse(content=state.dump_json(), media_type="application/json")

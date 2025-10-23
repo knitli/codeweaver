@@ -10,7 +10,7 @@ from functools import cache
 
 from codeweaver.agent_api.find_code import MatchedSection, find_code
 from codeweaver.agent_api.intent import IntentResult, QueryIntent
-from codeweaver.agent_api.models import CodeMatch, FindCodeResponseSummary
+from codeweaver.agent_api.models import CodeMatch, FindCodeResponseSummary, IntentType
 
 
 @cache
@@ -25,6 +25,7 @@ __all__ = (
     "CodeMatch",
     "FindCodeResponseSummary",
     "IntentResult",
+    "IntentType",
     "MatchedSection",
     "QueryIntent",
     "find_code",

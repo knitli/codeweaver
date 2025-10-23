@@ -261,7 +261,7 @@ from pydantic import (
 )
 from pydantic.dataclasses import dataclass
 
-from codeweaver._utils import lazy_importer
+from codeweaver.common.utils.utils import lazy_importer
 from codeweaver.core import (
     DATACLASS_CONFIG,
     BasedModel,
@@ -269,6 +269,7 @@ from codeweaver.core import (
     LiteralStringT,
 )
 from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.core.types import FROZEN_BASEDMODEL_CONFIG
 from codeweaver.semantic.types import (
     CategoryName,
     ConnectionClass,
@@ -347,7 +348,7 @@ class Thing(BasedModel):
 
     """
 
-    model_config = BasedModel.model_config | ConfigDict(frozen=True)
+    model_config = FROZEN_BASEDMODEL_CONFIG
 
     name: Annotated[ThingName, Field(description="The name of the Thing.")]
 
@@ -389,6 +390,7 @@ class Thing(BasedModel):
     ) = None
 
     _kind: ClassVar[Literal[ThingKind.TOKEN, ThingKind.COMPOSITE]]
+    """The kind of this Thing (TOKEN or COMPOSITE). (This is **not** the same as ast-grep's `kind` attribute, which is `name`.)"""
 
     def __init__(self, **data: Any) -> None:
         """Initialize a Thing (Token or Composite)."""
@@ -502,6 +504,25 @@ class Thing(BasedModel):
         if self.primary_category:
             return f"Thing: {self.name}, Category: {self.primary_category}, Language: {self.language.variable}"
         return f"Thing: {self.name}, Categories: {list(self.categories)}, Language: {self.language.variable}"
+
+    def serialize_for_cli(self) -> dict[str, Any]:
+        """Serialize the Thing for CLI output."""
+        as_python = self.model_dump(
+            mode="python",
+            round_trip=True,
+            exclude={
+                "model_config",
+                "language",
+                "classification",
+                "classification_result",
+                "classification_confidence",
+            },
+        )
+        return {
+            k: v.serialize_for_cli() if hasattr(v, "serialize_for_cli") else v
+            for k, v in as_python.items()
+            if v
+        }
 
 
 class CompositeThing(Thing):
@@ -756,6 +777,17 @@ class Category(BasedModel):
         """
         return self.member_things & other.member_things
 
+    def serialize_for_cli(self) -> dict[str, Any]:
+        """Serialize the Category for CLI output."""
+        as_python = self.model_dump(
+            mode="python", round_trip=True, exclude={"model_config", "language"}
+        )
+        return {
+            k: v.serialize_for_cli() if hasattr(v, "serialize_for_cli") else v
+            for k, v in as_python.items()
+            if v
+        }
+
 
 class Connection(BasedModel):
     """Base class for Connections between Things in a parse tree.
@@ -908,6 +940,19 @@ class Connection(BasedModel):
         return (
             len(self.target_thing_names) == 1 and self.constraints == ConnectionConstraint.ONLY_ONE
         )
+
+    def serialize_for_cli(self) -> dict[str, Any]:
+        """Serialize the Connection for CLI output."""
+        as_python = self.model_dump(
+            mode="python",
+            round_trip=True,
+            exclude={"model_config", "language", "allows_multiple", "requires_presence"},
+        )
+        return {
+            k: v.serialize_for_cli() if hasattr(v, "serialize_for_cli") else v
+            for k, v in as_python.items()
+            if v
+        }
 
 
 class DirectConnection(Connection):
