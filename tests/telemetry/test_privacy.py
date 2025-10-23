@@ -1,0 +1,244 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+"""
+Critical privacy filter tests.
+
+These tests validate that the privacy filter correctly blocks PII and
+sensitive information from telemetry events.
+
+IMPORTANT: These tests are CRITICAL for privacy compliance.
+All tests must pass before deploying telemetry to production.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from codeweaver.telemetry.privacy import PrivacyFilter
+
+
+class TestPrivacyFilter:
+    """Test suite for privacy filter functionality."""
+
+    @pytest.fixture
+    def privacy_filter(self) -> PrivacyFilter:
+        """Create privacy filter instance for testing."""
+        return PrivacyFilter(strict_mode=True)
+
+    def test_blocks_query_content(self, privacy_filter: PrivacyFilter):
+        """CRITICAL: Ensure query content is blocked."""
+        event = {
+            "event": "test_event",
+            "properties": {
+                "query": "authentication middleware",  # Should be blocked
+                "total_searches": 10,
+            },
+        }
+
+        assert not privacy_filter.validate_event(event), "Query content must be blocked"
+
+    def test_blocks_code_snippets(self, privacy_filter: PrivacyFilter):
+        """CRITICAL: Ensure code snippets are blocked."""
+        event = {
+            "event": "test_event",
+            "properties": {
+                "code": "def authenticate(user): pass",  # Should be blocked
+                "total_searches": 10,
+            },
+        }
+
+        assert not privacy_filter.validate_event(event), "Code snippets must be blocked"
+
+    def test_blocks_file_paths(self, privacy_filter: PrivacyFilter):
+        """CRITICAL: Ensure file paths are blocked."""
+        event = {
+            "event": "test_event",
+            "properties": {
+                "path": "/home/user/project/auth.py",  # Should be blocked
+                "total_searches": 10,
+            },
+        }
+
+        assert not privacy_filter.validate_event(event), "File paths must be blocked"
+
+    def test_blocks_repository_names(self, privacy_filter: PrivacyFilter):
+        """CRITICAL: Ensure repository names are blocked."""
+        event = {
+            "event": "test_event",
+            "properties": {
+                "repository": "my-secret-project",  # Should be blocked
+                "total_searches": 10,
+            },
+        }
+
+        assert not privacy_filter.validate_event(event), "Repository names must be blocked"
+
+    def test_blocks_user_identifiers(self, privacy_filter: PrivacyFilter):
+        """CRITICAL: Ensure user identifiers are blocked."""
+        event = {
+            "event": "test_event",
+            "properties": {
+                "user": "john.doe",  # Should be blocked
+                "email": "john@example.com",  # Should be blocked
+                "total_searches": 10,
+            },
+        }
+
+        assert not privacy_filter.validate_event(event), "User identifiers must be blocked"
+
+    def test_allows_aggregated_statistics(self, privacy_filter: PrivacyFilter):
+        """Ensure aggregated statistics are allowed."""
+        event = {
+            "event": "codeweaver_session_summary",
+            "properties": {
+                "total_searches": 12,
+                "success_rate": 0.917,
+                "avg_response_ms": 1250.0,
+                "tokens": {
+                    "total_generated": 50000,
+                    "total_delivered": 15000,
+                    "total_saved": 35000,
+                },
+                "languages": {"python": 6, "typescript": 2},
+                "semantic_frequencies": {"definition_callable": 0.25},
+            },
+        }
+
+        assert privacy_filter.validate_event(event), "Aggregated statistics should be allowed"
+
+    def test_filters_nested_sensitive_data(self, privacy_filter: PrivacyFilter):
+        """CRITICAL: Ensure nested sensitive data is blocked."""
+        event = {
+            "event": "test_event",
+            "properties": {
+                "metadata": {
+                    "query": "test query",  # Nested, should be blocked
+                    "safe_data": 123,
+                },
+            },
+        }
+
+        assert not privacy_filter.validate_event(
+            event
+        ), "Nested sensitive data must be blocked"
+
+    def test_filter_event_removes_disallowed_keys(self, privacy_filter: PrivacyFilter):
+        """Test that filter_event removes disallowed keys."""
+        properties = {
+            "query": "test",  # Should be removed
+            "total_searches": 10,  # Should be kept
+            "path": "/test/path",  # Should be removed
+        }
+
+        filtered = privacy_filter.filter_event(properties)
+
+        assert "query" not in filtered, "Query key should be removed"
+        assert "path" not in filtered, "Path key should be removed"
+        assert "total_searches" in filtered, "Safe key should be kept"
+        assert filtered["total_searches"] == 10
+
+    def test_filter_event_handles_nested_structures(self, privacy_filter: PrivacyFilter):
+        """Test filtering of nested dictionary structures."""
+        properties = {
+            "tokens": {
+                "total_generated": 50000,
+                "query": "test",  # Nested disallowed key
+            },
+            "metadata": {
+                "count": 10,
+            },
+        }
+
+        filtered = privacy_filter.filter_event(properties)
+
+        assert "tokens" in filtered
+        assert "query" not in filtered["tokens"], "Nested disallowed key should be removed"
+        assert "total_generated" in filtered["tokens"]
+        assert "metadata" in filtered
+        assert "count" in filtered["metadata"]
+
+    def test_blocks_strings_that_look_like_paths(self, privacy_filter: PrivacyFilter):
+        """CRITICAL: Ensure path-like strings are detected and blocked."""
+        test_cases = [
+            "/home/user/project/file.py",
+            "C:\\Users\\user\\project\\file.py",
+            "../relative/path/file.py",
+            "src/auth/middleware.py",
+        ]
+
+        for path_string in test_cases:
+            assert privacy_filter._looks_like_path_or_code(
+                path_string
+            ), f"Should detect as path: {path_string}"
+
+    def test_blocks_strings_that_look_like_code(self, privacy_filter: PrivacyFilter):
+        """CRITICAL: Ensure code-like strings are detected and blocked."""
+        test_cases = [
+            "def authenticate(user): pass",
+            "if (user.isAuthenticated) { return true; }",
+            "class AuthMiddleware: pass",
+            "const token = getToken();",
+        ]
+
+        for code_string in test_cases:
+            assert privacy_filter._looks_like_path_or_code(
+                code_string
+            ), f"Should detect as code: {code_string}"
+
+    def test_allows_short_safe_strings(self, privacy_filter: PrivacyFilter):
+        """Ensure short, safe strings are allowed."""
+        safe_strings = ["python", "typescript", "rust", "success", "failed"]
+
+        for safe_string in safe_strings:
+            assert not privacy_filter._looks_like_path_or_code(
+                safe_string
+            ), f"Should allow safe string: {safe_string}"
+
+    def test_strict_mode_rejects_unknown_keys(self, privacy_filter: PrivacyFilter):
+        """Test that strict mode rejects unknown keys."""
+        event = {
+            "event": "test_event",
+            "properties": {
+                "unknown_key": "value",  # Not in allowed list
+                "total_searches": 10,
+            },
+        }
+
+        assert not privacy_filter.validate_event(
+            event
+        ), "Strict mode should reject unknown keys"
+
+    def test_non_strict_mode_allows_unknown_keys(self):
+        """Test that non-strict mode allows unknown keys (if safe)."""
+        privacy_filter = PrivacyFilter(strict_mode=False)
+
+        event = {
+            "event": "test_event",
+            "properties": {
+                "custom_metric": 123,  # Unknown but safe
+                "total_searches": 10,
+            },
+        }
+
+        # Should pass non-strict mode (no disallowed keys)
+        assert privacy_filter.validate_event(
+            event
+        ), "Non-strict mode should allow unknown safe keys"
+
+    def test_handles_exceptions_gracefully(self, privacy_filter: PrivacyFilter):
+        """Ensure filter fails closed on exceptions."""
+        # Test with malformed data that might cause exceptions
+        invalid_event = {"event": None, "properties": None}
+
+        # Should fail closed (return False) rather than raise exception
+        try:
+            result = privacy_filter.validate_event(invalid_event)
+            assert not result, "Should fail closed on malformed data"
+        except Exception as e:
+            pytest.fail(f"Privacy filter should not raise exceptions: {e}")
+
+
+# Mark all tests as telemetry tests
+pytestmark = pytest.mark.telemetry

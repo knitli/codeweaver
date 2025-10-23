@@ -855,6 +855,13 @@ class SessionStatistics(DataclassSerializationMixin):
             description="""A typed Counter that tracks token usage statistics.""",
         ),
     ]
+    semantic_statistics: Annotated[
+        Any | None,
+        Field(
+            default=None,
+            description="""Semantic category usage metrics. Uses UsageMetrics from semantic.classifications.""",
+        ),
+    ]
 
     _successful_request_log: Annotated[
         list[Identifier], Field(default_factory=list, init=False, repr=False)
@@ -875,6 +882,17 @@ class SessionStatistics(DataclassSerializationMixin):
             self.index_statistics = FileStatistics()
         if not self.token_statistics:
             self.token_statistics = TokenCounter()
+        if not self.semantic_statistics:
+            # Lazy import to avoid circular dependencies
+            try:
+                from collections import Counter
+
+                from codeweaver.semantic.classifications import UsageMetrics
+
+                self.semantic_statistics = UsageMetrics(category_usage_counts=Counter())
+            except ImportError:
+                # If semantic module not available, leave as None
+                self.semantic_statistics = None
         self.timing_statistics = TimingStatistics(
             on_call_tool_requests={},
             on_read_resource_requests={},
