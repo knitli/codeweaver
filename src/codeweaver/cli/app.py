@@ -11,7 +11,7 @@ import sys
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
 import cyclopts
 
@@ -21,20 +21,17 @@ from rich import print as rich_print
 from rich.console import Console
 from rich.table import Table
 
-from codeweaver.agent_api import CodeMatch, FindCodeResponseSummary, IntentType, find_code
-from codeweaver.common import CODEWEAVER_PREFIX, lazy_importer
+from codeweaver.agent_api import CodeMatch, FindCodeResponseSummary, IntentType  #  find_code
+from codeweaver.common import CODEWEAVER_PREFIX, LazyImport, lazy_import
 from codeweaver.config import CodeWeaverSettingsDict
 from codeweaver.core import DictView
 from codeweaver.exceptions import CodeWeaverError
 
 
 # Lazy import for performance
-def get_settings_map() -> DictView[CodeWeaverSettingsDict]:
-    """Lazy load settings map."""
-    _settings_module = lazy_importer("codeweaver.config")()
-    _settings_map: Any = _settings_module.get_settings_map()
-    return _settings_map
-
+get_settings_map: LazyImport[DictView[CodeWeaverSettingsDict]] = lazy_import(
+    "codeweaver.config", "get_settings_map"
+)
 
 # Initialize console for rich output
 console = Console(markup=True, emoji=True)
@@ -56,7 +53,7 @@ async def _run_server(
 ) -> None:
     from codeweaver.main import run
 
-    console.print("[blue]Starting CodeWeaver MCP server...[/blue]")
+    console.print(f"{CODEWEAVER_PREFIX} [blue]Starting CodeWeaver MCP server...[/blue]")
     return await run(config_file=config_file, project_path=project_path, host=host, port=port)
 
 

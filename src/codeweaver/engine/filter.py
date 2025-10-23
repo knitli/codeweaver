@@ -19,7 +19,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from codeweaver.core import BaseEnum
-from codeweaver.core.constants import METADATA_PATH
+from codeweaver.core.file_extensions import METADATA_PATH
 from codeweaver.engine.match_models import (
     FieldCondition,
     Filter,

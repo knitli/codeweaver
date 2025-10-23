@@ -150,7 +150,7 @@ class NodeTypeDTO(BasedModel):
         """Check if this node type is a Symbol Token (a Token that is not an identifier or literal)."""
         if not self.is_token:
             return False
-        from codeweaver.semantic.constants import get_token_patterns_sync
+        from codeweaver.semantic.token_patterns import get_token_patterns_sync
 
         patterns = get_token_patterns_sync()
         not_symbol = patterns["not_symbol"]
@@ -162,7 +162,7 @@ class NodeTypeDTO(BasedModel):
     @property
     def is_operator_token(self) -> bool:
         """Check if this node type is an Operator Token (a Token that is an operator)."""
-        from codeweaver.semantic.constants import get_token_patterns_sync
+        from codeweaver.semantic.token_patterns import get_token_patterns_sync
 
         patterns = get_token_patterns_sync()
         if patterns["operator"] is None:
@@ -321,7 +321,7 @@ class TokenPurpose(BaseEnum):
         """Create TokenPurpose from NodeTypeDTO."""
         if node_dto.is_composite or node_dto.is_category:
             raise ValueError("Cannot determine TokenPurpose for Composite or Category nodes")
-        from codeweaver.semantic.constants import (
+        from codeweaver.semantic.token_patterns import (
             LANGUAGE_SPECIFIC_TOKEN_EXCEPTIONS,
             get_token_patterns_sync,
         )

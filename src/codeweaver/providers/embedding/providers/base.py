@@ -10,7 +10,7 @@ import logging
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from functools import cache
+from types import ModuleType
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -27,7 +27,7 @@ from uuid import UUID
 from pydantic import UUID7, ConfigDict
 from pydantic.main import IncEx
 
-from codeweaver.common.utils.utils import lazy_importer, uuid7
+from codeweaver.common import LazyImport, lazy_import, uuid7
 from codeweaver.core import (
     BasedModel,
     BlakeStore,
@@ -43,20 +43,18 @@ from codeweaver.providers.provider import Provider
 from codeweaver.tokenizers import Tokenizer, get_tokenizer
 
 
+statistics_module: LazyImport[ModuleType] = lazy_import("codeweaver.common.statistics")
+
 if TYPE_CHECKING:
     from codeweaver.common import SessionStatistics
+else:
+    SessionStatistics = statistics_module.SessionStatistics
 
+_get_statistics: LazyImport[SessionStatistics] = lazy_import(
+    "codeweaver.common.statistics", "get_statistics"
+)
 
 logger = logging.getLogger(__name__)
-
-
-@cache
-def _get_statistics() -> "SessionStatistics":
-    """Set the statistics source for the embedding provider."""
-    statistics_module = lazy_importer("codeweaver._statistics")
-    # we need SessionStatistics in this namespace for pydantic at runtime:
-    SessionStatistics = statistics_module.SessionStatistics  # pyright: ignore[reportUnusedVariable, reportUnusedExpression]  # noqa: F841, N806
-    return statistics_module.get_session_statistics()
 
 
 class EmbeddingErrorInfo(TypedDict):
@@ -98,7 +96,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     This class mirrors `pydantic_ai.providers.Provider` class to make it simple to use
     existing implementations of `pydantic_ai.providers.Provider` as embedding providers.
 
-    We chose to separate this from the `pydantic_ai.providers.Provider` class for clarity. That class is re-exported in `codeweaver.agent_providers.py` as `AgentProvider`, which is used for agent operations.
+    We chose to separate this from the `pydantic_ai.providers.Provider` class for clarity. That class is re-exported in `codeweaver.providers.agent` package as `AgentProvider`, which is used for agent operations.
     We didn't want folks accidentally conflating agent operations with embedding operations. That's kind of a 'dogs and cats living together' 🐕🐈 situation.
 
     We don't think many or possibly any of the pydantic-ai providers can be used directly as embedding providers -- the endpoints and request/response formats are often different.
@@ -120,6 +118,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     _doc_kwargs: ClassVar[dict[str, Any]] = {}
     _query_kwargs: ClassVar[dict[str, Any]] = {}
 
+    # Typing note: we can't type this properly because: 1) Pyright wants us to define the subtype for `list` and 2) pydantic does not support parameterized subtypes for generics.
     _store: UUIDStore[list] = make_uuid_store(  # type: ignore
         value_type=list, size_limit=1024 * 1024 * 3
     )
@@ -149,7 +148,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         self.query_kwargs = type(self)._query_kwargs.copy() or {}
         self._add_kwargs(kwargs or {})
         """Add any user-provided kwargs to the embedding provider, after we merge the defaults together."""
-        self._store: list = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)  # type: ignore # 3mb limit
+        self._store: UUIDStore[list] = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)  # type: ignore # 3mb limit
         self._initialize()
 
     def _add_kwargs(self, kwargs: dict[str, Any]) -> None:
@@ -202,7 +201,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
     async def embed_documents(
         self,
-        documents: Sequence[CodeChunk],
+        documents: Sequence[CodeChunk],  # type: ignore # intentionally obscurred
         *,
         batch_id: UUID7 | None = None,
         **kwargs: Mapping[str, Any] | None,
@@ -212,16 +211,16 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         Optionally takes a `batch_id` parameter to reprocess a specific batch of documents.
         """
         is_old_batch = False
-        if batch_id and self._store and batch_id in self._store:
-            documents = self._store[batch_id]
+        if batch_id and self._store and batch_id in self._store:  # pyright: ignore[reportUnknownMemberType]
+            documents: Sequence[CodeChunk] = self._store[batch_id]  # type: ignore
             is_old_batch = True
-        chunks, cache_key = self._process_input(documents, is_old_batch=is_old_batch)
+        chunks, cache_key = self._process_input(documents, is_old_batch=is_old_batch)  # type: ignore
         try:
             results: (
                 Sequence[Sequence[float]] | Sequence[Sequence[int]]
             ) = await self._embed_documents(tuple(chunks), **kwargs)
         except Exception as e:
-            return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)
+            return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)  # type: ignore
         else:
             return results
 
@@ -288,10 +287,10 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         )
 
     @overload
-    def _update_token_stats(self, *, token_count: int) -> None: ...
+    def _update_token_stats(self, *, token_count: int, from_docs: None = None) -> None: ...
     @overload
     def _update_token_stats(
-        self, *, from_docs: Sequence[str] | Sequence[Sequence[str]]
+        self, *, from_docs: Sequence[str] | Sequence[Sequence[str]], token_count: None = None
     ) -> None: ...
     def _update_token_stats(
         self,
@@ -300,7 +299,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         from_docs: Sequence[str] | Sequence[Sequence[str]] | None = None,
     ) -> None:
         """Update token statistics for the embedding provider."""
-        statistics = _get_statistics()
+        statistics: SessionStatistics = _get_statistics()
         if token_count is not None:
             statistics.add_token_usage(embedding_generated=token_count)
         elif from_docs and all(isinstance(doc, str) for doc in from_docs):
@@ -310,6 +309,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 else sum(self.tokenizer.estimate_batch(item) for item in from_docs)  # type: ignore
             )
             statistics.add_token_usage(embedding_generated=token_count)
+        raise ValueError(
+            "Either `token_count` or `from_docs` must be provided to update token statistics."
+        )
 
     @staticmethod
     def normalize(embedding: Sequence[float] | Sequence[int]) -> list[float]:
@@ -368,8 +370,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             else:
                 chunk = None
         final_chunks = [chunk for chunk in processed_chunks if chunk]
-        if self._store:
-            self._store[key] = final_chunks
+        if self._store:  # type: ignore
+            self._store[key] = final_chunks  # type: ignore
         return iter(final_chunks), key
 
     def _process_output(self, output_data: Any) -> list[list[float]] | list[list[int]]:

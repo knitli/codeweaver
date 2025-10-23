@@ -18,7 +18,7 @@ import black
 import textcase
 
 from codeweaver.core import LiteralStringT
-from codeweaver.core.constants import ALL_LANGUAGES
+from codeweaver.core.file_extensions import ALL_LANGUAGES
 from codeweaver.core.language import SemanticSearchLanguage
 
 

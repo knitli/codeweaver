@@ -73,7 +73,7 @@ from codeweaver.config.types import (
     default_config_file_locations,
 )
 from codeweaver.core import UNSET, BasedModel, DictView, Unset
-from codeweaver.core.constants import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_EXTENSIONS
+from codeweaver.core.file_extensions import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_EXTENSIONS
 from codeweaver.providers.provider import Provider
 
 
@@ -283,7 +283,7 @@ class FileFilterSettings(BasedModel):
                 ):
                     return False
                 if settings.include_tooling_dirs:
-                    from codeweaver.core.constants import (
+                    from codeweaver.core.file_extensions import (
                         COMMON_LLM_TOOLING_PATHS,
                         COMMON_TOOLING_PATHS,
                     )

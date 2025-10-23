@@ -4,7 +4,7 @@ from typing import Annotated, Self
 
 from pydantic import Field, model_validator
 
-from codeweaver.core.constants import ALL_LANGUAGES, ExtLangPair
+from codeweaver.core.file_extensions import ALL_LANGUAGES, ExtLangPair
 from codeweaver.core.secondary_languages import SecondarySupportedLanguage
 from codeweaver.core.types.models import FROZEN_BASEDMODEL_CONFIG, BasedModel
 from codeweaver.engine import DelimiterPattern, LanguageFamily

@@ -51,15 +51,17 @@ type DirectoryPathT = Annotated[
     ),
 ]
 
-FileExt = NewType("FileExt", LiteralStringT)
-"""A file extension string, including the leading dot. E.g. ".txt". May also be an exact filename like "Makefile" that has no extension."""
+# A simple directory name without any path components.
 
-type FileExtensionT = Annotated[
-    FileExt,
+DirectoryName = NewType("DirectoryName", LiteralStringT)
+"""A directory name string, e.g. "src"."""
+
+type DirectoryNameT = Annotated[
+    DirectoryName,
     Field(
-        description="""A file extension string as the `FileExt` NewType, including the leading dot. E.g. '.txt'. May also be an exact filename like 'Makefile' that has no extension.""",
-        pattern=r"""^(\.[^<>:;,?*|\\]+|[^<>:;,?*|\\]+)$""",
-        max_length=20,
+        description="""A directory name string, e.g. 'src'.""",
+        pattern=r"^[^<>:;,?*|\\]+$",
+        max_length=100,
     ),
 ]
 
@@ -74,6 +76,31 @@ type FileNameT = Annotated[
         max_length=100,
     ),
 ]
+
+FileExt = NewType("FileExt", LiteralStringT)
+"""A file extension string, including the leading dot. E.g. ".txt". May also be an exact filename like "Makefile" that has no extension."""
+
+type FileExtensionT = Annotated[
+    FileExt,
+    Field(
+        description="""A file extension string as the `FileExt` NewType, including the leading dot. E.g. '.txt'. May also be an exact filename like 'Makefile' that has no extension.""",
+        pattern=r"""^(\.[^<>:;,?*|\\]+|[^<>:;,?*|\\]+)$""",
+        min_length=2,
+        max_length=20,
+    ),
+]
+
+FileGlob = NewType("FileGlob", LiteralStringT)
+"""A file glob pattern string, e.g. "*.py" or "src/**/*.js"."""
+
+type FileGlobT = Annotated[
+    FileGlob,
+    Field(
+        description="""A file glob pattern string as the `FileGlob` NewType, e.g. '*.py' or 'src/**/*.js'.""",
+        max_length=255,
+    ),
+]
+
 
 # ================================================
 # *      Language-Related NewTypes/Aliases
@@ -167,15 +194,50 @@ type RerankingModelNameT = Annotated[
     ),
 ]
 
+# ================================================
+# *   NewTypes/Aliases for Dev/LLM Tooling
+# ================================================
+
+DevToolName = NewType("DevToolName", LiteralStringT)
+"""The name of a development tool, e.g. "cargo", "mise", "pytest"."""
+
+type DevToolNameT = Annotated[
+    DevToolName,
+    Field(
+        description="""The name of a development tool as the `DevToolName` NewType, e.g. 'cargo', 'mise', 'pytest'.""",
+        pattern=r"^[A-Za-z0-9_+-]+$",
+        max_length=30,
+    ),
+]
+
+LlmToolName = NewType("LlmToolName", LiteralStringT)
+"""The name of an LLM tool, e.g. "claude", "codeweaver"."""
+
+type LlmToolNameT = Annotated[
+    LlmToolName,
+    Field(
+        description="""The name of an LLM tool as the `LlmToolName` NewType, e.g. 'claude', 'codeweaver'.""",
+        pattern=r"^[A-Za-z0-9_+-]+$",
+        max_length=30,
+    ),
+]
+
+
 __all__ = (
     "CategoryName",
     "CategoryNameT",
+    "DevToolName",
+    "DevToolNameT",
+    "DirectoryName",
+    "DirectoryNameT",
     "DirectoryPath",
     "DirectoryPathT",
     "EmbeddingModelName",
     "EmbeddingModelNameT",
     "FileExt",
     "FileExtensionT",
+    "FileGlob",
+    "FileGlobT",
     "FileName",
     "FileNameT",
     "FilePath",
@@ -183,6 +245,8 @@ __all__ = (
     "LanguageName",
     "LanguageNameT",
     "LiteralStringT",
+    "LlmToolName",
+    "LlmToolNameT",
     "ModelName",
     "ModelNameT",
     "RerankingModelName",

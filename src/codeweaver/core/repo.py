@@ -12,7 +12,7 @@ from pydantic import DirectoryPath, Field, computed_field
 from pydantic.dataclasses import dataclass
 
 from codeweaver.core import DATACLASS_CONFIG, BaseEnum, DataclassSerializationMixin, LiteralStringT
-from codeweaver.core.constants import COMMON_TOOLING_PATHS, TEST_DIR_NAMES
+from codeweaver.core.file_extensions import COMMON_TOOLING_PATHS, TEST_DIR_NAMES
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 
 
@@ -423,7 +423,7 @@ class RepoChecklist(DataclassSerializationMixin):
         Returns:
             An instance of RepoChecklist with detected directories and files.
         """
-        from codeweaver.core.constants import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
+        from codeweaver.core.file_extensions import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
 
         root_level_dir_names: set[str] = {
             f.name for f in files if f.parent == project_root and f.is_dir()

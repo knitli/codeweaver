@@ -29,7 +29,7 @@ def get_tooling_dirs() -> set[Path]:
 
     global _tooling_dirs
     if _tooling_dirs is None:
-        from codeweaver.core.constants import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
+        from codeweaver.core.file_extensions import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
 
         tooling_paths = {
             path for tool in COMMON_TOOLING_PATHS for path in tool[1] if _is_hidden_dir(path)

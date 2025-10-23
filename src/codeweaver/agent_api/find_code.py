@@ -21,29 +21,12 @@ For example, your agent might say:
 
 from __future__ import annotations
 
-import time
-
-from collections.abc import Sequence
 from pathlib import Path
-from typing import NamedTuple, cast
+from typing import NamedTuple
 
 from pydantic import NonNegativeInt, PositiveInt
 
-from codeweaver.agent_api.intent import IntentType
-from codeweaver.agent_api.models import (
-    CodeMatch,
-    CodeMatchType,
-    FindCodeResponseSummary,
-    SearchStrategy,
-)
-from codeweaver.common import SessionStatistics
-from codeweaver.common.utils.utils import estimate_tokens, uuid7
-from codeweaver.config import CodeWeaverSettingsDict
-from codeweaver.core import DictView, DiscoveredFile, Span
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.engine.discovery import FileDiscoveryService
-from codeweaver.exceptions import QueryError
+from codeweaver.core import Span
 
 
 class MatchedSection(NamedTuple):
@@ -57,6 +40,28 @@ class MatchedSection(NamedTuple):
     chunk_number: PositiveInt | None = None
 
 
+# TODO: WHY IS THIS COMMENTED OUT?
+# I commented this out because it's a remanent of the old architecture. It needs to be re-integrated into the new architecture.
+# This was written before:
+# 1) Code Chunk existed,
+# and 2) the new File Discovery Service existed.
+#
+# In practice, it goes like this (or will):
+# 1) Use FileDiscoveryService to get the list of files.
+# 2) For each file, create CodeChunks using the best chunker available for that language.
+# 3) Each chunk is registered in the chunk registry
+# 4) Chunks are sent to the embedding (and sparse embedding) service(s) to get (document) embeddings.
+# 5) Embeddings are sent to the vector database for storage.
+# 6) When a query comes in, the query is embedded using the same embedding service(s).
+# 7) The vector database is queried for the most relevant chunks.
+# 8) Initial results are sent to the reranking service (if available) for reranking.
+# 9) For semantically indexed languages, the results are weighted based on semantic importance/relevance based on the task and objectives (see semantic/classification.py).
+# 10) Those are reranked based on that.
+# 11) Results go to the *context agent* if available for final filtering and selection, and potential re-querying.
+# 12) Final results are returned to the user's agent.
+
+# in phase 3 we'll use graph orchestration to manage this entire flow.
+"""
 async def find_code(
     query: str,
     settings: DictView[CodeWeaverSettingsDict],
@@ -68,22 +73,7 @@ async def find_code(
     max_results: PositiveInt = 50,
     statistics: SessionStatistics | None = None,
 ) -> FindCodeResponseSummary:
-    """Phase 1 implementation of find_code tool.
 
-    Uses basic keyword-based text search with file discovery.
-    This will be enhanced in Phase 2 with semantic search.
-
-    Args:
-        query: Search query
-        settings: An immutable view of the current CodeWeaver settings
-        intent: Query intent (optional)
-        token_limit: Maximum tokens in response
-        include_tests: Whether to include test files
-        focus_languages: Languages to focus the search on
-
-    Returns:
-        Structured response with code matches
-    """
     start_time = time.time()
     try:
         discovery_service = FileDiscoveryService(settings)
@@ -144,17 +134,6 @@ async def basic_text_search(
     settings: DictView[CodeWeaverSettingsDict],
     token_limit: int,
 ) -> list[CodeMatch]:
-    """Basic keyword-based search implementation for Phase 1.
-
-    Args:
-        query: Search query
-        files: List of files to search
-        settings: CodeWeaver settings
-        token_limit: Maximum tokens for results
-
-    Returns:
-        List of code matches
-    """
     matches: list[CodeMatch] = []
     query_terms = query.lower().split()
     current_token_count = 0
@@ -174,7 +153,7 @@ async def basic_text_search(
                 match = CodeMatch(
                     file=file,
                     related_symbols=("",),
-                    content=,
+                    content=CodeChunk.from_file(file, )
                     span=best_section.span,
                     relevance_score=min(score / 10.0, 1.0),
                     match_type=CodeMatchType.KEYWORD,
@@ -190,15 +169,6 @@ async def basic_text_search(
 
 
 def find_best_section(lines: list[str], query_terms: list[str]) -> MatchedSection | None:
-    """Find the best matching section in a file.
-
-    Args:
-        lines: File lines
-        query_terms: Search terms
-
-    Returns:
-        Best matching section or None
-    """
     if not lines:
         return None
     best_score = 0
@@ -229,16 +199,6 @@ def find_best_section(lines: list[str], query_terms: list[str]) -> MatchedSectio
 
 
 def get_surrounding_context(lines: list[str], span: Span, context_lines: int = 5) -> str:
-    """Get surrounding context for a code match.
-
-    Args:
-        lines: All file lines
-        span: Range of matched lines (1-indexed)
-        context_lines: Number of context lines before/after
-
-    Returns:
-        Context string
-    """
     start_line, end_line = span
     start_idx = max(0, start_line - 1 - context_lines)
     end_idx = min(len(lines), end_line + context_lines)
@@ -254,3 +214,4 @@ def get_surrounding_context(lines: list[str], span: Span, context_lines: int = 5
 
 
 __all__ = ("MatchedSection", "find_best_section", "find_code", "get_surrounding_context")
+"""

@@ -243,7 +243,6 @@ For developers familiar with tree-sitter terminology:
 - **Future-proof**: Accommodates real-world patterns (multi-category, polymorphic references)
 """
 
-# ruff: noqa: B009
 from __future__ import annotations
 
 import logging
@@ -256,13 +255,9 @@ from typing import TYPE_CHECKING, Annotated, Any, ClassVar, TypedDict, cast, ove
 from pydantic import DirectoryPath, Field, FilePath
 from pydantic_core import from_json
 
-from codeweaver.common.utils.utils import lazy_importer
-from codeweaver.core import RootedRoot
-from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.common import lazy_import
+from codeweaver.core import RootedRoot, SemanticSearchLanguage
 from codeweaver.semantic.types import CategoryName, NodeTypeDTO, ThingName
-
-
-grammar_module = lazy_importer("codeweaver.semantic.grammar_things")
 
 
 if TYPE_CHECKING:
@@ -276,13 +271,13 @@ if TYPE_CHECKING:
         Token,
     )
 else:
-    Category = getattr(grammar_module, "Category")
-    CompositeThing = getattr(grammar_module, "CompositeThing")
-    Connection = getattr(grammar_module, "Connection")
-    DirectConnection = getattr(grammar_module, "DirectConnection")
-    PositionalConnections = getattr(grammar_module, "PositionalConnections")
-    Token = getattr(grammar_module, "Token")
-    ThingOrCategoryType = getattr(grammar_module, "ThingOrCategoryType")
+    Category = lazy_import("codeweaver.semantic.grammar", "Category")
+    CompositeThing = lazy_import("codeweaver.semantic.grammar", "CompositeThing")
+    Connection = lazy_import("codeweaver.semantic.grammar", "Connection")
+    DirectConnection = lazy_import("codeweaver.semantic.grammar", "DirectConnection")
+    PositionalConnections = lazy_import("codeweaver.semantic.grammar", "PositionalConnections")
+    Token = lazy_import("codeweaver.semantic.grammar", "Token")
+    ThingOrCategoryType = lazy_import("codeweaver.semantic.grammar", "ThingOrCategoryType")
 
 
 logger = logging.getLogger()

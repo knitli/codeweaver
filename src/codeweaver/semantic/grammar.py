@@ -240,7 +240,6 @@ For developers familiar with tree-sitter terminology:
 - **Future-proof**: Accommodates real-world patterns (multi-category, polymorphic references)
 """
 
-# ruff: noqa:B009
 from __future__ import annotations
 
 import logging
@@ -261,7 +260,7 @@ from pydantic import (
 )
 from pydantic.dataclasses import dataclass
 
-from codeweaver.common.utils.utils import lazy_importer
+from codeweaver.common import LazyImport, lazy_import
 from codeweaver.core import (
     DATACLASS_CONFIG,
     BasedModel,
@@ -289,8 +288,12 @@ if TYPE_CHECKING:
     from codeweaver.semantic.classifier import GrammarBasedClassifier, GrammarClassificationResult
     from codeweaver.semantic.registry import ThingRegistry
 else:
-    _classification_module = lazy_importer("codeweaver.semantic.classifications")
-    ThingClass = getattr(_classification_module, "ThingClass")
+    ThingClass: LazyImport[ThingClass] = lazy_import(
+        "codeweaver.semantic.classifications", "ThingClass"
+    )
+    registry: LazyImport[ThingRegistry] = lazy_import(
+        "codeweaver.semantic.registry", "get_registry"
+    )
 
 logger = logging.getLogger()
 
@@ -412,12 +415,10 @@ class Thing(BasedModel):
     @property
     def categories(self) -> frozenset[Category]:
         """Resolve Categories from registry by name."""
-        registry_module = lazy_importer("codeweaver.semantic.registry")
-        registry = registry_module().get_registry()
         return frozenset(
             cat
             for name in self.category_names
-            if (cat := registry.get_category_by_name(name, language=self.language))
+            if (cat := registry().get_category_by_name(name, language=self.language))  # type: ignore
         )
 
     @property
@@ -1361,8 +1362,12 @@ class Grammar(DataclassSerializationMixin):
     @property
     def print(self) -> None:
         """Prints a detailed, pretty-formatted, human-readable summary of the Grammar."""
-        rich_console = lazy_importer("rich.console")().Console(markup=True, emoji=True)
-        table = lazy_importer("rich.table")().Table(title=f"Grammar for {self.language.as_title}")
+        from rich.console import Console
+
+        console = Console(markup=True, emoji=True)
+        from rich.table import Table
+
+        table = Table(title=f"Grammar for {self.language.as_title}")
         table.add_column("Aspect", style="cyan", no_wrap=True)
         table.add_column("Count", style="magenta")
         table.add_row("CompositeThings", str(self.composite_count))
@@ -1391,9 +1396,9 @@ class Grammar(DataclassSerializationMixin):
                 f"  - {token.name} ({token.purpose.as_title})"
                 for token in sorted(self.tokens, key=lambda t: t.name)
             )
-        rich_console.print(table)
+        console.print(table)
         if all_data:
-            rich_console.print("\n".join(all_data))
+            console.print("\n".join(all_data))
 
 
 def get_grammar(language: SemanticSearchLanguage) -> Grammar:
@@ -1421,10 +1426,12 @@ def get_all_grammars() -> MappingProxyType[SemanticSearchLanguage, Grammar]:
 
 if __name__ == "__main__":
     grammars = get_all_grammars()
-    rich_console = lazy_importer("rich.console")().Console(markup=True, emoji=True)
+    from rich.console import Console
+
+    console = Console(markup=True, emoji=True)
     for language, grammar in grammars.items():
         print(f"\n=== Grammar for {language.as_title} ===")
-        rich_console.print(grammar.print)
+        console.print(grammar.print)
 
 __all__ = (
     "Category",

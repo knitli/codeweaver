@@ -81,10 +81,10 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
         def map_result(voyage_result: VoyageRerankingResult, new_index: int) -> RerankingResult:
             """Maps a VoyageRerankingResult to a CodeWeaver RerankingResult."""
             return RerankingResult(
-                original_index=voyage_result[0],
+                original_index=voyage_result.index,  # type: ignore
                 batch_rank=new_index,
-                score=voyage_result[2],
-                chunk=original_chunks[voyage_result[0]],
+                score=voyage_result.relevance_score,  # type: ignore
+                chunk=original_chunks[voyage_result.index],  # type: ignore
             )
 
         results, token_count = returned_result.results, returned_result.total_tokens

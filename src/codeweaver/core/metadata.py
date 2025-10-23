@@ -4,13 +4,26 @@ from __future__ import annotations
 
 import contextlib
 
+from collections.abc import Callable, Generator
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, NotRequired, Required, Self, TypedDict
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Literal,
+    NamedTuple,
+    NotRequired,
+    Required,
+    Self,
+    TypedDict,
+    cast,
+    overload,
+)
 
 from ast_grep_py import SgNode
 from pydantic import UUID7, ConfigDict, Field, PositiveFloat
 
-from codeweaver.common.utils.utils import normalize_ext, uuid7
+from codeweaver.common.utils import normalize_ext, uuid7
 from codeweaver.core.language import (
     ConfigLanguage,
     SemanticSearchLanguage,
@@ -21,7 +34,10 @@ from codeweaver.core.types import (
     FROZEN_BASEDMODEL_CONFIG,
     BasedModel,
     BaseEnum,
+    FileExt,
+    FileExtensionT,
     LanguageName,
+    LanguageNameT,
     LiteralStringT,
 )
 
@@ -172,6 +188,81 @@ class Metadata(TypedDict, total=False):
     ]
 
 
+class ExtLangPair(NamedTuple):
+    """
+    Mapping of file extensions to their corresponding programming languages.
+
+    Not all 'extensions' are actually file extensions, some are file names or special cases, like `Makefile` or `Dockerfile`.
+    """
+
+    ext: FileExtensionT
+    """The file extension, including leading dot if it's a file extension. May also be a full file name."""
+
+    language: LanguageNameT
+    """The programming or config language associated with the file extension."""
+
+    @property
+    def is_actual_ext(self) -> bool:
+        """Check if the extension is a valid file extension."""
+        return self.ext.startswith(".")
+
+    @property
+    def is_file_name(self) -> bool:
+        """Check if the extension is a file name."""
+        return not self.ext.startswith(".")
+
+    @property
+    def is_config(self) -> bool:
+        """Check if the extension is a configuration file."""
+        from codeweaver.core.file_extensions import CONFIG_FILE_LANGUAGES
+
+        return self.language in CONFIG_FILE_LANGUAGES
+
+    @property
+    def is_doc(self) -> bool:
+        """Check if the extension is a documentation file."""
+        from codeweaver.core.file_extensions import DOC_FILES_EXTENSIONS
+
+        return next((True for doc_ext in DOC_FILES_EXTENSIONS if doc_ext.ext == self.ext), False)
+
+    @property
+    def is_code(self) -> bool:
+        """Check if the extension is a code file."""
+        return not self.is_config and not self.is_doc and not self.is_file_name
+
+    @property
+    def category(self) -> Literal["code", "docs", "config"]:
+        """Return the language of file based on its extension."""
+        if self.is_code:
+            return "code"
+        if self.is_doc:
+            return "docs"
+        if self.is_config:
+            return "config"
+        raise ValueError(f"Unknown category for {self.ext}")
+
+    @property
+    def is_weird_extension(self) -> bool:
+        """Check if a file extension doesn't fit the usual pattern of a dot followed by alphanumerics."""
+        if not self.is_actual_ext or self.is_file_name:
+            return True
+        if self.ext.istitle():
+            return True
+        return True if self.ext.find(".", 1) != -1 else "." not in self.ext
+
+    def is_same(self, filename: str) -> bool:
+        """Check if the given filename is the same filetype as the extension."""
+        # fast case first for elimination
+        if self.ext.lower() not in filename.lower():
+            return False
+        # a couple of these may seem redundant but we're descending in confidence levels here
+        if not self.is_weird_extension and filename.endswith(self.ext):
+            return True
+        if self.is_file_name and filename == self.ext:
+            return True
+        return bool(self.is_weird_extension and filename.lower().endswith(self.ext.lower()))
+
+
 def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
     """Determine the ExtKind based on the validated data."""
     if "file_path" in validated_data:
@@ -193,6 +284,108 @@ def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
     return None
 
 
+def get_ext_lang_pairs(*, include_data: bool = False) -> Generator[ExtLangPair]:
+    """Yield all `ExtLangPair` instances for code, config, and docs files."""
+    from codeweaver.core.file_extensions import (
+        CODE_FILES_EXTENSIONS,
+        DATA_FILES_EXTENSIONS,
+        DOC_FILES_EXTENSIONS,
+    )
+
+    if include_data:
+        yield from (*CODE_FILES_EXTENSIONS, *DATA_FILES_EXTENSIONS, *DOC_FILES_EXTENSIONS)
+    yield from (*CODE_FILES_EXTENSIONS, *DOC_FILES_EXTENSIONS)
+
+
+@overload
+def _handle_fallback(
+    path: Path, *, pair: ExtLangPair, extension: None = None
+) -> ExtLangPair | None: ...
+@overload
+def _handle_fallback(
+    path: Path, *, pair: None = None, extension: FileExt
+) -> ExtLangPair | None: ...
+def _handle_fallback(
+    path: Path, *, pair: ExtLangPair | None = None, extension: FileExt | None = None
+) -> ExtLangPair | None:
+    """Handle fallback for a given ExtLangPair and file path."""
+    from codeweaver.core.file_extensions import FALLBACK_TEST
+
+    if extension is None and pair is None:
+        raise ValueError("You must provide either 'pair' or 'extension'.")
+    extension = extension or cast(ExtLangPair, pair).ext
+    if extension in FALLBACK_TEST:
+        return ExtLangPair(ext=extension, language=_run_fallback_test(extension, path))
+    return pair
+
+
+def get_ext_lang_pair_for_file(
+    file_path: Path, *, include_data: bool = False
+) -> ExtLangPair | None:
+    """Get the `ExtLangPair` for a given file path."""
+    from codeweaver.core.file_extensions import FALLBACK_TEST
+
+    if not file_path.is_file():
+        return None
+    filename = file_path.name
+    for pair in get_ext_lang_pairs(include_data=include_data):
+        if pair.is_same(filename):
+            if pair.ext in FALLBACK_TEST:
+                language = _run_fallback_test(pair.ext, file_path)
+                return ExtLangPair(ext=pair.ext, language=language)
+            return pair
+    return None
+
+
+def get_language_from_extension(
+    extension: FileExt | LiteralStringT,
+    *,
+    path: Path | None = None,
+    hook: Callable[[FileExt, Path | None], LanguageName | None] | None = None,
+) -> LanguageName | None:
+    """Get the language associated with a given file extension."""
+    extension = FileExt(extension)
+    if path and path.is_file() and (fallback := _handle_fallback(path, extension=extension)):
+        return fallback.language
+    return next(
+        (pair.language for pair in get_ext_lang_pairs() if pair and pair.ext == extension),
+        hook(extension, path) if hook else None,
+    )
+
+
+def _run_fallback_test(extension: FileExt, path: Path) -> LanguageName:
+    """Run the fallback test for a given extension and file path."""
+    from codeweaver.core.file_extensions import FALLBACK_TEST
+
+    if extension in FALLBACK_TEST and path.is_file():
+        test_def = FALLBACK_TEST[extension]
+        with contextlib.suppress(Exception):
+            content = path.read_text(errors="ignore")
+            if (
+                test_def["on"] == "in" and any(value in content for value in test_def["values"])
+            ) or (
+                test_def["on"] == "not in"
+                and all(value not in content for value in test_def["values"])
+            ):
+                return test_def["fallback_to"]
+    return LanguageName("matlab") if extension == FileExt(".m") else LanguageName("coq")
+
+
+def _categorize_language(language: LanguageName) -> ChunkKind:
+    """Categorize a language into its corresponding ChunkKind."""
+    from codeweaver.core.file_extensions import (
+        CODE_LANGUAGES,
+        CONFIG_FILE_LANGUAGES,
+        DOCS_LANGUAGES,
+    )
+
+    if language in CONFIG_FILE_LANGUAGES:
+        return ChunkKind.CONFIG
+    if language in CODE_LANGUAGES:
+        return ChunkKind.CODE
+    return ChunkKind.DOCS if language in DOCS_LANGUAGES else ChunkKind.OTHER
+
+
 class ExtKind(NamedTuple):
     """Represents a file extension and its associated kind."""
 
@@ -210,6 +403,7 @@ class ExtKind(NamedTuple):
         kind: str | ChunkKind,
     ) -> ExtKind | None:
         """Create an ExtKind from a string representation."""
+        # Handle SemanticSearchLanguage directly
         if isinstance(language, SemanticSearchLanguage):
             if isinstance(kind, ChunkKind):
                 return cls(language=language, kind=kind)
@@ -217,35 +411,29 @@ class ExtKind(NamedTuple):
                 language=language,
                 kind=ChunkKind.CONFIG if language.is_config_language else ChunkKind.CODE,
             )
-        if isinstance(language, ConfigLanguage) and language not in (
-            ConfigLanguage.BASH,
-            ConfigLanguage.SELF,
-            ConfigLanguage.KOTLIN,
-        ):
-            return cls(
-                language=language.as_semantic_search_language or language, kind=ChunkKind.CONFIG
-            )
+
+        # Handle ConfigLanguage with special cases
         if isinstance(language, ConfigLanguage):
-            return cls(
-                language=language.as_semantic_search_language or language,
-                kind=ChunkKind.CODE_OR_CONFIG,
+            special_config_langs = (ConfigLanguage.BASH, ConfigLanguage.SELF, ConfigLanguage.KOTLIN)
+            target_kind = (
+                ChunkKind.CODE_OR_CONFIG if language in special_config_langs else ChunkKind.CONFIG
             )
+            return cls(language=language.as_semantic_search_language or language, kind=target_kind)
+
+        # Try to convert string to SemanticSearchLanguage
         with contextlib.suppress(KeyError, ValueError, AttributeError):
             if semantic := SemanticSearchLanguage.from_string(language):
                 return cls.from_language(semantic, kind)
-        from codeweaver.core.constants import CODE_LANGUAGES, CONFIG_FILE_LANGUAGES, DOCS_LANGUAGES
 
-        if language in CONFIG_FILE_LANGUAGES:
-            return cls(language=LanguageName(language), kind=ChunkKind.CONFIG)
-        if language in CODE_LANGUAGES:
-            return cls(language=LanguageName(language), kind=ChunkKind.CODE)
-        if language in DOCS_LANGUAGES:
-            return cls(language=LanguageName(language), kind=ChunkKind.DOCS)
-        if isinstance(kind, ChunkKind):
-            return cls(language=LanguageName(language), kind=kind)
-        if found_kind := ChunkKind.from_string(kind):
-            return cls(language=LanguageName(language), kind=found_kind)  # pyright: ignore[reportArgumentType]
-        return cls(language=LanguageName(language), kind=ChunkKind.OTHER)  # pyright: ignore[reportArgumentType]
+        # Resolve as LanguageName and categorize
+        lang_name = LanguageName(language)
+        resolved_kind = kind if isinstance(kind, ChunkKind) else ChunkKind.from_string(kind)
+
+        if resolved_kind:
+            categorized_kind = _categorize_language(lang_name)
+            return cls(language=lang_name, kind=categorized_kind)
+
+        return cls(language=lang_name, kind=ChunkKind.OTHER)
 
     @classmethod
     def from_file(cls, file: str | Path) -> ExtKind | None:
@@ -298,4 +486,13 @@ class ExtKind(NamedTuple):
         }
 
 
-__all__ = ("ChunkKind", "ChunkSource", "ExtKind", "Metadata", "SemanticMetadata")
+__all__ = (
+    "ChunkKind",
+    "ChunkSource",
+    "ExtKind",
+    "Metadata",
+    "SemanticMetadata",
+    "determine_ext_kind",
+    "get_ext_lang_pair_for_file",
+    "get_language_from_extension",
+)

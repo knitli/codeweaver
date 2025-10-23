@@ -7,6 +7,11 @@ From an authentication standpoint, you need to use the client's authentication e
 To keep things manageable, for now, we only support OpenAI-compatible models and endpoints via LiteLLM. Unlike other providers that only expose OpenAI models through the OpenAI API, LiteLLM actually supports a broad range of models through the OpenAI-compatible API. All models must be prefixed with "openai/" to tell LiteLLM to use the OpenAI-compatible endpoint.
 """
 
+# ===========================================================================
+# todo              This is not yet implemented!
+#        It needs to get integrated, tested, and documented.
+# ===========================================================================
+
 from typing import Literal
 
 from pydantic import FutureDate

@@ -5,7 +5,8 @@
 
 """Set up a logger with optional rich formatting."""
 
-import importlib
+from __future__ import annotations
+
 import logging
 
 from logging.config import dictConfig
@@ -14,21 +15,24 @@ from typing import TYPE_CHECKING, Any, Literal
 from fastmcp import Context
 from pydantic_core import to_json
 
+from codeweaver.common import LazyImport, lazy_import
 from codeweaver.config import LoggingConfigDict
 
 
-lazy_importer = importlib.import_module("codeweaver._utils").lazy_importer
-
 if TYPE_CHECKING:
+    from rich.console import Console
     from rich.logging import RichHandler
+else:
+    RichHandler: LazyImport[RichHandler] = lazy_import("rich.logging", "RichHandler")
+
+console: LazyImport[Console] = lazy_import("rich.console", "Console")
 
 
-def get_rich_handler(rich_kwargs: dict[str, Any]) -> "RichHandler":
-    """Get a RichHandler instance."""
-    RichHandler = lazy_importer("rich.logging")().RichHandler  # noqa: N806
-    Console = lazy_importer("rich.console")().Console  # noqa: N806
-    console = Console(markup=True, soft_wrap=True, emoji=True)
-    return RichHandler(console=console, markup=True, **rich_kwargs)
+def get_rich_handler(**kwargs: Any) -> RichHandler:
+    global RichHandler, console
+    return RichHandler(
+        console=console(markup=True, soft_wrap=True, emoji=True), markup=True, **kwargs
+    )  # type: ignore
 
 
 def _setup_config_logger(
@@ -43,7 +47,7 @@ def _setup_config_logger(
     if logging_kwargs:
         dictConfig({**logging_kwargs})
         if rich:
-            handler = get_rich_handler(rich_kwargs or {})
+            handler = get_rich_handler(**(rich_kwargs or {}))
             logger = logging.getLogger(name)
             logger.setLevel(level)
             logger.addHandler(handler)
@@ -72,7 +76,7 @@ def setup_logger(
     if not rich:
         logging.basicConfig(level=level)
         return logging.getLogger(name)
-    handler = get_rich_handler(rich_kwargs or {})
+    handler = get_rich_handler(**(rich_kwargs or {}))
     logger = logging.getLogger(name)
     logger.setLevel(level)
     logger.addHandler(handler)

@@ -6,8 +6,6 @@
 
 from __future__ import annotations
 
-import contextlib
-import datetime
 import logging
 
 from collections.abc import Container
@@ -23,7 +21,7 @@ from pydantic_core import to_json
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
-from codeweaver.agent_api import find_code
+# from codeweaver.agent_api import find_code
 from codeweaver.agent_api.intent import IntentType
 from codeweaver.agent_api.models import FindCodeResponseSummary
 from codeweaver.common import SessionStatistics, get_session_statistics, timed_http
@@ -31,7 +29,6 @@ from codeweaver.config import CodeWeaverSettingsDict, MiddlewareOptions
 from codeweaver.config.settings import get_settings_map
 from codeweaver.core import DictView
 from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.exceptions import CodeWeaverError
 from codeweaver.middleware.statistics import StatisticsMiddleware
 from codeweaver.server import AppState, HealthInfo, get_health_info
 
@@ -72,8 +69,11 @@ async def find_code_tool(
     include_tests: bool = False,
     focus_languages: tuple[SemanticSearchLanguage, ...] | None = None,
     context: Context | None = None,
-) -> FindCodeResponseSummary:
+) -> FindCodeResponseSummary:  # sourcery skip: remove-unreachable-code
     """Use CodeWeaver to find_code in the codebase."""
+    # temporary while this gets reimplemented in the agent_api
+    raise NotImplementedError("find_code_tool is not yet implemented")
+    """
     try:
         response = await find_code(
             query=query,
@@ -105,6 +105,7 @@ async def find_code_tool(
         ) from e
     else:
         return response
+    """
 
 
 # -------------------------

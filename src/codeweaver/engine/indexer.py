@@ -35,7 +35,7 @@ from codeweaver.core import (
     DiscoveredFile,
     SemanticSearchLanguage,
 )
-from codeweaver.core.constants import (
+from codeweaver.core.file_extensions import (
     CODE_FILES_EXTENSIONS,
     CONFIG_FILE_LANGUAGES,
     DEFAULT_EXCLUDED_DIRS,

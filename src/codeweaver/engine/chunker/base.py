@@ -18,7 +18,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, NamedTuple
+from typing import Annotated, Any, NamedTuple
 
 from pydantic import ConfigDict, Field, PositiveInt, computed_field
 
@@ -26,10 +26,6 @@ from codeweaver.core import BasedModel, CodeChunk
 from codeweaver.core.language import Chunker
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
-
-
-if TYPE_CHECKING:
-    pass
 
 
 SAFETY_MARGIN = 0.1

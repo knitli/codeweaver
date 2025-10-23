@@ -322,8 +322,8 @@ class SemanticClass(str, BaseEnum):
     @classmethod
     def from_token_purpose(cls, purpose: TokenPurpose, token_name: str) -> SemanticClass:
         """Map token purpose to an approximate semantic category."""
-        from codeweaver.semantic.constants import get_token_patterns_sync
         from codeweaver.semantic.grammar import TokenPurpose
+        from codeweaver.semantic.token_patterns import get_token_patterns_sync
 
         patterns = get_token_patterns_sync()
         if patterns["annotation"] is None:

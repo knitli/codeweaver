@@ -10,9 +10,10 @@ import subprocess
 from collections.abc import Callable
 from importlib import metadata
 from importlib.util import find_spec
+from types import ModuleType
 from typing import Literal, NotRequired, Required, TypedDict
 
-from codeweaver.common import has_package, lazy_importer
+from codeweaver.common import LazyImport, has_package, lazy_import
 
 
 # ===========================================================================
@@ -227,8 +228,8 @@ def _get_general_optimizations_available() -> AvailableOptimizations:
 def _set_cpu_optimizations() -> dict[
     Literal["intel_cpu", "simd_available", "simd_exts"], bool | tuple[str, ...]
 ]:
-    cpuinfo = lazy_importer("cpuinfo")
-    info = cpuinfo().get_cpu_info()
+    cpuinfo: LazyImport[ModuleType] = lazy_import("cpuinfo")
+    info = cpuinfo.get_cpu_info()
     simd_exts = tuple(
         flag for flag in ("avx512_vnni", "avx512", "avx2", "arm64") if flag in info.get("flags", [])
     )

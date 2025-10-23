@@ -21,7 +21,8 @@ from pydantic import Field, computed_field
 
 from codeweaver.common import get_project_root, normalize_ext
 from codeweaver.core import BasedModel, BaseEnum, LiteralStringT
-from codeweaver.core.constants import ALL_LANGUAGES, ExtLangPair, get_ext_lang_pairs
+from codeweaver.core.file_extensions import ALL_LANGUAGES
+from codeweaver.core.metadata import ExtLangPair, get_ext_lang_pairs
 from codeweaver.core.secondary_languages import SecondarySupportedLanguage
 from codeweaver.core.types.aliases import FileExt, FileExtensionT, FileNameT
 

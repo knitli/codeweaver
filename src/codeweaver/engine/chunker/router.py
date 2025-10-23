@@ -41,11 +41,7 @@ class EnhancedChunkMicroManager:
         Returns:
             List of CodeChunk objects
         """
-        if not content.strip():
-            return []
-
-        # Perform final validation and adjustments
-        return self._finalize_chunks(chunks)
+        return [] if not content.strip() else self._finalize_chunks(chunks)
 
     def _finalize_chunks(self, chunks: list[CodeChunk]) -> list[CodeChunk]:
         """Perform final validation and micro-adjustments on chunks.

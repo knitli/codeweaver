@@ -53,7 +53,17 @@ from collections.abc import Iterator, Sequence
 from functools import cached_property
 from pathlib import Path
 from types import ModuleType
-from typing import TYPE_CHECKING, Annotated, Any, Literal, NamedTuple, Unpack, cast, overload
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Literal,
+    LiteralString,
+    NamedTuple,
+    Unpack,
+    cast,
+    overload,
+)
 
 from ast_grep_py import (
     Config,
@@ -80,12 +90,9 @@ from pydantic import (
     computed_field,
 )
 
-from codeweaver.common.utils import lazy_import, uuid7
-from codeweaver.common.utils.lazy_importer import LazyImport
-from codeweaver.core import BasedModel, BaseEnum, LiteralStringT
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.engine.textify import humanize
-from codeweaver.semantic.types import ThingName
+from codeweaver.common import LazyImport, lazy_import, uuid7
+from codeweaver.core import BasedModel, BaseEnum, SemanticSearchLanguage, ThingName, ThingNameT
+from codeweaver.engine import humanize
 
 
 # type-only imports
@@ -398,9 +405,9 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
 
     @computed_field
     @cached_property
-    def name(self) -> ThingName:
+    def name(self) -> ThingNameT:
         """Get the name (kind - the name in the grammar) of the node."""
-        return ThingName(cast(LiteralStringT, self._node.kind()))
+        return ThingName(cast(LiteralString, self._node.kind()))
 
     @computed_field
     @cached_property

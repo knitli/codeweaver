@@ -422,7 +422,7 @@ class GrammarBasedClassifier:
         1. Language-specific grouped patterns (fastest)
         2. Generic cross-language patterns
         """
-        from codeweaver.semantic.constants import get_checks
+        from codeweaver.semantic.token_patterns import get_checks
 
         if match := next((iter(get_checks(str(thing.name), language=language))), None):
             return self._to_classification_result(

@@ -1,7 +1,5 @@
 """Internal helper utilities for the core package."""
 
-from codeweaver.core.types.models import
-
 
 def truncate_text(text: str, max_length: int = 100, ellipsis: str = "...") -> str:
     """
@@ -18,5 +16,6 @@ def truncate_text(text: str, max_length: int = 100, ellipsis: str = "...") -> st
     if len(text) <= max_length:
         return text
     return text[: max_length - len(ellipsis)] + ellipsis
+
 
 __all__ = ("truncate_text",)
