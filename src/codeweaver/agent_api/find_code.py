@@ -25,7 +25,7 @@ import time
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, NamedTuple, cast
+from typing import NamedTuple, cast
 
 from pydantic import NonNegativeInt, PositiveInt
 
@@ -40,13 +40,10 @@ from codeweaver.common import SessionStatistics
 from codeweaver.common.utils.utils import estimate_tokens, uuid7
 from codeweaver.config import CodeWeaverSettingsDict
 from codeweaver.core import DictView, DiscoveredFile, Span
+from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.engine.discovery import FileDiscoveryService
 from codeweaver.exceptions import QueryError
-
-
-if TYPE_CHECKING:
-    from codeweaver.config import CodeWeaverSettings
 
 
 class MatchedSection(NamedTuple):
@@ -106,7 +103,10 @@ async def find_code(
             processed_files = {match.file.path for match in matches}
             for file_path in processed_files:
                 statistics.add_file_operation(file_path, "processed")
-            total_tokens = sum(estimate_tokens(match.content) for match in matches)
+            total_tokens = sum(
+                estimate_tokens(cast(str, match.content.serialize_for_embedding()))
+                for match in matches
+            )
             statistics.add_token_usage(search_results=total_tokens)
     except Exception as e:
         raise QueryError(
@@ -124,7 +124,11 @@ async def find_code(
             summary=f"Found {len(matches)} matches for '{query}'",
             query_intent=intent,
             total_matches=len(matches),
-            token_count=sum(estimate_tokens(match.content) for match in matches),
+            token_count=sum(
+                estimate_tokens(cast(str, match.content.serialize_for_embedding()))
+                for match in matches
+            ),
+            total_results=max(len(matches), max_results),
             execution_time_ms=execution_time_ms,
             search_strategy=(SearchStrategy.FILE_DISCOVERY, SearchStrategy.TEXT_SEARCH),
             languages_found=cast(
@@ -135,7 +139,10 @@ async def find_code(
 
 
 async def basic_text_search(
-    query: str, files: Sequence[DiscoveredFile], settings: CodeWeaverSettings, token_limit: int
+    query: str,
+    files: Sequence[DiscoveredFile],
+    settings: DictView[CodeWeaverSettingsDict],
+    token_limit: int,
 ) -> list[CodeMatch]:
     """Basic keyword-based search implementation for Phase 1.
 
@@ -167,13 +174,12 @@ async def basic_text_search(
                 match = CodeMatch(
                     file=file,
                     related_symbols=("",),
-                    content=best_section.content,
+                    content=,
                     span=best_section.span,
                     relevance_score=min(score / 10.0, 1.0),
                     match_type=CodeMatchType.KEYWORD,
-                    surrounding_context=get_surrounding_context(lines, best_section.span),
                 )
-                match_tokens = len(match.content)
+                match_tokens = len(match.content.serialize_for_embedding())
                 if current_token_count + match_tokens <= token_limit:
                     matches.append(match)
                     current_token_count += match_tokens

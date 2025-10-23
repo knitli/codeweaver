@@ -52,6 +52,7 @@ import contextlib
 from collections.abc import Iterator, Sequence
 from functools import cached_property
 from pathlib import Path
+from types import ModuleType
 from typing import TYPE_CHECKING, Annotated, Any, Literal, NamedTuple, Unpack, cast, overload
 
 from ast_grep_py import (
@@ -80,6 +81,7 @@ from pydantic import (
 )
 
 from codeweaver.common.utils import lazy_import, uuid7
+from codeweaver.common.utils.lazy_importer import LazyImport
 from codeweaver.core import BasedModel, BaseEnum, LiteralStringT
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.engine.textify import humanize
@@ -90,11 +92,8 @@ from codeweaver.semantic.types import ThingName
 if TYPE_CHECKING:
     from codeweaver.semantic.classifications import AgentTask, ImportanceScores, ThingClass
     from codeweaver.semantic.node_type_parser import CompositeThing, Token
-    from codeweaver.semantic.registry import ThingRegistry
-else:
-    ThingRegistry = lazy_import("codeweaver.semantic.registry", "ThingRegistry")
 
-get_registry_module = lazy_import("codeweaver.semantic.registry")
+get_registry_module: LazyImport[ModuleType] = lazy_import("codeweaver.semantic.registry")
 
 # re-export Ast Grep's rules and config types:
 AstGrepSearchTypes = (

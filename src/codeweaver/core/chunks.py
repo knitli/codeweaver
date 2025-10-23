@@ -13,7 +13,16 @@ from collections.abc import Iterator, Sequence
 from datetime import UTC, datetime
 from functools import cached_property
 from pathlib import Path
-from typing import Annotated, Any, NotRequired, Required, TypedDict, cast, is_typeddict
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    NotRequired,
+    Required,
+    TypedDict,
+    cast,
+    is_typeddict,
+)
 
 from pydantic import (
     UUID7,
@@ -33,6 +42,9 @@ from codeweaver.core.spans import Span, SpanTuple
 from codeweaver.core.types import BasedModel, LanguageNameT
 from codeweaver.core.utils import truncate_text
 
+
+if TYPE_CHECKING:
+    from codeweaver.core.discovery import DiscoveredFile
 
 # ---------------------------------------------------------------------------
 # *                    Code Search and Chunks
@@ -217,6 +229,19 @@ class CodeChunk(BasedModel):
         if self_map.get("content"):
             self_map["content"] = truncate_text(self_map["content"])
         return self_map
+
+    @classmethod
+    def from_file(cls, file: DiscoveredFile, line_range: Span, content: str) -> CodeChunk:
+        """Create a CodeChunk from a file."""
+        return cls.model_validate({
+            "file_path": file.path,
+            "line_range": line_range,
+            "content": content,
+            "language": file.ext_kind.language
+            if file.ext_kind
+            else getattr(ExtKind.from_file(file.path), "language", None),
+            "source": ChunkSource.FILE,
+        })
 
     @computed_field
     @cached_property
