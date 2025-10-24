@@ -153,7 +153,7 @@ async def basic_text_search(
                 match = CodeMatch(
                     file=file,
                     related_symbols=("",),
-                    content=CodeChunk.from_file(file, )
+                    content=CodeChunk.from_file(file)
                     span=best_section.span,
                     relevance_score=min(score / 10.0, 1.0),
                     match_type=CodeMatchType.KEYWORD,

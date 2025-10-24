@@ -51,7 +51,7 @@ class PostHogClient:
     # ---------------------------------------------------------------------------
     def __init__(
         self,
-        api_key: str | None = "phc_XKWSirBXZdxYEYRl98cJQzqvTcvQ7U1KWZYygLghhJg",
+        api_key: str | None = None,
         host: str = "https://app.posthog.com",
         *,
         enabled: bool = True,
@@ -66,6 +66,14 @@ class PostHogClient:
             enabled: Enable telemetry sending
             strict_privacy_mode: Enable strict privacy validation
         """
+        import os
+
+        # Prefer environment variable, fallback to hardcoded key if not provided
+        if api_key is None:
+            api_key = os.environ.get(
+                "CODEWEAVER_POSTHOG_API_KEY", "phc_XKWSirBXZdxYEYRl98cJQzqvTcvQ7U1KWZYygLghhJg"
+            )
+
         self.enabled = enabled and api_key is not None
         self.logger = logging.getLogger(__name__)
         self.privacy_filter = PrivacyFilter(strict_mode=strict_privacy_mode)

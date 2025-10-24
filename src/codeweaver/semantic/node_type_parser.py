@@ -604,7 +604,7 @@ class NodeTypeParser:
         self._languages = frozenset(languages or iter(SemanticSearchLanguage)) | self._languages
         for language in languages or self._languages:
             # no tokens, no grammar
-            if not self._registration_cache[language]["tokens"] and (
+            if len(self._registration_cache[language]["tokens"]) == 0 and (
                 array := self._loader.get_node(language)
             ):
                 _ = self._parse_node_array(array)

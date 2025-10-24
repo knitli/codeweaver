@@ -6,6 +6,7 @@
 
 import sys
 import threading
+
 from types import ModuleType
 
 import pytest
@@ -31,6 +32,10 @@ class TestLazyImportBasics:
         assert isinstance(path_lazy, LazyImport)
 
         # Actually use it - should resolve
+        path_lazy = os_lazy.path
+        assert isinstance(path_lazy, LazyImport)
+        assert not path_lazy.is_resolved
+
         result = os_lazy.path.join("a", "b")
         assert result == "a/b"
         assert os_lazy.is_resolved
@@ -384,7 +389,6 @@ class TestEdgeCases:
     def test_lazy_import_with_existing_import(self):
         """Test LazyImport when module is already imported."""
         # Import normally first
-        import os
 
         # Now create lazy import
         lazy = lazy_import("os")

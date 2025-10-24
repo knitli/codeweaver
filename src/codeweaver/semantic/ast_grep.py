@@ -100,7 +100,7 @@ if TYPE_CHECKING:
     from codeweaver.semantic.classifications import AgentTask, ImportanceScores, ThingClass
     from codeweaver.semantic.node_type_parser import CompositeThing, Token
 
-get_registry_module: LazyImport[ModuleType] = lazy_import("codeweaver.semantic.registry")
+registry_module: LazyImport[ModuleType] = lazy_import("codeweaver.semantic.registry")
 
 # re-export Ast Grep's rules and config types:
 AstGrepSearchTypes = (
@@ -321,10 +321,8 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     def thing(self) -> CompositeThing | Token:
         """Get the grammar Thing that this node represents."""
         thing_name: ThingName = self.name  # type: ignore
-        registry_module = get_registry_module()
-        if thing := registry_module.get_registry().get_thing_by_name(
-            thing_name, language=self.language
-        ):
+        registry = registry_module()
+        if thing := registry.get_registry().get_thing_by_name(thing_name, language=self.language):
             return cast(CompositeThing | Token, thing)
         raise ValueError(
             f"Thing '{thing_name}' not found in registry for language '{self.language.name}'."

@@ -23,7 +23,7 @@ from __future__ import annotations
 from functools import cache
 from typing import Annotated
 
-from pydantic import Field, HttpUrl, PositiveInt
+from pydantic import Field, PositiveInt
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -47,34 +47,26 @@ class TelemetrySettings(BaseSettings):
     ]
 
     posthog_api_key: Annotated[
-        str | None = ,
-        Field(
-            default=None,
-            description="PostHog API key. Required if telemetry is enabled.",
-        ),
+        str | None,
+        Field(default=None, description="PostHog API key. Required if telemetry is enabled."),
     ]
 
     posthog_host: Annotated[
         str,
         Field(
-            default="https://app.posthog.com",
-            description="PostHog host URL for telemetry events.",
+            default="https://app.posthog.com", description="PostHog host URL for telemetry events."
         ),
     ]
 
     batch_size: Annotated[
         PositiveInt,
-        Field(
-            default=10,
-            description="Number of events to batch before sending to PostHog.",
-        ),
+        Field(default=10, description="Number of events to batch before sending to PostHog."),
     ]
 
     batch_interval_seconds: Annotated[
         PositiveInt,
         Field(
-            default=60,
-            description="Maximum time in seconds to wait before sending batched events.",
+            default=60, description="Maximum time in seconds to wait before sending batched events."
         ),
     ]
 
@@ -98,7 +90,4 @@ def get_telemetry_settings() -> TelemetrySettings:
     return TelemetrySettings()
 
 
-__all__ = (
-    "TelemetrySettings",
-    "get_telemetry_settings",
-)
+__all__ = ("TelemetrySettings", "get_telemetry_settings")

@@ -126,9 +126,7 @@ async def search(
                 "query": query,
                 "summary": response.summary,
                 "total_matches": response.total_matches,
-                "matches": [
-                    {",\n'    '".join(match.model_dump_json() for match in limited_matches)}
-                ],
+                "matches": [[match.model_dump() for match in limited_matches]],
             }
             rich_print(to_json(output, indent=2))
 
