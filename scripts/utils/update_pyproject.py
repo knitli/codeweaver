@@ -1,32 +1,45 @@
 #!/usr/bin/env python3
 """Update pyproject.toml dependency constraints to match uv.lock versions."""
 
+import re
 import tomllib
 
 from pathlib import Path
 
 
+VERSION_PATTERN = re.compile(
+    r'(?P<key>[\w\-]+)\s=\s\[(?P<dependencies>"(?P<name>[\w\-]+)(?P<operator>[<>=!]+)(?P<version>[\d\.]+)",?\s?)+\]|(?P<indent>[\s\t]+)"(?P<single_name>[\w\-]+)(?P<single_operator>[<>=!]+)(?P<single_version>[\d\.]+)",?'
+)
+
+
 def main() -> None:
     """Update pyproject.toml dependencies to match uv.lock versions."""
     lock_data = tomllib.loads(Path("uv.lock").read_text())
+    packages = lock_data["package"]
     locked_versions: dict[str, str] = {
-        pkg["name"]: pkg["version"] for pkg in lock_data.get("package", [])
+        pkg["name"]: pkg["version"] for pkg in packages if "name" in pkg and "version" in pkg
     }
     pyproject_path = Path("pyproject.toml")
     content = pyproject_path.read_text()
     lines = content.splitlines()
     for i, line in enumerate(lines):
-        stripped = line.strip()
-        if stripped.startswith('"') and any(
-            op in stripped for op in (">=", "==", "<=", ">", "<", "~=", "!=") if ";" not in stripped
-        ):
-            pkg_name = (
-                stripped.split('"')[1].split(">")[0].split("<")[0].split("=")[0].split("[")[0]
-            )
-            if pkg_name in locked_versions:
-                indent = line[: len(line) - len(line.lstrip())]
-                lines[i] = f'{indent}"{pkg_name}>={locked_versions[pkg_name]}",'
-                _ = pyproject_path.write_text("\n".join(lines) + "\n")
+        if match := VERSION_PATTERN.search(line):
+            if match.group("name"):
+                pkg_name = match.group("name")
+                if pkg_name in locked_versions:
+                    new_version = locked_versions[pkg_name]
+                    operator = match.group("operator")
+                    lines[i] = re.sub(
+                        rf'("{pkg_name}{operator})([\d\.]+)"', f'"\1{new_version}"', line
+                    )
+            elif match.group("single_name"):
+                pkg_name = match.group("single_name")
+                if pkg_name in locked_versions:
+                    new_version = locked_versions[pkg_name]
+                    operator = match.group("single_operator")
+                    lines[i] = re.sub(
+                        rf'("{pkg_name}{operator})([\d\.]+)"', f'"\1{new_version}"', line
+                    )
     print("Updated pyproject.toml with locked versions")
 
 
