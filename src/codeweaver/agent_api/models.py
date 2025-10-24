@@ -7,13 +7,19 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 from pydantic import ConfigDict, Field, NonNegativeFloat, NonNegativeInt, model_validator
 
 from codeweaver.agent_api.intent import IntentType
 from codeweaver.core import BASEDMODEL_CONFIG, BasedModel, BaseEnum, CodeChunk, DiscoveredFile, Span
 from codeweaver.core.language import SemanticSearchLanguage
+
+
+if TYPE_CHECKING:
+    from rich.table import Table
+
+    from codeweaver.core import AnonymityConversion, FilteredKey
 
 
 class SearchStrategy(BaseEnum):
@@ -38,18 +44,7 @@ class CodeMatchType(BaseEnum):
 class CodeMatch(BasedModel):
     """Individual code match with context and metadata."""
 
-    model_config = BASEDMODEL_CONFIG | ConfigDict(
-        json_schema_extra={
-            "example": {
-                "file": {"path": "src/auth/middleware.py", "language": "python", "file_size": 1234},
-                "content": "class AuthMiddleware(BaseMiddleware): ...",
-                "span": [15, 45],  # spans have a source_id for the chunk they came from
-                "relevance_score": 0.92,
-                "match_type": "text_search",
-            }
-        },
-        defer_build=True,
-    )
+    model_config = BASEDMODEL_CONFIG | ConfigDict(defer_build=True)
 
     # File information
     file: Annotated[DiscoveredFile, Field(description="""File information""")]
@@ -90,6 +85,9 @@ class CodeMatch(BasedModel):
         Field(default_factory=tuple, description="""Related functions, classes, or symbols"""),
     ]
 
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        return {FilteredKey("related_symbols"): AnonymityConversion.COUNT}
+
     @model_validator(mode="after")
     def validate_span(self) -> CodeMatch:
         """Validate span consistency."""
@@ -104,27 +102,7 @@ class CodeMatch(BasedModel):
 class FindCodeResponseSummary(BasedModel):
     """Structured response from find_code tool."""
 
-    model_config = BASEDMODEL_CONFIG | ConfigDict(
-        json_schema_extra={
-            "example": {
-                "matches": [],
-                "summary": "Found authentication middleware in 3 files...",
-                "query_intent": {
-                    "type": "understand",
-                    "confidence": 0.9,
-                    "reasoning": "Query indicates need for authentication setup",
-                    "focus_areas": ["middleware", "authentication"],
-                    "complexity_level": "moderate",
-                },
-                "total_matches": 15,
-                "total_token_count": 8543,
-                "execution_time_ms": 1234.5,
-                "search_strategy": ["file_discovery", "text_search"],
-                "languages_found": ["python", "typescript"],
-            }
-        },
-        defer_build=True,
-    )
+    model_config = BASEDMODEL_CONFIG | ConfigDict(defer_build=True)
 
     # Core results
     matches: Annotated[
@@ -172,12 +150,17 @@ class FindCodeResponseSummary(BasedModel):
         ),
     ]
 
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        from codeweaver.core import AnonymityConversion, FilteredKey
+
+        return {FilteredKey("summary"): AnonymityConversion.TEXT_COUNT}
+
     @classmethod
     def get_schema(cls) -> dict[str, Any]:
         """Get the JSON schema for the model as a Python dictionary."""
         return cls.model_json_schema(mode="serialization")
 
-    def _assemble_cli_summary(self) -> str:
+    def _assemble_cli_summary(self) -> Table:
         """Assemble a concise CLI summary of the response."""
         from rich.table import Table
 

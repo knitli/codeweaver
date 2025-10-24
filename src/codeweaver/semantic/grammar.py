@@ -412,6 +412,9 @@ class Thing(BasedModel):
             return category in self.categories if self.has_categories else False
         return category in self.category_names if self.has_categories else False
 
+    def _telemetry_keys(self) -> None:
+        return None
+
     @property
     def categories(self) -> frozenset[Category]:
         """Resolve Categories from registry by name."""
@@ -693,6 +696,9 @@ class Category(BasedModel):
         ),
     ]
 
+    def _telemetry_keys(self) -> None:
+        return None
+
     def __init__(self, **data: Any) -> None:
         """Initialize a Category."""
         if members := data.get("member_thing_names"):
@@ -875,6 +881,9 @@ class Connection(BasedModel):
             )
 
         super().__init__(**data)
+
+    def _telemetry_keys(self) -> None:
+        return None
 
     @property
     def target_things(self) -> frozenset[ThingOrCategoryType]:
@@ -1101,6 +1110,9 @@ class Grammar(DataclassSerializationMixin):
     _positional_connections: Annotated[
         frozenset[PositionalConnections], Field(exclude=True, default=frozenset)
     ]
+
+    def _telemetry_keys(self) -> None:
+        return None
 
     def __iter__(self) -> Iterator[ThingType]:
         """Iterate over all Things (CompositeThings and Tokens) in this Grammar."""

@@ -93,6 +93,9 @@ class Span(DataclassSerializationMixin):
 
     __match_args__: ClassVar[tuple[str, str]] = ("start", "end")
 
+    def _telemetry_keys(self) -> None:
+        return None
+
     def __hash__(self) -> NonNegativeInt:
         """Return a hash of the span."""
         return hash((self.start, self.end, self._source_id))
@@ -324,6 +327,9 @@ class SpanGroup(DataclassSerializationMixin):
         """Post-initialization to ensure spans are a set and normalized."""
         self.spans = self.spans or set()
         self._normalize()
+
+    def _telemetry_keys(self) -> None:
+        return None
 
     @computed_field
     @property

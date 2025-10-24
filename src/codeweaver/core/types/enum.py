@@ -1,12 +1,14 @@
 """Base enum classes for the CodeWeaver project."""
 
+from __future__ import annotations
+
 import contextlib
 
 from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
-from enum import Enum, unique
+from enum import Enum, auto, unique
 from functools import cached_property
 from types import MappingProxyType
-from typing import Annotated, Self, cast, override
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
 
 import textcase
 
@@ -15,6 +17,10 @@ from pydantic import Field, computed_field
 from pydantic.dataclasses import dataclass
 
 from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
+
+
+if TYPE_CHECKING:
+    from codeweaver.core.types.aliases import FilteredKey
 
 
 type EnumExtend = Callable[[Enum, str], Enum]
@@ -101,6 +107,10 @@ class BaseDataclassEnum(Enum):
             textcase.middot(s),
             textcase.camel(s),
         }
+
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion] | None:
+        """Return a mapping of telemetry keys to their anonymity conversion methods."""
+        raise NotImplementedError("Subclasses must implement _telemetry_keys method.")
 
     @classmethod
     def aliases(cls) -> MappingProxyType[str, Enum]:
@@ -453,4 +463,46 @@ class BaseEnum(Enum):
         return f"{self.as_title})"
 
 
-__all__ = ("BaseDataclassEnum", "BaseEnum", "BaseEnumData")
+type FilteredCallable = Callable[[Any], bool] | Callable[[Any], int] | Callable[[], None]
+type FilteredReturn = bool | int | dict[Any, int] | None
+
+
+class AnonymityConversion(BaseEnum):
+    """Enumeration of anonymity conversion methods for telemetry data.
+
+    These methods define how telemetry data should be anonymized or aggregated
+    to protect user privacy. Only applies to filtered fields.
+    """
+
+    BOOLEAN = auto()
+    """Convert to boolean presence/absence."""
+    COUNT = auto()
+    """Convert to count of occurrences."""
+    DISTRIBUTION = auto()
+    """Convert to distribution of values."""
+    AGGREGATE = auto()
+    """Aggregate values."""
+    HASH = auto()
+    """Hash values for anonymity."""
+    TEXT_COUNT = auto()
+    """Convert text to count of characters."""
+
+    FORBIDDEN = auto()
+
+    def filtered(self, values: Any) -> FilteredReturn:
+        """Process values according to the anonymity conversion method."""
+        functions: MappingProxyType[AnonymityConversion, FilteredCallable] = MappingProxyType({  # type: ignore
+            AnonymityConversion.BOOLEAN: lambda v: bool(v),  # type: ignore
+            AnonymityConversion.COUNT: lambda v: len(v) if isinstance(v, list) else 1,  # type: ignore
+            AnonymityConversion.DISTRIBUTION: lambda v: {item: v.count(item) for item in set(v)}  # type: ignore
+            if (isinstance(v, Sequence) and not isinstance(v, str))
+            else {v: 1},  # type: ignore
+            AnonymityConversion.AGGREGATE: lambda v: sum(v) if isinstance(v, list) else v,  # type: ignore
+            AnonymityConversion.HASH: lambda v: hash(v),  # type: ignore
+            AnonymityConversion.TEXT_COUNT: lambda v: len(v) if isinstance(v, str) else 0,
+            AnonymityConversion.FORBIDDEN: lambda: None,
+        })
+        return functions.get(self, lambda v: v)(values)  # type: ignore
+
+
+__all__ = ("AnonymityConversion", "BaseDataclassEnum", "BaseEnum", "BaseEnumData")

@@ -31,15 +31,14 @@ from codeweaver.telemetry.events import (
     SessionSummaryEvent,
     TelemetryEvent,
 )
-from codeweaver.telemetry.privacy import PrivacyFilter
+
 
 __all__ = (
-    "PostHogClient",
-    "PrivacyFilter",
-    "TelemetrySettings",
-    "TelemetryEvent",
-    "SessionSummaryEvent",
     "PerformanceBenchmarkEvent",
+    "PostHogClient",
+    "SessionSummaryEvent",
+    "TelemetryEvent",
+    "TelemetrySettings",
     "get_telemetry_client",
     "get_telemetry_settings",
 )

@@ -272,6 +272,9 @@ class ServiceCard(BasedModel):
     ] = None
     instance: Annotated[Any | None, Field(description="""The service instance""")] = None
 
+    def _telemetry_keys(self) -> None:
+        return None
+
     @classmethod
     def from_dict(cls, data: ServiceCardDict) -> ServiceCard:
         """Create a ServiceCard from a dictionary."""
@@ -305,6 +308,9 @@ class ServicesRegistry(BasedModel):
     def __init__(self) -> None:
         """Initialize the services registry."""
         # TODO register default services
+
+    def _telemetry_keys(self) -> None:
+        return None
 
     @classmethod
     def get_instance(cls) -> ServicesRegistry:
@@ -633,6 +639,9 @@ class ModelRegistry(BasedModel):
             self._agentic_profiles.values()
         )
 
+    def _telemetry_keys(self) -> None:
+        return None
+
 
 class ProviderRegistry(BasedModel):
     """Registry for managing provider implementations and settings."""
@@ -649,7 +658,7 @@ class ProviderRegistry(BasedModel):
     _agent_import: ClassVar[LiteralStringT] = (
         "codeweaver.agent_providers"  # no end dot because it's a module
     )
-    _vector_store_prefix: ClassVar[LiteralStringT] = "codeweaver.vector_stores.providers."
+    _vector_store_prefix: ClassVar[LiteralStringT] = "codeweaver.providers.vector_stores.providers."
     _provider_map: ClassVar[
         MappingProxyType[ProviderKind, MappingProxyType[Provider, LiteralStringT]]
     ] = MappingProxyType({
@@ -733,6 +742,9 @@ class ProviderRegistry(BasedModel):
         self._reranking_instances: MutableMapping[Provider, RerankingProvider[Any]] = {}
         self._agent_instances: MutableMapping[Provider, Any] = {}
         self._data_instances: MutableMapping[Provider, Any] = {}
+
+    def _telemetry_keys(self) -> None:
+        return None
 
     @classmethod
     def get_instance(cls) -> ProviderRegistry:

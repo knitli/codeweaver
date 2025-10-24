@@ -19,7 +19,7 @@ from datetime import UTC, datetime
 from functools import cache
 from pathlib import Path
 from types import MappingProxyType
-from typing import Annotated, Any, ClassVar, Literal, NamedTuple, cast
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal, NamedTuple, cast
 
 from fastmcp import Context
 from pydantic import (
@@ -58,6 +58,11 @@ from codeweaver.core import (
     ExtKind,
     SemanticSearchLanguage,
 )
+from codeweaver.core.types.enum import AnonymityConversion
+
+
+if TYPE_CHECKING:
+    from codeweaver.core import AnonymityConversion, FilteredKey
 
 
 @dataclass(config=DATACLASS_CONFIG | ConfigDict(extra="forbid", defer_build=True))
@@ -148,6 +153,9 @@ class TimingStatistics(DataclassSerializationMixin):
             description="""Time taken for settings http requests in milliseconds.""",
         ),
     ]
+
+    def _telemetry_keys(self) -> None:
+        return None
 
     def update(
         self,
@@ -332,12 +340,7 @@ class TimingStatistics(DataclassSerializationMixin):
         }
 
 
-@dataclass(
-    config=DATACLASS_CONFIG
-    | ConfigDict(
-        extra="forbid", json_schema_extra={"noTelemetryProps": ["unique_files"]}, defer_build=True
-    )
-)
+@dataclass(config=DATACLASS_CONFIG | ConfigDict(extra="forbid", defer_build=True))
 class _LanguageStatistics(DataclassSerializationMixin):
     """Statistics for a specific language within a category."""
 
@@ -365,6 +368,11 @@ class _LanguageStatistics(DataclassSerializationMixin):
     unique_files: ClassVar[
         Annotated[set[Path], Field(default_factory=set, init=False, repr=False, exclude=True)]
     ] = set()
+
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        from codeweaver.core import AnonymityConversion, FilteredKey
+
+        return {FilteredKey("unique_files"): AnonymityConversion.FORBIDDEN}
 
     @computed_field
     @property
@@ -409,12 +417,7 @@ def normalize_language(language: str) -> str | SemanticSearchLanguage | ConfigLa
     return language
 
 
-@dataclass(
-    config=DATACLASS_CONFIG
-    | ConfigDict(
-        extra="forbid", json_schema_extra={"noTelemetryProps": ["unique_files"]}, defer_build=True
-    )
-)
+@dataclass(config=DATACLASS_CONFIG | ConfigDict(extra="forbid", defer_build=True))
 class _CategoryStatistics(DataclassSerializationMixin):
     """Statistics for a file category (code, config, docs, other)."""
 
@@ -431,6 +434,9 @@ class _CategoryStatistics(DataclassSerializationMixin):
             description="""Language statistics in this category. Keys are language names, SemanticSearchLanguage members, or ConfigLanguage members; values are _LanguageStatistics objects.""",
         ),
     ]
+
+    def _telemetry_keys(self) -> None:
+        return None
 
     def get_language_stats(
         self, language: str | SemanticSearchLanguage | ConfigLanguage
@@ -512,7 +518,7 @@ class _CategoryStatistics(DataclassSerializationMixin):
     @property
     def _semantic_language_values(self) -> frozenset[str]:
         """Get the string values of all semantic search languages in this category."""
-        return frozenset(lang.value for lang in self.semantic_languages)
+        return frozenset(lang.variable for lang in self.semantic_languages)
 
     @property
     def operations_with_semantic_support(self) -> NonNegativeInt:
@@ -551,12 +557,7 @@ class _CategoryStatistics(DataclassSerializationMixin):
         )
 
 
-@dataclass(
-    config=DATACLASS_CONFIG
-    | ConfigDict(
-        extra="forbid", json_schema_extra={"noTelemetryProps": ["_other_files"]}, defer_build=True
-    )
-)
+@dataclass(config=DATACLASS_CONFIG | ConfigDict(extra="forbid", defer_build=True))
 class FileStatistics(DataclassSerializationMixin):
     """Comprehensive file statistics tracking categories, languages, and operations."""
 
@@ -572,6 +573,11 @@ class FileStatistics(DataclassSerializationMixin):
     _other_files: ClassVar[
         Annotated[set[Path], Field(default_factory=set, init=False, repr=False, exclude=True)]
     ] = set()
+
+    def _telemetry_keys(self):
+        from codeweaver.core import AnonymityConversion, FilteredKey
+
+        return {FilteredKey("_other_files"): AnonymityConversion.COUNT}
 
     def add_file(
         self, path: Path, operation: OperationsKey, ext_kind: ExtKind | None = None
@@ -916,6 +922,14 @@ class SessionStatistics(DataclassSerializationMixin):
             if (hasattr(self, attr) and getattr(self, attr)) is None or (not hasattr(self, attr)):
                 setattr(self, attr, [])
 
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        return {
+            FilteredKey("_successful_request_log"): AnonymityConversion.FORBIDDEN,
+            FilteredKey("_failed_request_log"): AnonymityConversion.FORBIDDEN,
+            FilteredKey("_successful_http_request_log"): AnonymityConversion.FORBIDDEN,
+            FilteredKey("_failed_http_request_log"): AnonymityConversion.FORBIDDEN,
+        }
+
     @computed_field
     @property
     def total_requests(self) -> NonNegativeInt:
@@ -1183,6 +1197,7 @@ class SessionStatistics(DataclassSerializationMixin):
 _statistics: SessionStatistics = SessionStatistics(
     index_statistics=FileStatistics(),
     token_statistics=TokenCounter(),
+    semantic_statistics=None,
     _successful_request_log=[],
     _failed_request_log=[],
     _successful_http_request_log=[],

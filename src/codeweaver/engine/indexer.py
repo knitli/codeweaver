@@ -28,7 +28,6 @@ from watchfiles.main import Change, FileChange
 
 from codeweaver.config import CodeWeaverSettingsDict, RignoreSettings
 from codeweaver.core import (
-    BasedModel,
     BlakeStore,
     ConfigLanguage,
     DictView,
@@ -239,7 +238,7 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         return self._walker
 
 
-class Indexer(BasedModel):
+class Indexer:
     """Main indexer class. Wraps a vector store and parsers."""
 
     _store: BlakeStore[DiscoveredFile] = PrivateAttr()

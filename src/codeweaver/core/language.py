@@ -89,6 +89,9 @@ class ExtensionRegistry(BasedModel):
             if lang.extensions:
                 self._add_exts_to_registry(cast(Iterable[LiteralStringT], lang.extensions), lang)
 
+    def _telemetry_keys(self) -> None:
+        return None
+
     def lookup(
         self, ext: LiteralStringT
     ) -> (

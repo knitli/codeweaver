@@ -87,6 +87,10 @@ class Sentinel:
         """Return state information for pickling."""
         return (self.__class__, (self._name, self._repr, self._module_name))
 
+    def __hash__(self) -> int:
+        """Return the hash of the ."""
+        return hash((self._name, self._module_name))
+
     @classmethod
     def __get_pydantic_core_schema__(
         cls, _source_type: Any, _handler: GetCoreSchemaHandler

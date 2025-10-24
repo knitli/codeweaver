@@ -38,9 +38,14 @@ from codeweaver.core import (
     make_blake_store,
     make_uuid_store,
 )
+from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.provider import Provider
 from codeweaver.tokenizers import Tokenizer, get_tokenizer
+
+
+if TYPE_CHECKING:
+    from codeweaver.core.types import AnonymityConversion, FilteredKey
 
 
 statistics_module: LazyImport[ModuleType] = lazy_import("codeweaver.common.statistics")
@@ -385,6 +390,19 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             _ = loop.run_in_executor(None, task)
         except Exception:
             logger.exception("Error occurred while executing fire-and-forget task.")
+
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
+
+        return {
+            FilteredKey("_store"): AnonymityConversion.COUNT,
+            FilteredKey("_hash_store"): AnonymityConversion.COUNT,
+            FilteredKey("_client"): AnonymityConversion.FORBIDDEN,
+            FilteredKey("_input_transformer"): AnonymityConversion.FORBIDDEN,
+            FilteredKey("_output_transformer"): AnonymityConversion.FORBIDDEN,
+            FilteredKey("_doc_kwargs"): AnonymityConversion.COUNT,
+            FilteredKey("_query_kwargs"): AnonymityConversion.COUNT,
+        }
 
     def model_dump_json(
         self,

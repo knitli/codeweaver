@@ -22,6 +22,7 @@ from codeweaver.core.types import DATACLASS_CONFIG, DataclassSerializationMixin
 if TYPE_CHECKING:
     from ast_grep_py import SgRoot
 
+    from codeweaver.core.types import AnonymityConversion, FilteredKey
     from codeweaver.semantic.ast_grep import FileThing
 
 
@@ -56,6 +57,15 @@ class DiscoveredFile(DataclassSerializationMixin):
             init=False,
         ),
     ]
+
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
+
+        return {
+            FilteredKey("path"): AnonymityConversion.HASH,
+            FilteredKey("file_hash"): AnonymityConversion.FORBIDDEN,
+            FilteredKey("git_branch"): AnonymityConversion.HASH,
+        }
 
     @classmethod
     def from_path(cls, path: Path, *, file_hash: BlakeKey | None = None) -> DiscoveredFile | None:

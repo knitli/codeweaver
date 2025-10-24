@@ -101,6 +101,9 @@ class SemanticMetadata(BasedModel):
         ),
     ] = False
 
+    def _telemetry_keys(self) -> None:
+        return None  # we'll exclude identifying info in the value types
+
     def _serialize_for_cli(self) -> dict[str, Any]:
         """Serialize the SemanticMetadata for CLI output."""
         self_map = self.model_dump(

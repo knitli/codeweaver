@@ -28,7 +28,7 @@ from fastmcp.server.server import DuplicateBehavior
 from fastmcp.tools import Tool
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.lowlevel.server import LifespanResultT
-from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt, SecretStr
+from pydantic import Field, PositiveFloat, PositiveInt, SecretStr
 from starlette.middleware import Middleware as ASGIMiddleware
 from uvicorn.config import (
     SSL_PROTOCOL_VERSION,
@@ -41,10 +41,12 @@ from uvicorn.config import (
 
 from codeweaver.config.logging import LoggingConfigDict
 from codeweaver.core import BASEDMODEL_CONFIG, BasedModel
+from codeweaver.core.types.enum import AnonymityConversion
 
 
 if TYPE_CHECKING:
     from codeweaver.core import DictView, Unset
+    from codeweaver.core.types import AnonymityConversion, FilteredKey
     from codeweaver.providers.provider import Provider
 
 # ===========================================================================
@@ -179,31 +181,7 @@ class UvicornServerSettings(BasedModel):
     """
 
     # For the following, we just want to track if it's the default value or not (True/False), not the actual value.
-    model_config = (
-        ConfigDict(
-            json_schema_extra={
-                "TelemetryBoolProps": [
-                    "host",
-                    "name",
-                    "ssl_keyfile",
-                    "ssl_certfile",
-                    "ssl_keyfile_password",
-                    "ssl_version",
-                    "ssl_cert_reqs",
-                    "ssl_ca_certs",
-                    "ssl_ciphers",
-                    "root_path",
-                    "headers",
-                    "server_header",
-                    "data_header",
-                    "forwarded_allow_ips",
-                    "env_file",
-                    "log_config",
-                ]
-            }
-        )
-        | BASEDMODEL_CONFIG
-    )
+    model_config = BASEDMODEL_CONFIG
 
     name: Annotated[str, Field(exclude=True)] = "CodeWeaver_http"
     host: str = "127.0.0.1"
@@ -253,6 +231,28 @@ class UvicornServerSettings(BasedModel):
     headers: list[tuple[str, str]] | None = None
     factory: bool = False
     h11_max_incomplete_event_size: int | None = None
+
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
+
+        return {
+            FilteredKey("host"): AnonymityConversion.BOOLEAN,
+            FilteredKey("name"): AnonymityConversion.BOOLEAN,
+            FilteredKey("ssl_keyfile"): AnonymityConversion.BOOLEAN,
+            FilteredKey("ssl_certfile"): AnonymityConversion.BOOLEAN,
+            FilteredKey("ssl_keyfile_password"): AnonymityConversion.BOOLEAN,
+            FilteredKey("ssl_version"): AnonymityConversion.BOOLEAN,
+            FilteredKey("ssl_cert_reqs"): AnonymityConversion.BOOLEAN,
+            FilteredKey("ssl_ca_certs"): AnonymityConversion.BOOLEAN,
+            FilteredKey("ssl_ciphers"): AnonymityConversion.BOOLEAN,
+            FilteredKey("root_path"): AnonymityConversion.BOOLEAN,
+            FilteredKey("headers"): AnonymityConversion.BOOLEAN,
+            FilteredKey("server_header"): AnonymityConversion.BOOLEAN,
+            FilteredKey("data_header"): AnonymityConversion.BOOLEAN,
+            FilteredKey("forwarded_allow_ips"): AnonymityConversion.BOOLEAN,
+            FilteredKey("env_file"): AnonymityConversion.BOOLEAN,
+            FilteredKey("log_config"): AnonymityConversion.BOOLEAN,
+        }
 
 
 class UvicornServerSettingsDict(TypedDict, total=False):

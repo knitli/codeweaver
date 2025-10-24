@@ -1,3 +1,4 @@
+# sourcery skip: name-type-suffix
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -15,14 +16,17 @@ Provides a privacy-aware wrapper around the PostHog Python client with:
 from __future__ import annotations
 
 import logging
+
 from functools import cache
-from typing import TYPE_CHECKING, Any
+from types import TracebackType
+from typing import TYPE_CHECKING, Any, Self
+
 
 if TYPE_CHECKING:
     from posthog import Posthog
 
 from codeweaver.telemetry.config import get_telemetry_settings
-from codeweaver.telemetry.privacy import PrivacyFilter
+
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +44,14 @@ class PostHogClient:
         ...     client.capture("session_summary", {"searches": 10})
     """
 
+    # ---------------------------------------------------------------------------
+    #!         THIS IS NOT AN API_KEY!! This key is a write-only project key
+    #!         safe to include in public repositories. It cannot be used to
+    #!         read data or access CodeWeaver's PostHog project.
+    # ---------------------------------------------------------------------------
     def __init__(
         self,
-        api_key: str | None = None,
+        api_key: str | None = "phc_XKWSirBXZdxYEYRl98cJQzqvTcvQ7U1KWZYygLghhJg",
         host: str = "https://app.posthog.com",
         *,
         enabled: bool = True,
@@ -52,7 +61,7 @@ class PostHogClient:
         Initialize PostHog client.
 
         Args:
-            api_key: PostHog API key (required if enabled)
+            api_key: PostHog project key (required if enabled)
             host: PostHog host URL
             enabled: Enable telemetry sending
             strict_privacy_mode: Enable strict privacy validation
@@ -63,7 +72,7 @@ class PostHogClient:
 
         self._client: Posthog | None = None
 
-        if self.enabled:
+        if self.enabled and api_key:
             try:
                 from posthog import Posthog
 
@@ -72,23 +81,17 @@ class PostHogClient:
                     host=host,
                     # Disable debug mode in production
                     debug=False,
-                    # Increase batch size for efficiency
-                    batch_size=10,
-                    # Flush every 60 seconds
-                    max_batch_size=100,
-                    # Use background thread for sending
-                    send_asynchronously=True,
                 )
                 self.logger.info("PostHog telemetry client initialized")
             except ImportError:
                 self.logger.warning(
                     "PostHog package not installed, telemetry disabled. "
-                    "Install with: uv pip install 'codeweaver-mcp[recommended]'"
+                    "Install with: uv pip install 'codeweaver-mcp[recommended]'"  # type: ignore
                 )
                 self.enabled = False
                 self._client = None
-            except Exception as e:
-                self.logger.exception("Failed to initialize PostHog client: %s", e)
+            except Exception:
+                self.logger.exception("Failed to initialize PostHog client")
                 self.enabled = False
                 self._client = None
         else:
@@ -112,11 +115,7 @@ class PostHogClient:
         )
 
     def capture(
-        self,
-        event: str,
-        properties: dict[str, Any],
-        *,
-        distinct_id: str = "anonymous",
+        self, event: str, properties: dict[str, Any], *, distinct_id: str = "anonymous"
     ) -> None:
         """
         Send event to PostHog with privacy filtering.
@@ -140,7 +139,7 @@ class PostHogClient:
             if not self.privacy_filter.validate_event(event_dict):
                 self.logger.warning(
                     "Event '%s' failed privacy validation, not sending. "
-                    "This may indicate a bug in event construction.",
+                    "This may indicate a bug in event construction.",  # type: ignore
                     event,
                 )
                 return
@@ -149,18 +148,16 @@ class PostHogClient:
             filtered_properties = self.privacy_filter.filter_event(properties)
 
             # Send to PostHog
-            self._client.capture(
-                distinct_id=distinct_id,
-                event=event,
-                properties=filtered_properties,
+            _ = self._client.capture(
+                distinct_id=distinct_id, event=event, properties=filtered_properties
             )
 
             self.logger.debug("Telemetry event sent: %s", event)
 
-        except Exception as e:
+        except Exception:
             # Never fail application due to telemetry
             # Just log and continue
-            self.logger.exception("Failed to send telemetry event '%s': %s", event, e)
+            self.logger.exception("Failed to send telemetry event '%s'", event)
 
     def capture_from_event(self, event_obj: Any) -> None:
         """
@@ -172,8 +169,8 @@ class PostHogClient:
         try:
             event_name, properties = event_obj.to_posthog_event()
             self.capture(event_name, properties)
-        except Exception as e:
-            self.logger.exception("Failed to capture event from object: %s", e)
+        except Exception:
+            self.logger.exception("Failed to capture event from object")
 
     def shutdown(self) -> None:
         """
@@ -186,14 +183,19 @@ class PostHogClient:
             try:
                 self._client.flush()
                 self.logger.info("PostHog client shut down successfully")
-            except Exception as e:
-                self.logger.exception("Error during PostHog client shutdown: %s", e)
+            except Exception:
+                self.logger.exception("Error during PostHog client shutdown")
 
-    def __enter__(self) -> PostHogClient:
+    def __enter__(self) -> Self:
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         """Context manager exit with automatic shutdown."""
         self.shutdown()
 
@@ -209,7 +211,4 @@ def get_telemetry_client() -> PostHogClient:
     return PostHogClient.from_settings()
 
 
-__all__ = (
-    "PostHogClient",
-    "get_telemetry_client",
-)
+__all__ = ("PostHogClient", "get_telemetry_client")

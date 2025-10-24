@@ -32,6 +32,9 @@ class CustomLanguage(BasedModel):
         ),
     ] = None
 
+    def _telemetry_keys(self) -> None:
+        return None
+
 
 class CustomDelimiter(BasedModel):
     """A custom delimiter for separating multiple prompts in a single input string. If you only want to define a new language and extensions but not a delimiter, use the `CustomLanguage` class instead.
@@ -69,6 +72,9 @@ class CustomDelimiter(BasedModel):
             default_factory=lambda data: None if data.get("extensions") else str,
         ),
     ] = None
+
+    def _telemetry_keys(self) -> None:
+        return None
 
     @model_validator(mode="after")
     def validate_instance(self) -> Self:

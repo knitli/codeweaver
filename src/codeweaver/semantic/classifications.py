@@ -104,6 +104,9 @@ class ImportanceScores(DataclassSerializationMixin):
         Field(description="Weight for documentation context; explaining code", ge=0.0, le=1.0),
     ]
 
+    def _telemetry_keys(self) -> None:
+        return None
+
     @classmethod
     def default(cls) -> Self:
         """Get default importance scores."""
@@ -145,6 +148,9 @@ class ImportanceScores(DataclassSerializationMixin):
     def from_dict(cls, **data: Unpack[ImportanceScoresDict]) -> Self:
         """Create ImportanceScores from a dictionary format."""
         return cls.validate_python(data=cast(dict[str, Any], data))
+
+    def _telemetry_keys(self) -> None:
+        return None
 
 
 class ImportanceRank(int, BaseEnum):
@@ -253,6 +259,9 @@ class ThingClass(BasedModel):
         return (
             ImportanceScores.validate_python(cast(dict[str, Any], v)) if isinstance(v, dict) else v
         )
+
+    def _telemetry_keys(self) -> None:
+        return None
 
 
 class SemanticClass(str, BaseEnum):
@@ -927,6 +936,9 @@ class AgentTask(BaseAgentTask, BaseDataclassEnum):
         "Predefined task for searching code.",
     )
 
+    def _telemetry_keys(self) -> None:
+        return None
+
     @classmethod
     def profiles(cls) -> MappingProxyType[str, ImportanceScoresDict]:
         """Get the context weight profiles for all tasks."""
@@ -992,6 +1004,9 @@ class UsageMetrics(DataclassSerializationMixin):
 
     category_usage_counts: Counter[SemanticClass]
 
+    def _telemetry_keys(self) -> None:
+        return None
+
     @computed_field
     @property
     def total_use(self) -> NonNegativeInt:
@@ -1017,6 +1032,9 @@ class UsageMetrics(DataclassSerializationMixin):
 @dataclass(config=DATACLASS_CONFIG)
 class ScoreValidation(DataclassSerializationMixin):
     """Validation results for importance score accuracy."""
+
+    def _telemetry_keys(self) -> None:
+        return None
 
     @computed_field
     @property

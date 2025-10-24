@@ -15,6 +15,7 @@ from collections.abc import Callable, ItemsView, Iterator, KeysView, ValuesView
 from functools import cached_property
 from types import MappingProxyType
 from typing import (
+    TYPE_CHECKING,
     Annotated,
     Any,
     Literal,
@@ -43,6 +44,9 @@ from typing_extensions import TypeIs
 from codeweaver.common.utils.utils import uuid7
 from codeweaver.core import BasedModel
 
+
+if TYPE_CHECKING:
+    from codeweaver.core.types import AnonymityConversion, FilteredKey
 
 try:
     # there are a handful of rare situations where users might not be able to install blake3
@@ -416,6 +420,11 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
             self.set(key, actually_there)
             return True
         return False
+
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
+
+        return {FilteredKey("store"): AnonymityConversion.COUNT}
 
 
 class UUIDStore[T](_SimpleTypedStore[UUID7, T]):

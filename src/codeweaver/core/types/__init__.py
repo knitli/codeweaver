@@ -19,6 +19,7 @@ from codeweaver.core.types.aliases import (
     FileNameT,
     FilePath,
     FilePathT,
+    FilteredKey,
     LanguageName,
     LanguageNameT,
     LiteralStringT,
@@ -34,7 +35,12 @@ from codeweaver.core.types.aliases import (
     ThingName,
     ThingNameT,
 )
-from codeweaver.core.types.enum import BaseDataclassEnum, BaseEnum, BaseEnumData
+from codeweaver.core.types.enum import (
+    AnonymityConversion,
+    BaseDataclassEnum,
+    BaseEnum,
+    BaseEnumData,
+)
 from codeweaver.core.types.models import (
     BASEDMODEL_CONFIG,
     DATACLASS_CONFIG,
@@ -55,6 +61,7 @@ __all__ = (
     "DATACLASS_CONFIG",
     "FROZEN_BASEDMODEL_CONFIG",
     "UNSET",
+    "AnonymityConversion",
     "BaseDataclassEnum",
     "BaseEnum",
     "BaseEnumData",
@@ -80,6 +87,7 @@ __all__ = (
     "FileNameT",
     "FilePath",
     "FilePathT",
+    "FilteredKey",
     "LanguageName",
     "LanguageNameT",
     "LiteralStringT",

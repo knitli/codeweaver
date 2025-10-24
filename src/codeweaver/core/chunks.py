@@ -45,6 +45,7 @@ from codeweaver.core.utils import truncate_text
 
 if TYPE_CHECKING:
     from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core.types import AnonymityConversion, FilteredKey
 
 # ---------------------------------------------------------------------------
 # *                    Code Search and Chunks
@@ -77,6 +78,15 @@ class SearchResult(BasedModel):
     metadata: Annotated[
         Metadata | None, Field(description="""Additional metadata about the result""")
     ] = None
+
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
+
+        base = {FilteredKey("content"): AnonymityConversion.TEXT_COUNT}
+        return {
+            FilteredKey("file_path"): AnonymityConversion.BOOLEAN,
+            FilteredKey("metadata"): AnonymityConversion.BOOLEAN,
+        } | (base if isinstance(self.content, str) else {})
 
 
 class CodeChunkDict(TypedDict, total=False):
@@ -157,6 +167,15 @@ class CodeChunk(BasedModel):
             description="""Batch ID for the embedding batch the chunk was processed in.""",
         ),
     ] = None
+
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
+
+        return {
+            FilteredKey("content"): AnonymityConversion.TEXT_COUNT,
+            FilteredKey("file_path"): AnonymityConversion.BOOLEAN,
+            FilteredKey("metadata"): AnonymityConversion.AGGREGATE,
+        }
 
     def serialize(self) -> SerializedCodeChunk[CodeChunk]:
         """Serialize the CodeChunk to a dictionary."""

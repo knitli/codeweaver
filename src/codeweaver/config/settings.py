@@ -22,14 +22,23 @@ from functools import cached_property, partial
 from importlib import util
 from pathlib import Path
 from textwrap import dedent
-from typing import Annotated, Any, Literal, NotRequired, Self, TypedDict, Unpack, cast
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Literal,
+    NotRequired,
+    Self,
+    TypedDict,
+    Unpack,
+    cast,
+)
 
 from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.server.server import DuplicateBehavior
 from fastmcp.tools.tool import Tool
 from mcp.server.auth.settings import AuthSettings
 from pydantic import (
-    ConfigDict,
     Field,
     FilePath,
     PositiveInt,
@@ -74,7 +83,13 @@ from codeweaver.config.types import (
 )
 from codeweaver.core import UNSET, BasedModel, DictView, Unset
 from codeweaver.core.file_extensions import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_EXTENSIONS
+from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.providers.provider import Provider
+
+
+if TYPE_CHECKING:
+    from codeweaver.core.types.aliases import FilteredKey
+    from codeweaver.core.types.enum import AnonymityConversion
 
 
 logger = logging.getLogger(__name__)
@@ -159,14 +174,6 @@ class FileFilterSettings(BasedModel):
     - if `include_tooling_dirs` is True (default and recommended), common hidden tooling directories will be included *if they aren't .gitignored* (assuming `use_gitignore` is enabled, which is default). Any gitignored files will be excluded. This includes directories like `.vscode`, `.idea`, but also more specialized ones like `.moon`, `.husky`, and LLM-specific ones like `.codeweaver`, `.claude`, `.codex`, `.roo`, and more.
     """
 
-    model_config = (
-        ConfigDict(
-            json_schema_extra={"NoTelemetryProps": ["forced_includes", "excludes"]},
-            defer_build=True,
-        )
-        | BasedModel.model_config
-    )
-
     forced_includes: Annotated[
         frozenset[str | Path],
         Field(
@@ -225,6 +232,14 @@ class FileFilterSettings(BasedModel):
         "same_file_system": True,
         "follow_links": False,
     })
+
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
+
+        return {
+            FilteredKey("forced_includes"): AnonymityConversion.COUNT,
+            FilteredKey("excludes"): AnonymityConversion.COUNT,
+        }
 
     def model_post_init(self, _context: MiddlewareContext[Any] | None = None, /) -> None:
         """Post-initialization processing."""
@@ -353,6 +368,9 @@ class ProviderSettings(BasedModel):
         Field(description="""Agent provider configuration"""),
     ] = DefaultAgentProviderSettings
 
+    def _telemetry_keys(self) -> None:
+        return None
+
 
 AllDefaultProviderSettings = ProviderSettings.model_construct(
     data=DefaultDataProviderSettings,
@@ -367,22 +385,6 @@ class FastMcpServerSettings(BasedModel):
 
     These settings don't represent the complete set of FastMCP server settings, but the ones users can configure. The remaining settings, if changed, could break functionality or cause unexpected behavior.
     """
-
-    model_config = (
-        ConfigDict(
-            json_schema_extra={
-                "TelemetryBoolProps": [  # properties to convert to bool for telemetry -- just 'property is set' or 'property is not set'
-                    "host",
-                    "port",
-                    "path",
-                    "additional_dependencies",
-                    "additional_middleware",
-                    "additional_tools",
-                ]
-            }
-        )
-        | BasedModel.model_config
-    )
 
     transport: Annotated[
         Literal["stdio", "http", "streamable-http"] | None,
@@ -422,6 +424,17 @@ class FastMcpServerSettings(BasedModel):
             serialization_alias="tools",
         ),
     ] = None
+
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
+
+        return {
+            FilteredKey("auth"): AnonymityConversion.BOOLEAN,
+            FilteredKey("host"): AnonymityConversion.BOOLEAN,
+            FilteredKey("port"): AnonymityConversion.BOOLEAN,
+            FilteredKey("additional_middleware"): AnonymityConversion.COUNT,
+            FilteredKey("additional_tools"): AnonymityConversion.COUNT,
+        }
 
     @staticmethod
     def _attempt_import(suspected_path: str) -> Any | None:
@@ -709,6 +722,16 @@ class CodeWeaverSettings(BaseSettings):
         if type(self).__pydantic_complete__:
             self._map = cast(DictView[CodeWeaverSettingsDict], DictView(self.model_dump()))
             globals()["_mapped_settings"] = self._map
+
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
+
+        return {
+            FilteredKey("project_path"): AnonymityConversion.HASH,
+            FilteredKey("project_root"): AnonymityConversion.HASH,
+            FilteredKey("project_name"): AnonymityConversion.BOOLEAN,
+            FilteredKey("config_file"): AnonymityConversion.HASH,
+        }
 
     @classmethod
     def from_config(cls, path: FilePath, **kwargs: Unpack[CodeWeaverSettingsDict]) -> Self:

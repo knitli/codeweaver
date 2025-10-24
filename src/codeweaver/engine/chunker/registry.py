@@ -7,12 +7,17 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 from weakref import WeakValueDictionary
 
 from pydantic import UUID7
 
 from codeweaver.common.utils.utils import uuid7
 from codeweaver.core import BasedModel
+
+
+if TYPE_CHECKING:
+    from codeweaver.core.types import AnonymityConversion, FilteredKey
 
 
 class SourceIdRegistry(BasedModel):
@@ -26,6 +31,14 @@ class SourceIdRegistry(BasedModel):
         self._registry: dict[Path, UUID7] = {}
         # Keep weak references to avoid memory leaks for temporary file processing
         self._weak_registry: WeakValueDictionary[Path, UUID7] = WeakValueDictionary()
+
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
+
+        return {
+            FilteredKey("_registry"): AnonymityConversion.COUNT,
+            FilteredKey("_weak_registry"): AnonymityConversion.FORBIDDEN,
+        }
 
     def source_id_for(self, file_path: Path) -> UUID7:
         """Get or create a source ID for the given file path.

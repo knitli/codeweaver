@@ -4,12 +4,17 @@ import logging
 import re
 
 from collections.abc import Callable
-from typing import Annotated, Any, Literal, NewType, NotRequired, Required, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, Literal, NewType, NotRequired, Required, TypedDict
 
 from pydantic import BeforeValidator, Field, FieldSerializationInfo, PrivateAttr, field_serializer
 
 from codeweaver.core import BasedModel
+from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.exceptions import ConfigurationError
+
+
+if TYPE_CHECKING:
+    from codeweaver.core import AnonymityConversion, FilteredKey
 
 
 # ===========================================================================
@@ -199,6 +204,11 @@ class SerializableLoggingFilter(BasedModel, logging.Filter):
         logging.Filter | Callable[[logging.LogRecord], bool | logging.LogRecord] | None,
         PrivateAttr(),
     ] = None
+
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        from codeweaver.core import AnonymityConversion, FilteredKey
+
+        return {FilteredKey("simple_filter"): AnonymityConversion.BOOLEAN}
 
     @field_serializer("include_pattern", "exclude_pattern", when_used="json-unless-none")
     def serialize_patterns(self, value: re.Pattern[str], info: FieldSerializationInfo) -> str:

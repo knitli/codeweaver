@@ -67,6 +67,9 @@ class QueryIntent(BasedModel):
         Field(default=QueryComplexity.MODERATE),
     ]
 
+    def _telemetry_keys(self) -> None:
+        return None
+
 
 class IntentResult(BasedModel):
     """Result of intent analysis with strategy recommendations."""
@@ -104,6 +107,9 @@ class IntentResult(BasedModel):
     prioritize_entry_points: Annotated[
         bool, Field(description="""Whether to prioritize entry points in results""")
     ] = False
+
+    def _telemetry_keys(self) -> None:
+        return None
 
 
 __all__ = ("IntentResult", "IntentType", "QueryComplexity", "QueryIntent")

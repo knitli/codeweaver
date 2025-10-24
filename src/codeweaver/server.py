@@ -52,6 +52,7 @@ from codeweaver.config import (
     get_settings_map,
 )
 from codeweaver.core import DATACLASS_CONFIG, BaseEnum, DataclassSerializationMixin, DictView
+from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.exceptions import InitializationError
 from codeweaver.providers import Provider as Provider
 
@@ -66,6 +67,7 @@ if TYPE_CHECKING:
     )
     from codeweaver.common.statistics import SessionStatistics
     from codeweaver.common.utils import LazyImport
+    from codeweaver.core.types import AnonymityConversion, FilteredKey
 else:
     # lazy types for pydantic at runtime
     ProviderRegistry: LazyImport[ProviderRegistry] = lazy_import(
@@ -143,6 +145,9 @@ class HealthInfo(DataclassSerializationMixin):
     version: Annotated[str, Field(description="Version of the CodeWeaver server")] = version
     startup_time: Annotated[float, Field(description="Startup time of the server")] = time.time()
     error: Annotated[str | bytes | None, Field(description="Error message if any")] = None
+
+    def _telemetry_keys(self) -> None:
+        return None
 
     @classmethod
     def initialize(cls) -> HealthInfo:
@@ -267,6 +272,18 @@ class AppState(DataclassSerializationMixin):
         """Post-initialization to set the global state reference."""
         global _state
         _state = self
+
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        # Each of the values that are BasedModel or DataclassSerializationMixin have their own filters
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
+
+        return {
+            # TODO: These can all be boolean but need to differentiate from defaults vs set values
+            # We'd need to make broader use of the Unset sentinel for that to work well
+            FilteredKey("config_path"): AnonymityConversion.BOOLEAN,
+            FilteredKey("project_root"): AnonymityConversion.HASH,
+            FilteredKey("middleware_stack"): AnonymityConversion.COUNT,
+        }
 
     @computed_field
     @property

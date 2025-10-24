@@ -14,9 +14,11 @@ from pydantic.dataclasses import dataclass
 from codeweaver.core import DATACLASS_CONFIG, BaseEnum, DataclassSerializationMixin, LiteralStringT
 from codeweaver.core.file_extensions import COMMON_TOOLING_PATHS, TEST_DIR_NAMES
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
+from codeweaver.core.types.enum import AnonymityConversion
 
 
 if TYPE_CHECKING:
+    from codeweaver.core.types import AnonymityConversion, FilteredKey
     from codeweaver.engine.discovery import FileDiscoveryService
 
 _discovery: FileDiscoveryService | None = None
@@ -147,6 +149,15 @@ class RepoDirectory(DataclassSerializationMixin):
     _subdirectories: Sequence[Path] | None = None
     """Cache of subdirectories in the directory."""
 
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
+
+        return {
+            FilteredKey("path"): AnonymityConversion.HASH,
+            FilteredKey("_files"): AnonymityConversion.COUNT,
+            FilteredKey("_subdirectories"): AnonymityConversion.COUNT,
+        }
+
 
 def get_discovery_service() -> FileDiscoveryService:
     """Get the singleton instance of the FileDiscoveryService.
@@ -274,6 +285,17 @@ class RepoChecklist(DataclassSerializationMixin):
         "packages": {"packages", "pkg", "pkgs"},
         "modules": {"modules", "mod", "mods", "workspaces", "pkgspaces", "services", "svcs"},
     })
+
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
+
+        return {
+            FilteredKey("_children"): AnonymityConversion.COUNT,
+            FilteredKey("tooling"): AnonymityConversion.DISTRIBUTION,
+            FilteredKey("llm_tooling"): AnonymityConversion.DISTRIBUTION,
+            FilteredKey("config_files"): AnonymityConversion.DISTRIBUTION,
+            FilteredKey("language_specific_files"): AnonymityConversion.DISTRIBUTION,
+        }
 
     @classmethod
     def _any_exists(cls, self_instance: Self) -> bool:

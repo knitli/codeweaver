@@ -75,6 +75,9 @@ class ChunkGovernor(BasedModel):
         """
         return int(max(50, min(200, self.chunk_limit * 0.2)))
 
+    def _telemetry_keys(self) -> None:
+        return None
+
 
 class BaseChunker(ABC):
     """Base class for chunkers."""

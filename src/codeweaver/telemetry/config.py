@@ -47,7 +47,7 @@ class TelemetrySettings(BaseSettings):
     ]
 
     posthog_api_key: Annotated[
-        str | None,
+        str | None = ,
         Field(
             default=None,
             description="PostHog API key. Required if telemetry is enabled.",

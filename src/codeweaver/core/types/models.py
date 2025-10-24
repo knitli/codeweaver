@@ -2,11 +2,23 @@
 
 from __future__ import annotations
 
+import abc
 import sys as _sys
 
 from collections.abc import Callable, Generator, Iterator, Sequence
 from functools import cached_property
-from typing import Annotated, Any, Literal, NotRequired, Self, TypedDict, Unpack, cast, override
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Literal,
+    NotRequired,
+    Self,
+    TypedDict,
+    Unpack,
+    cast,
+    override,
+)
 
 import textcase
 
@@ -14,6 +26,15 @@ from pydantic import BaseModel, ConfigDict, PrivateAttr, RootModel, TypeAdapter
 from pydantic.fields import ComputedFieldInfo, FieldInfo
 from pydantic.typing import IncEx
 
+from codeweaver.core.types.aliases import LiteralStringT
+
+
+if TYPE_CHECKING:
+    from codeweaver.core.types.aliases import FilteredKey
+    from codeweaver.core.types.enum import AnonymityConversion
+
+
+FILTERED_KEYS: frozenset[FilteredKey] = frozenset({FilteredKey("api_key"), FilteredKey("")})
 
 # ================================================
 # *       Dataclass Serialization
@@ -51,6 +72,10 @@ class DataclassSerializationMixin:
 
     _module: Annotated[str | None, PrivateAttr()] = None
     _adapter: Annotated[TypeAdapter[Self] | None, PrivateAttr()] = None
+
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion] | None:
+        """Get telemetry keys for the dataclass."""
+        return None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the mixin and set the module name and adapter."""
@@ -126,6 +151,50 @@ class DataclassSerializationMixin:
                         for item in attr  # type: ignore
                     ]
         return self.dump_python(round_trip=True, exclude_none=True) | self_map
+
+    def _telemetry_handler(self, _serialized_self: dict[str, Any], /) -> dict[str, Any]:
+        """An optional handler for subclasses to modify telemetry serialization. By default, it returns an empty dict.
+
+        We use any returns keys as overrides for the serialized_self.
+        """
+        return {}
+
+    def serialize_for_telemetry(self) -> dict[str, Any]:
+        """Serialize the model for telemetry output, filtering sensitive keys."""
+        from codeweaver.core.types.enum import AnonymityConversion
+
+        excludes: set[FilteredKey] = set()
+        default_group: dict[FilteredKey, Any] = {}
+        if telemetry_keys := (self._telemetry_keys() or {}):
+            excludes = {
+                key
+                for key, conversion in telemetry_keys.items()
+                if conversion == AnonymityConversion.FORBIDDEN
+            }
+            default_group = {
+                key: conversion.filtered(getattr(self, str(key), None))
+                for key, conversion in telemetry_keys.items()
+            }
+        data = self.dump_python(
+            round_trip=True,
+            exclude_none=True,
+            exclude_defaults=True,
+            exclude_unset=True,
+            exclude=excludes,
+        )
+        filtered_group: dict[str, Any] = self._telemetry_handler(data)
+        return {
+            # if a key is in the filtered group, use that value
+            key: filtered_group.get(
+                key,
+                (
+                    # otherwise, if it's in the default group, use that value
+                    default_group.get(FilteredKey(cast(LiteralStringT, key)), value)
+                ),
+            )
+            for key, value in data.items()
+            if FilteredKey(cast(LiteralStringT, key)) not in excludes
+        }
 
 
 def generate_title(model: type[Any]) -> str:
@@ -230,6 +299,11 @@ class BasedModel(BaseModel):
                     for item in attr  # type: ignore
                 ]
         return self.model_dump(mode="python", round_trip=True, exclude_none=True) | self_map
+
+    @abc.abstractmethod
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion] | None:
+        """Get telemetry keys for the dataclass."""
+        raise NotImplementedError("Subclasses must implement _telemetry_keys method.")
 
 
 __all__ = (

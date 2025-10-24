@@ -132,6 +132,9 @@ class NodeTypeDTO(BasedModel):
     # * Translation Helper Methods *
     # ===============================
 
+    def _telemetry_keys(self) -> None:
+        return None
+
     @computed_field
     @property
     def is_category(self) -> bool:

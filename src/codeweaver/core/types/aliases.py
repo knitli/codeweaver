@@ -18,6 +18,9 @@ We occasionally skirt the restrictions on LiteralString, such as for config sett
 SentinelName = NewType("SentinelName", LiteralStringT)
 """The name of a sentinel value, e.g. "UNSET"."""
 
+FilteredKey = NewType("FilteredKey", LiteralStringT)
+"""A key in a dictionary that must go through a privacy filter for telemetry purposes."""
+
 # ================================================
 # *       File and Directory NewTypes/Aliases
 # ================================================
@@ -242,6 +245,7 @@ __all__ = (
     "FileNameT",
     "FilePath",
     "FilePathT",
+    "FilteredKey",
     "LanguageName",
     "LanguageNameT",
     "LiteralStringT",

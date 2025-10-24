@@ -40,6 +40,9 @@ class SemanticScorer(BasedModel):
         NonNegativeFloat, Field(ge=0.0, le=0.2, description="""Bonus for top-level definitions""")
     ] = 0.05
 
+    def _telemetry_keys(self) -> None:
+        return None
+
     def calculate_importance_score(self, thing: AstThing[SgNode]) -> ImportanceScores:
         """Calculate the final importance score for a thing.
 
@@ -59,10 +62,8 @@ class SemanticScorer(BasedModel):
         # get contextual adjustments
         adjustment = self._apply_contextual_adjustments(thing)
         adjusted_scores = {k: v + adjustment for k, v in base_scores.items()}
+        # clamp scores to [0.00, 0.99]
         corrected_scores = {k: max(0.00, min(0.99, v)) for k, v in adjusted_scores.items()}
-        # Average the adjusted scores
-
-        # Clamp to valid range
         return ImportanceScores.validate_python(corrected_scores)
 
     def _apply_contextual_adjustments(self, thing: AstThing[SgNode]) -> float:
