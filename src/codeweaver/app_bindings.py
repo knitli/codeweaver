@@ -6,8 +6,6 @@
 
 from __future__ import annotations
 
-import contextlib
-import datetime
 import logging
 
 from collections.abc import Container
@@ -23,17 +21,16 @@ from pydantic_core import to_json
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
-from codeweaver._server import AppState, HealthInfo, get_health_info
-from codeweaver._statistics import SessionStatistics, get_session_statistics, timed_http
-from codeweaver._types import DictView
-from codeweaver.exceptions import CodeWeaverError
-from codeweaver.language import SemanticSearchLanguage
+# from codeweaver.agent_api import find_code
+from codeweaver.agent_api.intent import IntentType
+from codeweaver.agent_api.models import FindCodeResponseSummary
+from codeweaver.common import SessionStatistics, get_session_statistics, timed_http
+from codeweaver.config import CodeWeaverSettingsDict, MiddlewareOptions
+from codeweaver.config.settings import get_settings_map
+from codeweaver.core import DictView
+from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.middleware.statistics import StatisticsMiddleware
-from codeweaver.models.core import FindCodeResponseSummary
-from codeweaver.models.intent import IntentType
-from codeweaver.settings import get_settings_map
-from codeweaver.settings_types import CodeWeaverSettingsDict, MiddlewareOptions
-from codeweaver.tools.find_code import find_code_implementation
+from codeweaver.server import AppState, HealthInfo, get_health_info
 
 
 _logger = logging.getLogger(__name__)
@@ -72,10 +69,13 @@ async def find_code_tool(
     include_tests: bool = False,
     focus_languages: tuple[SemanticSearchLanguage, ...] | None = None,
     context: Context | None = None,
-) -> FindCodeResponseSummary:
+) -> FindCodeResponseSummary:  # sourcery skip: remove-unreachable-code
     """Use CodeWeaver to find_code in the codebase."""
+    # temporary while this gets reimplemented in the agent_api
+    raise NotImplementedError("find_code_tool is not yet implemented")
+    """
     try:
-        response = await find_code_implementation(
+        response = await find_code(
             query=query,
             settings=settings(),
             intent=intent,
@@ -105,6 +105,7 @@ async def find_code_tool(
         ) from e
     else:
         return response
+    """
 
 
 # -------------------------
@@ -164,7 +165,7 @@ async def version_info(_request: Request) -> PlainTextResponse:
 @timed_http("state")
 async def state_info(_request: Request) -> PlainTextResponse:
     """Return the complete application state as JSON."""
-    from codeweaver._server import get_state
+    from codeweaver.server import get_state
 
     state = get_state()
     return PlainTextResponse(content=state.dump_json(), media_type="application/json")

@@ -397,6 +397,40 @@ Retrieves all exceptions available in the CodeWeaver codebase and all used excep
 - Scans codebase for exception definitions
 - Lists used exceptions
 
+### lazy-import-demo.py
+
+**Location:** `scripts/utils/lazy-import-demo.py`
+
+Demonstrates the new LazyImport functionality for deferred module loading. Shows how the LazyImport class solves problems with the old lazy_importer pattern.
+
+**Usage:**
+```bash
+python scripts/utils/lazy-import-demo.py
+```
+
+**Features:**
+- Demonstrates basic lazy import patterns
+- Shows attribute chaining without import
+- Examples for settings and type patterns
+- Thread safety demonstration
+- Comparison with old implementation
+
+**See also:** [utils/LAZY_IMPORT_GUIDE.md](utils/LAZY_IMPORT_GUIDE.md) for complete usage guide and migration instructions.
+
+### LAZY_IMPORT_GUIDE.md
+
+**Location:** `scripts/utils/LAZY_IMPORT_GUIDE.md`
+
+Complete usage guide for the new LazyImport class in `src/codeweaver/common/utils/lazy_importer.py`.
+
+**Contents:**
+- Quick reference and basic usage
+- Solution to specific use cases (settings functions, TYPE_CHECKING patterns)
+- Advanced patterns (chaining, global-level usage)
+- Comparison with old lazy_importer
+- Migration guide
+- Best practices and performance considerations
+
 ---
 
 ## Script Naming Conventions

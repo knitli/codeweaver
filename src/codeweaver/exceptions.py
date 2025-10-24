@@ -11,7 +11,10 @@ are organized into five primary categories.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
+
+
+# TODO: We got into a bad habit of not using native exception types. We need to systematically go through and improve exception handling and information.
 
 
 class CodeWeaverError(Exception):
@@ -20,6 +23,14 @@ class CodeWeaverError(Exception):
     Provides structured error information including details and suggestions
     for resolution.
     """
+
+    _issue_information: ClassVar[tuple[str, ...]] = (
+        "CodeWeaver is still in beta. If you encounter issues, and think they are bugs, please report them at https://github.com/knitli/codeweaver-mcp/issues",
+        "",
+        "If you're not sure, you can open a discussion at: https://github.com/knitli/codeweaver-mcp/discussions",
+        "",
+        "Thank you for helping us improve CodeWeaver!",
+    )
 
     def __init__(
         self,
@@ -34,11 +45,36 @@ class CodeWeaverError(Exception):
             message: Human-readable error message
             details: Additional context about the error
             suggestions: Actionable suggestions for resolving the error
+            _issue_information: Preformatted issue reporting information
         """
         super().__init__(message)
         self.message = message
         self.details = details or {}
         self.suggestions = suggestions or []
+
+    @property
+    def _reporting_info(self) -> str:
+        """Generate issue reporting information."""
+        return "\n".join((
+            "Include the following information when reporting issues:",
+            f"- Error Message: {self.message}",
+            "- Details: " + ", ".join(f"{k}: {v}" for k, v in self.details.items())
+            if self.details
+            else "- No additional details provided.",
+            "- Suggestions: " + ", ".join(self.suggestions)
+            if self.suggestions
+            else "- No suggestions provided.",
+            "",
+            "If you're not sure, you can open a discussion at: https://github.com/knitli/codeweaver-mcp/discussions",
+            "",
+            "Thank you for helping us improve CodeWeaver!",
+        ))
+
+    @property
+    def report(self) -> str:
+        """Generate a full error report including reporting information."""
+        about = type(self)._issue_information
+        return f"{'\n'.join(about)}\n\n{self._reporting_info}"
 
 
 class InitializationError(CodeWeaverError):

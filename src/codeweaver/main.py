@@ -11,41 +11,51 @@ import asyncio
 import logging
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, is_typeddict
+from types import EllipsisType
+from typing import TYPE_CHECKING, Any, TypeGuard, is_typeddict
 
 from pydantic import FilePath
 
-from codeweaver._server import build_app
-from codeweaver._utils import lazy_importer
 from codeweaver.app_bindings import register_app_bindings, register_tool
-from codeweaver.provider import Provider as Provider  # needed for pydantic models
+from codeweaver.common.utils import lazy_import
+from codeweaver.providers.provider import Provider as Provider  # needed for pydantic models
+from codeweaver.server import build_app
 
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
 
-    from codeweaver._server import AppState, ServerSetup
+    from codeweaver.common.utils import LazyImport
+    from codeweaver.config.settings import CodeWeaverSettings
+    from codeweaver.server import AppState, ServerSetup
+else:
+    FastMCP: LazyImport[FastMCP] = lazy_import("fastmcp", "FastMCP")
+    CodeWeaverSettings: LazyImport[CodeWeaverSettings] = lazy_import(
+        "codeweaver.config.settings", "CodeWeaverSettings"
+    )
+    AppState: LazyImport[AppState] = lazy_import("codeweaver.server", "AppState")
+    ServerSetup: LazyImport[ServerSetup] = lazy_import("codeweaver.server", "ServerSetup")
 
 
-async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: dict[str, Any]) -> None:
+def is_server_setup(obj: Any) -> TypeGuard[ServerSetup]:
+    """Type guard to check if an object is a ServerSetup TypedDict."""
+    return (
+        is_typeddict(obj)
+        and all(key in obj for key in ("app", "settings"))
+        and isinstance(obj["settings"], CodeWeaverSettings)
+    )
+
+
+async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -> None:
     """Start CodeWeaver's FastMCP server.
 
     We start a minimal server here, and once it's up, we register components and merge in settings.
     """
-    from fastmcp import FastMCP
-
-    # Pydantic will need these at runtime
-    _server_module = lazy_importer("codeweaver._server")
-    ServerSetup: ServerSetup = _server_module.ServerSetup  # pyright: ignore[reportUnusedVariable] # noqa: F841, N806
-    AppState: AppState = _server_module.AppState  # pyright: ignore[reportUnusedVariable] # noqa: F841, N806
-
     app = server if isinstance(server, FastMCP) else server["app"]
-    kwargs = kwargs or {}
-    server_setup: ServerSetup = ...  # type: ignore
-    if is_typeddict(server):
-        server_setup: ServerSetup = server  # type: ignore
-    if server_setup and hasattr(server_setup, "get"):
-        settings = server_setup["settings"]
+    resolved_kwargs: dict[str, Any] = kwargs or {}
+    server_setup: ServerSetup | EllipsisType = server if is_server_setup(server) else ...
+    if server_setup and is_server_setup(server_setup):
+        settings: CodeWeaverSettings = server_setup["settings"]
         new_kwargs = {  # type: ignore
             "transport": settings.server.transport or "streamable-http",
             "host": server_setup.pop("host", "127.0.0.1"),
@@ -59,9 +69,9 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: dict[s
             if settings.uvicorn_settings
             else {},
         }
-        kwargs = new_kwargs | kwargs  # pyright: ignore[reportUnknownVariableType, reportAssignmentType]
+        resolved_kwargs = new_kwargs | kwargs  # pyright: ignore[reportUnknownVariableType]
     else:
-        kwargs = {  # type: ignore
+        resolved_kwargs = {  # type: ignore
             "transport": "streamable-http",
             "host": "127.0.0.1",
             "port": 9328,
@@ -71,9 +81,9 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: dict[s
             "uvicorn_config": {},
             **kwargs.copy(),
         }  # type: ignore
-    registry = lazy_importer("codeweaver._registry")
-    registry.initialize_registries()
-    await app.run_http_async(**kwargs)  # type: ignore
+    registry = lazy_import("codeweaver.common.registry", "initialize_providers")  # type: ignore
+    _ = registry()  # type: ignore
+    await app.run_http_async(**resolved_kwargs)  # type: ignore
 
 
 async def run(
@@ -90,11 +100,11 @@ async def run(
     if port:
         server_setup["port"] = port
     if config_file or project_path:
-        from codeweaver.settings import get_settings
+        from codeweaver.config.settings import get_settings
 
         server_setup["settings"] = get_settings(path=config_file)
     if project_path:
-        from codeweaver.settings import update_settings
+        from codeweaver.config.settings import update_settings
 
         _ = update_settings(**{
             **server_setup["settings"].model_dump(),

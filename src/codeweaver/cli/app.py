@@ -11,7 +11,7 @@ import sys
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
 import cyclopts
 
@@ -21,18 +21,17 @@ from rich import print as rich_print
 from rich.console import Console
 from rich.table import Table
 
-from codeweaver._types import DictView
-from codeweaver._utils import lazy_importer
+from codeweaver.agent_api import CodeMatch, FindCodeResponseSummary, IntentType  #  find_code
+from codeweaver.common import CODEWEAVER_PREFIX, LazyImport, lazy_import
+from codeweaver.config import CodeWeaverSettingsDict
+from codeweaver.core import DictView
 from codeweaver.exceptions import CodeWeaverError
-from codeweaver.models.core import CodeMatch, FindCodeResponseSummary
-from codeweaver.models.intent import IntentType
-from codeweaver.settings import get_settings_map
-from codeweaver.settings_types import CodeWeaverSettingsDict
-from codeweaver.tools.find_code import find_code_implementation
 
 
 # Lazy import for performance
-settings_map: Any = lazy_importer("codeweaver.settings").get_settings_map()
+get_settings_map: LazyImport[DictView[CodeWeaverSettingsDict]] = lazy_import(
+    "codeweaver.config", "get_settings_map"
+)
 
 # Initialize console for rich output
 console = Console(markup=True, emoji=True)
@@ -54,7 +53,7 @@ async def _run_server(
 ) -> None:
     from codeweaver.main import run
 
-    console.print("[blue]Starting CodeWeaver MCP server...[/blue]")
+    console.print(f"{CODEWEAVER_PREFIX} [blue]Starting CodeWeaver MCP server...[/blue]")
     return await run(config_file=config_file, project_path=project_path, host=host, port=port)
 
 
@@ -76,14 +75,14 @@ async def server(
     except CodeWeaverError as e:
         console.print_exception(show_locals=True)
         if e.suggestions:
-            console.print("[yellow]Suggestions:[/yellow]")
+            console.print(f"{CODEWEAVER_PREFIX} [yellow]Suggestions:[/yellow]")
             for suggestion in e.suggestions:
                 console.print(f"  • {suggestion}")
         sys.exit(1)
     except KeyboardInterrupt:
-        console.print_exception(show_locals=False)
+        console.print_exception(show_locals=False, word_wrap=True)
     except Exception:
-        console.print_exception(show_locals=True)
+        console.print_exception(show_locals=True, word_wrap=True)
         sys.exit(1)
 
 
@@ -101,15 +100,15 @@ async def search(
     try:
         settings = get_settings_map()
         if project_path:
-            from codeweaver.settings import update_settings
+            from codeweaver.config.settings import update_settings
 
             settings = update_settings(project_path=project_path)  # type: ignore
 
-        console.print(f"[blue]Searching in: {settings['project_root']}[/blue]")
-        console.print(f"[blue]Query: {query}[/blue]")
+        console.print(f"{CODEWEAVER_PREFIX} [blue]Searching in: {settings['project_root']}[/blue]")
+        console.print(f"{CODEWEAVER_PREFIX} [blue]Query: {query}[/blue]")
 
         # Execute search
-        response = await find_code_implementation(
+        response = await find_code(
             query=query,
             settings=settings,
             intent=intent,
@@ -127,20 +126,7 @@ async def search(
                 "query": query,
                 "summary": response.summary,
                 "total_matches": response.total_matches,
-                "matches": [
-                    {
-                        "file_path": str(match.file.path),
-                        "language": match.file.ext_kind.language,
-                        "relevance_score": match.relevance_score,
-                        "line_range": match.span,
-                        "content": (
-                            f"{match.content[:200]}..."
-                            if len(match.content) > 200
-                            else match.content
-                        ),
-                    }
-                    for match in limited_matches
-                ],
+                "matches": [[match.model_dump() for match in limited_matches]],
             }
             rich_print(to_json(output, indent=2))
 
@@ -172,7 +158,7 @@ async def config(
     try:
         settings = get_settings_map()
         if project_path:
-            from codeweaver.settings import update_settings
+            from codeweaver.config.settings import update_settings
 
             settings = update_settings(project_path=project_path)  # type: ignore
 
@@ -245,7 +231,6 @@ def _display_markdown_results(
             f"**Language:** {match.file.ext_kind.language or 'unknown'} | **Score:** {match.relevance_score:.2f} | {match.span!s}"
         )
         console.print(f"```{match.file.ext_kind.language or ''}")
-        console.print(f"{match.content[:300]}..." if len(match.content) > 300 else match.content)
         console.print("```\n")
 
 

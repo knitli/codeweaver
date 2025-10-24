@@ -49,11 +49,21 @@ from __future__ import annotations
 
 import contextlib
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from functools import cached_property
 from pathlib import Path
 from types import ModuleType
-from typing import TYPE_CHECKING, Annotated, Any, Literal, NamedTuple, Unpack, cast, overload
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Literal,
+    LiteralString,
+    NamedTuple,
+    Unpack,
+    cast,
+    overload,
+)
 
 from ast_grep_py import (
     Config,
@@ -80,30 +90,17 @@ from pydantic import (
     computed_field,
 )
 
-from codeweaver._types import BasedModel, BaseEnum, LiteralStringT
-from codeweaver._utils import lazy_importer, uuid7
-from codeweaver.language import SemanticSearchLanguage
-from codeweaver.semantic._types import ThingName
-from codeweaver.services.textify import humanize
+from codeweaver.common import LazyImport, lazy_import, uuid7
+from codeweaver.core import BasedModel, BaseEnum, SemanticSearchLanguage, ThingName, ThingNameT
+from codeweaver.engine import humanize
 
 
 # type-only imports
 if TYPE_CHECKING:
-    from codeweaver.semantic._node_type_parser import CompositeThing, Token
     from codeweaver.semantic.classifications import AgentTask, ImportanceScores, ThingClass
-    from codeweaver.semantic.registry import ThingRegistry
-else:
-    _grammar_module = lazy_importer("codeweaver.semantic.grammar")
-    CompositeThing = _grammar_module.CompositeThing
-    Token = _grammar_module.Token
+    from codeweaver.semantic.node_type_parser import CompositeThing, Token
 
-    _classifications_module = lazy_importer("codeweaver.semantic.classifications")
-    AgentTask = _classifications_module.AgentTask
-    ImportanceScores = _classifications_module.ImportanceScores
-    ThingClass = _classifications_module.ThingClass
-
-    ThingRegistry = lazy_importer("codeweaver.semantic.registry").ThingRegistry
-
+registry_module: LazyImport[ModuleType] = lazy_import("codeweaver.semantic.registry")
 
 # re-export Ast Grep's rules and config types:
 AstGrepSearchTypes = (
@@ -117,11 +114,6 @@ AstGrepSearchTypes = (
     Relation,
     CustomLang,
 )
-
-
-def get_registry_module() -> ModuleType:
-    """Lazy import the node types module to avoid circular imports."""
-    return lazy_importer("codeweaver.semantic.registry")
 
 
 class MetaVar(str, BaseEnum):
@@ -246,7 +238,7 @@ class FileThing[SgRoot: (AstGrepRoot)](BasedModel):
     @classmethod
     def from_file(cls, file_path: Path) -> FileThing[SgRoot]:
         """Create a FileThing from a file."""
-        from codeweaver.language import SemanticSearchLanguage
+        from codeweaver.core.language import SemanticSearchLanguage
 
         content = file_path.read_text()
         language = SemanticSearchLanguage.from_extension(file_path.suffix)
@@ -283,8 +275,6 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     parent_thing_id: Annotated[UUID7 | None, Field(description="""The ID of the parent node""")] = (
         None
     )
-
-    _registry: Annotated[ThingRegistry, Field(exclude=True)] = get_registry_module().get_registry()
 
     def __init__(
         self,
@@ -331,10 +321,8 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     def thing(self) -> CompositeThing | Token:
         """Get the grammar Thing that this node represents."""
         thing_name: ThingName = self.name  # type: ignore
-        registry_module = get_registry_module()
-        if thing := registry_module.get_registry().get_thing_by_name(
-            thing_name, language=self.language
-        ):
+        registry = registry_module()
+        if thing := registry.get_registry().get_thing_by_name(thing_name, language=self.language):
             return cast(CompositeThing | Token, thing)
         raise ValueError(
             f"Thing '{thing_name}' not found in registry for language '{self.language.name}'."
@@ -346,6 +334,8 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         """Check if the node is the root file thing."""
         if not self.thing.is_composite:
             return False
+        from codeweaver.semantic.grammar import CompositeThing
+
         assert isinstance(self.thing, CompositeThing)  # noqa: S101
         return cast(bool, self.thing.is_file)
 
@@ -408,14 +398,20 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     @computed_field
     @cached_property
     def is_explicit_rule_token(self) -> bool:
-        """Check if the node is an token defined with a specific rule (a named leaf)."""
+        """Check if the node is a token defined with a specific rule (a named leaf)."""
         return self._node.is_named_leaf()
 
     @computed_field
     @cached_property
-    def name(self) -> ThingName:
+    def name(self) -> ThingNameT:
         """Get the name (kind - the name in the grammar) of the node."""
-        return ThingName(cast(LiteralStringT, self._node.kind()))
+        return ThingName(cast(LiteralString, self._node.kind()))
+
+    @computed_field
+    @cached_property
+    def primary_category(self) -> str | None:
+        """Get the primary category of the node, if any."""
+        return self.thing.primary_category.name if self.thing.primary_category else None
 
     @computed_field
     @cached_property
@@ -527,6 +523,10 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
 
     # traversal API
     def get_root(self) -> FileThing[AstGrepRoot]:
+        """Get the root of the node. Alias for `get_file`."""
+        return self._root
+
+    def get_file(self) -> FileThing[AstGrepRoot]:
         """Get the root of the node."""
         return self._root
 
@@ -594,6 +594,47 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     def commit_edits(self, _edits: list[str]) -> str:
         """Commit a list of edits to the source code."""
         raise NotImplementedError("Edit functionality is not implemented yet.")
+
+    def serialize_as_child(self) -> str:
+        """Serialize the AstThing as a child for output."""
+        return f"{self.title}: {self.get_file().filename} [{self.range.start.line}:{self.range.start.column}-{self.range.end.line}:{self.range.end.column}]"
+
+    def serialize_for_cli(self) -> dict[str, Any]:
+        """Serialize the AstThing for CLI output."""
+        as_python = self.model_dump(
+            mode="python",
+            round_trip=True,
+            exclude={
+                "_node",
+                "_registry",
+                "has_explicit_rule",
+                "is_explicit_rule_token",
+                "range",
+                "importance",
+                "thing_id",
+                "parent_thing_id",
+                "language",
+                "text",
+            },
+        )
+        for k, v in as_python.items():
+            if isinstance(v, Sequence | Iterator) and not isinstance(v, str):
+                as_python[k] = [
+                    item.serialize_as_child()  # type: ignore
+                    if hasattr(item, "serialize_as_child")  # type: ignore
+                    else item.serialize_for_cli()  # type: ignore
+                    if hasattr(item, "serialize_for_cli")  # type: ignore
+                    else item
+                    for item in v  # type: ignore
+                ]
+        return {
+            k: v.serialize_as_child()
+            if hasattr(v, "serialize_as_child")
+            else v.serialize_for_cli()
+            if hasattr(v, "serialize_for_cli")
+            else v
+            for k, v in as_python.items()
+        }
 
 
 __all__ = (

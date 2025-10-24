@@ -182,6 +182,7 @@ remote-debug-profile/
 .vscode/zsh/.zcompdump-*
 .vscode/zsh/.zsh_history
 
+__pycache__/
 
 # //!SECTION  EXCEPTIONS -- Put all inverted ("!") rules at the end of the file!
 

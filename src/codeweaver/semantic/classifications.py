@@ -27,7 +27,7 @@ from pydantic import (
 from pydantic.dataclasses import dataclass
 from pydantic_core import ArgsKwargs, core_schema
 
-from codeweaver._types import (
+from codeweaver.core import (
     DATACLASS_CONFIG,
     BaseDataclassEnum,
     BasedModel,
@@ -35,7 +35,7 @@ from codeweaver._types import (
     BaseEnumData,
     DataclassSerializationMixin,
 )
-from codeweaver.language import SemanticSearchLanguage
+from codeweaver.core.language import SemanticSearchLanguage
 
 
 if TYPE_CHECKING:
@@ -104,6 +104,9 @@ class ImportanceScores(DataclassSerializationMixin):
         Field(description="Weight for documentation context; explaining code", ge=0.0, le=1.0),
     ]
 
+    def _telemetry_keys(self) -> None:
+        return None
+
     @classmethod
     def default(cls) -> Self:
         """Get default importance scores."""
@@ -145,6 +148,9 @@ class ImportanceScores(DataclassSerializationMixin):
     def from_dict(cls, **data: Unpack[ImportanceScoresDict]) -> Self:
         """Create ImportanceScores from a dictionary format."""
         return cls.validate_python(data=cast(dict[str, Any], data))
+
+    def _telemetry_keys(self) -> None:
+        return None
 
 
 class ImportanceRank(int, BaseEnum):
@@ -254,6 +260,9 @@ class ThingClass(BasedModel):
             ImportanceScores.validate_python(cast(dict[str, Any], v)) if isinstance(v, dict) else v
         )
 
+    def _telemetry_keys(self) -> None:
+        return None
+
 
 class SemanticClass(str, BaseEnum):
     """Language-agnostic semantic categories for AST nodes."""
@@ -322,8 +331,8 @@ class SemanticClass(str, BaseEnum):
     @classmethod
     def from_token_purpose(cls, purpose: TokenPurpose, token_name: str) -> SemanticClass:
         """Map token purpose to an approximate semantic category."""
-        from codeweaver.semantic._constants import get_token_patterns_sync
         from codeweaver.semantic.grammar import TokenPurpose
+        from codeweaver.semantic.token_patterns import get_token_patterns_sync
 
         patterns = get_token_patterns_sync()
         if patterns["annotation"] is None:
@@ -927,6 +936,9 @@ class AgentTask(BaseAgentTask, BaseDataclassEnum):
         "Predefined task for searching code.",
     )
 
+    def _telemetry_keys(self) -> None:
+        return None
+
     @classmethod
     def profiles(cls) -> MappingProxyType[str, ImportanceScoresDict]:
         """Get the context weight profiles for all tasks."""
@@ -992,6 +1004,9 @@ class UsageMetrics(DataclassSerializationMixin):
 
     category_usage_counts: Counter[SemanticClass]
 
+    def _telemetry_keys(self) -> None:
+        return None
+
     @computed_field
     @property
     def total_use(self) -> NonNegativeInt:
@@ -1017,6 +1032,9 @@ class UsageMetrics(DataclassSerializationMixin):
 @dataclass(config=DATACLASS_CONFIG)
 class ScoreValidation(DataclassSerializationMixin):
     """Validation results for importance score accuracy."""
+
+    def _telemetry_keys(self) -> None:
+        return None
 
     @computed_field
     @property

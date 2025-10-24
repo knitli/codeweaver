@@ -132,7 +132,7 @@ from codeweaver._utils import count_tokens
 from codeweaver.provider import BaseProvider
 → from codeweaver.providers.base import BaseProvider
 
-from codeweaver.embedding.providers.voyage import VoyageProvider
+from codeweaver.providers.embedding.providers.voyage import VoyageProvider
 → from codeweaver.providers.embedding.providers.voyage import VoyageProvider
 
 # Domain

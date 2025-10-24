@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from codeweaver.language import SemanticSearchLanguage
+from codeweaver.core.language import SemanticSearchLanguage
 
 
 @dataclass

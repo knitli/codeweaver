@@ -240,7 +240,6 @@ For developers familiar with tree-sitter terminology:
 - **Future-proof**: Accommodates real-world patterns (multi-category, polymorphic references)
 """
 
-# ruff: noqa:B009
 from __future__ import annotations
 
 import logging
@@ -261,15 +260,16 @@ from pydantic import (
 )
 from pydantic.dataclasses import dataclass
 
-from codeweaver._types import (
+from codeweaver.common import LazyImport, lazy_import
+from codeweaver.core import (
     DATACLASS_CONFIG,
     BasedModel,
     DataclassSerializationMixin,
     LiteralStringT,
 )
-from codeweaver._utils import lazy_importer
-from codeweaver.language import SemanticSearchLanguage
-from codeweaver.semantic._types import (
+from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.core.types import FROZEN_BASEDMODEL_CONFIG
+from codeweaver.semantic.types import (
     CategoryName,
     ConnectionClass,
     ConnectionConstraint,
@@ -288,8 +288,12 @@ if TYPE_CHECKING:
     from codeweaver.semantic.classifier import GrammarBasedClassifier, GrammarClassificationResult
     from codeweaver.semantic.registry import ThingRegistry
 else:
-    _classification_module = lazy_importer("codeweaver.semantic.classifications")
-    ThingClass = getattr(_classification_module, "ThingClass")
+    ThingClass: LazyImport[ThingClass] = lazy_import(
+        "codeweaver.semantic.classifications", "ThingClass"
+    )
+    registry: LazyImport[ThingRegistry] = lazy_import(
+        "codeweaver.semantic.registry", "get_registry"
+    )
 
 logger = logging.getLogger()
 
@@ -347,7 +351,7 @@ class Thing(BasedModel):
 
     """
 
-    model_config = BasedModel.model_config | ConfigDict(frozen=True)
+    model_config = FROZEN_BASEDMODEL_CONFIG
 
     name: Annotated[ThingName, Field(description="The name of the Thing.")]
 
@@ -389,6 +393,7 @@ class Thing(BasedModel):
     ) = None
 
     _kind: ClassVar[Literal[ThingKind.TOKEN, ThingKind.COMPOSITE]]
+    """The kind of this Thing (TOKEN or COMPOSITE). (This is **not** the same as ast-grep's `kind` attribute, which is `name`.)"""
 
     def __init__(self, **data: Any) -> None:
         """Initialize a Thing (Token or Composite)."""
@@ -407,15 +412,16 @@ class Thing(BasedModel):
             return category in self.categories if self.has_categories else False
         return category in self.category_names if self.has_categories else False
 
+    def _telemetry_keys(self) -> None:
+        return None
+
     @property
     def categories(self) -> frozenset[Category]:
         """Resolve Categories from registry by name."""
-        registry_module = lazy_importer("codeweaver.semantic.registry")
-        registry = registry_module().get_registry()
         return frozenset(
             cat
             for name in self.category_names
-            if (cat := registry.get_category_by_name(name, language=self.language))
+            if (cat := registry().get_category_by_name(name, language=self.language))  # type: ignore
         )
 
     @property
@@ -502,6 +508,25 @@ class Thing(BasedModel):
         if self.primary_category:
             return f"Thing: {self.name}, Category: {self.primary_category}, Language: {self.language.variable}"
         return f"Thing: {self.name}, Categories: {list(self.categories)}, Language: {self.language.variable}"
+
+    def serialize_for_cli(self) -> dict[str, Any]:
+        """Serialize the Thing for CLI output."""
+        as_python = self.model_dump(
+            mode="python",
+            round_trip=True,
+            exclude={
+                "model_config",
+                "language",
+                "classification",
+                "classification_result",
+                "classification_confidence",
+            },
+        )
+        return {
+            k: v.serialize_for_cli() if hasattr(v, "serialize_for_cli") else v
+            for k, v in as_python.items()
+            if v
+        }
 
 
 class CompositeThing(Thing):
@@ -671,6 +696,9 @@ class Category(BasedModel):
         ),
     ]
 
+    def _telemetry_keys(self) -> None:
+        return None
+
     def __init__(self, **data: Any) -> None:
         """Initialize a Category."""
         if members := data.get("member_thing_names"):
@@ -755,6 +783,17 @@ class Category(BasedModel):
         Used for analyzing multi-category membership.
         """
         return self.member_things & other.member_things
+
+    def serialize_for_cli(self) -> dict[str, Any]:
+        """Serialize the Category for CLI output."""
+        as_python = self.model_dump(
+            mode="python", round_trip=True, exclude={"model_config", "language"}
+        )
+        return {
+            k: v.serialize_for_cli() if hasattr(v, "serialize_for_cli") else v
+            for k, v in as_python.items()
+            if v
+        }
 
 
 class Connection(BasedModel):
@@ -843,6 +882,9 @@ class Connection(BasedModel):
 
         super().__init__(**data)
 
+    def _telemetry_keys(self) -> None:
+        return None
+
     @property
     def target_things(self) -> frozenset[ThingOrCategoryType]:
         """Resolve target Things/Categories from registry by name."""
@@ -908,6 +950,19 @@ class Connection(BasedModel):
         return (
             len(self.target_thing_names) == 1 and self.constraints == ConnectionConstraint.ONLY_ONE
         )
+
+    def serialize_for_cli(self) -> dict[str, Any]:
+        """Serialize the Connection for CLI output."""
+        as_python = self.model_dump(
+            mode="python",
+            round_trip=True,
+            exclude={"model_config", "language", "allows_multiple", "requires_presence"},
+        )
+        return {
+            k: v.serialize_for_cli() if hasattr(v, "serialize_for_cli") else v
+            for k, v in as_python.items()
+            if v
+        }
 
 
 class DirectConnection(Connection):
@@ -1056,6 +1111,9 @@ class Grammar(DataclassSerializationMixin):
         frozenset[PositionalConnections], Field(exclude=True, default=frozenset)
     ]
 
+    def _telemetry_keys(self) -> None:
+        return None
+
     def __iter__(self) -> Iterator[ThingType]:
         """Iterate over all Things (CompositeThings and Tokens) in this Grammar."""
         yield from self.things
@@ -1103,7 +1161,7 @@ class Grammar(DataclassSerializationMixin):
             registry: ThingRegistry = get_registry()
 
         except Exception:
-            from codeweaver.semantic._node_type_parser import NodeTypeParser
+            from codeweaver.semantic.node_type_parser import NodeTypeParser
 
             parser = NodeTypeParser()
             results = parser.parse_languages([language])
@@ -1316,8 +1374,12 @@ class Grammar(DataclassSerializationMixin):
     @property
     def print(self) -> None:
         """Prints a detailed, pretty-formatted, human-readable summary of the Grammar."""
-        rich_console = lazy_importer("rich.console")().Console(markup=True, emoji=True)
-        table = lazy_importer("rich.table")().Table(title=f"Grammar for {self.language.as_title}")
+        from rich.console import Console
+
+        console = Console(markup=True, emoji=True)
+        from rich.table import Table
+
+        table = Table(title=f"Grammar for {self.language.as_title}")
         table.add_column("Aspect", style="cyan", no_wrap=True)
         table.add_column("Count", style="magenta")
         table.add_row("CompositeThings", str(self.composite_count))
@@ -1346,9 +1408,9 @@ class Grammar(DataclassSerializationMixin):
                 f"  - {token.name} ({token.purpose.as_title})"
                 for token in sorted(self.tokens, key=lambda t: t.name)
             )
-        rich_console.print(table)
+        console.print(table)
         if all_data:
-            rich_console.print("\n".join(all_data))
+            console.print("\n".join(all_data))
 
 
 def get_grammar(language: SemanticSearchLanguage) -> Grammar:
@@ -1376,10 +1438,12 @@ def get_all_grammars() -> MappingProxyType[SemanticSearchLanguage, Grammar]:
 
 if __name__ == "__main__":
     grammars = get_all_grammars()
-    rich_console = lazy_importer("rich.console")().Console(markup=True, emoji=True)
+    from rich.console import Console
+
+    console = Console(markup=True, emoji=True)
     for language, grammar in grammars.items():
         print(f"\n=== Grammar for {language.as_title} ===")
-        rich_console.print(grammar.print)
+        console.print(grammar.print)
 
 __all__ = (
     "Category",

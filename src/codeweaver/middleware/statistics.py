@@ -37,7 +37,7 @@ from mcp.types import (
 from pydantic import AnyUrl
 from typing_extensions import TypeIs
 
-from codeweaver._statistics import (
+from codeweaver.common import (
     McpOperationRequests,
     SessionStatistics,
     TimingStatistics,
