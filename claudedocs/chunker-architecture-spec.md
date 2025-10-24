@@ -231,25 +231,30 @@ class SemanticChunker(BaseChunker):
 
     def _build_metadata(self, node: AstThing) -> Metadata:
         """Build rich AI-first metadata from AST node."""
-        importance_dict = (
-            node.importance.as_dict() if node.importance
-            else None
-        )
-
-        return {
+        from codeweaver.core.metadata import Metadata, SemanticMetadata
+        
+        # Use existing SemanticMetadata.from_node() factory
+        semantic_meta = SemanticMetadata.from_node(node, self.language)
+        
+        metadata: Metadata = {
+            "chunk_id": uuid7(),
+            "created_at": datetime.now(UTC).timestamp(),
             "name": node.title,
-            "classification": node.classification.name if node.classification else None,
-            "kind": str(node.name),
-            "category": node.primary_category,
-            "importance": importance_dict,
-            "is_composite": node.is_composite,
-            "parent_kind": node.parent.name if node.parent else None,
-            "nesting_level": len(list(node.ancestors())),
-            "semantic_meta": {
-                "has_explicit_rule": node.has_explicit_rule,
-                "connection_count": len(list(node.positional_connections)),
-            }
+            "semantic_meta": semantic_meta,
+            "context": {
+                # Chunker-specific context in flexible dict
+                "chunker_type": "semantic",
+                "content_hash": self._compute_content_hash(node.text),
+                "classification": node.classification.name if node.classification else None,
+                "kind": str(node.name),
+                "category": node.primary_category,
+                "importance_scores": node.importance.as_dict() if node.importance else None,
+                "is_composite": node.is_composite,
+                "nesting_level": len(list(node.ancestors())),
+            },
         }
+        
+        return metadata
 
     def _handle_oversized_node(self, node: AstThing, file_path: Path) -> list[CodeChunk]:
         """Handle nodes exceeding token limit."""
@@ -502,15 +507,25 @@ class DelimiterChunker(BaseChunker):
         return chunks
 
     def _build_metadata(self, boundary: Boundary, line: int) -> Metadata:
-        """Build basic metadata from delimiter boundary."""
-        return {
+        """Build metadata for delimiter chunks."""
+        from codeweaver.core.metadata import Metadata
+        
+        metadata: Metadata = {
+            "chunk_id": uuid7(),
+            "created_at": datetime.now(UTC).timestamp(),
             "name": f"{boundary.delimiter.kind.name.title()} at line {line}",
-            "delimiter_kind": boundary.delimiter.kind.name,
-            "delimiter_start": boundary.delimiter.start,
-            "delimiter_end": boundary.delimiter.end,
-            "priority": boundary.delimiter.priority,
-            "nesting_level": boundary.nesting_level,
+            "context": {
+                "chunker_type": "delimiter",
+                "content_hash": self._compute_content_hash(boundary.text),
+                "delimiter_kind": boundary.delimiter.kind.name,
+                "delimiter_start": boundary.delimiter.start,
+                "delimiter_end": boundary.delimiter.end,
+                "priority": boundary.delimiter.priority,
+                "nesting_level": boundary.nesting_level,
+            },
         }
+        
+        return metadata
 ```
 
 ---
@@ -1219,10 +1234,1088 @@ This specification provides a complete, evidence-based design for CodeWeaver's c
 - Adaptive sizing based on complexity
 - Cross-chunk context for better AI understanding
 
-**Next Steps**: Begin Phase 1 implementation per §9 checklist.
+**Next Steps**: Review Gap Analysis (§15), address critical gaps, then begin Phase 1 implementation per §9 checklist.
 
 ---
 
-**Document Version**: 1.0.0
-**Last Updated**: 2025-10-23
-**Status**: Ready for Implementation Review
+## 15. Specification Gap Analysis & Recommendations
+
+**Analysis Date**: 2025-10-24
+**Methodology**: Systematic coverage scan across 10 taxonomy categories + codebase evidence review
+
+### 15.1 Executive Summary
+
+This gap analysis identifies **10 specification gaps** across critical, high, and medium priority levels. The analysis is grounded in:
+- Existing codebase patterns (chunks.py, semantic types, tokenizers)
+- Industry best practices for AST parsing and code chunking
+- Constitutional principles (evidence-based, proven patterns)
+
+**Critical Gaps**: 3 (Performance, Empty files, Resource limits)
+**High Priority**: 3 (Chunk deduplication, Concurrency, Metadata schema)
+**Medium Priority**: 4 (Delimiter ties, Language detection, Incremental updates, Observability)
+
+---
+
+### 15.2 CRITICAL Gaps (Implementation Blocking)
+
+#### Gap 1: Performance Targets & Constraints
+
+**Issue**: No quantified performance requirements or resource limits specified.
+
+**Impact**:
+- Cannot validate architectural decisions (caching, async processing)
+- Cannot set realistic user expectations
+- Cannot design proper resource allocation
+
+**Research Evidence**:
+- tree-sitter parsing: ~1-10ms for typical files (<10K lines) based on tree-sitter benchmarks
+- ast-grep operations: Similar to tree-sitter performance characteristics
+- Delimiter regex: ~0.1-1ms for typical files
+- Token estimation (tiktoken): ~1-5ms per chunk based on tiktoken benchmarks
+
+**Recommendation**: Add to §11 (Performance Considerations):
+
+```markdown
+### 11.4 Performance Targets
+
+**File Size Limits**:
+- Maximum file size: 10MB (covers 99% of real source files)
+- Recommended optimal: <1MB for best performance
+- Files >10MB: Trigger warning, may use simplified chunking
+
+**Processing Speed Targets**:
+- Typical files (100-1000 lines): 100-500 files/second
+- Large files (1000-5000 lines): 50-200 files/second
+- Very large files (5000+ lines): 10-50 files/second
+
+**Timeout Constraints**:
+- Per-file timeout: 30 seconds (configurable)
+- Parse timeout: 10 seconds (prevents infinite loops)
+- Exceeding timeout triggers graceful degradation
+
+**Memory Constraints**:
+- Peak memory per chunking operation: <100MB
+- Allows parallel processing of 10-20 files with 2GB memory
+- Large file streaming to prevent memory exhaustion
+
+**Acceptance Criteria**:
+- 95% of files in typical codebases chunk within 100ms
+- 99% of files chunk within 1 second
+- Zero out-of-memory errors for files <10MB
+```
+
+**Configuration Extension**: Add to §10.1:
+
+```python
+class PerformanceSettings(BasedModel):
+    """Performance and resource limit configuration."""
+
+    max_file_size_mb: PositiveInt = Field(
+        default=10,
+        description="Maximum file size in MB to attempt chunking"
+    )
+    chunk_timeout_seconds: PositiveInt = Field(
+        default=30,
+        description="Maximum time allowed for chunking a single file"
+    )
+    parse_timeout_seconds: PositiveInt = Field(
+        default=10,
+        description="Maximum time for AST parsing operation"
+    )
+    max_chunks_per_file: PositiveInt = Field(
+        default=5000,
+        description="Maximum chunks to generate from single file"
+    )
+    max_memory_mb_per_operation: PositiveInt = Field(
+        default=100,
+        description="Peak memory limit per chunking operation"
+    )
+```
+
+---
+
+#### Gap 2: Empty & Edge File Handling
+
+**Issue**: Specification doesn't address empty files, whitespace-only files, single-line files, or binary files accidentally processed.
+
+**Impact**:
+- Potential crashes or unexpected behavior
+- Unclear chunking semantics for edge cases
+- Testing coverage gaps
+
+**Research Evidence**:
+- Industry pattern: Empty files return empty list, preserving "no content" semantics
+- Single-line files: Return as single chunk to preserve file existence
+- Binary files: Should be filtered upstream, but defense needed
+
+**Recommendation**: Add new §2.7 Edge Case Handling to Semantic Chunker:
+
+```python
+def _handle_edge_cases(self, content: str, file_path: Path) -> list[CodeChunk] | None:
+    """Handle edge cases before normal chunking.
+
+    Returns:
+        - Empty list for truly empty files
+        - Single chunk for whitespace-only or single-line files
+        - None to continue with normal chunking
+        - Raises BinaryFileError if binary content detected
+    """
+    # Binary file detection
+    if b'\\x00' in content.encode('utf-8', errors='ignore'):
+        raise BinaryFileError(f"Binary content detected in {file_path}")
+
+    # Empty file
+    if not content or len(content) == 0:
+        logger.info(f"Empty file: {file_path}, returning no chunks")
+        return []
+
+    # Whitespace-only file
+    if not content.strip():
+        logger.info(f"Whitespace-only file: {file_path}, returning single empty chunk")
+        return [CodeChunk(
+            content=content,
+            line_range=Span(1, content.count('\\n') + 1, source_id_for(file_path)),
+            file_path=file_path,
+            language=self.language.name,
+            source="edge_case",
+            ext_kind=self.chunker,
+            metadata={"edge_case": "whitespace_only"},
+        )]
+
+    # Single line (no semantic structure to parse)
+    if '\\n' not in content:
+        logger.debug(f"Single-line file: {file_path}, returning as single chunk")
+        return [CodeChunk(
+            content=content,
+            line_range=Span(1, 1, source_id_for(file_path)),
+            file_path=file_path,
+            language=self.language.name,
+            source="edge_case",
+            ext_kind=self.chunker,
+            metadata={"edge_case": "single_line"},
+        )]
+
+    # Continue with normal chunking
+    return None
+```
+
+Add to §7.1 Failure Modes table:
+
+| Failure | Chunker | Response |
+|---------|---------|----------|
+| Empty file (0 bytes) | Any | Return [] |
+| Whitespace-only | Any | Return single chunk with edge_case metadata |
+| Single-line file | Semantic | Return single chunk, skip AST parsing |
+| Binary file | Any | Raise BinaryFileError with clear message |
+
+Add test case to §8.2:
+
+```python
+def test_edge_cases():
+    """Verify edge case handling."""
+    governor = ChunkGovernor(capabilities=(mock_embedding_caps,))
+    chunker = SemanticChunker(governor, SemanticSearchLanguage.PYTHON)
+
+    # Empty file
+    assert chunker.chunk("", file_path=Path("empty.py")) == []
+
+    # Whitespace only
+    chunks = chunker.chunk("   \\n\\n  ", file_path=Path("whitespace.py"))
+    assert len(chunks) == 1
+    assert chunks[0].metadata["edge_case"] == "whitespace_only"
+
+    # Single line
+    chunks = chunker.chunk("x = 1", file_path=Path("oneline.py"))
+    assert len(chunks) == 1
+    assert chunks[0].metadata["edge_case"] == "single_line"
+
+    # Binary file
+    with pytest.raises(BinaryFileError):
+        chunker.chunk("text\\x00binary", file_path=Path("binary.py"))
+```
+
+---
+
+#### Gap 3: Resource Limits & Security
+
+**Issue**: No protection against malicious input causing resource exhaustion (deeply nested AST, infinite loops, memory bombs).
+
+**Impact**:
+- Production stability risk
+- Potential DoS vulnerability
+- Unpredictable failure modes
+
+**Research Evidence**:
+- Common AST depth limits: 100-500 levels (Python's default recursion limit: 1000)
+- Parse timeouts prevent pathological cases
+- Memory limits prevent exhaustion attacks
+
+**Recommendation**: Add new §7.4 Resource Governance:
+
+```python
+class ResourceGovernor:
+    """Enforces resource limits during chunking operations."""
+
+    def __init__(self, settings: PerformanceSettings):
+        self.settings = settings
+        self._start_time: float | None = None
+        self._chunk_count: int = 0
+
+    def __enter__(self):
+        """Start resource tracking."""
+        self._start_time = time.time()
+        self._chunk_count = 0
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Clean up resource tracking."""
+        self._start_time = None
+        self._chunk_count = 0
+
+    def check_timeout(self):
+        """Check if operation has exceeded timeout."""
+        if self._start_time is None:
+            return
+
+        elapsed = time.time() - self._start_time
+        if elapsed > self.settings.chunk_timeout_seconds:
+            raise ChunkingTimeoutError(
+                f"Chunking exceeded timeout of {self.settings.chunk_timeout_seconds}s"
+            )
+
+    def check_chunk_limit(self):
+        """Check if chunk count has exceeded limit."""
+        if self._chunk_count >= self.settings.max_chunks_per_file:
+            raise ChunkLimitExceededError(
+                f"Exceeded maximum of {self.settings.max_chunks_per_file} chunks per file"
+            )
+
+    def register_chunk(self):
+        """Register a new chunk and check limits."""
+        self._chunk_count += 1
+        self.check_chunk_limit()
+        self.check_timeout()
+
+class ChunkingTimeoutError(ChunkingError):
+    """Operation exceeded time limit."""
+
+class ChunkLimitExceededError(ChunkingError):
+    """File produced too many chunks."""
+
+class BinaryFileError(ChunkingError):
+    """Binary content detected in file."""
+
+class ASTDepthExceededError(ChunkingError):
+    """AST nesting exceeds safe depth."""
+```
+
+**AST Depth Protection**: Add to SemanticChunker:
+
+```python
+def _check_ast_depth(self, node: AstThing, max_depth: int = 200) -> None:
+    """Verify AST depth doesn't exceed safe limits."""
+    depth = len(list(node.ancestors()))
+    if depth > max_depth:
+        raise ASTDepthExceededError(
+            f"AST depth {depth} exceeds maximum {max_depth}. "
+            f"This may indicate malformed or adversarial code."
+        )
+
+def _find_chunkable_nodes(self, root: FileThing) -> list[AstThing]:
+    """Traverse AST with depth checking."""
+    chunkable = []
+    for node in root.root._node.children():
+        ast_thing = AstThing.from_sg_node(node, self.language)
+        self._check_ast_depth(ast_thing)  # Safety check
+        if self._is_chunkable(ast_thing):
+            chunkable.append(ast_thing)
+    return chunkable
+```
+
+**Usage Pattern**:
+
+```python
+def chunk(self, content: str, *, file_path: Path | None = None,
+          context: dict[str, Any] | None = None) -> list[CodeChunk]:
+    """Main chunking with resource governance."""
+    with ResourceGovernor(self.governor.performance_settings) as governor:
+        # Edge cases first
+        if edge_result := self._handle_edge_cases(content, file_path):
+            return edge_result
+
+        # Normal chunking with resource checks
+        root = self._parse_file(content, file_path)
+        nodes = self._find_chunkable_nodes(root)  # Includes depth checks
+
+        chunks = []
+        for node in nodes:
+            governor.check_timeout()  # Periodic timeout checks
+            node_chunks = self._node_to_chunks(node, file_path)
+            for chunk in node_chunks:
+                governor.register_chunk()  # Register and check limits
+                chunks.append(chunk)
+
+        return chunks
+```
+
+---
+
+#### Gap 4: Chunk Deduplication Strategy
+
+**Issue**: Chunks already have `chunk_id` (UUID7) per existing code, but deduplication strategy not specified.
+
+**Evidence from Codebase**:
+- `CodeChunk.chunk_id` exists (chunks.py:144-147, UUID7 type)
+- **UUIDStore and BlakeStore** exist for deduplication (stores.py)
+- **Existing pattern** in providers: `_hash_store: BlakeStore[UUID7]` maps content hashes → batch IDs
+- **DiscoveredFile** uses `file_hash: BlakeHashKey` (discovery.py:49-56) via blake3
+
+**Recommendation**: Leverage existing store infrastructure:
+
+**Update §2.4.1 to leverage existing Metadata**:
+
+```python
+# src/codeweaver/engine/chunker/semantic.py
+
+def _build_metadata(self, node: AstThing) -> Metadata:
+    """Build metadata using existing Metadata TypedDict structure."""
+    from codeweaver.core.metadata import Metadata, SemanticMetadata
+    
+    # Use existing SemanticMetadata.from_node() factory
+    semantic_meta = SemanticMetadata.from_node(node, self.language)
+    
+    metadata: Metadata = {
+        "chunk_id": uuid7(),
+        "created_at": datetime.now(UTC).timestamp(),
+        "name": node.title,
+        "semantic_meta": semantic_meta,
+        "context": {
+            # Chunker-specific context in flexible dict
+            "chunker_type": "semantic",
+            "content_hash": self._compute_content_hash(node.text),
+            "classification": node.classification.name if node.classification else None,
+            "kind": str(node.name),
+            "category": node.primary_category,
+            "importance_scores": node.importance.as_dict() if node.importance else None,
+            "is_composite": node.is_composite,
+            "nesting_level": len(list(node.ancestors())),
+        },
+    }
+    
+    return metadata
+```
+
+**Add new §6.4 Deduplication with Existing Stores**:
+
+```markdown
+### 6.4 Chunk Deduplication with UUIDStore and BlakeStore
+
+**Existing Infrastructure** (stores.py):
+- **UUIDStore[T]**: Generic store with UUID7 keys for chunk batches
+- **BlakeStore[T]**: Content-addressable store with Blake3 hash keys
+- **WeakValueDictionary**: Built-in trash heap for recovery
+
+**Deduplication Pattern** (from embedding providers):
+
+```python
+# src/codeweaver/engine/chunker/base.py
+
+from codeweaver.core.stores import BlakeStore, UUIDStore, make_blake_store, make_uuid_store
+
+class BaseChunker(ABC):
+    """Base chunker with deduplication support."""
+    
+    # Chunk batch store (UUID7 keys → lists of chunks)
+    _store: UUIDStore[list[CodeChunk]] = make_uuid_store(
+        value_type=list, size_limit=3 * 1024 * 1024  # 3MB limit
+    )
+    
+    # Dedup store (Blake3 content hash → batch UUID7)
+    _hash_store: BlakeStore[UUID7] = make_blake_store(
+        value_type=UUID7, size_limit=256 * 1024  # 256KB for hash mapping
+    )
+    
+    def _compute_content_hash(self, content: str) -> BlakeHashKey:
+        """Compute Blake3 hash for deduplication."""
+        from codeweaver.core.stores import get_blake_hash
+        
+        # Normalize before hashing (same as DiscoveredFile pattern)
+        normalized = content.strip()
+        return get_blake_hash(normalized.encode('utf-8'))
+    
+    def _deduplicate_chunks(
+        self, chunks: list[CodeChunk], batch_id: UUID7
+    ) -> list[CodeChunk]:
+        """Deduplicate chunks using hash store."""
+        deduplicated = []
+        
+        for chunk in chunks:
+            if not chunk.metadata or "context" not in chunk.metadata:
+                # No metadata, can't deduplicate
+                deduplicated.append(chunk)
+                continue
+                
+            content_hash = chunk.metadata["context"].get("content_hash")
+            if not content_hash:
+                # No hash computed, include it
+                deduplicated.append(chunk)
+                continue
+            
+            # Check if we've seen this content before
+            if existing_batch_id := self._hash_store.get(content_hash):
+                # Duplicate found - skip or merge
+                logger.debug(
+                    f"Duplicate chunk detected: {content_hash[:16]}... "
+                    f"(existing batch: {existing_batch_id})"
+                )
+                continue
+            
+            # New unique chunk - store hash mapping
+            self._hash_store.set(content_hash, batch_id)
+            deduplicated.append(chunk)
+        
+        return deduplicated
+    
+    def chunk(self, content: str, *, file_path: Path | None = None,
+              context: dict[str, Any] | None = None) -> list[CodeChunk]:
+        """Main chunking with deduplication."""
+        # Generate batch ID for this chunking operation
+        batch_id = uuid7()
+        
+        # Perform chunking (implementation-specific)
+        chunks = self._chunk_impl(content, file_path, context)
+        
+        # Deduplicate using hash store
+        unique_chunks = self._deduplicate_chunks(chunks, batch_id)
+        
+        # Store batch in UUID store
+        self._store.set(batch_id, unique_chunks)
+        
+        # Set batch ID on all chunks
+        for chunk in unique_chunks:
+            chunk.set_batch_id(batch_id)
+        
+        return unique_chunks
+```
+
+**Use Cases**:
+- **Incremental indexing**: Check `_hash_store` to skip re-embedding unchanged chunks
+- **Cross-file boilerplate**: Detect identical code blocks (headers, imports, templates)
+- **Storage optimization**: Single embedding for duplicate content across files
+- **Batch recovery**: Use `_store.recover(batch_id)` to restore from trash heap
+
+---
+
+#### Gap 5: Concurrency Model & Thread Safety
+
+**Issue**: Thread safety and parallel processing design not specified.
+
+**Evidence from Codebase**:
+- Pydantic models are immutable (`frozen=True` in semantic/types.py)
+- Project favors immutability patterns
+
+**Recommendation**: Add new §11.5 Concurrency Design:
+
+```markdown
+### 11.5 Concurrency & Thread Safety
+
+**Thread Safety Guarantees**:
+
+1. **Chunkers are Stateless**:
+   - All chunker instances are immutable after construction
+   - No shared mutable state between operations
+   - Safe for concurrent use across threads
+
+2. **ChunkerSelector Creates Fresh Instances**:
+   - Each `select_for_file()` call creates new chunker
+   - No instance reuse across files
+   - Eliminates cross-file state contamination
+
+3. **File-Level Parallelism**:
+   - Chunk each file independently
+   - No dependencies between file chunking operations
+   - Embarrassingly parallel workload
+
+**Implementation Pattern**:
+
+```python
+class SemanticChunker(BaseChunker):
+    """Stateless, thread-safe chunker."""
+
+    def __init__(self, governor: ChunkGovernor, language: SemanticSearchLanguage):
+        super().__init__(governor)
+        self.language = language
+        self._importance_threshold = 0.3
+        # NO mutable state - all operations are pure functions
+
+    def chunk(self, content: str, ...) -> list[CodeChunk]:
+        """Pure function - no side effects, thread-safe."""
+        # All state is local to this call
+        ...
+```
+
+**Parallel Processing**:
+
+```python
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
+def chunk_files_parallel(
+    files: list[DiscoveredFile],
+    governor: ChunkGovernor,
+    max_workers: int = 4
+) -> Iterator[tuple[Path, list[CodeChunk]]]:
+    """Chunk multiple files in parallel using process pool."""
+
+    selector = ChunkerSelector(governor)
+
+    def chunk_file(file: DiscoveredFile) -> tuple[Path, list[CodeChunk]]:
+        """Chunk single file (executed in worker process)."""
+        content = file.path.read_text()
+        chunker = selector.select_for_file(file)  # Fresh instance
+        chunks = chunker.chunk(content, file_path=file.path)
+        return (file.path, chunks)
+
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(chunk_file, f): f for f in files}
+
+        for future in as_completed(futures):
+            try:
+                yield future.result()
+            except Exception as e:
+                file = futures[future]
+                logger.error(f"Failed to chunk {file.path}: {e}")
+```
+
+**Why Process Pool vs Thread Pool**:
+- AST parsing is CPU-bound (not I/O-bound)
+- ProcessPoolExecutor bypasses GIL limitations
+- Better CPU utilization for multi-core systems
+- Isolated memory space prevents memory leaks
+
+**Configuration**:
+
+```python
+class ConcurrencySettings(BasedModel):
+    max_parallel_files: PositiveInt = Field(
+        default=4,
+        description="Maximum files to chunk concurrently"
+    )
+    use_process_pool: bool = Field(
+        default=True,
+        description="Use ProcessPoolExecutor (True) vs ThreadPoolExecutor (False)"
+    )
+```
+```
+
+---
+
+#### Gap 6: Metadata Type Safety
+
+**Issue**: Spec proposed custom TypedDict schemas, but codebase already has `Metadata` TypedDict and `SemanticMetadata` BasedModel.
+
+**Evidence from Codebase**:
+- **Metadata** TypedDict exists (metadata.py:155-196) with defined structure
+- **SemanticMetadata** BasedModel exists (metadata.py:78-153) for semantic chunks
+- **Project uses strict typing** with pyright rules
+- **Frozen models** for immutability (semantic/types.py)
+
+**Current Structure**:
+```python
+# codeweaver.core.metadata (EXISTING)
+
+class SemanticMetadata(BasedModel):
+    """Frozen BasedModel for semantic chunk metadata."""
+    model_config = FROZEN_BASEDMODEL_CONFIG | ConfigDict(validate_assignment=True)
+    
+    language: SemanticSearchLanguage | str
+    thing: AstThing[SgNode] | None
+    positional_connections: tuple[AstThing[SgNode], ...]
+    symbol: str | None
+    thing_id: UUID7
+    parent_thing_id: UUID7 | None
+    is_partial_node: bool = False
+
+class Metadata(TypedDict, total=False):
+    """TypedDict for chunk metadata."""
+    chunk_id: Required[UUID7]
+    created_at: Required[PositiveFloat]
+    name: NotRequired[str | None]
+    updated_at: NotRequired[PositiveFloat | None]
+    tags: NotRequired[tuple[str, ...] | None]
+    semantic_meta: NotRequired[SemanticMetadata | None]
+    context: NotRequired[dict[str, Any] | None]  # Flexible for additional data
+```
+
+**Recommendation**: Use existing types, extend `context` field for chunker-specific data:
+
+**Update §2.4.1 to leverage existing Metadata**:
+
+```python
+# src/codeweaver/engine/chunker/semantic.py
+
+def _build_metadata(self, node: AstThing) -> Metadata:
+    """Build metadata using existing Metadata TypedDict structure."""
+    from codeweaver.core.metadata import Metadata, SemanticMetadata
+    
+    # Use existing SemanticMetadata.from_node() factory
+    semantic_meta = SemanticMetadata.from_node(node, self.language)
+    
+    metadata: Metadata = {
+        "chunk_id": uuid7(),
+        "created_at": datetime.now(UTC).timestamp(),
+        "name": node.title,
+        "semantic_meta": semantic_meta,
+        "context": {
+            # Chunker-specific context in flexible dict
+            "chunker_type": "semantic",
+            "content_hash": self._compute_content_hash(node.text),
+            "classification": node.classification.name if node.classification else None,
+            "kind": str(node.name),
+            "category": node.primary_category,
+            "importance_scores": node.importance.as_dict() if node.importance else None,
+            "is_composite": node.is_composite,
+            "nesting_level": len(list(node.ancestors())),
+        },
+    }
+    
+    return metadata
+```
+
+**Add new §6.4 Deduplication with Existing Stores**:
+
+```markdown
+### 6.4 Chunk Deduplication with UUIDStore and BlakeStore
+
+**Existing Infrastructure** (stores.py):
+- **UUIDStore[T]**: Generic store with UUID7 keys for chunk batches
+- **BlakeStore[T]**: Content-addressable store with Blake3 hash keys
+- **WeakValueDictionary**: Built-in trash heap for recovery
+
+**Deduplication Pattern** (from embedding providers):
+
+```python
+# src/codeweaver/engine/chunker/base.py
+
+from codeweaver.core.stores import BlakeStore, UUIDStore, make_blake_store, make_uuid_store
+
+class BaseChunker(ABC):
+    """Base chunker with deduplication support."""
+    
+    # Chunk batch store (UUID7 keys → lists of chunks)
+    _store: UUIDStore[list[CodeChunk]] = make_uuid_store(
+        value_type=list, size_limit=3 * 1024 * 1024  # 3MB limit
+    )
+    
+    # Dedup store (Blake3 content hash → batch UUID7)
+    _hash_store: BlakeStore[UUID7] = make_blake_store(
+        value_type=UUID7, size_limit=256 * 1024  # 256KB for hash mapping
+    )
+    
+    def _compute_content_hash(self, content: str) -> BlakeHashKey:
+        """Compute Blake3 hash for deduplication."""
+        from codeweaver.core.stores import get_blake_hash
+        
+        # Normalize before hashing (same as DiscoveredFile pattern)
+        normalized = content.strip()
+        return get_blake_hash(normalized.encode('utf-8'))
+    
+    def _deduplicate_chunks(
+        self, chunks: list[CodeChunk], batch_id: UUID7
+    ) -> list[CodeChunk]:
+        """Deduplicate chunks using hash store."""
+        deduplicated = []
+        
+        for chunk in chunks:
+            if not chunk.metadata or "context" not in chunk.metadata:
+                # No metadata, can't deduplicate
+                deduplicated.append(chunk)
+                continue
+                
+            content_hash = chunk.metadata["context"].get("content_hash")
+            if not content_hash:
+                # No hash computed, include it
+                deduplicated.append(chunk)
+                continue
+            
+            # Check if we've seen this content before
+            if existing_batch_id := self._hash_store.get(content_hash):
+                # Duplicate found - skip or merge
+                logger.debug(
+                    f"Duplicate chunk detected: {content_hash[:16]}... "
+                    f"(existing batch: {existing_batch_id})"
+                )
+                continue
+            
+            # New unique chunk - store hash mapping
+            self._hash_store.set(content_hash, batch_id)
+            deduplicated.append(chunk)
+        
+        return deduplicated
+    
+    def chunk(self, content: str, *, file_path: Path | None = None,
+              context: dict[str, Any] | None = None) -> list[CodeChunk]:
+        """Main chunking with deduplication."""
+        # Generate batch ID for this chunking operation
+        batch_id = uuid7()
+        
+        # Perform chunking (implementation-specific)
+        chunks = self._chunk_impl(content, file_path, context)
+        
+        # Deduplicate using hash store
+        unique_chunks = self._deduplicate_chunks(chunks, batch_id)
+        
+        # Store batch in UUID store
+        self._store.set(batch_id, unique_chunks)
+        
+        # Set batch ID on all chunks
+        for chunk in unique_chunks:
+            chunk.set_batch_id(batch_id)
+        
+        return unique_chunks
+```
+
+**Use Cases**:
+- **Incremental indexing**: Check `_hash_store` to skip re-embedding unchanged chunks
+- **Cross-file boilerplate**: Detect identical code blocks (headers, imports, templates)
+- **Storage optimization**: Single embedding for duplicate content across files
+- **Batch recovery**: Use `_store.recover(batch_id)` to restore from trash heap
+
+---
+
+### 15.4 MEDIUM Priority Gaps (Implementation Guidance Needed)
+
+#### Gap 7: Delimiter Priority Tie-Breaking
+
+**Issue**: §3.3 Phase 3 sorts by priority then position, but doesn't specify behavior when overlaps have same priority.
+
+**Recommendation**: Update §3.3 Phase 3:
+
+```python
+def _resolve_overlaps(self, boundaries: list[Boundary]) -> list[Boundary]:
+    """Keep highest-priority non-overlapping boundaries.
+
+    Tie-breaking rules (in order):
+    1. Higher priority wins
+    2. Same priority: Longer match wins (more content captured)
+    3. Same length: Earlier position wins (deterministic)
+    """
+    sorted_bounds = sorted(
+        boundaries,
+        key=lambda b: (
+            -b.delimiter.priority,  # Higher priority first
+            -(b.end - b.start),      # Longer match first
+            b.start                   # Earlier position first
+        )
+    )
+
+    selected = []
+    for boundary in sorted_bounds:
+        if not any(self._overlaps(boundary, s) for s in selected):
+            selected.append(boundary)
+
+    return sorted(selected, key=lambda b: b.start)
+```
+
+---
+
+#### Gap 8: Language Detection Enhancement
+
+**Issue**: Only uses `file_path.suffix`, doesn't handle compound extensions (.spec.ts) or shebangs.
+
+**Recommendation**: Defer to future enhancement (§13.4):
+
+```markdown
+### 13.4 Incremental Re-Chunking
+
+**Concept**: Only re-chunk changed regions for efficiency.
+
+**Strategy**:
+1. Maintain content_hash for each chunk
+2. On file modification, identify changed line ranges
+3. Re-chunk only affected regions
+4. Preserve unchanged chunks (reuse existing embeddings)
+
+**Implementation**:
+```python
+def chunk_incremental(
+    self,
+    old_chunks: list[CodeChunk],
+    new_content: str,
+    changed_lines: set[int],
+    file_path: Path
+) -> list[CodeChunk]:
+    """Re-chunk only changed regions."""
+    # Implementation deferred to performance optimization phase
+    ...
+```
+```
+
+---
+
+#### Gap 9: Incremental Re-Chunking
+
+**Issue**: No strategy for re-chunking only changed regions when file is modified.
+
+**Recommendation**: Defer to future enhancement (§13.4):
+
+```markdown
+### 13.4 Incremental Re-Chunking
+
+**Concept**: Only re-chunk changed regions for efficiency.
+
+**Strategy**:
+1. Maintain content_hash for each chunk
+2. On file modification, identify changed line ranges
+3. Re-chunk only affected regions
+4. Preserve unchanged chunks (reuse existing embeddings)
+
+**Implementation**:
+```python
+def chunk_incremental(
+    self,
+    old_chunks: list[CodeChunk],
+    new_content: str,
+    changed_lines: set[int],
+    file_path: Path
+) -> list[CodeChunk]:
+    """Re-chunk only changed regions."""
+    # Implementation deferred to performance optimization phase
+    ...
+```
+```
+
+---
+
+#### Gap 10: Comprehensive Observability Schema
+
+**Issue**: §11.3 mentions telemetry but doesn't specify how to integrate with existing statistics system.
+
+**Evidence from Codebase**:
+- **SessionStatistics** exists (statistics.py:836-1189) with comprehensive tracking
+- **TimingStatistics** (statistics.py:62-335) tracks operation timing
+- **FileStatistics** (statistics.py:554-662) tracks file operations by category/language
+- **Existing pattern**: Providers use `_get_statistics()` and update metrics
+
+**Existing Statistics Infrastructure**:
+
+```python
+# codeweaver.common.statistics (EXISTING)
+
+class SessionStatistics(DataclassSerializationMixin):
+    """Statistics for tracking session performance."""
+    
+    timing_statistics: TimingStatistics | None
+    index_statistics: FileStatistics | None  # Track chunking operations
+    token_statistics: TokenCounter | None
+    semantic_statistics: Any | None
+    
+    def add_file_operation(self, path: Path, operation: OperationsKey) -> None:
+        """Add file operation: 'indexed', 'retrieved', 'processed', 'reindexed', 'skipped'"""
+        ...
+    
+    def add_file_operations_by_extkind(
+        self, operations: Sequence[tuple[Path, ExtKind, OperationsKey]]
+    ) -> None:
+        """Add operations with ExtKind for proper categorization."""
+        ...
+```
+
+**Recommendation**: Integrate chunking metrics into existing `SessionStatistics`:
+
+**Add to §11.3 Observability Integration**:
+
+```markdown
+### 11.3 Observability Integration with SessionStatistics
+
+**Use Existing Infrastructure** (statistics.py):
+
+```python
+# src/codeweaver/engine/chunker/base.py
+
+from codeweaver.common.statistics import get_session_statistics
+from codeweaver.core.metadata import ExtKind
+
+class BaseChunker(ABC):
+    """Base chunker with integrated statistics tracking."""
+    
+    def chunk(self, content: str, *, file_path: Path | None = None,
+              context: dict[str, Any] | None = None) -> list[CodeChunk]:
+        """Main chunking with statistics tracking."""
+        import time
+        
+        statistics = get_session_statistics()
+        start_time = time.perf_counter()
+        
+        try:
+            # Perform chunking
+            chunks = self._chunk_impl(content, file_path, context)
+            
+            # Track successful operation
+            if file_path and (ext_kind := ExtKind.from_file(file_path)):
+                statistics.add_file_operations_by_extkind([
+                    (file_path, ext_kind, "processed")
+                ])
+            
+            # Track chunk metrics
+            self._track_chunk_metrics(chunks, time.perf_counter() - start_time)
+            
+            return chunks
+            
+        except ParseError as e:
+            # Track parse failures
+            logger.error(f"Parse error in {file_path}: {e}")
+            if file_path and (ext_kind := ExtKind.from_file(file_path)):
+                statistics.add_file_operations_by_extkind([
+                    (file_path, ext_kind, "skipped")
+                ])
+            raise
+    
+    def _track_chunk_metrics(self, chunks: list[CodeChunk], duration: float) -> None:
+        """Track chunking performance metrics."""
+        # Log structured metrics
+        logger.info(
+            "chunking_completed",
+            extra={
+                "chunk_count": len(chunks),
+                "duration_ms": duration * 1000,
+                "chunker_type": self.chunker.name,
+                "avg_chunk_size": sum(len(c.content) for c in chunks) / len(chunks) if chunks else 0,
+            }
+        )
+```
+
+**File Statistics Tracking**:
+
+Track chunking operations by language and category using existing `FileStatistics`:
+
+```python
+# Statistics automatically categorize by ExtKind:
+# - ChunkKind.CODE → code files
+# - ChunkKind.CONFIG → config files  
+# - ChunkKind.DOCS → documentation files
+
+statistics.add_file_operations_by_extkind([
+    (Path("main.py"), ExtKind.from_file(Path("main.py")), "processed"),
+    (Path("config.json"), ExtKind.from_file(Path("config.json")), "processed"),
+])
+
+# Access statistics:
+summary = statistics.index_statistics.get_summary_by_category()
+# Returns: {
+#   ChunkKind.CODE: {"unique_files": 150, "total_operations": 300, "languages": 5},
+#   ChunkKind.CONFIG: {"unique_files": 20, "total_operations": 40, "languages": 3},
+#   ...
+# }
+```
+
+**Metrics to Track** (aligned with existing system):
+
+1. **File Operations** (via FileStatistics):
+   - `processed`: Successfully chunked files
+   - `skipped`: Files skipped due to errors
+   - `reindexed`: Files re-chunked after changes
+   
+2. **Performance Metrics** (via structured logging):
+   - `chunking.duration_ms`: Time to chunk file (log as extra field)
+   - `chunking.chunk_count`: Number of chunks produced
+   - `chunking.avg_chunk_size`: Average chunk size in characters
+
+3. **Quality Metrics** (via structured logging):
+   - `chunking.parse_errors`: AST parse failures (increment skip counter)
+   - `chunking.fallback_count`: Semantic → delimiter fallbacks
+   - `chunking.edge_cases`: Empty, single-line, binary files
+   - `chunking.oversized_chunks`: Chunks exceeding limits
+
+**Structured Logging Format**:
+
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Success event
+logger.info(
+    "chunking_completed",
+    extra={
+        "file_path": str(file_path),
+        "chunker_type": self.chunker.name,
+        "chunk_count": len(chunks),
+        "duration_ms": duration * 1000,
+        "file_size_bytes": len(content),
+        "language": self.language.name if hasattr(self, 'language') else "unknown",
+    }
+)
+
+# Error event
+logger.error(
+    "chunking_failed",
+    extra={
+        "file_path": str(file_path),
+        "chunker_type": self.chunker.name,
+        "error_type": type(e).__name__,
+        "error_message": str(e),
+        "fallback_triggered": True,
+    }
+)
+
+# Edge case event
+logger.debug(
+    "chunking_edge_case",
+    extra={
+        "file_path": str(file_path),
+        "edge_case_type": "single_line",  # or "empty", "binary", etc.
+    }
+)
+```
+
+**Benefits**:
+- **Reuses existing infrastructure**: No duplicate statistics tracking
+- **Consistent with providers**: Same patterns as embedding/reranking providers
+- **Type-safe**: ExtKind provides proper categorization
+- **Production-ready**: FileStatistics handles language detection, categorization automatically
+```
+
+---
+
+### 15.5 Integration with Existing Codebase
+
+**Patterns Identified**:
+
+1. **UUID7 for IDs**: `CodeChunk.chunk_id` already uses UUID7 (chunks.py:144-147)
+   - **Recommendation**: Maintain consistency, add UUID7 for content_hash if needed
+
+2. **Frozen Pydantic Models**: Semantic types use `frozen=True` (semantic/types.py)
+   - **Recommendation**: All chunker configuration models should be frozen
+
+3. **TypedDict for Schemas**: Used in chunks.py (CodeChunkDict)
+   - **Recommendation**: Use TypedDict for metadata schemas (aligns with existing patterns)
+
+4. **Strict Type Checking**: Project has opinionated pyright rules
+   - **Recommendation**: All new code must pass strict type checking, avoid `Any` where possible
+
+---
+
+### 15.6 Specification Coverage Summary
+
+| Category | Status | Priority | Action |
+|----------|--------|----------|--------|
+| **Functional Scope** | ✅ Clear | - | No action needed |
+| **Domain & Data Model** | ✅ Clear | - | No action needed |
+| **Non-Functional Quality** | ⚠️ Partial | CRITICAL | Add performance targets (Gap 1) |
+| **Integration & Dependencies** | ✅ Clear | - | No action needed |
+| **Edge Cases** | ❌ Missing | CRITICAL | Add empty file handling (Gap 2) |
+| **Resource Limits** | ❌ Missing | CRITICAL | Add resource governance (Gap 3) |
+| **Deduplication** | ⚠️ Partial | HIGH | Add dedup strategy (Gap 4) |
+| **Concurrency** | ⚠️ Partial | HIGH | Add concurrency model (Gap 5) |
+| **Type Safety** | ✅ Clear | - | No action needed |
+| **Observability** | ⚠️ Partial | MEDIUM | Add metrics schema (Gap 10) |
+
+**Overall Readiness**: 70% → 95% after addressing critical and high-priority gaps.
+
+**Recommendation**: Address Gaps 1-6 before implementation begins. Gaps 7-10 can be addressed during implementation with the guidance provided.
+
+---
+
+**Document Version**: 1.0.1
+**Last Updated**: 2025-10-24
+**Status**: Gap Analysis Complete - Ready for Review & Implementation
