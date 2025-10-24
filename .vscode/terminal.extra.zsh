@@ -12,21 +12,20 @@
 setup_env() {
   eval "$(mise -q activate zsh)"
   eval "$(mise -q env -s zsh)"
+  mise --silent mise run update-tools || true &
   print -P "%F{209}[codeweaver]%f %F{148}Mise environment activated.%f This may take a moment while we reshim Mise..."
   mise -q reshim || {
     print -P "%F{209}[codeweaver]%f %F{red}Failed to reshim Mise!%f"
   }
   print -P "%F{209}[codeweaver]%f %F{148}All done on our end!%f We're going to re-init your local environment, so it may take a moment depending on your setup. You're good to go once you get your terminal back. Happy coding!"
+  print -P "%F{209}[codeweaver]%f %F{magenta}Tip:%f If you get a message 📩 from %F{magenta}mise%f 👇 about a missing package, try running %F{cyan}'mise run update-tools'%f to install and update any required tools."
 }
 
 full_setup() {
-  setup_env
-  mise -q trust -y || {
+  mise -q -y trust || {
     print -P "%F{209}[codeweaver]%f %F{red}Failed to trust the Mise environment!%f"
   }
-  mise -q reshim || {
-    print -P "%F{209}[codeweaver]%f %F{red}Failed to reshim the Mise environment!%f"
-  }
+  setup_env
   # Skip 'mise run setup' to avoid circular activation
 }
 

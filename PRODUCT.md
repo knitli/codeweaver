@@ -536,7 +536,7 @@ CodeWeaver: "Powerful configuration for humans AND simple interface for agents."
 
 ### Business Metrics
 - **Cost per query**: Target <$0.10 per semantic search query (naive multi-step queries ~$0.20-$0.30)
-- **Token cost savings**: Calculate savings vs. traditional "dump context" and RAG approaches (initial implementation already in [`_statistics.py`](src/codeweaver/_statistics.py)
+- **Token cost savings**: Calculate savings vs. traditional "dump context" and RAG approaches (initial implementation already in [`statistics.py`](src/codeweaver/common/statistics.py)
 - **Developer productivity gain**: Time saved on code discovery tasks (All requests/responses timed in statistics module)
 - **Infrastructure efficiency**: Resource usage per indexed codebase
 

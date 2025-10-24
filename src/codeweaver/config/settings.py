@@ -39,6 +39,7 @@ from fastmcp.server.server import DuplicateBehavior
 from fastmcp.tools.tool import Tool
 from mcp.server.auth.settings import AuthSettings
 from pydantic import (
+    DirectoryPath,
     Field,
     FilePath,
     PositiveInt,
@@ -52,6 +53,7 @@ from pydantic_ai.settings import merge_model_settings
 from pydantic_core import from_json
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
+from codeweaver.common.utils.lazy_importer import lazy_import
 from codeweaver.config.language import CustomDelimiter, CustomLanguage
 from codeweaver.config.logging import LoggingSettings
 from codeweaver.config.middleware import (
@@ -569,9 +571,9 @@ class CodeWeaverSettings(BaseSettings):
 
     # Core settings
     project_path: Annotated[
-        Path,
+        DirectoryPath,
         Field(
-            default_factory=importlib.import_module("codeweaver._utils").get_project_root(),
+            default_factory=lazy_import("codeweaver.common.utils").get_project_root,  # type: ignore
             description="""Root path of the codebase to analyze. CodeWeaver will try to detect the project root automatically if you don't provide one.""",
         ),
     ]

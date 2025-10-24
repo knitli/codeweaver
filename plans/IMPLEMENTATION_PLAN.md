@@ -148,7 +148,7 @@ The CLI is already comprehensively implemented with:
 
 ### Provider Registry Implementation
 ```python
-# src/codeweaver/_registry.py
+# src/codeweaver/common/registry.py
 from typing import Any
 from codeweaver.providers.embedding.base import EmbeddingProvider
 from codeweaver.vector_stores.base import VectorStoreProvider

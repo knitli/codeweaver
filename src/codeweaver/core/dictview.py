@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Read-only view wrapper around a mapping (intended for TypedDict-backed dicts)."""
 
 from collections.abc import ItemsView, Iterator, KeysView, Mapping, ValuesView

@@ -19,7 +19,7 @@ from codeweaver.core.language import SemanticSearchLanguage
 if TYPE_CHECKING:
     from rich.table import Table
 
-    from codeweaver.core import AnonymityConversion, FilteredKey
+    from codeweaver.core import AnonymityConversion, FilteredKey, LanguageName
 
 
 class SearchStrategy(BaseEnum):
@@ -139,9 +139,9 @@ class FindCodeResponseSummary(BasedModel):
     ]
 
     languages_found: Annotated[
-        tuple[SemanticSearchLanguage | str, ...],
+        tuple[SemanticSearchLanguage | LanguageName, ...],
         Field(
-            description="""Programming languages in the results. If the language is supported for semantic search, it will be a `SemanticSearchLanguage`, otherwise a `str` from languages in `codeweaver._constants.py`""",
+            description="""Programming languages in the results. If the language is supported for semantic search, it will be a `SemanticSearchLanguage`, otherwise a `LanguageName` NewType (str) from languages in `codeweaver.core.file_extensions.py`""",
             default_factory=lambda data: tuple(
                 match.file.ext_kind.language
                 for match in data["matches"]

@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """LiteLLM embedding provider information.
 
 LiteLLM presents a difficult case, as it supports a wide range of providers itself, and each provider may have multiple models with different capabilities and using different APIs.

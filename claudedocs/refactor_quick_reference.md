@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # CodeWeaver Refactor - Quick Reference Guide
 
 **Purpose**: Fast lookup for "where does X go?" during migration
@@ -321,13 +328,13 @@ Is it a foundational type/primitive?
    │  ├─ Yes → config/
    │  └─ No
    │     ├─ Is it external API model?
-   │     │  ├─ Yes → api/
+   │     │  ├─ Yes → agent_api/
    │     │  └─ No
    │     │     ├─ Is it business logic?
-   │     │     │  ├─ Yes → domain/
+   │     │     │  ├─ Yes → common/
    │     │     │  └─ No
-   │     │     │     ├─ Is it infrastructure?
-   │     │     │     │  ├─ Yes → infrastructure/
+   │     │     │     ├─ Is it cross-cutting app infrastructure?
+   │     │     │     │  ├─ Yes → engine/
    │     │     │     │  └─ No → Ask for clarification
 ```
 

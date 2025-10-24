@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """CodeWeaver Code Chunks and Search Results.
 
 `CodeChunk` are the core building block of all CodeWeaver operations. They are the result of code parsing

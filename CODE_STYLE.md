@@ -61,12 +61,13 @@ Study pydantic ecosystem patterns: [pydantic](https://github.com/pydantic/pydant
 - **Strict typing** with [opinionated pyright rules](pyproject.toml)
 - **Structured data**: Use `TypedDict`, `Protocol`, `NamedTuple`, `enum.Enum`, `typing_extensions.TypeIs` (similar to typing.TypeGuard but more flexible, typing.TypeGuard also OK)
     - Use the project's derivative for these: 
-      - `dataclass` -> `pydantic.dataclasses.dataclass` **and** `codeweaver._common.DataclassSerializationMixin`
-      - `pydantic.BaseModel` -> `codeweaver._common.BasedModel`
+      - `dataclass` -> `pydantic.dataclasses.dataclass` **and** `codeweaver.core.types.models.DataclassSerializationMixin`
+      - `pydantic.BaseModel` -> `codeweaver.core.types.models.BasedModel`
       - `pydantic.ConfigDict` -> 
-      - `enum.Enum` -> `codeweaver._common.BaseEnum`
+      - `enum.Enum` -> `codeweaver.core.types.enum.BaseEnum`
 - **Define structures**: Don't be lazy - use `TypedDict`, `NamedTuple`, `dataclass` or `BasedModel` to define structured data. Only use vague/generic types like `dict[str, Any]` when the types/structure are truly unknown or have many possibilities.
     - Complex objects: `dataclass` or `BaseModel` descendants
+    - New pattern for complex member-like objects: dataclass enums where each member has a dataclass value -- current plan is to replace most of the complex string enums with this pattern. See `codeweaver.semantic.classification.AgentTask` for an implementation example.
     - Simple objects: `NamedTuple` if the object would benefit from methods or will be nested; `TypedDict` otherwise. 
 - **Generics**: Define proper generic types/protocols/guards
     - Use newer python parameterized generics syntax: `class SomeClass[SomeGeneric]:` -- don't use `typing.Generic`
@@ -81,7 +82,7 @@ Study pydantic ecosystem patterns: [pydantic](https://github.com/pydantic/pydant
 from typing import Annotated
 from pydantic import ConfigDict, Field
 
-from codeweaver._common import BasedModel
+from codeweaver.core import BasedModel
 
 class MyModel(BasedModel):
     model_config = ConfigDict(extra="allow")
@@ -107,9 +108,9 @@ class MyModel(BasedModel):
 - **Specify exception types**: No bare `except:`
 - **Use `else` for returns**: After `try` blocks for clarity
 - **Use `raise from`**: Maintain exception context
-- **Use `contextlib.suppress`**: For intentional exception suppression
+- **Use `contextlib.suppress`**: For intentional exception suppression (not try-except-pass/continue)
 
-- If raising an exception, raise to a specific, codeweaver exception (`codeweaver.exceptions`)
+- If raising an exception, raise to a specific codeweaver exception (`codeweaver.exceptions`)
 
 ### Functions
 

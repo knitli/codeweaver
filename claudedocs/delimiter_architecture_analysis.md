@@ -1,7 +1,14 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # Delimiter Architecture Analysis and Recommendations
 
 **Date**: 2025-10-04
-**Scope**: `src/codeweaver/_constants.py` delimiter implementation (lines 8-2698)
+**Scope**: `src/codeweaver/core.py` delimiter implementation (lines 8-2698)
 
 ## Executive Summary
 

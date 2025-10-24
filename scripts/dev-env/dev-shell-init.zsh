@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 # CodeWeaver dev shell initialization (zsh)
 # - Idempotently activate this repo's .venv
 # - Optionally source workspace-specific extra commands
