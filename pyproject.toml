@@ -458,7 +458,7 @@ all-gpu = [
   "numpy>=2.3.0",
   "permit-fastmcp>=0.1.1",
   "posthog>=6.3.0",
-  "pydantic-ai-slim[anthropic,cohere,bedrock,huggingface,openai,google,groq]>=0.6.2",
+  "pydantic-ai-slim[anthropic,cohere,bedrock,huggingface,openai,google,groq]>=1.4.0",
   "pydantic-ai>=0.6.2",
   "pydantic-graph>=0.6.2",
   "pydantic-settings>=2.10.1",
@@ -472,9 +472,9 @@ all-gpu = [
   "tomli-w>=1.2.0",
   "typing-extensions>=4.14.1",
   "uuid7>=0.1.0; python_version < '3.14'",
-  "uvicorn[standard]>=0.35.0",
-  "voyageai>=0.3.4",
-  "watchfiles>=1.1.0",
+  "uvicorn[standard]>=0.38.0",
+  "voyageai>=0.3.5",
+  "watchfiles>=1.1.1",
 ]
 
 [tool.uv-dynamic-versioning]

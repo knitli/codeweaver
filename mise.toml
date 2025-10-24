@@ -93,7 +93,7 @@ eval "$(mise --silent activate zsh)" &&
 eval "$(mise --silent env -s zsh)" &&
 print -P "%F{209}[codeweaver]%f Initializing %F{209}CodeWeaver%f..."
 hk init --mise &>/dev/null || true &&
-uv venv --allow-existing .venv &&
+mise run venv || true &&
 source .venv/bin/activate &
 mise --silent -y run sync &
 git config alias.root 'rev-parse --show-toplevel' &&
@@ -149,8 +149,9 @@ hk check
 
 format-fix = """
 #!/usr/bin/env /usr/bin/zsh
-print -P "%F{209}[codeweaver]%f Applying formatting...hold onto your butts...🦖 "
-mise run fix-ruff-patterns &&
+print -P "%F{209}[codeweaver]%f Applying formatting...hold onto your butts 🚬...🦖 "
+mise run fix-ruff-patterns || {
+    print -P "%F{209}[codeweaver]%f ⚠️  %F{red}Ruff pattern fixer encountered issues.%f"}
 uv run ruff format .
 files="$(git ls-files '*.yaml' '*.yml' '*.json' 2>/dev/null)"
 if [ -n "$files" ]; then
@@ -160,6 +161,16 @@ files="$(git ls-files '*.toml' 2>/dev/null)"
 if [ -n "$files" ]; then
     taplo format --in-place $files 2>/dev/null || true
 fi
+"""
+
+venv = """
+#!/usr/bin/env /usr/bin/zsh
+print -P "%F{209}[codeweaver]%f Setting up Python virtual environment..."
+uv venv --allow-existing --seed --keyring-provider subprocess --python 3.13 --refresh .venv &&
+print -P "%F{209}[codeweaver]%f ✅ Virtual environment is ready!"
+source .venv/bin/activate || print -P "%F{209}[codeweaver]%f ⚠️  %F{red}Failed to source virtual environment.%f"
+print -P "%F{209}[codeweaver]%f Running dependency sync..."
+mise run sync
 """
 
 # Testing

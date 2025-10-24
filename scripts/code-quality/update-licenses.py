@@ -44,7 +44,7 @@ INTERACTIVE = Parameter(
     negative=(), help="Run the script in interactive mode, prompting for contributors."
 )
 app = App(
-    name="Thread License Updater",
+    name="Knitli License Updater",
     version=__version__,
     help="Update licenses for files in the repository using Reuse. Respects .gitignore.",
     help_format="rich",
@@ -66,8 +66,8 @@ def years() -> str:
     """
     Get the range of years for the copyright notice.
     """
-    if (year := str(datetime.now(UTC).year)) and year != "2025":
-        return f"2025-{year}"
+    if (year := datetime.now(UTC).year) and year != 2025:
+        return f"2025-{year!s}"
     return "2025"
 
 
@@ -90,6 +90,7 @@ if not REUSE_PATH:
     print("Reuse is not installed or not found in PATH. Please install it to use this script.")
     sys.exit(1)
 CHECK_CMD = [REUSE_PATH, "lint", "-j"]
+"""Outputs a JSON report of non-compliant files."""
 NON_CODE_EXTS = {
     "login",
     "astro",
@@ -150,6 +151,7 @@ NON_CODE_EXTS = {
     "zshenv",
     "zshrc",
 }
+"""Extensions (without leading dots) considered non-code files for license purposes. Some of these *are* code, but they're helpers/support files and we treat them as non-code for license purposes (more lenient license in most knitli libraries)."""
 DEFAULT_CONTRIBUTORS = ["Adam Poulemanos <adam@knit.li>"]
 
 
@@ -216,16 +218,16 @@ def filter_path(paths: tuple[Path] | None = None, path: Path | None = None) -> b
 def get_files_with_missing() -> list[Path] | None:
     """Get files with missing licenses."""
     try:
-        result = subprocess.run(CHECK_CMD, capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            CHECK_CMD, capture_output=True, text=True
+        )  # reuse returns a non-zero exit code if there are non-compliant files, so we don't use check=True
         output = json.loads(result.stdout.strip("%\n "))
-        non_compliant_report = output.get("non_compliant", {})
-        missing_files = non_compliant_report.get(
-            "missing_copyright_info", []
-        ) + non_compliant_report.get("missing_licensing_info", [])
-        if not missing_files:
-            print("No files with missing licenses found.")
-            return None
-        print(f"Found {len(missing_files)} files with missing licenses.")
+        missing_files: list[str] = []
+        if (non_compliant_report := output.get("non_compliant", {})) and (
+            missing_files := non_compliant_report.get("missing_copyright_info", [])
+            + non_compliant_report.get("missing_licensing_info", [])
+        ):
+            print(f"Found {len(missing_files)} files with missing licenses.")
     except subprocess.CalledProcessError as e:
         print(f"Error checking files: {e}")
         return None
@@ -276,15 +278,13 @@ def get_contributor() -> str:
         sys.exit(1)
     # if we are, prompt for the contributor
     if contributor := input(
-        "What's your name and email? (e.g. 'Adam Poulemanos <adam@knit.li>'): "
+        "What's your name and email? (e.g. 'Adam Poulemanos <adam@knit.li>' (the default)): "
     ).strip():
-        if "<" in contributor and ">" in contributor:
+        if all(char in contributor for char in ("<", ">", "@")):
             return contributor
         if "@" in contributor and "@" in contributor.split(" ")[-1]:
             parts = contributor.split(" ")
-            name = " ".join(parts[:-1])
-            email = f"<{parts[-1]}>"
-            return f"{name} {email}"
+            return f"{''.join(parts[:-1])} <{parts[-1]}>"  # name email
         # assume they just provided a name; which is fine.
         return contributor
     raise ValueError(
