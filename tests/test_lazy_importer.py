@@ -414,7 +414,7 @@ class TestDocumentationExamples:
 
     def test_basic_module_import_example(self):
         """Test example from LazyImport docstring."""
-        tiktoken = lazy_import("tiktoken")
+        lazy_import("tiktoken")
         # Would normally do: encoding = tiktoken.get_encoding("cl100k_base")
         # But tiktoken might not be installed, so we test with os instead
 

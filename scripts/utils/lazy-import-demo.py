@@ -15,7 +15,9 @@ the old lazy_importer implementation, specifically:
 """
 
 import sys
+
 from pathlib import Path
+
 
 # Add src to path for direct import
 repo_root = Path(__file__).parent.parent
@@ -24,7 +26,7 @@ sys.path.insert(0, str(repo_root / "src"))
 from codeweaver.common.utils.lazy_importer import lazy_import
 
 
-def demo_basic_usage():
+def demo_basic_usage() -> None:
     """Demonstrate basic lazy import functionality."""
     print("=" * 70)
     print("DEMO 1: Basic Module Import")
@@ -50,7 +52,7 @@ def demo_basic_usage():
     print()
 
 
-def demo_function_import():
+def demo_function_import() -> None:
     """Demonstrate importing a specific function."""
     print("=" * 70)
     print("DEMO 2: Direct Function Import")
@@ -69,7 +71,7 @@ def demo_function_import():
     print()
 
 
-def demo_class_import():
+def demo_class_import() -> None:
     """Demonstrate importing and instantiating a class."""
     print("=" * 70)
     print("DEMO 3: Class Import and Instantiation")
@@ -83,14 +85,14 @@ def demo_class_import():
 
     # Instantiate it - import happens here
     p = Path("/tmp/test")
-    print(f"✓ Instantiated: Path('/tmp/test')")
+    print("✓ Instantiated: Path('/tmp/test')")
     print(f"  Result: {p}")
     print(f"  Type: {type(p)}")
     print(f"  Is resolved now: {Path.is_resolved}")
     print()
 
 
-def demo_settings_pattern():
+def demo_settings_pattern() -> None:
     """Demonstrate the settings getter pattern (your main use case)."""
     print("=" * 70)
     print("DEMO 4: Settings Getter Pattern (YOUR USE CASE)")
@@ -102,7 +104,7 @@ def demo_settings_pattern():
 
     # Global-level assignment
     _get_cwd = lazy_import("os").getcwd
-    print(f"✓ Assigned at 'global' level: _get_cwd = lazy_import('os').getcwd")
+    print("✓ Assigned at 'global' level: _get_cwd = lazy_import('os').getcwd")
     print(f"  Is resolved: {_get_cwd.is_resolved}")
     print(f"  Type: {type(_get_cwd).__name__}")
     print()
@@ -110,13 +112,13 @@ def demo_settings_pattern():
     # Later in code - call the function
     print("Later in code, when you actually need it:")
     cwd = _get_cwd()
-    print(f"✓ Called: _get_cwd()")
+    print("✓ Called: _get_cwd()")
     print(f"  Result: {cwd}")
     print(f"  Is resolved now: {_get_cwd.is_resolved}")
     print()
 
 
-def demo_type_checking_pattern():
+def demo_type_checking_pattern() -> None:
     """Demonstrate TYPE_CHECKING + runtime type pattern."""
     print("=" * 70)
     print("DEMO 5: TYPE_CHECKING + Runtime Type Pattern")
@@ -139,18 +141,18 @@ def demo_type_checking_pattern():
     # Simulate runtime usage
     print("For runtime (non-annotation) use:")
     Path = lazy_import("pathlib", "Path")
-    print(f"✓ Path = lazy_import('pathlib', 'Path')")
+    print("✓ Path = lazy_import('pathlib', 'Path')")
     print(f"  Is resolved: {Path.is_resolved}")
     print()
 
     instance = Path("/home")
-    print(f"✓ instance = Path('/home')")
+    print("✓ instance = Path('/home')")
     print(f"  Result: {instance}")
     print(f"  Is resolved now: {Path.is_resolved}")
     print()
 
 
-def demo_comparison_old_vs_new():
+def demo_comparison_old_vs_new() -> None:
     """Compare old lazy_importer vs new LazyImport."""
     print("=" * 70)
     print("DEMO 6: Comparison - Old vs New")
@@ -178,13 +180,13 @@ def demo_comparison_old_vs_new():
     Path = lazy_import("pathlib").Path
     print("  Path = lazy_import('pathlib').Path")
     print(f"  Is resolved: {Path.is_resolved}  # ✅ Still lazy!")
-    instance = Path("/tmp")
+    Path("/tmp")
     print("  instance = Path('/tmp')")
     print(f"  Is resolved now: {Path.is_resolved}  # ✅ Imported when instantiated")
     print()
 
 
-def demo_thread_safety():
+def demo_thread_safety() -> None:
     """Demonstrate thread-safe resolution."""
     import threading
 
@@ -214,14 +216,14 @@ def demo_thread_safety():
     for t in threads:
         t.join()
 
-    print(f"✓ All threads completed")
+    print("✓ All threads completed")
     print(f"  Is resolved now: {join.is_resolved}")
     print(f"  All results identical: {all(r == results[0] for r in results)}")
     print(f"  Sample result: {results[0]}")
     print()
 
 
-def main():
+def main() -> None:
     """Run all demonstrations."""
     print("\n")
     print("╔" + "=" * 68 + "╗")

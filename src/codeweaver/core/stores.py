@@ -42,7 +42,7 @@ from pydantic import (
 from typing_extensions import TypeIs
 
 from codeweaver.common.utils.utils import uuid7
-from codeweaver.core import BasedModel
+from codeweaver.core.types.models import BasedModel
 
 
 if TYPE_CHECKING:

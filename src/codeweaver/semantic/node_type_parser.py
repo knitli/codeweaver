@@ -255,9 +255,11 @@ from typing import TYPE_CHECKING, Annotated, Any, ClassVar, TypedDict, cast, ove
 from pydantic import DirectoryPath, Field, FilePath
 from pydantic_core import from_json
 
-from codeweaver.common import lazy_import
-from codeweaver.core import RootedRoot, SemanticSearchLanguage
-from codeweaver.semantic.types import CategoryName, NodeTypeDTO, ThingName
+from codeweaver.common.utils import lazy_import
+from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.core.types.aliases import CategoryNameT, ThingName
+from codeweaver.core.types.models import RootedRoot
+from codeweaver.semantic.types import NodeTypeDTO
 
 
 if TYPE_CHECKING:
@@ -652,7 +654,7 @@ class NodeTypeParser:
         """
         return self._build_thing(node_dto, Token)
 
-    def _get_node_categories(self, node_dto: NodeTypeDTO) -> frozenset[CategoryName]:
+    def _get_node_categories(self, node_dto: NodeTypeDTO) -> frozenset[CategoryNameT]:
         """Get the set of Categories a node belongs to based on its name and language.
 
         Args:

@@ -11,7 +11,7 @@ from typing import Any, ClassVar, cast
 
 from voyageai.object.embeddings import EmbeddingsObject
 
-from codeweaver.core import CodeChunk
+from codeweaver.core.chunks import CodeChunk
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers import EmbeddingProvider

@@ -74,9 +74,8 @@ class PostHogClient:
                 "CODEWEAVER_POSTHOG_API_KEY", "phc_XKWSirBXZdxYEYRl98cJQzqvTcvQ7U1KWZYygLghhJg"
             )
 
-        self.enabled = enabled and api_key is not None
+        self.enabled = enabled and api_key
         self.logger = logging.getLogger(__name__)
-        self.privacy_filter = PrivacyFilter(strict_mode=strict_privacy_mode)
 
         self._client: Posthog | None = None
 
@@ -151,9 +150,6 @@ class PostHogClient:
                     event,
                 )
                 return
-
-            # Filter properties for extra safety
-            filtered_properties = self.privacy_filter.filter_event(properties)
 
             # Send to PostHog
             _ = self._client.capture(

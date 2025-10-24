@@ -29,17 +29,16 @@ import textcase
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr, RootModel, TypeAdapter
 from pydantic.fields import ComputedFieldInfo, FieldInfo
-from pydantic.typing import IncEx
+from pydantic.main import IncEx
 
-from codeweaver.core.types.aliases import LiteralStringT
+from codeweaver.core.types.aliases import FilteredKey, LiteralStringT
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types.aliases import FilteredKey
     from codeweaver.core.types.enum import AnonymityConversion
 
 
-FILTERED_KEYS: frozenset[FilteredKey] = frozenset({FilteredKey("api_key"), FilteredKey("")})
+FILTERED_KEYS: frozenset[FilteredKey] = frozenset({FilteredKey("api_key")})
 
 # ================================================
 # *       Dataclass Serialization

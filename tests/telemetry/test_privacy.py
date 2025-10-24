@@ -116,13 +116,11 @@ class TestPrivacyFilter:
                 "metadata": {
                     "query": "test query",  # Nested, should be blocked
                     "safe_data": 123,
-                },
+                }
             },
         }
 
-        assert not privacy_filter.validate_event(
-            event
-        ), "Nested sensitive data must be blocked"
+        assert not privacy_filter.validate_event(event), "Nested sensitive data must be blocked"
 
     def test_filter_event_removes_disallowed_keys(self, privacy_filter: PrivacyFilter):
         """Test that filter_event removes disallowed keys."""
@@ -146,9 +144,7 @@ class TestPrivacyFilter:
                 "total_generated": 50000,
                 "query": "test",  # Nested disallowed key
             },
-            "metadata": {
-                "count": 10,
-            },
+            "metadata": {"count": 10},
         }
 
         filtered = privacy_filter.filter_event(properties)
@@ -169,9 +165,9 @@ class TestPrivacyFilter:
         ]
 
         for path_string in test_cases:
-            assert privacy_filter._looks_like_path_or_code(
-                path_string
-            ), f"Should detect as path: {path_string}"
+            assert privacy_filter._looks_like_path_or_code(path_string), (
+                f"Should detect as path: {path_string}"
+            )
 
     def test_blocks_strings_that_look_like_code(self, privacy_filter: PrivacyFilter):
         """CRITICAL: Ensure code-like strings are detected and blocked."""
@@ -183,18 +179,18 @@ class TestPrivacyFilter:
         ]
 
         for code_string in test_cases:
-            assert privacy_filter._looks_like_path_or_code(
-                code_string
-            ), f"Should detect as code: {code_string}"
+            assert privacy_filter._looks_like_path_or_code(code_string), (
+                f"Should detect as code: {code_string}"
+            )
 
     def test_allows_short_safe_strings(self, privacy_filter: PrivacyFilter):
         """Ensure short, safe strings are allowed."""
         safe_strings = ["python", "typescript", "rust", "success", "failed"]
 
         for safe_string in safe_strings:
-            assert not privacy_filter._looks_like_path_or_code(
-                safe_string
-            ), f"Should allow safe string: {safe_string}"
+            assert not privacy_filter._looks_like_path_or_code(safe_string), (
+                f"Should allow safe string: {safe_string}"
+            )
 
     def test_strict_mode_rejects_unknown_keys(self, privacy_filter: PrivacyFilter):
         """Test that strict mode rejects unknown keys."""
@@ -206,9 +202,7 @@ class TestPrivacyFilter:
             },
         }
 
-        assert not privacy_filter.validate_event(
-            event
-        ), "Strict mode should reject unknown keys"
+        assert not privacy_filter.validate_event(event), "Strict mode should reject unknown keys"
 
     def test_non_strict_mode_allows_unknown_keys(self):
         """Test that non-strict mode allows unknown keys (if safe)."""
@@ -223,9 +217,9 @@ class TestPrivacyFilter:
         }
 
         # Should pass non-strict mode (no disallowed keys)
-        assert privacy_filter.validate_event(
-            event
-        ), "Non-strict mode should allow unknown safe keys"
+        assert privacy_filter.validate_event(event), (
+            "Non-strict mode should allow unknown safe keys"
+        )
 
     def test_handles_exceptions_gracefully(self, privacy_filter: PrivacyFilter):
         """Ensure filter fails closed on exceptions."""

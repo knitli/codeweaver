@@ -14,19 +14,14 @@ from __future__ import annotations
 import re
 
 from enum import Flag, auto
-from typing import Annotated, Literal, NamedTuple, NewType, TypedDict, cast
+from typing import Annotated, Literal, NamedTuple, TypedDict, cast
 
 from pydantic import ConfigDict, Field, PrivateAttr, computed_field
 
-from codeweaver.core import BasedModel, BaseEnum, LiteralStringT
 from codeweaver.core.language import SemanticSearchLanguage
-
-
-Role = NewType("Role", LiteralStringT)
-CategoryName = NewType("CategoryName", LiteralStringT)
-ThingName = NewType("ThingName", LiteralStringT)
-
-type ThingOrCategoryNameType = ThingName | CategoryName
+from codeweaver.core.types.aliases import LiteralStringT
+from codeweaver.core.types.enum import BaseEnum
+from codeweaver.core.types.models import BasedModel
 
 
 class SimpleNodeTypeDTO(TypedDict):

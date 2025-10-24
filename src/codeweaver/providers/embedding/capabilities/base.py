@@ -8,8 +8,9 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal, NotRequired, Required, Self, TypedDict
 
-from pydantic import BaseModel, ConfigDict, Field, PositiveFloat, PositiveInt
+from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
 
+from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
 from codeweaver.providers.provider import Provider
 
 
@@ -79,15 +80,10 @@ class EmbeddingCapabilities(TypedDict, total=False):
     other: NotRequired[dict[str, Any]]
 
 
-class EmbeddingModelCapabilities(BaseModel):
+class EmbeddingModelCapabilities(BasedModel):
     """Describes the capabilities of an embedding model, such as the default dimension."""
 
-    model_config = ConfigDict(
-        str_strip_whitespace=True,
-        extra="allow",
-        arbitrary_types_allowed=True,
-        serialize_by_alias=True,
-    )
+    model_config = BASEDMODEL_CONFIG | ConfigDict(extra="allow")
 
     name: Annotated[
         str, Field(min_length=3, description="""The name of the model or family of models.""")
@@ -189,6 +185,9 @@ class EmbeddingModelCapabilities(BaseModel):
         """Check if the model is available."""
         return self._available
 
+    def _telemetry_keys(self) -> None:
+        return None
+
 
 from importlib.util import find_spec
 
@@ -197,7 +196,7 @@ HAS_FASTEMBED = find_spec("fastembed") is not None
 HAS_ST = find_spec("sentence_transformers") is not None
 
 
-class SparseEmbeddingModelCapabilities(BaseModel):
+class SparseEmbeddingModelCapabilities(BasedModel):
     """A model describing the capabilities of a sparse embedding model.
 
     Sparse embeddings are much simpler than dense embeddings, so this model is much simpler.
@@ -240,7 +239,10 @@ class SparseEmbeddingModelCapabilities(BaseModel):
             description="""The Hugging Face model name, if it applies *and* is different from the model name. Currently only applies to some models from `fastembed` and `ollama`"""
         ),
     ] = None
-    other: Annotated[dict[str, Any], Field(description="""Extra model-specific settings.""")] = {}
+    other: Annotated[
+        dict[str, Any],
+        Field(description="""Extra model-specific settings.""", default_factory=dict),
+    ]
 
     _available: Annotated[
         bool, Field(description="""Whether the model is available for use.""")
@@ -250,6 +252,9 @@ class SparseEmbeddingModelCapabilities(BaseModel):
     def available(self) -> bool:
         """Check if the model is available."""
         return self._available
+
+    def _telemetry_keys(self) -> None:
+        return None
 
 
 def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:

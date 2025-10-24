@@ -19,7 +19,7 @@ from typing import Any, Self, cast
 
 from pydantic import AnyHttpUrl, create_model
 
-from codeweaver.core import CodeChunk
+from codeweaver.core.chunks import CodeChunk
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider

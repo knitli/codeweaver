@@ -24,10 +24,10 @@ from pydantic import Field, NonNegativeFloat, NonNegativeInt, computed_field
 from typing_extensions import TypeIs
 
 from codeweaver.common.utils.utils import rpartial
-from codeweaver.core import BaseEnum
 from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.core.types.aliases import CategoryName, CategoryNameT, ThingNameT
+from codeweaver.core.types.enum import BaseEnum
 from codeweaver.semantic.classifications import ImportanceRank, SemanticClass
-from codeweaver.semantic.types import CategoryName, ThingName
 
 
 if TYPE_CHECKING:
@@ -752,7 +752,7 @@ class GrammarBasedClassifier:
         return None
 
     def classify_thing(
-        self, thing_name: ThingName, language: SemanticSearchLanguage | str
+        self, thing_name: ThingNameT, language: SemanticSearchLanguage | str
     ) -> GrammarClassificationResult | None:
         """Classify a thing using grammar structure.
 
@@ -821,7 +821,7 @@ class GrammarBasedClassifier:
         return GrammarClassificationResult.from_results(results) if results else None
 
     @property
-    def _build_category_to_semantic_map(self) -> MappingProxyType[CategoryName, SemanticClass]:
+    def _build_category_to_semantic_map(self) -> MappingProxyType[CategoryNameT, SemanticClass]:
         """Build mapping from grammar Category names to SemanticClass enum values.
 
         Based on empirical analysis of 25 languages, ~40 unique Categories once normalized.
@@ -831,8 +831,6 @@ class GrammarBasedClassifier:
 
         NOTE: There's not standardization of Categories or their meanings across languages. Commonly found Categories reflect grammars that were largely written by the same people (the tree-sitter core team). Many Categories are language-specific or only found in one or two languages. This mapping is based on empirical analysis of all categories found in the 25 languages we support, and assigning them to the closest fitting SemanticClass. This is a living document and will evolve as we analyze more languages and refine our understanding of existing ones.
         """
-        from codeweaver.semantic.types import CategoryName
-
         return MappingProxyType({
             # Universal Categories (appear in most languages)
             CategoryName("expression"): SemanticClass.OPERATION_OPERATOR,

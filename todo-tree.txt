@@ -1,0 +1,74 @@
+└─ codeweaver-mcp
+   ├─ scripts
+   │  └─ cwdev.py
+   │     └─ line 11: TODO : The plan for this script is to make it an overall dev helper to do things like:
+   ├─ src
+   │  ├─ agent_api
+   │  │  └─ find_code.py
+   │  │     └─ line 48: TODO : WHY IS THIS COMMENTED OUT? ... here's why:
+   │  ├─ common
+   │  │  ├─ utils
+   │  │  │  ├─ git.py
+   │  │  │  │  └─ line 119: TODO : (big one): This is a precursor for future functionality. We'd like to be able to associate indexes and other artifacts with a specific git commit. Because there's nothing worse than an Agent working from a totally different context than the one you expect. We need to track changes across commits, branches, etc. This is a first step. We'll need to figure out how manage partial indexes, diffs, etc. later.
+   │  │  │  └─ normalize.py
+   │  │  │     ├─ line 22: TODO : Add Rebuff.ai integration, and/or other advanced sanitization options. Probably as middleware.
+   │  │  │     └─ line 48: TODO : Need to add a mechanism to override or customize the injection patterns.
+   │  │  ├─ registry.py
+   │  │  │  ├─ line 94: TODO : We need to integrate feature detection into service registration and validation
+   │  │  │  ├─ line 310: TODO register default services
+   │  │  │  └─ line 1479: TODO : Services registry... we'll need to deconflict available providers, capabilities, against registered services to figure out what's actually available
+   │  │  └─ statistics.py
+   │  │     └─ line 600: TODO : We'd ideally want to make sure these are pushed to the indexer, unless we receive these in the same action
+   │  ├─ config
+   │  │  ├─ logging.py
+   │  │  │  └─ line 192: TODO : Once they become more available, we should use `raw template strings` here
+   │  │  ├─ settings.py
+   │  │  │  └─ line 666: TODO : I don't think we're actually checking for these before initializing the server. We should.
+   │  │  └─ types.py
+   │  │     └─ line 206: TODO : We should add it, but we need to manage handling it mid-request.
+   │  ├─ core
+   │  │  ├─ types
+   │  │  │  └─ enum.py
+   │  │  │     └─ line 39: TODO : For our larger enums with lots of property methods, like `SemanticSearchLanguage`, it probably makes sense to define it as an enum with type `dataclass` members, where most of the properties are defined on the dataclass, and the enum just holds instances of that dataclass. This would make it easier to manage and extend the enum members. See https://docs.python.org/3/howto/enum.html#dataclass-support. This would also make it easier to add new members without having to add the member to the enum methods themselves. Since attributes and properties are accessed the same way, we could do this without it being a breaking change. Classes that would benefit from this treatment:
+   │  │  ├─ discovery.py
+   │  │  │  └─ line 106: TODO : A better approach for files that we can semantically analyze is to hash the AST or structure instead of the raw file contents and compare those.
+   │  │  ├─ language.py
+   │  │  │  ├─ line 466: TODO : Validate the `dependency_key_paths` for each config file to ensure they are correct. If you use these languages, please let us know if you find any issues with the `dependency_key_paths` in the config files. Some are probably incorrect.
+   │  │  │  ├─ line 1398: TODO : Integrate into indexing and search services to use these languages.
+   │  │  │  └─ line 1437: TODO : We included the langchain dependency before we got ... carried away ... with our own chunkers. Ours are much more robust. We'd need to improve markdown handling, but otherwise, we can probably drop the langchain dependency and remove this chunker.
+   │  │  └─ metadata.py
+   │  │     └─ line 90: TODO : Logic for symbol extraction from AST nodes
+   │  ├─ engine
+   │  │  ├─ chunker
+   │  │  │  └─ registry.py
+   │  │  │     └─ line 70: TODO : We need to send a signal to vector stores to remove associated vectors
+   │  │  ├─ indexer.py
+   │  │  │  └─ line 11: TODO : register with providers registry
+   │  │  └─ textify.py
+   │  │     └─ line 8: TODO : Once we have better code parsing implementations, we need to define a pipeline for processing.
+   │  ├─ providers
+   │  │  ├─ embedding
+   │  │  │  └─ mistral.py
+   │  │  │     └─ line 29: TODO : Add support for batch jobs. Ideal for most usage, but becomes more difficult to manage state.
+   │  │  ├─ reranking
+   │  │  │  ├─ capabilities
+   │  │  │  │  └─ base.py
+   │  │  │  │     └─ line 184: TODO : We need to handle the case where the first chunk is larger than the max_input.
+   │  │  │  └─ __init__.py
+   │  │  │     └─ line 14: TODO : Implement the same system we have for Embedding models
+   │  │  ├─ capabilities.py
+   │  │  │  └─ line 24: TODO : The vector provider capabilities aren't what they need to be.... it needs to be things like sparse vectors, quantization, etc.
+   │  │  └─ provider.py
+   │  │     └─ line 109: TODO : We need to allow for dynamic providers in the future, we would check if there's a provider class registered for the value, then register the provider here with `cls.add_member("NEW_PROVIDER", "new_provider")`.
+   │  ├─ semantic
+   │  │  └─ __init__.py
+   │  │     └─ line 67: TODO : We can probably refactor out the need for this, but a problem for another day.
+   │  ├─ exceptions.py
+   │  │  └─ line 17: TODO : We got into a bad habit of not using native exception types. We need to systematically go through and improve exception handling and information.
+   │  └─ server.py
+   │     ├─ line 137: TODO : Expand to be more dynamic, computing health based on service status, etc.
+   │     ├─ line 281: TODO : These can all be boolean but need to differentiate from defaults vs set values
+   │     └─ line 360: TODO : Add state caching/saving and cleanup logic here
+   └─ pyproject.toml
+      ├─ line 122: TODO : Integrate hatch plugins for:
+      └─ line 395: TODO : Implement authentication and authorization middleware -- should be simple to add

@@ -174,6 +174,9 @@ type RoleT = Annotated[
     ),
 ]
 
+type ThingOrCategoryNameT = ThingNameT | CategoryNameT
+"""A union type that can be either a ThingNameT or a CategoryNameT."""
+
 # ================================================
 # * NewTypes for Embedding and Reranking Model Names
 # ================================================
@@ -265,4 +268,5 @@ __all__ = (
     "SentinelName",
     "ThingName",
     "ThingNameT",
+    "ThingOrCategoryNameT",
 )

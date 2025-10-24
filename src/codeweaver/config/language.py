@@ -9,10 +9,11 @@ from typing import Annotated, Self
 
 from pydantic import Field, model_validator
 
-from codeweaver.core.file_extensions import ALL_LANGUAGES, ExtLangPair
+from codeweaver.core.file_extensions import ALL_LANGUAGES
+from codeweaver.core.metadata import ExtLangPair
 from codeweaver.core.secondary_languages import SecondarySupportedLanguage
 from codeweaver.core.types.models import FROZEN_BASEDMODEL_CONFIG, BasedModel
-from codeweaver.engine import DelimiterPattern, LanguageFamily
+from codeweaver.engine.chunker.delimiters import DelimiterPattern, LanguageFamily
 
 
 class CustomLanguage(BasedModel):

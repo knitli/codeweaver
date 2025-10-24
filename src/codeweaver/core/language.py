@@ -19,17 +19,22 @@ from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, TypedDict, cast, o
 from langchain_text_splitters import Language as LC_Language
 from pydantic import Field, computed_field
 
-from codeweaver.common import get_project_root, normalize_ext
-from codeweaver.core import BasedModel, BaseEnum, LiteralStringT
-from codeweaver.core.file_extensions import ALL_LANGUAGES
-from codeweaver.core.metadata import ExtLangPair, get_ext_lang_pairs
+from codeweaver.common.utils import LazyImport, get_project_root, lazy_import, normalize_ext
 from codeweaver.core.secondary_languages import SecondarySupportedLanguage
-from codeweaver.core.types.aliases import FileExt, FileExtensionT, FileNameT
+from codeweaver.core.types.aliases import FileExt, FileExtensionT, FileNameT, LiteralStringT
+from codeweaver.core.types.enum import BaseEnum
+from codeweaver.core.types.models import BasedModel
 
 
 if TYPE_CHECKING:
-    from codeweaver.config import CustomDelimiter
+    from codeweaver.config.language import CustomDelimiter
+    from codeweaver.core.metadata import ExtLangPair
+else:
+    ExtLangPair: LazyImport[ExtLangPair] = lazy_import("codeweaver.core.metadata", "ExtLangPair")
 
+get_ext_lang_pairs: LazyImport[Generator[ExtLangPair, None, None]] = lazy_import(
+    "codeweaver.core.metadata", "get_ext_lang_pairs"
+)
 
 PROJECT_ROOT = get_project_root() or Path.cwd().resolve()
 
@@ -1511,6 +1516,8 @@ class Chunker(int, BaseEnum):
 
         Deterministic ordering (sorted) improves cacheability & test stability.
         """
+        from codeweaver.core.file_extensions import ALL_LANGUAGES
+
         languages: set[LiteralStringT] = set(ALL_LANGUAGES)
         languages.update(cast(LiteralStringT, lang.variable) for lang in SemanticSearchLanguage)
         languages.update(cast(LiteralStringT, lang.variable) for lang in ConfigLanguage)
@@ -1614,7 +1621,6 @@ __all__ = (
     "ConfigLanguage",
     "ConfigNamePair",
     "ConfigPathPair",
-    "ExtPair",
     "LanguageConfigFile",
     "SemanticSearchLanguage",
     "find_config_paths",

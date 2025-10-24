@@ -42,7 +42,7 @@ class Tokenizers(Tokenizer[TokenizersTokenizer]):
     def __init__(self, encoder: str, **kwargs: dict[str, Any] | None) -> None:
         """Initialize tokenizers encoder."""
         # pyright can't handle the dynamic import of tokenizers, even with `TypeIs`, so we use a few ignores here
-        self._encoder = TokenizersTokenizer.from_pretrained(encoder, **(kwargs or {}))  # pyright: ignore[reportUnknownMemberType]
+        self._encoder = TokenizersTokenizer.from_pretrained(encoder, **(kwargs or {}))  # pyright: ignore[reportArgumentType, reportUnknownMemberType]
         if not _is_tokenizer(self._encoder):  # pyright: ignore[reportUnknownMemberType]
             raise TypeError(f"Expected a Tokenizers instance, got {type(self._encoder)}")  # pyright: ignore[reportUnknownArgumentType, reportUnknownMemberType]
 

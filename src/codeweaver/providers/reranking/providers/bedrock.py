@@ -18,8 +18,9 @@ from typing import Annotated, Any, Literal, Self, cast
 from pydantic import AliasGenerator, ConfigDict, Field, JsonValue, PositiveInt, model_validator
 from pydantic.alias_generators import to_camel, to_snake
 
-from codeweaver.config import AWSProviderSettings
-from codeweaver.core import BasedModel, CodeChunk, StructuredDataInput
+from codeweaver.config.providers import AWSProviderSettings
+from codeweaver.core.chunks import CodeChunk, StructuredDataInput
+from codeweaver.core.types.models import BasedModel
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.amazon import get_amazon_reranking_capabilities
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities

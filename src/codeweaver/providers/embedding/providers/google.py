@@ -11,7 +11,8 @@ from typing import Any, Literal, cast
 
 from google.genai.types import HttpOptions
 
-from codeweaver.core import BaseEnum, CodeChunk
+from codeweaver.core.chunks import CodeChunk
+from codeweaver.core.types.enum import BaseEnum
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 

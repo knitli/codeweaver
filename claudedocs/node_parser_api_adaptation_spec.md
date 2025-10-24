@@ -41,7 +41,7 @@ ThingName = NewType("ThingName", LiteralStringT)
 
 type ThingType = CompositeThing | Token
 type ThingOrCategoryType = CompositeThing | Token | Category
-type ThingOrCategoryNameType = ThingName | CategoryName
+type ThingOrCategoryNameT = ThingName | CategoryName
 ```
 
 ---
@@ -108,7 +108,7 @@ class Token(Thing):
 class Connection(BasedModel):
     """Base for edges between Things."""
     source_thing: ThingName
-    target_thing_names: tuple[ThingOrCategoryNameType, ...]
+    target_thing_names: tuple[ThingOrCategoryNameT, ...]
     allows_multiple: bool  # was: multiple
     requires_presence: bool  # was: required
     language: SemanticSearchLanguage
@@ -136,7 +136,7 @@ class _ThingRegistry:
     """Central registry for all Things and Categories."""
 
     def get_thing_by_name(
-        self, name: ThingOrCategoryNameType,
+        self, name: ThingOrCategoryNameT,
         *, language: SemanticSearchLanguage | None = None
     ) -> ThingOrCategoryType | None:
         """Retrieve Thing or Category by name."""

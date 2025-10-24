@@ -18,7 +18,7 @@ from importlib.util import find_spec
 from types import ModuleType
 from typing import Literal, NotRequired, Required, TypedDict
 
-from codeweaver.common import LazyImport, has_package, lazy_import
+from codeweaver.common.utils import LazyImport, has_package, lazy_import
 
 
 # ===========================================================================

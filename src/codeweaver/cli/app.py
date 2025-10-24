@@ -22,9 +22,10 @@ from rich.console import Console
 from rich.table import Table
 
 from codeweaver.agent_api import CodeMatch, FindCodeResponseSummary, IntentType  #  find_code
-from codeweaver.common import CODEWEAVER_PREFIX, LazyImport, lazy_import
-from codeweaver.config import CodeWeaverSettingsDict
-from codeweaver.core import DictView
+from codeweaver.common import CODEWEAVER_PREFIX
+from codeweaver.common.utils import LazyImport, lazy_import
+from codeweaver.config.settings import CodeWeaverSettingsDict
+from codeweaver.core.types.dictview import DictView
 from codeweaver.exceptions import CodeWeaverError
 
 

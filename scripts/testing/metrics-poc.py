@@ -4,7 +4,7 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """
-Proof of Concept: CodeWeaver Metrics and Telemetry System
+Proof of Concept: CodeWeaver Metrics and Telemetry System.
 
 Demonstrates the complete telemetry and metrics workflow:
 1. Statistics collection from simulated searches
@@ -29,9 +29,10 @@ from __future__ import annotations
 
 import argparse
 import sys
-from collections import Counter
+
 from pathlib import Path
 from typing import TYPE_CHECKING
+
 
 if TYPE_CHECKING:
     pass
@@ -73,14 +74,8 @@ def create_mock_repository_files() -> list[tuple[Path, str, int]]:
         (Path("docs/api/auth.md"), "markdown", 3000),
         (Path("docs/security.md"), "markdown", 5000),
         # Add more files to demonstrate scaling
-        *[
-            (Path(f"src/services/service_{i}.py"), "python", 2500)
-            for i in range(1, 21)
-        ],
-        *[
-            (Path(f"tests/integration/test_service_{i}.py"), "python", 3000)
-            for i in range(1, 11)
-        ],
+        *[(Path(f"src/services/service_{i}.py"), "python", 2500) for i in range(1, 21)],
+        *[(Path(f"tests/integration/test_service_{i}.py"), "python", 3000) for i in range(1, 11)],
     ]
 
 
@@ -141,17 +136,17 @@ def simulate_session_statistics() -> dict:
     }
 
 
-def print_separator(title: str = ""):
+def print_separator(title: str = "") -> None:
     """Print a section separator."""
     if title:
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print(f" {title}")
-        print(f"{'='*70}\n")
+        print(f"{'=' * 70}\n")
     else:
-        print(f"{'='*70}\n")
+        print(f"{'=' * 70}\n")
 
 
-def main():
+def main() -> None:
     """Run the metrics POC demonstration."""
     parser = argparse.ArgumentParser(description="CodeWeaver Metrics POC")
     parser.add_argument(
@@ -159,11 +154,7 @@ def main():
         action="store_true",
         help="Actually send telemetry to PostHog (requires API key)",
     )
-    parser.add_argument(
-        "--detailed",
-        action="store_true",
-        help="Show detailed output",
-    )
+    parser.add_argument("--detailed", action="store_true", help="Show detailed output")
     args = parser.parse_args()
 
     print_separator("CodeWeaver Metrics & Telemetry - Proof of Concept")
@@ -188,20 +179,16 @@ def main():
 
     # Step 3: Calculate baseline comparison
     print("\n📊 Step 3: Calculating baseline comparison...")
-    
+
     try:
-        from codeweaver.telemetry.comparison import (
-            BaselineComparator,
-            CodeWeaverMetrics,
-        )
+        from codeweaver.telemetry.comparison import BaselineComparator, CodeWeaverMetrics
 
         comparator = BaselineComparator()
 
         # Estimate naive grep approach
         query_keywords = ["authentication", "middleware"]
         baseline = comparator.estimate_naive_grep_approach(
-            query_keywords=query_keywords,
-            repository_files=repository_files,
+            query_keywords=query_keywords, repository_files=repository_files
         )
 
         # Create CodeWeaver metrics from simulated results
@@ -216,17 +203,21 @@ def main():
         comparison = comparator.compare(baseline, codeweaver_metrics)
 
         print(f"   ✓ Baseline approach: {baseline.approach}")
-        print(f"   ✓ Baseline would return: {baseline.files_matched} files, "
-              f"{baseline.estimated_tokens:,} tokens")
-        print(f"   ✓ CodeWeaver returned: {codeweaver_metrics.files_returned} files, "
-              f"{codeweaver_metrics.actual_tokens:,} tokens")
+        print(
+            f"   ✓ Baseline would return: {baseline.files_matched} files, "
+            f"{baseline.estimated_tokens:,} tokens"
+        )
+        print(
+            f"   ✓ CodeWeaver returned: {codeweaver_metrics.files_returned} files, "
+            f"{codeweaver_metrics.actual_tokens:,} tokens"
+        )
 
     except ImportError as e:
         print(f"   ⚠ Could not import telemetry module: {e}")
-        print(f"   Using simplified comparison...")
+        print("   Using simplified comparison...")
         # Simplified fallback
         baseline_tokens = 45000
-        codeweaver_tokens = codeweaver_results["actual_tokens"]
+        codeweaver_results["actual_tokens"]
         comparison = None
 
     # Step 4: Display efficiency comparison
@@ -272,10 +263,7 @@ def main():
     print_separator("Telemetry Event Generation")
 
     try:
-        from codeweaver.telemetry.events import (
-            PerformanceBenchmarkEvent,
-            SessionSummaryEvent,
-        )
+        from codeweaver.telemetry.events import PerformanceBenchmarkEvent, SessionSummaryEvent
 
         # Create session summary event
         session_stats = simulate_session_statistics()

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from codeweaver.config import EmbeddingModelSettings, EmbeddingProviderSettings
+from codeweaver.config.providers import EmbeddingModelSettings, EmbeddingProviderSettings
 from codeweaver.providers.embedding.capabilities import (
     load_default_capabilities,
     load_sparse_capabilities,

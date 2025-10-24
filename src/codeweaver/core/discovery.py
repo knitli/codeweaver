@@ -21,7 +21,7 @@ from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import is_semantic_config_ext
 from codeweaver.core.metadata import ExtKind
 from codeweaver.core.stores import BlakeHashKey, BlakeKey, get_blake_hash
-from codeweaver.core.types import DATACLASS_CONFIG, DataclassSerializationMixin
+from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
 
 
 if TYPE_CHECKING:

@@ -24,11 +24,11 @@ from starlette.responses import PlainTextResponse
 # from codeweaver.agent_api import find_code
 from codeweaver.agent_api.intent import IntentType
 from codeweaver.agent_api.models import FindCodeResponseSummary
-from codeweaver.common import SessionStatistics, get_session_statistics, timed_http
-from codeweaver.config import CodeWeaverSettingsDict, MiddlewareOptions
-from codeweaver.config.settings import get_settings_map
-from codeweaver.core import DictView
+from codeweaver.common.statistics import SessionStatistics, get_session_statistics, timed_http
+from codeweaver.config.middleware import MiddlewareOptions
+from codeweaver.config.settings import CodeWeaverSettingsDict, get_settings_map
 from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.core.types.dictview import DictView
 from codeweaver.middleware.statistics import StatisticsMiddleware
 from codeweaver.server import AppState, HealthInfo, get_health_info
 

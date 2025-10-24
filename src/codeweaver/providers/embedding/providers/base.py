@@ -21,37 +21,28 @@ from typing import (
     TypedDict,
     cast,
     overload,
+    override,
 )
 from uuid import UUID
 
 from pydantic import UUID7, ConfigDict
 from pydantic.main import IncEx
 
-from codeweaver.common import LazyImport, lazy_import, uuid7
-from codeweaver.core import (
-    BasedModel,
-    BlakeStore,
-    CodeChunk,
-    SerializedCodeChunk,
-    StructuredDataInput,
-    UUIDStore,
-    make_blake_store,
-    make_uuid_store,
-)
+from codeweaver.common.utils import LazyImport, lazy_import, uuid7
+from codeweaver.core.chunks import CodeChunk, SerializedCodeChunk, StructuredDataInput
+from codeweaver.core.stores import BlakeStore, UUIDStore, make_blake_store, make_uuid_store
 from codeweaver.core.types.enum import AnonymityConversion
+from codeweaver.core.types.models import BasedModel
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.provider import Provider
 from codeweaver.tokenizers import Tokenizer, get_tokenizer
 
 
-if TYPE_CHECKING:
-    from codeweaver.core.types import AnonymityConversion, FilteredKey
-
-
 statistics_module: LazyImport[ModuleType] = lazy_import("codeweaver.common.statistics")
 
 if TYPE_CHECKING:
-    from codeweaver.common import SessionStatistics
+    from codeweaver.common.statistics import SessionStatistics
+    from codeweaver.core.types import AnonymityConversion, FilteredKey
 else:
     SessionStatistics = statistics_module.SessionStatistics
 
@@ -404,7 +395,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             FilteredKey("_query_kwargs"): AnonymityConversion.COUNT,
         }
 
-    def model_dump_json(
+    @override
+    def model_dump_json(  # type: ignore
         self,
         *,
         indent: int | None = None,

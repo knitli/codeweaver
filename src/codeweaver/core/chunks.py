@@ -40,7 +40,7 @@ from pydantic import (
 )
 from pydantic_core import to_json
 
-from codeweaver.common import ensure_iterable, set_relative_path, uuid7
+from codeweaver.common.utils import ensure_iterable, set_relative_path, uuid7
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.metadata import ChunkSource, ExtKind, Metadata, determine_ext_kind
 from codeweaver.core.spans import Span, SpanTuple
@@ -132,11 +132,10 @@ class CodeChunk(BasedModel):
             default_factory=determine_ext_kind,
             description="""The extension kind of the source file""",
         ),
-    ] = None
+    ]
     timestamp: Annotated[
         PositiveFloat,
         Field(
-            default_factory=datetime.now(UTC).timestamp,
             kw_only=True,
             description="""Timestamp of the code chunk creation or modification""",
             frozen=True,
@@ -144,23 +143,14 @@ class CodeChunk(BasedModel):
     ] = datetime.now(UTC).timestamp()
     chunk_id: Annotated[
         UUID7,
-        Field(
-            default_factory=uuid7,
-            kw_only=True,
-            description="""Unique identifier for the code chunk""",
-            frozen=True,
-        ),
+        Field(kw_only=True, description="""Unique identifier for the code chunk""", frozen=True),
     ] = uuid7()
     parent_id: Annotated[
         UUID7 | None, Field(description="""Parent chunk ID, such as the file ID, if applicable""")
     ] = None
     metadata: Annotated[
         Metadata | None,
-        Field(
-            default_factory=dict,
-            kw_only=True,
-            description="""Additional metadata about the code chunk""",
-        ),
+        Field(kw_only=True, description="""Additional metadata about the code chunk"""),
     ] = None
     _version: Annotated[str, Field(repr=True, init=False, serialization_alias="chunk_version")] = (
         "1.0.0"

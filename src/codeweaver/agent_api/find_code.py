@@ -45,7 +45,7 @@ class MatchedSection(NamedTuple):
     chunk_number: PositiveInt | None = None
 
 
-# TODO: WHY IS THIS COMMENTED OUT?
+# TODO: WHY IS THIS COMMENTED OUT? ... here's why:
 # I commented this out because it's a remanent of the old architecture. It needs to be re-integrated into the new architecture.
 # This was written before:
 # 1) Code Chunk existed,

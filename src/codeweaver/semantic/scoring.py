@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Annotated
 from ast_grep_py import SgNode
 from pydantic import Field, NonNegativeFloat, NonNegativeInt
 
-from codeweaver.core import BasedModel
+from codeweaver.core.types.models import BasedModel
 
 
 if TYPE_CHECKING:

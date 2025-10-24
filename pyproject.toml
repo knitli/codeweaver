@@ -38,10 +38,10 @@ dependencies = [
   "ast-grep-py>=0.39.6",
   "blake3>=1.0.8",
   "cyclopts>=4.0.0",
-  "fastmcp[websockets]>=2.12.5",
+  "fastmcp>=2.12.5",
   "httpx>=0.28.1",
   "langchain-text-splitters>=1.0.0",
-  "mcp>=1.19.0",
+  "mcp>=1.16.0",
   "numpy>=2.3.4",
   "posthog>=6.7.9",
   "pydantic-ai>=1.4.0",
@@ -230,7 +230,7 @@ recommended = [
   "tiktoken>=0.12.0",
   "tokenizers>=0.21.4",
   "tomli-w>=1.2.0",
-  "typing_extensions>=4.14.1",
+  "typing_extensions>=4.15.0",
   "uuid7>=0.1.0; python_version < '3.14'",
   "uvicorn[standard]>=0.38.0",
   "voyageai>=0.3.5",
@@ -325,7 +325,7 @@ required-core = [
   "uvicorn[standard]>=0.38.0",
 ]
 
-cli = ["cyclopts>=3.22.5", "rich>=14.0.0", "tomli-w>=1.2.0"]
+cli = ["cyclopts>=4.0.0", "rich>=14.2.0", "tomli-w>=1.2.0"]
 
 # also requires one agent-capable provider, one embedding-capable provider, and a vector store
 pre-context = [
@@ -377,12 +377,12 @@ provider-voyageai = ["voyageai>=0.3.4"]
 # Requires additional setup, see https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/
 
 # ==== Vector Stores ====
-provider-in-memory = ["qdrant-client>=1.15.0", "tokenizers>=0.13.2"]
+provider-in-memory = ["qdrant-client>=1.15.1", "tokenizers>=0.13.2"]
 provider-qdrant = ["qdrant-client>=1.15.0"]
 
 # ==== Data Sources ====
 
-source-filesystem = ["langchain-text-splitters>=0.3.9", "watchfiles>=1.1.0"]
+source-filesystem = ["langchain-text-splitters>=1.0.0", "watchfiles>=1.1.0"]
 source-tavily = ["pydantic-ai-slim[tavily]>=0.6.2"]
 source-duckduckgo = ["pydantic-ai-slim[duckduckgo]>=0.6.2"]
 

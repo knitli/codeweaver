@@ -35,16 +35,15 @@ from codeweaver.core.language import (
     has_semantic_extension,
     is_semantic_config_ext,
 )
-from codeweaver.core.types import (
-    FROZEN_BASEDMODEL_CONFIG,
-    BasedModel,
-    BaseEnum,
+from codeweaver.core.types.aliases import (
     FileExt,
     FileExtensionT,
     LanguageName,
     LanguageNameT,
     LiteralStringT,
 )
+from codeweaver.core.types.enum import BaseEnum
+from codeweaver.core.types.models import FROZEN_BASEDMODEL_CONFIG, BasedModel
 
 
 if TYPE_CHECKING:
@@ -96,7 +95,7 @@ class SemanticMetadata(BasedModel):
             if data.get("primary_thing")
             else None,
         ),
-    ] = None
+    ]
     thing_id: UUID7 = uuid7()
     parent_thing_id: UUID7 | None = None
     is_partial_node: Annotated[

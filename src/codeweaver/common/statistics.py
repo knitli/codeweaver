@@ -49,16 +49,10 @@ from codeweaver.common.types import (
     ToolOrPromptName,
 )
 from codeweaver.common.utils import uuid7
-from codeweaver.core import (
-    DATACLASS_CONFIG,
-    BaseEnum,
-    ChunkKind,
-    ConfigLanguage,
-    DataclassSerializationMixin,
-    ExtKind,
-    SemanticSearchLanguage,
-)
-from codeweaver.core.types.enum import AnonymityConversion
+from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
+from codeweaver.core.metadata import ChunkKind, ExtKind
+from codeweaver.core.types.enum import AnonymityConversion, BaseEnum
+from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
 
 
 if TYPE_CHECKING:

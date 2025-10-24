@@ -2,7 +2,7 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-
+# pyright: reportUnsupportedDunderAll=none
 """Type aliases and base models used throughout the CodeWeaver project."""
 
 from codeweaver.core.types.aliases import (
@@ -39,7 +39,9 @@ from codeweaver.core.types.aliases import (
     SentinelName,
     ThingName,
     ThingNameT,
+    ThingOrCategoryNameT,
 )
+from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.enum import (
     AnonymityConversion,
     BaseDataclassEnum,
@@ -78,6 +80,7 @@ __all__ = (
     "DeserializationKwargs",
     "DevToolName",
     "DevToolNameT",
+    "DictView",
     "DirectoryName",
     "DirectoryNameT",
     "DirectoryPath",
@@ -110,7 +113,13 @@ __all__ = (
     "SerializationKwargs",
     "ThingName",
     "ThingNameT",
+    "ThingOrCategoryNameT",
     "Unset",
     "generate_field_title",
     "generate_title",
 )
+
+
+def __dir__() -> list[str]:
+    """List available attributes for the semantic package."""
+    return list(__all__)

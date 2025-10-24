@@ -23,9 +23,9 @@ from __future__ import annotations
 
 import contextlib
 
-from typing import Literal, NotRequired, TypedDict, cast, is_typeddict
+from typing import NotRequired, TypedDict, cast, is_typeddict
 
-from codeweaver.core import BaseEnum
+from codeweaver.core.types.enum import BaseEnum
 from codeweaver.exceptions import ConfigurationError
 
 
@@ -327,6 +327,7 @@ class Provider(BaseEnum):
     def is_embedding_provider(self) -> bool:
         """Check if the provider is an embedding provider."""
         from codeweaver.providers.capabilities import get_provider_kinds
+        from codeweaver.providers.types import LiteralProvider
 
         return any(
             kind == ProviderKind.EMBEDDING
@@ -336,12 +337,14 @@ class Provider(BaseEnum):
     def is_sparse_provider(self) -> bool:
         """Check if the provider is a sparse embedding provider."""
         from codeweaver.providers.capabilities import get_provider_kinds
+        from codeweaver.providers.types import LiteralProvider
 
         return ProviderKind.SPARSE_EMBEDDING in get_provider_kinds(cast(LiteralProvider, self))
 
     def is_reranking_provider(self) -> bool:
         """Check if the provider is a reranking provider."""
         from codeweaver.providers.capabilities import get_provider_kinds
+        from codeweaver.providers.types import LiteralProvider
 
         return ProviderKind.RERANKING in get_provider_kinds(cast(LiteralProvider, self))
 
@@ -371,44 +374,4 @@ class ProviderKind(BaseEnum):
     """A setting to identify when a `ProviderKind` is not set or is configured."""
 
 
-LiteralProviderKind = Literal[
-    ProviderKind.AGENT,
-    ProviderKind.DATA,
-    ProviderKind.EMBEDDING,
-    ProviderKind.RERANKING,
-    ProviderKind.SPARSE_EMBEDDING,
-    ProviderKind.VECTOR_STORE,
-]
-LiteralProvider = Literal[
-    Provider.ANTHROPIC,
-    Provider.AZURE,
-    Provider.BEDROCK,
-    Provider.CEREBRAS,
-    Provider.COHERE,
-    Provider.DEEPSEEK,
-    Provider.DUCKDUCKGO,
-    Provider.FASTEMBED,
-    Provider.FIREWORKS,
-    Provider.GITHUB,
-    Provider.GOOGLE,
-    Provider.GROQ,
-    Provider.HEROKU,
-    Provider.HUGGINGFACE_INFERENCE,
-    Provider.LITELLM,
-    Provider.MISTRAL,
-    Provider.MOONSHOT,
-    Provider.OLLAMA,
-    Provider.OPENAI,
-    Provider.OPENROUTER,
-    Provider.PERPLEXITY,
-    Provider.QDRANT,
-    Provider.SENTENCE_TRANSFORMERS,
-    Provider.TAVILY,
-    Provider.TOGETHER,
-    Provider.VERCEL,
-    Provider.VOYAGE,
-    Provider.X_AI,
-]
-
-
-__all__ = ("LiteralProvider", "LiteralProviderKind", "Provider", "ProviderEnvVars", "ProviderKind")
+__all__ = ("Provider", "ProviderEnvVars", "ProviderKind")

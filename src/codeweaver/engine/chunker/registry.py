@@ -13,7 +13,7 @@ from weakref import WeakValueDictionary
 from pydantic import UUID7
 
 from codeweaver.common.utils.utils import uuid7
-from codeweaver.core import BasedModel
+from codeweaver.core.types.models import BasedModel
 
 
 if TYPE_CHECKING:

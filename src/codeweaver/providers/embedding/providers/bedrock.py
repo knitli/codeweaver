@@ -36,7 +36,8 @@ from pydantic import (
 from pydantic.alias_generators import to_camel, to_snake
 from types_boto3_bedrock_runtime import BedrockRuntimeClient
 
-from codeweaver.core import BasedModel, CodeChunk
+from codeweaver.core.chunks import CodeChunk
+from codeweaver.core.types.models import BasedModel
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.embedding.capabilities import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider

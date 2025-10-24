@@ -26,14 +26,8 @@ import watchfiles
 from pydantic import PrivateAttr
 from watchfiles.main import Change, FileChange
 
-from codeweaver.config import CodeWeaverSettingsDict, RignoreSettings
-from codeweaver.core import (
-    BlakeStore,
-    ConfigLanguage,
-    DictView,
-    DiscoveredFile,
-    SemanticSearchLanguage,
-)
+from codeweaver.config.settings import CodeWeaverSettingsDict, RignoreSettings
+from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.file_extensions import (
     CODE_FILES_EXTENSIONS,
     CONFIG_FILE_LANGUAGES,
@@ -41,6 +35,9 @@ from codeweaver.core.file_extensions import (
     DEFAULT_EXCLUDED_EXTENSIONS,
     DOC_FILES_EXTENSIONS,
 )
+from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
+from codeweaver.core.stores import BlakeStore
+from codeweaver.core.types.dictview import DictView
 
 
 logger = logging.getLogger(__name__)

@@ -14,8 +14,14 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, cast
 
 from codeweaver.common.utils import lazy_import
-from codeweaver.core import SemanticSearchLanguage
-from codeweaver.semantic.types import CategoryName, Role, ThingName, ThingOrCategoryNameType
+from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.core.types.aliases import (
+    CategoryNameT,
+    Role,
+    RoleT,
+    ThingNameT,
+    ThingOrCategoryNameT,
+)
 
 
 if TYPE_CHECKING:
@@ -41,9 +47,9 @@ else:
 
 logger = logging.getLogger(__name__)
 
-type _TokenDict = dict[ThingName, Token]
-type _CompositeThingDict = dict[ThingName, CompositeThing]
-type _CategoryDict = dict[CategoryName, Category]
+type _TokenDict = dict[ThingNameT, Token]
+type _CompositeThingDict = dict[ThingNameT, CompositeThing]
+type _CategoryDict = dict[CategoryNameT, Category]
 
 
 class ThingRegistry:
@@ -65,14 +71,14 @@ class ThingRegistry:
         dict[SemanticSearchLanguage, _CategoryDict],
     ]
 
-    _direct_connections: dict[SemanticSearchLanguage, dict[ThingName, list[DirectConnection]]]
+    _direct_connections: dict[SemanticSearchLanguage, dict[ThingNameT, list[DirectConnection]]]
     """Direct connections by source Thing name."""
-    _positional_connections: dict[SemanticSearchLanguage, dict[ThingName, PositionalConnections]]
+    _positional_connections: dict[SemanticSearchLanguage, dict[ThingNameT, PositionalConnections]]
     """Positional connections by source Thing name."""
 
     _connections: tuple[
-        dict[SemanticSearchLanguage, dict[ThingName, list[DirectConnection]]],
-        dict[SemanticSearchLanguage, dict[ThingName, PositionalConnections]],
+        dict[SemanticSearchLanguage, dict[ThingNameT, list[DirectConnection]]],
+        dict[SemanticSearchLanguage, dict[ThingNameT, PositionalConnections]],
     ]
 
     def __init__(self) -> None:
@@ -98,10 +104,10 @@ class ThingRegistry:
     def __contains__(
         self,
         obj: ThingOrCategoryType
-        | ThingOrCategoryNameType
+        | ThingOrCategoryNameT
         | PositionalConnections
         | DirectConnection
-        | Role,
+        | RoleT,
     ) -> bool:
         """Check if a thing, category, or connection is registered -- by instance or name."""
         if isinstance(obj, Category | Token | CompositeThing):
@@ -111,7 +117,7 @@ class ThingRegistry:
                 return obj.source_thing in self._direct_connections.get(obj.language, {})
             return obj.source_thing in self._positional_connections.get(obj.language, {})
         scan = [thing for thing in self.everything if not isinstance(thing, PositionalConnections)]
-        names: list[ThingOrCategoryNameType | Role] = [
+        names: list[ThingOrCategoryNameT | Role] = [
             cast(ThingOrCategoryType, thing).name
             if hasattr(thing, "name")
             else cast(DirectConnection, thing).role
@@ -129,7 +135,7 @@ class ThingRegistry:
 
     def _language_content(
         self, language: SemanticSearchLanguage
-    ) -> MappingProxyType[ThingOrCategoryNameType, ThingOrCategoryType]:
+    ) -> MappingProxyType[ThingOrCategoryNameT, ThingOrCategoryType]:
         """Provides a combined read-only view of all Things for a specific language."""
         return MappingProxyType(
             self._tokens[language] | self._composite_things[language] | self._categories[language]
@@ -275,7 +281,7 @@ class ThingRegistry:
             self.register_connection(connection)
 
     def get_thing_by_name(
-        self, name: ThingOrCategoryNameType, *, language: SemanticSearchLanguage | None = None
+        self, name: ThingOrCategoryNameT, *, language: SemanticSearchLanguage | None = None
     ) -> ThingOrCategoryType | None:
         """Get a Thing by its name across all languages."""
         if language and name in (content := self._language_content(language)):
@@ -288,7 +294,7 @@ class ThingRegistry:
         return None
 
     def get_category_by_name(
-        self, name: CategoryName, *, language: SemanticSearchLanguage | None = None
+        self, name: CategoryNameT, *, language: SemanticSearchLanguage | None = None
     ) -> Category | None:
         """Get a Category by its name across all languages."""
         if language and name in (content := self._categories[language]):
@@ -301,7 +307,7 @@ class ThingRegistry:
         return None
 
     def _get_direct_connections_by_source(
-        self, source: ThingName, *, language: SemanticSearchLanguage | None = None
+        self, source: ThingNameT, *, language: SemanticSearchLanguage | None = None
     ) -> Generator[DirectConnection]:
         """Get DirectConnections by their source Thing name across all languages."""
         if language:
@@ -319,7 +325,7 @@ class ThingRegistry:
         )
 
     def _get_positional_connections_by_source(
-        self, source: ThingName, *, language: SemanticSearchLanguage | None = None
+        self, source: ThingNameT, *, language: SemanticSearchLanguage | None = None
     ) -> PositionalConnections | None:
         """Get PositionalConnectionss by their source Thing name across all languages."""
         if language:
@@ -335,13 +341,13 @@ class ThingRegistry:
         )
 
     def get_positional_connections_by_source(
-        self, source: ThingName, *, language: SemanticSearchLanguage | None = None
+        self, source: ThingNameT, *, language: SemanticSearchLanguage | None = None
     ) -> PositionalConnections | None:
         """Get PositionalConnectionss by their source Thing name across all languages."""
         return self._get_positional_connections_by_source(source, language=language)
 
     def get_direct_connections_by_source(
-        self, source: ThingName, *, language: SemanticSearchLanguage | None = None
+        self, source: ThingNameT, *, language: SemanticSearchLanguage | None = None
     ) -> Generator[DirectConnection]:
         """Get DirectConnections by their source Thing name across all languages."""
         yield from self._get_direct_connections_by_source(source, language=language)
@@ -370,8 +376,8 @@ class ThingRegistry:
     def connections(
         self,
     ) -> tuple[
-        MappingProxyType[SemanticSearchLanguage, dict[ThingName, list[DirectConnection]]],
-        MappingProxyType[SemanticSearchLanguage, dict[ThingName, PositionalConnections]],
+        MappingProxyType[SemanticSearchLanguage, dict[ThingNameT, list[DirectConnection]]],
+        MappingProxyType[SemanticSearchLanguage, dict[ThingNameT, PositionalConnections]],
     ]:
         """Get all registered Connections."""
         return (
@@ -383,7 +389,7 @@ class ThingRegistry:
     def all_cats_and_things(
         self,
     ) -> MappingProxyType[
-        SemanticSearchLanguage, MappingProxyType[ThingOrCategoryNameType, ThingOrCategoryType]
+        SemanticSearchLanguage, MappingProxyType[ThingOrCategoryNameT, ThingOrCategoryType]
     ]:
         """Get all registered Things and Categories combined."""
         return MappingProxyType({
@@ -411,14 +417,14 @@ class ThingRegistry:
     @property
     def direct_connections(
         self,
-    ) -> MappingProxyType[SemanticSearchLanguage, dict[ThingName, list[DirectConnection]]]:
+    ) -> MappingProxyType[SemanticSearchLanguage, dict[ThingNameT, list[DirectConnection]]]:
         """Get all registered DirectConnections."""
         return MappingProxyType(self._direct_connections)
 
     @property
     def positional_connections(
         self,
-    ) -> MappingProxyType[SemanticSearchLanguage, dict[ThingName, PositionalConnections]]:
+    ) -> MappingProxyType[SemanticSearchLanguage, dict[ThingNameT, PositionalConnections]]:
         """Get all registered PositionalConnections."""
         return MappingProxyType(self._positional_connections)
 

@@ -11,7 +11,7 @@ from typing import Any, cast
 
 from pydantic import ConfigDict
 
-from codeweaver.core import CodeChunk
+from codeweaver.core.chunks import CodeChunk
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities

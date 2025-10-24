@@ -10,7 +10,8 @@ from typing import Annotated, Any, Literal, NotRequired, Required, TypedDict
 
 from pydantic import Field, NonNegativeInt, PositiveInt
 
-from codeweaver.core import BasedModel, CodeChunk, SerializedCodeChunk
+from codeweaver.core.chunks import CodeChunk, SerializedCodeChunk
+from codeweaver.core.types.models import BasedModel
 from codeweaver.providers.provider import Provider
 from codeweaver.tokenizers.base import Tokenizer
 
@@ -156,6 +157,9 @@ class RerankingModelCapabilities(BasedModel):
         if not self.tokenizer:
             self.tokenizer = "tiktoken"
             self.tokenizer_model = "cl100k_base"
+
+    def _telemetry_keys(self) -> None:
+        return None
 
     @property
     def token_processor(self) -> Tokenizer[Any]:

@@ -20,7 +20,7 @@ from typing import Any, ClassVar, cast
 import numpy as np
 
 from codeweaver.common.utils.utils import rpartial
-from codeweaver.core import CodeChunk
+from codeweaver.core.chunks import CodeChunk
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers import EmbeddingProvider

@@ -27,7 +27,8 @@ from pydantic import (
 from pydantic.dataclasses import dataclass
 from pydantic_core import ArgsKwargs, core_schema
 
-from codeweaver.core import (
+from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.core.types import (
     DATACLASS_CONFIG,
     BaseDataclassEnum,
     BasedModel,
@@ -35,7 +36,6 @@ from codeweaver.core import (
     BaseEnumData,
     DataclassSerializationMixin,
 )
-from codeweaver.core.language import SemanticSearchLanguage
 
 
 if TYPE_CHECKING:
@@ -103,9 +103,6 @@ class ImportanceScores(DataclassSerializationMixin):
         NonNegativeFloat,
         Field(description="Weight for documentation context; explaining code", ge=0.0, le=1.0),
     ]
-
-    def _telemetry_keys(self) -> None:
-        return None
 
     @classmethod
     def default(cls) -> Self:

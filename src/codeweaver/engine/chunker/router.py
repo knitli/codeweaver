@@ -13,7 +13,10 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pydantic import UUID7
 
 from codeweaver.common.utils.utils import estimate_tokens, uuid7
-from codeweaver.core import CodeChunk, DiscoveredFile, Metadata, Span
+from codeweaver.core.chunks import CodeChunk
+from codeweaver.core.discovery import DiscoveredFile
+from codeweaver.core.metadata import Metadata
+from codeweaver.core.spans import Span
 from codeweaver.engine.chunker.registry import source_id_for
 
 

@@ -84,3 +84,6 @@ class DictView[TypedDictT: (Mapping[str, Any])](Mapping[str, Any]):
     def __repr__(self) -> str:
         """Return a string representation of the DictView."""
         return f"{type(self).__name__}({dict(self._mapping)})"
+
+
+__all__ = ("DictView",)

@@ -49,13 +49,7 @@ from codeweaver.providers.optimize import (
     decide_fastembed_runtime,
     get_optimizations,
 )
-from codeweaver.providers.provider import (
-    LiteralProvider,
-    LiteralProviderKind,
-    Provider,
-    ProviderEnvVars,
-    ProviderKind,
-)
+from codeweaver.providers.provider import Provider, ProviderEnvVars, ProviderKind
 from codeweaver.providers.reranking import (
     KnownRerankModelName,
     RerankingProvider,
@@ -67,6 +61,7 @@ from codeweaver.providers.reranking import (
 )
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.tools import get_data_provider, load_default_data_providers
+from codeweaver.providers.types import LiteralProvider, LiteralProviderKind
 from codeweaver.providers.vector_stores import VectorStoreProvider
 
 

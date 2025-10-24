@@ -476,7 +476,6 @@ class TestIntegration:
         for delim in all_delimiters:
             self._test_delimiter_dict(delim)
 
-    # TODO Rename this here and in `test_family_pattern_expansion`
     def _test_delimiter_dict(self, delim):
         assert "start" in delim
         assert "end" in delim

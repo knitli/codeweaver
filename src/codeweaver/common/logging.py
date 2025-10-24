@@ -15,21 +15,22 @@ from typing import TYPE_CHECKING, Any, Literal
 from fastmcp import Context
 from pydantic_core import to_json
 
-from codeweaver.common import LazyImport, lazy_import
-from codeweaver.config import LoggingConfigDict
+from codeweaver.common.utils.lazy_importer import lazy_import
+from codeweaver.config.logging import LoggingConfigDict
 
 
 if TYPE_CHECKING:
     from rich.console import Console
     from rich.logging import RichHandler
+
+    from codeweaver.common import LazyImport
 else:
     RichHandler: LazyImport[RichHandler] = lazy_import("rich.logging", "RichHandler")
 
-console: LazyImport[Console] = lazy_import("rich.console", "Console")
-
 
 def get_rich_handler(**kwargs: Any) -> RichHandler:
-    global RichHandler, console
+    console: LazyImport[Console] = lazy_import("rich.console", "Console")
+    global RichHandler
     return RichHandler(
         console=console(markup=True, soft_wrap=True, emoji=True), markup=True, **kwargs
     )  # type: ignore

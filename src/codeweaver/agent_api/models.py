@@ -12,14 +12,18 @@ from typing import TYPE_CHECKING, Annotated, Any
 from pydantic import ConfigDict, Field, NonNegativeFloat, NonNegativeInt, model_validator
 
 from codeweaver.agent_api.intent import IntentType
-from codeweaver.core import BASEDMODEL_CONFIG, BasedModel, BaseEnum, CodeChunk, DiscoveredFile, Span
+from codeweaver.core.chunks import CodeChunk
+from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.core.spans import Span
+from codeweaver.core.types.enum import BaseEnum
+from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
 
 
 if TYPE_CHECKING:
     from rich.table import Table
 
-    from codeweaver.core import AnonymityConversion, FilteredKey, LanguageName
+    from codeweaver.core.types import AnonymityConversion, FilteredKey, LanguageName
 
 
 class SearchStrategy(BaseEnum):
@@ -86,6 +90,8 @@ class CodeMatch(BasedModel):
     ]
 
     def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
+
         return {FilteredKey("related_symbols"): AnonymityConversion.COUNT}
 
     @model_validator(mode="after")

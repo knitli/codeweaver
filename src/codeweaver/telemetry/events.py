@@ -43,7 +43,9 @@ class SessionSummaryEvent:
         NonNegativeFloat, Field(description="Total session duration in minutes")
     ]
 
-    total_searches: Annotated[NonNegativeInt, Field(description="Total number of searches performed")]
+    total_searches: Annotated[
+        NonNegativeInt, Field(description="Total number of searches performed")
+    ]
 
     successful_searches: Annotated[
         NonNegativeInt, Field(description="Number of successful searches")
@@ -89,7 +91,8 @@ class SessionSummaryEvent:
     ]
 
     languages: Annotated[
-        dict[str, NonNegativeInt], Field(description="Anonymized language distribution (counts only)")
+        dict[str, NonNegativeInt],
+        Field(description="Anonymized language distribution (counts only)"),
     ]
 
     semantic_frequencies: Annotated[
@@ -258,17 +261,14 @@ class SemanticValidationEvent:
                 "total_chunks_analyzed": self.total_chunks_analyzed,
                 "category_usage": self.category_usage,
                 "usage_frequencies": self.usage_frequencies,
-                "alignment_with_scores": {
-                    "correlation": self.correlation,
-                    "note": self.note,
-                },
+                "alignment_with_scores": {"correlation": self.correlation, "note": self.note},
             },
         )
 
 
 __all__ = (
-    "TelemetryEvent",
-    "SessionSummaryEvent",
     "PerformanceBenchmarkEvent",
     "SemanticValidationEvent",
+    "SessionSummaryEvent",
+    "TelemetryEvent",
 )

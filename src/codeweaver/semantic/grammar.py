@@ -260,25 +260,30 @@ from pydantic import (
 )
 from pydantic.dataclasses import dataclass
 
-from codeweaver.common import LazyImport, lazy_import
-from codeweaver.core import (
+from codeweaver.common.utils import LazyImport, lazy_import
+from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.core.types.aliases import (
+    CategoryName,
+    CategoryNameT,
+    LiteralStringT,
+    Role,
+    RoleT,
+    ThingName,
+    ThingNameT,
+    ThingOrCategoryNameT,
+)
+from codeweaver.core.types.models import (
     DATACLASS_CONFIG,
+    FROZEN_BASEDMODEL_CONFIG,
     BasedModel,
     DataclassSerializationMixin,
-    LiteralStringT,
 )
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.types import FROZEN_BASEDMODEL_CONFIG
 from codeweaver.semantic.types import (
-    CategoryName,
     ConnectionClass,
     ConnectionConstraint,
     NodeTypeDTO,
-    Role,
     SimpleNodeTypeDTO,
     ThingKind,
-    ThingName,
-    ThingOrCategoryNameType,
     TokenPurpose,
 )
 
@@ -320,17 +325,17 @@ def name_normalizer(name: str) -> str:
     return name.lower().strip().lstrip("_")
 
 
-def cat_name_normalizer(name: LiteralStringT | CategoryName) -> CategoryName:
+def cat_name_normalizer(name: LiteralStringT | CategoryNameT) -> CategoryNameT:
     """Normalize category names by stripping leading underscores."""
     return CategoryName(name_normalizer(str(name)))  # pyright: ignore[reportArgumentType]
 
 
-def thing_name_normalizer(name: LiteralStringT | ThingName) -> ThingName:
+def thing_name_normalizer(name: LiteralStringT | ThingNameT) -> ThingNameT:
     """Normalize thing names by stripping leading underscores."""
     return ThingName(name_normalizer(str(name)))  # pyright: ignore[reportArgumentType]
 
 
-def role_name_normalizer(name: LiteralStringT | Role) -> Role:
+def role_name_normalizer(name: LiteralStringT | RoleT) -> RoleT:
     """Normalize role names by stripping leading underscores."""
     return Role(name_normalizer(str(name)))  # pyright: ignore[reportArgumentType]
 
@@ -360,7 +365,7 @@ class Thing(BasedModel):
     ]
 
     category_names: Annotated[
-        frozenset[CategoryName],
+        frozenset[CategoryNameT],
         Field(description="Names of Categories this Thing belongs to.", default_factory=frozenset),
     ]
 
@@ -406,7 +411,7 @@ class Thing(BasedModel):
             data["category_names"] = frozenset(cat_name_normalizer(name) for name in cat_names)
         super().__init__(**data)
 
-    def __contains__(self, category: Category | CategoryName) -> bool:
+    def __contains__(self, category: Category | CategoryNameT) -> bool:
         """Check if this Thing belongs to the specified Category."""
         if isinstance(category, Category):
             return category in self.categories if self.has_categories else False
@@ -430,7 +435,9 @@ class Thing(BasedModel):
         return bool(self.category_names)
 
     @classmethod
-    def from_node_dto(cls, node_dto: NodeTypeDTO, category_names: frozenset[CategoryName]) -> Thing:
+    def from_node_dto(
+        cls, node_dto: NodeTypeDTO, category_names: frozenset[CategoryNameT]
+    ) -> Thing:
         """Create a Thing (Token or Composite) from a NodeTypeDTO and category names."""
         if node_dto.is_category:
             raise ValueError("Cannot create Thing from Category node")
@@ -681,7 +688,7 @@ class Category(BasedModel):
 
     model_config = BasedModel.model_config | ConfigDict(frozen=True)
 
-    name: Annotated[CategoryName, Field(description="The name of the Category.")]
+    name: Annotated[CategoryNameT, Field(description="The name of the Category.")]
 
     language: Annotated[
         SemanticSearchLanguage,
@@ -689,7 +696,7 @@ class Category(BasedModel):
     ]
 
     member_thing_names: Annotated[
-        frozenset[ThingName],
+        frozenset[ThingNameT],
         Field(
             description="Names of Things that are members of this Category.",
             default_factory=frozenset,
@@ -773,7 +780,7 @@ class Category(BasedModel):
         """Get the number of member Things in this Category."""
         return len(self.member_things)
 
-    def includes(self, thing_name: ThingName) -> bool:
+    def includes(self, thing_name: ThingNameT) -> bool:
         """Check if this Category includes the specified Thing name."""
         return thing_name in self.member_thing_names
 
@@ -819,12 +826,12 @@ class Connection(BasedModel):
     model_config = BasedModel.model_config | ConfigDict(frozen=True)
 
     source_thing: Annotated[
-        ThingName,
+        ThingNameT,
         Field(description="The name of the source Thing this Connection originates from."),
     ]
 
     target_thing_names: Annotated[
-        tuple[ThingOrCategoryNameType, ...],
+        tuple[ThingOrCategoryNameT, ...],
         Field(
             description="Names of target Things or Categories this Connection can point to.",
             default_factory=tuple,
@@ -897,7 +904,7 @@ class Connection(BasedModel):
             if (thing := registry.get_thing_by_name(name, language=self.language))
         )
 
-    def __contains__(self, thing: ThingOrCategoryType | ThingOrCategoryNameType) -> bool:
+    def __contains__(self, thing: ThingOrCategoryType | ThingOrCategoryNameT) -> bool:
         """Check if this Connection can point to the specified Thing or Category by name or instance."""
         if isinstance(thing, CompositeThing | Token | Category):
             return thing in self.target_things
@@ -920,7 +927,7 @@ class Connection(BasedModel):
         """Get ConnectionConstraint flags for this Connection."""
         return ConnectionConstraint.from_cardinality(*self._cardinality)
 
-    def can_connect_to(self, thing: ThingOrCategoryType | ThingOrCategoryNameType) -> bool:
+    def can_connect_to(self, thing: ThingOrCategoryType | ThingOrCategoryNameT) -> bool:
         """Check if this Connection can point to the specified Thing.
 
         This method differs slightly from using __contains__ because it treats Things that can be anywhere (extra) as always connectable.
@@ -987,7 +994,7 @@ class DirectConnection(Connection):
     """
 
     role: Annotated[
-        Role,
+        RoleT,
         Field(
             description="""
             The semantic function of this DirectConnection.
@@ -1453,7 +1460,7 @@ __all__ = (
     "Grammar",
     "PositionalConnections",
     "Thing",
-    "ThingOrCategoryNameType",
+    "ThingOrCategoryNameT",
     "ThingOrCategoryType",
     "ThingType",
     "Token",

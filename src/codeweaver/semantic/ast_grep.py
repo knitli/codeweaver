@@ -90,8 +90,11 @@ from pydantic import (
     computed_field,
 )
 
-from codeweaver.common import LazyImport, lazy_import, uuid7
-from codeweaver.core import BasedModel, BaseEnum, SemanticSearchLanguage, ThingName, ThingNameT
+from codeweaver.common.utils import LazyImport, lazy_import, uuid7
+from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.core.types.aliases import ThingName, ThingNameT
+from codeweaver.core.types.enum import BaseEnum
+from codeweaver.core.types.models import BasedModel
 from codeweaver.engine import humanize
 
 

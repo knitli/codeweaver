@@ -16,10 +16,11 @@ from typing import TYPE_CHECKING, Annotated, ClassVar, Literal, Self, TypedDict,
 from pydantic import DirectoryPath, Field, computed_field
 from pydantic.dataclasses import dataclass
 
-from codeweaver.core import DATACLASS_CONFIG, BaseEnum, DataclassSerializationMixin, LiteralStringT
 from codeweaver.core.file_extensions import COMMON_TOOLING_PATHS, TEST_DIR_NAMES
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
-from codeweaver.core.types.enum import AnonymityConversion
+from codeweaver.core.types.aliases import LiteralStringT
+from codeweaver.core.types.enum import BaseEnum
+from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
 
 
 if TYPE_CHECKING:
@@ -155,7 +156,7 @@ class RepoDirectory(DataclassSerializationMixin):
     """Cache of subdirectories in the directory."""
 
     def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
-        from codeweaver.core.types import AnonymityConversion, FilteredKey
+        from codeweaver.core.types.aliases import FilteredKey
 
         return {
             FilteredKey("path"): AnonymityConversion.HASH,

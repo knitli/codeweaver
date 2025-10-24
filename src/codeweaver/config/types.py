@@ -35,18 +35,16 @@ from uvicorn.config import (
     HTTPProtocolType,
     InterfaceType,
     LifespanType,
-    LoopSetupType,
     WSProtocolType,
 )
 
 from codeweaver.config.logging import LoggingConfigDict
-from codeweaver.core import BASEDMODEL_CONFIG, BasedModel
 from codeweaver.core.types.enum import AnonymityConversion
+from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
 
 
 if TYPE_CHECKING:
-    from codeweaver.core import DictView, Unset
-    from codeweaver.core.types import AnonymityConversion, FilteredKey
+    from codeweaver.core.types import AnonymityConversion, DictView, FilteredKey, Unset
     from codeweaver.providers.provider import Provider
 
 # ===========================================================================
@@ -188,7 +186,6 @@ class UvicornServerSettings(BasedModel):
     port: PositiveInt = 9328
     uds: str | None = None
     fd: int | None = None
-    loop: LoopSetupType | str = "auto"
     http: type[asyncio.Protocol] | HTTPProtocolType | str = "auto"
     ws: type[asyncio.Protocol] | WSProtocolType | str = "auto"
     ws_max_size: PositiveInt = 16777216  # 16 MiB
@@ -267,7 +264,6 @@ class UvicornServerSettingsDict(TypedDict, total=False):
     port: NotRequired[PositiveInt]
     uds: NotRequired[str | None]
     fd: NotRequired[int | None]
-    loop: NotRequired[LoopSetupType | str]
     http: NotRequired[type[asyncio.Protocol] | HTTPProtocolType | str]
     ws: NotRequired[type[asyncio.Protocol] | WSProtocolType | str]
     ws_max_size: NotRequired[PositiveInt]

@@ -16,7 +16,7 @@ from pydantic import Field, PositiveInt, SecretStr
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
 
 from codeweaver.config.types import BaseProviderSettings
-from codeweaver.core import DictView
+from codeweaver.core.types import DictView
 
 
 # ===========================================================================

@@ -36,25 +36,29 @@ from pydantic.dataclasses import dataclass
 from pydantic_core import to_json
 
 from codeweaver import __version__ as version
-from codeweaver.common import get_project_root, lazy_import, rpartial, setup_logger
-from codeweaver.config import (
-    CodeWeaverSettings,
-    CodeWeaverSettingsDict,
+from codeweaver.common.logging import setup_logger
+from codeweaver.common.utils import get_project_root, lazy_import, rpartial
+from codeweaver.config.logging import LoggingSettings
+from codeweaver.config.middleware import (
     ErrorHandlingMiddlewareSettings,
-    FastMcpServerSettings,
-    FastMcpServerSettingsDict,
-    FileFilterSettings,
     LoggingMiddlewareSettings,
-    LoggingSettings,
     MiddlewareOptions,
     RateLimitingMiddlewareSettings,
     RetryMiddlewareSettings,
+)
+from codeweaver.config.settings import (
+    CodeWeaverSettings,
+    CodeWeaverSettingsDict,
+    FastMcpServerSettings,
+    FileFilterSettings,
     get_settings_map,
 )
-from codeweaver.core import DATACLASS_CONFIG, BaseEnum, DataclassSerializationMixin, DictView
-from codeweaver.core.types.enum import AnonymityConversion
+from codeweaver.config.types import FastMcpServerSettingsDict
+from codeweaver.core.types.dictview import DictView
+from codeweaver.core.types.enum import AnonymityConversion, BaseEnum
+from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
 from codeweaver.exceptions import InitializationError
-from codeweaver.providers import Provider as Provider
+from codeweaver.providers.provider import Provider as Provider
 
 
 if TYPE_CHECKING:
