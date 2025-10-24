@@ -26,7 +26,6 @@ permissions:
   contents: write
   discussions: write
   pull-requests: write
-  workflows: write
 jobs:
   claude-response:
     runs-on: ubuntu-latest
