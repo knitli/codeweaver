@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Qdrant provider for vector and hybrid search/store."""
 
+from __future__ import annotations
+
 from typing import Any
 
 from codeweaver.exceptions import ProviderError

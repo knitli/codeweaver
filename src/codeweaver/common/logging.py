@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 
+from importlib import import_module
 from logging.config import dictConfig
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -20,7 +21,6 @@ from codeweaver.config.logging import LoggingConfigDict
 
 
 if TYPE_CHECKING:
-    from rich.console import Console
     from rich.logging import RichHandler
 
     from codeweaver.common import LazyImport
@@ -29,7 +29,7 @@ else:
 
 
 def get_rich_handler(**kwargs: Any) -> RichHandler:
-    console: LazyImport[Console] = lazy_import("rich.console", "Console")
+    console = import_module("rich.console").Console
     global RichHandler
     return RichHandler(
         console=console(markup=True, soft_wrap=True, emoji=True), markup=True, **kwargs

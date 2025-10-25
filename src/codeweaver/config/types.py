@@ -44,7 +44,7 @@ from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types import AnonymityConversion, DictView, FilteredKey, Unset
+    from codeweaver.core.types import AnonymityConversion, DictView, FilteredKeyT, Unset
     from codeweaver.providers.provider import Provider
 
 # ===========================================================================
@@ -229,7 +229,7 @@ class UvicornServerSettings(BasedModel):
     factory: bool = False
     h11_max_incomplete_event_size: int | None = None
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {

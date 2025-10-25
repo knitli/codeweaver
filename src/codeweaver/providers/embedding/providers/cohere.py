@@ -4,6 +4,8 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 # applies to new/modified code in this directory (`src/codeweaver/embedding_providers/`)
 
+from __future__ import annotations
+
 import os
 
 from collections.abc import Mapping, Sequence

@@ -50,7 +50,7 @@ from codeweaver.core.utils import truncate_text
 
 if TYPE_CHECKING:
     from codeweaver.core.discovery import DiscoveredFile
-    from codeweaver.core.types import AnonymityConversion, FilteredKey
+    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
 # ---------------------------------------------------------------------------
 # *                    Code Search and Chunks
@@ -84,7 +84,7 @@ class SearchResult(BasedModel):
         Metadata | None, Field(description="""Additional metadata about the result""")
     ] = None
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         base = {FilteredKey("content"): AnonymityConversion.TEXT_COUNT}
@@ -163,7 +163,7 @@ class CodeChunk(BasedModel):
         ),
     ] = None
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {
@@ -321,3 +321,9 @@ __all__ = (
     "SerializedCodeChunk",
     "StructuredDataInput",
 )
+
+# Rebuild model to resolve forward references (if AstThing is available)
+try:
+    CodeChunk.model_rebuild()
+except Exception:
+    pass  # Forward references will be resolved when AstThing is imported

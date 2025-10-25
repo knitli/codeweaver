@@ -866,6 +866,7 @@ Add comprehensive docstrings to all chunker modules:
 **Acceptance**:
 - [ ] All modules have module-level docstrings
 - [ ] Public APIs documented with examples
+
 - [ ] Cross-references to spec sections included
 
 ---

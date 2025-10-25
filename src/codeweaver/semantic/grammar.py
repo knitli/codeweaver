@@ -278,6 +278,7 @@ from codeweaver.core.types.models import (
     BasedModel,
     DataclassSerializationMixin,
 )
+from codeweaver.semantic.classifications import ThingClass
 from codeweaver.semantic.types import (
     ConnectionClass,
     ConnectionConstraint,
@@ -289,16 +290,11 @@ from codeweaver.semantic.types import (
 
 
 if TYPE_CHECKING:
-    from codeweaver.semantic.classifications import ThingClass
     from codeweaver.semantic.classifier import GrammarBasedClassifier, GrammarClassificationResult
     from codeweaver.semantic.registry import ThingRegistry
-else:
-    ThingClass: LazyImport[ThingClass] = lazy_import(
-        "codeweaver.semantic.classifications", "ThingClass"
-    )
-    registry: LazyImport[ThingRegistry] = lazy_import(
-        "codeweaver.semantic.registry", "get_registry"
-    )
+
+
+registry: LazyImport[ThingRegistry] = lazy_import("codeweaver.semantic.registry", "get_registry")
 
 logger = logging.getLogger()
 
@@ -565,8 +561,7 @@ class CompositeThing(Thing):
         Annotated[
             bool,
             Field(
-                description="Whether this Composite is the root of the parse tree (i.e., the start symbol).",
-                validation_alias="root",
+                description="Whether this Composite is the root of the parse tree (i.e., the start symbol)."
             ),
         ]
         | None

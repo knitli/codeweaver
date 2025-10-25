@@ -5,6 +5,8 @@
 
 """Re-exports for agent models from pydantic_ai."""
 
+from __future__ import annotations
+
 from pydantic_ai.models import (
     DownloadedItem,
     cached_async_http_client,

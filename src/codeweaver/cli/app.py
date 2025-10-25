@@ -16,7 +16,6 @@ from typing import Annotated, Literal
 import cyclopts
 
 from pydantic import FilePath
-from pydantic_core import to_json
 from rich import print as rich_print
 from rich.console import Console
 from rich.table import Table
@@ -97,7 +96,7 @@ async def search(
     project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
     output_format: Literal["json", "table", "markdown"] = "table",
 ) -> None:
-    """Search codebase from command line (Phase 1: local only)."""
+    """Search codebase from command line (using stub during refactor)."""
     try:
         settings = get_settings_map()
         if project_path:
@@ -108,13 +107,16 @@ async def search(
         console.print(f"{CODEWEAVER_PREFIX} [blue]Searching in: {settings['project_root']}[/blue]")
         console.print(f"{CODEWEAVER_PREFIX} [blue]Query: {query}[/blue]")
 
-        # Execute search
-        response = await find_code(
+        # Use stub find_code_tool during refactor
+        from codeweaver.app_bindings import find_code_tool
+
+        response = await find_code_tool(
             query=query,
-            settings=settings,
             intent=intent,
-            token_limit=settings["token_limit"],
+            token_limit=settings.get("token_limit", 10000),
             include_tests=include_tests,
+            focus_languages=None,
+            context=None,
         )
 
         # Limit results for CLI display
@@ -122,14 +124,7 @@ async def search(
 
         # Output results in requested format
         if output_format == "json":
-            # Create a simplified version for JSON output
-            output = {
-                "query": query,
-                "summary": response.summary,
-                "total_matches": response.total_matches,
-                "matches": [[match.model_dump() for match in limited_matches]],
-            }
-            rich_print(to_json(output, indent=2))
+            rich_print(response.model_dump_json(indent=2))
 
         elif output_format == "table":
             _display_table_results(query, response, limited_matches)
@@ -180,45 +175,51 @@ async def config(
 def _display_table_results(
     query: str, response: FindCodeResponseSummary, matches: Sequence[CodeMatch]
 ) -> None:
-    """Display search results as a table."""
+    """Display search results as a table using serialize_for_cli."""
     console.print(f"\n[bold green]Search Results for: '{query}'[/bold green]")
-    console.print(
-        f"[dim]Found {response.total_matches} matches in {response.execution_time_ms:.1f}ms[/dim]\n"
-    )
 
-    if not matches:
-        console.print("[yellow]No matches found[/yellow]")
-        return
+    # Use the built-in CLI summary from FindCodeResponseSummary
+    summary_table = response.assemble_cli_summary()
+    console.print(summary_table)
 
-    table = Table(show_header=True, header_style="bold blue")
-    table.add_column("File", style="cyan", no_wrap=True, min_width=30)
-    table.add_column("Language", style="green", min_width=10)
-    table.add_column("Score", style="yellow", justify="right", min_width=8)
-    table.add_column("Lines", style="magenta", justify="center", min_width=10)
-    table.add_column("Preview", style="white", min_width=40, max_width=60)
+    # If there are matches, display them in a detailed table
+    if matches:
+        console.print("\n[bold blue]Match Details:[/bold blue]\n")
 
-    for match in matches:
-        preview = (
-            match.content[:100].replace("\n", " ") + "..."
-            if len(match.content) > 100
-            else match.content.replace("\n", " ")
-        )
+        table = Table(show_header=True, header_style="bold blue")
+        table.add_column("File", style="cyan", no_wrap=True, min_width=30)
+        table.add_column("Language", style="green", min_width=10)
+        table.add_column("Score", style="yellow", justify="right", min_width=8)
+        table.add_column("Lines", style="magenta", justify="center", min_width=10)
+        table.add_column("Preview", style="white", min_width=40, max_width=60)
 
-        table.add_row(
-            str(match.file.path),
-            str(match.file.ext_kind.language) or "unknown",
-            f"{match.relevance_score:.2f}",
-            f"{match.span!s}",
-            preview,
-        )
+        for match in matches:
+            # Use serialize_for_cli to get structured data
+            match_data = match.serialize_for_cli()
 
-    console.print(table)
+            preview = (
+                match.content[:100].replace("\n", " ") + "..."
+                if len(str(match.content)) > 100
+                else str(match.content).replace("\n", " ")
+            )
+
+            table.add_row(
+                str(match_data.get("file", {}).get("path", "unknown")),
+                str(match_data.get("file", {}).get("ext_kind", {}).get("language", "unknown")),
+                f"{match.relevance_score:.2f}",
+                f"{match.span!s}",
+                preview,
+            )
+
+        console.print(table)
+    else:
+        console.print("\n[yellow]No matches found[/yellow]")
 
 
 def _display_markdown_results(
     query: str, response: FindCodeResponseSummary, matches: Sequence[CodeMatch]
 ) -> None:
-    """Display search results as markdown."""
+    """Display search results as markdown using serialize_for_cli."""
     console.print(f"# Search Results for: '{query}'\n")
     console.print(f"Found {response.total_matches} matches in {response.execution_time_ms:.1f}ms\n")
 
@@ -227,11 +228,18 @@ def _display_markdown_results(
         return
 
     for i, match in enumerate(matches, 1):
-        console.print(f"## {i}. {match.file.path}")
+        # Use serialize_for_cli to get structured data
+        match_data = match.serialize_for_cli()
+
+        file_path = match_data.get("file", {}).get("path", "unknown")
+        language = match_data.get("file", {}).get("ext_kind", {}).get("language", "unknown")
+
+        console.print(f"## {i}. {file_path}")
         console.print(
-            f"**Language:** {match.file.ext_kind.language or 'unknown'} | **Score:** {match.relevance_score:.2f} | {match.span!s}"
+            f"**Language:** {language} | **Score:** {match.relevance_score:.2f} | {match.span!s}"
         )
-        console.print(f"```{match.file.ext_kind.language or ''}")
+        console.print(f"```{language}")
+        console.print(str(match.content) if match.content else "")
         console.print("```\n")
 
 

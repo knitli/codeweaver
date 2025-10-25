@@ -5,6 +5,8 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Constants and patterns used in semantic analysis."""
 
+from __future__ import annotations
+
 import asyncio
 import re
 

@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Tokenizer implementation using the Tiktoken library."""
 
+from __future__ import annotations
+
 from collections.abc import Sequence
 from typing import Any
 

@@ -5,7 +5,9 @@
 
 """Configuration models for user-defined languages and delimiters in CodeWeaver."""
 
-from typing import Annotated, Self
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Annotated, Self
 
 from pydantic import Field, model_validator
 
@@ -13,7 +15,9 @@ from codeweaver.core.file_extensions import ALL_LANGUAGES
 from codeweaver.core.metadata import ExtLangPair
 from codeweaver.core.secondary_languages import SecondarySupportedLanguage
 from codeweaver.core.types.models import FROZEN_BASEDMODEL_CONFIG, BasedModel
-from codeweaver.engine.chunker.delimiters import DelimiterPattern, LanguageFamily
+
+if TYPE_CHECKING:
+    from codeweaver.engine.chunker.delimiters import DelimiterPattern, LanguageFamily
 
 
 class CustomLanguage(BasedModel):
@@ -64,7 +68,6 @@ class CustomDelimiter(BasedModel):
     extensions: Annotated[
         list[ExtLangPair] | None,
         Field(
-            default_factory=list,
             description="""List of file extensions and their associated languages to apply this delimiter to. If you are defining delimiters for a language that does not currently have support see `codeweaver.core.file_extensions.CODE_FILES_EXTENSIONS`, `codeweaver.core.file_extensions.DATA_FILES_EXTENSIONS`, and `codeweaver.core.file_extensions.DOC_FILES_EXTENSIONS`. An ExtLangPair is a tuple of `ext: FileExt, language: LanguageName` (str NewTypes for FileExt and LanguageName) or `ConfigLanguage` or `SemanticSearchLanguage` enums. If the language and extensions are already defined in `codeweaver.core.file_extensions` then you don't need to provide these, but you DO need to provide a language.""",
         ),
     ] = None
@@ -75,7 +78,6 @@ class CustomDelimiter(BasedModel):
             min_length=1,
             max_length=30,
             description="""The programming language this delimiter applies to. Must be one of the languages defined in `codeweaver.core.file_extensions`. If you want to define delimiters for a new language and/or file extensions, leave this field as `None` and provide the `extensions` field.""",
-            default_factory=lambda data: None if data.get("extensions") else str,
         ),
     ] = None
 
@@ -100,3 +102,6 @@ class CustomDelimiter(BasedModel):
                 f"The language '{self.language}' must match the language in all provided extensions: {[ext.language for ext in self.extensions]}. You also don't need to provide a language if all extensions have the same language as the one you're defining the delimiter for (which it should)."
             )
         return self
+
+
+__all__ = ("CustomDelimiter", "CustomLanguage")

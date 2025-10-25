@@ -5,6 +5,8 @@
 
 """Git and Path related utilities."""
 
+from __future__ import annotations
+
 # ruff: noqa: S607
 import contextlib
 import shutil

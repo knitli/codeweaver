@@ -59,6 +59,7 @@ class DelimiterKind(str, BaseEnum):
 
     PARAGRAPH = "paragraph"  # double newlines, semantic section boundaries
     WHITESPACE = "whitespace"
+    GENERIC = "generic"  # Generic fallback delimiter type
     UNKNOWN = "unknown"
 
     __slots__ = ()
@@ -157,6 +158,7 @@ class DelimiterKind(str, BaseEnum):
             DelimiterKind.TEMPLATE_STRING: 15,
             DelimiterKind.STRING: 10,
             DelimiterKind.PRAGMA: 5,
+            DelimiterKind.GENERIC: 3,
             DelimiterKind.WHITESPACE: 1,
             DelimiterKind.UNKNOWN: 1,
         }[self]

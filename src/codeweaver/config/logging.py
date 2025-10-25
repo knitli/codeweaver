@@ -5,6 +5,8 @@
 
 """Logging configuration settings and utilities for CodeWeaver."""
 
+from __future__ import annotations
+
 import logging
 import re
 
@@ -13,13 +15,13 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, NewType, NotRequired,
 
 from pydantic import BeforeValidator, Field, FieldSerializationInfo, PrivateAttr, field_serializer
 
-from codeweaver.core import BasedModel
 from codeweaver.core.types.enum import AnonymityConversion
+from codeweaver.core.types.models import BasedModel
 from codeweaver.exceptions import ConfigurationError
 
 
 if TYPE_CHECKING:
-    from codeweaver.core import AnonymityConversion, FilteredKey
+    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
 
 # ===========================================================================
@@ -210,8 +212,8 @@ class SerializableLoggingFilter(BasedModel, logging.Filter):
         PrivateAttr(),
     ] = None
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
-        from codeweaver.core import AnonymityConversion, FilteredKey
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {FilteredKey("simple_filter"): AnonymityConversion.BOOLEAN}
 

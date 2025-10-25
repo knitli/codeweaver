@@ -5,6 +5,8 @@
 
 """Cohere reranking model capabilities."""
 
+from __future__ import annotations
+
 from collections.abc import Sequence
 
 from pydantic import NonNegativeInt

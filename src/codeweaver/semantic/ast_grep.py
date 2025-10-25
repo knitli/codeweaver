@@ -76,6 +76,7 @@ from ast_grep_py import (
     Relation,
     Rule,
     RuleWithoutNot,
+    SgNode,
 )
 from ast_grep_py import Range as SgRange
 from ast_grep_py import SgNode as AstGrepNode
@@ -87,21 +88,26 @@ from pydantic import (
     NonNegativeInt,
     PositiveFloat,
     PositiveInt,
+    PrivateAttr,
     computed_field,
 )
 
 from codeweaver.common.utils import LazyImport, lazy_import, uuid7
 from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.types.aliases import ThingName, ThingNameT
-from codeweaver.core.types.enum import BaseEnum
+from codeweaver.core.types.aliases import FileExt, LiteralStringT, ThingName, ThingNameT
+from codeweaver.core.types.enum import AnonymityConversion, BaseEnum
 from codeweaver.core.types.models import BasedModel
 from codeweaver.engine import humanize
 
 
+# Runtime imports needed for cast operations and type checking
+from codeweaver.semantic.grammar import Category, CompositeThing, Token
+
 # type-only imports
 if TYPE_CHECKING:
+    from codeweaver.core.types.aliases import FilteredKey
+    from codeweaver.core.types.enum import AnonymityConversion
     from codeweaver.semantic.classifications import AgentTask, ImportanceScores, ThingClass
-    from codeweaver.semantic.node_type_parser import CompositeThing, Token
 
 registry_module: LazyImport[ModuleType] = lazy_import("codeweaver.semantic.registry")
 
@@ -214,29 +220,65 @@ class FileThing[SgRoot: (AstGrepRoot)](BasedModel):
 
     model_config = BasedModel.model_config | ConfigDict(arbitrary_types_allowed=True)
 
-    _root: Annotated[AstGrepRoot, Field(description="""The underlying SgRoot""", exclude=True)]
+    _root: AstGrepRoot = PrivateAttr()
+
+    _id: UUID7 = PrivateAttr(default_factory=uuid7)
+
+    _file_path: Path | None = PrivateAttr(default=None)
+
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        from codeweaver.core.types.aliases import FilteredKey
+        from codeweaver.core.types.enum import AnonymityConversion
+
+        return {
+            FilteredKey("_root"): AnonymityConversion.HASH,
+            FilteredKey("filename"): AnonymityConversion.HASH,
+        }
 
     @classmethod
-    def from_sg_root(cls, sg_root: AstGrepRoot) -> FileThing[SgRoot]:
+    def from_sg_root(cls, sg_root: AstGrepRoot, file_path: Path | None = None) -> FileThing[SgRoot]:
         """Create a FileThing from an ast-grep SgRoot."""
-        return cls(_root=sg_root)
+        instance = cls.model_construct()
+        instance._root = sg_root
+        instance._file_path = file_path
+        return instance
 
     @classmethod
     def from_sg_node(cls, sg_node: AstGrepNode) -> FileThing[SgRoot]:
         """Create a FileThing from an ast-grep SgNode."""
-        return cls(_root=sg_node.get_root())
+        instance = cls.model_construct()
+        instance._root = sg_node.get_root()
+        return instance
 
     @computed_field
     @cached_property
     def filename(self) -> Path:
-        """Get the filename from the SgRoot."""
+        """Get the filename from the SgRoot or the stored file path."""
+        if self._file_path is not None:
+            return self._file_path
         return Path(self._root.filename())
 
-    @computed_field
-    @cached_property
-    def root(self) -> FileThing[SgRoot]:
+    @property
+    def id(self) -> UUID7:
+        """Return the unique ID of the file thing."""
+        return self._id
+
+    @property
+    def root(self) -> AstThing[SgNode]:
         """Return the parent root node, also wrapped as a FileThing."""
-        return type(self).from_sg_node(self._root.root())
+        if language := SemanticSearchLanguage.from_extension(
+            FileExt(cast(LiteralStringT, (self.filename.suffix or self.filename.name)))
+        ):
+            return cast(
+                AstThing[SgNode],
+                AstThing.from_sg_node(
+                    self._root.root(), language, thing_id=self._id, parent_thing_id=self._id
+                ),
+            )
+        raise ValueError(
+            "Language could not be inferred from the file extension. Please provide a valid file. Received: %s",
+            self.filename.suffix or self.filename.name,
+        )
 
     @classmethod
     def from_file(cls, file_path: Path) -> FileThing[SgRoot]:
@@ -244,7 +286,9 @@ class FileThing[SgRoot: (AstGrepRoot)](BasedModel):
         from codeweaver.core.language import SemanticSearchLanguage
 
         content = file_path.read_text()
-        language = SemanticSearchLanguage.from_extension(file_path.suffix)
+        language = SemanticSearchLanguage.from_extension(
+            FileExt(cast(LiteralStringT, file_path.suffix or file_path.name))
+        )
         return cls.from_sg_root(
             AstGrepRoot(content, cast(SemanticSearchLanguage, language).variable)
         )
@@ -269,15 +313,34 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
 
     model_config = BasedModel.model_config | ConfigDict(arbitrary_types_allowed=True)
 
-    language: Annotated[SemanticSearchLanguage, Field(description="""The language of the node""")]
-
     _node: Annotated[AstGrepNode, Field(description="""The underlying SgNode""", exclude=True)]
+
+    language: Annotated[
+        SemanticSearchLanguage,
+        Field(
+            description="""The language of the node""",
+            default_factory=lambda data: SemanticSearchLanguage.from_extension(
+                data["_node"].get_root().filename().suffix
+                or data["_node"].get_root().filename().name
+            ),
+        ),
+    ]
 
     thing_id: Annotated[UUID7, Field(description="""The unique ID of the node""")] = uuid7()
 
     parent_thing_id: Annotated[UUID7 | None, Field(description="""The ID of the parent node""")] = (
         None
     )
+
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        from codeweaver.core.types.aliases import FilteredKey
+        from codeweaver.core.types.enum import AnonymityConversion
+
+        return {
+            FilteredKey("_node"): AnonymityConversion.HASH,
+            FilteredKey("language"): AnonymityConversion.IDENTITY,
+            FilteredKey("thing_id"): AnonymityConversion.HASH,
+        }
 
     def __init__(
         self,
@@ -287,33 +350,42 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         parent_thing_id: UUID7 | None = None,
     ) -> None:
         """Initialize the AstThing and set the parent_thing_id if applicable."""
-        thing_id = thing_id or uuid7()
-        if parent_thing_id is None and (parent_node := self.parent):
-            parent_thing_id = getattr(parent_node, "thing_id", None)
-            if parent_thing_id is None:
-                parent_thing_id = uuid7()
-                parent_node.thing_id = parent_thing_id
+        # Resolve thing_id first
+        if thing_id is None:
+            thing_id = uuid7()
+
+        # Resolve language if needed
         if language is None:
             with contextlib.suppress(Exception):
                 language = SemanticSearchLanguage.from_extension(
-                    Path(node.get_root().filename()).suffix
+                    FileExt(cast(LiteralStringT, Path(node.get_root().filename()).suffix))
                 )
         if language is None:
             raise ValueError(
                 "Language must be provided or inferable from the node's root filename."
             )
-        self.language = language
-        self._node = node
-        self.thing_id = thing_id
-        self.parent_thing_id = parent_thing_id
-        super().__init__()
+
+        # Initialize Pydantic model with all fields
+        super().__init__(_node=node, language=language, thing_id=thing_id, parent_thing_id=parent_thing_id)
 
     @classmethod
     def from_sg_node(
-        cls, sg_node: AstGrepNode, language: SemanticSearchLanguage
+        cls,
+        sg_node: AstGrepNode,
+        language: SemanticSearchLanguage,
+        *,
+        thing_id: UUID7 | None = None,
+        parent_thing_id: UUID7 | None = None,
     ) -> AstThing[SgNode]:
         """Create an AstThing from an ast-grep `SgNode`."""
-        return cls(language=language, node=sg_node)
+        # Use model_construct to bypass validation and custom __init__
+        instance = cls.model_construct(
+            _node=sg_node,
+            language=language,
+            thing_id=thing_id or uuid7(),
+            parent_thing_id=parent_thing_id,
+        )
+        return instance
 
     # ================================================
     # *      Identity and Metadata Properties       *
@@ -321,15 +393,17 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
 
     @computed_field
     @property
-    def thing(self) -> CompositeThing | Token:
+    def thing(self) -> CompositeThing | Token | Category | None:
         """Get the grammar Thing that this node represents."""
         thing_name: ThingName = self.name  # type: ignore
-        registry = registry_module()
+        # Handle ERROR nodes from ast-grep (syntax errors)
+        if thing_name == "ERROR":
+            return None
+        registry = registry_module  # Access the module, don't call it
         if thing := registry.get_registry().get_thing_by_name(thing_name, language=self.language):
-            return cast(CompositeThing | Token, thing)
-        raise ValueError(
-            f"Thing '{thing_name}' not found in registry for language '{self.language.name}'."
-        )
+            return cast(CompositeThing | Token | Category, thing)
+        # Return None for unknown things rather than raising
+        return None
 
     @computed_field
     @property
@@ -337,16 +411,18 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         """Check if the node is the root file thing."""
         if not self.thing.is_composite:
             return False
-        from codeweaver.semantic.grammar import CompositeThing
-
-        assert isinstance(self.thing, CompositeThing)  # noqa: S101
-        return cast(bool, self.thing.is_file)
+        return (isinstance(self.thing, CompositeThing) and self.thing.is_file) or (
+            self.thing_id == self.parent_thing_id
+        )
 
     @computed_field
     @property
     def classification(self) -> ThingClass | None:
-        """Get the semantic classification of the node."""
-        return self.thing.classification
+        """Get the classification of this node."""
+        thing = self.thing
+        if thing is None or isinstance(thing, Category):
+            return None
+        return thing.classification
 
     @cached_property
     def importance(self) -> ImportanceScores | None:
@@ -357,7 +433,8 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     @property
     def symbol(self) -> str:
         """Get a symbolic representation of the node."""
-        raise NotImplementedError("Symbol generation is not implemented yet.")
+        # Return the node's text as a simple symbol representation
+        return self.text
 
     @computed_field
     @cached_property
@@ -656,3 +733,16 @@ __all__ = (
     "Rule",
     "RuleWithoutNot",
 )
+
+# Rebuild models to resolve forward references
+try:
+    FileThing.model_rebuild()
+    AstThing.model_rebuild()
+    # Rebuild models that depend on AstThing after it's fully defined
+    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core.metadata import SemanticMetadata
+
+    SemanticMetadata.model_rebuild()
+    CodeChunk.model_rebuild()
+except Exception:
+    pass  # Forward references will be resolved when dependencies are available

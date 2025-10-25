@@ -5,6 +5,8 @@
 
 """Utility functions for type checking and validation."""
 
+from __future__ import annotations
+
 import inspect
 import logging
 import os

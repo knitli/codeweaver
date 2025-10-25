@@ -6,6 +6,8 @@
 # sourcery skip: avoid-single-character-names-variables
 """Cohere reranking provider implementation."""
 
+from __future__ import annotations
+
 import asyncio
 import os
 

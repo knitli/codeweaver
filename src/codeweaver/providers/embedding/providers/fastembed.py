@@ -11,6 +11,8 @@
 FastEmbed is a lightweight and efficient library for generating embeddings locally.
 """
 
+from __future__ import annotations
+
 import asyncio
 import multiprocessing
 

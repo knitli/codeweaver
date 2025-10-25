@@ -6,6 +6,8 @@
 # sourcery skip: avoid-single-character-names-variables
 """Provider for Sentence Transformers models."""
 
+from __future__ import annotations
+
 import asyncio
 
 from collections.abc import Sequence

@@ -17,7 +17,7 @@ from codeweaver.core.types.models import BasedModel
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types import AnonymityConversion, FilteredKey
+    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
 
 class SourceIdRegistry(BasedModel):
@@ -32,7 +32,7 @@ class SourceIdRegistry(BasedModel):
         # Keep weak references to avoid memory leaks for temporary file processing
         self._weak_registry: WeakValueDictionary[Path, UUID7] = WeakValueDictionary()
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {

@@ -92,7 +92,7 @@ from codeweaver.providers.provider import Provider
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types.aliases import FilteredKey
+    from codeweaver.core.types.aliases import FilteredKeyT
     from codeweaver.core.types.enum import AnonymityConversion
 
 
@@ -152,6 +152,118 @@ DefaultMiddlewareSettings = MiddlewareOptions(
         max_requests_per_second=75, get_client_id=None, burst_capacity=150, global_limit=True
     ),
 )
+
+
+class PerformanceSettings(BasedModel):
+    """Performance and resource limit configuration."""
+
+    max_file_size_mb: Annotated[
+        PositiveInt,
+        Field(default=10, description="""Maximum file size in MB to attempt chunking"""),
+    ] = 10
+
+    chunk_timeout_seconds: Annotated[
+        PositiveInt,
+        Field(default=30, description="""Maximum time allowed for chunking a single file"""),
+    ] = 30
+
+    parse_timeout_seconds: Annotated[
+        PositiveInt, Field(default=10, description="""Maximum time for AST parsing operation""")
+    ] = 10
+
+    max_chunks_per_file: Annotated[
+        PositiveInt,
+        Field(default=5000, description="""Maximum chunks to generate from single file"""),
+    ] = 5000
+
+    max_memory_mb_per_operation: Annotated[
+        PositiveInt, Field(default=100, description="""Peak memory limit per chunking operation""")
+    ] = 100
+
+    max_ast_depth: Annotated[
+        PositiveInt, Field(default=200, description="""Maximum AST nesting depth""")
+    ] = 200
+
+    def _telemetry_keys(self) -> None:
+        return None
+
+
+class ConcurrencySettings(BasedModel):
+    """Concurrency configuration."""
+
+    max_parallel_files: Annotated[
+        PositiveInt, Field(default=4, description="""Maximum files to chunk concurrently""")
+    ] = 4
+
+    use_process_pool: Annotated[
+        bool,
+        Field(
+            default=True,
+            description="""Use ProcessPoolExecutor (True) vs ThreadPoolExecutor (False)""",
+        ),
+    ] = True
+
+    def _telemetry_keys(self) -> None:
+        return None
+
+
+class ChunkerSettings(BasedModel):
+    """Configuration for chunker system."""
+
+    # Delimiter chunker settings (placeholder for future)
+    custom_delimiters: Annotated[
+        dict[str, list[dict[str, Any]]],
+        Field(default_factory=dict, description="""Custom delimiter patterns per language"""),
+    ]
+
+    force_delimiter_for_languages: Annotated[
+        list[str],
+        Field(
+            default_factory=list, description="""Languages to always use delimiter chunking for"""
+        ),
+    ]
+
+    # Semantic chunker settings
+    semantic_importance_threshold: Annotated[
+        float,
+        Field(
+            default=0.3,
+            ge=0.0,
+            le=1.0,
+            description="""Minimum importance score for nodes to be chunkable""",
+        ),
+    ] = 0.3
+
+    # Selector settings
+    prefer_semantic: Annotated[
+        bool, Field(default=True, description="""Prefer semantic chunking when available""")
+    ] = True
+
+    # Degradation settings
+    enable_hybrid_chunking: Annotated[
+        bool,
+        Field(
+            default=True,
+            description="""Allow semantic to fallback to delimiter for oversized nodes""",
+        ),
+    ] = True
+
+    # Resource settings
+    performance: Annotated[
+        PerformanceSettings,
+        Field(
+            default_factory=PerformanceSettings,
+            description="""Performance and resource limit configuration""",
+        ),
+    ]
+
+    concurrency: Annotated[
+        ConcurrencySettings,
+        Field(default_factory=ConcurrencySettings, description="""Concurrency configuration"""),
+    ]
+
+    def _telemetry_keys(self) -> None:
+        return None
 
 
 def merge_agent_model_settings(
@@ -221,7 +333,6 @@ class FileFilterSettings(BasedModel):
     other_ignore_kwargs: Annotated[
         RignoreSettings | Unset,
         Field(
-            default_factory=dict,
             description="""Other kwargs to pass to `rignore`. See <https://pypi.org/project/rignore/>. By default we set max_filesize to 5MB and same_file_system to True.""",
         ),
     ] = UNSET
@@ -237,7 +348,7 @@ class FileFilterSettings(BasedModel):
         "follow_links": False,
     })
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {
@@ -429,7 +540,7 @@ class FastMcpServerSettings(BasedModel):
         ),
     ] = None
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {
@@ -575,7 +686,7 @@ class CodeWeaverSettings(BaseSettings):
     project_path: Annotated[
         DirectoryPath,
         Field(
-            default_factory=lazy_import("codeweaver.common.utils").get_project_root,  # type: ignore
+            default_factory=lambda: lazy_import("codeweaver.common.utils").get_project_root(),
             description="""Root path of the codebase to analyze. CodeWeaver will try to detect the project root automatically if you don't provide one.""",
         ),
     ]
@@ -587,7 +698,6 @@ class CodeWeaverSettings(BaseSettings):
     provider: Annotated[
         ProviderSettings,
         Field(
-            default_factory=ProviderSettings,
             description="""Provider and model configurations for agents, data, embedding, reranking, sparse embedding, and vector store providers. Will default to default profile if not provided.""",
         ),
     ] = AllDefaultProviderSettings
@@ -617,7 +727,7 @@ class CodeWeaverSettings(BaseSettings):
     ] = DefaultFastMcpServerSettings
 
     logging: Annotated[
-        LoggingSettings | None, Field(default_factory=dict, description="""Logging configuration""")
+        LoggingSettings | None, Field(description="""Logging configuration""")
     ] = None
 
     middleware_settings: Annotated[
@@ -627,6 +737,11 @@ class CodeWeaverSettings(BaseSettings):
     filter_settings: Annotated[
         FileFilterSettings, Field(description="""File filtering settings""")
     ] = FileFilterSettings()
+
+    chunker: Annotated[
+        ChunkerSettings,
+        Field(description="""Chunker system configuration"""),
+    ] = ChunkerSettings()
 
     custom_languages: Annotated[
         list[CustomLanguage] | None,
@@ -704,7 +819,7 @@ class CodeWeaverSettings(BaseSettings):
     uvicorn_settings: Annotated[
         UvicornServerSettings | None,
         Field(
-            default_factory=UvicornServerSettings, description="""Settings for the Uvicorn server"""
+            description="""Settings for the Uvicorn server"""
         ),
     ] = None
 
@@ -727,7 +842,7 @@ class CodeWeaverSettings(BaseSettings):
             self._map = cast(DictView[CodeWeaverSettingsDict], DictView(self.model_dump()))
             globals()["_mapped_settings"] = self._map
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {
@@ -912,7 +1027,9 @@ def reset_settings() -> None:
 
 
 __all__ = (
+    "ChunkerSettings",
     "CodeWeaverSettings",
+    "ConcurrencySettings",
     "DefaultAgentProviderSettings",
     "DefaultDataProviderSettings",
     "DefaultEmbeddingProviderSettings",
@@ -921,6 +1038,7 @@ __all__ = (
     "FastMcpServerSettings",
     "FileFilterSettings",
     "FileFilterSettingsDict",
+    "PerformanceSettings",
     "get_settings",
     "get_settings_map",
     "merge_agent_model_settings",

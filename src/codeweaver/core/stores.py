@@ -26,6 +26,8 @@ from typing import (
     TypeGuard,
     TypeVar,
     cast,
+    get_args,
+    get_origin,
 )
 from weakref import WeakValueDictionary
 
@@ -46,7 +48,7 @@ from codeweaver.core.types.models import BasedModel
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types import AnonymityConversion, FilteredKey
+    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
 try:
     # there are a handful of rare situations where users might not be able to install blake3
@@ -151,14 +153,30 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
 
     def __init__(self, **data: Any) -> None:
         """Initialize the store with type checks and post-init processing."""
+        # Extract special parameters before passing to parent
         if data.get("store") is not None:
-            self.store = data.pop("store")
+            store_data = data.pop("store")
+        else:
+            store_data = None
+            
         if data.get("value_type"):
-            self._value_type = data.pop("value_type")
-        if data.get("_value_type"):
-            self._value_type = data.pop("_value_type")
-        elif not self._value_type and data:
-            self._value_type = next(iter(data.values())).__class__  # type: ignore
+            value_type = data.pop("value_type")
+        elif data.get("_value_type"):
+            value_type = data.pop("_value_type")
+        elif data:
+            value_type = next(iter(data.values())).__class__  # type: ignore
+        else:
+            value_type = None
+            
+        # Call parent __init__ to properly initialize Pydantic model (including private attributes)
+        super().__init__(**data)
+        
+        # Now set the extracted values
+        if value_type is not None:
+            self._value_type = value_type
+        if store_data is not None:
+            self.store = store_data
+            
         if not hasattr(self, "_value_type") or not self._value_type:
             raise ValueError(
                 "`You must either provide `_value_type` or provide values to infer it from.`"
@@ -283,7 +301,11 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
 
     def _guard(self, item: Any) -> TypeIs[T]:
         """Ensure the item is of the correct type."""
-        return isinstance(item, self.value_type)
+        # Extract actual type from Annotated types (e.g., Annotated[UUID, ...] -> UUID)
+        check_type = self.value_type
+        if get_origin(check_type) is Annotated:
+            check_type = get_args(check_type)[0]
+        return isinstance(item, check_type)
 
     @property
     def keygen(self) -> Callable[[], UUID7] | Callable[[str | bytes], BlakeHashKey]:
@@ -372,7 +394,8 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
             # LIFO removal strategy for simplicity
             removed = self.store.popitem()
             weight_loss_goal -= sys.getsizeof(removed[0]) + sys.getsizeof(removed[1])
-            self._trash_heap[removed[0]] = removed[1]
+            if self._trash_heap is not None:
+                self._trash_heap[removed[0]] = removed[1]
             if weight_loss_goal <= 0:
                 break
 
@@ -386,7 +409,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
             if value == self.store[key]:
                 return
             _ = self._check_and_set(key, value)
-        if key in self._trash_heap and self._trash_heap[key] is not None:
+        if self._trash_heap is not None and key in self._trash_heap and self._trash_heap[key] is not None:
             del self._trash_heap[key]
         self.store[key] = value
 
@@ -398,20 +421,24 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         """Delete a value from the store."""
         if key in self.store:
             del self.store[key]
-        if key in self._trash_heap:
+        if self._trash_heap is not None and key in self._trash_heap:
             del self._trash_heap[key]
 
     def clear(self) -> None:
         """Clear the store."""
-        self._trash_heap.update(self.store)
+        if self._trash_heap is not None:
+            self._trash_heap.update(self.store)
         self.store.clear()
 
     def clear_trash(self) -> None:
         """Clear the trash heap."""
-        self._trash_heap.clear()
+        if self._trash_heap is not None:
+            self._trash_heap.clear()
 
     def recover(self, key: KeyT) -> bool:
         """Recover a value from the trash heap."""
+        if self._trash_heap is None:
+            return False
         if (
             key in self._trash_heap
             and key not in self.store
@@ -421,7 +448,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
             return True
         return False
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {FilteredKey("store"): AnonymityConversion.COUNT}
@@ -443,6 +470,7 @@ class BlakeStore[T](_SimpleTypedStore[BlakeHashKey, T]):
         """Initialize the BlakeStore with Blake3 key generation."""
         super().__init__(**kwargs)
         self._keygen = get_blake_hash_generic
+        self._trash_heap = None  # BlakeStore doesn't need trash heap for deduplication
 
 
 def make_uuid_store[T](

@@ -17,6 +17,8 @@ To keep things manageable, for now, we only support OpenAI-compatible models and
 #        It needs to get integrated, tested, and documented.
 # ===========================================================================
 
+from __future__ import annotations
+
 from typing import Literal
 
 from pydantic import FutureDate

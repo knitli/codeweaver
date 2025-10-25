@@ -5,6 +5,8 @@
 
 """Read-only view wrapper around a mapping (intended for TypedDict-backed dicts)."""
 
+from __future__ import annotations
+
 from collections.abc import ItemsView, Iterator, KeysView, Mapping, ValuesView
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, cast

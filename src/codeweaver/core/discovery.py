@@ -27,7 +27,7 @@ from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializatio
 if TYPE_CHECKING:
     from ast_grep_py import SgRoot
 
-    from codeweaver.core.types import AnonymityConversion, FilteredKey
+    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
     from codeweaver.semantic.ast_grep import FileThing
 
 
@@ -63,7 +63,7 @@ class DiscoveredFile(DataclassSerializationMixin):
         ),
     ]
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {

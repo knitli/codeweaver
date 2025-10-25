@@ -8,6 +8,8 @@
 # applies to new/modified code in this directory (`src/codeweaver/embedding_providers/`)
 """HuggingFace embedding provider."""
 
+from __future__ import annotations
+
 import logging
 
 from collections.abc import Iterator, Mapping, Sequence

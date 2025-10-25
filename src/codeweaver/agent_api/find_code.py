@@ -45,6 +45,32 @@ class MatchedSection(NamedTuple):
     chunk_number: PositiveInt | None = None
 
 
+# Temporary stub for find_code during refactoring
+async def find_code(
+    query: str,
+    *,
+    intent: str | None = None,
+    token_limit: int = 10000,
+    include_tests: bool = False,
+    focus_languages: tuple[str, ...] | None = None,
+    max_results: int = 50,
+) -> dict:
+    """Stub implementation of find_code tool during refactoring.
+
+    Returns a placeholder response indicating the tool is temporarily disabled.
+    """
+    return {
+        "matches": [],
+        "summary": "find_code tool temporarily disabled during refactoring",
+        "query": query,
+        "total_matches": 0,
+        "token_count": 0,
+    }
+
+
+__all__ = ("MatchedSection", "find_code")
+
+
 # TODO: WHY IS THIS COMMENTED OUT? ... here's why:
 # I commented this out because it's a remanent of the old architecture. It needs to be re-integrated into the new architecture.
 # This was written before:
