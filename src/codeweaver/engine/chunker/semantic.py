@@ -238,7 +238,7 @@ class SemanticChunker(BaseChunker):
         if not content.strip():
             source_id = uuid7()
             return [
-                CodeChunk(
+                CodeChunk.model_construct(
                     content=content,
                     line_range=Span(1, content.count("\n") + 1, source_id),
                     ext_kind=ExtKind.from_file(file_path) if file_path else None,
@@ -248,7 +248,8 @@ class SemanticChunker(BaseChunker):
                     metadata={
                         "chunk_id": uuid7(),
                         "created_at": datetime.now(UTC).timestamp(),
-                        "context": {"edge_case": "whitespace_only", "chunker_type": "semantic"},
+                        "edge_case": "whitespace_only",
+                        "context": {"chunker_type": "semantic"},
                     },
                 )
             ]
@@ -258,7 +259,7 @@ class SemanticChunker(BaseChunker):
             source_id = uuid7()
             ext_kind = ExtKind.from_file(file_path) if file_path else None
             return [
-                CodeChunk(
+                CodeChunk.model_construct(
                     content=content,
                     line_range=Span(1, 1, source_id),
                     file_path=file_path,
@@ -268,7 +269,8 @@ class SemanticChunker(BaseChunker):
                     metadata={
                         "chunk_id": uuid7(),
                         "created_at": datetime.now(UTC).timestamp(),
-                        "context": {"edge_case": "single_line", "chunker_type": "semantic"},
+                        "edge_case": "single_line",
+                        "context": {"chunker_type": "semantic"},
                     },
                 )
             ]

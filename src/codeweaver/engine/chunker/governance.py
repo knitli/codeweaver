@@ -135,9 +135,9 @@ class ResourceGovernor:
         This prevents memory exhaustion and index bloat from pathological input.
 
         Raises:
-            ChunkLimitExceededError: When chunk count reaches or exceeds maximum
+            ChunkLimitExceededError: When chunk count exceeds maximum
         """
-        if self._chunk_count >= self.settings.max_chunks_per_file:
+        if self._chunk_count > self.settings.max_chunks_per_file:
             raise ChunkLimitExceededError(
                 f"Exceeded maximum of {self.settings.max_chunks_per_file} chunks per file",
                 chunk_count=self._chunk_count,
