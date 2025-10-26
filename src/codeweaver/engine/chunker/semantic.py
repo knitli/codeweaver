@@ -156,6 +156,9 @@ class SemanticChunker(BaseChunker):
 
         # Extract file_path and source_id from DiscoveredFile
         file_path = file.path if file else None
+        # Ensure file_path is absolute for error messages
+        if file_path:
+            file_path = file_path.resolve()
         # Use the DiscoveredFile's existing source_id instead of generating a new one
         source_id = UUID7Hex(file.source_id.hex) if file else uuid7()
 

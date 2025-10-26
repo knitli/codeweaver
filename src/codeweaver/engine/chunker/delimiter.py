@@ -446,6 +446,7 @@ class DelimiterChunker(BaseChunker):
             "chunk_id": uuid7(),
             "created_at": datetime.now(UTC).timestamp(),
             "name": f"{delimiter.kind.name.title()} at line {line}",  # type: ignore[union-attr]
+            "kind": delimiter.kind,  # Add kind at top level for test compatibility
             "context": chunk_context,
         }
         return metadata
@@ -454,7 +455,7 @@ class DelimiterChunker(BaseChunker):
         """Load delimiter set for language.
 
         Checks for custom delimiters in settings first, then falls back to
-        delimiter families system when implemented.
+        delimiter families system.
 
         Args:
             language: Programming language name
@@ -462,7 +463,11 @@ class DelimiterChunker(BaseChunker):
         Returns:
             List of Delimiter objects for the language
         """
-        from codeweaver.engine.chunker.delimiter_model import DelimiterKind
+        from codeweaver.engine.chunker.delimiter_model import Delimiter, DelimiterKind
+        from codeweaver.engine.chunker.delimiters.families import (
+            LanguageFamily,
+            get_family_patterns,
+        )
 
         # Check for custom delimiters from settings
         if (
@@ -483,16 +488,24 @@ class DelimiterChunker(BaseChunker):
                     # TODO: Implement proper conversion when delimiter families are integrated
                     pass
 
-        # TODO: Load from delimiter families system when implemented.
-        # For now, use generic delimiters suitable for most C-style languages.
-        return [
+        # Load from delimiter families system
+        family = LanguageFamily.from_known_language(language)
+        patterns = get_family_patterns(family)
+
+        # Convert patterns to delimiters
+        delimiters: list[Delimiter] = []
+        for pattern in patterns:
+            delimiters.extend(Delimiter.from_pattern(pattern))
+
+        # Always add generic fallback delimiters with lower priority
+        delimiters.extend([
             Delimiter(
                 start="{",
                 end="}",
                 kind=DelimiterKind.BLOCK,
                 priority=100,
-                inclusive=True,
-                take_whole_lines=True,
+                inclusive=False,
+                take_whole_lines=False,
                 nestable=True,
             ),
             Delimiter(
@@ -500,11 +513,13 @@ class DelimiterChunker(BaseChunker):
                 end=")",
                 kind=DelimiterKind.GENERIC,
                 priority=50,
-                inclusive=True,
+                inclusive=False,
                 take_whole_lines=False,
                 nestable=True,
             ),
-        ]
+        ])
+
+        return delimiters
 
     def _strip_delimiters(self, text: str, delimiter: Delimiter) -> str:
         """Remove delimiter markers from text.

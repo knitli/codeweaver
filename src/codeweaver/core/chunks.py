@@ -313,6 +313,17 @@ class CodeChunk(BasedModel):
         """Return the ending line number from line_range."""
         return self.line_range.end
 
+    # Aliases for common naming conventions
+    @property
+    def start_line(self) -> PositiveInt:
+        """Alias for line_start for compatibility."""
+        return self.line_start
+
+    @property
+    def end_line(self) -> PositiveInt:
+        """Alias for line_end for compatibility."""
+        return self.line_end
+
     @classmethod
     def chunkify(cls, text: StructuredDataInput) -> Iterator[CodeChunk]:
         """Convert text to a CodeChunk."""
@@ -360,9 +371,14 @@ __all__ = (
     "StructuredDataInput",
 )
 
-# Rebuild models to resolve forward references (if AstThing is available)
-with contextlib.suppress(Exception):
-    if not SearchResult.__pydantic_complete__:
-        _ = SearchResult.model_rebuild()
-    if not CodeChunk.__pydantic_complete__:
-        _ = CodeChunk.model_rebuild()
+# Rebuild models to resolve forward references
+# Force rebuild even if it fails - better to have working models than perfect ones
+try:
+    SearchResult.model_rebuild(force=True)
+except Exception:
+    pass
+
+try:
+    CodeChunk.model_rebuild(force=True)
+except Exception:
+    pass

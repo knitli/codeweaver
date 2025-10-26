@@ -43,11 +43,14 @@ def mock_governor() -> MagicMock:
     governor = MagicMock()
     governor.chunk_limit = 2000
     governor.simple_overlap = 50
-    governor.performance_settings = MagicMock(
+    # Match the actual governor.settings.performance structure
+    governor.settings = MagicMock()
+    governor.settings.performance = MagicMock(
         chunk_timeout_seconds=30,
         max_chunks_per_file=5000,
         max_ast_depth=200
     )
+    governor.settings.semantic_importance_threshold = 0.3
     return governor
 
 
@@ -172,7 +175,7 @@ class TestASTDepthErrors:
 class TestTimeoutErrors:
     """Tests for chunking timeout enforcement."""
 
-    def test_timeout_exceeded(self, monkeypatch: MonkeyPatch) -> None:
+    def test_timeout_exceeded(self, mock_governor: MagicMock, monkeypatch: MonkeyPatch) -> None:
         """Verify that slow operations raise ChunkingTimeoutError.
 
         Approach: Mock the parsing operation to be slow and set short timeout
@@ -182,7 +185,8 @@ class TestTimeoutErrors:
         from codeweaver.core.language import SemanticSearchLanguage
         from codeweaver.engine.chunker.semantic import SemanticChunker
 
-        # Arrange: Create chunker with very short timeout        mock_governor.timeout_seconds = 0.001  # 1 millisecond timeout
+        # Arrange: Create chunker with very short timeout
+        mock_governor.timeout_seconds = 0.001  # 1 millisecond timeout
         mock_governor.check_timeout = MagicMock(
             side_effect=ChunkingTimeoutError(
                 "Operation exceeded timeout",

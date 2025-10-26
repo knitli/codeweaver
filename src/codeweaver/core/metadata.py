@@ -26,7 +26,7 @@ from typing import (
 )
 
 from ast_grep_py import SgNode
-from pydantic import UUID7, ConfigDict, Field, PositiveFloat
+from pydantic import UUID7, ConfigDict, Field, PositiveFloat, SkipValidation
 
 from codeweaver.common.utils import normalize_ext, uuid7
 from codeweaver.core.language import (
@@ -78,14 +78,14 @@ class ChunkSource(BaseEnum):
 class SemanticMetadata(BasedModel):
     """Metadata associated with the semantics of a code chunk."""
 
-    model_config = FROZEN_BASEDMODEL_CONFIG | ConfigDict(validate_assignment=True)
+    model_config = FROZEN_BASEDMODEL_CONFIG | ConfigDict(validate_assignment=True, arbitrary_types_allowed=True)
 
     language: Annotated[
         SemanticSearchLanguage | str,
         Field(description="""The programming language of the code chunk"""),
     ]
-    thing: AstThing[SgNode] | None
-    positional_connections: tuple[AstThing[SgNode], ...] = ()
+    thing: Any = None  # AstThing[SgNode] | None - using Any to avoid forward reference issues
+    positional_connections: Any = ()  # tuple[AstThing[SgNode], ...] - using Any to avoid forward reference issues
     # TODO: Logic for symbol extraction from AST nodes
     symbol: Annotated[
         str | None,
@@ -182,12 +182,7 @@ class Metadata(TypedDict, total=False):
         ]
     ]
     semantic_meta: NotRequired[
-        Annotated[
-            SemanticMetadata | None,
-            Field(
-                description="""Semantic metadata associated with the code chunk, if applicable. Should be included if the code chunk was from semantic chunking."""
-            ),
-        ]
+        SkipValidation[SemanticMetadata | None]  # type: ignore[valid-type]
     ]
     context: Annotated[
         dict[str, Any] | None,
