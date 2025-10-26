@@ -1,121 +1,118 @@
-[38;5;238m─────┬──────────────────────────────────────────────────────────────────────────[0m
-     [38;5;238m│ [0m[1mSTDIN[0m
-[38;5;238m─────┼──────────────────────────────────────────────────────────────────────────[0m
-[38;5;238m   1[0m [38;5;238m│[0m [38;2;248;248;242m// SPDX-FileCopyrightText: 2025 Knitli Inc.[0m
-[38;5;238m   2[0m [38;5;238m│[0m [38;2;248;248;242m// SPDX-License-Identifier: MIT OR Apache-2.0[0m
-[38;5;238m   3[0m [38;5;238m│[0m 
-[38;5;238m   4[0m [38;5;238m│[0m [38;2;248;248;242m// Package fixtures provides sample Go code for testing chunker functionality.[0m
-[38;5;238m   5[0m [38;5;238m│[0m [38;2;248;248;242mpackage fixtures[0m
-[38;5;238m   6[0m [38;5;238m│[0m 
-[38;5;238m   7[0m [38;5;238m│[0m [38;2;248;248;242mimport ([0m
-[38;5;238m   8[0m [38;5;238m│[0m [38;2;248;248;242m    "fmt"[0m
-[38;5;238m   9[0m [38;5;238m│[0m [38;2;248;248;242m    "sync"[0m
-[38;5;238m  10[0m [38;5;238m│[0m [38;2;248;248;242m    "time"[0m
-[38;5;238m  11[0m [38;5;238m│[0m [38;2;248;248;242m)[0m
-[38;5;238m  12[0m [38;5;238m│[0m 
-[38;5;238m  13[0m [38;5;238m│[0m [38;2;248;248;242m// Processor defines the interface for data processing operations.[0m
-[38;5;238m  14[0m [38;5;238m│[0m [38;2;248;248;242mtype Processor interface {[0m
-[38;5;238m  15[0m [38;5;238m│[0m [38;2;248;248;242m    Process(item DataItem) (DataItem, error)[0m
-[38;5;238m  16[0m [38;5;238m│[0m [38;2;248;248;242m    ProcessBatch(items []DataItem) ([]DataItem, error)[0m
-[38;5;238m  17[0m [38;5;238m│[0m [38;2;248;248;242m}[0m
-[38;5;238m  18[0m [38;5;238m│[0m 
-[38;5;238m  19[0m [38;5;238m│[0m [38;2;248;248;242m// DataItem represents a single data element with metadata.[0m
-[38;5;238m  20[0m [38;5;238m│[0m [38;2;248;248;242mtype DataItem struct {[0m
-[38;5;238m  21[0m [38;5;238m│[0m [38;2;248;248;242m    ID        string[0m
-[38;5;238m  22[0m [38;5;238m│[0m [38;2;248;248;242m    Value     int[0m
-[38;5;238m  23[0m [38;5;238m│[0m [38;2;248;248;242m    Timestamp time.Time[0m
-[38;5;238m  24[0m [38;5;238m│[0m [38;2;248;248;242m    Metadata  map[string]string[0m
-[38;5;238m  25[0m [38;5;238m│[0m [38;2;248;248;242m}[0m
-[38;5;238m  26[0m [38;5;238m│[0m 
-[38;5;238m  27[0m [38;5;238m│[0m [38;2;248;248;242m// Cache provides thread-safe caching with TTL support.[0m
-[38;5;238m  28[0m [38;5;238m│[0m [38;2;248;248;242mtype Cache struct {[0m
-[38;5;238m  29[0m [38;5;238m│[0m [38;2;248;248;242m    mu      sync.RWMutex[0m
-[38;5;238m  30[0m [38;5;238m│[0m [38;2;248;248;242m    storage map[string]cacheEntry[0m
-[38;5;238m  31[0m [38;5;238m│[0m [38;2;248;248;242m    ttl     time.Duration[0m
-[38;5;238m  32[0m [38;5;238m│[0m [38;2;248;248;242m}[0m
-[38;5;238m  33[0m [38;5;238m│[0m 
-[38;5;238m  34[0m [38;5;238m│[0m [38;2;248;248;242mtype cacheEntry struct {[0m
-[38;5;238m  35[0m [38;5;238m│[0m [38;2;248;248;242m    value     interface{}[0m
-[38;5;238m  36[0m [38;5;238m│[0m [38;2;248;248;242m    expiresAt time.Time[0m
-[38;5;238m  37[0m [38;5;238m│[0m [38;2;248;248;242m}[0m
-[38;5;238m  38[0m [38;5;238m│[0m 
-[38;5;238m  39[0m [38;5;238m│[0m [38;2;248;248;242m// NewCache creates a new cache with specified TTL.[0m
-[38;5;238m  40[0m [38;5;238m│[0m [38;2;248;248;242mfunc NewCache(ttl time.Duration) *Cache {[0m
-[38;5;238m  41[0m [38;5;238m│[0m [38;2;248;248;242m    return &Cache{[0m
-[38;5;238m  42[0m [38;5;238m│[0m [38;2;248;248;242m        storage: make(map[string]cacheEntry),[0m
-[38;5;238m  43[0m [38;5;238m│[0m [38;2;248;248;242m        ttl:     ttl,[0m
-[38;5;238m  44[0m [38;5;238m│[0m [38;2;248;248;242m    }[0m
-[38;5;238m  45[0m [38;5;238m│[0m [38;2;248;248;242m}[0m
-[38;5;238m  46[0m [38;5;238m│[0m 
-[38;5;238m  47[0m [38;5;238m│[0m [38;2;248;248;242m// Get retrieves a value from cache if not expired.[0m
-[38;5;238m  48[0m [38;5;238m│[0m [38;2;248;248;242mfunc (c *Cache) Get(key string) (interface{}, bool) {[0m
-[38;5;238m  49[0m [38;5;238m│[0m [38;2;248;248;242m    c.mu.RLock()[0m
-[38;5;238m  50[0m [38;5;238m│[0m [38;2;248;248;242m    defer c.mu.RUnlock()[0m
-[38;5;238m  51[0m [38;5;238m│[0m 
-[38;5;238m  52[0m [38;5;238m│[0m [38;2;248;248;242m    entry, exists := c.storage[key][0m
-[38;5;238m  53[0m [38;5;238m│[0m [38;2;248;248;242m    if !exists {[0m
-[38;5;238m  54[0m [38;5;238m│[0m [38;2;248;248;242m        return nil, false[0m
-[38;5;238m  55[0m [38;5;238m│[0m [38;2;248;248;242m    }[0m
-[38;5;238m  56[0m [38;5;238m│[0m 
-[38;5;238m  57[0m [38;5;238m│[0m [38;2;248;248;242m    if time.Now().After(entry.expiresAt) {[0m
-[38;5;238m  58[0m [38;5;238m│[0m [38;2;248;248;242m        return nil, false[0m
-[38;5;238m  59[0m [38;5;238m│[0m [38;2;248;248;242m    }[0m
-[38;5;238m  60[0m [38;5;238m│[0m 
-[38;5;238m  61[0m [38;5;238m│[0m [38;2;248;248;242m    return entry.value, true[0m
-[38;5;238m  62[0m [38;5;238m│[0m [38;2;248;248;242m}[0m
-[38;5;238m  63[0m [38;5;238m│[0m 
-[38;5;238m  64[0m [38;5;238m│[0m [38;2;248;248;242m// Set stores a value in cache with TTL.[0m
-[38;5;238m  65[0m [38;5;238m│[0m [38;2;248;248;242mfunc (c *Cache) Set(key string, value interface{}) {[0m
-[38;5;238m  66[0m [38;5;238m│[0m [38;2;248;248;242m    c.mu.Lock()[0m
-[38;5;238m  67[0m [38;5;238m│[0m [38;2;248;248;242m    defer c.mu.Unlock()[0m
-[38;5;238m  68[0m [38;5;238m│[0m 
-[38;5;238m  69[0m [38;5;238m│[0m [38;2;248;248;242m    c.storage[key] = cacheEntry{[0m
-[38;5;238m  70[0m [38;5;238m│[0m [38;2;248;248;242m        value:     value,[0m
-[38;5;238m  71[0m [38;5;238m│[0m [38;2;248;248;242m        expiresAt: time.Now().Add(c.ttl),[0m
-[38;5;238m  72[0m [38;5;238m│[0m [38;2;248;248;242m    }[0m
-[38;5;238m  73[0m [38;5;238m│[0m [38;2;248;248;242m}[0m
-[38;5;238m  74[0m [38;5;238m│[0m 
-[38;5;238m  75[0m [38;5;238m│[0m [38;2;248;248;242m// DefaultProcessor implements the Processor interface.[0m
-[38;5;238m  76[0m [38;5;238m│[0m [38;2;248;248;242mtype DefaultProcessor struct {[0m
-[38;5;238m  77[0m [38;5;238m│[0m [38;2;248;248;242m    cache      *Cache[0m
-[38;5;238m  78[0m [38;5;238m│[0m [38;2;248;248;242m    multiplier int[0m
-[38;5;238m  79[0m [38;5;238m│[0m [38;2;248;248;242m}[0m
-[38;5;238m  80[0m [38;5;238m│[0m 
-[38;5;238m  81[0m [38;5;238m│[0m [38;2;248;248;242m// NewDefaultProcessor creates a processor with caching.[0m
-[38;5;238m  82[0m [38;5;238m│[0m [38;2;248;248;242mfunc NewDefaultProcessor(multiplier int) *DefaultProcessor {[0m
-[38;5;238m  83[0m [38;5;238m│[0m [38;2;248;248;242m    return &DefaultProcessor{[0m
-[38;5;238m  84[0m [38;5;238m│[0m [38;2;248;248;242m        cache:      NewCache(5 * time.Minute),[0m
-[38;5;238m  85[0m [38;5;238m│[0m [38;2;248;248;242m        multiplier: multiplier,[0m
-[38;5;238m  86[0m [38;5;238m│[0m [38;2;248;248;242m    }[0m
-[38;5;238m  87[0m [38;5;238m│[0m [38;2;248;248;242m}[0m
-[38;5;238m  88[0m [38;5;238m│[0m 
-[38;5;238m  89[0m [38;5;238m│[0m [38;2;248;248;242m// Process transforms a single data item.[0m
-[38;5;238m  90[0m [38;5;238m│[0m [38;2;248;248;242mfunc (p *DefaultProcessor) Process(item DataItem) (DataItem, error) {[0m
-[38;5;238m  91[0m [38;5;238m│[0m [38;2;248;248;242m    if item.ID == "" {[0m
-[38;5;238m  92[0m [38;5;238m│[0m [38;2;248;248;242m        return DataItem{}, fmt.Errorf("missing item ID")[0m
-[38;5;238m  93[0m [38;5;238m│[0m [38;2;248;248;242m    }[0m
-[38;5;238m  94[0m [38;5;238m│[0m 
-[38;5;238m  95[0m [38;5;238m│[0m [38;2;248;248;242m    item.Value *= p.multiplier[0m
-[38;5;238m  96[0m [38;5;238m│[0m [38;2;248;248;242m    item.Timestamp = time.Now()[0m
-[38;5;238m  97[0m [38;5;238m│[0m 
-[38;5;238m  98[0m [38;5;238m│[0m [38;2;248;248;242m    return item, nil[0m
-[38;5;238m  99[0m [38;5;238m│[0m [38;2;248;248;242m}[0m
-[38;5;238m 100[0m [38;5;238m│[0m 
-[38;5;238m 101[0m [38;5;238m│[0m [38;2;248;248;242m// ProcessBatch processes multiple items concurrently.[0m
-[38;5;238m 102[0m [38;5;238m│[0m [38;2;248;248;242mfunc (p *DefaultProcessor) ProcessBatch(items []DataItem) ([]DataItem, error) {[0m
-[38;5;238m 103[0m [38;5;238m│[0m [38;2;248;248;242m    results := make([]DataItem, len(items))[0m
-[38;5;238m 104[0m [38;5;238m│[0m [38;2;248;248;242m    var wg sync.WaitGroup[0m
-[38;5;238m 105[0m [38;5;238m│[0m 
-[38;5;238m 106[0m [38;5;238m│[0m [38;2;248;248;242m    for i, item := range items {[0m
-[38;5;238m 107[0m [38;5;238m│[0m [38;2;248;248;242m        wg.Add(1)[0m
-[38;5;238m 108[0m [38;5;238m│[0m [38;2;248;248;242m        go func(idx int, it DataItem) {[0m
-[38;5;238m 109[0m [38;5;238m│[0m [38;2;248;248;242m            defer wg.Done()[0m
-[38;5;238m 110[0m [38;5;238m│[0m [38;2;248;248;242m            result, _ := p.Process(it)[0m
-[38;5;238m 111[0m [38;5;238m│[0m [38;2;248;248;242m            results[idx] = result[0m
-[38;5;238m 112[0m [38;5;238m│[0m [38;2;248;248;242m        }(i, item)[0m
-[38;5;238m 113[0m [38;5;238m│[0m [38;2;248;248;242m    }[0m
-[38;5;238m 114[0m [38;5;238m│[0m 
-[38;5;238m 115[0m [38;5;238m│[0m [38;2;248;248;242m    wg.Wait()[0m
-[38;5;238m 116[0m [38;5;238m│[0m [38;2;248;248;242m    return results, nil[0m
-[38;5;238m 117[0m [38;5;238m│[0m [38;2;248;248;242m}[0m
-[38;5;238m─────┴──────────────────────────────────────────────────────────────────────────[0m
+// SPDX-FileCopyrightText: 2025 Knitli Inc.
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+// Package fixtures provides sample Go code for testing chunker functionality.
+package fixtures
+
+import (
+    "fmt"
+    "sync"
+    "time"
+)
+
+// Processor defines the interface for data processing operations.
+type Processor interface {
+    Process(item DataItem) (DataItem, error)
+    ProcessBatch(items []DataItem) ([]DataItem, error)
+}
+
+// DataItem represents a single data element with metadata.
+type DataItem struct {
+    ID        string
+    Value     int
+    Timestamp time.Time
+    Metadata  map[string]string
+}
+
+// Cache provides thread-safe caching with TTL support.
+type Cache struct {
+    mu      sync.RWMutex
+    storage map[string]cacheEntry
+    ttl     time.Duration
+}
+
+type cacheEntry struct {
+    value     interface{}
+    expiresAt time.Time
+}
+
+// NewCache creates a new cache with specified TTL.
+func NewCache(ttl time.Duration) *Cache {
+    return &Cache{
+        storage: make(map[string]cacheEntry),
+        ttl:     ttl,
+    }
+}
+
+// Get retrieves a value from cache if not expired.
+func (c *Cache) Get(key string) (interface{}, bool) {
+    c.mu.RLock()
+    defer c.mu.RUnlock()
+
+    entry, exists := c.storage[key]
+    if !exists {
+        return nil, false
+    }
+
+    if time.Now().After(entry.expiresAt) {
+        return nil, false
+    }
+
+    return entry.value, true
+}
+
+// Set stores a value in cache with TTL.
+func (c *Cache) Set(key string, value interface{}) {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+
+    c.storage[key] = cacheEntry{
+        value:     value,
+        expiresAt: time.Now().Add(c.ttl),
+    }
+}
+
+// DefaultProcessor implements the Processor interface.
+type DefaultProcessor struct {
+    cache      *Cache
+    multiplier int
+}
+
+// NewDefaultProcessor creates a processor with caching.
+func NewDefaultProcessor(multiplier int) *DefaultProcessor {
+    return &DefaultProcessor{
+        cache:      NewCache(5 * time.Minute),
+        multiplier: multiplier,
+    }
+}
+
+// Process transforms a single data item.
+func (p *DefaultProcessor) Process(item DataItem) (DataItem, error) {
+    if item.ID == "" {
+        return DataItem{}, fmt.Errorf("missing item ID")
+    }
+
+    item.Value *= p.multiplier
+    item.Timestamp = time.Now()
+
+    return item, nil
+}
+
+// ProcessBatch processes multiple items concurrently.
+func (p *DefaultProcessor) ProcessBatch(items []DataItem) ([]DataItem, error) {
+    results := make([]DataItem, len(items))
+    var wg sync.WaitGroup
+
+    for i, item := range items {
+        wg.Add(1)
+        go func(idx int, it DataItem) {
+            defer wg.Done()
+            result, _ := p.Process(it)
+            results[idx] = result
+        }(i, item)
+    }
+
+    wg.Wait()
+    return results, nil
+}
+─────┴──────────────────────────────────────────────────────────────────────────

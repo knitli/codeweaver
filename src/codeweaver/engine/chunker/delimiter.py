@@ -17,7 +17,7 @@ import re
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from codeweaver.common.utils import uuid7
 from codeweaver.core.chunks import CodeChunk
@@ -32,7 +32,9 @@ from codeweaver.engine.chunker.exceptions import (
     ChunkLimitExceededError,
     ParseError,
 )
-from codeweaver.engine.chunker.registry import source_id_for
+
+if TYPE_CHECKING:
+    from codeweaver.core.discovery import DiscoveredFile
 
 
 class DelimiterChunker(BaseChunker):
@@ -72,7 +74,7 @@ class DelimiterChunker(BaseChunker):
         self._delimiters = self._load_delimiters_for_language(language)
 
     def chunk(
-        self, content: str, *, file_path: Path | None = None, context: dict[str, Any] | None = None
+        self, content: str, *, file: DiscoveredFile | None = None, context: dict[str, Any] | None = None
     ) -> list[CodeChunk]:
         """Chunk content using delimiter patterns.
 
@@ -81,7 +83,7 @@ class DelimiterChunker(BaseChunker):
 
         Args:
             content: Source code to chunk
-            file_path: Optional source file path
+            file: Optional DiscoveredFile with metadata and source_id
             context: Optional additional context
 
         Returns:
@@ -93,11 +95,15 @@ class DelimiterChunker(BaseChunker):
             OversizedChunkError: If individual chunks exceed token limit
             ParseError: If delimiter matching fails
         """
+        from codeweaver.core.types.aliases import UUID7Hex
         from codeweaver.engine.chunker.governance import ResourceGovernor
 
         # Edge case: empty content
         if not content or not content.strip():
             return []
+
+        # Extract file_path and source_id from DiscoveredFile
+        file_path = file.path if file else None
 
         # Edge case: binary content detection
         try:
@@ -110,17 +116,21 @@ class DelimiterChunker(BaseChunker):
             ) from e
 
         # Get performance settings from governor, or use defaults
-        if self._governor.settings is not None:
-            performance_settings = self._governor.settings.performance
+        if (
+            self.governor.settings is not None
+            and hasattr(self.governor.settings, "performance")
+            and (performance_settings := self.governor.settings.performance)
+        ):
+            pass  # performance_settings already assigned in walrus operator
         else:
-            # Fallback defaults if no settings provided
-            from codeweaver.config.settings import PerformanceSettings
+            from codeweaver.config.chunker import PerformanceSettings
+
             performance_settings = PerformanceSettings()
 
         with ResourceGovernor(performance_settings) as governor:
             try:
-                # Generate consistent source_id for all spans from this file
-                source_id = source_id_for(file_path) if file_path else uuid7()
+                # Use the DiscoveredFile's existing source_id instead of generating a new one
+                source_id = UUID7Hex(file.source_id.hex) if file else uuid7()
 
                 # Phase 1: Find all delimiter matches
                 governor.check_timeout()
@@ -143,7 +153,9 @@ class DelimiterChunker(BaseChunker):
                 resolved = self._resolve_overlaps(boundaries)
 
                 # Convert boundaries to chunks
-                chunks = self._boundaries_to_chunks(resolved, content, file_path, source_id, context)
+                chunks = self._boundaries_to_chunks(
+                    resolved, content, file_path, source_id, context
+                )
 
                 # Register each chunk with the governor for resource tracking
                 for _ in chunks:
@@ -453,11 +465,19 @@ class DelimiterChunker(BaseChunker):
         from codeweaver.engine.chunker.delimiter_model import DelimiterKind
 
         # Check for custom delimiters from settings
-        if self._governor.settings is not None and self._governor.settings.custom_delimiters:
+        if (
+            self._governor.settings is not None
+            and hasattr(self._governor.settings, "custom_delimiters")
+            and self._governor.settings.custom_delimiters
+        ):
             for custom_delim in self._governor.settings.custom_delimiters:
                 if custom_delim.language == language or (
-                    custom_delim.extensions and
-                    any(ext.language == language for ext in custom_delim.extensions if hasattr(ext, 'language'))
+                    custom_delim.extensions
+                    and any(
+                        ext.language == language
+                        for ext in custom_delim.extensions
+                        if hasattr(ext, "language")
+                    )
                 ):
                     # Convert DelimiterPattern to Delimiter objects
                     # TODO: Implement proper conversion when delimiter families are integrated

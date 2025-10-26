@@ -5,70 +5,53 @@
 """Edge case tests for SemanticChunker."""
 
 from pathlib import Path
-from unittest.mock import Mock
 
 import pytest
 
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.engine.chunker import SemanticChunker
+from codeweaver.engine.chunker.base import ChunkGovernor
 from codeweaver.engine.chunker.exceptions import BinaryFileError
 
 
-@pytest.fixture
-def mock_governor() -> Mock:
-    """Create mock ChunkGovernor for testing."""
-    from unittest.mock import Mock
-
-    governor = Mock()
-    governor.chunk_limit = 2000
-    governor.simple_overlap = 50
-    governor.performance_settings = Mock(
-        chunk_timeout_seconds=30, max_chunks_per_file=5000, max_ast_depth=200
-    )
-    return governor
-
-
-def test_empty_file(mock_governor: Mock) -> None:
+def test_empty_file(chunk_governor: ChunkGovernor, discovered_empty_file) -> None:
     """Verify empty file returns empty list."""
-    fixture_path = Path("tests/fixtures/empty.py")
-    content = fixture_path.read_text()
+    content = discovered_empty_file.contents
 
-    chunker = SemanticChunker(mock_governor, SemanticSearchLanguage.PYTHON)
-    chunks = chunker.chunk(content, file_path=fixture_path)
+    chunker = SemanticChunker(chunk_governor, SemanticSearchLanguage.PYTHON)
+    chunks = chunker.chunk(content, file=discovered_empty_file)
 
     assert len(chunks) == 0, "Empty file should return no chunks"
 
 
-def test_whitespace_only_file(mock_governor: Mock) -> None:
+def test_whitespace_only_file(chunk_governor: ChunkGovernor, discovered_whitespace_only_file) -> None:
     """Verify whitespace-only file returns single chunk with edge_case metadata."""
-    fixture_path = Path("tests/fixtures/whitespace_only.py")
-    content = fixture_path.read_text()
+    # Read raw content directly to preserve whitespace (DiscoveredFile.contents normalizes/strips)
+    content = discovered_whitespace_only_file.path.read_text()
 
-    chunker = SemanticChunker(mock_governor, SemanticSearchLanguage.PYTHON)
-    chunks = chunker.chunk(content, file_path=fixture_path)
+    chunker = SemanticChunker(chunk_governor, SemanticSearchLanguage.PYTHON)
+    chunks = chunker.chunk(content, file=discovered_whitespace_only_file)
 
     assert len(chunks) == 1, "Whitespace-only file should return single chunk"
     assert chunks[0].metadata.get("edge_case") == "whitespace_only"
 
 
-def test_single_line_file(mock_governor: Mock) -> None:
+def test_single_line_file(chunk_governor: ChunkGovernor, discovered_single_line_file) -> None:
     """Verify single-line file returns single chunk with edge_case metadata."""
-    fixture_path = Path("tests/fixtures/single_line.py")
-    content = fixture_path.read_text()
+    content = discovered_single_line_file.contents
 
-    chunker = SemanticChunker(mock_governor, SemanticSearchLanguage.PYTHON)
-    chunks = chunker.chunk(content, file_path=fixture_path)
+    chunker = SemanticChunker(chunk_governor, SemanticSearchLanguage.PYTHON)
+    chunks = chunker.chunk(content, file=discovered_single_line_file)
 
     assert len(chunks) == 1, "Single-line file should return single chunk"
     assert chunks[0].metadata.get("edge_case") == "single_line"
 
 
-def test_binary_file_detection(mock_governor: Mock) -> None:
+def test_binary_file_detection(chunk_governor: ChunkGovernor, discovered_binary_mock_file) -> None:
     """Verify binary file detection raises BinaryFileError."""
-    fixture_path = Path("tests/fixtures/binary_mock.txt")
-    content = fixture_path.read_text(encoding="utf-8", errors="ignore")
+    content = discovered_binary_mock_file.path.read_text(encoding="utf-8", errors="ignore")
 
-    chunker = SemanticChunker(mock_governor, SemanticSearchLanguage.PYTHON)
+    chunker = SemanticChunker(chunk_governor, SemanticSearchLanguage.PYTHON)
 
     with pytest.raises(BinaryFileError):
-        _ = chunker.chunk(content, file_path=fixture_path)
+        _ = chunker.chunk(content, file=discovered_binary_mock_file)

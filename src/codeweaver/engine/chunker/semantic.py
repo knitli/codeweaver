@@ -53,12 +53,12 @@ from codeweaver.core.stores import (
 from codeweaver.engine.chunker.base import BaseChunker
 from codeweaver.engine.chunker.exceptions import ASTDepthExceededError, BinaryFileError, ParseError
 from codeweaver.engine.chunker.governance import ResourceGovernor
-from codeweaver.engine.chunker.registry import source_id_for
 
 
 if TYPE_CHECKING:
     from ast_grep_py import SgRoot
 
+    from codeweaver.core.discovery import DiscoveredFile
     from codeweaver.engine.chunker.base import ChunkGovernor
     from codeweaver.semantic.ast_grep import AstThing, FileThing
 
@@ -119,10 +119,12 @@ class SemanticChunker(BaseChunker):
         if governor.settings is not None:
             self._importance_threshold = governor.settings.semantic_importance_threshold
         else:
-            self._importance_threshold = 0.3  # default value  # TODO: Make configurable via governor
+            self._importance_threshold = (
+                0.3  # default value  # TODO: Make configurable via governor
+            )
 
     def chunk(
-        self, content: str, *, file_path: Path | None = None, context: dict[str, Any] | None = None
+        self, content: str, *, file: DiscoveredFile | None = None, context: dict[str, Any] | None = None
     ) -> list[CodeChunk]:
         """Chunk content into semantic code segments with resource governance.
 
@@ -132,7 +134,7 @@ class SemanticChunker(BaseChunker):
 
         Args:
             content: Source code content to chunk
-            file_path: Optional file path for context and metadata
+            file: Optional DiscoveredFile with metadata and source_id
             context: Optional additional context (currently unused)
 
         Returns:
@@ -146,20 +148,24 @@ class SemanticChunker(BaseChunker):
             ASTDepthExceededError: If AST nesting exceeds safe depth limit
         """
         from codeweaver.common.statistics import get_session_statistics
+        from codeweaver.core.types.aliases import UUID7Hex
 
         statistics = get_session_statistics()
         start_time = time.perf_counter()
         batch_id = uuid7()
 
-        # Generate consistent source_id for all spans from this file
-        source_id = source_id_for(file_path) if file_path else uuid7()
+        # Extract file_path and source_id from DiscoveredFile
+        file_path = file.path if file else None
+        # Use the DiscoveredFile's existing source_id instead of generating a new one
+        source_id = UUID7Hex(file.source_id.hex) if file else uuid7()
 
         # Get performance settings from governor, or use defaults
         if self.governor.settings is not None:
             performance_settings = self.governor.settings.performance
         else:
             # Fallback defaults if no settings provided
-            from codeweaver.config.settings import PerformanceSettings
+            from codeweaver.config.chunker import PerformanceSettings
+
             performance_settings = PerformanceSettings()
 
         with ResourceGovernor(performance_settings) as governor:

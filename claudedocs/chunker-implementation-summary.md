@@ -331,7 +331,7 @@ chunks = chunker.chunk(content, file_path=path)
 
 ### Resource Governance
 ```python
-from codeweaver.config.settings import PerformanceSettings
+from codeweaver.config.settings.chunker import PerformanceSettings
 from codeweaver.engine.chunker.governance import ResourceGovernor
 
 settings = PerformanceSettings(

@@ -16,22 +16,14 @@ from pathlib import Path
 
 import pytest
 
-from codeweaver.config.settings import PerformanceSettings
+from codeweaver.engine.chunker.base import ChunkGovernor
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
-from codeweaver.engine.chunker.governance import ResourceGovernor
 
 
 @pytest.fixture
-def governor() -> ResourceGovernor:
-    """Create resource governor for tests."""
-    settings = PerformanceSettings()
-    return ResourceGovernor(settings)
-
-
-@pytest.fixture
-def delimiter_chunker(governor: ResourceGovernor) -> DelimiterChunker:
+def delimiter_chunker(chunk_governor: ChunkGovernor) -> DelimiterChunker:
     """Create delimiter chunker instance for tests."""
-    return DelimiterChunker(governor=governor)
+    return DelimiterChunker(governor=chunk_governor)
 
 
 class TestGenericFallback:
@@ -67,8 +59,10 @@ for multiple chunks if the generic patterns work correctly.
         file_path = tmp_path / "plain.txt"
         file_path.write_text(content)
 
-        # Execute chunking
-        chunks = delimiter_chunker.chunk(content, file_path=file_path)
+        # Create DiscoveredFile and execute chunking
+        from codeweaver.core.discovery import DiscoveredFile
+        discovered_file = DiscoveredFile.from_path(file_path)
+        chunks = delimiter_chunker.chunk(content, file=discovered_file)
 
         # Verify chunks were produced
         assert len(chunks) > 0, "Generic fallback should still produce chunks"
@@ -117,8 +111,10 @@ def function_three():
         file_path = tmp_path / "functions.py"
         file_path.write_text(content)
 
-        # Test with default configuration (should have expected behavior)
-        chunks = delimiter_chunker.chunk(content, file_path=file_path)
+        # Create DiscoveredFile and test with default configuration
+        from codeweaver.core.discovery import DiscoveredFile
+        discovered_file = DiscoveredFile.from_path(file_path)
+        chunks = delimiter_chunker.chunk(content, file=discovered_file)
 
         assert len(chunks) > 0, "Should produce chunks"
 
@@ -168,8 +164,10 @@ a, b, c = 1, 2, 3; total = a + b + c  # Another multi-statement line
         file_path = tmp_path / "multiline.py"
         file_path.write_text(content)
 
-        # Chunk with default configuration
-        chunks = delimiter_chunker.chunk(content, file_path=file_path)
+        # Create DiscoveredFile and chunk with default configuration
+        from codeweaver.core.discovery import DiscoveredFile
+        discovered_file = DiscoveredFile.from_path(file_path)
+        chunks = delimiter_chunker.chunk(content, file=discovered_file)
 
         assert len(chunks) > 0, "Should produce chunks"
 
@@ -232,7 +230,10 @@ function outer() {
         file_path = tmp_path / "nested.js"
         file_path.write_text(content)
 
-        chunks = delimiter_chunker.chunk(content, file_path=file_path)
+        # Create DiscoveredFile and chunk
+        from codeweaver.core.discovery import DiscoveredFile
+        discovered_file = DiscoveredFile.from_path(file_path)
+        chunks = delimiter_chunker.chunk(content, file=discovered_file)
 
         assert len(chunks) > 0, "Should produce chunks from nested structure"
 
@@ -261,7 +262,10 @@ class MyClass:
         file_path = tmp_path / "overlap.py"
         file_path.write_text(content)
 
-        chunks = delimiter_chunker.chunk(content, file_path=file_path)
+        # Create DiscoveredFile and chunk
+        from codeweaver.core.discovery import DiscoveredFile
+        discovered_file = DiscoveredFile.from_path(file_path)
+        chunks = delimiter_chunker.chunk(content, file=discovered_file)
 
         assert len(chunks) > 0, "Should resolve overlapping delimiters"
 
@@ -296,7 +300,10 @@ function alsoEmpty() {
         file_path = tmp_path / "empty_blocks.js"
         file_path.write_text(content)
 
-        chunks = delimiter_chunker.chunk(content, file_path=file_path)
+        # Create DiscoveredFile and chunk
+        from codeweaver.core.discovery import DiscoveredFile
+        discovered_file = DiscoveredFile.from_path(file_path)
+        chunks = delimiter_chunker.chunk(content, file=discovered_file)
 
         # Empty blocks should still produce chunks (even if minimal)
         assert len(chunks) >= 0, "Should handle empty delimiter blocks"
@@ -323,7 +330,9 @@ function another() {
         file_path = tmp_path / "unmatched.js"
         file_path.write_text(content)
 
-        # Should not crash, should produce some chunks
-        chunks = delimiter_chunker.chunk(content, file_path=file_path)
+        # Create DiscoveredFile - should not crash, should produce some chunks
+        from codeweaver.core.discovery import DiscoveredFile
+        discovered_file = DiscoveredFile.from_path(file_path)
+        chunks = delimiter_chunker.chunk(content, file=discovered_file)
 
         assert len(chunks) >= 0, "Should handle unmatched delimiters gracefully"

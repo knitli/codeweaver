@@ -84,11 +84,19 @@ def file_is_binary(file_path: Path) -> bool:
     return False
 
 
+def is_test_environment() -> bool:
+    """Check if the code is running in a test environment."""
+    return "pytest" in sys.modules or any(
+        arg.startswith("-m") and "pytest" in arg for arg in sys.argv
+    )
+
+
 __all__ = (
     "file_is_binary",
     "has_package",
     "is_class",
     "is_debug",
     "is_pydantic_basemodel",
+    "is_test_environment",
     "is_typeadapter",
 )

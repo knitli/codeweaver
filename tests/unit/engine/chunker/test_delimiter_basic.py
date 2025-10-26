@@ -95,8 +95,10 @@ function createDataProcessor(config) {
         test_file = tmp_path / "nested.js"
         test_file.write_text(js_code)
 
-        # Chunk the code
-        chunks = delimiter_chunker.chunk(js_code, file_path=test_file)
+        # Create DiscoveredFile and chunk the code
+        from codeweaver.core.discovery import DiscoveredFile
+        discovered_file = DiscoveredFile.from_path(test_file)
+        chunks = delimiter_chunker.chunk(js_code, file=discovered_file)
 
         # Verify chunks were created
         assert len(chunks) > 0, "Should create at least one chunk"
@@ -169,8 +171,10 @@ class DataProcessor:
         test_file = tmp_path / "overlapping.py"
         test_file.write_text(py_code)
 
-        # Chunk the code
-        chunks = delimiter_chunker.chunk(py_code, file_path=test_file)
+        # Create DiscoveredFile and chunk the code
+        from codeweaver.core.discovery import DiscoveredFile
+        discovered_file = DiscoveredFile.from_path(test_file)
+        chunks = delimiter_chunker.chunk(py_code, file=discovered_file)
 
         # Verify chunks were created
         assert len(chunks) > 0, "Should create at least one chunk"
@@ -262,8 +266,10 @@ def validate_config(config: dict) -> bool:
         test_file = tmp_path / "boundaries.py"
         _ = test_file.write_text(py_code)
 
-        # Chunk the code
-        chunks = delimiter_chunker.chunk(py_code, file_path=test_file)
+        # Create DiscoveredFile and chunk the code
+        from codeweaver.core.discovery import DiscoveredFile
+        discovered_file = DiscoveredFile.from_path(test_file)
+        chunks = delimiter_chunker.chunk(py_code, file=discovered_file)
 
         # Verify chunks were created
         assert len(chunks) > 0, "Should create at least one chunk"
@@ -343,7 +349,10 @@ function processData(items) {
         test_file = tmp_path / "nested_control.js"
         test_file.write_text(code)
 
-        chunks = delimiter_chunker.chunk(code, file_path=test_file)
+        # Create DiscoveredFile and chunk the code
+        from codeweaver.core.discovery import DiscoveredFile
+        discovered_file = DiscoveredFile.from_path(test_file)
+        chunks = delimiter_chunker.chunk(code, file=discovered_file)
 
         # Should have at least one chunk
         assert len(chunks) > 0, "Should create chunks for nested structures"
@@ -379,7 +388,10 @@ def another_function():
         test_file = tmp_path / "boundaries.py"
         _ = test_file.write_text(code)
 
-        chunks = delimiter_chunker.chunk(code, file_path=test_file)
+        # Create DiscoveredFile and chunk the code
+        from codeweaver.core.discovery import DiscoveredFile
+        discovered_file = DiscoveredFile.from_path(test_file)
+        chunks = delimiter_chunker.chunk(code, file=discovered_file)
 
         # Should have chunks for both functions
         assert len(chunks) >= 2, "Should detect both function boundaries"

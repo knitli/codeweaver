@@ -52,16 +52,20 @@ class SourceIdRegistry(UUIDStore[DiscoveredFile]):
     def source_id_for(self, file: DiscoveredFile) -> UUID7HexT:
         """Get or create a source ID for the given file.
 
+        Uses the DiscoveredFile's existing source_id instead of generating a new one.
+        This ensures consistency across the codeweaver system where DiscoveredFile
+        objects serve as the canonical source of truth for file identity.
+
         Args:
-            file: DiscoveredFile instance
+            file: DiscoveredFile instance with existing source_id
 
         Returns:
-            Hex string (newtype) representation of the UUID7 source ID
+            Hex string (newtype) representation of the file's UUID7 source_id
         """
-        key = uuid7()
+        # Use the DiscoveredFile's existing source_id, don't generate a new one
         if file not in self.store.values():
-            self.store[key] = file
-        return UUID7Hex(key.hex)
+            self.store[file.source_id] = file
+        return UUID7Hex(file.source_id.hex)
 
     def clear(self) -> None:
         """Clear the registry."""

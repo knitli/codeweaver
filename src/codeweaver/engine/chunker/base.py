@@ -27,9 +27,9 @@ from codeweaver.core.types.models import BasedModel
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
-
 if TYPE_CHECKING:
-    from codeweaver.config.settings import ChunkerSettings
+    from codeweaver.config.chunker import ChunkerSettings
+    from codeweaver.core.discovery import DiscoveredFile
 
 
 SAFETY_MARGIN = 0.1
@@ -73,7 +73,7 @@ class ChunkGovernor(BasedModel):
     def simple_overlap(self) -> int:
         """A simple overlap value to use for chunking without context or external factors.
 
-        Calculates as 20% of the chunk_limit, clamped between 50 and 200 tokens. Practically, we only use this value when we can't determine a better overlap based on the tokenizer or other factors. `ChunkMicroManager` may override this value based on more complex logic, aiming to identify and encapsulate logical boundaries within the text with no need for overlap.
+        Calculates as 20% of the chunk_limit, clamped between 50 and 200 tokens. Practically, we only use this value when we can't determine a better overlap based on the tokenizer or other factors. `ChunkGovernor` may override this value based on more complex logic, aiming to identify and encapsulate logical boundaries within the text with no need for overlap.
         """
         return int(max(50, min(200, self.chunk_limit * 0.2)))
 
@@ -92,9 +92,18 @@ class BaseChunker(ABC):
 
     @abstractmethod
     def chunk(
-        self, content: str, *, file_path: Path | None = None, context: dict[str, Any] | None = None
+        self, content: str, *, file: DiscoveredFile | None = None, context: dict[str, Any] | None = None
     ) -> list[CodeChunk]:
-        """Chunk the given content into code chunks using `self._governor` settings."""
+        """Chunk the given content into code chunks using `self._governor` settings.
+
+        Args:
+            content: The text content to chunk.
+            file: The DiscoveredFile object containing file metadata and source_id.
+            context: Additional context for chunking.
+
+        Returns:
+            List of CodeChunk objects with source_id from the DiscoveredFile.
+        """
 
     @property
     def governor(self) -> ChunkGovernor:

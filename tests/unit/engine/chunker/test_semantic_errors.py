@@ -72,9 +72,11 @@ class TestParseErrors:
         # Create chunker with mock governor
         chunker = SemanticChunker(governor=mock_governor, language=SemanticSearchLanguage.PYTHON)
 
-        # Act & Assert: Verify ParseError raised
+        # Create DiscoveredFile and verify ParseError raised
+        from codeweaver.core.discovery import DiscoveredFile
+        discovered_file = DiscoveredFile.from_path(malformed_file)
         with pytest.raises(ParseError) as exc_info:
-            chunker.chunk(content, file_path=malformed_file)
+            chunker.chunk(content, file=discovered_file)
 
         # Verify error details
         error = exc_info.value
@@ -97,8 +99,10 @@ class TestParseErrors:
 
         chunker = SemanticChunker(governor=mock_governor, language=SemanticSearchLanguage.PYTHON)
 
+        from codeweaver.core.discovery import DiscoveredFile
+        discovered_file = DiscoveredFile.from_path(malformed_file)
         with pytest.raises(ParseError) as exc_info:
-            chunker.chunk(content, file_path=malformed_file)
+            chunker.chunk(content, file=discovered_file)
 
         error = exc_info.value
         assert hasattr(error, "suggestions"), "ParseError should have suggestions attribute"
@@ -127,8 +131,10 @@ class TestASTDepthErrors:
         chunker = SemanticChunker(governor=mock_governor, language=SemanticSearchLanguage.PYTHON)
 
         # Act & Assert: Verify ASTDepthExceededError raised
+        from codeweaver.core.discovery import DiscoveredFile
+        discovered_file = DiscoveredFile.from_path(deep_file)
         with pytest.raises(ASTDepthExceededError) as exc_info:
-            chunker.chunk(content, file_path=deep_file)
+            chunker.chunk(content, file=discovered_file)
 
         # Verify error details
         error = exc_info.value
@@ -150,8 +156,10 @@ class TestASTDepthErrors:
         mock_governor.performance_settings.max_ast_depth = 200
         chunker = SemanticChunker(governor=mock_governor, language=SemanticSearchLanguage.PYTHON)
 
+        from codeweaver.core.discovery import DiscoveredFile
+        discovered_file = DiscoveredFile.from_path(deep_file)
         with pytest.raises(ASTDepthExceededError) as exc_info:
-            chunker.chunk(content, file_path=deep_file)
+            chunker.chunk(content, file=discovered_file)
 
         error = exc_info.value
         error_msg = str(error)
@@ -193,8 +201,9 @@ class TestTimeoutErrors:
 
         with patch.object(chunker, "_parse_file", side_effect=slow_parse):
             # Act & Assert: Verify ChunkingTimeoutError raised
+            # Note: Using None for file since we're testing timeout, not file handling
             with pytest.raises(ChunkingTimeoutError) as exc_info:
-                chunker.chunk("def test(): pass", file_path=Path("test.py"))
+                chunker.chunk("def test(): pass", file=None)
 
         # Verify error details
         error = exc_info.value
@@ -264,8 +273,9 @@ class TestChunkLimitErrors:
         )
 
         # Act & Assert: Verify ChunkLimitExceededError raised
+        # Note: Using None for file since we're testing chunk limits, not file handling
         with pytest.raises(ChunkLimitExceededError) as exc_info:
-            chunker.chunk(many_functions, file_path=Path("test.py"))
+            chunker.chunk(many_functions, file=None)
 
         # Verify error details
         error = exc_info.value

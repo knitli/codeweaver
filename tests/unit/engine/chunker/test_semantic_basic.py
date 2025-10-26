@@ -12,29 +12,17 @@ Python, JavaScript, and Rust.
 """
 
 from pathlib import Path
-from unittest.mock import Mock
 
 import pytest
 
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.engine.chunker import SemanticChunker
+from codeweaver.engine.chunker.base import ChunkGovernor
 
 
-@pytest.fixture
-def mock_governor() -> Mock:
-    """Create mock ChunkGovernor for testing."""
-    from unittest.mock import Mock
-
-    governor = Mock()
-    governor.chunk_limit = 2000  # tokens
-    governor.simple_overlap = 50
-    governor.performance_settings = Mock(
-        chunk_timeout_seconds=30, max_chunks_per_file=5000, max_ast_depth=200
-    )
-    return governor
-
-
-def test_semantic_chunks_python_file(mock_governor: Mock) -> None:
+def test_semantic_chunks_python_file(
+    chunk_governor: ChunkGovernor, discovered_sample_python_file
+) -> None:
     """Verify semantic chunking of valid Python produces correct structure.
 
     Tests:
@@ -43,11 +31,10 @@ def test_semantic_chunks_python_file(mock_governor: Mock) -> None:
     - Chunk content matches original code sections
     - All chunks have valid line ranges
     """
-    fixture_path = Path("tests/fixtures/sample.py")
-    content = fixture_path.read_text()
+    content = discovered_sample_python_file.contents
 
-    chunker = SemanticChunker(mock_governor, SemanticSearchLanguage.PYTHON)
-    chunks = chunker.chunk(content, file_path=fixture_path)
+    chunker = SemanticChunker(chunk_governor, SemanticSearchLanguage.PYTHON)
+    chunks = chunker.chunk(content, file=discovered_sample_python_file)
 
     # Should produce multiple chunks from sample.py
     assert len(chunks) > 0, "Should produce at least one chunk"
@@ -73,7 +60,9 @@ def test_semantic_chunks_python_file(mock_governor: Mock) -> None:
     assert all(chunk.content.strip() for chunk in chunks), "No chunks should have empty content"
 
 
-def test_semantic_chunks_javascript_file(mock_governor: Mock) -> None:
+def test_semantic_chunks_javascript_file(
+    chunk_governor: ChunkGovernor, discovered_sample_javascript_file
+) -> None:
     """Verify JavaScript AST parsing and nested function handling.
 
     Tests:
@@ -81,11 +70,10 @@ def test_semantic_chunks_javascript_file(mock_governor: Mock) -> None:
     - Nested functions are handled properly
     - Metadata contains function/class classifications
     """
-    fixture_path = Path("tests/fixtures/sample.js")
-    content = fixture_path.read_text()
+    content = discovered_sample_javascript_file.contents
 
-    chunker = SemanticChunker(mock_governor, SemanticSearchLanguage.JAVASCRIPT)
-    chunks = chunker.chunk(content, file_path=fixture_path)
+    chunker = SemanticChunker(chunk_governor, SemanticSearchLanguage.JAVASCRIPT)
+    chunks = chunker.chunk(content, file=discovered_sample_javascript_file)
 
     assert len(chunks) > 0, "Should produce chunks from JavaScript file"
 
@@ -95,7 +83,9 @@ def test_semantic_chunks_javascript_file(mock_governor: Mock) -> None:
         assert chunk.language.name == "JAVASCRIPT", "Language should be JavaScript"
 
 
-def test_semantic_chunks_rust_file(mock_governor: Mock) -> None:
+def test_semantic_chunks_rust_file(
+    chunk_governor: ChunkGovernor, discovered_sample_rust_file
+) -> None:
     """Verify Rust trait/impl chunking.
 
     Tests:
@@ -103,11 +93,10 @@ def test_semantic_chunks_rust_file(mock_governor: Mock) -> None:
     - Trait and impl blocks are identified
     - Chunks maintain Rust code structure
     """
-    fixture_path = Path("tests/fixtures/sample.rs")
-    content = fixture_path.read_text()
+    content = discovered_sample_rust_file.contents
 
-    chunker = SemanticChunker(mock_governor, SemanticSearchLanguage.RUST)
-    chunks = chunker.chunk(content, file_path=fixture_path)
+    chunker = SemanticChunker(chunk_governor, SemanticSearchLanguage.RUST)
+    chunks = chunker.chunk(content, file=discovered_sample_rust_file)
 
     assert len(chunks) > 0, "Should produce chunks from Rust file"
 

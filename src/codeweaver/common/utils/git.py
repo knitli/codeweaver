@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-# ruff: noqa: S607
+# ruff: noqa: S603
 import contextlib
 import shutil
 import subprocess
@@ -27,7 +27,7 @@ class Missing(Sentinel):
     """Sentinel for missing values."""
 
 
-MISSING: Missing = Missing(SentinelName("Missing"), "<MISSING>")
+MISSING: Missing = Missing(name=SentinelName("Missing"), repr_="<MISSING>", module_name=__name__)
 
 
 def try_git_rev_parse() -> Path | None:
@@ -35,13 +35,22 @@ def try_git_rev_parse() -> Path | None:
     if not has_git():
         return None
     git = shutil.which("git")
+    if not git:
+        return None
     with contextlib.suppress(subprocess.CalledProcessError):
         output = subprocess.run(
-            ["rev-parse", "--show-superproject-working-tree", "--show-toplevel", "|", "head", "-1"],
-            executable=git,
+            [
+                git,
+                "rev-parse",
+                "--show-superproject-working-tree",
+                "--show-toplevel",
+                "|",
+                "head",
+                "-1",
+            ],
             capture_output=True,
             text=True,
-        )
+        )  # type: ignore
         return Path(output.stdout.strip())
     return None
 
@@ -54,11 +63,8 @@ def is_git_dir(directory: Path | None = None) -> bool:
     """
     directory = directory or Path.cwd()
     git_path = directory / ".git"
-    if git_path.exists():
-        # In a worktree, .git is a file containing "gitdir: <path>"
-        # In a regular repo, .git is a directory
-        return git_path.is_dir() or git_path.is_file()
-    return False
+    git_worktree = git_path.is_file() and git_path.read_text().startswith("gitdir:")
+    return git_path.is_dir() or git_worktree if git_path.exists() else False
 
 
 def _walk_down_to_git_root(path: Path | None = None) -> Path:
@@ -88,7 +94,10 @@ def get_project_root(root_path: Path | None = None) -> Path:
 
 
 def set_relative_path(path: Path | str | None) -> Path | None:
-    """Validates a path and makes it relative to the project root if the path is absolute."""
+    """Validates a path and makes it relative to the project root if the path is absolute.
+
+    If the path is outside the project root (e.g., test temp files), returns the path as-is.
+    """
     if path is None:
         return None
     path_obj = Path(path)
@@ -96,7 +105,12 @@ def set_relative_path(path: Path | str | None) -> Path | None:
         return path_obj
 
     base_path = get_project_root()
-    return path_obj.relative_to(base_path)
+    try:
+        return path_obj.relative_to(base_path)
+    except ValueError:
+        # Path is outside project root (e.g., /tmp test files)
+        # Return as-is to allow testing with temporary directories
+        return path_obj
 
 
 def has_git() -> bool:
@@ -105,9 +119,7 @@ def has_git() -> bool:
     if not git:
         return False
     with contextlib.suppress(subprocess.CalledProcessError):
-        output = subprocess.run(
-            ["--version"], executable=git, stderr=subprocess.STDOUT, capture_output=True
-        )
+        output = subprocess.run([git, "--version"], capture_output=True)
         return output.returncode == 0
     return False
 
@@ -132,14 +144,10 @@ def get_git_revision(directory: Path) -> str | Missing:
         return MISSING
     directory = cast(Path, git_dir)
     if has_git():
-        git = shutil.which("git")
+        git = cast(bytes, shutil.which("git"))
         with contextlib.suppress(subprocess.CalledProcessError):
             output = subprocess.run(
-                ["rev-parse", "--short", "HEAD"],
-                executable=git,
-                cwd=directory,
-                capture_output=True,
-                text=True,
+                [git, "rev-parse", "--short", "HEAD"], cwd=directory, capture_output=True, text=True
             )
             return output.stdout.strip()
     return MISSING
@@ -152,8 +160,7 @@ def _get_branch_from_origin(directory: Path) -> str | Missing:
         return MISSING
     with contextlib.suppress(subprocess.CalledProcessError):
         output = subprocess.run(
-            ["rev-parse", "--abbrev-ref", "origin/HEAD"],
-            executable=git,
+            [git, "rev-parse", "--abbrev-ref", "origin/HEAD"],
             cwd=directory,
             capture_output=True,
             text=True,
@@ -169,15 +176,16 @@ def _get_branch_from_origin(directory: Path) -> str | Missing:
 def get_git_branch(directory: Path) -> str | Missing:
     """Get the current branch name of a git repository."""
     git_dir = _get_git_dir(directory)
-    if git_dir is MISSING:
-        return MISSING
     directory = cast(Path, git_dir)
     if has_git():
         git = shutil.which("git")
+        if git_dir is MISSING and (git_dir := get_project_root(directory)):
+            directory = git_dir
+        else:
+            return MISSING
         with contextlib.suppress(subprocess.CalledProcessError):
             output = subprocess.run(
-                ["rev-parse", "--abbrev-ref", "HEAD"],
-                executable=git,
+                [cast(bytes, git), "rev-parse", "--abbrev-ref", "HEAD"],
                 cwd=directory,
                 capture_output=True,
                 text=True,

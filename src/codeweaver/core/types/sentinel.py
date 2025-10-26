@@ -11,12 +11,12 @@ import sys as _sys
 
 from threading import Lock as _Lock
 from types import FrameType
-from typing import Any, Self, cast
+from typing import Self, cast
 
-from pydantic import GetCoreSchemaHandler
 from pydantic_core import core_schema
 
 from codeweaver.core.types.aliases import LiteralStringT, SentinelName
+from codeweaver.core.types.models import BasedModel
 
 
 def _get_parent_frame() -> FrameType:
@@ -28,7 +28,7 @@ _lock = _Lock()
 _registry: dict[SentinelName, Sentinel] = {}
 
 
-class Sentinel:
+class Sentinel(BasedModel):
     """Create a unique sentinel object.
     ...
     """
@@ -96,22 +96,6 @@ class Sentinel:
         """Return the hash of the ."""
         return hash((self._name, self._module_name))
 
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls, _source_type: Any, _handler: GetCoreSchemaHandler
-    ) -> core_schema.CoreSchema:
-        """Return the Pydantic core schema for the ."""
-        return core_schema.with_info_after_validator_function(
-            cls._validate,
-            core_schema.str_schema(),
-            # spellchecker:off
-            serialization=core_schema.plain_serializer_function_ser_schema(
-                # spellchecker:on
-                cls._serialize,
-                when_used="json",
-            ),
-        )
-
     @staticmethod
     def _validate(value: str, _info: core_schema.ValidationInfo) -> tuple[LiteralStringT, str, str]:
         """Validate that a value is a ."""
@@ -122,6 +106,9 @@ class Sentinel:
     def _serialize(existing: Sentinel) -> str:
         """Serialize a Sentinel to a string."""
         return f"{existing._name} {existing._repr} {existing._module_name}"
+
+    def _telemetry_keys(self) -> None:
+        return None
 
 
 class Unset:

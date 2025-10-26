@@ -259,7 +259,7 @@ class GracefulChunker(BaseChunker):
         self.fallback = fallback
 
     def chunk(
-        self, content: str, *, file_path: Path | None = None, context: dict[str, Any] | None = None
+        self, content: str, *, file: DiscoveredFile | None = None, context: dict[str, Any] | None = None
     ) -> list[CodeChunk]:
         """Try primary chunker, fall back on error.
 
@@ -268,7 +268,7 @@ class GracefulChunker(BaseChunker):
 
         Args:
             content: Source code content to chunk
-            file_path: Optional file path for context and logging
+            file: Optional DiscoveredFile with metadata and source_id
             context: Optional additional context for chunking
 
         Returns:
@@ -279,25 +279,28 @@ class GracefulChunker(BaseChunker):
             are caught and logged but not propagated.
 
         Examples:
+            >>> from codeweaver.core.discovery import DiscoveredFile
+            >>> from pathlib import Path
             >>> content = "def foo(): pass"
-            >>> chunks = graceful_chunker.chunk(content, file_path=Path("test.py"))
+            >>> file = DiscoveredFile.from_path(Path("test.py"))
+            >>> chunks = graceful_chunker.chunk(content, file=file)
             >>> # Returns chunks from primary if successful, fallback on error
         """
         try:
-            return self.primary.chunk(content, file_path=file_path, context=context)
+            return self.primary.chunk(content, file=file, context=context)
         except Exception as e:
             logger.warning(
                 "Primary chunker failed: %s. Using fallback.",
                 e,
                 extra={
-                    "file_path": str(file_path) if file_path else None,
+                    "file_path": str(file.path) if file else None,
                     "primary_chunker": type(self.primary).__name__,
                     "fallback_chunker": type(self.fallback).__name__,
                     "error_type": type(e).__name__,
                 },
                 exc_info=True,
             )
-            return self.fallback.chunk(content, file_path=file_path, context=context)
+            return self.fallback.chunk(content, file=file, context=context)
 
 
 __all__ = ("ChunkerSelector", "GracefulChunker")

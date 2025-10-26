@@ -13,10 +13,11 @@ from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, cast
 
-from pydantic import AfterValidator, Field, NonNegativeInt, computed_field
+from pydantic import UUID7, AfterValidator, Field, NonNegativeInt, computed_field
 from pydantic.dataclasses import dataclass
 
-from codeweaver.common.utils import get_git_branch, sanitize_unicode, set_relative_path
+from codeweaver.common.utils import get_git_branch, sanitize_unicode, set_relative_path, uuid7
+from codeweaver.common.utils.git import Missing
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import is_semantic_config_ext
 from codeweaver.core.metadata import ExtKind
@@ -55,13 +56,19 @@ class DiscoveredFile(DataclassSerializationMixin):
         ),
     ]
     git_branch: Annotated[
-        str | None,
+        str | Missing,
         Field(
             default_factory=lambda data: get_git_branch(data["path"]),
             description="""Git branch the file was discovered in, if detected.""",
-            init=False,
         ),
     ]
+
+    source_id: Annotated[
+        UUID7,
+        Field(
+            description="Unique identifier for the source of the file. All chunks from this file will share this ID."
+        ),
+    ] = uuid7()
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey

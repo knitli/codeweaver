@@ -163,7 +163,9 @@ class CodeChunk(BasedModel):
     # Vector storage fields
     chunk_name: Annotated[
         str | None,
-        Field(description="""Fully qualified chunk identifier (e.g., 'auth.py:UserAuth.validate')"""),
+        Field(
+            description="""Fully qualified chunk identifier (e.g., 'auth.py:UserAuth.validate')"""
+        ),
     ] = None
     embeddings: Annotated[
         dict[str, list[float] | dict[str, Any]] | None,
@@ -266,7 +268,7 @@ class CodeChunk(BasedModel):
 
     @classmethod
     def from_file(cls, file: DiscoveredFile, line_range: Span, content: str) -> CodeChunk:
-        """Create a CodeChunk from a file."""
+        """Create a CodeChunk from a file. (This creates a chunk that consists of the entire file contents. To create smaller chunks, use a chunker.)."""
         return cls.model_validate({
             "file_path": file.path,
             "line_range": line_range,
@@ -275,6 +277,7 @@ class CodeChunk(BasedModel):
             if file.ext_kind
             else getattr(ExtKind.from_file(file.path), "language", None),
             "source": ChunkSource.FILE,
+            "parent_id": file.source_id,
         })
 
     @computed_field
@@ -345,6 +348,9 @@ class CodeChunk(BasedModel):
                 yield result.decode("utf-8") if isinstance(result, bytes | bytearray) else result
 
 
+import contextlib
+
+
 __all__ = (
     "ChunkSequence",
     "CodeChunk",
@@ -355,8 +361,8 @@ __all__ = (
 )
 
 # Rebuild models to resolve forward references (if AstThing is available)
-try:
-    SearchResult.model_rebuild()
-    CodeChunk.model_rebuild()
-except Exception:
-    pass  # Forward references will be resolved when AstThing is imported
+with contextlib.suppress(Exception):
+    if not SearchResult.__pydantic_complete__:
+        _ = SearchResult.model_rebuild()
+    if not CodeChunk.__pydantic_complete__:
+        _ = CodeChunk.model_rebuild()

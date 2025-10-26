@@ -132,8 +132,10 @@ def test_duplicate_functions_deduplicated(
     """
     content = python_file_with_duplicates.read_text()
 
-    # Chunk the file containing duplicates
-    chunks = semantic_chunker.chunk(content, file_path=python_file_with_duplicates)
+    # Create DiscoveredFile and chunk the file containing duplicates
+    from codeweaver.core.discovery import DiscoveredFile
+    discovered_file = DiscoveredFile.from_path(python_file_with_duplicates)
+    chunks = semantic_chunker.chunk(content, file=discovered_file)
 
     # Count method definitions in original content
     method_count = len(re.findall(r"^\s+def \w+\(", content, re.MULTILINE))
@@ -183,8 +185,10 @@ def test_unique_chunks_preserved(
     """
     content = python_file_with_unique_functions.read_text()
 
-    # Chunk the file with all unique functions
-    chunks = semantic_chunker.chunk(content, file_path=python_file_with_unique_functions)
+    # Create DiscoveredFile and chunk the file with all unique functions
+    from codeweaver.core.discovery import DiscoveredFile
+    discovered_file = DiscoveredFile.from_path(python_file_with_unique_functions)
+    chunks = semantic_chunker.chunk(content, file=discovered_file)
 
     # Count function definitions in original content
     function_count = len(re.findall(r"^def \w+\(", content, re.MULTILINE))
@@ -234,8 +238,10 @@ def test_batch_id_tracking(
 
     content = python_file_with_unique_functions.read_text()
 
-    # Chunk the file
-    chunks = semantic_chunker.chunk(content, file_path=python_file_with_unique_functions)
+    # Create DiscoveredFile and chunk the file
+    from codeweaver.core.discovery import DiscoveredFile
+    discovered_file = DiscoveredFile.from_path(python_file_with_unique_functions)
+    chunks = semantic_chunker.chunk(content, file=discovered_file)
 
     # Verify all chunks have a batch ID
     assert all(chunk.embedding_batch_id is not None for chunk in chunks), (
