@@ -33,6 +33,7 @@ from codeweaver.engine.chunker.exceptions import (
     ParseError,
 )
 
+
 if TYPE_CHECKING:
     from codeweaver.core.discovery import DiscoveredFile
 
@@ -314,7 +315,7 @@ class DelimiterChunker(BaseChunker):
         for delimiter in keyword_delimiters:
             # Find all keyword occurrences using word boundary matching
             pattern = rf"\b{re.escape(delimiter.start)}\b"
-            
+
             for match in re.finditer(pattern, content):
                 keyword_pos = match.start()
 
@@ -324,7 +325,7 @@ class DelimiterChunker(BaseChunker):
 
                 # Find the next structural opening after the keyword
                 struct_start, struct_char = self._find_next_structural_with_char(
-                    content, start=keyword_pos + len(delimiter.start), 
+                    content, start=keyword_pos + len(delimiter.start),
                     allowed=set(STRUCTURAL_PAIRS.keys())
                 )
 
@@ -398,7 +399,7 @@ class DelimiterChunker(BaseChunker):
                         return None, None  # Comment goes to end of file
                     pos = newline_pos + 1
                     continue
-                elif two_chars == "/*":
+                if two_chars == "/*":
                     # Skip block comment
                     end_comment = content.find("*/", pos + 2)
                     if end_comment == -1:
@@ -484,7 +485,7 @@ class DelimiterChunker(BaseChunker):
                             break
                         pos = newline
                         continue
-                    elif two_chars == "/*":
+                    if two_chars == "/*":
                         end_comment = content.find("*/", pos + 2)
                         if end_comment == -1:
                             break
@@ -528,7 +529,7 @@ class DelimiterChunker(BaseChunker):
             line_start = 0
         else:
             line_start += 1  # Move past the newline
-        
+
         # Get the line content up to the colon
         line_with_colon = content[line_start:colon_pos]
         # Calculate base indentation (number of leading spaces/tabs)
@@ -549,7 +550,7 @@ class DelimiterChunker(BaseChunker):
                 line_end = len(content)
 
             line = content[current_line_start:line_end]
-            
+
             # Skip empty lines and comment lines
             stripped = line.lstrip()
             if not stripped or stripped.startswith("#"):
@@ -598,10 +599,7 @@ class DelimiterChunker(BaseChunker):
         backticks = prefix.count("`")
 
         # Odd number of quotes means we're inside a string
-        if single_quotes % 2 == 1 or double_quotes % 2 == 1 or backticks % 2 == 1:
-            return True
-
-        return False
+        return bool(single_quotes % 2 == 1 or double_quotes % 2 == 1 or backticks % 2 == 1)
 
     def _extract_boundaries(self, matches: list[DelimiterMatch]) -> list[Boundary]:
         """Extract complete boundaries from delimiter matches.
@@ -895,11 +893,11 @@ class DelimiterChunker(BaseChunker):
         # These catch function/class/def keywords across many languages
         from codeweaver.engine.chunker.delimiters.patterns import (
             CLASS_PATTERN,
-            FUNCTION_PATTERN,
             CONDITIONAL_PATTERN,
+            FUNCTION_PATTERN,
             LOOP_PATTERN,
         )
-        
+
         common_patterns = [FUNCTION_PATTERN, CLASS_PATTERN, CONDITIONAL_PATTERN, LOOP_PATTERN]
         for pattern in common_patterns:
             # Only add if not already present (avoid duplicates from family patterns)
