@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import contextlib
 import os
-
 from collections.abc import Generator, Iterable
 from functools import cache
 from pathlib import Path
@@ -19,7 +18,12 @@ from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, TypedDict, cast, o
 from langchain_text_splitters import Language as LC_Language
 from pydantic import DirectoryPath, Field, computed_field
 
-from codeweaver.common.utils import LazyImport, get_project_root, lazy_import, normalize_ext
+from codeweaver.common.utils import (
+    LazyImport,
+    get_project_root,
+    lazy_import,
+    normalize_ext,
+)
 from codeweaver.core.secondary_languages import SecondarySupportedLanguage
 from codeweaver.core.types.aliases import (
     DirectoryName,
@@ -36,7 +40,6 @@ from codeweaver.core.types.aliases import (
 )
 from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.models import BasedModel
-
 
 if TYPE_CHECKING:
     from codeweaver.config.language import CustomDelimiter
@@ -68,7 +71,10 @@ class ExtensionRegistry(BasedModel):
     """
 
     _registry: Annotated[
-        dict[FileExtensionT, SemanticSearchLanguage | SecondarySupportedLanguage | ConfigLanguage],
+        dict[
+            FileExtensionT,
+            SemanticSearchLanguage | SecondarySupportedLanguage | ConfigLanguage,
+        ],
         Field(
             default_factory=dict,
             description="""A mapping of file extensions to their associated languages.""",
@@ -98,14 +104,19 @@ class ExtensionRegistry(BasedModel):
         for lang in languages:
             exts = tuple(pair.ext for pair in extpairs if pair.language == lang)
             self._add_exts_to_registry(
-                cast(Iterable[FileExtensionT], exts), cast(SecondarySupportedLanguage, lang)
+                cast(Iterable[FileExtensionT], exts),
+                cast(SecondarySupportedLanguage, lang),
             )
         for lang in ConfigLanguage:
             if lang.extensions:
-                self._add_exts_to_registry(cast(Iterable[FileExtensionT], lang.extensions), lang)
+                self._add_exts_to_registry(
+                    cast(Iterable[FileExtensionT], lang.extensions), lang
+                )
         for lang in SemanticSearchLanguage:
             if lang.extensions:
-                self._add_exts_to_registry(cast(Iterable[FileExtensionT], lang.extensions), lang)
+                self._add_exts_to_registry(
+                    cast(Iterable[FileExtensionT], lang.extensions), lang
+                )
 
     def _telemetry_keys(self) -> None:
         return None
@@ -113,7 +124,11 @@ class ExtensionRegistry(BasedModel):
     def lookup(
         self, ext: FileExtensionT
     ) -> (
-        SemanticSearchLanguage | SecondarySupportedLanguage | ConfigLanguage | FileExtensionT | None
+        SemanticSearchLanguage
+        | SecondarySupportedLanguage
+        | ConfigLanguage
+        | FileExtensionT
+        | None
     ):
         """
         Looks up the language associated with a given file extension.
@@ -186,14 +201,19 @@ class ExtensionRegistry(BasedModel):
                 case ConfigNamePair():
                     exts = ext_tuple.language.extensions
                     self._add_exts_to_registry(
-                        cast(tuple[FileExtensionT, ...], (*(exts or ()), ext_tuple.filename)),
+                        cast(
+                            tuple[FileExtensionT, ...],
+                            (*(exts or ()), ext_tuple.filename),
+                        ),
                         ext_tuple.language,
                     )  # type: ignore
                 case ExtLangPair():
                     self._add_exts_to_registry(
                         *(ext_tuple.ext,),
                         ext_tuple.language
-                        if isinstance(ext_tuple.language, SemanticSearchLanguage | ConfigLanguage)
+                        if isinstance(
+                            ext_tuple.language, SemanticSearchLanguage | ConfigLanguage
+                        )
                         else LanguageName(ext_tuple.language),
                     )  # type: ignore
         if extension is not None and language is not None:
@@ -274,7 +294,9 @@ class ConfigLanguage(BaseEnum):
         """
         ext = ext.lower() if ext.startswith(".") else ext
         if ext in cls.all_extensions():
-            return next((language for language in cls if ext in language.extensions), None)
+            return next(
+                (language for language in cls if ext in language.extensions), None
+            )
         return None
 
     @property
@@ -296,13 +318,20 @@ class ConfigLanguage(BaseEnum):
                 ".bash_profile",
                 ".bash_logout",
             ),
-            ConfigLanguage.CMAKE: (".cmake", "CMakeLists.txt", "CMakefile", ".cmake.in"),
+            ConfigLanguage.CMAKE: (
+                ".cmake",
+                "CMakeLists.txt",
+                "CMakefile",
+                ".cmake.in",
+            ),
             ConfigLanguage.INI: (".ini", ".cfg"),
             ConfigLanguage.HCL: (".tf", ".hcl", ".tfvars", ".nomad", ".workflow"),
             ConfigLanguage.JSON: (".json", ".jsonc", ".json5"),
             ConfigLanguage.GROOVY: (".gradle", ".gradle.kts"),
             ConfigLanguage.KOTLIN: (".kts",),
+            # spellchecker:off
             ConfigLanguage.MAKE: ("Makefile", "makefile", ".makefile", ".mak", ".make"),
+            # spellchecker:on
             ConfigLanguage.PROPERTIES: (".properties",),
             ConfigLanguage.SELF: ("SELF",),
             ConfigLanguage.TOML: (".toml",),
@@ -332,7 +361,9 @@ class ConfigLanguage(BaseEnum):
         """
         Returns all file extensions for all configuration languages.
         """
-        yield from (ext for lang in cls for ext in lang.extensions if ext and ext != "SELF")
+        yield from (
+            ext for lang in cls for ext in lang.extensions if ext and ext != "SELF"
+        )
 
 
 class RepoConventions(TypedDict, total=False):
@@ -422,78 +453,100 @@ class SemanticSearchLanguage(str, BaseEnum):
         }.get(self)
 
     @classmethod
-    def extension_map(cls) -> MappingProxyType[SemanticSearchLanguage, tuple[FileExtensionT, ...]]:
+    def extension_map(
+        cls,
+    ) -> MappingProxyType[SemanticSearchLanguage, tuple[FileExtensionT, ...]]:
         """
         Returns a mapping of file extensions to their corresponding SemanticSearchLanguage.
         This is used to quickly look up the language based on file extension.
         """
-        return MappingProxyType({
-            # the bash grammar is pretty tolerant of posix shell scripts, so we include common shell script extensions here
-            cls.BASH: (
-                FileExt(".bash"),
-                FileExt(".bash_profile"),
-                FileExt(".bashrc"),
-                FileExt(".csh"),
-                FileExt(".cshrc"),
-                FileExt(".ksh"),
-                FileExt(".kshrc"),
-                FileExt(".profile"),
-                FileExt(".sh"),
-                FileExt(".tcsh"),
-                FileExt(".tcshrc"),
-                FileExt(".zprofile"),
-                FileExt(".zsh"),
-                FileExt(".zshrc"),
-            ),
-            cls.C_LANG: (FileExt(".c"), FileExt(".h")),
-            cls.C_PLUS_PLUS: (FileExt(".cpp"), FileExt(".hpp"), FileExt(".cc"), FileExt(".cxx")),
-            cls.C_SHARP: (FileExt(".cs"), FileExt(".csharp")),
-            cls.CSS: (FileExt(".css"),),
-            cls.ELIXIR: (FileExt(".ex"), FileExt(".exs")),
-            cls.GO: (FileExt(".go"),),
-            cls.HASKELL: (FileExt(".hs"),),
-            cls.HCL: (
-                FileExt(".tf"),
-                FileExt(".hcl"),
-                FileExt(".nomad"),
-                FileExt(".tf"),
-                FileExt(".tfvars"),
-                FileExt(".workflow"),
-            ),
-            cls.HTML: (FileExt(".html"), FileExt(".htm"), FileExt(".xhtml")),
-            cls.JAVA: (FileExt(".java"),),
-            cls.JAVASCRIPT: (FileExt(".js"), FileExt(".mjs"), FileExt(".cjs")),
-            cls.JSON: (FileExt(".json"), FileExt(".jsonc"), FileExt(".json5")),
-            cls.JSX: (FileExt(".jsx"),),
-            cls.KOTLIN: (FileExt(".kt"), FileExt(".kts"), FileExt(".ktm")),
-            cls.LUA: (FileExt(".lua"),),
-            cls.NIX: (FileExt(".nix"),),
-            cls.PHP: (FileExt(".php"), FileExt(".phtml")),
-            cls.PYTHON: (
-                FileExt(".py"),
-                FileExt(".pyi"),
-                FileExt(".py3"),
-                FileExt(".bzl"),
-                FileExt(".ipynb"),
-            ),
-            cls.RUBY: (FileExt(".rb"), FileExt(".gemspec"), FileExt(".rake"), FileExt(".ru")),
-            cls.RUST: (FileExt(".rs"),),
-            cls.SCALA: (FileExt(".scala"), FileExt(".sc"), FileExt(".sbt")),
-            cls.SOLIDITY: (FileExt(".sol"),),
-            cls.SWIFT: (FileExt(".swift"),),
-            cls.TYPESCRIPT: (FileExt(".ts"), FileExt(".mts"), FileExt(".cts")),
-            cls.TSX: (FileExt(".tsx"),),
-            cls.YAML: (FileExt(".yaml"), FileExt(".yml")),
-        })
+        return MappingProxyType(
+            {
+                # the bash grammar is pretty tolerant of posix shell scripts, so we include common shell script extensions here
+                cls.BASH: (
+                    FileExt(".bash"),
+                    FileExt(".bash_profile"),
+                    FileExt(".bashrc"),
+                    FileExt(".csh"),
+                    FileExt(".cshrc"),
+                    FileExt(".ksh"),
+                    FileExt(".kshrc"),
+                    FileExt(".profile"),
+                    FileExt(".sh"),
+                    FileExt(".tcsh"),
+                    FileExt(".tcshrc"),
+                    FileExt(".zprofile"),
+                    FileExt(".zsh"),
+                    FileExt(".zshrc"),
+                ),
+                cls.C_LANG: (FileExt(".c"), FileExt(".h")),
+                cls.C_PLUS_PLUS: (
+                    FileExt(".cpp"),
+                    FileExt(".hpp"),
+                    FileExt(".cc"),
+                    FileExt(".cxx"),
+                ),
+                cls.C_SHARP: (FileExt(".cs"), FileExt(".csharp")),
+                cls.CSS: (FileExt(".css"),),
+                cls.ELIXIR: (FileExt(".ex"), FileExt(".exs")),
+                cls.GO: (FileExt(".go"),),
+                cls.HASKELL: (FileExt(".hs"),),
+                cls.HCL: (
+                    FileExt(".tf"),
+                    FileExt(".hcl"),
+                    FileExt(".nomad"),
+                    FileExt(".tf"),
+                    FileExt(".tfvars"),
+                    FileExt(".workflow"),
+                ),
+                cls.HTML: (FileExt(".html"), FileExt(".htm"), FileExt(".xhtml")),
+                cls.JAVA: (FileExt(".java"),),
+                cls.JAVASCRIPT: (FileExt(".js"), FileExt(".mjs"), FileExt(".cjs")),
+                cls.JSON: (FileExt(".json"), FileExt(".jsonc"), FileExt(".json5")),
+                cls.JSX: (FileExt(".jsx"),),
+                cls.KOTLIN: (FileExt(".kt"), FileExt(".kts"), FileExt(".ktm")),
+                cls.LUA: (FileExt(".lua"),),
+                cls.NIX: (FileExt(".nix"),),
+                cls.PHP: (FileExt(".php"), FileExt(".phtml")),
+                cls.PYTHON: (
+                    FileExt(".py"),
+                    FileExt(".pyi"),
+                    FileExt(".py3"),
+                    FileExt(".bzl"),
+                    FileExt(".ipynb"),
+                ),
+                cls.RUBY: (
+                    FileExt(".rb"),
+                    FileExt(".gemspec"),
+                    FileExt(".rake"),
+                    FileExt(".ru"),
+                ),
+                cls.RUST: (FileExt(".rs"),),
+                cls.SCALA: (FileExt(".scala"), FileExt(".sc"), FileExt(".sbt")),
+                cls.SOLIDITY: (FileExt(".sol"),),
+                cls.SWIFT: (FileExt(".swift"),),
+                cls.TYPESCRIPT: (FileExt(".ts"), FileExt(".mts"), FileExt(".cts")),
+                cls.TSX: (FileExt(".tsx"),),
+                cls.YAML: (FileExt(".yaml"), FileExt(".yml")),
+            }
+        )
 
     @classmethod
-    def from_extension(cls, ext: FileExtensionT | LiteralStringT) -> SemanticSearchLanguage | None:
+    def from_extension(
+        cls, ext: FileExtensionT | LiteralStringT
+    ) -> SemanticSearchLanguage | None:
         """
         Returns the SemanticSearchLanguage associated with the given file extension.
         """
-        ext = FileExt(ext.lower()) if ext.startswith(".") else FileExt(f".{ext.lower()}")
+        ext = (
+            FileExt(ext.lower()) if ext.startswith(".") else FileExt(f".{ext.lower()}")
+        )
         return next(
-            (language for language, extensions in cls.extension_map().items() if ext in extensions),
+            (
+                language
+                for language, extensions in cls.extension_map().items()
+                if ext in extensions
+            ),
             None,
         )
 
@@ -528,7 +581,10 @@ class SemanticSearchLanguage(str, BaseEnum):
                         language=self,
                         path=PROJECT_ROOT / "CMakeLists.txt",
                         language_type=ConfigLanguage.CMAKE,
-                        dependency_key_paths=(("CMAKE_CXX_FLAGS",), ("CMAKE_EXE_LINKER_FLAGS",)),
+                        dependency_key_paths=(
+                            ("CMAKE_CXX_FLAGS",),
+                            ("CMAKE_EXE_LINKER_FLAGS",),
+                        ),
                     ),
                     LanguageConfigFile(
                         language=self,
@@ -594,13 +650,18 @@ class SemanticSearchLanguage(str, BaseEnum):
                     ),
                     LanguageConfigFile(
                         language=self,
-                        path=Path(os.environ.get("STACK_YAML") or PROJECT_ROOT / "stack.yml"),
+                        path=Path(
+                            os.environ.get("STACK_YAML") or PROJECT_ROOT / "stack.yml"
+                        ),
                         language_type=ConfigLanguage.YAML,
                         dependency_key_paths=(("extra-deps",),),
                     ),
                     LanguageConfigFile(
                         language=self,
-                        path=next(iter(PROJECT_ROOT.glob("*.cabal")), PROJECT_ROOT / "package.cabal"),
+                        path=next(
+                            iter(PROJECT_ROOT.glob("*.cabal")),
+                            PROJECT_ROOT / "package.cabal",
+                        ),
                         language_type=ConfigLanguage.INI,
                         dependency_key_paths=(
                             ("build-depends",),
@@ -617,7 +678,12 @@ class SemanticSearchLanguage(str, BaseEnum):
                         language_type=ConfigLanguage.XML,
                         dependency_key_paths=(
                             ("project", "dependencies", "dependency"),
-                            ("project", "dependencyManagement", "dependencies", "dependency"),
+                            (
+                                "project",
+                                "dependencyManagement",
+                                "dependencies",
+                                "dependency",
+                            ),
                         ),
                     ),
                     LanguageConfigFile(
@@ -683,19 +749,28 @@ class SemanticSearchLanguage(str, BaseEnum):
                         language=self,
                         path=PROJECT_ROOT / "luarocks.json",
                         language_type=ConfigLanguage.JSON,
-                        dependency_key_paths=(("dependencies",), ("build_dependencies",)),
+                        dependency_key_paths=(
+                            ("dependencies",),
+                            ("build_dependencies",),
+                        ),
                     ),
                     LanguageConfigFile(
                         language=self,
                         path=PROJECT_ROOT / "rockspec.json",
                         language_type=ConfigLanguage.JSON,
-                        dependency_key_paths=(("dependencies",), ("build_dependencies",)),
+                        dependency_key_paths=(
+                            ("dependencies",),
+                            ("build_dependencies",),
+                        ),
                     ),
                     LanguageConfigFile(
                         language=self,
                         path=PROJECT_ROOT / "rockspec",
                         language_type=ConfigLanguage.INI,
-                        dependency_key_paths=(("dependencies",), ("build_dependencies",)),
+                        dependency_key_paths=(
+                            ("dependencies",),
+                            ("build_dependencies",),
+                        ),
                     ),
                 )
             case SemanticSearchLanguage.NIX:
@@ -877,12 +952,18 @@ class SemanticSearchLanguage(str, BaseEnum):
                 SemanticSearchLanguage.HTML,
                 SemanticSearchLanguage.CSS,
             ),
-            SemanticSearchLanguage.JSX: (SemanticSearchLanguage.HTML, SemanticSearchLanguage.CSS),
+            SemanticSearchLanguage.JSX: (
+                SemanticSearchLanguage.HTML,
+                SemanticSearchLanguage.CSS,
+            ),
             SemanticSearchLanguage.TYPESCRIPT: (
                 SemanticSearchLanguage.HTML,
                 SemanticSearchLanguage.CSS,
             ),
-            SemanticSearchLanguage.TSX: (SemanticSearchLanguage.HTML, SemanticSearchLanguage.CSS),
+            SemanticSearchLanguage.TSX: (
+                SemanticSearchLanguage.HTML,
+                SemanticSearchLanguage.CSS,
+            ),
             SemanticSearchLanguage.PHP: (
                 SemanticSearchLanguage.HTML,
                 SemanticSearchLanguage.JAVASCRIPT,
@@ -899,7 +980,10 @@ class SemanticSearchLanguage(str, BaseEnum):
         """
         Returns True if this language is a configuration language.
         """
-        return self.value in ConfigLanguage.values() and self is not SemanticSearchLanguage.KOTLIN
+        return (
+            self.value in ConfigLanguage.values()
+            and self is not SemanticSearchLanguage.KOTLIN
+        )
 
     @classmethod
     def config_language_exts(cls) -> Generator[str]:
@@ -910,7 +994,10 @@ class SemanticSearchLanguage(str, BaseEnum):
             ext
             for lang in cls
             for ext in cls.extension_map()[lang]
-            if isinstance(lang, cls) and lang.is_config_language and ext and ext != FileExt(".sh")
+            if isinstance(lang, cls)
+            and lang.is_config_language
+            and ext
+            and ext != FileExt(".sh")
         )
 
     @property
@@ -974,7 +1061,9 @@ class SemanticSearchLanguage(str, BaseEnum):
         Returns all file extensions associated with programming languages (excluding configuration languages).
         """
         yield from (
-            ext for ext in cls.all_extensions() if ext and ext not in cls.config_language_exts()
+            ext
+            for ext in cls.all_extensions()
+            if ext and ext not in cls.config_language_exts()
         )
 
     @classmethod
@@ -985,7 +1074,9 @@ class SemanticSearchLanguage(str, BaseEnum):
         from codeweaver.core.metadata import ExtLangPair
 
         for lang, exts in cls.extension_map().items():
-            yield from (ExtLangPair(ext=FileExt(ext), language=lang) for ext in exts if ext)  # type: ignore
+            yield from (
+                ExtLangPair(ext=FileExt(ext), language=lang) for ext in exts if ext
+            )  # type: ignore
 
     @classmethod
     def config_pairs(cls) -> Generator[ConfigPathPair]:
@@ -1004,7 +1095,9 @@ class SemanticSearchLanguage(str, BaseEnum):
         yield from all_paths
 
     @classmethod
-    def _language_from_config_file(cls, config_file: Path) -> SemanticSearchLanguage | None:
+    def _language_from_config_file(
+        cls, config_file: Path
+    ) -> SemanticSearchLanguage | None:
         """
         Returns the SemanticSearchLanguage for a given configuration file path.
 
@@ -1064,7 +1157,10 @@ class SemanticSearchLanguage(str, BaseEnum):
                 lang
                 for lang in cls
                 if lang.extensions
-                if next((extension for extension in lang.extensions if ext == extension), None)
+                if next(
+                    (extension for extension in lang.extensions if ext == extension),
+                    None,
+                )
             ),
             None,
         )
@@ -1076,18 +1172,38 @@ class SemanticSearchLanguage(str, BaseEnum):
         Returns the repository conventions associated with this language.
         """
         defaults = RepoConventions(
-            source_dirs=(DirectoryName("src"), DirectoryName("source"), DirectoryName("lib")),
-            test_dirs=(DirectoryName("tests"), DirectoryName("test"), DirectoryName("spec")),
+            source_dirs=(
+                DirectoryName("src"),
+                DirectoryName("source"),
+                DirectoryName("lib"),
+            ),
+            test_dirs=(
+                DirectoryName("tests"),
+                DirectoryName("test"),
+                DirectoryName("spec"),
+            ),
             test_patterns=(FileGlob("test_*"), FileGlob("_test")),
-            binary_dirs=(DirectoryName("build"), DirectoryName("bin"), DirectoryName("obj")),
+            binary_dirs=(
+                DirectoryName("build"),
+                DirectoryName("bin"),
+                DirectoryName("obj"),
+            ),
             workspace_defined_in_file=False,
         )
         return {
             SemanticSearchLanguage.BASH: defaults
             | RepoConventions(
-                source_dirs=(DirectoryName("scripts"), DirectoryName("bin"), DirectoryName("lib")),
+                source_dirs=(
+                    DirectoryName("scripts"),
+                    DirectoryName("bin"),
+                    DirectoryName("lib"),
+                ),
                 test_dirs=(DirectoryName("tests"), DirectoryName("test")),
-                test_patterns=(FileGlob("test_*"), FileGlob("_test.sh"), FileGlob(".bats")),
+                test_patterns=(
+                    FileGlob("test_*"),
+                    FileGlob("_test.sh"),
+                    FileGlob(".bats"),
+                ),
                 binary_dirs=(),
             ),
             SemanticSearchLanguage.C_LANG: defaults
@@ -1095,7 +1211,11 @@ class SemanticSearchLanguage(str, BaseEnum):
                 source_dirs=(DirectoryName("src"),),
                 test_dirs=(DirectoryName("tests"), DirectoryName("test")),
                 test_patterns=(FileGlob("test_*"), FileGlob("_test.c")),
-                binary_dirs=(DirectoryName("build"), DirectoryName("bin"), DirectoryName("obj")),
+                binary_dirs=(
+                    DirectoryName("build"),
+                    DirectoryName("bin"),
+                    DirectoryName("obj"),
+                ),
                 binary_patterns=(FileGlob("*.o"), FileGlob("*.out"), FileGlob("*.exe")),
                 workspace_files=(FileName("CMakeLists.txt"), FileName("Makefile")),
             ),
@@ -1103,7 +1223,11 @@ class SemanticSearchLanguage(str, BaseEnum):
             | RepoConventions(
                 source_dirs=(DirectoryName("src"), DirectoryName("include")),
                 test_dirs=(DirectoryName("tests"), DirectoryName("test")),
-                test_patterns=(FileGlob("test_*"), FileGlob("_test.cpp"), FileGlob("_test.cc")),
+                test_patterns=(
+                    FileGlob("test_*"),
+                    FileGlob("_test.cpp"),
+                    FileGlob("_test.cc"),
+                ),
                 binary_dirs=(
                     DirectoryName("build"),
                     DirectoryName("bin"),
@@ -1155,7 +1279,11 @@ class SemanticSearchLanguage(str, BaseEnum):
             ),
             SemanticSearchLanguage.GO: defaults
             | RepoConventions(
-                source_dirs=(DirectoryName("internal"), DirectoryName("pkg"), DirectoryName("cmd")),
+                source_dirs=(
+                    DirectoryName("internal"),
+                    DirectoryName("pkg"),
+                    DirectoryName("cmd"),
+                ),
                 test_dirs=(DirectoryName("tests"), DirectoryName("test")),
                 test_patterns=(FileGlob("_test.go"),),
                 binary_dirs=(DirectoryName("bin"), DirectoryName("build")),
@@ -1340,7 +1468,11 @@ class SemanticSearchLanguage(str, BaseEnum):
                     DirectoryName("test"),
                 ),
                 test_patterns=(FileGlob("Test.kt"), FileGlob("*Test.kt")),
-                binary_dirs=(DirectoryName("target"), DirectoryName("build"), DirectoryName("out")),
+                binary_dirs=(
+                    DirectoryName("target"),
+                    DirectoryName("build"),
+                    DirectoryName("out"),
+                ),
                 workspace_files=(
                     FileName("settings.gradle"),
                     FileName("settings.gradle.kts"),
@@ -1370,7 +1502,11 @@ class SemanticSearchLanguage(str, BaseEnum):
             ),
             SemanticSearchLanguage.PHP: defaults
             | RepoConventions(
-                source_dirs=(DirectoryName("src"), DirectoryName("lib"), DirectoryName("app")),
+                source_dirs=(
+                    DirectoryName("src"),
+                    DirectoryName("lib"),
+                    DirectoryName("app"),
+                ),
                 test_dirs=(DirectoryName("tests"),),
                 test_patterns=(FileGlob("Test.php"), FileGlob("*Test.php")),
                 binary_dirs=(DirectoryName("vendor"), DirectoryName("build")),
@@ -1408,7 +1544,10 @@ class SemanticSearchLanguage(str, BaseEnum):
                 workspace_defined_in_file=True,
                 workspace_definition_files=(
                     (FileName("pyproject.toml"), (("tool.poetry"),)),
-                    (FileName("pyproject.toml"), (("tool.hatch"),)),  # Poetry/Hatch workspaces
+                    (
+                        FileName("pyproject.toml"),
+                        (("tool.hatch"),),
+                    ),  # Poetry/Hatch workspaces
                 ),
             ),
             SemanticSearchLanguage.RUBY: defaults
@@ -1594,7 +1733,12 @@ class SemanticSearchLanguage(str, BaseEnum):
 def has_semantic_extension(ext: FileExtensionT) -> SemanticSearchLanguage | None:
     """Check if the given extension is a semantic search language."""
     return next(
-        (lang for lang_ext, lang in SemanticSearchLanguage.ext_pairs() if lang_ext == ext), None
+        (
+            lang
+            for lang_ext, lang in SemanticSearchLanguage.ext_pairs()
+            if lang_ext == ext
+        ),
+        None,
     )  # type: ignore
 
 
@@ -1602,7 +1746,10 @@ def has_semantic_extension(ext: FileExtensionT) -> SemanticSearchLanguage | None
 def is_semantic_config_ext(ext: str) -> bool:
     """Check if the given extension is a semantic config file."""
     ext = normalize_ext(ext)
-    return any(ext == config_ext for config_ext in SemanticSearchLanguage.config_language_exts())
+    return any(
+        ext == config_ext
+        for config_ext in SemanticSearchLanguage.config_language_exts()
+    )
 
 
 def find_config_paths() -> tuple[Path, ...] | None:
@@ -1612,7 +1759,9 @@ def find_config_paths() -> tuple[Path, ...] | None:
     Returns:
         A tuple of Path objects representing the configuration files, or None if no config files are found.
     """
-    config_paths = tuple(p for p in SemanticSearchLanguage.all_config_paths() if p.exists())
+    config_paths = tuple(
+        p for p in SemanticSearchLanguage.all_config_paths() if p.exists()
+    )
     return config_paths or None
 
 
@@ -1648,7 +1797,9 @@ def languages_present_from_configs() -> tuple[SemanticSearchLanguage, ...] | Non
 
 
 codeweaver_to_langchain = {
-    k.value: k.value for k in LC_Language if k.value not in ("js", "ts", "proto", "rst", "sol", "c")
+    k.value: k.value
+    for k in LC_Language
+    if k.value not in ("js", "ts", "proto", "rst", "sol", "c")
 } | {
     "javascript": "js",
     "typescript": "ts",
@@ -1735,7 +1886,9 @@ class Chunker(int, BaseEnum):
         ):
             return cls.USER_DELIMITER
         return (
-            cls.LANGCHAIN_SPECIAL if str(language) in {"markdown", "md"} else cls.BUILTIN_DELIMITER
+            cls.LANGCHAIN_SPECIAL
+            if str(language) in {"markdown", "md"}
+            else cls.BUILTIN_DELIMITER
         )
 
     @staticmethod
@@ -1765,7 +1918,9 @@ class Chunker(int, BaseEnum):
         from codeweaver.core.file_extensions import ALL_LANGUAGES
 
         languages: set[LiteralStringT] = set(ALL_LANGUAGES)
-        languages.update(cast(LiteralStringT, lang.variable) for lang in SemanticSearchLanguage)
+        languages.update(
+            cast(LiteralStringT, lang.variable) for lang in SemanticSearchLanguage
+        )
         languages.update(cast(LiteralStringT, lang.variable) for lang in ConfigLanguage)
         if custom := cls._custom_delimiter_languages():
             languages.update(custom)
@@ -1799,7 +1954,9 @@ class Chunker(int, BaseEnum):
         if self is Chunker.LANGCHAIN_SPECIAL:
             return type(self)._as_literal_tuple(sorted(codeweaver_to_langchain.keys()))
         if self is Chunker.USER_DELIMITER:
-            return type(self)._as_literal_tuple(sorted(type(self)._custom_delimiter_languages()))
+            return type(self)._as_literal_tuple(
+                sorted(type(self)._custom_delimiter_languages())
+            )
         if self is Chunker.SEMANTIC:
             return tuple(SemanticSearchLanguage)
         raise AssertionError(f"Unhandled chunker: {self}")

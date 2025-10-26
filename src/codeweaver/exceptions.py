@@ -109,6 +109,36 @@ class RerankingProviderError(ProviderError):
     """
 
 
+class ProviderSwitchError(ProviderError):
+    """Provider switching detection error.
+
+    Raised when the system detects that the vector store collection was created
+    with a different provider than the currently configured one.
+    """
+
+
+class DimensionMismatchError(ProviderError):
+    """Embedding dimension mismatch error.
+
+    Raised when embedding dimensions don't match the vector store collection
+    configuration.
+    """
+
+
+class CollectionNotFoundError(ProviderError):
+    """Collection not found error.
+
+    Raised when attempting operations on a non-existent collection.
+    """
+
+
+class PersistenceError(ProviderError):
+    """Persistence operation error.
+
+    Raised when in-memory provider persistence operations fail.
+    """
+
+
 class IndexingError(CodeWeaverError):
     """File indexing and processing errors.
 
@@ -162,11 +192,15 @@ class MissingValueError(CodeWeaverError):
 
 __all__ = (
     "CodeWeaverError",
+    "CollectionNotFoundError",
     "ConfigurationError",
+    "DimensionMismatchError",
     "IndexingError",
     "InitializationError",
     "MissingValueError",
+    "PersistenceError",
     "ProviderError",
+    "ProviderSwitchError",
     "QueryError",
     "RerankingProviderError",
     "ValidationError",

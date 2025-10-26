@@ -74,6 +74,7 @@ from codeweaver.config.providers import (
     RerankingModelSettings,
     RerankingProviderSettings,
     SparseEmbeddingModelSettings,
+    VectorStoreSettings,
 )
 from codeweaver.config.types import (
     FastMcpServerSettingsDict,
@@ -472,12 +473,15 @@ class ProviderSettings(BasedModel):
         tuple[RerankingProviderSettings, ...] | Unset,
         Field(description="""Reranking provider configuration"""),
     ] = DefaultRerankingProviderSettings
-    """
-    vector: Annotated[
-        tuple[BaseVectorStoreConfig, ...],
-        Field(default_factory=QdrantVectorStore, description="Vector store provider configuration"),
-    ] = QdrantConfig()
-    """
+
+    vector_store: Annotated[
+        VectorStoreSettings,
+        Field(
+            default_factory=lambda: VectorStoreSettings(provider="memory"),
+            description="""Vector store provider configuration (Qdrant or in-memory)""",
+        ),
+    ]
+
     agent: Annotated[
         tuple[AgentProviderSettings, ...] | Unset,
         Field(description="""Agent provider configuration"""),

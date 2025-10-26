@@ -84,6 +84,11 @@ class SearchResult(BasedModel):
         Metadata | None, Field(description="""Additional metadata about the result""")
     ] = None
 
+    @property
+    def chunk(self) -> CodeChunk | str:
+        """Alias for content field for backward compatibility."""
+        return self.content
+
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
@@ -109,6 +114,8 @@ class CodeChunkDict(TypedDict, total=False):
     chunk_id: NotRequired[UUID7]
     parent_id: NotRequired[UUID7 | None]
     metadata: NotRequired[Metadata | None]
+    chunk_name: NotRequired[str | None]
+    embeddings: NotRequired[dict[str, list[float] | dict[str, Any]] | None]
     _embedding_batch: NotRequired[UUID7 | None]
 
 
@@ -152,6 +159,19 @@ class CodeChunk(BasedModel):
         Metadata | None,
         Field(kw_only=True, description="""Additional metadata about the code chunk"""),
     ] = None
+
+    # Vector storage fields
+    chunk_name: Annotated[
+        str | None,
+        Field(description="""Fully qualified chunk identifier (e.g., 'auth.py:UserAuth.validate')"""),
+    ] = None
+    embeddings: Annotated[
+        dict[str, list[float] | dict[str, Any]] | None,
+        Field(
+            description="""Hybrid embeddings with 'dense' (list[float]) and/or 'sparse' (dict) keys"""
+        ),
+    ] = None
+
     _version: Annotated[str, Field(repr=True, init=False, serialization_alias="chunk_version")] = (
         "1.0.0"
     )
@@ -278,6 +298,18 @@ class CodeChunk(BasedModel):
         """Return the length of the serialized content in characters."""
         return len(self.serialize_for_embedding())
 
+    @computed_field
+    @cached_property
+    def line_start(self) -> PositiveInt:
+        """Return the starting line number from line_range."""
+        return self.line_range.start
+
+    @computed_field
+    @cached_property
+    def line_end(self) -> PositiveInt:
+        """Return the ending line number from line_range."""
+        return self.line_range.end
+
     @classmethod
     def chunkify(cls, text: StructuredDataInput) -> Iterator[CodeChunk]:
         """Convert text to a CodeChunk."""
@@ -322,8 +354,9 @@ __all__ = (
     "StructuredDataInput",
 )
 
-# Rebuild model to resolve forward references (if AstThing is available)
+# Rebuild models to resolve forward references (if AstThing is available)
 try:
+    SearchResult.model_rebuild()
     CodeChunk.model_rebuild()
 except Exception:
     pass  # Forward references will be resolved when AstThing is imported

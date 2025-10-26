@@ -68,6 +68,7 @@ class Provider(BaseEnum):
     FASTEMBED = "fastembed"
 
     QDRANT = "qdrant"
+    MEMORY = "memory"
 
     ANTHROPIC = "anthropic"
     BEDROCK = "bedrock"
