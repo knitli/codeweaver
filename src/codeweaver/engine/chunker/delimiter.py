@@ -522,9 +522,17 @@ class DelimiterChunker(BaseChunker):
         Returns:
             Position of the end of the block, or None if not found
         """
-        # Find the line with the colon
-        line_start = content.rfind("\n", 0, colon_pos) + 1
-        base_indent = colon_pos - line_start
+        # Find the line with the colon and calculate its indentation
+        line_start = content.rfind("\n", 0, colon_pos)
+        if line_start == -1:
+            line_start = 0
+        else:
+            line_start += 1  # Move past the newline
+        
+        # Get the line content up to the colon
+        line_with_colon = content[line_start:colon_pos]
+        # Calculate base indentation (number of leading spaces/tabs)
+        base_indent = len(line_with_colon) - len(line_with_colon.lstrip())
 
         # Find lines after the colon
         pos = content.find("\n", colon_pos)
@@ -535,12 +543,12 @@ class DelimiterChunker(BaseChunker):
 
         while pos < len(content):
             # Get the indentation of the current line
-            line_start = pos
+            current_line_start = pos
             line_end = content.find("\n", pos)
             if line_end == -1:
                 line_end = len(content)
 
-            line = content[line_start:line_end]
+            line = content[current_line_start:line_end]
             
             # Skip empty lines and comment lines
             stripped = line.lstrip()
@@ -548,12 +556,12 @@ class DelimiterChunker(BaseChunker):
                 pos = line_end + 1 if line_end < len(content) else len(content)
                 continue
 
-            # Calculate indentation
+            # Calculate indentation of this line
             indent = len(line) - len(stripped)
 
             # If we find a line at same or lower indentation, that's the end
             if indent <= base_indent:
-                return line_start
+                return current_line_start
 
             pos = line_end + 1 if line_end < len(content) else len(content)
 
@@ -776,7 +784,7 @@ class DelimiterChunker(BaseChunker):
                 start_line, end_line = self._pos_to_lines(boundary.start, boundary.end, lines)
 
             # Build metadata
-            metadata = self._build_metadata(boundary, chunk_text, start_line, context)
+            metadata = self._build_metadata(boundary, chunk_text, start_line, end_line, context)
 
             # Create chunk with shared source_id
             chunk = CodeChunk(
@@ -792,14 +800,15 @@ class DelimiterChunker(BaseChunker):
         return chunks
 
     def _build_metadata(
-        self, boundary: Boundary, text: str, line: int, context: dict[str, Any] | None
+        self, boundary: Boundary, text: str, start_line: int, end_line: int, context: dict[str, Any] | None
     ) -> Metadata:
         """Build metadata for a delimiter chunk.
 
         Args:
             boundary: Boundary that created this chunk
             text: Chunk content
-            line: Starting line number
+            start_line: Starting line number
+            end_line: Ending line number
             context: Optional additional context
 
         Returns:
@@ -826,9 +835,12 @@ class DelimiterChunker(BaseChunker):
         metadata: Metadata = {
             "chunk_id": uuid7(),
             "created_at": datetime.now(UTC).timestamp(),
-            "name": f"{delimiter.kind.name.title()} at line {line}",  # type: ignore[union-attr]
+            "name": f"{delimiter.kind.name.title()} at line {start_line}",  # type: ignore[union-attr]
             "kind": delimiter.kind,  # Add kind at top level for test compatibility
             "nesting_level": boundary.nesting_level,  # Add nesting_level at top level too
+            "priority": int(delimiter.priority),  # Add priority at top level
+            "line_start": start_line,  # Add line_start for test compatibility
+            "line_end": end_line,  # Add line_end for test compatibility
             "context": chunk_context,
         }
         return metadata

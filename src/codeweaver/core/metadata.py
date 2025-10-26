@@ -181,6 +181,24 @@ class Metadata(TypedDict, total=False):
             Field(description="""Nesting level for delimiter chunks (0 = top level)"""),
         ]
     ]
+    priority: NotRequired[
+        Annotated[
+            int | None,
+            Field(description="""Priority value for delimiter chunks"""),
+        ]
+    ]
+    line_start: NotRequired[
+        Annotated[
+            int | None,
+            Field(description="""Starting line number for the chunk"""),
+        ]
+    ]
+    line_end: NotRequired[
+        Annotated[
+            int | None,
+            Field(description="""Ending line number for the chunk"""),
+        ]
+    ]
     updated_at: NotRequired[
         Annotated[
             PositiveFloat | None,
