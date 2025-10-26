@@ -723,7 +723,8 @@ class CodeWeaverSettings(BaseSettings):
     def project_root(self) -> Path:
         """Get the project root directory."""
         if not hasattr(self, "project_path") or not self.project_path:
-            self.project_path = importlib.import_module("codeweaver._utils").get_project_root()
+            from codeweaver.common.utils.git import get_project_root
+            self.project_path = get_project_root()
         return self.project_path.resolve()
 
     @classmethod  # spellchecker:off
@@ -791,7 +792,8 @@ def get_settings(path: FilePath | None = None) -> CodeWeaverSettings:
     If you **really** need to get the mutable settings instance, you can use this function. It will create the global instance if it doesn't exist, optionally loading from a configuration file (like, .codeweaver.toml) if you provide a path.
     """
     global _settings
-    root = importlib.import_module("codeweaver._utils").get_project_root()
+    from codeweaver.common.utils.git import get_project_root
+    root = get_project_root()
     if _settings and path and path.exists():
         _settings = CodeWeaverSettings.from_config(path, **dict(_settings))
     elif path and path.exists():

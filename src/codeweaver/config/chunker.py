@@ -205,13 +205,12 @@ class ChunkerSettings(BasedModel):
         **data: Any,
     ) -> None:
         """Initialize ChunkerSettings with optional custom delimiters."""
-        self.custom_delimiters = custom_delimiters or []
-        self.custom_languages = custom_languages or {}
-        if data:
-            for key, value in data.items():
-                if key in type(self).model_fields:
-                    setattr(self, key, value)
-        super().__init__()
+        # Pass values through to super().__init__ instead of setting them directly
+        super().__init__(
+            custom_delimiters=custom_delimiters or [],
+            custom_languages=custom_languages or {},
+            **data
+        )
 
 
 __all__ = (
