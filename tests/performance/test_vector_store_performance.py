@@ -29,7 +29,7 @@ from qdrant_client.async_qdrant_client import AsyncQdrantClient
 
 from codeweaver.config.providers import MemoryConfig, QdrantConfig
 from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.language import Language
+from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.providers.vector_stores.inmemory import MemoryVectorStore
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
 
@@ -55,7 +55,7 @@ def create_test_chunk(
         chunk_index=chunk_index,
         start_line=chunk_index * 10,
         end_line=(chunk_index + 1) * 10,
-        language=Language.PYTHON,
+        language=SemanticSearchLanguage.PYTHON,
         content=content,
         chunk_name=f"test_function_{chunk_index}",
         parent_name=None,
