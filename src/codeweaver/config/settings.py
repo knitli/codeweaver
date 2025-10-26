@@ -742,7 +742,7 @@ class CodeWeaverSettings(BaseSettings):
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         """Customize the sources of settings for a specific settings class.
-        
+
         Configuration precedence (highest to lowest):
         1. init_settings - Direct initialization arguments
         2. env_settings - Environment variables (CODEWEAVER_*)
@@ -753,22 +753,22 @@ class CodeWeaverSettings(BaseSettings):
         7. file_secret_settings - Secret files (lowest priority)
         """
         sources: list[PydanticBaseSettingsSource] = [init_settings, env_settings, dotenv_settings]
-        
+
         # Add TOML config source if configured
         if toml_file := settings_cls.model_config.get("toml_file"):
             sources.append(TomlConfigSettingsSource(settings_cls, toml_file=toml_file))
-        
+
         # Add YAML config source if configured
         if yaml_file := settings_cls.model_config.get("yaml_file"):
             sources.append(YamlConfigSettingsSource(settings_cls, yaml_file=yaml_file))
-        
+
         # Add JSON config source if configured
         if json_file := settings_cls.model_config.get("json_file"):
             sources.append(JsonConfigSettingsSource(settings_cls, json_file=json_file))
-        
+
         # Add file secret settings last (lowest priority)
         sources.append(file_secret_settings)
-        
+
         return tuple(sources)
 
     def _update_settings(self, **kwargs: CodeWeaverSettingsDict) -> Self:
