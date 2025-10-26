@@ -199,6 +199,12 @@ class Metadata(TypedDict, total=False):
             Field(description="""Ending line number for the chunk"""),
         ]
     ]
+    fallback_to_generic: NotRequired[
+        Annotated[
+            bool | None,
+            Field(description="""Whether generic/fallback chunking was used"""),
+        ]
+    ]
     updated_at: NotRequired[
         Annotated[
             PositiveFloat | None,

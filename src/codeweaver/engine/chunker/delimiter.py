@@ -137,9 +137,19 @@ class DelimiterChunker(BaseChunker):
                 governor.check_timeout()
                 matches = self._find_delimiter_matches(content)
 
-                # Edge case: no matches found
+                # Edge case: no matches found - try paragraph fallback
+                used_fallback = False
                 if not matches:
-                    return []
+                    matches = self._fallback_paragraph_chunking(content)
+                    used_fallback = True
+                    if not matches:
+                        return []
+                
+                # Add fallback indicator to context if needed
+                if used_fallback:
+                    if context is None:
+                        context = {}
+                    context["fallback_to_generic"] = True
 
                 # Phase 2: Extract boundaries from matches
                 governor.check_timeout()
@@ -601,6 +611,55 @@ class DelimiterChunker(BaseChunker):
         # Odd number of quotes means we're inside a string
         return bool(single_quotes % 2 == 1 or double_quotes % 2 == 1 or backticks % 2 == 1)
 
+    def _fallback_paragraph_chunking(self, content: str) -> list[DelimiterMatch]:
+        """Fallback to paragraph-based chunking when no delimiters match.
+        
+        Uses double newlines (\n\n) as paragraph boundaries for plain text.
+        Creates matches for the content between paragraph breaks.
+        
+        Args:
+            content: Content with no delimiter matches
+            
+        Returns:
+            List of DelimiterMatch objects for paragraph boundaries
+        """
+        from codeweaver.engine.chunker.delimiter_model import Delimiter, DelimiterKind
+        
+        # Create a paragraph delimiter - we'll create complete boundaries directly
+        # by finding text blocks separated by double newlines
+        paragraph_delim = Delimiter(
+            start="",
+            end="",
+            kind=DelimiterKind.PARAGRAPH,
+            priority=40,
+            inclusive=True,  # Include the text content itself
+            take_whole_lines=True,
+            nestable=False,
+        )
+        
+        # Split by double newlines and find the positions of each paragraph
+        matches: list[DelimiterMatch] = []
+        paragraphs = re.split(r'\n\n+', content)
+        
+        current_pos = 0
+        for para in paragraphs:
+            if para.strip():  # Only create matches for non-empty paragraphs
+                # Find the actual position of this paragraph in the content
+                para_start = content.find(para, current_pos)
+                if para_start >= 0:
+                    para_end = para_start + len(para)
+                    matches.append(
+                        DelimiterMatch(
+                            delimiter=paragraph_delim,
+                            start_pos=para_start,
+                            end_pos=para_end,
+                            nesting_level=0,
+                        )
+                    )
+                    current_pos = para_end
+        
+        return matches
+
     def _extract_boundaries(self, matches: list[DelimiterMatch]) -> list[Boundary]:
         """Extract complete boundaries from delimiter matches.
 
@@ -624,7 +683,9 @@ class DelimiterChunker(BaseChunker):
         for match in matches:
             delimiter: Delimiter = match.delimiter  # type: ignore[assignment]
             # Keyword delimiters with empty ends that have been matched already have both positions
-            if delimiter.is_keyword_delimiter and match.end_pos is not None:  # type: ignore[union-attr]
+            # Also treat matches with both start and end positions as complete
+            if (delimiter.is_keyword_delimiter and match.end_pos is not None) or \
+               (match.end_pos is not None and delimiter.start == "" and delimiter.end == ""):  # type: ignore[union-attr]
                 keyword_matches.append(match)
             else:
                 explicit_matches.append(match)
@@ -841,6 +902,11 @@ class DelimiterChunker(BaseChunker):
             "line_end": end_line,  # Add line_end for test compatibility
             "context": chunk_context,
         }
+        
+        # Add fallback indicator at top level if present in context
+        if context and context.get("fallback_to_generic"):
+            metadata["fallback_to_generic"] = True  # type: ignore[typeddict-unknown-key]
+        
         return metadata
 
     def _load_delimiters_for_language(self, language: str) -> list[Delimiter]:
