@@ -159,6 +159,12 @@ def huge_string_literal_file(fixture_path: Path) -> Path:
     return fixture_path / "huge_string_literal.py"
 
 
+@pytest.fixture
+def many_functions_file(fixture_path: Path) -> Path:
+    """Get path to many functions fixture."""
+    return fixture_path / "many_functions.py"
+
+
 # DiscoveredFile fixtures (corresponding to Path fixtures above)
 
 
@@ -264,3 +270,11 @@ def discovered_huge_string_literal_file(huge_string_literal_file: Path):
     from codeweaver.core.discovery import DiscoveredFile
 
     return DiscoveredFile.from_path(huge_string_literal_file)
+
+
+@pytest.fixture
+def discovered_many_functions_file(many_functions_file: Path):
+    """Create DiscoveredFile for many functions fixture."""
+    from codeweaver.core.discovery import DiscoveredFile
+
+    return DiscoveredFile.from_path(many_functions_file)

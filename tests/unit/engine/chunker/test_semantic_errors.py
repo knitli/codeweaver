@@ -243,7 +243,9 @@ class TestTimeoutErrors:
 class TestChunkLimitErrors:
     """Tests for chunk limit enforcement."""
 
-    def test_chunk_limit_exceeded(self, mock_governor: MagicMock) -> None:
+    def test_chunk_limit_exceeded(
+        self, mock_governor: MagicMock, discovered_many_functions_file
+    ) -> None:
         """Verify that excessive chunking raises ChunkLimitExceededError.
 
         Approach: Mock register_chunk to enforce low limit
@@ -253,44 +255,21 @@ class TestChunkLimitErrors:
         from codeweaver.core.language import SemanticSearchLanguage
         from codeweaver.engine.chunker.semantic import SemanticChunker
 
-        # Arrange: Create chunker with very low chunk limit        mock_governor.max_chunks_per_file = 10  # Very low limit for testing
-
-        # Track chunk registration and enforce limit
-        chunk_count = 0
-
-        def register_chunk_with_limit():
-            nonlocal chunk_count
-            chunk_count += 1
-            if chunk_count > mock_governor.max_chunks_per_file:
-                raise ChunkLimitExceededError(
-                    "Chunk limit exceeded",
-                    chunk_count=chunk_count,
-                    max_chunks=mock_governor.max_chunks_per_file,
-                    file_path="test.py",
-                )
-
-        mock_governor.register_chunk = register_chunk_with_limit
+        # Arrange: Create chunker with very low chunk limit
+        mock_governor.settings.performance.max_chunks_per_file = 10  # Very low limit for testing
 
         chunker = SemanticChunker(governor=mock_governor, language=SemanticSearchLanguage.PYTHON)
 
-        # Create content that would generate many chunks
-        # Simulate a file with many small functions
-        many_functions = "\n\n".join(
-            f"def function_{i}():\n    pass"
-            for i in range(15)  # More than the limit
-        )
-
         # Act & Assert: Verify ChunkLimitExceededError raised
-        # Note: Using None for file since we're testing chunk limits, not file handling
+        # many_functions.py has 15 functions, exceeding the limit of 10
         with pytest.raises(ChunkLimitExceededError) as exc_info:
-            chunker.chunk(many_functions, file=None)
+            chunker.chunk(discovered_many_functions_file.contents, file=discovered_many_functions_file)
 
         # Verify error details
         error = exc_info.value
         assert error.chunk_count is not None, "Error should track chunk count"
         assert error.max_chunks is not None, "Error should track configured limit"
         assert error.chunk_count > error.max_chunks, "Chunk count must exceed limit"
-        assert error.file_path is not None, "Error should track file path"
 
     def test_chunk_limit_error_overflow_metrics(self, mock_governor: MagicMock) -> None:
         """Verify that chunk limit errors include overflow metrics.

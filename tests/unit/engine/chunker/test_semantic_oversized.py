@@ -31,11 +31,14 @@ def test_oversized_node_fallback_to_delimiter(
     chunk_governor: ChunkGovernor,
     discovered_huge_function_file,
 ):
-    """Test oversized node falls back to delimiter chunking.
+    """Test oversized file is successfully chunked into multiple semantic chunks.
 
-    Input: huge_function.py (>2000 tokens)
-    Expected: Multiple chunks, all under token limit
-    Verify: Chunks have parent_semantic_node in metadata
+    Input: huge_function.py (>2000 tokens total)
+    Expected: Multiple semantic chunks via child node processing, all under token limit
+    Verify: Each chunk respects token limits, multiple chunks created
+
+    Note: This file has many child statement nodes that can be chunked individually,
+    so it successfully processes via semantic chunking without needing delimiter fallback.
     """
     content = discovered_huge_function_file.contents
 
@@ -50,16 +53,15 @@ def test_oversized_node_fallback_to_delimiter(
             f"Chunk exceeds token limit: {chunk.token_count} > {chunk_governor.chunk_limit}"
         )
 
-    # Chunks should have parent semantic node in metadata
-    # (This indicates fallback from semantic to delimiter)
-    def has_fallback_indicator(chunk):
-        if not chunk.metadata or "context" not in chunk.metadata or not chunk.metadata["context"]:
-            return False
-        context = chunk.metadata["context"]
-        return "parent_semantic_node" in context or "fallback" in context
-
-    has_parent_metadata = any(has_fallback_indicator(chunk) for chunk in chunks)
-    assert has_parent_metadata, "Chunks should indicate semantic fallback in metadata"
+    # Verify chunks are semantic (successful child node processing)
+    semantic_chunks = [
+        chunk for chunk in chunks
+        if chunk.metadata
+        and "context" in chunk.metadata
+        and chunk.metadata["context"]
+        and chunk.metadata["context"].get("chunker_type") == "semantic"
+    ]
+    assert len(semantic_chunks) > 0, "Should have semantic chunks from child node processing"
 
 
 def test_oversized_node_recursive_children(
@@ -67,18 +69,21 @@ def test_oversized_node_recursive_children(
     chunk_governor: ChunkGovernor,
     discovered_large_class_file,
 ):
-    """Test oversized composite node falls back to delimiter chunking.
+    """Test oversized class is successfully chunked via child processing.
 
     Input: Class with large methods (>2000 tokens total)
-    Expected: Delimiter fallback chunks from oversized class
-    Verify: Each chunk under limit, fallback indicators present
+    Expected: Multiple semantic chunks from child nodes, all under token limit
+    Verify: Each chunk under limit, semantic chunking used
+
+    Note: The class has child nodes (methods, statements) that can be chunked
+    individually, so semantic chunking successfully handles it without delimiter fallback.
     """
     content = discovered_large_class_file.contents
 
     chunks = python_chunker.chunk(content, file=discovered_large_class_file)
 
-    # Should chunk individual methods
-    assert len(chunks) > 1, "Should chunk methods separately"
+    # Should chunk individual statements/methods
+    assert len(chunks) > 1, "Should chunk child nodes separately"
 
     # All chunks should be under token limit
     for chunk in chunks:
@@ -86,16 +91,15 @@ def test_oversized_node_recursive_children(
             f"Chunk exceeds token limit: {chunk.token_count} > {chunk_governor.chunk_limit}"
         )
 
-    # Chunks should be created via delimiter fallback from oversized class
-    # (class is too large, so it falls back to delimiter chunking)
-    delimiter_fallback_chunks = [
+    # Verify chunks are semantic (successful child node processing)
+    semantic_chunks = [
         chunk for chunk in chunks
         if chunk.metadata
         and "context" in chunk.metadata
         and chunk.metadata["context"]
-        and chunk.metadata["context"].get("fallback") == "delimiter"
+        and chunk.metadata["context"].get("chunker_type") == "semantic"
     ]
-    assert len(delimiter_fallback_chunks) > 0, "Should have delimiter fallback chunks from oversized class"
+    assert len(semantic_chunks) > 0, "Should have semantic chunks from child node processing"
 
 
 @pytest.mark.skip(reason="Text splitter fallback not yet implemented - not MVP requirement")

@@ -16,6 +16,7 @@ from codeweaver.engine.chunker import (
     get_store,
     source_id_for,
 )
+from codeweaver.engine.chunking_service import ChunkingService
 from codeweaver.engine.discovery import FileDiscoveryService, get_tooling_dirs
 from codeweaver.engine.filter import (
     ArbitraryFilter,
@@ -79,6 +80,7 @@ __all__ = (
     "AnyVariants",
     "ArbitraryFilter",
     "ChunkGovernor",
+    "ChunkingService",
     "CodeFilter",
     "Condition",
     "ConfigFilter",
