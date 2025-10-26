@@ -77,7 +77,7 @@ class SemanticChunker(BaseChunker):
     1. AST nodes within token limit → semantic chunks
     2. Oversized composite nodes → recursive child chunking
     3. Still oversized → delimiter-based fallback
-    4. Last resort → RecursiveCharacterTextSplitter
+    4. Last resort → return single chunk as-is (may exceed limit for indivisible content)
 
     Features:
     - Importance-weighted node filtering (default threshold: 0.3)
@@ -570,7 +570,7 @@ class SemanticChunker(BaseChunker):
         Applies graceful degradation:
         1. Try chunking children recursively (for composite nodes)
         2. Fallback to delimiter-based chunking on node text
-        3. Last resort: RecursiveCharacterTextSplitter
+        3. Last resort: Return single chunk as-is (may exceed token limit)
 
         Preserves semantic context in fallback chunks via metadata enhancement.
 

@@ -39,7 +39,7 @@ DelimiterChunker (secondary, 170+ langs)
     ↓ (fallback on no matches)
 GenericDelimiters (tertiary, universal)
     ↓ (last resort)
-RecursiveTextSplitter (existing)
+Return as single chunk (may exceed token limit)
 ```
 
 ### 1.2 Design Principles (Constitutional)
@@ -928,7 +928,7 @@ class ASTDepthExceededError(ChunkingError):
 | Parse error | Semantic | → Delimiter fallback |
 | Oversized node | Semantic | → Delimiter on node OR recurse children |
 | No delimiters match | Delimiter | → Generic patterns (braces, newlines) |
-| All chunks oversized | Delimiter | → RecursiveTextSplitter |
+| All chunks oversized | Delimiter | → Return as single chunk |
 | Unknown language | Selector | → Delimiter w/ family inference |
 | Empty file (0 bytes) | Any | Return [] |
 | Whitespace-only | Any | Return single chunk with edge_case metadata |
@@ -946,7 +946,7 @@ DelimiterChunker (good quality, 170+ langs)
     ↓ no_matches
 GenericDelimiters (basic quality, universal)
     ↓ oversized_chunks
-RecursiveTextSplitter (last resort, crude)
+Return as single chunk (last resort, may exceed limit)
 ```
 
 ### 7.3 Complete Degradation Implementation
@@ -987,24 +987,17 @@ def chunk_with_full_degradation(
     except Exception as e:
         errors.append(f"Generic: {e}")
 
-    # Last resort: RecursiveTextSplitter
+    # Last resort: Return single chunk as-is (may exceed token limit)
     logger.error(f"All chunking strategies failed for {file_path}: {errors}")
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=int(governor.chunk_limit * 0.9),
-        chunk_overlap=governor.simple_overlap,
-        length_function=estimate_tokens,
-    )
-    text_parts = splitter.split_text(content)
     return [
         CodeChunk(
-            content=part,
-            line_range=Span(0, part.count('\n'), source_id_for(file_path)),
+            content=content,
+            line_range=Span(0, content.count('\n'), source_id_for(file_path)),
             file_path=file_path,
             language="unknown",
             source="fallback",
             metadata={"error": "All strategies failed", "errors": errors}
         )
-        for part in text_parts
     ]
 ```
 

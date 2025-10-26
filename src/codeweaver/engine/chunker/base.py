@@ -4,13 +4,15 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Base chunker services and definitions.
 
-CodeWeaver has a robust chunking system that allows it to extract meaningful information from any codebase. Chunks are created based on a few factors:
+CodeWeaver has a robust chunking system that allows it to extract meaningful information from any codebase. Chunks are created based on a graceful degradation strategy:
 
-1. The kind of chunk available.
+1. **Semantic Chunking**: When we have a tree-sitter grammar for a language (there are currently 26 supported languages, see `codeweaver.language.SemanticSearchLanguage`), semantic chunking is the primary strategy.
 
-    - When we have a tree-sitter grammar for a language (there are currently 26 supported languages, see `codeweaver.language.SemanticSearchLanguage`), then semantic chunking is the primary strategy.
-    - If semantic chunking isn't available, we fall back to specialized chunkers for the language, if we have one. These come from `langchain_text_splitters` and include chunkers for markdown, latex, protobuf, restructuredtext, perl, powershell, and visualbasic6.
-    - If one of those isn't available, we again fall back to a set of chunkers defined in
+2. **Delimiter Chunking**: If semantic chunking isn't available or fails (e.g., parse errors, oversized nodes without chunkable children), we fall back to delimiter-based chunking using language-specific patterns.
+
+3. **Generic Fallback**: If delimiter patterns don't match, we use generic delimiters (braces, newlines, etc.) to ensure we can always produce chunks.
+
+This multi-tiered approach ensures reliable chunking across 170+ languages while maintaining semantic quality for supported languages.
 """
 
 from __future__ import annotations
@@ -34,17 +36,6 @@ if TYPE_CHECKING:
 
 SAFETY_MARGIN = 0.1
 """A safety margin to apply to chunk sizes to account for metadata and tokenization variability."""
-
-SPLITTER_AVAILABLE = {
-    "protobuf": "proto",
-    "restructuredtext": "rst",
-    "markdown": "markdown",
-    "latex": "latex",
-    "perl": "perl",
-    "powershell": "powershell",
-    "visualbasic6": "visualbasic6",
-}
-"""Languages with langchain_text_splitters support that don't have semantic search support. The keys are the name of the language as defined in `codeweaver._supported_languages.SecondarySupportedLanguage`, and the values are the name of the language as defined in `langchain_text_splitters.Language`."""
 
 
 class ChunkGovernor(BasedModel):

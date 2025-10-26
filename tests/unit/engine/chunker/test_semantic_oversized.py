@@ -5,10 +5,14 @@
 
 """Tests for oversized node handling in SemanticChunker.
 
-Tests the fallback chain for nodes that exceed token limits:
-1. Try to chunk children recursively
-2. Fallback to delimiter chunking on node text
-3. Last resort: RecursiveTextSplitter
+Tests the recursive child processing strategy for nodes that exceed token limits.
+When a node is too large to fit in a single chunk, the chunker attempts to:
+1. Chunk children recursively (tested here)
+2. If that fails, fallback to delimiter chunking on node text
+3. Last resort: Return single chunk as-is (may exceed token limit)
+
+These tests verify that oversized files with chunkable children are successfully
+processed via recursive child node chunking.
 """
 
 from pathlib import Path
@@ -26,19 +30,20 @@ def python_chunker(chunk_governor: ChunkGovernor) -> SemanticChunker:
     return SemanticChunker(chunk_governor, SemanticSearchLanguage.PYTHON)
 
 
-def test_oversized_node_fallback_to_delimiter(
+def test_oversized_file_chunks_via_child_nodes(
     python_chunker: SemanticChunker,
     chunk_governor: ChunkGovernor,
     discovered_huge_function_file,
 ):
-    """Test oversized file is successfully chunked into multiple semantic chunks.
+    """Test oversized file is successfully chunked via child node processing.
 
     Input: huge_function.py (>2000 tokens total)
     Expected: Multiple semantic chunks via child node processing, all under token limit
     Verify: Each chunk respects token limits, multiple chunks created
 
-    Note: This file has many child statement nodes that can be chunked individually,
-    so it successfully processes via semantic chunking without needing delimiter fallback.
+    This file has many child statement nodes that can be chunked individually,
+    demonstrating the chunker's ability to recursively process children when a
+    node is too large to fit in a single chunk.
     """
     content = discovered_huge_function_file.contents
 
@@ -64,7 +69,7 @@ def test_oversized_node_fallback_to_delimiter(
     assert len(semantic_chunks) > 0, "Should have semantic chunks from child node processing"
 
 
-def test_oversized_node_recursive_children(
+def test_oversized_class_chunks_via_methods(
     python_chunker: SemanticChunker,
     chunk_governor: ChunkGovernor,
     discovered_large_class_file,
@@ -75,8 +80,9 @@ def test_oversized_node_recursive_children(
     Expected: Multiple semantic chunks from child nodes, all under token limit
     Verify: Each chunk under limit, semantic chunking used
 
-    Note: The class has child nodes (methods, statements) that can be chunked
-    individually, so semantic chunking successfully handles it without delimiter fallback.
+    The class has child nodes (methods, statements) that can be chunked
+    individually, demonstrating successful recursive child node processing
+    for composite structures.
     """
     content = discovered_large_class_file.contents
 
@@ -102,39 +108,3 @@ def test_oversized_node_recursive_children(
     assert len(semantic_chunks) > 0, "Should have semantic chunks from child node processing"
 
 
-@pytest.mark.skip(reason="Text splitter fallback not yet implemented - not MVP requirement")
-def test_all_strategies_fail_uses_text_splitter(
-    python_chunker: SemanticChunker,
-    chunk_governor: ChunkGovernor,
-    discovered_huge_string_literal_file,
-):
-    """Test last resort fallback to RecursiveTextSplitter.
-
-    Input: Huge indivisible text block (e.g., long string literal)
-    Expected: Falls back to RecursiveTextSplitter
-    Verify: Metadata contains fallback indication
-
-    Note: This tests a future feature (text splitter fallback) that is not part of MVP.
-    Currently, oversized indivisible nodes (like huge string literals) are returned as-is
-    without splitting, which may exceed token limits.
-    """
-    content = discovered_huge_string_literal_file.contents
-
-    chunks = python_chunker.chunk(content, file=discovered_huge_string_literal_file)
-
-    # Should produce chunks even for indivisible content
-    assert len(chunks) > 0, "Should produce chunks via text splitter fallback"
-
-    # All chunks should be under token limit
-    for chunk in chunks:
-        assert chunk.token_count <= chunk_governor.chunk_limit, (
-            f"Chunk exceeds token limit: {chunk.token_count} > {chunk_governor.chunk_limit}"
-        )
-
-    # Chunks should indicate text splitter fallback
-    has_fallback_indicator = any(
-        chunk.metadata.get("fallback") == "text_splitter" or
-        chunk.metadata.get("source") == "text_splitter"
-        for chunk in chunks
-    )
-    assert has_fallback_indicator, "Should indicate text splitter fallback in metadata"

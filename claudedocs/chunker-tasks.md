@@ -218,29 +218,28 @@ Write tests for all edge cases per spec §2.6:
 
 ### T007 [P]: Semantic Chunker - Oversized Node Tests
 **File**: `tests/unit/engine/chunker/test_semantic_oversized.py`
-**Parallel**: Yes [P] (new test file)
+**Parallel**: Yes [P] (existing test file - updated)
+**Status**: ✅ COMPLETED - Tests renamed and updated
 
-Write tests for oversized node handling per spec §2.5:
+Tests for oversized node handling per spec §2.5:
 
-1. **test_oversized_node_fallback_to_delimiter()**:
+1. **test_oversized_file_chunks_via_child_nodes()** (renamed from test_oversized_node_fallback_to_delimiter):
    - Input: `huge_function.py` (>2000 tokens)
-   - Expected: Multiple chunks, all under token limit
-   - Verify: Chunks have `parent_semantic_node` in metadata
+   - Expected: Multiple chunks via recursive child processing, all under token limit
+   - Verify: Each chunk under limit, semantic chunking used
 
-2. **test_oversized_node_recursive_children()**:
+2. **test_oversized_class_chunks_via_methods()** (renamed from test_oversized_node_recursive_children):
    - Input: Class with large methods
    - Expected: Children chunked individually
    - Verify: Each chunk under limit
 
-3. **test_all_strategies_fail_uses_text_splitter()**:
-   - Input: Huge indivisible text block
-   - Expected: Falls back to `RecursiveTextSplitter`
-   - Verify: Metadata contains fallback indication
+**Note**: The original test #3 (`test_all_strategies_fail_uses_text_splitter`) was removed as the langchain RecursiveTextSplitter dependency has been eliminated. Delimiter chunking is now the primary fallback strategy.
 
 **Acceptance**:
-- [ ] Tests verify token limits enforced
-- [ ] Tests check fallback chain triggers correctly
-- [ ] All tests FAIL (implementation pending)
+- [x] Tests verify token limits enforced
+- [x] Tests renamed to accurately reflect recursive child processing
+- [x] Langchain references removed
+- [x] Tests verify semantic chunking works for oversized files with chunkable children
 
 ---
 
