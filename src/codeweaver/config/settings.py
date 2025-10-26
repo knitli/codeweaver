@@ -13,7 +13,6 @@ clear precedence hierarchy and validation.
 from __future__ import annotations
 
 import contextlib
-import importlib
 import inspect
 import logging
 
@@ -40,7 +39,14 @@ from pydantic import (
 from pydantic.fields import ComputedFieldInfo, FieldInfo
 from pydantic_ai.settings import merge_model_settings
 from pydantic_core import from_json
-from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+from pydantic_settings import (
+    BaseSettings,
+    JsonConfigSettingsSource,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+    TomlConfigSettingsSource,
+    YamlConfigSettingsSource,
+)
 
 from codeweaver.common.utils.lazy_importer import lazy_import
 from codeweaver.config.chunker import ChunkerSettings
@@ -547,9 +553,6 @@ class CodeWeaverSettings(BaseSettings):
             BasedModel.model_config["field_title_generator"],  # type: ignore
         ),
         json_file=default_config_file_locations(as_json=True),
-        json_schema_extra={
-            "NoTelemetryProps": ["project_path", "project_root", "project_name", "config_file"]
-        },
         nested_model_default_partial_update=True,
         str_strip_whitespace=True,
         title="CodeWeaver Settings",
@@ -724,6 +727,7 @@ class CodeWeaverSettings(BaseSettings):
         """Get the project root directory."""
         if not hasattr(self, "project_path") or not self.project_path:
             from codeweaver.common.utils.git import get_project_root
+
             self.project_path = get_project_root()
         return self.project_path.resolve()
 
@@ -737,12 +741,35 @@ class CodeWeaverSettings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        """Customize the sources of settings for a specific settings class."""
-        # spellchecker:off
-        return super().settings_customise_sources(
-            settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings
-        )
-        # spellchecker:on
+        """Customize the sources of settings for a specific settings class.
+
+        Configuration precedence (highest to lowest):
+        1. init_settings - Direct initialization arguments
+        2. env_settings - Environment variables (CODEWEAVER_*)
+        3. dotenv_settings - .env files
+        4. toml_sources - TOML config files (.codeweaver.local.toml, .codeweaver.toml, etc.)
+        5. yaml_sources - YAML config files (.codeweaver.local.yaml, .codeweaver.yaml, etc.)
+        6. json_sources - JSON config files (.codeweaver.local.json, .codeweaver.json, etc.)
+        7. file_secret_settings - Secret files (lowest priority)
+        """
+        sources: list[PydanticBaseSettingsSource] = [init_settings, env_settings, dotenv_settings]
+
+        # Add TOML config source if configured
+        if toml_file := settings_cls.model_config.get("toml_file"):
+            sources.append(TomlConfigSettingsSource(settings_cls, toml_file=toml_file))
+
+        # Add YAML config source if configured
+        if yaml_file := settings_cls.model_config.get("yaml_file"):
+            sources.append(YamlConfigSettingsSource(settings_cls, yaml_file=yaml_file))
+
+        # Add JSON config source if configured
+        if json_file := settings_cls.model_config.get("json_file"):
+            sources.append(JsonConfigSettingsSource(settings_cls, json_file=json_file))
+
+        # Add file secret settings last (lowest priority)
+        sources.append(file_secret_settings)
+
+        return tuple(sources)
 
     def _update_settings(self, **kwargs: CodeWeaverSettingsDict) -> Self:
         """Update settings, validating a new CodeWeaverSettings instance and updating the global instance."""
@@ -793,6 +820,7 @@ def get_settings(path: FilePath | None = None) -> CodeWeaverSettings:
     """
     global _settings
     from codeweaver.common.utils.git import get_project_root
+
     root = get_project_root()
     if _settings and path and path.exists():
         _settings = CodeWeaverSettings.from_config(path, **dict(_settings))

@@ -391,7 +391,7 @@ def default_config_file_locations(
     """Get default file locations for configuration files."""
     # Determine base extensions
     extensions = (
-        ["yaml", "yml"] if not as_yaml and not as_json else ["yaml", "yml"] if as_yaml else ["json"]
+        ["toml"] if not as_yaml and not as_json else ["yaml", "yml"] if as_yaml else ["json"]
     )
     # Get user config directory
     user_config_dir = (
