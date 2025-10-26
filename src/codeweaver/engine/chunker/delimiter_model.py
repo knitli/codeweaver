@@ -68,6 +68,16 @@ class Delimiter(BasedModel):
         """Get telemetry keys for the delimiter model."""
         return
 
+    @property
+    def is_keyword_delimiter(self) -> bool:
+        """Check if this delimiter uses keyword matching (empty end).
+        
+        Returns:
+            True if this delimiter has an empty end string, indicating it needs
+            keyword-to-structure binding rather than explicit end matching.
+        """
+        return self.end == ""
+
     @classmethod
     def from_pattern(cls, pattern: DelimiterPattern) -> list[Delimiter]:
         """Expand pattern to concrete delimiters.

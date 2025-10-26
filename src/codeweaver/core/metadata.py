@@ -167,6 +167,44 @@ class Metadata(TypedDict, total=False):
     name: NotRequired[
         Annotated[str | None, Field(description="""Name of the code chunk, if applicable""")]
     ]
+    kind: NotRequired[
+        Annotated[
+            Any | None,
+            Field(
+                description="""Optional kind/type classification of the chunk (e.g., DelimiterKind for delimiter chunks)"""
+            ),
+        ]
+    ]
+    nesting_level: NotRequired[
+        Annotated[
+            int | None,
+            Field(description="""Nesting level for delimiter chunks (0 = top level)"""),
+        ]
+    ]
+    priority: NotRequired[
+        Annotated[
+            int | None,
+            Field(description="""Priority value for delimiter chunks"""),
+        ]
+    ]
+    line_start: NotRequired[
+        Annotated[
+            int | None,
+            Field(description="""Starting line number for the chunk"""),
+        ]
+    ]
+    line_end: NotRequired[
+        Annotated[
+            int | None,
+            Field(description="""Ending line number for the chunk"""),
+        ]
+    ]
+    fallback_to_generic: NotRequired[
+        Annotated[
+            bool | None,
+            Field(description="""Whether generic/fallback chunking was used"""),
+        ]
+    ]
     updated_at: NotRequired[
         Annotated[
             PositiveFloat | None,
