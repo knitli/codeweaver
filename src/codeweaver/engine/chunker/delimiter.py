@@ -348,6 +348,9 @@ class DelimiterChunker(BaseChunker):
                 )
 
                 if struct_end is not None:
+                    # Calculate nesting level by counting parent structures
+                    nesting_level = self._calculate_nesting_level(content, keyword_pos)
+                    
                     # Create a complete match from keyword to closing structure
                     # This represents the entire construct (e.g., function...})
                     matches.append(
@@ -355,11 +358,61 @@ class DelimiterChunker(BaseChunker):
                             delimiter=delimiter,
                             start_pos=keyword_pos,
                             end_pos=struct_end,
-                            nesting_level=0,  # Will be set during boundary extraction
+                            nesting_level=nesting_level,
                         )
                     )
 
         return matches
+
+    def _calculate_nesting_level(self, content: str, pos: int) -> int:
+        """Calculate nesting level at a given position by counting braces.
+        
+        Args:
+            content: Source code
+            pos: Position to check nesting at
+            
+        Returns:
+            Nesting level (0 = top level, 1+ = nested)
+        """
+        # Count opening and closing braces before this position
+        # Ignore braces in strings and comments
+        brace_depth = 0
+        i = 0
+        in_string = False
+        string_char = None
+        
+        while i < pos:
+            c = content[i]
+            
+            # Handle strings
+            if c in ('"', "'", '`') and (i == 0 or content[i-1] != '\\'):
+                if not in_string:
+                    in_string = True
+                    string_char = c
+                elif c == string_char:
+                    in_string = False
+                    string_char = None
+            
+            # Handle comments (simplified - just check for // and /*)
+            elif not in_string:
+                if content[i:i+2] == '//':
+                    # Skip to end of line
+                    next_newline = content.find('\n', i)
+                    i = next_newline if next_newline >= 0 else len(content)
+                    continue
+                elif content[i:i+2] == '/*':
+                    # Skip to end of comment
+                    end_comment = content.find('*/', i+2)
+                    i = end_comment + 2 if end_comment >= 0 else len(content)
+                    continue
+                elif c == '{':
+                    brace_depth += 1
+                elif c == '}':
+                    brace_depth = max(0, brace_depth - 1)
+            
+            i += 1
+        
+        return brace_depth
 
     def _find_next_structural_with_char(
         self, content: str, start: int, allowed: set[str]
@@ -698,7 +751,7 @@ class DelimiterChunker(BaseChunker):
                     start=match.start_pos,
                     end=match.end_pos,  # type: ignore[arg-type]
                     delimiter=delimiter,
-                    nesting_level=0,  # Keyword delimiters are typically top-level structures
+                    nesting_level=match.nesting_level,  # Use the calculated nesting level from matching
                 )
                 boundaries.append(boundary)
             except ValueError:
@@ -752,6 +805,8 @@ class DelimiterChunker(BaseChunker):
         """Resolve overlapping boundaries using priority and tie-breaking rules.
 
         Phase 3: Keep highest-priority non-overlapping boundaries.
+        However, preserve nested structures (boundaries completely contained within others)
+        to maintain nesting information.
 
         Tie-breaking rules (in order):
         1. Higher priority wins
@@ -762,7 +817,7 @@ class DelimiterChunker(BaseChunker):
             boundaries: List of potentially overlapping boundaries
 
         Returns:
-            List of non-overlapping boundaries
+            List of non-overlapping boundaries (with nested structures preserved)
         """
         if not boundaries:
             return []
@@ -777,12 +832,28 @@ class DelimiterChunker(BaseChunker):
             ),
         )
 
-        # Keep non-overlapping boundaries
+        # Keep non-overlapping boundaries, but allow nested structures with same priority
         result: list[Boundary] = []
 
         for boundary in sorted_boundaries:
-            overlaps = any(self._boundaries_overlap(boundary, selected) for selected in result)
-            if not overlaps:
+            # Check if this boundary overlaps with any selected boundary
+            # Allow nesting only if priorities are equal (true nested structures like functions inside functions)
+            should_add = True
+            for selected in result:
+                if self._boundaries_overlap(boundary, selected):
+                    # Check if one is nested inside the other
+                    is_nested = (boundary.start >= selected.start and boundary.end <= selected.end) or \
+                               (selected.start >= boundary.start and selected.end <= boundary.end)
+                    
+                    # Only allow nesting if priorities are equal (same kind of structure)
+                    same_priority = boundary.delimiter.priority == selected.delimiter.priority  # type: ignore[union-attr]
+                    
+                    if not (is_nested and same_priority):
+                        # Not a same-priority nested structure, skip this boundary
+                        should_add = False
+                        break
+            
+            if should_add:
                 result.append(boundary)
 
         # Sort result by position for consistent output
