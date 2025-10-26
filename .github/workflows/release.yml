@@ -29,7 +29,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@9b03c627221f32cb88b299427119da30671cf9cc
         with:
-          python-version: "3.11"
+          python-version: "3.12"
       - name: Cache UV dependencies
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:

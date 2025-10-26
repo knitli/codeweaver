@@ -1220,9 +1220,9 @@ class ConcurrencySettings(BasedModel):
         default=4,
         description="Maximum files to chunk concurrently"
     )
-    use_process_pool: bool = Field(
-        default=True,
-        description="Use ProcessPoolExecutor (True) vs ThreadPoolExecutor (False)"
+    executor: Literal["process", "thread"] = Field(
+        default="process",
+        description="Use ProcessPoolExecutor (process) vs ThreadPoolExecutor (thread)"
     )
 
 
@@ -1238,26 +1238,12 @@ class ChunkerSettings(BasedModel):
     )
 
     # Delimiter chunker settings
-    custom_delimiters: dict[str, list[DelimiterPattern]] = Field(
+    custom_delimiters: dict[LanguageNameT, list[CustomDelimiter]] = Field(
         default_factory=dict,
         description="Custom delimiter patterns per language"
     )
 
-    # Selector settings
-    prefer_semantic: bool = Field(
-        default=True,
-        description="Prefer semantic chunking when available"
-    )
-    force_delimiter_for_languages: list[str] = Field(
-        default_factory=list,
-        description="Languages to always use delimiter chunking for"
-    )
-
-    # Degradation settings
-    enable_hybrid_chunking: bool = Field(
-        default=True,
-        description="Allow semantic to fallback to delimiter for oversized nodes"
-    )
+    custom_languages: list[CustomLanguage] = Field(default_factory=list, description="Associate new language with one of CodeWeaver's existing language families")
 
     # Resource settings
     performance: PerformanceSettings = Field(
@@ -1282,9 +1268,6 @@ class CodeWeaverSettings(BasedModel):
 
 [chunker]
 semantic_importance_threshold = 0.4
-prefer_semantic = true
-enable_hybrid_chunking = true
-force_delimiter_for_languages = ["latex", "markdown"]
 
 [chunker.performance]
 max_file_size_mb = 10
@@ -1295,7 +1278,6 @@ max_ast_depth = 200
 
 [chunker.concurrency]
 max_parallel_files = 4
-use_process_pool = true
 ```
 
 ---

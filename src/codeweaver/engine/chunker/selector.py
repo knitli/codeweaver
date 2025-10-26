@@ -18,9 +18,10 @@ from __future__ import annotations
 import logging
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.core.types.aliases import FileExt, LiteralStringT
 from codeweaver.engine.chunker.base import BaseChunker
 from codeweaver.engine.chunker.exceptions import ParseError
 from codeweaver.engine.chunker.semantic import SemanticChunker
@@ -102,6 +103,7 @@ class ChunkerSelector:
             - Falls back to delimiter chunking on semantic parse errors
             - Logs warnings when fallback occurs
             - TODO: Implement DelimiterChunker for proper fallback
+            - Checks max_file_size_mb from settings before chunking
 
         Examples:
             >>> from pathlib import Path
@@ -112,6 +114,34 @@ class ChunkerSelector:
             >>> chunker2 = selector.select_for_file(file)
             >>> assert chunker1 is not chunker2  # Fresh instances
         """
+        # Check file size limit if settings are available
+        if self.governor.settings is not None:
+            max_size_bytes = self.governor.settings.performance.max_file_size_mb * 1024 * 1024
+            try:
+                file_size = file.path.stat().st_size
+                if file_size > max_size_bytes:
+                    logger.warning(
+                        "File %s exceeds max size limit (%d MB > %d MB). Skipping chunking.",
+                        file.path,
+                        file_size / (1024 * 1024),
+                        self.governor.settings.performance.max_file_size_mb,
+                        extra={
+                            "file_path": str(file.path),
+                            "file_size_mb": file_size / (1024 * 1024),
+                            "max_size_mb": self.governor.settings.performance.max_file_size_mb,
+                        },
+                    )
+                    # Return empty chunker or raise exception
+                    # For now, return semantic chunker which will handle it gracefully
+                    # TODO: Consider returning a NullChunker or raising FileTooLargeError
+            except OSError as e:
+                logger.warning(
+                    "Could not stat file %s: %s",
+                    file.path,
+                    e,
+                    extra={"file_path": str(file.path), "error": str(e)},
+                )
+
         language = self._detect_language(file)
 
         # Try semantic first for supported languages
@@ -145,6 +175,8 @@ class ChunkerSelector:
         extensions to language enums. Returns the extension string if no
         mapping is found.
 
+        Also checks custom language mappings from settings if available.
+
         Args:
             file: DiscoveredFile with path attribute containing extension
 
@@ -164,12 +196,19 @@ class ChunkerSelector:
         ext = file.path.suffix
 
         # SemanticSearchLanguage.from_extension returns None for unknown
-        result = SemanticSearchLanguage.from_extension(ext)
-        if result is not None:
-            return result
+        result = SemanticSearchLanguage.from_extension(FileExt(cast(LiteralStringT, ext)))
 
-        # Unknown language, return extension string
-        return ext.lstrip(".").lower()
+        if result is None:
+            # Check custom language mappings from settings
+            ext_str = ext.lstrip(".").lower()
+            if self.governor.settings is not None and self.governor.settings.custom_languages:
+                # Custom languages map language names to families, not extensions to languages
+                # So we just return the extension string for now
+                # TODO: Implement proper extension-to-language mapping when needed
+                return ext_str
+            return ext_str
+
+        return result
 
 
 class GracefulChunker(BaseChunker):

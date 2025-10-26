@@ -8,11 +8,12 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 """Tests for ResourceGovernor resource limits enforcement."""
 
 import time
+
 from typing import Protocol
 
 import pytest
 
-from codeweaver.engine.chunker.exceptions import ChunkLimitExceededError, ChunkingTimeoutError
+from codeweaver.engine.chunker.exceptions import ChunkingTimeoutError, ChunkLimitExceededError
 from codeweaver.engine.chunker.governance import ResourceGovernor
 
 

@@ -48,6 +48,7 @@ A common way to move ("traverse") through the AST is to start at the root node (
 from __future__ import annotations
 
 import contextlib
+import logging
 
 from collections.abc import Iterator, Sequence
 from functools import cached_property
@@ -99,15 +100,17 @@ from codeweaver.core.types.enum import AnonymityConversion, BaseEnum
 from codeweaver.core.types.models import BasedModel
 from codeweaver.engine import humanize
 
-
 # Runtime imports needed for cast operations and type checking
 from codeweaver.semantic.grammar import Category, CompositeThing, Token
+
 
 # type-only imports
 if TYPE_CHECKING:
     from codeweaver.core.types.aliases import FilteredKey
     from codeweaver.core.types.enum import AnonymityConversion
     from codeweaver.semantic.classifications import AgentTask, ImportanceScores, ThingClass
+
+logger = logging.getLogger(__name__)
 
 registry_module: LazyImport[ModuleType] = lazy_import("codeweaver.semantic.registry")
 
@@ -338,8 +341,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
 
         return {
             FilteredKey("_node"): AnonymityConversion.HASH,
-            FilteredKey("language"): AnonymityConversion.IDENTITY,
-            FilteredKey("thing_id"): AnonymityConversion.HASH,
+            FilteredKey("text"): AnonymityConversion.TEXT_COUNT,
         }
 
     def __init__(
@@ -353,6 +355,16 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         # Resolve thing_id first
         if thing_id is None:
             thing_id = uuid7()
+        self.thing_id = thing_id
+        self.language = cast(
+            SemanticSearchLanguage,
+            language
+            or SemanticSearchLanguage.from_extension(
+                FileExt(cast(LiteralStringT, Path(node.get_root().filename()).suffix))
+            ),
+        )
+        self._node = node
+        self.parent_thing_id = parent_thing_id or self.parent.thing_id if self.parent else None
 
         # Resolve language if needed
         if language is None:
@@ -365,9 +377,6 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
                 "Language must be provided or inferable from the node's root filename."
             )
 
-        # Initialize Pydantic model with all fields
-        super().__init__(_node=node, language=language, thing_id=thing_id, parent_thing_id=parent_thing_id)
-
     @classmethod
     def from_sg_node(
         cls,
@@ -378,14 +387,12 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         parent_thing_id: UUID7 | None = None,
     ) -> AstThing[SgNode]:
         """Create an AstThing from an ast-grep `SgNode`."""
-        # Use model_construct to bypass validation and custom __init__
-        instance = cls.model_construct(
+        return cls.model_construct(
             _node=sg_node,
             language=language,
             thing_id=thing_id or uuid7(),
             parent_thing_id=parent_thing_id,
         )
-        return instance
 
     # ================================================
     # *      Identity and Metadata Properties       *
@@ -397,7 +404,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         """Get the grammar Thing that this node represents."""
         thing_name: ThingName = self.name  # type: ignore
         # Handle ERROR nodes from ast-grep (syntax errors)
-        if thing_name == "ERROR":
+        if thing_name == ThingName("ERROR"):
             return None
         registry = registry_module  # Access the module, don't call it
         if thing := registry.get_registry().get_thing_by_name(thing_name, language=self.language):
@@ -409,7 +416,9 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     @property
     def is_file_thing(self) -> bool:
         """Check if the node is the root file thing."""
-        if not self.thing.is_composite:
+        if isinstance(self.thing, Category):
+            return False
+        if self.thing and self.thing.is_token:
             return False
         return (isinstance(self.thing, CompositeThing) and self.thing.is_file) or (
             self.thing_id == self.parent_thing_id
@@ -491,6 +500,8 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     @cached_property
     def primary_category(self) -> str | None:
         """Get the primary category of the node, if any."""
+        if not self.thing or isinstance(self.thing, Category):
+            return None
         return self.thing.primary_category.name if self.thing.primary_category else None
 
     @computed_field
@@ -735,14 +746,12 @@ __all__ = (
 )
 
 # Rebuild models to resolve forward references
-try:
-    FileThing.model_rebuild()
-    AstThing.model_rebuild()
-    # Rebuild models that depend on AstThing after it's fully defined
+with contextlib.suppress(Exception):
     from codeweaver.core.chunks import CodeChunk
     from codeweaver.core.metadata import SemanticMetadata
 
-    SemanticMetadata.model_rebuild()
-    CodeChunk.model_rebuild()
-except Exception:
-    pass  # Forward references will be resolved when dependencies are available
+    for model in (FileThing, AstThing, SemanticMetadata, CodeChunk):
+        if not model.model_rebuild():
+            logger.warning("Model %s failed to rebuild in ast_grep.py", model.__name__)
+        else:
+            logger.debug("Model %s rebuilt successfully in ast_grep.py", model.__name__)

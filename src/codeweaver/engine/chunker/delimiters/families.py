@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING
 
 import textcase
 
-from codeweaver.core import BaseEnum
+from codeweaver.core.types.enum import BaseEnum
 
 
 if TYPE_CHECKING:

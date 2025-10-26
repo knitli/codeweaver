@@ -17,10 +17,9 @@ import re
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-from uuid_extensions import uuid7
-
+from codeweaver.common.utils import uuid7
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.metadata import Metadata
 from codeweaver.core.spans import Span
@@ -33,6 +32,7 @@ from codeweaver.engine.chunker.exceptions import (
     ChunkLimitExceededError,
     ParseError,
 )
+from codeweaver.engine.chunker.registry import source_id_for
 
 
 class DelimiterChunker(BaseChunker):
@@ -93,6 +93,8 @@ class DelimiterChunker(BaseChunker):
             OversizedChunkError: If individual chunks exceed token limit
             ParseError: If delimiter matching fails
         """
+        from codeweaver.engine.chunker.governance import ResourceGovernor
+
         # Edge case: empty content
         if not content or not content.strip():
             return []
@@ -107,40 +109,56 @@ class DelimiterChunker(BaseChunker):
                 details={"error": str(e)},
             ) from e
 
-        try:
-            # Phase 1: Find all delimiter matches
-            matches = self._find_delimiter_matches(content)
-
-            # Edge case: no matches found
-            if not matches:
-                return []
-
-            # Phase 2: Extract boundaries from matches
-            boundaries = self._extract_boundaries(matches)
-
-            # Edge case: no complete boundaries
-            if not boundaries:
-                return []
-
-            # Phase 3: Resolve overlapping boundaries
-            resolved = self._resolve_overlaps(boundaries)
-
-            # Convert boundaries to chunks
-            chunks = self._boundaries_to_chunks(resolved, content, file_path, context)
-
-            # Enforce chunk limit
-            self._enforce_chunk_limit(chunks, file_path)
-
-        except ChunkingError:
-            raise
-        except Exception as e:
-            raise ParseError(
-                f"Delimiter matching failed: {e}",
-                file_path=str(file_path) if file_path else None,
-                details={"error": str(e), "language": self._language},
-            ) from e
+        # Get performance settings from governor, or use defaults
+        if self._governor.settings is not None:
+            performance_settings = self._governor.settings.performance
         else:
-            return chunks
+            # Fallback defaults if no settings provided
+            from codeweaver.config.settings import PerformanceSettings
+            performance_settings = PerformanceSettings()
+
+        with ResourceGovernor(performance_settings) as governor:
+            try:
+                # Generate consistent source_id for all spans from this file
+                source_id = source_id_for(file_path) if file_path else uuid7()
+
+                # Phase 1: Find all delimiter matches
+                governor.check_timeout()
+                matches = self._find_delimiter_matches(content)
+
+                # Edge case: no matches found
+                if not matches:
+                    return []
+
+                # Phase 2: Extract boundaries from matches
+                governor.check_timeout()
+                boundaries = self._extract_boundaries(matches)
+
+                # Edge case: no complete boundaries
+                if not boundaries:
+                    return []
+
+                # Phase 3: Resolve overlapping boundaries
+                governor.check_timeout()
+                resolved = self._resolve_overlaps(boundaries)
+
+                # Convert boundaries to chunks
+                chunks = self._boundaries_to_chunks(resolved, content, file_path, source_id, context)
+
+                # Register each chunk with the governor for resource tracking
+                for _ in chunks:
+                    governor.register_chunk()
+
+            except ChunkingError:
+                raise
+            except Exception as e:
+                raise ParseError(
+                    f"Delimiter matching failed: {e}",
+                    file_path=str(file_path) if file_path else None,
+                    details={"error": str(e), "language": self._language},
+                ) from e
+            else:
+                return chunks
 
     def _enforce_chunk_limit(self, chunks: list[CodeChunk], file_path: Path | None) -> None:
         """Enforce maximum chunk count limit.
@@ -178,8 +196,8 @@ class DelimiterChunker(BaseChunker):
             return matches
 
         # Build combined regex for all start and end delimiters
-        start_patterns = {d.start: d for d in self._delimiters}
-        end_patterns = {d.end: d for d in self._delimiters}
+        start_patterns: dict[str, Delimiter] = {d.start: d for d in self._delimiters}
+        end_patterns: dict[str, Delimiter] = {d.end: d for d in self._delimiters}
 
         # Escape patterns and combine
         all_patterns = list(start_patterns.keys()) + list(end_patterns.keys())
@@ -192,7 +210,7 @@ class DelimiterChunker(BaseChunker):
 
             # Determine if this is a start or end delimiter
             if matched_text in start_patterns:
-                delimiter = start_patterns[matched_text]
+                delimiter: Delimiter = start_patterns[matched_text]
                 matches.append(
                     DelimiterMatch(
                         delimiter=delimiter,
@@ -232,15 +250,17 @@ class DelimiterChunker(BaseChunker):
         delimiter_stacks: dict[str, list[tuple[DelimiterMatch, int]]] = {}
 
         for match in matches:
-            delimiter_key = f"{match.delimiter.start}_{match.delimiter.end}"
+            # Get delimiter with explicit type
+            delimiter: Delimiter = match.delimiter  # type: ignore[assignment]
+            delimiter_key: str = f"{delimiter.start}_{delimiter.end}"  # type: ignore[union-attr]
 
             if delimiter_key not in delimiter_stacks:
                 delimiter_stacks[delimiter_key] = []
 
             if match.is_start:
                 # Start delimiter - push to stack
-                current_level = (
-                    len(delimiter_stacks[delimiter_key]) if match.delimiter.nestable else 0
+                current_level: int = (
+                    len(delimiter_stacks[delimiter_key]) if delimiter.nestable else 0  # type: ignore[union-attr]
                 )
                 delimiter_stacks[delimiter_key].append((match, current_level))
             else:
@@ -253,10 +273,12 @@ class DelimiterChunker(BaseChunker):
 
                 # Create boundary
                 try:
+                    # Type assertion for end_pos
+                    end_pos: int = match.end_pos if match.end_pos is not None else match.start_pos
                     boundary = Boundary(
                         start=start_match.start_pos,
-                        end=match.end_pos,  # type: ignore[arg-type]
-                        delimiter=match.delimiter,
+                        end=end_pos,
+                        delimiter=delimiter,
                         nesting_level=nesting_level,
                     )
                     boundaries.append(boundary)
@@ -287,20 +309,19 @@ class DelimiterChunker(BaseChunker):
 
         # Sort by priority (desc), length (desc), position (asc)
         sorted_boundaries = sorted(
-            boundaries, key=lambda b: (-b.delimiter.priority, -(b.end - b.start), b.start)
+            boundaries,
+            key=lambda b: (
+                -cast(int, b.delimiter.priority),  # type: ignore[union-attr]
+                -(b.end - b.start),
+                b.start,
+            ),
         )
 
         # Keep non-overlapping boundaries
         result: list[Boundary] = []
 
         for boundary in sorted_boundaries:
-            # Check if this boundary overlaps with any already selected
-            overlaps = False
-            for selected in result:
-                if self._boundaries_overlap(boundary, selected):
-                    overlaps = True
-                    break
-
+            overlaps = any(self._boundaries_overlap(boundary, selected) for selected in result)
             if not overlaps:
                 result.append(boundary)
 
@@ -317,13 +338,14 @@ class DelimiterChunker(BaseChunker):
         Returns:
             True if boundaries overlap
         """
-        return not (b1.end <= b2.start or b2.end <= b1.start)
+        return b1.end > b2.start and b2.end > b1.start
 
     def _boundaries_to_chunks(
         self,
         boundaries: list[Boundary],
         content: str,
         file_path: Path | None,
+        source_id: Any,  # UUID7 type
         context: dict[str, Any] | None,
     ) -> list[CodeChunk]:
         """Convert boundaries to CodeChunk objects.
@@ -332,24 +354,30 @@ class DelimiterChunker(BaseChunker):
             boundaries: Resolved boundaries to convert
             content: Source content
             file_path: Optional source file path
+            source_id: Source identifier for all spans from this file
             context: Optional additional context
 
         Returns:
             List of CodeChunk objects
         """
+        from codeweaver.core.metadata import ExtKind
+
         chunks: list[CodeChunk] = []
         lines = content.splitlines(keepends=True)
 
         for boundary in boundaries:
+            # Get delimiter with explicit type
+            delimiter: Delimiter = boundary.delimiter  # type: ignore[assignment]
+
             # Extract chunk text
             chunk_text = content[boundary.start : boundary.end]
 
             # Strip delimiters if not inclusive
-            if not boundary.delimiter.inclusive:
-                chunk_text = self._strip_delimiters(chunk_text, boundary.delimiter)
+            if not delimiter.inclusive:  # type: ignore[union-attr]
+                chunk_text = self._strip_delimiters(chunk_text, delimiter)  # type: ignore[arg-type]
 
             # Expand to line boundaries if requested
-            if boundary.delimiter.take_whole_lines:
+            if delimiter.take_whole_lines:  # type: ignore[union-attr]
                 start_line, end_line = self._expand_to_lines(boundary.start, boundary.end, lines)
             else:
                 start_line, end_line = self._pos_to_lines(boundary.start, boundary.end, lines)
@@ -357,10 +385,11 @@ class DelimiterChunker(BaseChunker):
             # Build metadata
             metadata = self._build_metadata(boundary, chunk_text, start_line, context)
 
-            # Create chunk
+            # Create chunk with shared source_id
             chunk = CodeChunk(
                 content=chunk_text,
-                line_range=Span(start=start_line, end=end_line),
+                ext_kind=ExtKind.from_file(file_path) if file_path else None,
+                line_range=Span(start_line, end_line, source_id),  # type: ignore[call-arg]  # All spans from same file share source_id
                 file_path=file_path,
                 metadata=metadata,
             )
@@ -383,28 +412,37 @@ class DelimiterChunker(BaseChunker):
         Returns:
             Metadata dictionary
         """
+        # Get delimiter with explicit type
+        delimiter: Delimiter = boundary.delimiter  # type: ignore[assignment]
+
+        # Build context dict with proper types
+        chunk_context: dict[str, Any] = {
+            "chunker_type": "delimiter",
+            "content_hash": str(get_blake_hash(text)),
+            "delimiter_kind": delimiter.kind.name,  # type: ignore[union-attr]
+            "delimiter_start": delimiter.start,  # type: ignore[union-attr]
+            "delimiter_end": delimiter.end,  # type: ignore[union-attr]
+            "priority": int(delimiter.priority),  # type: ignore[arg-type,union-attr]
+            "nesting_level": boundary.nesting_level,
+        }
+
+        # Merge with provided context
+        if context:
+            chunk_context |= context
+
         metadata: Metadata = {
             "chunk_id": uuid7(),
             "created_at": datetime.now(UTC).timestamp(),
-            "name": f"{boundary.delimiter.kind.name.title()} at line {line}",
-            "context": {
-                "chunker_type": "delimiter",
-                "content_hash": str(get_blake_hash(text)),
-                "delimiter_kind": boundary.delimiter.kind.name,
-                "delimiter_start": boundary.delimiter.start,
-                "delimiter_end": boundary.delimiter.end,
-                "priority": boundary.delimiter.priority,
-                "nesting_level": boundary.nesting_level,
-                **(context or {}),
-            },
+            "name": f"{delimiter.kind.name.title()} at line {line}",  # type: ignore[union-attr]
+            "context": chunk_context,
         }
         return metadata
 
     def _load_delimiters_for_language(self, language: str) -> list[Delimiter]:
         """Load delimiter set for language.
 
-        TODO: Load from delimiter families system when implemented.
-        For now, use generic delimiters suitable for most C-style languages.
+        Checks for custom delimiters in settings first, then falls back to
+        delimiter families system when implemented.
 
         Args:
             language: Programming language name
@@ -414,7 +452,19 @@ class DelimiterChunker(BaseChunker):
         """
         from codeweaver.engine.chunker.delimiter_model import DelimiterKind
 
-        # Generic delimiters for most C-style languages
+        # Check for custom delimiters from settings
+        if self._governor.settings is not None and self._governor.settings.custom_delimiters:
+            for custom_delim in self._governor.settings.custom_delimiters:
+                if custom_delim.language == language or (
+                    custom_delim.extensions and
+                    any(ext.language == language for ext in custom_delim.extensions if hasattr(ext, 'language'))
+                ):
+                    # Convert DelimiterPattern to Delimiter objects
+                    # TODO: Implement proper conversion when delimiter families are integrated
+                    pass
+
+        # TODO: Load from delimiter families system when implemented.
+        # For now, use generic delimiters suitable for most C-style languages.
         return [
             Delimiter(
                 start="{",

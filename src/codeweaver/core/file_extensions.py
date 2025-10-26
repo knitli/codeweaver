@@ -471,7 +471,6 @@ CODE_FILES_EXTENSIONS: tuple[ExtLangPair, ...] = (
     LangPair(ext=FileExt("makefile.sco"), language=LanguageName("make")),
     LangPair(ext=FileExt("mkfile"), language=LanguageName("make")),
     LangPair(ext=FileExt("rebar.config"), language=LanguageName("erlang")),
-    # We're only going to cover the main ones for VB6, but langchain has a splitter for it so we'll support it.
     LangPair(ext=FileExt(".bas"), language=LanguageName("visualbasic6")),
     LangPair(ext=FileExt(".cls"), language=LanguageName("visualbasic6")),
     LangPair(ext=FileExt(".ctl"), language=LanguageName("visualbasic6")),

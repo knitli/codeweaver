@@ -40,7 +40,7 @@ Study pydantic ecosystem patterns: [pydantic](https://github.com/pydantic/pydant
     - **But not exacting**: Don't waste space explaining the obvious. We have strong typing that makes args/returns clear. A brief sentence may be enough. 
 - **Line length**: 100 characters
 - **Auto-formatting**: Ruff configuration enabled
-- **Python typing**: Modern (≥3.11) - `typing.Self`, `typing.Literal`, piped unions (`int | str`), constructors as types (`list[str]`), `type` keyword for `typing.TypeAliasType`.
+- **Python typing**: Modern (≥3.12) - `typing.Self`, `typing.Literal`, piped unions (`int | str`), constructors as types (`list[str]`), `type` keyword for `typing.TypeAliasType`.
 
 ## Lazy Evaluation & Immutability
 

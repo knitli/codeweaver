@@ -13,17 +13,16 @@ through a context manager protocol.
 from __future__ import annotations
 
 import time
+
 from typing import TYPE_CHECKING, Any
 
-from codeweaver.engine.chunker.exceptions import ChunkLimitExceededError, ChunkingTimeoutError
+from codeweaver.engine.chunker.exceptions import ChunkingTimeoutError, ChunkLimitExceededError
 
 
 if TYPE_CHECKING:
-    from typing import Self
-
     # NOTE: PerformanceSettings will be defined in config module per spec §10.1
     # Temporarily using Any as placeholder for type checking
-    from typing import Protocol
+    from typing import Protocol, Self
 
     class PerformanceSettings(Protocol):
         """Protocol for performance settings configuration."""
@@ -93,7 +92,7 @@ class ResourceGovernor:
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: Any | None,
+        exc_tb: object,
     ) -> None:
         """Clean up resource tracking.
 

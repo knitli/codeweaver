@@ -27,11 +27,10 @@ from codeweaver.engine.chunker.exceptions import (
 from codeweaver.engine.chunker.governance import ResourceGovernor
 from codeweaver.engine.chunker.registry import (
     SourceIdRegistry,
-    clear_registry,
-    get_registry,
+    clear_store,
+    get_store,
     source_id_for,
 )
-from codeweaver.engine.chunker.router import EnhancedChunkMicroManager
 from codeweaver.engine.chunker.selector import ChunkerSelector, GracefulChunker
 from codeweaver.engine.chunker.semantic import SemanticChunker
 
@@ -49,7 +48,6 @@ __all__ = (
     "DelimiterChunker",
     "DelimiterMatch",
     "DelimiterPattern",
-    "EnhancedChunkMicroManager",
     "GracefulChunker",
     "LanguageFamily",
     "OversizedChunkError",
@@ -57,9 +55,9 @@ __all__ = (
     "ResourceGovernor",
     "SemanticChunker",
     "SourceIdRegistry",
-    "clear_registry",
+    "clear_store",
     "detect_language_family",
     "expand_pattern",
-    "get_registry",
+    "get_store",
     "source_id_for",
 )

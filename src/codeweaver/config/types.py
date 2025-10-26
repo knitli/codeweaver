@@ -28,7 +28,7 @@ from fastmcp.server.server import DuplicateBehavior
 from fastmcp.tools import Tool
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.lowlevel.server import LifespanResultT
-from pydantic import Field, PositiveFloat, PositiveInt, SecretStr
+from pydantic import Field, FilePath, NonNegativeFloat, PositiveFloat, PositiveInt, SecretStr
 from starlette.middleware import Middleware as ASGIMiddleware
 from uvicorn.config import (
     SSL_PROTOCOL_VERSION,
@@ -44,6 +44,10 @@ from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
 
 
 if TYPE_CHECKING:
+    from codeweaver.config.chunker import CustomDelimiter, CustomLanguage
+    from codeweaver.config.logging import LoggingSettings
+    from codeweaver.config.middleware import MiddlewareOptions
+    from codeweaver.config.providers import ProviderSettingsDict
     from codeweaver.core.types import AnonymityConversion, DictView, FilteredKeyT, Unset
     from codeweaver.providers.provider import Provider
 
@@ -122,6 +126,48 @@ class BaseProviderSettings(TypedDict, total=False):
 
 
 # ===========================================================================
+# *       TypedDict Representations of Chunker and Related Settings
+# ===========================================================================
+
+
+class PerformanceSettingsDict(TypedDict, total=False):
+    """TypedDict for performance settings.
+
+    Not intended to be used directly; used for internal type checking and validation.
+    """
+
+    max_file_size_mb: NotRequired[PositiveInt | None]
+    chunk_timeout_seconds: NotRequired[PositiveInt | None]
+    parse_timeout_seconds: NotRequired[PositiveInt | None]
+    max_chunks_per_file: NotRequired[PositiveInt | None]
+    max_memory_mb_per_operation: NotRequired[PositiveInt | None]
+    max_ast_depth: NotRequired[PositiveInt | None]
+
+
+class ConcurrencySettingsDict(TypedDict, total=False):
+    """TypedDict for concurrency settings.
+
+    Not intended to be used directly; used for internal type checking and validation.
+    """
+
+    max_parallel_files: NotRequired[PositiveInt | None]
+    use_process_pool: NotRequired[bool | None]
+
+
+class ChunkerSettingsDict(TypedDict, total=False):
+    """TypedDict for Chunker settings.
+
+    Not intended to be used directly; used for internal type checking and validation.
+    """
+
+    custom_delimiters: NotRequired[list[CustomDelimiter]] | None
+    custom_languages: NotRequired[list[CustomLanguage]] | None
+    semantic_importance_threshold: NotRequired[NonNegativeFloat | None]
+    performance: NotRequired[PerformanceSettingsDict | None]
+    concurrency: NotRequired[ConcurrencySettingsDict | None]
+
+
+# ===========================================================================
 # *        TypedDict Representations of Top-Level Settings Models
 # ===========================================================================
 
@@ -164,6 +210,37 @@ class FastMcpServerSettingsDict(TypedDict, total=False):
     resource_prefix_format: NotRequired[Literal["protocol", "path"] | None]
     middleware: NotRequired[list[str | Middleware] | None]
     tools: NotRequired[list[str | Tool] | None]
+
+
+class CodeWeaverSettingsDict(TypedDict, total=False):
+    """TypedDict for CodeWeaver settings.
+
+    Not intended to be used directly; used for internal type checking and validation.
+    """
+
+    project_path: NotRequired[Path | None]
+    project_name: NotRequired[str | None]
+    provider: NotRequired[ProviderSettingsDict | None]
+    config_file: NotRequired[FilePath | None]
+    token_limit: NotRequired[PositiveInt]
+    max_file_size: NotRequired[PositiveInt]
+    max_results: NotRequired[PositiveInt]
+    server: NotRequired[FastMcpServerSettingsDict]
+    logging: NotRequired[LoggingSettings]
+    middleware_settings: NotRequired[MiddlewareOptions]
+    chunker: NotRequired[ChunkerSettingsDict]
+    project_root: NotRequired[Path | None]
+    uvicorn_settings: NotRequired[UvicornServerSettingsDict]
+    filter_settings: NotRequired[FileFilterSettingsDict]
+    enable_background_indexing: NotRequired[bool]
+    enable_telemetry: NotRequired[bool]
+    enable_health_endpoint: NotRequired[bool]
+    enable_statistics_endpoint: NotRequired[bool]
+    enable_settings_endpoint: NotRequired[bool]
+    enable_version_endpoint: NotRequired[bool]
+    allow_identifying_telemetry: NotRequired[bool]
+    enable_ai_intent_analysis: NotRequired[bool]
+    enable_precontext: NotRequired[bool]
 
 
 # ===========================================================================
@@ -341,11 +418,15 @@ def default_config_file_locations(
 
 
 __all__ = (
+    "ChunkerSettingsDict",
+    "CodeWeaverSettingsDict",
+    "ConcurrencySettingsDict",
     "ConnectionConfiguration",
     "ConnectionRateLimitConfig",
     "FastMcpHttpRunArgs",
     "FastMcpServerSettingsDict",
     "FileFilterSettingsDict",
+    "PerformanceSettingsDict",
     "RignoreSettings",
     "UvicornServerSettings",
     "UvicornServerSettingsDict",

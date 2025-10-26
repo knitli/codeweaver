@@ -18,15 +18,18 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from functools import cached_property
 from pathlib import Path
-from typing import Annotated, Any, NamedTuple
+from typing import TYPE_CHECKING, Annotated, Any
 
 from pydantic import ConfigDict, Field, PositiveInt, computed_field
 
 from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.language import Chunker
 from codeweaver.core.types.models import BasedModel
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+
+
+if TYPE_CHECKING:
+    from codeweaver.config.settings import ChunkerSettings
 
 
 SAFETY_MARGIN = 0.1
@@ -44,13 +47,6 @@ SPLITTER_AVAILABLE = {
 """Languages with langchain_text_splitters support that don't have semantic search support. The keys are the name of the language as defined in `codeweaver._supported_languages.SecondarySupportedLanguage`, and the values are the name of the language as defined in `langchain_text_splitters.Language`."""
 
 
-class ChunkerEntry(NamedTuple):
-    """An entry in the chunker registry."""
-
-    chunker_kind: Chunker
-    chunker: type[BaseChunker]
-
-
 class ChunkGovernor(BasedModel):
     """Configuration for chunking behavior."""
 
@@ -60,6 +56,11 @@ class ChunkGovernor(BasedModel):
         tuple[EmbeddingModelCapabilities | RerankingModelCapabilities, ...],
         Field(description="""The model capabilities to infer chunking behavior from."""),
     ] = ()
+
+    settings: Annotated[
+        "ChunkerSettings | None",
+        Field(default=None, description="""Chunker configuration settings."""),
+    ] = None
 
     @computed_field
     @cached_property
@@ -84,7 +85,6 @@ class BaseChunker(ABC):
     """Base class for chunkers."""
 
     _governor: ChunkGovernor
-    chunker: Chunker
 
     def __init__(self, governor: ChunkGovernor) -> None:
         """Initialize the chunker."""
@@ -112,4 +112,4 @@ class BaseChunker(ABC):
         return self._governor.simple_overlap
 
 
-__all__ = ("BaseChunker", "ChunkGovernor", "ChunkerEntry")
+__all__ = ("BaseChunker", "ChunkGovernor")

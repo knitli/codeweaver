@@ -19,7 +19,6 @@ classifiers = [
   "Natural Language :: English",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
@@ -40,7 +39,6 @@ dependencies = [
   "cyclopts>=4.0.0",
   "fastmcp>=2.12.5",
   "httpx>=0.28.1",
-  "langchain-text-splitters>=1.0.0",
   "mcp>=1.16.0",
   "numpy>=2.3.4",
   "posthog>=6.7.10",
@@ -62,7 +60,7 @@ dependencies = [
 dynamic = ["version"]
 description = "Extensible MCP server for semantic code search with plugin architecture supporting multiple embedding providers, vector databases, and data sources."
 readme = { file = "README.md", content-type = "text/markdown" }
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 keywords = [
   "ai",
   "artificial intelligence",
@@ -215,7 +213,6 @@ recommended = [
   "cyclopts",
   "py-cpuinfo",
   "fastmcp",
-  "langchain-text-splitters",
   "mcp",
   "numpy",
   "posthog",
@@ -243,7 +240,6 @@ recommended-no-telemetry = [
   "cyclopts",
   "py-cpuinfo",
   "fastmcp",
-  "langchain-text-splitters",
   "mcp",
   "numpy",
   "posthog",
@@ -272,7 +268,6 @@ recommended-local-only = [
   "py-cpuinfo",
   "fastembed",
   "fastmcp",
-  "langchain-text-splitters",
   "mcp",
   "numpy",
   "posthog",
@@ -311,7 +306,6 @@ required-core = [
   "aenum",
   "ast-grep-py",
   "fastmcp",
-  "langchain-text-splitters",
   "mcp",
   "numpy",
   "pydantic-graph",
@@ -382,7 +376,7 @@ provider-qdrant = ["qdrant-client"]
 
 # ==== Data Sources ====
 
-source-filesystem = ["langchain-text-splitters", "watchfiles"]
+source-filesystem = ["watchfiles"]
 source-tavily = ["pydantic-ai-slim[tavily]"]
 source-duckduckgo = ["pydantic-ai-slim[duckduckgo]"]
 
@@ -419,13 +413,10 @@ all = [
   "fastembed",
   "fastmcp",
   "httpx",
-  "langchain-text-splitters",
   "mcp",
   "numpy",
   "permit-fastmcp",
   "posthog",
-  "langchain-text-splitters",
-  "mcp",
   "numpy",
   "permit-fastmcp",
   "pydantic-ai",
@@ -467,7 +458,6 @@ all-gpu = [
   "fastembed-gpu",
   "fastmcp",
   "httpx",
-  "langchain-text-splitters",
   "mcp",
   "numpy",
   "permit-fastmcp",

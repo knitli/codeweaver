@@ -141,7 +141,7 @@ Successfully implemented the complete chunker system redesign per specification 
 **Quality Standards**:
 - ✅ SPDX headers on all files (MIT OR Apache-2.0)
 - ✅ Google-style docstrings with examples
-- ✅ Modern Python 3.11+ type hints (`list[T]`, `dict[K, V]`, `Self`)
+- ✅ Modern Python 3.12+ type hints (`list[T]`, `dict[K, V]`, `Self`)
 - ✅ Comprehensive error handling with rich context
 - ✅ CODE_STYLE.md compliance (100-char lines, active voice)
 - ✅ Ruff linting: 0 errors (semantic.py, delimiter.py, selector.py)

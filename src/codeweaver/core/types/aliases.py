@@ -37,6 +37,19 @@ type FilteredKeyT = Annotated[
     ),
 ]
 
+UUID7Hex = NewType("UUID7Hex", str)
+"""A UUID7 represented as a hex string."""
+
+UUID7HexT = Annotated[
+    UUID7Hex,
+    Field(
+        description="A UUID7 represented as a hex string.",
+        pattern=r"^[0-9a-f]{32}$",
+        min_length=32,
+        max_length=32,
+    ),
+]
+
 # ================================================
 # *       File and Directory NewTypes/Aliases
 # ================================================

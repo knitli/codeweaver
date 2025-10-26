@@ -142,11 +142,9 @@ class ConcurrencySettings(BasedModel):
     use_process_pool: bool = True
 
 class ChunkerSettings(BasedModel):
-    semantic_importance_threshold: float = 0.3
-    custom_delimiters: dict[str, list[DelimiterPattern]] = Field(default_factory=dict)
-    prefer_semantic: bool = True
-    force_delimiter_for_languages: list[str] = Field(default_factory=list)
-    enable_hybrid_chunking: bool = True
+    semantic_importance_threshold: float = 0.2
+    custom_delimiters: dict[LanguageNameT, CustomDelimiter] = Field(default_factory=dict)    
+    custom_languages: list[CustomLanguage] = Field(default_factory=list)
     performance: PerformanceSettings = Field(default_factory=PerformanceSettings)
     concurrency: ConcurrencySettings = Field(default_factory=ConcurrencySettings)
 ```

@@ -16,11 +16,11 @@ These classes work together to implement pattern-based chunking across 170+ lang
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated
 
 from pydantic import Field, PositiveInt
 
-from codeweaver.core import BasedModel
+from codeweaver.core.types.models import BasedModel
 from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
 
 
@@ -66,7 +66,7 @@ class Delimiter(BasedModel):
 
     def _telemetry_keys(self) -> None:
         """Get telemetry keys for the delimiter model."""
-        return None
+        return
 
     @classmethod
     def from_pattern(cls, pattern: DelimiterPattern) -> list[Delimiter]:

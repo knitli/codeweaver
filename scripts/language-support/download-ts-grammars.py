@@ -44,7 +44,7 @@ class GrammarRetrievalError(Exception):
     """Raised when grammar retrieval fails."""
 
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 console = Console(markup=True, emoji=True)
 

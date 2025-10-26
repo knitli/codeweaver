@@ -21,18 +21,7 @@ from collections.abc import Callable
 from functools import cached_property, partial
 from importlib import util
 from pathlib import Path
-from textwrap import dedent
-from typing import (
-    TYPE_CHECKING,
-    Annotated,
-    Any,
-    Literal,
-    NotRequired,
-    Self,
-    TypedDict,
-    Unpack,
-    cast,
-)
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Self, Unpack, cast
 
 from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.server.server import DuplicateBehavior
@@ -54,7 +43,7 @@ from pydantic_core import from_json
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 from codeweaver.common.utils.lazy_importer import lazy_import
-from codeweaver.config.language import CustomDelimiter, CustomLanguage
+from codeweaver.config.chunker import ChunkerSettings
 from codeweaver.config.logging import LoggingSettings
 from codeweaver.config.middleware import (
     AVAILABLE_MIDDLEWARE,
@@ -70,17 +59,14 @@ from codeweaver.config.providers import (
     DataProviderSettings,
     EmbeddingModelSettings,
     EmbeddingProviderSettings,
-    ProviderSettingsDict,
     RerankingModelSettings,
     RerankingProviderSettings,
     SparseEmbeddingModelSettings,
 )
 from codeweaver.config.types import (
-    FastMcpServerSettingsDict,
-    FileFilterSettingsDict,
+    CodeWeaverSettingsDict,
     RignoreSettings,
     UvicornServerSettings,
-    UvicornServerSettingsDict,
     default_config_file_locations,
 )
 from codeweaver.core.file_extensions import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_EXTENSIONS
@@ -154,118 +140,6 @@ DefaultMiddlewareSettings = MiddlewareOptions(
 )
 
 
-class PerformanceSettings(BasedModel):
-    """Performance and resource limit configuration."""
-
-    max_file_size_mb: Annotated[
-        PositiveInt,
-        Field(default=10, description="""Maximum file size in MB to attempt chunking"""),
-    ] = 10
-
-    chunk_timeout_seconds: Annotated[
-        PositiveInt,
-        Field(default=30, description="""Maximum time allowed for chunking a single file"""),
-    ] = 30
-
-    parse_timeout_seconds: Annotated[
-        PositiveInt, Field(default=10, description="""Maximum time for AST parsing operation""")
-    ] = 10
-
-    max_chunks_per_file: Annotated[
-        PositiveInt,
-        Field(default=5000, description="""Maximum chunks to generate from single file"""),
-    ] = 5000
-
-    max_memory_mb_per_operation: Annotated[
-        PositiveInt, Field(default=100, description="""Peak memory limit per chunking operation""")
-    ] = 100
-
-    max_ast_depth: Annotated[
-        PositiveInt, Field(default=200, description="""Maximum AST nesting depth""")
-    ] = 200
-
-    def _telemetry_keys(self) -> None:
-        return None
-
-
-class ConcurrencySettings(BasedModel):
-    """Concurrency configuration."""
-
-    max_parallel_files: Annotated[
-        PositiveInt, Field(default=4, description="""Maximum files to chunk concurrently""")
-    ] = 4
-
-    use_process_pool: Annotated[
-        bool,
-        Field(
-            default=True,
-            description="""Use ProcessPoolExecutor (True) vs ThreadPoolExecutor (False)""",
-        ),
-    ] = True
-
-    def _telemetry_keys(self) -> None:
-        return None
-
-
-class ChunkerSettings(BasedModel):
-    """Configuration for chunker system."""
-
-    # Delimiter chunker settings (placeholder for future)
-    custom_delimiters: Annotated[
-        dict[str, list[dict[str, Any]]],
-        Field(default_factory=dict, description="""Custom delimiter patterns per language"""),
-    ]
-
-    force_delimiter_for_languages: Annotated[
-        list[str],
-        Field(
-            default_factory=list, description="""Languages to always use delimiter chunking for"""
-        ),
-    ]
-
-    # Semantic chunker settings
-    semantic_importance_threshold: Annotated[
-        float,
-        Field(
-            default=0.3,
-            ge=0.0,
-            le=1.0,
-            description="""Minimum importance score for nodes to be chunkable""",
-        ),
-    ] = 0.3
-
-    # Selector settings
-    prefer_semantic: Annotated[
-        bool, Field(default=True, description="""Prefer semantic chunking when available""")
-    ] = True
-
-    # Degradation settings
-    enable_hybrid_chunking: Annotated[
-        bool,
-        Field(
-            default=True,
-            description="""Allow semantic to fallback to delimiter for oversized nodes""",
-        ),
-    ] = True
-
-    # Resource settings
-    performance: Annotated[
-        PerformanceSettings,
-        Field(
-            default_factory=PerformanceSettings,
-            description="""Performance and resource limit configuration""",
-        ),
-    ]
-
-    concurrency: Annotated[
-        ConcurrencySettings,
-        Field(default_factory=ConcurrencySettings, description="""Concurrency configuration"""),
-    ]
-
-    def _telemetry_keys(self) -> None:
-        return None
-
-
 def merge_agent_model_settings(
     base: AgentModelSettings | None, override: AgentModelSettings | None
 ) -> AgentModelSettings | None:
@@ -333,7 +207,7 @@ class FileFilterSettings(BasedModel):
     other_ignore_kwargs: Annotated[
         RignoreSettings | Unset,
         Field(
-            description="""Other kwargs to pass to `rignore`. See <https://pypi.org/project/rignore/>. By default we set max_filesize to 5MB and same_file_system to True.""",
+            description="""Other kwargs to pass to `rignore`. See <https://pypi.org/project/rignore/>. By default we set max_filesize to 5MB and same_file_system to True."""
         ),
     ] = UNSET
 
@@ -686,7 +560,7 @@ class CodeWeaverSettings(BaseSettings):
     project_path: Annotated[
         DirectoryPath,
         Field(
-            default_factory=lambda: lazy_import("codeweaver.common.utils").get_project_root(),
+            default_factory=lambda: lazy_import("codeweaver.common.utils").get_project_root(),  # type: ignore
             description="""Root path of the codebase to analyze. CodeWeaver will try to detect the project root automatically if you don't provide one.""",
         ),
     ]
@@ -698,7 +572,7 @@ class CodeWeaverSettings(BaseSettings):
     provider: Annotated[
         ProviderSettings,
         Field(
-            description="""Provider and model configurations for agents, data, embedding, reranking, sparse embedding, and vector store providers. Will default to default profile if not provided.""",
+            description="""Provider and model configurations for agents, data, embedding, reranking, sparse embedding, and vector store providers. Will default to default profile if not provided."""
         ),
     ] = AllDefaultProviderSettings
 
@@ -726,9 +600,9 @@ class CodeWeaverSettings(BaseSettings):
         Field(description="""Optionally customize FastMCP server settings."""),
     ] = DefaultFastMcpServerSettings
 
-    logging: Annotated[
-        LoggingSettings | None, Field(description="""Logging configuration""")
-    ] = None
+    logging: Annotated[LoggingSettings | None, Field(description="""Logging configuration""")] = (
+        None
+    )
 
     middleware_settings: Annotated[
         MiddlewareOptions | None, Field(description="""Middleware settings""")
@@ -738,35 +612,9 @@ class CodeWeaverSettings(BaseSettings):
         FileFilterSettings, Field(description="""File filtering settings""")
     ] = FileFilterSettings()
 
-    chunker: Annotated[
-        ChunkerSettings,
-        Field(description="""Chunker system configuration"""),
-    ] = ChunkerSettings()
-
-    custom_languages: Annotated[
-        list[CustomLanguage] | None,
-        Field(
-            description=dedent("""
-            If CodeWeaver's built-in language support doesn't cover your codebase sufficiently, you can do one of two things:
-            1. Define custom delimiters for the languages you want to improve support for. This is the recommended approach if you just want to improve chunking for a specific language or file type. Or if you want full control over how chunking is done for a specific language or file type. Do that with the `custom_delimiters` setting, by providing a list of `CustomDelimiter` objects.
-            2. You can optionally provide a list of custom languages for your codebase. This is useful if you use a language or file type that isn't natively supported by CodeWeaver. You can define the language name, file extensions, and the language's family for CodeWeaver to infer a chunking strategy. You can't define custom delimiters here -- use `custom_delimiters` for that.
-
-            Note that CodeWeaver has very extensive built-in language support (currently around 170 languages and 200+ file types), so you should only need to use this if you have a very niche or uncommon language or file type, or if we just missed the extension you are using in our definitions. In either case, please consider submitting a pull request to add it to our built-in definitions, or [file an issue](https://github.com/knitli/codeweaver-mcp/issues/) to let us know!
-            """)
-        ),
-    ] = None
-
-    custom_delimiters: Annotated[
-        list[CustomDelimiter] | None,
-        Field(
-            description=dedent("""
-        You can optionally provide a list of custom delimiters for your codebase. There are two scenarios where you might want to do this:
-        1. You use a language or file type that isn't natively supported by CodeWeaver, and you want to add support for it by defining custom delimiters (you could also submit a pull request! Our builtin delimiters are very extensive, and do a decent job of covering unknown languages, but anything explicitly defined will probably do better.
-        2. You want to override the default delimiters for a language or file type. For example, if you don't think the delimiters are providing good results, you can override them here.
-        3. (I said two...) You should NOT do this if you want a completely custom chunking strategy. You can add one programmatically to the `Chunker` class with `register._chunker.` Your chunker should subclass `codeweaver.services.chunker.base.BaseChunker`.
-        """)
-        ),
-    ] = None
+    chunker: Annotated[ChunkerSettings, Field(description="""Chunker system configuration""")] = (
+        ChunkerSettings()
+    )
 
     enable_background_indexing: Annotated[
         bool,
@@ -817,10 +665,7 @@ class CodeWeaverSettings(BaseSettings):
     ] = Path(".codeweaver/repo_index.json")
 
     uvicorn_settings: Annotated[
-        UvicornServerSettings | None,
-        Field(
-            description="""Settings for the Uvicorn server"""
-        ),
+        UvicornServerSettings | None, Field(description="""Settings for the Uvicorn server""")
     ] = None
 
     __version__: Annotated[
@@ -926,33 +771,6 @@ class CodeWeaverSettings(BaseSettings):
         return self._map
 
 
-class CodeWeaverSettingsDict(TypedDict, total=False):
-    """A serialized `CodeWeaverSettings` object."""
-
-    project_path: NotRequired[Path | None]
-    project_name: NotRequired[str | None]
-    provider: NotRequired[ProviderSettingsDict | None]
-    config_file: NotRequired[FilePath | None]
-    token_limit: NotRequired[PositiveInt]
-    max_file_size: NotRequired[PositiveInt]
-    max_results: NotRequired[PositiveInt]
-    server: NotRequired[FastMcpServerSettingsDict]
-    logging: NotRequired[LoggingSettings]
-    middleware_settings: NotRequired[MiddlewareOptions]
-    project_root: NotRequired[Path | None]
-    uvicorn_settings: NotRequired[UvicornServerSettingsDict]
-    filter_settings: NotRequired[FileFilterSettingsDict]
-    enable_background_indexing: NotRequired[bool]
-    enable_telemetry: NotRequired[bool]
-    enable_health_endpoint: NotRequired[bool]
-    enable_statistics_endpoint: NotRequired[bool]
-    enable_settings_endpoint: NotRequired[bool]
-    enable_version_endpoint: NotRequired[bool]
-    allow_identifying_telemetry: NotRequired[bool]
-    enable_ai_intent_analysis: NotRequired[bool]
-    enable_precontext: NotRequired[bool]
-
-
 # Global settings instance
 _settings: CodeWeaverSettings | None = None
 """The global settings instance. Use `get_settings()` to access it."""
@@ -1027,9 +845,7 @@ def reset_settings() -> None:
 
 
 __all__ = (
-    "ChunkerSettings",
     "CodeWeaverSettings",
-    "ConcurrencySettings",
     "DefaultAgentProviderSettings",
     "DefaultDataProviderSettings",
     "DefaultEmbeddingProviderSettings",
@@ -1037,8 +853,6 @@ __all__ = (
     "DefaultRerankingProviderSettings",
     "FastMcpServerSettings",
     "FileFilterSettings",
-    "FileFilterSettingsDict",
-    "PerformanceSettings",
     "get_settings",
     "get_settings_map",
     "merge_agent_model_settings",

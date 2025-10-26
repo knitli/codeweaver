@@ -7,20 +7,17 @@
 
 from __future__ import annotations
 
-import contextlib
 import os
 
-from collections.abc import Generator, Iterable
+from collections.abc import Generator
 from functools import cache
 from pathlib import Path
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, TypedDict, cast, overload
+from typing import TYPE_CHECKING, NamedTuple, TypedDict, cast
 
-from langchain_text_splitters import Language as LC_Language
-from pydantic import DirectoryPath, Field, computed_field
+from pydantic import computed_field
 
 from codeweaver.common.utils import LazyImport, get_project_root, lazy_import, normalize_ext
-from codeweaver.core.secondary_languages import SecondarySupportedLanguage
 from codeweaver.core.types.aliases import (
     DirectoryName,
     DirectoryNameT,
@@ -30,16 +27,12 @@ from codeweaver.core.types.aliases import (
     FileGlobT,
     FileName,
     FileNameT,
-    LanguageName,
-    LanguageNameT,
     LiteralStringT,
 )
 from codeweaver.core.types.enum import BaseEnum
-from codeweaver.core.types.models import BasedModel
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.language import CustomDelimiter
     from codeweaver.core.metadata import ExtLangPair
 
 type KeyPath = tuple[LiteralStringT, ...]
@@ -60,149 +53,6 @@ ConfigNamePair = NamedTuple(
     (("filename", FileNameT), ("language", "SemanticSearchLanguage | ConfigLanguage")),
 )
 """A tuple representing a configuration file name and its associated language, like `("pyproject.toml", SemanticSearchLanguage.PYTHON)` or `("CMakeLists.txt", ConfigLanguage.CMAKE)`."""
-
-
-class ExtensionRegistry(BasedModel):
-    """
-    A registry for custom file extensions and their associated languages.
-    """
-
-    _registry: Annotated[
-        dict[FileExtensionT, SemanticSearchLanguage | SecondarySupportedLanguage | ConfigLanguage],
-        Field(
-            default_factory=dict,
-            description="""A mapping of file extensions to their associated languages.""",
-        ),
-    ]
-    _found_registry: Annotated[
-        dict[DirectoryPath, tuple[ExtLangPair, ...]],
-        Field(
-            description="""A mapping of found directory paths (actually exist) to their associated language and file extension.""",
-            default_factory=dict,
-        ),
-    ]
-
-    def __init__(self, *, include_data: bool = False, **kwargs: Any) -> None:
-        """
-        Initializes the ExtensionRegistry.
-
-        Args:
-            include_data: If False (default), omits extensions associated with data files (e.g., .csv, .db, .xlsx) from the registry. This will not exclude documentation and config files (e.g., .md, .json, .yaml). If True, includes all extensions.
-            **kwargs: Additional keyword arguments for the BasedModel.
-        """
-        super().__init__(**kwargs)
-        self._registry = {}
-        self._found_registry = {}
-        extpairs = get_ext_lang_pairs(include_data=include_data)
-        languages = {pair.language for pair in extpairs}
-        for lang in languages:
-            exts = tuple(pair.ext for pair in extpairs if pair.language == lang)
-            self._add_exts_to_registry(
-                cast(Iterable[FileExtensionT], exts), cast(SecondarySupportedLanguage, lang)
-            )
-        for lang in ConfigLanguage:
-            if lang.extensions:
-                self._add_exts_to_registry(cast(Iterable[FileExtensionT], lang.extensions), lang)
-        for lang in SemanticSearchLanguage:
-            if lang.extensions:
-                self._add_exts_to_registry(cast(Iterable[FileExtensionT], lang.extensions), lang)
-
-    def _telemetry_keys(self) -> None:
-        return None
-
-    def lookup(
-        self, ext: FileExtensionT
-    ) -> (
-        SemanticSearchLanguage | SecondarySupportedLanguage | ConfigLanguage | FileExtensionT | None
-    ):
-        """
-        Looks up the language associated with a given file extension.
-
-        Args:
-            ext: The file extension to look up.
-
-        Returns:
-            The associated language, or None if not found.
-        """
-        normalized_ext = normalize_ext(ext)
-        return self._registry.get(normalized_ext, None)
-
-    def _add_exts_to_registry(
-        self,
-        exts: Iterable[FileExtensionT] | None,
-        language: SemanticSearchLanguage
-        | SecondarySupportedLanguage
-        | ConfigLanguage
-        | LanguageNameT,
-    ) -> None:
-        """Adds file extensions to the registry."""
-        if not exts:
-            return
-        for ext in exts:
-            if ext in self._registry:
-                continue
-            self._registry[FileExt(ext)] = language  # type: ignore
-
-    @overload
-    def register(
-        self, *, ext_tuple: ExtLangPair | ConfigNamePair | ConfigPathPair
-    ) -> None: ...  # sourcery skip: docstrings-for-functions
-    @overload
-    def register(
-        self,
-        *,
-        extension: FileExtensionT,
-        language: SemanticSearchLanguage
-        | ConfigLanguage
-        | SecondarySupportedLanguage
-        | FileExtensionT,
-    ) -> None: ...  # sourcery skip: docstrings-for-functions
-    def register(
-        self,
-        *,
-        ext_tuple: ExtLangPair | ConfigNamePair | ConfigPathPair | None = None,
-        extension: FileExtensionT | None = None,
-        language: SemanticSearchLanguage
-        | ConfigLanguage
-        | SecondarySupportedLanguage
-        | FileExtensionT
-        | None = None,
-    ) -> None:
-        """
-        Registers a new file extension and its associated language.
-
-        Args:
-            ext_tuple: A tuple containing the file extension and its associated language.
-            extension: The file extension to register.
-            language: The language associated with the file extension.
-        """
-        from codeweaver.core.metadata import ExtLangPair
-
-        if ext_tuple is not None:
-            match ext_tuple:
-                case ConfigPathPair():
-                    exts = (*(ext_tuple.language.extensions or ()), ext_tuple.path.name)
-                    self._add_exts_to_registry(exts, ext_tuple.language)  # type: ignore
-                case ConfigNamePair():
-                    exts = ext_tuple.language.extensions
-                    self._add_exts_to_registry(
-                        cast(tuple[FileExtensionT, ...], (*(exts or ()), ext_tuple.filename)),
-                        ext_tuple.language,
-                    )  # type: ignore
-                case ExtLangPair():
-                    self._add_exts_to_registry(
-                        *(ext_tuple.ext,),
-                        ext_tuple.language
-                        if isinstance(ext_tuple.language, SemanticSearchLanguage | ConfigLanguage)
-                        else LanguageName(ext_tuple.language),
-                    )  # type: ignore
-        if extension is not None and language is not None:
-            self._add_exts_to_registry(
-                (extension,),
-                language
-                if isinstance(language, SemanticSearchLanguage | ConfigLanguage)
-                else LanguageName(language),
-            )  # type: ignore
 
 
 class LanguageConfigFile(NamedTuple):
@@ -1647,227 +1497,9 @@ def languages_present_from_configs() -> tuple[SemanticSearchLanguage, ...] | Non
     return None
 
 
-codeweaver_to_langchain = {
-    k.value: k.value for k in LC_Language if k.value not in ("js", "ts", "proto", "rst", "sol", "c")
-} | {
-    "javascript": "js",
-    "typescript": "ts",
-    "protobuf": "proto",
-    "solidity": "sol",
-    "c_lang": "c",
-    "restructuredtext": "rst",
-}
-
-
-_custom_delimiters: list[CustomDelimiter] = []
-"""A global list to hold custom delimiters registered by the user.
-
-Note: We had previously used a set here but realized the order may be important if defining multiple CustomDelimiters for the same language. Users should provide them in priority order, and we want to respect that order when using them.
-"""
-
-
-class Chunker(int, BaseEnum):
-    """Defines chunkers/parsers/splitters that CodeWeaver supports.
-
-    An int enum, the members are in order of preference/robustness with the most general and least robust at lower numbers, and the richest at higher numbers. The final fallback (lowest value) is `langchain_text_splitters.RecursiveCharacterTextSplitter`. The richest/best is our own semantic chunker, which uses `ast_grep_py` (tree-sitter).
-    """
-
-    LANGCHAIN_RECURSIVE = 0
-    """The final fallback chunker, `langchain_text_splitters.RecursiveCharacterTextSplitter`"""
-    LANGCHAIN_SPECIAL = 1
-    """A language-specific chunker provided by `langchain_text_splitters`, such as for markdown. These chunkers are more robust than the generic recursive chunker, but not as robust as CodeWeaver's semantic chunker, with the exception of the experimental markdown chunker which is quite good -- we use it for markdown files before our own. That is the only langchain splitter that takes priority over our own chunkers."""
-    # TODO: We included the langchain dependency before we got ... carried away ... with our own chunkers. Ours are much more robust. We'd need to improve markdown handling, but otherwise, we can probably drop the langchain dependency and remove this chunker.
-    BUILTIN_DELIMITER = 2
-    """CodeWeaver's delimiter-based text chunkers; delimiters are defined in //LINK - src/codeweaver/services/chunker/delimiters/families.py"""
-    USER_DELIMITER = 3
-    """A user-defined delimiter, using our delimiter-based chunker. Defined in config files and registered at runtime."""
-    SEMANTIC = 4
-    """CodeWeaver's semantic chunker. The most robust chunker, using `ast_grep_py` (tree-sitter)."""
-
-    def _chunkers(self) -> list[CustomDelimiter]:
-        global _custom_delimiters
-        return _custom_delimiters
-
-    @classmethod
-    def for_language(
-        cls, language: LanguageNameT | SemanticSearchLanguage | ConfigLanguage
-    ) -> Chunker:
-        """
-        Returns the most robust chunker that supports the given language.
-
-        Args:
-            language (str): The programming language to find a chunker for.
-
-        Returns:
-            Chunker: The most robust chunker that supports the given language.
-
-        Raises:
-            ValueError: If no chunker supports the given language.
-        """
-        if isinstance(language, SemanticSearchLanguage | ConfigLanguage):
-            return (
-                cls.SEMANTIC
-                if (
-                    isinstance(language, SemanticSearchLanguage)
-                    or (language.is_semantic_search_language)
-                )
-                else cls.BUILTIN_DELIMITER
-            )
-        structured_language = None
-        with contextlib.suppress(AttributeError, ValueError):
-            # try to interpret the language as a ConfigLanguage next
-            structured_language = SemanticSearchLanguage.from_string(language)
-        if not structured_language:
-            with contextlib.suppress(AttributeError, ValueError):
-                structured_language = ConfigLanguage.from_string(language)
-        if structured_language:
-            language = structured_language
-            return (
-                cls.SEMANTIC
-                if (
-                    isinstance(language, SemanticSearchLanguage)
-                    or (language.is_semantic_search_language)
-                )
-                else cls.BUILTIN_DELIMITER
-            )
-        if cls.custom_delimiters() and next(
-            (d for d in cls.custom_delimiters() if d.language == language), None
-        ):
-            return cls.USER_DELIMITER
-        return (
-            cls.LANGCHAIN_SPECIAL if str(language) in {"markdown", "md"} else cls.BUILTIN_DELIMITER
-        )
-
-    @staticmethod
-    def _as_literal_tuple(values: Iterable[str]) -> tuple[LanguageNameT, ...]:
-        """
-        Internal helper to coerce an iterable of str into tuple[LiteralStringT, ...].
-
-        We centralize the cast to keep callsites clean and ensure type checkers
-        narrow the union branch for supported_languages correctly.
-        """
-        return cast(tuple[LanguageNameT, ...], tuple(values))
-
-    @classmethod
-    def _recursive_all_languages(cls) -> tuple[LanguageNameT, ...]:
-        """
-        Build the complete language set used by LANGCHAIN_RECURSIVE.
-
-        Returns a homogeneous tuple[LanguageNameT, ...].
-
-        Composition:
-          - All SemanticSearchLanguage member values
-          - ALL_LANGUAGES (code + data + docs)
-          - Any custom delimiter languages (if registered)
-
-        Deterministic ordering (sorted) improves cacheability & test stability.
-        """
-        from codeweaver.core.file_extensions import ALL_LANGUAGES
-
-        languages: set[LiteralStringT] = set(ALL_LANGUAGES)
-        languages.update(cast(LiteralStringT, lang.variable) for lang in SemanticSearchLanguage)
-        languages.update(cast(LiteralStringT, lang.variable) for lang in ConfigLanguage)
-        if custom := cls._custom_delimiter_languages():
-            languages.update(custom)
-        return cls._as_literal_tuple(sorted(languages))
-
-    @property
-    def supported_languages(
-        self,
-    ) -> (
-        tuple[SemanticSearchLanguage, ...]
-        | tuple[SecondarySupportedLanguage, ...]
-        | tuple[LiteralStringT, ...]
-        | tuple[SemanticSearchLanguage | SecondarySupportedLanguage, ...]
-    ):
-        """
-        Returns a tuple of supported languages for the chunker.
-
-        LANGCHAIN_RECURSIVE:
-            Returns tuple[LiteralStringT, ...] built from semantic + secondary + custom.
-        BUILTIN_DELIMITER, LANGCHAIN_SPECIAL, USER_DELIMITER:
-            Return tuple[LiteralStringT, ...].
-        SEMANTIC:
-            Returns tuple[SemanticSearchLanguage, ...].
-        """
-        from codeweaver.engine.chunker.delimiters.families import defined_languages
-
-        if self is Chunker.LANGCHAIN_RECURSIVE:
-            return type(self)._recursive_all_languages()
-        if self is Chunker.BUILTIN_DELIMITER:
-            return type(self)._as_literal_tuple(sorted(defined_languages()))
-        if self is Chunker.LANGCHAIN_SPECIAL:
-            return type(self)._as_literal_tuple(sorted(codeweaver_to_langchain.keys()))
-        if self is Chunker.USER_DELIMITER:
-            return type(self)._as_literal_tuple(sorted(type(self)._custom_delimiter_languages()))
-        if self is Chunker.SEMANTIC:
-            return tuple(SemanticSearchLanguage)
-        raise AssertionError(f"Unhandled chunker: {self}")
-
-    @classmethod
-    def custom_delimiters(cls) -> list[CustomDelimiter]:
-        """
-        Returns a set of custom delimiters registered by the user.
-
-        Returns:
-            set: A set of CustomDelimiter instances.
-        """
-        global _custom_delimiters
-        return _custom_delimiters
-
-    @classmethod
-    def _custom_delimiter_languages(cls) -> frozenset[LanguageNameT]:
-        """
-        Returns a frozenset of language names for which custom chunkers have been registered.
-
-        Returns:
-            frozenset: A frozenset of language names.
-        """
-        languages: set[LanguageNameT] = set()
-        global _custom_delimiters
-        for d in _custom_delimiters:
-            if d.language:
-                languages.add(LanguageName(cast(LiteralStringT, d.language)))
-            if d.extensions:
-                languages |= {
-                    LanguageName(cast(LiteralStringT, ext.language))
-                    for ext in d.extensions
-                    if ext.language
-                }
-        return frozenset(languages)
-
-    @classmethod
-    def register_custom_delimiter(cls, delimiter: CustomDelimiter) -> None:
-        """
-        Registers a custom delimiter for a given language.
-
-        Args:
-            delimiter (CustomDelimiter): The custom delimiter to register.
-        """
-        global _custom_delimiters
-        _custom_delimiters.append(delimiter)
-
-    def next_chunker(self, *, language: LiteralStringT | None = None) -> Chunker | None:
-        """
-        Returns the next chunker in the order of preference/robustness.
-
-        Returns:
-            Chunker | None: The next chunker, or None if this is the last chunker.
-        """
-        if language and language.lower() in ("markdown", "md"):
-            # markdown and latex have special chunkers in langchain
-            if self == type(self).BUILTIN_DELIMITER:
-                return type(self).LANGCHAIN_RECURSIVE
-            return (
-                Chunker.LANGCHAIN_SPECIAL
-                if self != Chunker.LANGCHAIN_SPECIAL
-                else Chunker.BUILTIN_DELIMITER
-            )
-        return None if self == Chunker.LANGCHAIN_RECURSIVE else Chunker(self - 1)
 
 
 __all__ = (
-    "Chunker",
     "ConfigLanguage",
     "ConfigNamePair",
     "ConfigPathPair",

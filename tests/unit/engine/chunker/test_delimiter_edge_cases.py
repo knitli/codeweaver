@@ -16,9 +16,9 @@ from pathlib import Path
 
 import pytest
 
+from codeweaver.config.settings import PerformanceSettings
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
 from codeweaver.engine.chunker.governance import ResourceGovernor
-from codeweaver.config.settings import PerformanceSettings
 
 
 @pytest.fixture

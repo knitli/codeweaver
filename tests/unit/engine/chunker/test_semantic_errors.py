@@ -37,10 +37,24 @@ if TYPE_CHECKING:
 FIXTURES_DIR = Path(__file__).parent.parent.parent.parent / "fixtures"
 
 
+@pytest.fixture
+def mock_governor() -> MagicMock:
+    """Create properly configured mock governor for testing."""
+    governor = MagicMock()
+    governor.chunk_limit = 2000
+    governor.simple_overlap = 50
+    governor.performance_settings = MagicMock(
+        chunk_timeout_seconds=30,
+        max_chunks_per_file=5000,
+        max_ast_depth=200
+    )
+    return governor
+
+
 class TestParseErrors:
     """Tests for parse error handling with malformed code."""
 
-    def test_parse_error_raises(self) -> None:
+    def test_parse_error_raises(self, mock_governor: MagicMock) -> None:
         """Verify that malformed code raises ParseError.
 
         Input: malformed.py fixture with syntax errors
@@ -55,8 +69,7 @@ class TestParseErrors:
         assert malformed_file.exists(), "malformed.py fixture must exist"
         content = malformed_file.read_text()
 
-        # Create mock governor and chunker
-        mock_governor = MagicMock()
+        # Create chunker with mock governor
         chunker = SemanticChunker(governor=mock_governor, language=SemanticSearchLanguage.PYTHON)
 
         # Act & Assert: Verify ParseError raised
@@ -71,7 +84,7 @@ class TestParseErrors:
             "Error message should indicate parsing failure"
         )
 
-    def test_parse_error_suggestions_present(self) -> None:
+    def test_parse_error_suggestions_present(self, mock_governor: MagicMock) -> None:
         """Verify that ParseError includes actionable suggestions.
 
         Confirms that parse errors provide helpful guidance for resolution.
@@ -82,7 +95,6 @@ class TestParseErrors:
         malformed_file = FIXTURES_DIR / "malformed.py"
         content = malformed_file.read_text()
 
-        mock_governor = MagicMock()
         chunker = SemanticChunker(governor=mock_governor, language=SemanticSearchLanguage.PYTHON)
 
         with pytest.raises(ParseError) as exc_info:
@@ -96,7 +108,7 @@ class TestParseErrors:
 class TestASTDepthErrors:
     """Tests for AST depth limit enforcement."""
 
-    def test_ast_depth_exceeded_error(self) -> None:
+    def test_ast_depth_exceeded_error(self, mock_governor: MagicMock) -> None:
         """Verify that deeply nested code raises ASTDepthExceededError.
 
         Input: deep_nesting.py fixture with >200 nesting levels
@@ -111,9 +123,7 @@ class TestASTDepthErrors:
         assert deep_file.exists(), "deep_nesting.py fixture must exist"
         content = deep_file.read_text()
 
-        # Create mock governor with depth limit
-        mock_governor = MagicMock()
-        mock_governor.max_ast_depth = 200  # Standard limit
+        # Create mock governor with depth limit        mock_governor.max_ast_depth = 200  # Standard limit
         chunker = SemanticChunker(governor=mock_governor, language=SemanticSearchLanguage.PYTHON)
 
         # Act & Assert: Verify ASTDepthExceededError raised
@@ -127,7 +137,7 @@ class TestASTDepthErrors:
         assert error.actual_depth > error.max_depth, "Actual depth must exceed limit"
         assert error.file_path == str(deep_file), "Error should track file path"
 
-    def test_ast_depth_error_message_descriptive(self) -> None:
+    def test_ast_depth_error_message_descriptive(self, mock_governor: MagicMock) -> None:
         """Verify that AST depth error messages are clear and actionable.
 
         Confirms that depth errors provide helpful diagnostics and suggestions.
@@ -137,9 +147,7 @@ class TestASTDepthErrors:
 
         deep_file = FIXTURES_DIR / "deep_nesting.py"
         content = deep_file.read_text()
-
-        mock_governor = MagicMock()
-        mock_governor.max_ast_depth = 200
+        mock_governor.performance_settings.max_ast_depth = 200
         chunker = SemanticChunker(governor=mock_governor, language=SemanticSearchLanguage.PYTHON)
 
         with pytest.raises(ASTDepthExceededError) as exc_info:
@@ -166,9 +174,7 @@ class TestTimeoutErrors:
         from codeweaver.core.language import SemanticSearchLanguage
         from codeweaver.engine.chunker.semantic import SemanticChunker
 
-        # Arrange: Create chunker with very short timeout
-        mock_governor = MagicMock()
-        mock_governor.timeout_seconds = 0.001  # 1 millisecond timeout
+        # Arrange: Create chunker with very short timeout        mock_governor.timeout_seconds = 0.001  # 1 millisecond timeout
         mock_governor.check_timeout = MagicMock(
             side_effect=ChunkingTimeoutError(
                 "Operation exceeded timeout",
@@ -197,7 +203,7 @@ class TestTimeoutErrors:
         assert error.elapsed_seconds > error.timeout_seconds, "Elapsed time should exceed timeout"
         assert error.file_path is not None, "Error should track file being processed"
 
-    def test_timeout_error_suggestions_present(self) -> None:
+    def test_timeout_error_suggestions_present(self, mock_governor: MagicMock) -> None:
         """Verify that timeout errors include helpful suggestions.
 
         Confirms that timeout errors provide guidance for resolution.
@@ -220,7 +226,7 @@ class TestTimeoutErrors:
 class TestChunkLimitErrors:
     """Tests for chunk limit enforcement."""
 
-    def test_chunk_limit_exceeded(self) -> None:
+    def test_chunk_limit_exceeded(self, mock_governor: MagicMock) -> None:
         """Verify that excessive chunking raises ChunkLimitExceededError.
 
         Approach: Mock register_chunk to enforce low limit
@@ -230,9 +236,7 @@ class TestChunkLimitErrors:
         from codeweaver.core.language import SemanticSearchLanguage
         from codeweaver.engine.chunker.semantic import SemanticChunker
 
-        # Arrange: Create chunker with very low chunk limit
-        mock_governor = MagicMock()
-        mock_governor.max_chunks_per_file = 10  # Very low limit for testing
+        # Arrange: Create chunker with very low chunk limit        mock_governor.max_chunks_per_file = 10  # Very low limit for testing
 
         # Track chunk registration and enforce limit
         chunk_count = 0
@@ -270,7 +274,7 @@ class TestChunkLimitErrors:
         assert error.chunk_count > error.max_chunks, "Chunk count must exceed limit"
         assert error.file_path is not None, "Error should track file path"
 
-    def test_chunk_limit_error_overflow_metrics(self) -> None:
+    def test_chunk_limit_error_overflow_metrics(self, mock_governor: MagicMock) -> None:
         """Verify that chunk limit errors include overflow metrics.
 
         Confirms that errors track how many chunks exceeded the limit.
@@ -290,7 +294,7 @@ class TestChunkLimitErrors:
                 "Overflow count should be difference between actual and max"
             )
 
-    def test_chunk_limit_error_suggestions_present(self) -> None:
+    def test_chunk_limit_error_suggestions_present(self, mock_governor: MagicMock) -> None:
         """Verify that chunk limit errors include actionable suggestions.
 
         Confirms that errors provide guidance for handling excessive chunking.
@@ -310,7 +314,7 @@ class TestChunkLimitErrors:
 class TestErrorMessageQuality:
     """Tests for error message quality and descriptiveness."""
 
-    def test_all_error_types_have_descriptive_messages(self) -> None:
+    def test_all_error_types_have_descriptive_messages(self, mock_governor: MagicMock) -> None:
         """Verify that all chunking errors have clear, actionable messages.
 
         Confirms that error messages follow quality standards:
@@ -346,7 +350,7 @@ class TestErrorMessageQuality:
                 f"{type(error).__name__} should provide actionable guidance"
             )
 
-    def test_error_details_are_structured(self) -> None:
+    def test_error_details_are_structured(self, mock_governor: MagicMock) -> None:
         """Verify that error details are properly structured and accessible.
 
         Confirms that errors expose metrics and context in a consistent way.

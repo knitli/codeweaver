@@ -35,7 +35,6 @@
    │  │  ├─ language.py
    │  │  │  ├─ line 466: TODO : Validate the `dependency_key_paths` for each config file to ensure they are correct. If you use these languages, please let us know if you find any issues with the `dependency_key_paths` in the config files. Some are probably incorrect.
    │  │  │  ├─ line 1398: TODO : Integrate into indexing and search services to use these languages.
-   │  │  │  └─ line 1437: TODO : We included the langchain dependency before we got ... carried away ... with our own chunkers. Ours are much more robust. We'd need to improve markdown handling, but otherwise, we can probably drop the langchain dependency and remove this chunker.
    │  │  └─ metadata.py
    │  │     └─ line 90: TODO : Logic for symbol extraction from AST nodes
    │  ├─ engine

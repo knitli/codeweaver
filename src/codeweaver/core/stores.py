@@ -86,8 +86,6 @@ def to_uuid() -> UUID7:
 class StoreDict(TypedDict, total=False):
     """Dictionary representation of a _SimpleTypedStore.
 
-    Note: This schema was simplified in the 2025 refactor.
-    Legacy fields like 'use_uuid' and 'sub_value_type' are no longer supported.
     Use make_uuid_store() or make_blake_store() factory functions instead.
     """
 
@@ -154,11 +152,8 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
     def __init__(self, **data: Any) -> None:
         """Initialize the store with type checks and post-init processing."""
         # Extract special parameters before passing to parent
-        if data.get("store") is not None:
-            store_data = data.pop("store")
-        else:
-            store_data = None
-            
+        store_data = data.pop("store") if data.get("store") is not None else None
+
         if data.get("value_type"):
             value_type = data.pop("value_type")
         elif data.get("_value_type"):
@@ -167,16 +162,16 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
             value_type = next(iter(data.values())).__class__  # type: ignore
         else:
             value_type = None
-            
+
         # Call parent __init__ to properly initialize Pydantic model (including private attributes)
         super().__init__(**data)
-        
+
         # Now set the extracted values
         if value_type is not None:
             self._value_type = value_type
         if store_data is not None:
             self.store = store_data
-            
+
         if not hasattr(self, "_value_type") or not self._value_type:
             raise ValueError(
                 "`You must either provide `_value_type` or provide values to infer it from.`"
@@ -394,7 +389,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
             # LIFO removal strategy for simplicity
             removed = self.store.popitem()
             weight_loss_goal -= sys.getsizeof(removed[0]) + sys.getsizeof(removed[1])
-            if self._trash_heap is not None:
+            if self._trash_heap is not None:  # type: ignore
                 self._trash_heap[removed[0]] = removed[1]
             if weight_loss_goal <= 0:
                 break
@@ -409,7 +404,11 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
             if value == self.store[key]:
                 return
             _ = self._check_and_set(key, value)
-        if self._trash_heap is not None and key in self._trash_heap and self._trash_heap[key] is not None:
+        if (
+            self._trash_heap is not None  # type: ignore
+            and key in self._trash_heap
+            and self._trash_heap[key] is not None
+        ):
             del self._trash_heap[key]
         self.store[key] = value
 
@@ -421,23 +420,23 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         """Delete a value from the store."""
         if key in self.store:
             del self.store[key]
-        if self._trash_heap is not None and key in self._trash_heap:
+        if self._trash_heap is not None and key in self._trash_heap:  # type: ignore
             del self._trash_heap[key]
 
     def clear(self) -> None:
         """Clear the store."""
-        if self._trash_heap is not None:
+        if self._trash_heap is not None:  # type: ignore
             self._trash_heap.update(self.store)
         self.store.clear()
 
     def clear_trash(self) -> None:
         """Clear the trash heap."""
-        if self._trash_heap is not None:
+        if self._trash_heap is not None:  # type: ignore
             self._trash_heap.clear()
 
     def recover(self, key: KeyT) -> bool:
         """Recover a value from the trash heap."""
-        if self._trash_heap is None:
+        if self._trash_heap is None:  # type: ignore
             return False
         if (
             key in self._trash_heap
@@ -470,7 +469,7 @@ class BlakeStore[T](_SimpleTypedStore[BlakeHashKey, T]):
         """Initialize the BlakeStore with Blake3 key generation."""
         super().__init__(**kwargs)
         self._keygen = get_blake_hash_generic
-        self._trash_heap = None  # BlakeStore doesn't need trash heap for deduplication
+        self._trash_heap = None  # type: ignore # BlakeStore doesn't need trash heap for deduplication
 
 
 def make_uuid_store[T](
