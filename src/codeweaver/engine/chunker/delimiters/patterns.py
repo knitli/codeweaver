@@ -97,7 +97,6 @@ class DelimiterPattern(NamedTuple):
             Field(
                 gt=0,
                 lt=100,
-                default_factory=lambda data: data["kind"].default_priority,
                 description="The priority of the delimiter.",
             ),
         ]
@@ -107,20 +106,17 @@ class DelimiterPattern(NamedTuple):
         bool | None,
         Field(
             description="Whether to include the delimiters in the resulting chunk.",
-            default_factory=lambda data: data["kind"].infer_inline_strategy().inclusive,
         ),
     ] = None
     take_whole_lines: Annotated[
         bool | None,
         Field(
             description="Whether to expand the chunk to include whole lines if matched within it.",
-            default_factory=lambda data: data["kind"].infer_inline_strategy().take_whole_lines,
         ),
     ] = None
     nestable: Annotated[
         bool | None,
         Field(
-            default_factory=lambda data: data["kind"].infer_nestable(),
             description="Whether the delimiter can be nested.",
         ),
     ] = None
