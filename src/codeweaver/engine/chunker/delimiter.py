@@ -828,6 +828,7 @@ class DelimiterChunker(BaseChunker):
             "created_at": datetime.now(UTC).timestamp(),
             "name": f"{delimiter.kind.name.title()} at line {line}",  # type: ignore[union-attr]
             "kind": delimiter.kind,  # Add kind at top level for test compatibility
+            "nesting_level": boundary.nesting_level,  # Add nesting_level at top level too
             "context": chunk_context,
         }
         return metadata
@@ -877,6 +878,27 @@ class DelimiterChunker(BaseChunker):
         delimiters: list[Delimiter] = []
         for pattern in patterns:
             delimiters.extend(Delimiter.from_pattern(pattern))
+
+        # Always add common code element patterns as fallback (for generic/unknown languages)
+        # These catch function/class/def keywords across many languages
+        from codeweaver.engine.chunker.delimiters.patterns import (
+            CLASS_PATTERN,
+            FUNCTION_PATTERN,
+            CONDITIONAL_PATTERN,
+            LOOP_PATTERN,
+        )
+        
+        common_patterns = [FUNCTION_PATTERN, CLASS_PATTERN, CONDITIONAL_PATTERN, LOOP_PATTERN]
+        for pattern in common_patterns:
+            # Only add if not already present (avoid duplicates from family patterns)
+            pattern_delimiters = Delimiter.from_pattern(pattern)
+            for delim in pattern_delimiters:
+                # Check if this delimiter already exists
+                if not any(
+                    d.start == delim.start and d.end == delim.end and d.kind == delim.kind
+                    for d in delimiters
+                ):
+                    delimiters.append(delim)
 
         # Always add generic fallback delimiters with LOWER priority than semantic ones
         # These catch any structural delimiters not already matched by language-specific patterns

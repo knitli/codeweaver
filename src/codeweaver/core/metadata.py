@@ -175,6 +175,12 @@ class Metadata(TypedDict, total=False):
             ),
         ]
     ]
+    nesting_level: NotRequired[
+        Annotated[
+            int | None,
+            Field(description="""Nesting level for delimiter chunks (0 = top level)"""),
+        ]
+    ]
     updated_at: NotRequired[
         Annotated[
             PositiveFloat | None,
