@@ -122,3 +122,19 @@ class BaseChunker(ABC):
 
 
 __all__ = ("BaseChunker", "ChunkGovernor")
+
+# Rebuild models to resolve forward references after all types are imported
+# This is done at module import time to ensure ChunkerSettings is available
+def _rebuild_models() -> None:
+    """Rebuild pydantic models after all types are defined."""
+    try:
+        # Import ChunkerSettings to make it available for model rebuild
+        from codeweaver.config.chunker import ChunkerSettings  # noqa: F401
+
+        ChunkGovernor.model_rebuild(force=True)
+    except Exception:
+        # If rebuild fails, model will still work but may have issues with ChunkerSettings
+        pass
+
+
+_rebuild_models()

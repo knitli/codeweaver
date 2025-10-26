@@ -38,9 +38,12 @@ from codeweaver.core.types.aliases import (
     Role,
     RoleT,
     SentinelName,
+    SentinelNameT,
     ThingName,
     ThingNameT,
     ThingOrCategoryNameT,
+    UUID7Hex,
+    UUID7HexT,
 )
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.enum import (
@@ -112,10 +115,13 @@ __all__ = (
     "RootedRoot",
     "Sentinel",
     "SentinelName",
+    "SentinelNameT",
     "SerializationKwargs",
     "ThingName",
     "ThingNameT",
     "ThingOrCategoryNameT",
+    "UUID7Hex",
+    "UUID7HexT",
     "Unset",
     "generate_field_title",
     "generate_title",

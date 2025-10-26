@@ -258,6 +258,5 @@ def massive_function_with_repetitive_code(data):
     result += data.get("field_0248", 0) * 1.248 + 42
     result += data.get("field_0249", 0) * 1.249 + 42
     result += data.get("field_0250", 0) * 1.250 + 42
-    
+
     return result
-─────┴──────────────────────────────────────────────────────────────────────────

@@ -31,6 +31,7 @@ from codeweaver.engine.chunker.registry import (
     get_store,
     source_id_for,
 )
+from codeweaver.engine.chunker.parallel import chunk_files_parallel, chunk_files_parallel_dict
 from codeweaver.engine.chunker.selector import ChunkerSelector, GracefulChunker
 from codeweaver.engine.chunker.semantic import SemanticChunker
 
@@ -55,6 +56,8 @@ __all__ = (
     "ResourceGovernor",
     "SemanticChunker",
     "SourceIdRegistry",
+    "chunk_files_parallel",
+    "chunk_files_parallel_dict",
     "clear_store",
     "detect_language_family",
     "expand_pattern",

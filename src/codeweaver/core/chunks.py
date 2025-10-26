@@ -303,6 +303,16 @@ class CodeChunk(BasedModel):
 
     @computed_field
     @cached_property
+    def token_count(self) -> PositiveInt:
+        """Estimate token count for the chunk content.
+
+        Uses rough approximation of 1 token per 4 characters.
+        TODO: Replace with proper tokenizer (tiktoken, transformers).
+        """
+        return len(self.content) // 4
+
+    @computed_field
+    @cached_property
     def line_start(self) -> PositiveInt:
         """Return the starting line number from line_range."""
         return self.line_range.start
