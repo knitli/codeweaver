@@ -1,13 +1,5 @@
 {
   "servers": {
-    "browserDebugTools": {
-      "args": [
-        "--bun",
-        "@agentdeskai/browser-tools-server@latest"
-      ],
-      "command": "bunx",
-      "type": "stdio"
-    },
     "context7": {
       "args": [
         "--bun",
