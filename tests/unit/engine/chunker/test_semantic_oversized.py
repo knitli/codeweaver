@@ -97,6 +97,7 @@ def test_oversized_node_recursive_children(
 def test_all_strategies_fail_uses_text_splitter(
     python_chunker: SemanticChunker,
     chunk_governor: ChunkGovernor,
+    discovered_huge_string_literal_file,
 ):
     """Test last resort fallback to RecursiveTextSplitter.
 
@@ -104,14 +105,9 @@ def test_all_strategies_fail_uses_text_splitter(
     Expected: Falls back to RecursiveTextSplitter
     Verify: Metadata contains fallback indication
     """
-    # Create an indivisible large string literal that can't be split semantically
-    huge_string_code = '''
-long_text = """
-''' + ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. " * 500) + '''
-"""
-'''
+    content = discovered_huge_string_literal_file.contents
 
-    chunks = python_chunker.chunk(huge_string_code)
+    chunks = python_chunker.chunk(content, file=discovered_huge_string_literal_file)
 
     # Should produce chunks even for indivisible content
     assert len(chunks) > 0, "Should produce chunks via text splitter fallback"
