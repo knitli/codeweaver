@@ -4,6 +4,6 @@
 from typing import Final
 
 
-__version__: Final[str] = "0.0.1rc245+g1ac93ce"
+__version__: Final[str] = "0.0.1rc248+g296b7ef"
 
 __all__ = ("__version__",)
