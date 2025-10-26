@@ -167,6 +167,14 @@ class Metadata(TypedDict, total=False):
     name: NotRequired[
         Annotated[str | None, Field(description="""Name of the code chunk, if applicable""")]
     ]
+    kind: NotRequired[
+        Annotated[
+            Any | None,
+            Field(
+                description="""Optional kind/type classification of the chunk (e.g., DelimiterKind for delimiter chunks)"""
+            ),
+        ]
+    ]
     updated_at: NotRequired[
         Annotated[
             PositiveFloat | None,

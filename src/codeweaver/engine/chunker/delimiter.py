@@ -192,9 +192,10 @@ class DelimiterChunker(BaseChunker):
             )
 
     def _find_delimiter_matches(self, content: str) -> list[DelimiterMatch]:
-        """Find all delimiter matches in content.
+        """Find all delimiter matches in content using two-phase matching.
 
-        Phase 1: Uses combined regex to find all delimiter occurrences efficiently.
+        Phase 1: Matches explicit start/end pairs (e.g., {...}, (...))
+        Phase 2: Matches keyword delimiters with empty ends (e.g., function, def, class)
 
         Args:
             content: Source code to scan
@@ -202,18 +203,52 @@ class DelimiterChunker(BaseChunker):
         Returns:
             List of DelimiterMatch objects ordered by position
         """
+        if not self._delimiters:
+            return []
+
+        # Separate delimiters by type
+        explicit_delimiters = [d for d in self._delimiters if not d.is_keyword_delimiter]
+        keyword_delimiters = [d for d in self._delimiters if d.is_keyword_delimiter]
+
         matches: list[DelimiterMatch] = []
 
-        if not self._delimiters:
+        # Phase 1: Handle explicit start/end pairs (existing logic)
+        matches.extend(self._match_explicit_delimiters(content, explicit_delimiters))
+
+        # Phase 2: Handle keyword delimiters with empty ends
+        matches.extend(self._match_keyword_delimiters(content, keyword_delimiters))
+
+        return sorted(matches, key=lambda m: m.start_pos)
+
+    def _match_explicit_delimiters(
+        self, content: str, delimiters: list[Delimiter]
+    ) -> list[DelimiterMatch]:
+        """Match delimiters with explicit start/end pairs.
+
+        Uses the original matching logic for delimiters like {...}, (...), etc.
+
+        Args:
+            content: Source code to scan
+            delimiters: List of delimiters with explicit end markers
+
+        Returns:
+            List of DelimiterMatch objects
+        """
+        matches: list[DelimiterMatch] = []
+
+        if not delimiters:
             return matches
 
         # Build combined regex for all start and end delimiters
-        start_patterns: dict[str, Delimiter] = {d.start: d for d in self._delimiters}
-        end_patterns: dict[str, Delimiter] = {d.end: d for d in self._delimiters}
+        start_patterns: dict[str, Delimiter] = {d.start: d for d in delimiters}
+        end_patterns: dict[str, Delimiter] = {d.end: d for d in delimiters if d.end}
 
         # Escape patterns and combine
         all_patterns = list(start_patterns.keys()) + list(end_patterns.keys())
-        combined_pattern = "|".join(re.escape(p) for p in all_patterns)
+        combined_pattern = "|".join(re.escape(p) for p in all_patterns if p)
+
+        if not combined_pattern:
+            return matches
 
         # Find all matches
         for match in re.finditer(combined_pattern, content):
@@ -244,11 +279,328 @@ class DelimiterChunker(BaseChunker):
 
         return matches
 
+    def _match_keyword_delimiters(
+        self, content: str, keyword_delimiters: list[Delimiter]
+    ) -> list[DelimiterMatch]:
+        """Match keywords and bind them to structural delimiters.
+
+        Handles delimiters with empty end strings by finding keywords and binding
+        them to the next structural delimiter, then finding the matching close.
+        For example: "function name() {...}" becomes a FUNCTION chunk.
+
+        Args:
+            content: Source code to scan
+            keyword_delimiters: List of keyword delimiters with empty end strings
+
+        Returns:
+            List of complete Boundary objects for keyword-based structures
+        """
+        matches: list[DelimiterMatch] = []
+
+        if not keyword_delimiters:
+            return matches
+
+        # Filter out delimiters with empty start strings - they match everywhere!
+        keyword_delimiters = [d for d in keyword_delimiters if d.start]
+
+        # Define structural delimiters that can complete keywords
+        # Map opening structural chars to their closing counterparts
+        STRUCTURAL_PAIRS = {
+            "{": "}",
+            ":": "\n",  # Python uses : followed by indented block (simplified to newline)
+            "=>": "",   # Arrow functions often have expression bodies
+        }
+
+        for delimiter in keyword_delimiters:
+            # Find all keyword occurrences using word boundary matching
+            pattern = rf"\b{re.escape(delimiter.start)}\b"
+            
+            for match in re.finditer(pattern, content):
+                keyword_pos = match.start()
+
+                # Skip if keyword is inside a string or comment
+                if self._is_inside_string_or_comment(content, keyword_pos):
+                    continue
+
+                # Find the next structural opening after the keyword
+                struct_start, struct_char = self._find_next_structural_with_char(
+                    content, start=keyword_pos + len(delimiter.start), 
+                    allowed=set(STRUCTURAL_PAIRS.keys())
+                )
+
+                if struct_start is None:
+                    continue
+
+                # Find the matching closing delimiter for the structural character
+                struct_end = self._find_matching_close(
+                    content, struct_start, struct_char, STRUCTURAL_PAIRS.get(struct_char, "")
+                )
+
+                if struct_end is not None:
+                    # Create a complete match from keyword to closing structure
+                    # This represents the entire construct (e.g., function...})
+                    matches.append(
+                        DelimiterMatch(
+                            delimiter=delimiter,
+                            start_pos=keyword_pos,
+                            end_pos=struct_end,
+                            nesting_level=0,  # Will be set during boundary extraction
+                        )
+                    )
+
+        return matches
+
+    def _find_next_structural_with_char(
+        self, content: str, start: int, allowed: set[str]
+    ) -> tuple[int | None, str | None]:
+        """Find the next structural delimiter and return its position and character.
+
+        Args:
+            content: Source code to search
+            start: Starting position for search
+            allowed: Set of allowed structural delimiter strings
+
+        Returns:
+            Tuple of (position of structural delimiter, the delimiter character/string), or (None, None)
+        """
+        pos = start
+        in_string = False
+        string_char = None
+        paren_depth = 0
+        content_len = len(content)
+
+        while pos < content_len:
+            char = content[pos]
+
+            # Handle string boundaries
+            if char in ('"', "'", "`"):
+                if not in_string:
+                    in_string = True
+                    string_char = char
+                elif char == string_char:
+                    # Check if escaped
+                    if pos > 0 and content[pos - 1] != "\\":
+                        in_string = False
+                        string_char = None
+
+            # Skip if inside string
+            if in_string:
+                pos += 1
+                continue
+
+            # Skip line comments
+            if pos + 1 < content_len:
+                two_chars = content[pos : pos + 2]
+                if two_chars in ("//", "#"):
+                    # Skip to end of line
+                    newline_pos = content.find("\n", pos)
+                    if newline_pos == -1:
+                        return None, None  # Comment goes to end of file
+                    pos = newline_pos + 1
+                    continue
+                elif two_chars == "/*":
+                    # Skip block comment
+                    end_comment = content.find("*/", pos + 2)
+                    if end_comment == -1:
+                        return None, None  # Unclosed comment
+                    pos = end_comment + 2
+                    continue
+
+            # Track parenthesis depth (for skipping parameter lists)
+            if char == "(":
+                paren_depth += 1
+            elif char == ")":
+                paren_depth -= 1
+
+            # Check for structural delimiter (only at paren depth 0)
+            if paren_depth == 0:
+                for struct in sorted(allowed, key=len, reverse=True):  # Check longer patterns first
+                    struct_len = len(struct)
+                    if content[pos : pos + struct_len] == struct:
+                        return pos, struct
+
+            pos += 1
+
+        return None, None
+
+    def _find_matching_close(
+        self, content: str, open_pos: int, open_char: str, close_char: str
+    ) -> int | None:
+        """Find the matching closing delimiter for an opening delimiter.
+
+        Handles nesting of the same delimiter type (e.g., nested braces).
+
+        Args:
+            content: Source code
+            open_pos: Position of the opening delimiter
+            open_char: The opening delimiter character/string
+            close_char: The closing delimiter character/string to find
+
+        Returns:
+            Position after the closing delimiter, or None if not found
+        """
+        if not close_char:
+            # No explicit close (e.g., arrow functions with expression bodies)
+            # Find the next statement terminator
+            pos = open_pos + len(open_char)
+            # For now, just extend to end of line as a simple heuristic
+            newline = content.find("\n", pos)
+            return newline if newline != -1 else len(content)
+
+        if close_char == "\n":
+            # Python-style: find end of indented block
+            # For simplicity, find the next line at same/lower indentation
+            # This is a simplified heuristic - full Python parsing would be more complex
+            return self._find_python_block_end(content, open_pos)
+
+        # Standard brace/bracket matching with nesting support
+        pos = open_pos + len(open_char)
+        depth = 1
+        in_string = False
+        string_char = None
+        content_len = len(content)
+
+        while pos < content_len and depth > 0:
+            char = content[pos]
+
+            # Handle string boundaries
+            if char in ('"', "'", "`"):
+                if not in_string:
+                    in_string = True
+                    string_char = char
+                elif char == string_char:
+                    # Check if escaped
+                    if pos > 0 and content[pos - 1] != "\\":
+                        in_string = False
+                        string_char = None
+
+            if not in_string:
+                # Skip comments
+                if pos + 1 < content_len:
+                    two_chars = content[pos : pos + 2]
+                    if two_chars in ("//", "#"):
+                        newline = content.find("\n", pos)
+                        if newline == -1:
+                            break
+                        pos = newline
+                        continue
+                    elif two_chars == "/*":
+                        end_comment = content.find("*/", pos + 2)
+                        if end_comment == -1:
+                            break
+                        pos = end_comment + 2
+                        continue
+
+                # Check for nested open
+                if content[pos : pos + len(open_char)] == open_char:
+                    depth += 1
+                    pos += len(open_char)
+                    continue
+
+                # Check for close
+                if content[pos : pos + len(close_char)] == close_char:
+                    depth -= 1
+                    if depth == 0:
+                        return pos + len(close_char)
+                    pos += len(close_char)
+                    continue
+
+            pos += 1
+
+        return None  # No matching close found
+
+    def _find_python_block_end(self, content: str, colon_pos: int) -> int | None:
+        """Find the end of a Python indented block starting after a colon.
+
+        This is a simplified heuristic that finds the next line at the same or
+        lower indentation level.
+
+        Args:
+            content: Source code
+            colon_pos: Position of the colon that starts the block
+
+        Returns:
+            Position of the end of the block, or None if not found
+        """
+        # Find the line with the colon
+        line_start = content.rfind("\n", 0, colon_pos) + 1
+        base_indent = colon_pos - line_start
+
+        # Find lines after the colon
+        pos = content.find("\n", colon_pos)
+        if pos == -1:
+            return len(content)  # Block goes to end of file
+
+        pos += 1  # Move past newline
+
+        while pos < len(content):
+            # Get the indentation of the current line
+            line_start = pos
+            line_end = content.find("\n", pos)
+            if line_end == -1:
+                line_end = len(content)
+
+            line = content[line_start:line_end]
+            
+            # Skip empty lines and comment lines
+            stripped = line.lstrip()
+            if not stripped or stripped.startswith("#"):
+                pos = line_end + 1 if line_end < len(content) else len(content)
+                continue
+
+            # Calculate indentation
+            indent = len(line) - len(stripped)
+
+            # If we find a line at same or lower indentation, that's the end
+            if indent <= base_indent:
+                return line_start
+
+            pos = line_end + 1 if line_end < len(content) else len(content)
+
+        return len(content)  # Block goes to end of file
+
+    def _is_inside_string_or_comment(self, content: str, pos: int) -> bool:
+        """Check if a position is inside a string literal or comment.
+
+        This is a simplified check that scans backward from the position to
+        determine context. Used to avoid matching keywords in strings/comments.
+
+        Args:
+            content: Source code
+            pos: Position to check
+
+        Returns:
+            True if position is inside a string or comment
+        """
+        # Simple heuristic: scan backward to start of line
+        line_start = content.rfind("\n", 0, pos) + 1
+        prefix = content[line_start:pos]
+
+        # Check for line comment before position
+        if "//" in prefix or "#" in prefix:
+            comment_pos = max(prefix.rfind("//"), prefix.rfind("#"))
+            # If comment is before our position and not in quotes, we're in a comment
+            before_comment = prefix[:comment_pos]
+            if before_comment.count('"') % 2 == 0 and before_comment.count("'") % 2 == 0:
+                return True
+
+        # Check for unclosed string quotes
+        single_quotes = prefix.count("'")
+        double_quotes = prefix.count('"')
+        backticks = prefix.count("`")
+
+        # Odd number of quotes means we're inside a string
+        if single_quotes % 2 == 1 or double_quotes % 2 == 1 or backticks % 2 == 1:
+            return True
+
+        return False
+
     def _extract_boundaries(self, matches: list[DelimiterMatch]) -> list[Boundary]:
         """Extract complete boundaries from delimiter matches.
 
         Phase 2: Match start delimiters with corresponding end delimiters,
-        handling nesting for nestable delimiters.
+        handling nesting for nestable delimiters. Also handles keyword delimiters
+        that already have complete boundaries.
 
         Args:
             matches: List of delimiter matches from Phase 1
@@ -258,10 +610,39 @@ class DelimiterChunker(BaseChunker):
         """
         boundaries: list[Boundary] = []
 
+        # Separate keyword delimiter matches (which are already complete boundaries)
+        # from explicit delimiter matches (which need start/end pairing)
+        keyword_matches: list[DelimiterMatch] = []
+        explicit_matches: list[DelimiterMatch] = []
+
+        for match in matches:
+            delimiter: Delimiter = match.delimiter  # type: ignore[assignment]
+            # Keyword delimiters with empty ends that have been matched already have both positions
+            if delimiter.is_keyword_delimiter and match.end_pos is not None:  # type: ignore[union-attr]
+                keyword_matches.append(match)
+            else:
+                explicit_matches.append(match)
+
+        # Handle keyword delimiter matches - they're already complete
+        for match in keyword_matches:
+            delimiter: Delimiter = match.delimiter  # type: ignore[assignment]
+            try:
+                boundary = Boundary(
+                    start=match.start_pos,
+                    end=match.end_pos,  # type: ignore[arg-type]
+                    delimiter=delimiter,
+                    nesting_level=0,  # Keyword delimiters are typically top-level structures
+                )
+                boundaries.append(boundary)
+            except ValueError:
+                # Invalid boundary (start >= end) - skip
+                continue
+
+        # Handle explicit delimiter matches - need start/end pairing
         # Group matches by delimiter type
         delimiter_stacks: dict[str, list[tuple[DelimiterMatch, int]]] = {}
 
-        for match in matches:
+        for match in explicit_matches:
             # Get delimiter with explicit type
             delimiter: Delimiter = match.delimiter  # type: ignore[assignment]
             delimiter_key: str = f"{delimiter.start}_{delimiter.end}"  # type: ignore[union-attr]
@@ -497,13 +878,14 @@ class DelimiterChunker(BaseChunker):
         for pattern in patterns:
             delimiters.extend(Delimiter.from_pattern(pattern))
 
-        # Always add generic fallback delimiters with lower priority
+        # Always add generic fallback delimiters with LOWER priority than semantic ones
+        # These catch any structural delimiters not already matched by language-specific patterns
         delimiters.extend([
             Delimiter(
                 start="{",
                 end="}",
                 kind=DelimiterKind.BLOCK,
-                priority=100,
+                priority=30,  # Same as BLOCK default priority
                 inclusive=False,
                 take_whole_lines=False,
                 nestable=True,
@@ -512,7 +894,7 @@ class DelimiterChunker(BaseChunker):
                 start="(",
                 end=")",
                 kind=DelimiterKind.GENERIC,
-                priority=50,
+                priority=3,  # Same as GENERIC default priority
                 inclusive=False,
                 take_whole_lines=False,
                 nestable=True,
