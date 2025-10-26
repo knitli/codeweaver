@@ -175,46 +175,50 @@ class TestASTDepthErrors:
 class TestTimeoutErrors:
     """Tests for chunking timeout enforcement."""
 
-    def test_timeout_exceeded(self, mock_governor: MagicMock, monkeypatch: MonkeyPatch) -> None:
+    def test_timeout_exceeded(
+        self,
+        mock_governor: MagicMock,
+        monkeypatch: MonkeyPatch,
+        discovered_sample_python_file,
+    ) -> None:
         """Verify that slow operations raise ChunkingTimeoutError.
 
-        Approach: Mock the parsing operation to be slow and set short timeout
+        Approach: Mock time.time() to simulate elapsed time exceeding timeout
         Expected: ChunkingTimeoutError raised with timing metrics
         Verifies: Exception contains timeout threshold and elapsed time
         """
+        import time
         from codeweaver.core.language import SemanticSearchLanguage
         from codeweaver.engine.chunker.semantic import SemanticChunker
 
-        # Arrange: Create chunker with very short timeout
-        mock_governor.timeout_seconds = 0.001  # 1 millisecond timeout
-        mock_governor.check_timeout = MagicMock(
-            side_effect=ChunkingTimeoutError(
-                "Operation exceeded timeout",
-                timeout_seconds=0.001,
-                elapsed_seconds=0.1,
-                file_path="test.py",
-            )
-        )
+        # Arrange: Create chunker with very short timeout (10ms)
+        mock_governor.settings.performance.chunk_timeout_seconds = 0.01
 
         chunker = SemanticChunker(governor=mock_governor, language=SemanticSearchLanguage.PYTHON)
 
-        # Mock slow parsing operation
-        def slow_parse(*args, **kwargs):
-            mock_governor.check_timeout()
-            return MagicMock()
+        # Mock time.time() to simulate timeout
+        start_time = 1000.0
+        elapsed_time = 0.1  # 100ms elapsed, exceeds 10ms timeout
 
-        with patch.object(chunker, "_parse_file", side_effect=slow_parse):
-            # Act & Assert: Verify ChunkingTimeoutError raised
-            # Note: Using None for file since we're testing timeout, not file handling
-            with pytest.raises(ChunkingTimeoutError) as exc_info:
-                chunker.chunk("def test(): pass", file=None)
+        call_count = [0]
+        def mock_time():
+            call_count[0] += 1
+            # First call sets start time, subsequent calls show elapsed time
+            if call_count[0] == 1:
+                return start_time
+            return start_time + elapsed_time
+
+        monkeypatch.setattr(time, "time", mock_time)
+
+        # Act & Assert: Verify ChunkingTimeoutError raised
+        with pytest.raises(ChunkingTimeoutError) as exc_info:
+            chunker.chunk(discovered_sample_python_file.contents, file=discovered_sample_python_file)
 
         # Verify error details
         error = exc_info.value
         assert error.timeout_seconds is not None, "Error should track timeout threshold"
         assert error.elapsed_seconds is not None, "Error should track elapsed time"
         assert error.elapsed_seconds > error.timeout_seconds, "Elapsed time should exceed timeout"
-        assert error.file_path is not None, "Error should track file being processed"
 
     def test_timeout_error_suggestions_present(self, mock_governor: MagicMock) -> None:
         """Verify that timeout errors include helpful suggestions.

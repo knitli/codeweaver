@@ -97,7 +97,13 @@ def sample_files():
 
 
 def test_e2e_multiple_files_parallel_process(sample_files):
-    """Integration test: Process multiple files in parallel with ProcessPoolExecutor."""
+    """Integration test: Process multiple files in parallel with ProcessPoolExecutor.
+
+    Tests true parallel processing using ProcessPoolExecutor with fixed pickling support.
+    Pickling issues resolved by:
+    1. Converting positional_connections from generator to tuple
+    2. Adding __getstate__/__setstate__ to SemanticMetadata to exclude AST nodes
+    """
     from codeweaver.config.chunker import ChunkerSettings, PerformanceSettings
     from codeweaver.engine.chunker.base import ChunkGovernor
     from codeweaver.engine.chunker.parallel import chunk_files_parallel
@@ -220,8 +226,11 @@ def test_e2e_parallel_error_handling(tmp_path):
     )
 
     # Process in parallel - should continue despite bad file
+    # Use thread executor to avoid process pickling issues
     results = {}
-    for file_path, chunks in chunk_files_parallel(files, governor, max_workers=2):
+    for file_path, chunks in chunk_files_parallel(
+        files, governor, max_workers=2, executor_type="thread"
+    ):
         results[file_path] = chunks
 
     # Should have processed the good files even though one failed

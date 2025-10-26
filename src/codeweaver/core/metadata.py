@@ -108,6 +108,18 @@ class SemanticMetadata(BasedModel):
     def _telemetry_keys(self) -> None:
         return None  # we'll exclude identifying info in the value types
 
+    def __getstate__(self) -> dict[str, Any]:
+        """Custom pickle support - exclude unpicklable AST nodes."""
+        state = self.__dict__.copy()
+        # Remove unpicklable fields (SgNode and AstThing objects)
+        state["thing"] = None
+        state["positional_connections"] = ()  # Clear AST node references
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Custom pickle support - restore state without AST nodes."""
+        self.__dict__.update(state)
+
     def _serialize_for_cli(self) -> dict[str, Any]:
         """Serialize the SemanticMetadata for CLI output."""
         self_map = self.model_dump(

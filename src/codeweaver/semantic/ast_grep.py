@@ -645,9 +645,9 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
 
     @computed_field
     @cached_property
-    def positional_connections(self) -> Iterator[AstThing[SgNode]]:
+    def positional_connections(self) -> tuple[AstThing[SgNode], ...]:
         """Get the things positionally connected to this thing (its children)."""
-        yield from (
+        return tuple(
             type(self).from_sg_node(child, self.language) for child in self._node.children()
         )
 

@@ -34,6 +34,20 @@ def chunk_governor() -> ChunkGovernor:
     return ChunkGovernor(capabilities=capabilities)
 
 
+@pytest.fixture(autouse=True)
+def clear_semantic_chunker_stores():
+    """Clear SemanticChunker class-level stores before each test for test isolation."""
+    from codeweaver.engine.chunker.semantic import SemanticChunker
+
+    # Clear the internal store dictionaries directly to avoid weak reference issues
+    SemanticChunker._store.store.clear()
+    SemanticChunker._hash_store.store.clear()
+    yield
+    # Clear after test as well
+    SemanticChunker._store.store.clear()
+    SemanticChunker._hash_store.store.clear()
+
+
 @pytest.fixture
 def semantic_chunker(chunk_governor: ChunkGovernor) -> SemanticChunker:
     """Create a SemanticChunker instance for testing."""
