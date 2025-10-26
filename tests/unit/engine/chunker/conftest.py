@@ -147,6 +147,18 @@ def binary_mock_file(fixture_path: Path) -> Path:
     return fixture_path / "binary_mock.txt"
 
 
+@pytest.fixture
+def large_class_file(fixture_path: Path) -> Path:
+    """Get path to large class fixture."""
+    return fixture_path / "large_class.py"
+
+
+@pytest.fixture
+def huge_string_literal_file(fixture_path: Path) -> Path:
+    """Get path to huge string literal fixture."""
+    return fixture_path / "huge_string_literal.py"
+
+
 # DiscoveredFile fixtures (corresponding to Path fixtures above)
 
 
@@ -236,3 +248,19 @@ def discovered_binary_mock_file(binary_mock_file: Path):
     from codeweaver.core.discovery import DiscoveredFile
 
     return DiscoveredFile.from_path(binary_mock_file)
+
+
+@pytest.fixture
+def discovered_large_class_file(large_class_file: Path):
+    """Create DiscoveredFile for large class fixture."""
+    from codeweaver.core.discovery import DiscoveredFile
+
+    return DiscoveredFile.from_path(large_class_file)
+
+
+@pytest.fixture
+def discovered_huge_string_literal_file(huge_string_literal_file: Path):
+    """Create DiscoveredFile for huge string literal fixture."""
+    from codeweaver.core.discovery import DiscoveredFile
+
+    return DiscoveredFile.from_path(huge_string_literal_file)

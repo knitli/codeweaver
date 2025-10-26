@@ -11,11 +11,12 @@ import sys as _sys
 
 from threading import Lock as _Lock
 from types import FrameType
-from typing import Self, cast
+from typing import Annotated, Self, cast
 
+from pydantic import Field
 from pydantic_core import core_schema
 
-from codeweaver.core.types.aliases import LiteralStringT, SentinelName
+from codeweaver.core.types.aliases import LiteralStringT, SentinelName, SentinelNameT
 from codeweaver.core.types.models import BasedModel
 
 
@@ -33,7 +34,7 @@ class Sentinel(BasedModel):
     ...
     """
 
-    _name: SentinelName
+    _name: Annotated[SentinelNameT, Field(default_factory=SentinelName)]
     _repr: str
     _module_name: str
 

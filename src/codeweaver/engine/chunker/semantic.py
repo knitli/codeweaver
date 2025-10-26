@@ -600,30 +600,74 @@ class SemanticChunker(BaseChunker):
             if child_chunks:
                 return child_chunks
 
-        # Fallback: Use delimiter chunker
-        # TODO: Implement delimiter chunker fallback when available
-        # For now, create a single chunk with partial node metadata
-        logger.warning(
-            "Oversized node without chunkable children: %s, creating single chunk (delimiter fallback not yet implemented)",
+        # Fallback: Use delimiter chunker to split oversized node text
+        logger.info(
+            "Oversized node without chunkable children: %s, falling back to delimiter chunker",
             node.name,
         )
 
-        metadata = self._build_metadata(node)
-        if metadata and "semantic_meta" in metadata:
-            # Mark as partial node in semantic metadata
-            metadata["semantic_meta"].is_partial_node = True  # type: ignore
-        if "context" in metadata and metadata["context"] is not None:
-            metadata["context"]["oversized_fallback"] = True
+        # Import delimiter chunker for fallback
+        from codeweaver.engine.chunker.delimiter import DelimiterChunker
 
-        return [
+        # Create delimiter chunker with same language
+        delimiter_chunker = DelimiterChunker(
+            governor=self.governor,
+            language=self.language.value if hasattr(self.language, "value") else str(self.language),
+        )
+
+        # Chunk the node text using delimiter patterns
+        # Create a pseudo-file for the node text with proper source tracking
+        from codeweaver.core.discovery import DiscoveredFile as _DiscoveredFile
+
+        temp_file = _DiscoveredFile.from_path(file_path) if file_path else None
+
+        # Get delimiter chunks
+        delimiter_chunks = delimiter_chunker.chunk(node.text, file=temp_file)
+
+        # Enhance each chunk with semantic fallback metadata
+        semantic_metadata = self._build_metadata(node)
+        if semantic_metadata and "semantic_meta" in semantic_metadata:
+            # Mark as partial node
+            semantic_metadata["semantic_meta"] = semantic_metadata["semantic_meta"].model_copy(
+                update={"is_partial_node": True}
+            )
+
+        enhanced_chunks: list[CodeChunk] = []
+        for delimiter_chunk in delimiter_chunks:
+            # Preserve delimiter chunk content but enhance metadata
+            chunk_metadata = delimiter_chunk.metadata or {}
+            if "context" not in chunk_metadata or chunk_metadata["context"] is None:
+                chunk_metadata["context"] = {}
+
+            # Add semantic fallback indicators (both top-level and in context)
+            chunk_metadata["fallback"] = "delimiter"  # Top-level for test compatibility
+            chunk_metadata["parent_semantic_node"] = node.name  # Top-level for test compatibility
+            chunk_metadata["context"]["fallback"] = "delimiter"  # type: ignore[index]
+            chunk_metadata["context"]["parent_semantic_node"] = node.name  # type: ignore[index]
+            chunk_metadata["parent_semantic_meta"] = semantic_metadata.get("semantic_meta")
+
+            # Create enhanced chunk preserving delimiter chunk properties
+            enhanced_chunk = CodeChunk(
+                content=delimiter_chunk.content,
+                line_range=delimiter_chunk.line_range,
+                ext_kind=delimiter_chunk.ext_kind,
+                file_path=delimiter_chunk.file_path,
+                language=delimiter_chunk.language,
+                source=ChunkSource.SEMANTIC,  # Mark as semantic even though it used delimiter
+                metadata=chunk_metadata,
+            )
+            enhanced_chunks.append(enhanced_chunk)
+
+        return enhanced_chunks if enhanced_chunks else [
+            # Last resort: single chunk with fallback metadata
             CodeChunk(
                 content=node.text,
-                line_range=Span(node.range.start.line, node.range.end.line, source_id),  # type: ignore[call-arg]  # All spans from same file share source_id
+                line_range=Span(node.range.start.line, node.range.end.line, source_id),  # type: ignore[call-arg]
                 ext_kind=ExtKind.from_file(file_path) if file_path else None,
                 file_path=file_path,
                 language=self.language,
                 source=ChunkSource.SEMANTIC,
-                metadata=metadata,
+                metadata=semantic_metadata,
             )
         ]
 
@@ -659,16 +703,19 @@ class SemanticChunker(BaseChunker):
 
         for chunk in chunks:
             if not chunk.metadata or "context" not in chunk.metadata:
+                chunk.set_batch_id(batch_id)
                 deduplicated.append(chunk)
                 continue
 
             context = chunk.metadata.get("context")
             if not context:
+                chunk.set_batch_id(batch_id)
                 deduplicated.append(chunk)
                 continue
 
             content_hash = context.get("content_hash")
             if not content_hash:
+                chunk.set_batch_id(batch_id)
                 deduplicated.append(chunk)
                 continue
 
@@ -683,6 +730,7 @@ class SemanticChunker(BaseChunker):
 
             # New unique chunk
             self._hash_store.set(content_hash, batch_id)
+            chunk.set_batch_id(batch_id)
             deduplicated.append(chunk)
 
         return deduplicated

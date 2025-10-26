@@ -25,6 +25,15 @@ We occasionally skirt the restrictions on LiteralString, such as for config sett
 SentinelName = NewType("SentinelName", LiteralStringT)
 """The name of a sentinel value, e.g. "UNSET"."""
 
+SentinelNameT = Annotated[
+    SentinelName,
+    Field(
+        description="""The name of a sentinel value as the `SentinelName` NewType, e.g. 'UNSET'.""",
+        pattern=r"^[A-Za-z0-9_+-]+$",
+        max_length=50,
+    ),
+]
+
 FilteredKey = NewType("FilteredKey", LiteralStringT)
 """A key in a dictionary that must go through a privacy filter for telemetry purposes."""
 
@@ -292,7 +301,10 @@ __all__ = (
     "Role",
     "RoleT",
     "SentinelName",
+    "SentinelNameT",
     "ThingName",
     "ThingNameT",
     "ThingOrCategoryNameT",
+    "UUID7Hex",
+    "UUID7HexT",
 )
