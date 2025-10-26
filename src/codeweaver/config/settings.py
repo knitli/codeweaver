@@ -13,7 +13,6 @@ clear precedence hierarchy and validation.
 from __future__ import annotations
 
 import contextlib
-import importlib
 import inspect
 import logging
 
@@ -547,9 +546,6 @@ class CodeWeaverSettings(BaseSettings):
             BasedModel.model_config["field_title_generator"],  # type: ignore
         ),
         json_file=default_config_file_locations(as_json=True),
-        json_schema_extra={
-            "NoTelemetryProps": ["project_path", "project_root", "project_name", "config_file"]
-        },
         nested_model_default_partial_update=True,
         str_strip_whitespace=True,
         title="CodeWeaver Settings",
@@ -724,6 +720,7 @@ class CodeWeaverSettings(BaseSettings):
         """Get the project root directory."""
         if not hasattr(self, "project_path") or not self.project_path:
             from codeweaver.common.utils.git import get_project_root
+
             self.project_path = get_project_root()
         return self.project_path.resolve()
 
@@ -793,6 +790,7 @@ def get_settings(path: FilePath | None = None) -> CodeWeaverSettings:
     """
     global _settings
     from codeweaver.common.utils.git import get_project_root
+
     root = get_project_root()
     if _settings and path and path.exists():
         _settings = CodeWeaverSettings.from_config(path, **dict(_settings))
