@@ -1,0 +1,287 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+# Contract: MemoryVectorStore Provider
+# Description: In-memory vector storage with JSON persistence for development/testing
+# Extends: VectorStoreProvider
+# Version: 1.0
+# Date: 2025-10-25
+
+contract:
+  name: MemoryVectorStore
+  type: concrete_implementation
+  extends: VectorStoreProvider
+  location: src/codeweaver/providers/vector_stores/inmemory.py
+
+configuration:
+  class_name: MemoryConfig
+  location: src/codeweaver/config/providers.py
+  parameters:
+    - name: persist_path
+      type: Path | None
+      default: ".codeweaver/vector_store.json"
+      description: Path for JSON persistence file
+      validation:
+        - Parent directory must exist
+        - Must be writable location
+        - Relative paths resolved from project root
+      examples:
+        - ".codeweaver/vector_store.json"
+        - "/tmp/codeweaver/vectors.json"
+    - name: auto_persist
+      type: bool
+      default: true
+      description: Automatically save after operations
+      notes:
+        - If true, persist after each upsert/delete
+        - If false, only persist on explicit save or shutdown
+    - name: persist_interval
+      type: int | None
+      default: 300
+      description: Periodic persist interval in seconds
+      validation:
+        - minimum: 10 (if not None)
+        - None to disable periodic persistence
+      notes:
+        - Requires auto_persist=true to have effect
+        - Reduces data loss risk for long-running sessions
+    - name: collection_name
+      type: str | None
+      default: null
+      description: Collection name override (defaults to project name)
+      validation:
+        - Alphanumeric characters, underscores, hyphens only
+        - Maximum 255 characters
+
+initialization:
+  - name: _initialize
+    description: Initialize in-memory Qdrant client and restore from disk
+    steps:
+      - Create AsyncQdrantClient with path=":memory:"
+      - Check if persistence file exists
+      - If exists, restore collections and points from JSON
+      - If not exists, initialize empty state
+      - Set up periodic persistence task if enabled
+      - Register shutdown hook for final persistence
+    errors:
+      - PersistenceError: Failed to read persistence file
+      - ValidationError: Persistence file has invalid format
+      - VersionError: Persistence file version incompatible
+    success_criteria:
+      - In-memory client initialized successfully
+      - Existing data restored if persistence file exists
+      - Periodic persistence scheduled if configured
+      - Shutdown hook registered
+
+persistence_format:
+  version: "1.0"
+  structure:
+    version: string
+    metadata:
+      created_at: datetime
+      last_modified: datetime
+      codeweaver_version: string
+    collections:
+      collection_name:
+        metadata:
+          provider: string
+          embedding_dim_dense: int
+          embedding_dim_sparse: int | null
+          created_at: datetime
+        vectors_config:
+          dense:
+            size: int
+            distance: string
+        sparse_vectors_config:
+          sparse: {}
+        points:
+          - id: string
+            vector:
+              dense: list[float]
+              sparse: {indices: list[int], values: list[float]}
+            payload: dict
+  example: |
+    {
+      "version": "1.0",
+      "metadata": {
+        "created_at": "2025-10-25T10:00:00Z",
+        "last_modified": "2025-10-25T11:30:00Z",
+        "codeweaver_version": "0.1.0"
+      },
+      "collections": {
+        "codeweaver-mcp": {
+          "metadata": {
+            "provider": "memory",
+            "embedding_dim_dense": 768,
+            "created_at": "2025-10-25T10:00:00Z"
+          },
+          "vectors_config": {
+            "dense": {"size": 768, "distance": "Cosine"}
+          },
+          "sparse_vectors_config": {
+            "sparse": {}
+          },
+          "points": [...]
+        }
+      }
+    }
+
+persistence_operations:
+  - name: _persist_to_disk
+    description: Save in-memory state to JSON file
+    implementation:
+      - Extract all collections from in-memory client
+      - For each collection, get metadata and all points
+      - Serialize to pydantic models for validation
+      - Write to temporary file with atomic rename
+      - Update last_modified timestamp
+    error_handling:
+      - If write fails, keep old persistence file
+      - Log error with detailed diagnostic information
+      - Retry up to 3 times with exponential backoff
+    success_criteria:
+      - JSON file written successfully
+      - File is valid JSON with correct schema
+      - Atomic operation (no partial writes)
+    performance:
+      - O(n) where n = total points across all collections
+      - Estimated 1-2 seconds for 10k points
+
+  - name: _restore_from_disk
+    description: Load collections and points from JSON persistence file
+    implementation:
+      - Read JSON file and validate version
+      - Validate schema using pydantic models
+      - For each collection, recreate with vector configuration
+      - Batch upsert points into in-memory client
+      - Validate restoration by checking point count
+    error_handling:
+      - If file corrupted, log error and start with empty state
+      - If version incompatible, attempt migration or fail gracefully
+      - Provide clear error message with recovery steps
+    success_criteria:
+      - All collections restored successfully
+      - All points accessible via search
+      - Metadata matches persisted state
+    performance:
+      - O(n) where n = total points
+      - Estimated 2-3 seconds for 10k points
+
+periodic_persistence:
+  - name: _periodic_persist_task
+    description: Background task for periodic persistence
+    implementation:
+      - Run as async task in event loop
+      - Sleep for persist_interval seconds
+      - Call _persist_to_disk()
+      - Repeat until shutdown
+    error_handling:
+      - Log persistence errors but continue running
+      - Don't crash on individual persist failures
+    notes:
+      - Only runs if auto_persist=true and persist_interval is not None
+      - Gracefully shuts down on application shutdown
+
+shutdown_hook:
+  - name: _on_shutdown
+    description: Final persistence before application shutdown
+    implementation:
+      - Cancel periodic persistence task if running
+      - Perform final _persist_to_disk()
+      - Close in-memory client
+      - Clean up temporary files
+    registration:
+      - Register with FastMCP shutdown hooks
+      - Or use atexit module as fallback
+    success_criteria:
+      - Final persistence completes successfully
+      - No data loss on graceful shutdown
+
+scale_limitations:
+  recommended_max:
+    chunks: 10000
+    total_points: 10000
+    file_size_mb: 100
+    memory_usage_mb: 500
+  warnings:
+    - Auto-warn when approaching 8000 chunks
+    - Suggest migration to Qdrant for larger codebases
+    - Document performance degradation beyond limits
+  rationale:
+    - In-memory designed for development/testing
+    - JSON serialization overhead for larger datasets
+    - No persistent indexing optimization
+
+migration_support:
+  export_to_qdrant:
+    description: Export memory store to Qdrant instance
+    steps:
+      - Read all collections from memory store
+      - Connect to Qdrant instance
+      - Create collections with same configuration
+      - Batch upsert all points
+      - Validate point counts match
+    implementation_location: src/codeweaver/providers/vector_stores/migration.py
+  import_from_qdrant:
+    description: Import Qdrant collection to memory store
+    steps:
+      - Connect to Qdrant instance
+      - Scroll through collection points (batch iteration)
+      - Batch upsert into memory store
+      - Persist to disk
+      - Validate point counts match
+    warnings:
+      - Check collection size against scale limitations
+      - Warn if collection exceeds recommended max
+
+error_handling:
+  persistence_errors:
+    - DiskFullError: Log error, continue in-memory only
+    - PermissionError: Check file permissions, suggest fix
+    - CorruptedFileError: Backup corrupted file, start fresh
+    - VersionMismatchError: Attempt migration or reject with message
+  memory_errors:
+    - MemoryError: Suggest migration to Qdrant for large datasets
+    - CollectionExistsError: Use existing collection or fail
+  operation_errors:
+    - Same as QdrantVectorStore (inherits base behavior)
+
+performance_characteristics:
+  search:
+    complexity: O(log n)  # HNSW index in-memory
+    typical_latency: <50ms for <10k chunks
+  upsert:
+    complexity: O(k log n)  # k = batch size
+    typical_latency: <100ms for 100 chunks
+  persist:
+    complexity: O(n)  # Full serialization
+    typical_latency: 1-2s for 10k chunks
+  restore:
+    complexity: O(n)  # Full deserialization + indexing
+    typical_latency: 2-3s for 10k chunks
+
+testing_requirements:
+  unit_tests:
+    - Test persistence format serialization/deserialization
+    - Test atomic file write (temp + rename)
+    - Test periodic persistence task lifecycle
+    - Test shutdown hook registration and execution
+  integration_tests:
+    - Test full lifecycle: init -> operations -> persist -> restore
+    - Test persistence file corruption recovery
+    - Test scale limitations warnings
+    - Test migration to/from Qdrant
+  contract_tests:
+    - Verify all VectorStoreProvider methods implemented
+    - Verify method signatures match abstract interface
+    - Verify async operation behavior
+    - Verify error handling matches contract
+
+documentation_requirements:
+  - Clear scale limitations and when to migrate
+  - Persistence file format documentation
+  - Migration guide to Qdrant for production
+  - Troubleshooting guide for common persistence errors
+  - Performance characteristics vs Qdrant comparison

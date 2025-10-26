@@ -23,17 +23,15 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
 
     model_config = BasedModel.model_config | ConfigDict(extra="allow")
 
-    _client: VectorStoreClient
+    _client: VectorStoreClient | None
     _provider: Provider
 
-    def __init__(self, client: Any = None, **kwargs: Any) -> None:
-        """Initialize the vector store provider."""
-        self._client = client
-        self.kwargs = kwargs
-        self._initialize()
-
     def _initialize(self) -> None:
-        """Initialize the vector store provider."""
+        """Initialize the vector store provider.
+
+        This method should be called after creating an instance to perform
+        any async initialization. Override in subclasses for custom initialization.
+        """
 
     @property
     def client(self) -> VectorStoreClient:
@@ -50,44 +48,90 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
     @property
     @abstractmethod
     def base_url(self) -> str | None:
-        """
-        The base URL for the provider's API, if applicable.
+        """The base URL for the provider's API, if applicable.
+
+        Returns:
+            Valid HTTP/HTTPS URL or None.
         """
         return None
 
     @property
     def collection(self) -> str | None:
-        """Get the name of the currently configured collection."""
+        """Name of the currently configured collection.
+
+        Returns:
+            Collection name (alphanumeric, underscores, hyphens; max 255 chars)
+            or None if no collection configured.
+        """
         return None
 
     @abstractmethod
-    def list_collections(self) -> list[str] | None:
+    async def list_collections(self) -> list[str] | None:
         """List all collections in the vector store.
 
         Returns:
-            List of collection names
+            List of collection names, or None if operation not supported.
+            Returns empty list when no collections exist.
+
+        Raises:
+            ConnectionError: Failed to connect to vector store.
+            ProviderError: Provider-specific operation failure.
         """
 
     @abstractmethod
     async def search(
-        self, vector: list[float], query_filter: Filter | None = None
+        self,
+        vector: list[float] | dict[str, list[float] | Any],
+        query_filter: Filter | None = None,
     ) -> list[SearchResult]:
-        """Search for similar vectors.
+        """Search for similar vectors using query vector(s).
+
+        Supports both dense-only and hybrid search:
+        - Dense only: Pass a list[float] for the query vector
+        - Hybrid: Pass a dict with named vectors like {"dense": [...], "sparse": {...}}
 
         Args:
-            vector: Query vector
-            query_filter: Filter to apply to the search
+            vector: Query vector (single dense vector or dict of named vectors for hybrid search).
+                For hybrid search, the dict can contain:
+                - "dense": list[float] - Dense embedding vector
+                - "sparse": dict with "indices" and "values" keys - Sparse embedding
+            query_filter: Optional filter to apply to search results.
+                Filter fields must exist in payload schema.
 
         Returns:
-            List of search results
+            List of search results sorted by relevance score (descending).
+            Maximum 100 results returned per query.
+            Each result includes score between 0.0 and 1.0.
+            Returns empty list when no results match query/filter.
+
+        Raises:
+            CollectionNotFoundError: Collection doesn't exist.
+            DimensionMismatchError: Query vector dimension doesn't match collection.
+            InvalidFilterError: Filter contains invalid fields or values.
+            SearchError: Search operation failed.
         """
 
     @abstractmethod
     async def upsert(self, chunks: list[CodeChunk]) -> None:
-        """Insert or update code chunks in the vector store.
+        """Insert or update code chunks with their embeddings.
 
         Args:
-            chunks: List of code chunks to store
+            chunks: List of code chunks to insert/update.
+                - Each chunk must have unique chunk_id.
+                - Each chunk must have at least one embedding (sparse or dense).
+                - Embedding dimensions must match collection configuration.
+                - Maximum 1000 chunks per batch.
+
+        Raises:
+            CollectionNotFoundError: Collection doesn't exist.
+            DimensionMismatchError: Embedding dimension doesn't match collection.
+            ValidationError: Chunk data validation failed.
+            UpsertError: Upsert operation failed.
+
+        Notes:
+            - Existing chunks with same ID are replaced.
+            - Payload indexes updated for new/modified chunks.
+            - Operation is atomic (all-or-nothing for batch).
         """
 
     @abstractmethod
@@ -95,19 +139,53 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         """Delete all chunks for a specific file.
 
         Args:
-            file_path: Path of file to remove from index
+            file_path: Path of file to remove from index.
+                Must be relative path from project root.
+                Use forward slashes for cross-platform compatibility.
+
+        Raises:
+            CollectionNotFoundError: Collection doesn't exist.
+            DeleteError: Delete operation failed.
+
+        Notes:
+            - Idempotent: No error if file has no chunks.
+            - Payload indexes updated to remove deleted chunks.
         """
 
     @abstractmethod
     async def delete_by_id(self, ids: list[UUID4]) -> None:
-        """
-        Delete a specific code chunk by its unique identifier (the `chunk_id` field).
+        """Delete specific code chunks by their unique identifiers.
+
+        Args:
+            ids: List of chunk IDs to delete.
+                - Each ID must be valid UUID4.
+                - Maximum 1000 IDs per batch.
+
+        Raises:
+            CollectionNotFoundError: Collection doesn't exist.
+            DeleteError: Delete operation failed.
+
+        Notes:
+            - Idempotent: No error if some IDs don't exist.
+            - Operation is atomic (all-or-nothing for batch).
         """
 
     @abstractmethod
     async def delete_by_name(self, names: list[str]) -> None:
-        """
-        Delete specific code chunks by their unique names.
+        """Delete specific code chunks by their unique names.
+
+        Args:
+            names: List of chunk names to delete.
+                - Each name must be non-empty string.
+                - Maximum 1000 names per batch.
+
+        Raises:
+            CollectionNotFoundError: Collection doesn't exist.
+            DeleteError: Delete operation failed.
+
+        Notes:
+            - Idempotent: No error if some names don't exist.
+            - Operation is atomic (all-or-nothing for batch).
         """
 
 

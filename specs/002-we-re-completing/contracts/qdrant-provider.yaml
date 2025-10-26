@@ -1,0 +1,227 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+# Contract: QdrantVectorStore Provider
+# Description: Qdrant-specific implementation contract for vector storage
+# Extends: VectorStoreProvider
+# Version: 1.0
+# Date: 2025-10-25
+
+contract:
+  name: QdrantVectorStore
+  type: concrete_implementation
+  extends: VectorStoreProvider
+  location: src/codeweaver/providers/vector_stores/qdrant.py
+
+configuration:
+  class_name: QdrantConfig
+  location: src/codeweaver/config/providers.py
+  parameters:
+    - name: url
+      type: str | None
+      default: null
+      description: Qdrant server URL (local or remote)
+      validation:
+        - Valid HTTP/HTTPS URL or None
+        - If None, defaults to "http://localhost:6333"
+      examples:
+        - "http://localhost:6333"  # Local Qdrant
+        - "https://xyz.us-east.aws.cloud.qdrant.io:6333"  # Qdrant Cloud
+    - name: api_key
+      type: str | None
+      default: null
+      description: API key for authentication (remote instances)
+      validation:
+        - Required if connecting to authenticated remote instance
+        - Can be set via CODEWEAVER_QDRANT_API_KEY env var
+      sensitive: true
+    - name: collection_name
+      type: str | None
+      default: null
+      description: Collection name override (defaults to project name)
+      validation:
+        - Alphanumeric characters, underscores, hyphens only
+        - Maximum 255 characters
+    - name: prefer_grpc
+      type: bool
+      default: false
+      description: Use gRPC instead of HTTP for operations
+      notes:
+        - gRPC preferred for bulk operations
+        - Requires gRPC port (default 6334) to be accessible
+    - name: batch_size
+      type: int
+      default: 64
+      description: Batch size for bulk upsert operations
+      validation:
+        - minimum: 1
+        - maximum: 1000
+    - name: dense_vector_name
+      type: str
+      default: "dense"
+      description: Named vector for dense embeddings
+      validation:
+        - Non-empty string
+        - Alphanumeric and underscores only
+    - name: sparse_vector_name
+      type: str
+      default: "sparse"
+      description: Named vector for sparse embeddings
+      validation:
+        - Non-empty string
+        - Alphanumeric and underscores only
+
+initialization:
+  - name: _initialize
+    description: Initialize Qdrant client and validate connection
+    steps:
+      - Create AsyncQdrantClient with configured URL/API key
+      - Test connection with list_collections or health check
+      - Get or create collection with hybrid vector configuration
+      - Store collection metadata for provider validation
+      - Create payload indexes for frequently filtered fields
+    errors:
+      - ConnectionError: Failed to connect to Qdrant server
+      - AuthenticationError: Invalid API key
+      - ConfigurationError: Invalid configuration parameters
+    success_criteria:
+      - Client successfully connects to Qdrant
+      - Collection exists or is created successfully
+      - Metadata stored for provider validation
+      - Payload indexes created
+
+collection_management:
+  - name: get_or_create_collection
+    description: Get existing collection or create with hybrid vector config
+    parameters:
+      - name: collection_name
+        type: str
+        required: true
+      - name: dense_dim
+        type: int
+        required: true
+      - name: sparse_enabled
+        type: bool
+        default: true
+    implementation:
+      - Check if collection exists
+      - If exists, validate metadata compatibility
+      - If not exists, create with named vectors configuration:
+          vectors_config:
+            dense:
+              size: {dense_dim}
+              distance: COSINE
+          sparse_vectors_config:
+            sparse:
+              # Qdrant manages sparse vector configuration
+      - Store metadata: provider, dimensions, project name
+      - Create payload indexes: file_path, language, chunk_name
+    returns:
+      type: CollectionInfo
+      description: Collection information and configuration
+
+hybrid_search_implementation:
+  - name: _prepare_query_vector
+    description: Prepare query vector for hybrid search
+    parameters:
+      - name: vector
+        type: list[float] | dict[str, list[float] | SparseVector]
+      - name: search_mode
+        type: "dense" | "sparse" | "hybrid"
+        default: "hybrid"
+    implementation:
+      - If vector is list[float], use as dense vector only
+      - If vector is dict, extract named vectors (dense, sparse)
+      - Validate vector dimensions match collection configuration
+      - Construct Qdrant query format for named vector search
+    returns:
+      type: dict[str, list[float] | SparseVector]
+      description: Qdrant-compatible query vector
+
+  - name: _merge_search_results
+    description: Merge and score results from hybrid search
+    parameters:
+      - name: dense_results
+        type: list[ScoredPoint] | None
+      - name: sparse_results
+        type: list[ScoredPoint] | None
+      - name: alpha
+        type: float
+        default: 0.5
+        description: Weight for dense vs sparse (0=sparse only, 1=dense only)
+    implementation:
+      - Normalize scores from each vector type
+      - Combine scores: final_score = alpha * dense + (1-alpha) * sparse
+      - Sort by combined score descending
+      - Filter results where file still exists in filesystem
+      - Convert ScoredPoint to SearchResult with CodeChunk
+    returns:
+      type: list[SearchResult]
+      description: Merged and filtered search results
+
+provider_validation:
+  - name: _validate_provider_compatibility
+    description: Check if current provider matches collection metadata
+    implementation:
+      - Read collection metadata (stored as alias or payload)
+      - Compare metadata.provider with self.name.value
+      - Compare metadata.embedding_dim_dense with expected dimension
+      - If mismatch, raise ProviderSwitchError with resolution steps
+    errors:
+      - ProviderSwitchError: Collection created with different provider
+      - DimensionMismatchError: Embedding dimensions don't match
+    success_criteria:
+      - Metadata matches current provider configuration
+      - No action needed if metadata compatible
+
+remote_deployment_support:
+  local_connection:
+    url: "http://localhost:6333"
+    api_key: null
+    prefer_grpc: false
+    notes:
+      - No authentication required
+      - Qdrant must be running locally (Docker or native)
+      - Default port 6333 for HTTP
+
+  remote_connection:
+    url: "https://{instance}.cloud.qdrant.io:6333"
+    api_key: "{required}"
+    prefer_grpc: true
+    notes:
+      - API key required for authentication
+      - gRPC recommended for better performance
+      - Supports Qdrant Cloud and self-hosted remote instances
+
+error_handling:
+  connection_errors:
+    - ConnectionError: Retry with exponential backoff (max 3 retries)
+    - TimeoutError: Increase timeout or check network
+    - AuthenticationError: Verify API key, no retry
+  operation_errors:
+    - DimensionMismatchError: Log error with expected vs actual dimensions
+    - CollectionNotFoundError: Attempt to create collection if auto-create enabled
+    - UpsertError: Log failed chunk IDs, continue with successful chunks
+
+performance_optimizations:
+  - Use gRPC for bulk operations (prefer_grpc=true)
+  - Batch upsert with optimal batch_size (64 default)
+  - Create payload indexes before bulk indexing
+  - Use async operations for all I/O
+  - Connection pooling via AsyncQdrantClient
+
+testing_requirements:
+  integration_tests:
+    - Test with local Qdrant instance (Docker container)
+    - Test collection creation with hybrid vectors
+    - Test upsert with both dense and sparse embeddings
+    - Test hybrid search with both vector types
+    - Test file-based deletion
+    - Test provider validation on initialization
+  contract_tests:
+    - Verify all VectorStoreProvider methods implemented
+    - Verify method signatures match abstract interface
+    - Verify async operation behavior
+    - Verify error handling matches contract

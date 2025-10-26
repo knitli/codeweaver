@@ -47,10 +47,17 @@ def try_git_rev_parse() -> Path | None:
 
 
 def is_git_dir(directory: Path | None = None) -> bool:
-    """Is the given directory version-controlled with git?"""
+    """Is the given directory version-controlled with git?
+
+    Handles both regular git repositories (.git is a directory) and
+    git worktrees (.git is a file pointing to the worktree location).
+    """
     directory = directory or Path.cwd()
-    if (git_dir := (directory / ".git")) and git_dir.exists():
-        return git_dir.is_dir()
+    git_path = directory / ".git"
+    if git_path.exists():
+        # In a worktree, .git is a file containing "gitdir: <path>"
+        # In a regular repo, .git is a directory
+        return git_path.is_dir() or git_path.is_file()
     return False
 
 
