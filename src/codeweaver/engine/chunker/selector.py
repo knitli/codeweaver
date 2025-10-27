@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import logging
 
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from codeweaver.core.language import SemanticSearchLanguage
@@ -259,7 +258,11 @@ class GracefulChunker(BaseChunker):
         self.fallback = fallback
 
     def chunk(
-        self, content: str, *, file: DiscoveredFile | None = None, context: dict[str, Any] | None = None
+        self,
+        content: str,
+        *,
+        file: DiscoveredFile | None = None,
+        context: dict[str, Any] | None = None,
     ) -> list[CodeChunk]:
         """Try primary chunker, fall back on error.
 

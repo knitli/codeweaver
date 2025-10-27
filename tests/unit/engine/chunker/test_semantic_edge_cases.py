@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Edge case tests for SemanticChunker."""
 
-from pathlib import Path
 
 import pytest
 
@@ -24,7 +23,9 @@ def test_empty_file(chunk_governor: ChunkGovernor, discovered_empty_file) -> Non
     assert len(chunks) == 0, "Empty file should return no chunks"
 
 
-def test_whitespace_only_file(chunk_governor: ChunkGovernor, discovered_whitespace_only_file) -> None:
+def test_whitespace_only_file(
+    chunk_governor: ChunkGovernor, discovered_whitespace_only_file
+) -> None:
     """Verify whitespace-only file returns single chunk with edge_case metadata."""
     # Read raw content directly to preserve whitespace (DiscoveredFile.contents normalizes/strips)
     content = discovered_whitespace_only_file.path.read_text()

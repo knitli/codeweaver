@@ -11,9 +11,7 @@ Tests verify core chunking behavior for supported languages including
 Python, JavaScript, and Rust.
 """
 
-from pathlib import Path
 
-import pytest
 
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.engine.chunker import SemanticChunker

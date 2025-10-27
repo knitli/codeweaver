@@ -19,11 +19,12 @@ import json
 import statistics
 import tempfile
 import time
+
 from pathlib import Path
-from typing import Any
 from uuid import uuid4
 
 import pytest
+
 from qdrant_client import models
 from qdrant_client.async_qdrant_client import AsyncQdrantClient
 
@@ -94,9 +95,7 @@ async def qdrant_client() -> AsyncQdrantClient:
 async def qdrant_store(qdrant_client: AsyncQdrantClient) -> QdrantVectorStore:
     """Create a QdrantVectorStore for testing."""
     config = QdrantConfig(
-        url="http://localhost:6333",
-        collection_name=f"perf_test_{uuid4().hex[:8]}",
-        batch_size=64,
+        url="http://localhost:6333", collection_name=f"perf_test_{uuid4().hex[:8]}", batch_size=64
     )
     store = QdrantVectorStore(config=config, embedder=None, reranker=None)
     await store._initialize()
@@ -186,7 +185,7 @@ async def test_qdrant_upsert_batch_performance(qdrant_store: QdrantVectorStore) 
         duration = time.perf_counter() - start
 
         results[count] = duration
-        print(f"\nUpsert {count} chunks: {duration:.3f}s ({count/duration:.0f} chunks/sec)")
+        print(f"\nUpsert {count} chunks: {duration:.3f}s ({count / duration:.0f} chunks/sec)")
 
     # Validate 100 chunk requirement
     assert results[100] < 1.0, f"Upsert 100 chunks took {results[100]:.3f}s, exceeds 1s requirement"
@@ -235,9 +234,9 @@ async def test_qdrant_delete_by_file_performance(
 
     # Validate requirement for typical files (<100 chunks)
     if chunks_per_file <= 100:
-        assert (
-            p95 < 100
-        ), f"P95 delete latency {p95:.2f}ms exceeds 100ms for {chunks_per_file} chunks/file"
+        assert p95 < 100, (
+            f"P95 delete latency {p95:.2f}ms exceeds 100ms for {chunks_per_file} chunks/file"
+        )
 
 
 @pytest.mark.asyncio
@@ -251,9 +250,7 @@ async def test_memory_persistence_performance(chunk_count: int) -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         persist_path = Path(tmpdir) / "test_store.json"
         config = MemoryConfig(
-            persist_path=persist_path,
-            auto_persist=False,
-            collection_name="perf_test",
+            persist_path=persist_path, auto_persist=False, collection_name="perf_test"
         )
 
         # Create store and populate
@@ -275,7 +272,7 @@ async def test_memory_persistence_performance(chunk_count: int) -> None:
         print(f"\nPersist {chunk_count} chunks:")
         print(f"  Duration: {persist_duration:.3f}s")
         print(f"  File size: {file_size_mb:.2f}MB")
-        print(f"  Throughput: {chunk_count/persist_duration:.0f} chunks/sec")
+        print(f"  Throughput: {chunk_count / persist_duration:.0f} chunks/sec")
 
         # Measure restore performance
         new_store = MemoryVectorStore(config=config, embedder=None, reranker=None)
@@ -285,16 +282,16 @@ async def test_memory_persistence_performance(chunk_count: int) -> None:
         restore_duration = time.perf_counter() - start
 
         print(f"  Restore: {restore_duration:.3f}s")
-        print(f"  Restore throughput: {chunk_count/restore_duration:.0f} chunks/sec")
+        print(f"  Restore throughput: {chunk_count / restore_duration:.0f} chunks/sec")
 
         # Validate requirements for 10k chunks
         if chunk_count == 10000:
-            assert (
-                1.0 <= persist_duration <= 2.0
-            ), f"Persist 10k chunks took {persist_duration:.3f}s, outside 1-2s requirement"
-            assert (
-                2.0 <= restore_duration <= 3.0
-            ), f"Restore 10k chunks took {restore_duration:.3f}s, outside 2-3s requirement"
+            assert 1.0 <= persist_duration <= 2.0, (
+                f"Persist 10k chunks took {persist_duration:.3f}s, outside 1-2s requirement"
+            )
+            assert 2.0 <= restore_duration <= 3.0, (
+                f"Restore 10k chunks took {restore_duration:.3f}s, outside 2-3s requirement"
+            )
 
 
 @pytest.mark.asyncio
@@ -387,13 +384,15 @@ async def test_hybrid_search_performance(qdrant_store: QdrantVectorStore) -> Non
     hybrid_mean = statistics.mean(hybrid_latencies)
     overhead_pct = ((hybrid_mean - dense_mean) / dense_mean) * 100
 
-    print(f"\nHybrid search performance comparison:")
+    print("\nHybrid search performance comparison:")
     print(f"  Dense-only mean: {dense_mean:.2f}ms")
     print(f"  Hybrid mean: {hybrid_mean:.2f}ms")
     print(f"  Overhead: {overhead_pct:.1f}%")
 
     # Hybrid should be within 50% overhead of dense-only
-    assert overhead_pct < 50, f"Hybrid search overhead {overhead_pct:.1f}% exceeds acceptable threshold"
+    assert overhead_pct < 50, (
+        f"Hybrid search overhead {overhead_pct:.1f}% exceeds acceptable threshold"
+    )
 
 
 # Performance regression test
@@ -445,18 +444,22 @@ async def test_performance_regression_check(qdrant_store: QdrantVectorStore) -> 
             baseline = json.load(f)
 
         # Compare against baseline
-        search_regression = (
-            metrics["search"]["p95_ms"] - baseline["search"]["p95_ms"]
-        ) / baseline["search"]["p95_ms"]
+        search_regression = (metrics["search"]["p95_ms"] - baseline["search"]["p95_ms"]) / baseline[
+            "search"
+        ]["p95_ms"]
 
-        print(f"\nPerformance comparison vs baseline:")
-        print(f"  Search P95: {metrics['search']['p95_ms']:.2f}ms (baseline: {baseline['search']['p95_ms']:.2f}ms)")
-        print(f"  Regression: {search_regression*100:+.1f}%")
+        print("\nPerformance comparison vs baseline:")
+        print(
+            f"  Search P95: {metrics['search']['p95_ms']:.2f}ms (baseline: {baseline['search']['p95_ms']:.2f}ms)"
+        )
+        print(f"  Regression: {search_regression * 100:+.1f}%")
 
         # Alert on >20% regression
         if search_regression > 0.2:
-            pytest.fail(f"Performance regression detected: {search_regression*100:.1f}% slower than baseline")
+            pytest.fail(
+                f"Performance regression detected: {search_regression * 100:.1f}% slower than baseline"
+            )
 
-    print(f"\nCurrent performance metrics:")
+    print("\nCurrent performance metrics:")
     print(f"  Search P95: {metrics['search']['p95_ms']:.2f}ms")
     print(f"  Delete: {metrics['delete']['latency_ms']:.2f}ms")

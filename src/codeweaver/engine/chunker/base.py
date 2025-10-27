@@ -19,7 +19,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from functools import cached_property
-from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any
 
 from pydantic import ConfigDict, Field, PositiveInt, computed_field
@@ -28,6 +27,7 @@ from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.models import BasedModel
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+
 
 if TYPE_CHECKING:
     from codeweaver.config.chunker import ChunkerSettings
@@ -49,7 +49,7 @@ class ChunkGovernor(BasedModel):
     ] = ()
 
     settings: Annotated[
-        "ChunkerSettings | None",
+        ChunkerSettings | None,
         Field(default=None, description="""Chunker configuration settings."""),
     ] = None
 
@@ -83,7 +83,11 @@ class BaseChunker(ABC):
 
     @abstractmethod
     def chunk(
-        self, content: str, *, file: DiscoveredFile | None = None, context: dict[str, Any] | None = None
+        self,
+        content: str,
+        *,
+        file: DiscoveredFile | None = None,
+        context: dict[str, Any] | None = None,
     ) -> list[CodeChunk]:
         """Chunk the given content into code chunks using `self._governor` settings.
 
@@ -113,6 +117,7 @@ class BaseChunker(ABC):
 
 
 __all__ = ("BaseChunker", "ChunkGovernor")
+
 
 # Rebuild models to resolve forward references after all types are imported
 # This is done at module import time to ensure ChunkerSettings is available

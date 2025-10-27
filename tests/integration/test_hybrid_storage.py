@@ -13,10 +13,10 @@ from uuid import uuid4
 
 import pytest
 
-from codeweaver.config.providers import QdrantConfig
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
+
 
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
@@ -24,10 +24,7 @@ pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 @pytest.fixture
 async def qdrant_provider():
     """Create Qdrant provider for testing."""
-    config = {
-        "url": "http://localhost:6333",
-        "collection_name": f"test_hybrid_{uuid4().hex[:8]}",
-    }
+    config = {"url": "http://localhost:6333", "collection_name": f"test_hybrid_{uuid4().hex[:8]}"}
     provider = QdrantVectorStore(config=config)
     await provider._initialize()
     yield provider

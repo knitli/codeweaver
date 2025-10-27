@@ -9,16 +9,17 @@ VectorStoreProvider interface and provides in-memory storage with persistence.
 """
 
 import tempfile
+
 from pathlib import Path
 from uuid import uuid4
 
 import pytest
 
-from codeweaver.config.providers import MemoryConfig
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.core.spans import Span
 from codeweaver.providers.vector_stores.inmemory import MemoryVectorStore
+
 
 pytestmark = pytest.mark.unit
 
@@ -46,7 +47,7 @@ async def memory_provider(memory_config):
     """Create a MemoryVectorStore instance for testing."""
     provider = MemoryVectorStore(config=memory_config)
     await provider._initialize()
-    yield provider
+    return provider
     # Cleanup handled by temp directory
 
 
@@ -105,7 +106,9 @@ class TestMemoryProviderContract:
         await memory_provider.delete_by_file(sample_chunk.file_path)
 
         results = await memory_provider.search(vector={"dense": [0.5, 0.5, 0.5] * 256})
-        assert len(results) == 0 or all(r.chunk.file_path != sample_chunk.file_path for r in results)
+        assert len(results) == 0 or all(
+            r.chunk.file_path != sample_chunk.file_path for r in results
+        )
 
     async def test_delete_by_id(self, memory_provider, sample_chunk):
         """Test delete_by_id removes chunks."""
@@ -121,7 +124,9 @@ class TestMemoryProviderContract:
         await memory_provider.delete_by_name([sample_chunk.chunk_name])
 
         results = await memory_provider.search(vector={"dense": [0.5, 0.5, 0.5] * 256})
-        assert len(results) == 0 or all(r.chunk.chunk_name != sample_chunk.chunk_name for r in results)
+        assert len(results) == 0 or all(
+            r.chunk.chunk_name != sample_chunk.chunk_name for r in results
+        )
 
     async def test_persist_to_disk(self, memory_provider, memory_config, sample_chunk):
         """Test _persist_to_disk creates JSON file."""

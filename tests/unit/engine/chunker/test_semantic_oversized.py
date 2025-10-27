@@ -15,7 +15,6 @@ These tests verify that oversized files with chunkable children are successfully
 processed via recursive child node chunking.
 """
 
-from pathlib import Path
 
 import pytest
 
@@ -31,9 +30,7 @@ def python_chunker(chunk_governor: ChunkGovernor) -> SemanticChunker:
 
 
 def test_oversized_file_chunks_via_child_nodes(
-    python_chunker: SemanticChunker,
-    chunk_governor: ChunkGovernor,
-    discovered_huge_function_file,
+    python_chunker: SemanticChunker, chunk_governor: ChunkGovernor, discovered_huge_function_file
 ):
     """Test oversized file is successfully chunked via child node processing.
 
@@ -60,7 +57,8 @@ def test_oversized_file_chunks_via_child_nodes(
 
     # Verify chunks are semantic (successful child node processing)
     semantic_chunks = [
-        chunk for chunk in chunks
+        chunk
+        for chunk in chunks
         if chunk.metadata
         and "context" in chunk.metadata
         and chunk.metadata["context"]
@@ -70,9 +68,7 @@ def test_oversized_file_chunks_via_child_nodes(
 
 
 def test_oversized_class_chunks_via_methods(
-    python_chunker: SemanticChunker,
-    chunk_governor: ChunkGovernor,
-    discovered_large_class_file,
+    python_chunker: SemanticChunker, chunk_governor: ChunkGovernor, discovered_large_class_file
 ):
     """Test oversized class is successfully chunked via child processing.
 
@@ -99,12 +95,11 @@ def test_oversized_class_chunks_via_methods(
 
     # Verify chunks are semantic (successful child node processing)
     semantic_chunks = [
-        chunk for chunk in chunks
+        chunk
+        for chunk in chunks
         if chunk.metadata
         and "context" in chunk.metadata
         and chunk.metadata["context"]
         and chunk.metadata["context"].get("chunker_type") == "semantic"
     ]
     assert len(semantic_chunks) > 0, "Should have semantic chunks from child node processing"
-
-

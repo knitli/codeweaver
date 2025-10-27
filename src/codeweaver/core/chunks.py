@@ -383,12 +383,8 @@ __all__ = (
 
 # Rebuild models to resolve forward references
 # Force rebuild even if it fails - better to have working models than perfect ones
-try:
+with contextlib.suppress(Exception):
     SearchResult.model_rebuild(force=True)
-except Exception:
-    pass
 
-try:
+with contextlib.suppress(Exception):
     CodeChunk.model_rebuild(force=True)
-except Exception:
-    pass

@@ -17,6 +17,7 @@ from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
 
+
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
 
@@ -79,13 +80,18 @@ async def test_hybrid_search_ranking():
 
     # Execute hybrid search
     results = await provider.search(
-        vector={"dense": [1.0, 0.0, 0.0] * 256, "sparse": {"indices": [1, 2], "values": [1.0, 0.9]}},
+        vector={
+            "dense": [1.0, 0.0, 0.0] * 256,
+            "sparse": {"indices": [1, 2], "values": [1.0, 0.9]},
+        },
         limit=10,
     )
 
     # Verify results are ranked by relevance
     assert len(results) >= 2, "Should return multiple results"
-    assert results[0].chunk.chunk_name == "exact_match.py:func", "Highest score should be exact match"
+    assert results[0].chunk.chunk_name == "exact_match.py:func", (
+        "Highest score should be exact match"
+    )
     assert results[0].score > results[1].score, "Results should be in descending score order"
     assert "partial_match.py:func" in [r.chunk.chunk_name for r in results]
 

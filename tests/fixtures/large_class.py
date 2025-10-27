@@ -23,7 +23,7 @@ class LargeClass:
         # First processing stage
         for i in range(500):
             temp_value = i * 2
-            temp_value += i ** 2
+            temp_value += i**2
             temp_value -= i // 3
             temp_value *= i % 7 + 1
             temp_value += i * 3
@@ -37,13 +37,9 @@ class LargeClass:
             intermediate_data.append({
                 "index": i,
                 "value": temp_value,
-                "squared": temp_value ** 2,
-                "cubed": temp_value ** 3,
-                "metadata": {
-                    "iteration": i,
-                    "stage": "first",
-                    "computed_at": i * 1000,
-                }
+                "squared": temp_value**2,
+                "cubed": temp_value**3,
+                "metadata": {"iteration": i, "stage": "first", "computed_at": i * 1000},
             })
 
         # Second processing stage
@@ -59,20 +55,17 @@ class LargeClass:
                 "tertiary": i * 30,
                 "nested": {
                     "level1": i,
-                    "level2": i ** 2,
-                    "level3": i ** 3,
-                    "level4": {
-                        "deep_value": i * 100,
-                        "deep_list": [j for j in range(i, i + 20)],
-                    }
-                }
+                    "level2": i**2,
+                    "level3": i**3,
+                    "level4": {"deep_value": i * 100, "deep_list": list(range(i, i + 20))},
+                },
             }
 
         # Third processing stage
         final_results = []
         for i in range(500):
             combined = intermediate_data[i]["value"] + processed_results.get(i, 0)
-            transformed = combined * 2 + combined ** 2 - combined // 3
+            transformed = combined * 2 + combined**2 - combined // 3
             final_results.append({
                 "index": i,
                 "combined": combined,
@@ -81,7 +74,12 @@ class LargeClass:
                 "products": [transformed * j for j in range(20)],
             })
 
-        return {"result": result, "intermediate": intermediate_data, "processed": processed_results, "final": final_results}
+        return {
+            "result": result,
+            "intermediate": intermediate_data,
+            "processed": processed_results,
+            "final": final_results,
+        }
 
     def method_two(self):
         """Large method two - matrix operations."""
@@ -94,7 +92,7 @@ class LargeClass:
             row = []
             row_sum = 0
             for j in range(100):
-                cell_value = (i * j) + (i ** 2) + (j ** 2)
+                cell_value = (i * j) + (i**2) + (j**2)
                 row.append({
                     "value": cell_value,
                     "row": i,
@@ -117,7 +115,7 @@ class LargeClass:
                         "difference": abs(i - j),
                         "power": (i + 1) ** (j % 3 + 1),
                         "mod": i % (j + 1),
-                    }
+                    },
                 })
                 row_sum += cell_value
                 col_sums[j] += cell_value
@@ -131,19 +129,26 @@ class LargeClass:
             transformed_row = []
             for j in range(100):
                 original_value = matrix_data[i][j]["value"]
-                transformed_value = (original_value * 2) + (row_sums[i] // 100) + (col_sums[j] // 100)
+                transformed_value = (
+                    (original_value * 2) + (row_sums[i] // 100) + (col_sums[j] // 100)
+                )
                 transformed_row.append({
                     "original": original_value,
                     "transformed": transformed_value,
                     "row_context": row_sums[i],
                     "col_context": col_sums[j],
                     "local_average": (
-                        original_value
-                        + matrix_data[i - 1][j]["value"] if i > 0 else 0
-                        + matrix_data[i + 1][j]["value"] if i < 99 else 0
-                        + matrix_data[i][j - 1]["value"] if j > 0 else 0
-                        + matrix_data[i][j + 1]["value"] if j < 99 else 0
-                    ) / 5
+                        original_value + matrix_data[i - 1][j]["value"]
+                        if i > 0
+                        else 0 + matrix_data[i + 1][j]["value"]
+                        if i < 99
+                        else 0 + matrix_data[i][j - 1]["value"]
+                        if j > 0
+                        else 0 + matrix_data[i][j + 1]["value"]
+                        if j < 99
+                        else 0
+                    )
+                    / 5,
                 })
             transformed_matrix.append(transformed_row)
 
@@ -174,7 +179,7 @@ class LargeClass:
                         "cost": i * 3,
                         "benefit": i * 4,
                         "tags": [f"tag_{j}" for j in range(i % 20)],
-                    }
+                    },
                 },
                 "neighbors": [],
                 "paths": {},
@@ -192,11 +197,8 @@ class LargeClass:
                         "type": "directed" if i < j else "undirected",
                         "capacity": edge_weight * 2,
                         "flow": edge_weight // 2,
-                        "attributes": {
-                            "cost": edge_weight * 3,
-                            "benefit": edge_weight * 4,
-                        }
-                    }
+                        "attributes": {"cost": edge_weight * 3, "benefit": edge_weight * 4},
+                    },
                 })
                 nodes[i]["neighbors"].append(j)
                 nodes[j]["neighbors"].append(i)
@@ -212,10 +214,12 @@ class LargeClass:
                 "total_edge_weight": total_edge_weight,
                 "average_edge_weight": total_edge_weight / node_degree if node_degree > 0 else 0,
                 "centrality": node_degree / 299.0,  # Simple degree centrality
-                "connected_categories": list(set(
-                    nodes[neighbor]["metadata"]["category"]
-                    for neighbor in nodes[i]["neighbors"]
-                )),
+                "connected_categories": list(
+                    {
+                        nodes[neighbor]["metadata"]["category"]
+                        for neighbor in nodes[i]["neighbors"]
+                    }
+                ),
             }
 
         return {
@@ -226,7 +230,7 @@ class LargeClass:
                 "node_count": len(nodes),
                 "edge_count": len(edges),
                 "avg_degree": sum(len(n["neighbors"]) for n in nodes.values()) / len(nodes),
-            }
+            },
         }
 
     def method_four(self):
@@ -252,35 +256,40 @@ class LargeClass:
                     "seasonal": seasonal,
                     "noise": noise,
                 },
-                "metadata": {
-                    "period": i // 12,
-                    "phase": i % 12,
-                    "quarter": (i % 12) // 3,
-                }
+                "metadata": {"period": i // 12, "phase": i % 12, "quarter": (i % 12) // 3},
             })
 
         # Calculate moving averages
         window_size = 20
         for i in range(len(time_series)):
             if i < window_size:
-                window = time_series[0:i+1]
+                window = time_series[0 : i + 1]
             else:
-                window = time_series[i-window_size+1:i+1]
+                window = time_series[i - window_size + 1 : i + 1]
 
             avg_value = sum(point["value"] for point in window) / len(window)
             moving_averages.append({
                 "timestamp": time_series[i]["timestamp"],
                 "value": avg_value,
                 "window_size": len(window),
-                "std_dev": (sum((point["value"] - avg_value) ** 2 for point in window) / len(window)) ** 0.5,
+                "std_dev": (
+                    sum((point["value"] - avg_value) ** 2 for point in window) / len(window)
+                )
+                ** 0.5,
             })
 
         # Detect trends
         for i in range(20, len(time_series) - 20):
-            prev_avg = sum(point["value"] for point in time_series[i-20:i]) / 20
-            next_avg = sum(point["value"] for point in time_series[i:i+20]) / 20
+            prev_avg = sum(point["value"] for point in time_series[i - 20 : i]) / 20
+            next_avg = sum(point["value"] for point in time_series[i : i + 20]) / 20
 
-            trend_direction = "up" if next_avg > prev_avg * 1.05 else "down" if next_avg < prev_avg * 0.95 else "flat"
+            trend_direction = (
+                "up"
+                if next_avg > prev_avg * 1.05
+                else "down"
+                if next_avg < prev_avg * 0.95
+                else "flat"
+            )
             trend_strength = abs(next_avg - prev_avg) / prev_avg if prev_avg != 0 else 0
 
             trends.append({
@@ -301,7 +310,7 @@ class LargeClass:
                 "min": min(point["value"] for point in time_series),
                 "max": max(point["value"] for point in time_series),
                 "avg": sum(point["value"] for point in time_series) / len(time_series),
-            }
+            },
         }
 
     def method_five(self):
@@ -330,7 +339,7 @@ class LargeClass:
                     "unique_words": len(set(doc_words)),
                     "avg_word_length": sum(len(w) for w in doc_words) / len(doc_words),
                     "longest_word": max(doc_words, key=len),
-                }
+                },
             })
 
             # Update word frequencies
@@ -364,7 +373,10 @@ class LargeClass:
 
         return {
             "documents": documents,
-            "word_freq": {k: {"count": v["count"], "doc_count": len(v["documents"])} for k, v in word_freq.items()},
+            "word_freq": {
+                k: {"count": v["count"], "doc_count": len(v["documents"])}
+                for k, v in word_freq.items()
+            },
             "bigram_freq": bigram_freq,
             "tfidf": tfidf_scores,
             "summary": {
@@ -372,5 +384,5 @@ class LargeClass:
                 "unique_words": len(word_freq),
                 "unique_bigrams": len(bigram_freq),
                 "avg_doc_length": sum(doc["length"] for doc in documents) / len(documents),
-            }
+            },
         }

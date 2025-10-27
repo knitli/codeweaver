@@ -64,9 +64,17 @@ class CodeWeaverError(Exception):
             if "file_path" in self.details:
                 detail_parts.append(f"file: {self.details['file_path']}")
             # Include numeric metrics if present
-            for key in ["actual_depth", "max_depth", "actual_tokens", "max_tokens",
-                       "chunk_count", "max_chunks", "timeout_seconds", "elapsed_seconds",
-                       "line_number"]:
+            for key in [
+                "actual_depth",
+                "max_depth",
+                "actual_tokens",
+                "max_tokens",
+                "chunk_count",
+                "max_chunks",
+                "timeout_seconds",
+                "elapsed_seconds",
+                "line_number",
+            ]:
                 if key in self.details:
                     detail_parts.append(f"{key.replace('_', ' ')}: {self.details[key]}")
 

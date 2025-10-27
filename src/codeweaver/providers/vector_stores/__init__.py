@@ -48,7 +48,7 @@ def get_vector_store_provider(
         >>> from unittest.mock import MagicMock
         >>> qdrant_settings = VectorStoreSettings(
         ...     provider="qdrant",
-        ...     qdrant={"url": "http://localhost:6333", "collection_name": "test"}
+        ...     qdrant={"url": "http://localhost:6333", "collection_name": "test"},
         ... )
         >>> mock_embedder = MagicMock()
         >>> provider = get_vector_store_provider(qdrant_settings, embedder=mock_embedder)
@@ -71,15 +71,14 @@ def get_vector_store_provider(
             _metadata=None,
         )
 
-    elif provider_type == "memory":
+    if provider_type == "memory":
         memory_config = settings.get("memory", {})
         return MemoryVectorStore.model_construct(config=memory_config, _client=None)
 
-    else:
-        raise ValueError(
-            f"Unknown vector store provider: {provider_type}. "
-            f"Supported providers: 'qdrant', 'memory'"
-        )
+    raise ValueError(
+        f"Unknown vector store provider: {provider_type}. "
+        f"Supported providers: 'qdrant', 'memory'"
+    )
 
 
 __all__ = (

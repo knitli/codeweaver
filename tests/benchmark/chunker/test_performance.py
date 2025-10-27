@@ -13,14 +13,14 @@ Validates that chunking performance meets targets specified in architecture spec
 """
 
 import time
+
 from pathlib import Path
 
 import pytest
 
-from codeweaver.engine.chunker.selector import ChunkerSelector
-from codeweaver.engine.chunker.base import ChunkGovernor
-from codeweaver.config.settings import get_settings
 from codeweaver.core.discovery import DiscoveredFile
+from codeweaver.engine.chunker.base import ChunkGovernor
+from codeweaver.engine.chunker.selector import ChunkerSelector
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
 
@@ -28,43 +28,43 @@ from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapab
 def generate_python_file(num_lines: int) -> str:
     """Generate Python file with specified number of lines."""
     functions_count = num_lines // 10
-    lines = ['# Test file for performance benchmarking\n\n']
+    lines = ["# Test file for performance benchmarking\n\n"]
 
     for i in range(functions_count):
         lines.extend([
-            f'def function_{i}(x, y):\n',
+            f"def function_{i}(x, y):\n",
             f'    """Function {i} docstring."""\n',
-            f'    result = x + y\n',
-            f'    if result > 100:\n',
-            f'        return result * 2\n',
-            f'    else:\n',
-            f'        return result + 10\n',
-            '\n',
+            "    result = x + y\n",
+            "    if result > 100:\n",
+            "        return result * 2\n",
+            "    else:\n",
+            "        return result + 10\n",
+            "\n",
         ])
 
-    return ''.join(lines)
+    return "".join(lines)
 
 
 def generate_javascript_file(num_lines: int) -> str:
     """Generate JavaScript file with specified number of lines."""
     functions_count = num_lines // 12
-    lines = ['// Test file for performance benchmarking\n\n']
+    lines = ["// Test file for performance benchmarking\n\n"]
 
     for i in range(functions_count):
         lines.extend([
-            f'function process_{i}(data) {{\n',
-            f'  // Process data {i}\n',
-            f'  const result = data.map(x => x * 2);\n',
-            f'  if (result.length > 100) {{\n',
-            f'    return result.filter(x => x > 50);\n',
-            f'  }} else {{\n',
-            f'    return result.reduce((a, b) => a + b, 0);\n',
-            f'  }}\n',
-            f'}}\n',
-            '\n',
+            f"function process_{i}(data) {{\n",
+            f"  // Process data {i}\n",
+            "  const result = data.map(x => x * 2);\n",
+            "  if (result.length > 100) {\n",
+            "    return result.filter(x => x > 50);\n",
+            "  } else {\n",
+            "    return result.reduce((a, b) => a + b, 0);\n",
+            "  }\n",
+            "}\n",
+            "\n",
         ])
 
-    return ''.join(lines)
+    return "".join(lines)
 
 
 class TestChunkerPerformance:
@@ -110,8 +110,9 @@ class TestChunkerPerformance:
         assert all(chunk.content for chunk in result), "All chunks should have content"
 
         # Performance target: < 5ms per file (200 files/second)
-        assert benchmark.stats['mean'] < 0.005, \
+        assert benchmark.stats["mean"] < 0.005, (
             f"Mean time {benchmark.stats['mean']:.4f}s exceeds target of 0.005s"
+        )
 
     @pytest.mark.benchmark
     def test_typical_javascript_file_performance(self, selector, benchmark):
@@ -130,7 +131,7 @@ class TestChunkerPerformance:
         result = benchmark(chunk_file)
 
         assert len(result) > 0
-        assert benchmark.stats['mean'] < 0.005
+        assert benchmark.stats["mean"] < 0.005
 
     # Large files: 1000-5000 lines
     @pytest.mark.benchmark
@@ -152,8 +153,9 @@ class TestChunkerPerformance:
 
         assert len(result) > 0
         # Performance target: < 20ms per file (50 files/second)
-        assert benchmark.stats['mean'] < 0.020, \
+        assert benchmark.stats["mean"] < 0.020, (
             f"Mean time {benchmark.stats['mean']:.4f}s exceeds target of 0.020s"
+        )
 
     # Very large files: 5000+ lines
     @pytest.mark.benchmark
@@ -175,13 +177,16 @@ class TestChunkerPerformance:
 
         assert len(result) > 0
         # Performance target: < 100ms per file (10 files/second)
-        assert benchmark.stats['mean'] < 0.100, \
+        assert benchmark.stats["mean"] < 0.100, (
             f"Mean time {benchmark.stats['mean']:.4f}s exceeds target of 0.100s"
+        )
 
     # Memory profiling
     @pytest.mark.benchmark
-    @pytest.mark.skipif(not pytest.importorskip("memory_profiler", minversion=None),
-                       reason="memory_profiler not installed")
+    @pytest.mark.skipif(
+        not pytest.importorskip("memory_profiler", minversion=None),
+        reason="memory_profiler not installed",
+    )
     def test_memory_usage_typical_file(self, selector):
         """Verify memory usage stays under 100MB for typical files.
 
@@ -202,18 +207,21 @@ class TestChunkerPerformance:
 
         # Measure memory delta
         snapshot_after = tracemalloc.take_snapshot()
-        top_stats = snapshot_after.compare_to(snapshot_before, 'lineno')
+        top_stats = snapshot_after.compare_to(snapshot_before, "lineno")
 
         total_memory_mb = sum(stat.size_diff for stat in top_stats) / (1024 * 1024)
         tracemalloc.stop()
 
         assert len(result) > 0
-        assert total_memory_mb < 100, \
+        assert total_memory_mb < 100, (
             f"Memory usage {total_memory_mb:.2f}MB exceeds target of 100MB"
+        )
 
     @pytest.mark.benchmark
-    @pytest.mark.skipif(not pytest.importorskip("memory_profiler", minversion=None),
-                       reason="memory_profiler not installed")
+    @pytest.mark.skipif(
+        not pytest.importorskip("memory_profiler", minversion=None),
+        reason="memory_profiler not installed",
+    )
     def test_memory_usage_large_file(self, selector):
         """Verify memory usage stays under 100MB even for large files.
 
@@ -231,14 +239,15 @@ class TestChunkerPerformance:
         result = chunker.chunk(content, file_path=file_path)
 
         snapshot_after = tracemalloc.take_snapshot()
-        top_stats = snapshot_after.compare_to(snapshot_before, 'lineno')
+        top_stats = snapshot_after.compare_to(snapshot_before, "lineno")
 
         total_memory_mb = sum(stat.size_diff for stat in top_stats) / (1024 * 1024)
         tracemalloc.stop()
 
         assert len(result) > 0
-        assert total_memory_mb < 100, \
+        assert total_memory_mb < 100, (
             f"Memory usage {total_memory_mb:.2f}MB exceeds target of 100MB"
+        )
 
     # Throughput test
     @pytest.mark.benchmark
@@ -265,16 +274,17 @@ class TestChunkerPerformance:
         files_per_second = len(test_files) / elapsed
 
         assert total_chunks > 0, "Should produce chunks"
-        assert files_per_second > 50, \
+        assert files_per_second > 50, (
             f"Throughput {files_per_second:.1f} files/sec below minimum of 50"
+        )
 
     # Performance regression tracking
     @pytest.mark.benchmark
     def test_semantic_vs_delimiter_performance(self, selector, benchmark):
         """Compare semantic and delimiter chunker performance on same content."""
-        from codeweaver.engine.chunker.semantic import SemanticChunker
-        from codeweaver.engine.chunker.delimiter import DelimiterChunker
         from codeweaver.core.language import SemanticSearchLanguage
+        from codeweaver.engine.chunker.delimiter import DelimiterChunker
+        from codeweaver.engine.chunker.semantic import SemanticChunker
 
         content = generate_python_file(500)
         file_path = Path("comparison.py")
@@ -295,9 +305,9 @@ class TestChunkerPerformance:
         delimiter_time = time.perf_counter() - start
 
         # Log results for regression tracking
-        print(f"\nSemantic: {len(semantic_result)} chunks in {semantic_time*1000:.2f}ms")
-        print(f"Delimiter: {len(delimiter_result)} chunks in {delimiter_time*1000:.2f}ms")
-        print(f"Ratio: {semantic_time/delimiter_time:.2f}x")
+        print(f"\nSemantic: {len(semantic_result)} chunks in {semantic_time * 1000:.2f}ms")
+        print(f"Delimiter: {len(delimiter_result)} chunks in {delimiter_time * 1000:.2f}ms")
+        print(f"Ratio: {semantic_time / delimiter_time:.2f}x")
 
         # Both should complete reasonably fast
         assert semantic_time < 0.010, "Semantic chunker too slow"
@@ -339,10 +349,10 @@ class TestChunkerScalability:
 
             # Quality checks
             assert len(chunks) > 0, f"No chunks for {size} line file"
-            assert all(chunk.content.strip() for chunk in chunks), \
+            assert all(chunk.content.strip() for chunk in chunks), (
                 f"Empty chunks in {size} line file"
-            assert all(chunk.metadata for chunk in chunks), \
-                f"Missing metadata in {size} line file"
+            )
+            assert all(chunk.metadata for chunk in chunks), f"Missing metadata in {size} line file"
 
     @pytest.mark.benchmark
     def test_concurrent_chunking_safety(self, selector):

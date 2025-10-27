@@ -14,13 +14,14 @@ import os
 import sys
 
 from collections.abc import Callable, Iterable
+from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from pydantic import UUID7
 
 
 if TYPE_CHECKING:
-    from codeweaver.core import CategoryName, LiteralStringT
+    from codeweaver.core.types import CategoryName, LiteralStringT
 
 
 logger = logging.getLogger(__name__)
@@ -149,4 +150,24 @@ def ensure_iterable[T](value: Iterable[T] | T) -> Iterable[T]:
         yield cast(T, value)
 
 
-__all__ = ("ensure_iterable", "estimate_tokens", "get_possible_env_vars", "rpartial", "uuid7")
+def get_user_config_dir(*, base_only: bool = False) -> Path:
+    """Get the user configuration directory based on the operating system."""
+    import platform
+
+    if (system := platform.system()) == "Windows":
+        config_dir = Path(os.getenv("APPDATA", Path("~\\AppData\\Roaming").expanduser()))
+    if system == "Darwin":
+        config_dir = Path.home() / "Library" / "Application Support"
+    else:
+        config_dir = Path(os.getenv("XDG_CONFIG_HOME", Path.home() / ".config"))
+    return config_dir if base_only else config_dir / "codeweaver"
+
+
+__all__ = (
+    "ensure_iterable",
+    "estimate_tokens",
+    "get_possible_env_vars",
+    "get_user_config_dir",
+    "rpartial",
+    "uuid7",
+)

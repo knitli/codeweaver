@@ -19,6 +19,7 @@ from codeweaver.exceptions import ProviderSwitchError
 from codeweaver.providers.vector_stores.inmemory import MemoryVectorStore
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
 
+
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
 
@@ -66,4 +67,4 @@ async def test_provider_switch_detection():
     except Exception:
         pass
 
-    print(f"✅ Scenario 8 PASSED: Provider switch detected with error")
+    print("✅ Scenario 8 PASSED: Provider switch detected with error")

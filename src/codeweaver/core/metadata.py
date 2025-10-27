@@ -78,7 +78,9 @@ class ChunkSource(BaseEnum):
 class SemanticMetadata(BasedModel):
     """Metadata associated with the semantics of a code chunk."""
 
-    model_config = FROZEN_BASEDMODEL_CONFIG | ConfigDict(validate_assignment=True, arbitrary_types_allowed=True)
+    model_config = FROZEN_BASEDMODEL_CONFIG | ConfigDict(
+        validate_assignment=True, arbitrary_types_allowed=True
+    )
 
     language: Annotated[
         SemanticSearchLanguage | str,
@@ -189,33 +191,20 @@ class Metadata(TypedDict, total=False):
     ]
     nesting_level: NotRequired[
         Annotated[
-            int | None,
-            Field(description="""Nesting level for delimiter chunks (0 = top level)"""),
+            int | None, Field(description="""Nesting level for delimiter chunks (0 = top level)""")
         ]
     ]
     priority: NotRequired[
-        Annotated[
-            int | None,
-            Field(description="""Priority value for delimiter chunks"""),
-        ]
+        Annotated[int | None, Field(description="""Priority value for delimiter chunks""")]
     ]
     line_start: NotRequired[
-        Annotated[
-            int | None,
-            Field(description="""Starting line number for the chunk"""),
-        ]
+        Annotated[int | None, Field(description="""Starting line number for the chunk""")]
     ]
     line_end: NotRequired[
-        Annotated[
-            int | None,
-            Field(description="""Ending line number for the chunk"""),
-        ]
+        Annotated[int | None, Field(description="""Ending line number for the chunk""")]
     ]
     fallback_to_generic: NotRequired[
-        Annotated[
-            bool | None,
-            Field(description="""Whether generic/fallback chunking was used"""),
-        ]
+        Annotated[bool | None, Field(description="""Whether generic/fallback chunking was used""")]
     ]
     updated_at: NotRequired[
         Annotated[

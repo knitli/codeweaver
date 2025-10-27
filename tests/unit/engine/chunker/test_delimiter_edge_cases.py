@@ -61,6 +61,7 @@ for multiple chunks if the generic patterns work correctly.
 
         # Create DiscoveredFile and execute chunking
         from codeweaver.core.discovery import DiscoveredFile
+
         discovered_file = DiscoveredFile.from_path(file_path)
         chunks = delimiter_chunker.chunk(content, file=discovered_file)
 
@@ -113,6 +114,7 @@ def function_three():
 
         # Create DiscoveredFile and test with default configuration
         from codeweaver.core.discovery import DiscoveredFile
+
         discovered_file = DiscoveredFile.from_path(file_path)
         chunks = delimiter_chunker.chunk(content, file=discovered_file)
 
@@ -166,6 +168,7 @@ a, b, c = 1, 2, 3; total = a + b + c  # Another multi-statement line
 
         # Create DiscoveredFile and chunk with default configuration
         from codeweaver.core.discovery import DiscoveredFile
+
         discovered_file = DiscoveredFile.from_path(file_path)
         chunks = delimiter_chunker.chunk(content, file=discovered_file)
 
@@ -174,7 +177,6 @@ a, b, c = 1, 2, 3; total = a + b + c  # Another multi-statement line
         # Verify all chunks respect line boundaries
         for chunk in chunks:
             # Check chunk content starts and ends properly
-            content_clean = chunk.content
 
             # If take_whole_lines is configured:
             # - Content should start at line beginning (no leading partial line)
@@ -232,6 +234,7 @@ function outer() {
 
         # Create DiscoveredFile and chunk
         from codeweaver.core.discovery import DiscoveredFile
+
         discovered_file = DiscoveredFile.from_path(file_path)
         chunks = delimiter_chunker.chunk(content, file=discovered_file)
 
@@ -264,6 +267,7 @@ class MyClass:
 
         # Create DiscoveredFile and chunk
         from codeweaver.core.discovery import DiscoveredFile
+
         discovered_file = DiscoveredFile.from_path(file_path)
         chunks = delimiter_chunker.chunk(content, file=discovered_file)
 
@@ -302,6 +306,7 @@ function alsoEmpty() {
 
         # Create DiscoveredFile and chunk
         from codeweaver.core.discovery import DiscoveredFile
+
         discovered_file = DiscoveredFile.from_path(file_path)
         chunks = delimiter_chunker.chunk(content, file=discovered_file)
 
@@ -332,6 +337,7 @@ function another() {
 
         # Create DiscoveredFile - should not crash, should produce some chunks
         from codeweaver.core.discovery import DiscoveredFile
+
         discovered_file = DiscoveredFile.from_path(file_path)
         chunks = delimiter_chunker.chunk(content, file=discovered_file)
 

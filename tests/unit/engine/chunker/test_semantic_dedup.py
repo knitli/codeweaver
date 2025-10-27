@@ -148,6 +148,7 @@ def test_duplicate_functions_deduplicated(
 
     # Create DiscoveredFile and chunk the file containing duplicates
     from codeweaver.core.discovery import DiscoveredFile
+
     discovered_file = DiscoveredFile.from_path(python_file_with_duplicates)
     chunks = semantic_chunker.chunk(content, file=discovered_file)
 
@@ -201,6 +202,7 @@ def test_unique_chunks_preserved(
 
     # Create DiscoveredFile and chunk the file with all unique functions
     from codeweaver.core.discovery import DiscoveredFile
+
     discovered_file = DiscoveredFile.from_path(python_file_with_unique_functions)
     chunks = semantic_chunker.chunk(content, file=discovered_file)
 
@@ -254,6 +256,7 @@ def test_batch_id_tracking(
 
     # Create DiscoveredFile and chunk the file
     from codeweaver.core.discovery import DiscoveredFile
+
     discovered_file = DiscoveredFile.from_path(python_file_with_unique_functions)
     chunks = semantic_chunker.chunk(content, file=discovered_file)
 

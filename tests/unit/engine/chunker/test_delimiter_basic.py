@@ -97,6 +97,7 @@ function createDataProcessor(config) {
 
         # Create DiscoveredFile and chunk the code
         from codeweaver.core.discovery import DiscoveredFile
+
         discovered_file = DiscoveredFile.from_path(test_file)
         chunks = delimiter_chunker.chunk(js_code, file=discovered_file)
 
@@ -173,6 +174,7 @@ class DataProcessor:
 
         # Create DiscoveredFile and chunk the code
         from codeweaver.core.discovery import DiscoveredFile
+
         discovered_file = DiscoveredFile.from_path(test_file)
         chunks = delimiter_chunker.chunk(py_code, file=discovered_file)
 
@@ -268,6 +270,7 @@ def validate_config(config: dict) -> bool:
 
         # Create DiscoveredFile and chunk the code
         from codeweaver.core.discovery import DiscoveredFile
+
         discovered_file = DiscoveredFile.from_path(test_file)
         chunks = delimiter_chunker.chunk(py_code, file=discovered_file)
 
@@ -351,6 +354,7 @@ function processData(items) {
 
         # Create DiscoveredFile and chunk the code
         from codeweaver.core.discovery import DiscoveredFile
+
         discovered_file = DiscoveredFile.from_path(test_file)
         chunks = delimiter_chunker.chunk(code, file=discovered_file)
 
@@ -390,6 +394,7 @@ def another_function():
 
         # Create DiscoveredFile and chunk the code
         from codeweaver.core.discovery import DiscoveredFile
+
         discovered_file = DiscoveredFile.from_path(test_file)
         chunks = delimiter_chunker.chunk(code, file=discovered_file)
 

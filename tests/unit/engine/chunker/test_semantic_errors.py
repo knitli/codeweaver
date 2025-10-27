@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -46,9 +46,7 @@ def mock_governor() -> MagicMock:
     # Match the actual governor.settings.performance structure
     governor.settings = MagicMock()
     governor.settings.performance = MagicMock(
-        chunk_timeout_seconds=30,
-        max_chunks_per_file=5000,
-        max_ast_depth=200
+        chunk_timeout_seconds=30, max_chunks_per_file=5000, max_ast_depth=200
     )
     governor.settings.semantic_importance_threshold = 0.3
     return governor
@@ -77,6 +75,7 @@ class TestParseErrors:
 
         # Create DiscoveredFile and verify ParseError raised
         from codeweaver.core.discovery import DiscoveredFile
+
         discovered_file = DiscoveredFile.from_path(malformed_file)
         with pytest.raises(ParseError) as exc_info:
             chunker.chunk(content, file=discovered_file)
@@ -103,6 +102,7 @@ class TestParseErrors:
         chunker = SemanticChunker(governor=mock_governor, language=SemanticSearchLanguage.PYTHON)
 
         from codeweaver.core.discovery import DiscoveredFile
+
         discovered_file = DiscoveredFile.from_path(malformed_file)
         with pytest.raises(ParseError) as exc_info:
             chunker.chunk(content, file=discovered_file)
@@ -135,6 +135,7 @@ class TestASTDepthErrors:
 
         # Act & Assert: Verify ASTDepthExceededError raised
         from codeweaver.core.discovery import DiscoveredFile
+
         discovered_file = DiscoveredFile.from_path(deep_file)
         with pytest.raises(ASTDepthExceededError) as exc_info:
             chunker.chunk(content, file=discovered_file)
@@ -160,6 +161,7 @@ class TestASTDepthErrors:
         chunker = SemanticChunker(governor=mock_governor, language=SemanticSearchLanguage.PYTHON)
 
         from codeweaver.core.discovery import DiscoveredFile
+
         discovered_file = DiscoveredFile.from_path(deep_file)
         with pytest.raises(ASTDepthExceededError) as exc_info:
             chunker.chunk(content, file=discovered_file)
@@ -176,10 +178,7 @@ class TestTimeoutErrors:
     """Tests for chunking timeout enforcement."""
 
     def test_timeout_exceeded(
-        self,
-        mock_governor: MagicMock,
-        monkeypatch: MonkeyPatch,
-        discovered_sample_python_file,
+        self, mock_governor: MagicMock, monkeypatch: MonkeyPatch, discovered_sample_python_file
     ) -> None:
         """Verify that slow operations raise ChunkingTimeoutError.
 
@@ -188,6 +187,7 @@ class TestTimeoutErrors:
         Verifies: Exception contains timeout threshold and elapsed time
         """
         import time
+
         from codeweaver.core.language import SemanticSearchLanguage
         from codeweaver.engine.chunker.semantic import SemanticChunker
 
@@ -201,6 +201,7 @@ class TestTimeoutErrors:
         elapsed_time = 0.1  # 100ms elapsed, exceeds 10ms timeout
 
         call_count = [0]
+
         def mock_time():
             call_count[0] += 1
             # First call sets start time, subsequent calls show elapsed time
@@ -212,7 +213,9 @@ class TestTimeoutErrors:
 
         # Act & Assert: Verify ChunkingTimeoutError raised
         with pytest.raises(ChunkingTimeoutError) as exc_info:
-            chunker.chunk(discovered_sample_python_file.contents, file=discovered_sample_python_file)
+            chunker.chunk(
+                discovered_sample_python_file.contents, file=discovered_sample_python_file
+            )
 
         # Verify error details
         error = exc_info.value
@@ -263,7 +266,9 @@ class TestChunkLimitErrors:
         # Act & Assert: Verify ChunkLimitExceededError raised
         # many_functions.py has 15 functions, exceeding the limit of 10
         with pytest.raises(ChunkLimitExceededError) as exc_info:
-            chunker.chunk(discovered_many_functions_file.contents, file=discovered_many_functions_file)
+            chunker.chunk(
+                discovered_many_functions_file.contents, file=discovered_many_functions_file
+            )
 
         # Verify error details
         error = exc_info.value

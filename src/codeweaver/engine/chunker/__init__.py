@@ -25,13 +25,13 @@ from codeweaver.engine.chunker.exceptions import (
     ParseError,
 )
 from codeweaver.engine.chunker.governance import ResourceGovernor
+from codeweaver.engine.chunker.parallel import chunk_files_parallel, chunk_files_parallel_dict
 from codeweaver.engine.chunker.registry import (
     SourceIdRegistry,
     clear_store,
     get_store,
     source_id_for,
 )
-from codeweaver.engine.chunker.parallel import chunk_files_parallel, chunk_files_parallel_dict
 from codeweaver.engine.chunker.selector import ChunkerSelector, GracefulChunker
 from codeweaver.engine.chunker.semantic import SemanticChunker
 

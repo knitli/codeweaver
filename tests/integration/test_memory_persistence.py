@@ -9,6 +9,7 @@ Validates acceptance criteria spec.md:78
 """
 
 import tempfile
+
 from pathlib import Path
 from uuid import uuid4
 
@@ -17,6 +18,7 @@ import pytest
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.providers.vector_stores.inmemory import MemoryVectorStore
+
 
 pytestmark = pytest.mark.integration
 
@@ -31,11 +33,7 @@ async def test_inmemory_persistence():
     """
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_path = Path(tmpdir) / "test_memory.json"
-        config = {
-            "persist_path": temp_path,
-            "auto_persist": True,
-            "collection_name": "test_memory",
-        }
+        config = {"persist_path": temp_path, "auto_persist": True, "collection_name": "test_memory"}
 
         # Phase 1: Create and populate
         provider1 = MemoryVectorStore(config=config)

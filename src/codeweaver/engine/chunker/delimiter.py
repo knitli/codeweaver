@@ -75,7 +75,11 @@ class DelimiterChunker(BaseChunker):
         self._delimiters = self._load_delimiters_for_language(language)
 
     def chunk(
-        self, content: str, *, file: DiscoveredFile | None = None, context: dict[str, Any] | None = None
+        self,
+        content: str,
+        *,
+        file: DiscoveredFile | None = None,
+        context: dict[str, Any] | None = None,
     ) -> list[CodeChunk]:
         """Chunk content using delimiter patterns.
 
@@ -144,7 +148,7 @@ class DelimiterChunker(BaseChunker):
                     used_fallback = True
                     if not matches:
                         return []
-                
+
                 # Add fallback indicator to context if needed
                 if used_fallback:
                     if context is None:
@@ -319,7 +323,7 @@ class DelimiterChunker(BaseChunker):
         STRUCTURAL_PAIRS = {
             "{": "}",
             ":": "\n",  # Python uses : followed by indented block (simplified to newline)
-            "=>": "",   # Arrow functions often have expression bodies
+            "=>": "",  # Arrow functions often have expression bodies
         }
 
         for delimiter in keyword_delimiters:
@@ -335,8 +339,9 @@ class DelimiterChunker(BaseChunker):
 
                 # Find the next structural opening after the keyword
                 struct_start, struct_char = self._find_next_structural_with_char(
-                    content, start=keyword_pos + len(delimiter.start),
-                    allowed=set(STRUCTURAL_PAIRS.keys())
+                    content,
+                    start=keyword_pos + len(delimiter.start),
+                    allowed=set(STRUCTURAL_PAIRS.keys()),
                 )
 
                 if struct_start is None:
@@ -350,7 +355,7 @@ class DelimiterChunker(BaseChunker):
                 if struct_end is not None:
                     # Calculate nesting level by counting parent structures
                     nesting_level = self._calculate_nesting_level(content, keyword_pos)
-                    
+
                     # Create a complete match from keyword to closing structure
                     # This represents the entire construct (e.g., function...})
                     matches.append(
@@ -366,11 +371,11 @@ class DelimiterChunker(BaseChunker):
 
     def _calculate_nesting_level(self, content: str, pos: int) -> int:
         """Calculate nesting level at a given position by counting braces.
-        
+
         Args:
             content: Source code
             pos: Position to check nesting at
-            
+
         Returns:
             Nesting level (0 = top level, 1+ = nested)
         """
@@ -380,38 +385,38 @@ class DelimiterChunker(BaseChunker):
         i = 0
         in_string = False
         string_char = None
-        
+
         while i < pos:
             c = content[i]
-            
+
             # Handle strings
-            if c in ('"', "'", '`') and (i == 0 or content[i-1] != '\\'):
+            if c in ('"', "'", "`") and (i == 0 or content[i - 1] != "\\"):
                 if not in_string:
                     in_string = True
                     string_char = c
                 elif c == string_char:
                     in_string = False
                     string_char = None
-            
+
             # Handle comments (simplified - just check for // and /*)
             elif not in_string:
-                if content[i:i+2] == '//':
+                if content[i : i + 2] == "//":
                     # Skip to end of line
-                    next_newline = content.find('\n', i)
+                    next_newline = content.find("\n", i)
                     i = next_newline if next_newline >= 0 else len(content)
                     continue
-                elif content[i:i+2] == '/*':
+                if content[i : i + 2] == "/*":
                     # Skip to end of comment
-                    end_comment = content.find('*/', i+2)
+                    end_comment = content.find("*/", i + 2)
                     i = end_comment + 2 if end_comment >= 0 else len(content)
                     continue
-                elif c == '{':
+                if c == "{":
                     brace_depth += 1
-                elif c == '}':
+                elif c == "}":
                     brace_depth = max(0, brace_depth - 1)
-            
+
             i += 1
-        
+
         return brace_depth
 
     def _find_next_structural_with_char(
@@ -665,19 +670,19 @@ class DelimiterChunker(BaseChunker):
         return bool(single_quotes % 2 == 1 or double_quotes % 2 == 1 or backticks % 2 == 1)
 
     def _fallback_paragraph_chunking(self, content: str) -> list[DelimiterMatch]:
-        """Fallback to paragraph-based chunking when no delimiters match.
-        
+        r"""Fallback to paragraph-based chunking when no delimiters match.
+
         Uses double newlines (\n\n) as paragraph boundaries for plain text.
         Creates matches for the content between paragraph breaks.
-        
+
         Args:
             content: Content with no delimiter matches
-            
+
         Returns:
             List of DelimiterMatch objects for paragraph boundaries
         """
         from codeweaver.engine.chunker.delimiter_model import Delimiter, DelimiterKind
-        
+
         # Create a paragraph delimiter - we'll create complete boundaries directly
         # by finding text blocks separated by double newlines
         paragraph_delim = Delimiter(
@@ -689,11 +694,11 @@ class DelimiterChunker(BaseChunker):
             take_whole_lines=True,
             nestable=False,
         )
-        
+
         # Split by double newlines and find the positions of each paragraph
         matches: list[DelimiterMatch] = []
-        paragraphs = re.split(r'\n\n+', content)
-        
+        paragraphs = re.split(r"\n\n+", content)
+
         current_pos = 0
         for para in paragraphs:
             if para.strip():  # Only create matches for non-empty paragraphs
@@ -710,7 +715,7 @@ class DelimiterChunker(BaseChunker):
                         )
                     )
                     current_pos = para_end
-        
+
         return matches
 
     def _extract_boundaries(self, matches: list[DelimiterMatch]) -> list[Boundary]:
@@ -737,8 +742,9 @@ class DelimiterChunker(BaseChunker):
             delimiter: Delimiter = match.delimiter  # type: ignore[assignment]
             # Keyword delimiters with empty ends that have been matched already have both positions
             # Also treat matches with both start and end positions as complete
-            if (delimiter.is_keyword_delimiter and match.end_pos is not None) or \
-               (match.end_pos is not None and delimiter.start == "" and delimiter.end == ""):  # type: ignore[union-attr]
+            if (delimiter.is_keyword_delimiter and match.end_pos is not None) or (
+                match.end_pos is not None and delimiter.start == "" and delimiter.end == ""
+            ):  # type: ignore[union-attr]
                 keyword_matches.append(match)
             else:
                 explicit_matches.append(match)
@@ -842,17 +848,18 @@ class DelimiterChunker(BaseChunker):
             for selected in result:
                 if self._boundaries_overlap(boundary, selected):
                     # Check if one is nested inside the other
-                    is_nested = (boundary.start >= selected.start and boundary.end <= selected.end) or \
-                               (selected.start >= boundary.start and selected.end <= boundary.end)
-                    
+                    is_nested = (
+                        boundary.start >= selected.start and boundary.end <= selected.end
+                    ) or (selected.start >= boundary.start and selected.end <= boundary.end)
+
                     # Only allow nesting if priorities are equal (same kind of structure)
                     same_priority = boundary.delimiter.priority == selected.delimiter.priority  # type: ignore[union-attr]
-                    
+
                     if not (is_nested and same_priority):
                         # Not a same-priority nested structure, skip this boundary
                         should_add = False
                         break
-            
+
             if should_add:
                 result.append(boundary)
 
@@ -902,11 +909,11 @@ class DelimiterChunker(BaseChunker):
 
             # Extract chunk text
             chunk_text = content[boundary.start : boundary.end]
-            
+
             # Always calculate line ranges first
             # For proper line range metadata, always expand to full lines
             start_line, end_line = self._expand_to_lines(boundary.start, boundary.end, lines)
-            
+
             # Determine final chunk content based on delimiter settings
             if delimiter.take_whole_lines:  # type: ignore[union-attr]
                 # Extract the full lines
@@ -919,7 +926,7 @@ class DelimiterChunker(BaseChunker):
                 line_start_pos = sum(len(line) for line in lines[: start_line - 1])
                 line_end_pos = sum(len(line) for line in lines[:end_line])
                 chunk_text = content[line_start_pos:line_end_pos]
-                
+
                 # Strip delimiters if not inclusive - but this may create mismatch with line range
                 # The test expects content to match line range, so we keep full lines
                 # if not delimiter.inclusive:  # type: ignore[union-attr]
@@ -942,7 +949,12 @@ class DelimiterChunker(BaseChunker):
         return chunks
 
     def _build_metadata(
-        self, boundary: Boundary, text: str, start_line: int, end_line: int, context: dict[str, Any] | None
+        self,
+        boundary: Boundary,
+        text: str,
+        start_line: int,
+        end_line: int,
+        context: dict[str, Any] | None,
     ) -> Metadata:
         """Build metadata for a delimiter chunk.
 
@@ -985,11 +997,11 @@ class DelimiterChunker(BaseChunker):
             "line_end": end_line,  # Add line_end for test compatibility
             "context": chunk_context,
         }
-        
+
         # Add fallback indicator at top level if present in context
         if context and context.get("fallback_to_generic"):
             metadata["fallback_to_generic"] = True  # type: ignore[typeddict-unknown-key]
-        
+
         return metadata
 
     def _load_delimiters_for_language(self, language: str) -> list[Delimiter]:

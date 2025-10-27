@@ -42,12 +42,12 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
         """Initialize the Mistral embedding provider."""
         kwargs = kwargs or {}
         self._caps = caps
-        client_kwargs = kwargs.get("client_kwargs", {})
+        client_options = kwargs.get("client_options", {})
         if not client:
-            api_key = os.environ.get("MISTRAL_API_KEY", kwargs.get("api_key")) or client_kwargs.get(
-                "api_key"
-            )
-            self._client = Mistral(api_key=api_key, **client_kwargs)
+            api_key = os.environ.get(
+                "MISTRAL_API_KEY", kwargs.get("api_key")
+            ) or client_options.get("api_key")
+            self._client = Mistral(api_key=api_key, **client_options)
         self.model = caps.name
         super().__init__(caps=caps, client=cast(Mistral, client), **kwargs)
 
@@ -83,13 +83,13 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
         self, documents: Sequence[CodeChunk], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         readied_documents = self.chunks_to_strings(documents)
-        kwargs = (kwargs or {}) | self.doc_kwargs.get("client_kwargs", {})
+        kwargs = (kwargs or {}) | self.doc_kwargs.get("client_options", {})
         return await self._fetch_embeddings(cast(list[str], readied_documents), **kwargs)
 
     async def _embed_query(
         self, query: Sequence[str], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
-        kwargs = (kwargs or {}) | self.query_kwargs.get("client_kwargs", {})
+        kwargs = (kwargs or {}) | self.query_kwargs.get("client_options", {})
         return await self._fetch_embeddings(cast(list[str], query), **kwargs)
 
 

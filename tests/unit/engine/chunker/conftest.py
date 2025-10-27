@@ -15,6 +15,7 @@ from codeweaver.engine.chunker.base import ChunkGovernor
 from codeweaver.engine.chunker.governance import ResourceGovernor
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
+
 # Rebuild ChunkGovernor model to resolve forward references
 # This must happen after all imports to ensure ChunkerSettings is available
 ChunkGovernor.model_rebuild()
@@ -36,10 +37,7 @@ def performance_settings() -> PerformanceSettings:
 @pytest.fixture
 def chunker_settings(performance_settings: PerformanceSettings) -> ChunkerSettings:
     """Create ChunkerSettings with test configuration."""
-    return ChunkerSettings(
-        semantic_importance_threshold=0.2,
-        performance=performance_settings,
-    )
+    return ChunkerSettings(semantic_importance_threshold=0.2, performance=performance_settings)
 
 
 @pytest.fixture
@@ -53,8 +51,7 @@ def mock_embedding_capability() -> EmbeddingModelCapabilities:
 
 @pytest.fixture
 def chunk_governor(
-    mock_embedding_capability: EmbeddingModelCapabilities,
-    chunker_settings: ChunkerSettings,
+    mock_embedding_capability: EmbeddingModelCapabilities, chunker_settings: ChunkerSettings
 ) -> ChunkGovernor:
     """Create properly configured ChunkGovernor for tests.
 
@@ -63,10 +60,7 @@ def chunk_governor(
     - simple_overlap: 50-200 tokens (calculated as 20% of chunk_limit)
     - settings: Full ChunkerSettings hierarchy with PerformanceSettings
     """
-    return ChunkGovernor(
-        capabilities=(mock_embedding_capability,),
-        settings=chunker_settings,
-    )
+    return ChunkGovernor(capabilities=(mock_embedding_capability,), settings=chunker_settings)
 
 
 @pytest.fixture

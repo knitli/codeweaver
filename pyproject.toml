@@ -535,6 +535,7 @@ packages = ["src/codeweaver"]
 [tool.hatch.build.targets.sdist]
 include = [
   ".gitignore",
+  "ARCHITECTURE.md",
   "CHANGELOG.md",
   "CONTRIBUTORS_LICENSE_AGREEMENT.py",
   "LICENSE",

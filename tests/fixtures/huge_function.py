@@ -3,10 +3,11 @@
 
 """File with single massive function exceeding token limits."""
 
+
 def massive_function_with_repetitive_code(data):
     """This function is intentionally massive to exceed token limits."""
     result = 0
-    
+
     # Repetitive computation blocks (300+ lines)
     result += data.get("field_0001", 0) * 1.001 + 42
     result += data.get("field_0002", 0) * 1.002 + 42

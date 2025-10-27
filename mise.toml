@@ -264,7 +264,7 @@ print -P "%F{209}[codeweaver]%f ✅ All pre-commit checks passed! You're awesome
 fix-ruff-patterns = """
 #!/bin/bash
 echo "Running ruff pattern fixer..."
-./scripts/code-quality/fix-ruff-patterns.sh
+./scripts/code-quality/fix-ruff-patterns.sh "${*}"
 """
 update-licenses = """
 #!/usr/bin/env /usr/bin/zsh

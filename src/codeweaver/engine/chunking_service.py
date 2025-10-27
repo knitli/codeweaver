@@ -12,17 +12,17 @@ sequential and parallel chunking capabilities with intelligent fallback.
 from __future__ import annotations
 
 import logging
+
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from codeweaver.core.chunks import CodeChunk
-from codeweaver.engine.chunker import ChunkGovernor, ChunkerSelector, chunk_files_parallel
+from codeweaver.engine.chunker import ChunkerSelector, ChunkGovernor, chunk_files_parallel
 
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from codeweaver.config.chunker import ChunkerSettings
     from codeweaver.core.discovery import DiscoveredFile
 
 
@@ -38,7 +38,9 @@ class ChunkingService:
     Examples:
         Basic usage with parallel processing:
 
-        >>> from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+        >>> from codeweaver.providers.embedding.capabilities.base import (
+        ...     EmbeddingModelCapabilities,
+        ... )
         >>> capabilities = EmbeddingModelCapabilities(context_window=8192)
         >>> governor = ChunkGovernor(capabilities=(capabilities,))
         >>> service = ChunkingService(governor)
@@ -51,21 +53,14 @@ class ChunkingService:
 
         >>> from codeweaver.config.chunker import ChunkerSettings, ConcurrencySettings
         >>> settings = ChunkerSettings(
-        ...     concurrency=ConcurrencySettings(
-        ...         max_parallel_files=8,
-        ...         executor="thread"
-        ...     )
+        ...     concurrency=ConcurrencySettings(max_parallel_files=8, executor="thread")
         ... )
         >>> governor = ChunkGovernor(capabilities=(capabilities,), settings=settings)
         >>> service = ChunkingService(governor)
     """
 
     def __init__(
-        self,
-        governor: ChunkGovernor,
-        *,
-        enable_parallel: bool = True,
-        parallel_threshold: int = 3,
+        self, governor: ChunkGovernor, *, enable_parallel: bool = True, parallel_threshold: int = 3
     ) -> None:
         """Initialize the chunking service.
 
@@ -117,15 +112,10 @@ class ChunkingService:
 
         if use_parallel:
             logger.info(
-                "Chunking %d files in parallel (threshold: %d)",
-                len(files),
-                self.parallel_threshold,
+                "Chunking %d files in parallel (threshold: %d)", len(files), self.parallel_threshold
             )
             yield from chunk_files_parallel(
-                files,
-                self.governor,
-                max_workers=max_workers,
-                executor_type=executor_type,
+                files, self.governor, max_workers=max_workers, executor_type=executor_type
             )
         else:
             logger.info("Chunking %d files sequentially", len(files))
@@ -155,11 +145,7 @@ class ChunkingService:
                 # Chunk the file
                 chunks = chunker.chunk(content, file=file)
 
-                logger.debug(
-                    "Chunked %s: %d chunks generated",
-                    file.path,
-                    len(chunks),
-                )
+                logger.debug("Chunked %s: %d chunks generated", file.path, len(chunks))
 
                 yield (file.path, chunks)
 
@@ -174,10 +160,7 @@ class ChunkingService:
                 )
                 # Continue processing other files
 
-    def chunk_file(
-        self,
-        file: DiscoveredFile,
-    ) -> list[CodeChunk]:
+    def chunk_file(self, file: DiscoveredFile) -> list[CodeChunk]:
         """Chunk a single file.
 
         Convenience method for chunking a single file without iteration.
@@ -195,11 +178,7 @@ class ChunkingService:
         content = file.path.read_text(encoding="utf-8", errors="ignore")
         return chunker.chunk(content, file=file)
 
-    def chunk_content(
-        self,
-        content: str,
-        file: DiscoveredFile | None = None,
-    ) -> list[CodeChunk]:
+    def chunk_content(self, content: str, file: DiscoveredFile | None = None) -> list[CodeChunk]:
         """Chunk string content directly.
 
         Args:

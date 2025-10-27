@@ -9,14 +9,11 @@ all required methods and properties according to the contract specification.
 """
 
 import inspect
-from pathlib import Path
+
 from typing import get_type_hints
 
 import pytest
-from pydantic import UUID4
 
-from codeweaver.core.chunks import CodeChunk, SearchResult
-from codeweaver.engine.filter import Filter
 from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
 
@@ -27,7 +24,9 @@ class TestVectorStoreProviderContract:
         """Verify all abstract methods are defined in the interface."""
         abstract_methods = {
             name
-            for name, method in inspect.getmembers(VectorStoreProvider, predicate=inspect.isfunction)
+            for name, method in inspect.getmembers(
+                VectorStoreProvider, predicate=inspect.isfunction
+            )
             if getattr(method, "__isabstractmethod__", False)
         }
 
@@ -40,9 +39,9 @@ class TestVectorStoreProviderContract:
             "delete_by_name",
         }
 
-        assert expected_methods.issubset(
-            abstract_methods
-        ), f"Missing abstract methods: {expected_methods - abstract_methods}"
+        assert expected_methods.issubset(abstract_methods), (
+            f"Missing abstract methods: {expected_methods - abstract_methods}"
+        )
 
     def test_list_collections_signature(self):
         """Verify list_collections method signature matches contract."""
@@ -62,7 +61,7 @@ class TestVectorStoreProviderContract:
         """Verify search method signature matches contract."""
         method = VectorStoreProvider.search
         sig = inspect.signature(method)
-        type_hints = get_type_hints(method)
+        get_type_hints(method)
 
         # Should have vector and query_filter parameters
         params = {p.name: p for p in sig.parameters.values() if p.name != "self"}
@@ -92,7 +91,7 @@ class TestVectorStoreProviderContract:
         assert inspect.iscoroutinefunction(method), "upsert must be async"
 
         # Should return None
-        return_hint = type_hints.get("return")
+        type_hints.get("return")
         # Type checking for None is tricky, just verify it exists
 
     def test_delete_by_file_signature(self):
@@ -138,9 +137,9 @@ class TestVectorStoreProviderContract:
         assert hasattr(VectorStoreProvider, "base_url"), "base_url property must be defined"
 
         # base_url should be abstract
-        assert getattr(
-            VectorStoreProvider.base_url.fget, "__isabstractmethod__", False
-        ), "base_url should be abstract"
+        assert getattr(VectorStoreProvider.base_url.fget, "__isabstractmethod__", False), (
+            "base_url should be abstract"
+        )
 
     def test_cannot_instantiate_abstract_class(self):
         """Verify that VectorStoreProvider cannot be instantiated directly."""

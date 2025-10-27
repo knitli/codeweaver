@@ -38,6 +38,7 @@ def mock_discovered_file():
         file.path = Path(path_str)
         file.source_id = uuid7()  # Add source_id for Span validation (UUID7)
         return file
+
     return _make_file
 
 
@@ -56,8 +57,7 @@ def test_e2e_real_python_file(mock_governor, mock_discovered_file):
     assert len(chunks) > 0, "Should produce chunks"
     assert all(c.content.strip() for c in chunks), "No empty chunks"
     assert all(c.metadata for c in chunks), "All chunks have metadata"
-    assert all(c.line_range.start <= c.line_range.end for c in chunks), \
-        "Valid line ranges"
+    assert all(c.line_range.start <= c.line_range.end for c in chunks), "Valid line ranges"
 
 
 def test_e2e_degradation_chain(mock_governor, mock_discovered_file):
@@ -72,7 +72,7 @@ def test_e2e_degradation_chain(mock_governor, mock_discovered_file):
     # (implementation will add fallback logic)
     with pytest.raises(Exception):  # Will fail until fallback implemented
         chunker = selector.select_for_file(file)
-        chunks = chunker.chunk(content, file_path=fixture_path)
+        chunker.chunk(content, file_path=fixture_path)
 
 
 # =============================================================================
@@ -117,15 +117,10 @@ def test_e2e_multiple_files_parallel_process(sample_files):
         pytest.skip("No fixture files available for parallel processing test")
 
     # Create real governor with capabilities
-    capabilities = EmbeddingModelCapabilities(
-        context_window=8192,
-        embedding_dimensions=1536,
-    )
+    capabilities = EmbeddingModelCapabilities(context_window=8192, embedding_dimensions=1536)
     settings = ChunkerSettings(
         performance=PerformanceSettings(
-            max_ast_depth=200,
-            chunk_timeout_seconds=30,
-            max_chunks_per_file=5000,
+            max_ast_depth=200, chunk_timeout_seconds=30, max_chunks_per_file=5000
         )
     )
     governor = ChunkGovernor(capabilities=(capabilities,), settings=settings)
@@ -146,9 +141,9 @@ def test_e2e_multiple_files_parallel_process(sample_files):
         assert len(chunks) > 0, f"File {file_path} should produce chunks"
         assert all(c.content.strip() for c in chunks), f"No empty chunks in {file_path}"
         assert all(c.metadata for c in chunks), f"All chunks have metadata in {file_path}"
-        assert all(
-            c.line_range.start <= c.line_range.end for c in chunks
-        ), f"Valid line ranges in {file_path}"
+        assert all(c.line_range.start <= c.line_range.end for c in chunks), (
+            f"Valid line ranges in {file_path}"
+        )
 
 
 @pytest.mark.skip(reason="Parallel file processing needs debugging - tracked separately")
@@ -164,15 +159,10 @@ def test_e2e_multiple_files_parallel_thread(sample_files):
         pytest.skip("No fixture files available for parallel processing test")
 
     # Create real governor
-    capabilities = EmbeddingModelCapabilities(
-        context_window=8192,
-        embedding_dimensions=1536,
-    )
+    capabilities = EmbeddingModelCapabilities(context_window=8192, embedding_dimensions=1536)
     settings = ChunkerSettings(
         performance=PerformanceSettings(
-            max_ast_depth=200,
-            chunk_timeout_seconds=30,
-            max_chunks_per_file=5000,
+            max_ast_depth=200, chunk_timeout_seconds=30, max_chunks_per_file=5000
         )
     )
     governor = ChunkGovernor(capabilities=(capabilities,), settings=settings)
@@ -197,7 +187,6 @@ def test_e2e_parallel_error_handling(tmp_path):
     """Verify parallel processing continues when individual files fail."""
     from codeweaver.config.chunker import ChunkerSettings
     from codeweaver.core.discovery import DiscoveredFile
-    from codeweaver.core.metadata import ExtKind
     from codeweaver.engine.chunker.base import ChunkGovernor
     from codeweaver.engine.chunker.parallel import chunk_files_parallel
     from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
@@ -225,9 +214,7 @@ def test_e2e_parallel_error_handling(tmp_path):
 
     # Create governor
     capabilities = EmbeddingModelCapabilities(context_window=8192, embedding_dimensions=1536)
-    governor = ChunkGovernor(
-        capabilities=(capabilities,), settings=ChunkerSettings()
-    )
+    governor = ChunkGovernor(capabilities=(capabilities,), settings=ChunkerSettings())
 
     # Process in parallel - should continue despite bad file
     # Use thread executor to avoid process pickling issues
@@ -240,12 +227,16 @@ def test_e2e_parallel_error_handling(tmp_path):
     # Should have processed the good files even though one failed
     # Note: Depending on error handling, bad file might produce chunks via fallback
     # or be skipped. We verify we got at least the good files.
-    assert len(results) >= 2, f"Should process at least the two good files, got {len(results)}: {list(results.keys())}"
+    assert len(results) >= 2, (
+        f"Should process at least the two good files, got {len(results)}: {list(results.keys())}"
+    )
 
     # Check if good files are in results (handle both absolute and relative paths)
     result_paths = {p.resolve() for p in results.keys()}
     assert good_file.resolve() in result_paths, f"Good file {good_file} should be processed"
-    assert another_good.resolve() in result_paths, f"Another good file {another_good} should be processed"
+    assert another_good.resolve() in result_paths, (
+        f"Another good file {another_good} should be processed"
+    )
 
 
 def test_e2e_parallel_empty_file_list():

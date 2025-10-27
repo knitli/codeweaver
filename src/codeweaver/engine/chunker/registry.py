@@ -12,7 +12,6 @@ from weakref import WeakValueDictionary
 
 from pydantic import UUID7
 
-from codeweaver.common.utils.utils import uuid7
 from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.stores import UUIDStore
 from codeweaver.core.types.aliases import UUID7Hex, UUID7HexT

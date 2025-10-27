@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import platform
 import ssl
 
 from collections.abc import Awaitable, Callable
@@ -38,6 +37,7 @@ from uvicorn.config import (
     WSProtocolType,
 )
 
+from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.logging import LoggingConfigDict
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
@@ -121,7 +121,7 @@ class BaseProviderSettings(TypedDict, total=False):
     enabled: Required[bool]
     api_key: NotRequired[str | None]
     connection: NotRequired[ConnectionConfiguration | None]
-    client_kwargs: NotRequired[dict[str, Any] | None]
+    client_options: NotRequired[dict[str, Any] | None]
     other: NotRequired[dict[str, Any] | None]
 
 
@@ -394,11 +394,7 @@ def default_config_file_locations(
         ["toml"] if not as_yaml and not as_json else ["yaml", "yml"] if as_yaml else ["json"]
     )
     # Get user config directory
-    user_config_dir = (
-        os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))
-        if platform.system() == "Windows"
-        else os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))
-    )
+    user_config_dir = get_user_config_dir()
 
     # Build file paths maintaining precedence order
     base_paths = [

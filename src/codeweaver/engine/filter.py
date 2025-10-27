@@ -273,24 +273,32 @@ def to_qdrant_filter(filter_obj: Filter | None) -> Filter | None:
     Examples:
         >>> from codeweaver.engine.match_models import Filter, FieldCondition, MatchAny
         >>> # Filter by file paths
-        >>> filter_obj = Filter(must=[
-        ...     FieldCondition(key="file_path", match=MatchAny(any=["src/main.py", "src/utils.py"]))
-        ... ])
+        >>> filter_obj = Filter(
+        ...     must=[
+        ...         FieldCondition(
+        ...             key="file_path", match=MatchAny(any=["src/main.py", "src/utils.py"])
+        ...         )
+        ...     ]
+        ... )
         >>> qdrant_filter = to_qdrant_filter(filter_obj)
         >>> assert qdrant_filter == filter_obj
 
         >>> # Filter by language
-        >>> filter_obj = Filter(must=[
-        ...     FieldCondition(key="language", match=MatchAny(any=["python", "javascript"]))
-        ... ])
+        >>> filter_obj = Filter(
+        ...     must=[
+        ...         FieldCondition(
+        ...             key="language", match=MatchAny(any=["python", "javascript"])
+        ...         )
+        ...     ]
+        ... )
         >>> qdrant_filter = to_qdrant_filter(filter_obj)
         >>> assert qdrant_filter is not None
 
         >>> # Filter by line range
         >>> from codeweaver.engine.match_models import Range
-        >>> filter_obj = Filter(must=[
-        ...     FieldCondition(key="line_start", range=Range(gte=10, lte=100))
-        ... ])
+        >>> filter_obj = Filter(
+        ...     must=[FieldCondition(key="line_start", range=Range(gte=10, lte=100))]
+        ... )
         >>> qdrant_filter = to_qdrant_filter(filter_obj)
         >>> assert qdrant_filter is not None
 

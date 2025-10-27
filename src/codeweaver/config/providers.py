@@ -58,7 +58,7 @@ class RerankingModelSettings(TypedDict, total=False):
     custom_prompt: NotRequired[str | None]
     call_kwargs: NotRequired[dict[str, Any] | None]
     """Keyword arguments to pass to the client model's `rerank` method."""
-    client_kwargs: NotRequired[dict[str, Any] | None]
+    client_options: NotRequired[dict[str, Any] | None]
     """Keyword arguments to pass to the client model's constructor."""
 
 
@@ -156,6 +156,8 @@ class QdrantConfig(TypedDict, total=False):
     """Named vector for dense embeddings. Defaults to 'dense'."""
     sparse_vector_name: NotRequired[str]
     """Named vector for sparse embeddings. Defaults to 'sparse'."""
+    client_options: NotRequired[dict[str, Any] | None]
+    """Additional keyword arguments to pass to the Qdrant client."""
 
 
 class MemoryConfig(TypedDict, total=False):

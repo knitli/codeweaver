@@ -55,12 +55,12 @@ def _process_model_settings(model_settings: EmbeddingModelSettings) -> dict[str,
                 {
                     "dimension": "output_dimension",
                     "data_type": "output_dtype",
-                    "client_kwargs": "kwargs",
+                    "client_options": "kwargs",
                 },
             )
         case _:
             return processed_settings | _add_compatible_keys(
-                model_settings, {"client_kwargs": "kwargs"}
+                model_settings, {"client_options": "kwargs"}
             )
 
     return processed_settings

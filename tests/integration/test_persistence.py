@@ -13,10 +13,10 @@ from uuid import uuid4
 
 import pytest
 
-from codeweaver.config.providers import QdrantConfig
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
+
 
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 

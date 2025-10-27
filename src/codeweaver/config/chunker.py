@@ -209,7 +209,7 @@ class ChunkerSettings(BasedModel):
         super().__init__(
             custom_delimiters=custom_delimiters or [],
             custom_languages=custom_languages or {},
-            **data
+            **data,
         )
 
 

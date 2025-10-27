@@ -13,13 +13,15 @@ This script demonstrates:
 """
 
 import sys
+
 from pathlib import Path
+
 
 # Add src to path if running from examples directory
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 
-def main():
+def main() -> None:
     """Run chunking demo."""
     from codeweaver.config.chunker import ChunkerSettings, ConcurrencySettings
     from codeweaver.core.discovery import DiscoveredFile
@@ -55,10 +57,7 @@ def main():
     print("Step 2: Configuring chunking service...")
 
     # Create capabilities (required for ChunkGovernor)
-    capabilities = EmbeddingModelCapabilities(
-        context_window=8192,
-        embedding_dimensions=1536,
-    )
+    capabilities = EmbeddingModelCapabilities(context_window=8192, embedding_dimensions=1536)
 
     # Create settings with parallel processing config
     settings = ChunkerSettings(
@@ -78,10 +77,10 @@ def main():
         parallel_threshold=3,  # Use parallel for 3+ files
     )
 
-    print(f"  Parallel processing: Enabled")
-    print(f"  Parallel threshold: 3 files")
-    print(f"  Max workers: 4")
-    print(f"  Executor: thread")
+    print("  Parallel processing: Enabled")
+    print("  Parallel threshold: 3 files")
+    print("  Max workers: 4")
+    print("  Executor: thread")
     print()
 
     # 3. Chunk files
@@ -101,7 +100,7 @@ def main():
         if len(chunks) > 0:
             # Show first chunk details
             first_chunk = chunks[0]
-            print(f"    First chunk:")
+            print("    First chunk:")
             print(f"      Lines: {first_chunk.line_range.start}-{first_chunk.line_range.end}")
             print(f"      Length: {len(first_chunk.content)} chars")
             print(f"      Language: {first_chunk.language}")
@@ -138,7 +137,7 @@ def main():
         seq_total_chunks += len(chunks)
 
     print(f"  Sequential: {seq_total_chunks} chunks from 3 files")
-    print(f"  (Both methods produce identical results)")
+    print("  (Both methods produce identical results)")
     print()
 
     print("=" * 80)

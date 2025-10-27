@@ -16,11 +16,11 @@ from uuid import uuid4
 
 import pytest
 
-from codeweaver.config.providers import QdrantConfig
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.core.spans import Span
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
+
 
 # Mark all tests in this module as requiring Qdrant
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
@@ -48,11 +48,7 @@ async def qdrant_provider(qdrant_config):
 
     # Use model_construct to bypass validation and create instance
     provider = QdrantVectorStore.model_construct(
-        config=qdrant_config,
-        _embedder=mock_embedder,
-        _reranker=None,
-        _client=None,
-        _metadata=None,
+        config=qdrant_config, _embedder=mock_embedder, _reranker=None, _client=None, _metadata=None
     )
     await provider._initialize()
     yield provider
@@ -166,7 +162,9 @@ class TestQdrantProviderContract:
 
         # Verify chunk is gone
         results = await qdrant_provider.search(vector={"dense": [0.1, 0.2, 0.3] * 256})
-        assert len(results) == 0 or all(r.chunk.file_path != sample_chunk.file_path for r in results)
+        assert len(results) == 0 or all(
+            r.chunk.file_path != sample_chunk.file_path for r in results
+        )
 
     async def test_delete_by_file_idempotent(self, qdrant_provider):
         """Test delete_by_file doesn't error on non-existent file."""
@@ -193,7 +191,9 @@ class TestQdrantProviderContract:
 
         # Verify chunk is gone
         results = await qdrant_provider.search(vector={"dense": [0.1, 0.2, 0.3] * 256})
-        assert len(results) == 0 or all(r.chunk.chunk_name != sample_chunk.chunk_name for r in results)
+        assert len(results) == 0 or all(
+            r.chunk.chunk_name != sample_chunk.chunk_name for r in results
+        )
 
     async def test_collection_property(self, qdrant_provider, qdrant_config):
         """Test collection property returns configured collection name."""

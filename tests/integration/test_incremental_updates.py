@@ -17,6 +17,7 @@ from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
 
+
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
 
@@ -28,7 +29,10 @@ async def test_incremental_updates():
     When: File is re-indexed
     Then: System updates only affected embeddings in both sparse and dense indexes
     """
-    config = {"url": "http://localhost:6333", "collection_name": f"test_incremental_{uuid4().hex[:8]}"}
+    config = {
+        "url": "http://localhost:6333",
+        "collection_name": f"test_incremental_{uuid4().hex[:8]}",
+    }
     provider = QdrantVectorStore(config=config)
     await provider._initialize()
 

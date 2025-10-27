@@ -124,7 +124,11 @@ class SemanticChunker(BaseChunker):
             )
 
     def chunk(
-        self, content: str, *, file: DiscoveredFile | None = None, context: dict[str, Any] | None = None
+        self,
+        content: str,
+        *,
+        file: DiscoveredFile | None = None,
+        context: dict[str, Any] | None = None,
     ) -> list[CodeChunk]:
         """Chunk content into semantic code segments with resource governance.
 
@@ -658,18 +662,22 @@ class SemanticChunker(BaseChunker):
             )
             enhanced_chunks.append(enhanced_chunk)
 
-        return enhanced_chunks if enhanced_chunks else [
-            # Last resort: single chunk with fallback metadata
-            CodeChunk(
-                content=node.text,
-                line_range=Span(node.range.start.line, node.range.end.line, source_id),  # type: ignore[call-arg]
-                ext_kind=ExtKind.from_file(file_path) if file_path else None,
-                file_path=file_path,
-                language=self.language,
-                source=ChunkSource.SEMANTIC,
-                metadata=semantic_metadata,
-            )
-        ]
+        return (
+            enhanced_chunks
+            if enhanced_chunks
+            else [
+                # Last resort: single chunk with fallback metadata
+                CodeChunk(
+                    content=node.text,
+                    line_range=Span(node.range.start.line, node.range.end.line, source_id),  # type: ignore[call-arg]
+                    ext_kind=ExtKind.from_file(file_path) if file_path else None,
+                    file_path=file_path,
+                    language=self.language,
+                    source=ChunkSource.SEMANTIC,
+                    metadata=semantic_metadata,
+                )
+            ]
+        )
 
     def _compute_content_hash(self, content: str) -> BlakeHashKey:
         """Compute Blake3 hash for content deduplication.

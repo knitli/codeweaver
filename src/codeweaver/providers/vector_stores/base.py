@@ -8,14 +8,81 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import UUID4, ConfigDict
+from typing_extensions import TypeIs
 
 from codeweaver.core.chunks import CodeChunk, SearchResult
 from codeweaver.core.types.models import BasedModel
 from codeweaver.engine.filter import Filter
+from codeweaver.providers.embedding.capabilities.base import (
+    EmbeddingModelCapabilities,
+    SparseEmbeddingModelCapabilities,
+)
 from codeweaver.providers.provider import Provider
+
+
+if TYPE_CHECKING:
+    from codeweaver.config.types import CodeWeaverSettingsDict
+    from codeweaver.core.types.dictview import DictView
+
+
+def _get_settings() -> DictView[CodeWeaverSettingsDict]:
+    """Get global CodeWeaver settings.
+
+    Returns:
+        Global settings as a dictionary view.
+    """
+    from codeweaver.config.settings import get_settings_map
+
+    return get_settings_map()
+
+
+def _assemble_caps() -> dict[
+    Literal["dense", "sparse"],
+    list[EmbeddingModelCapabilities] | list[SparseEmbeddingModelCapabilities],
+]:
+    """Assemble embedding model capabilities from settings.
+
+    Returns:
+        EmbeddingModelCapabilities instance or None if not configured.
+    """
+    settings_map: dict[Literal["dense", "sparse"], list[dict[str, Any]]] = {
+        "dense": [],
+        "sparse": [],
+    }
+    settings_map["dense"].extend(
+        model.get("model_settings") for model in _get_settings()["provider"]["embedding"]
+    )
+
+    settings_map["sparse"].extend(
+        model.get("sparse_model_settings") for model in _get_settings()["provider"]["embedding"]
+    )
+
+    embedding_caps: list[EmbeddingModelCapabilities] = (
+        [
+            cap
+            for cap in get_model_registry().list_embedding_models()
+            if cap.name in {config.name for config in settings_map["dense"]}
+        ]
+        if settings_map["dense"]
+        else []
+    )
+    sparse_caps: list[SparseEmbeddingModelCapabilities] = (
+        [
+            cap
+            for cap in get_model_registry().list_sparse_embedding_models()
+            if cap.name in {config.name for config in settings_map["sparse"]}
+        ]
+        if settings_map["sparse"]
+        else []
+    )
+    if embedding_caps or sparse_caps:
+        return {"dense": embedding_caps, "sparse": sparse_caps}
+    raise RuntimeError(
+        "No embedding model capabilities found in settings. We can't store vectors without embeddings."
+    )
 
 
 class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
@@ -23,19 +90,31 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
 
     model_config = BasedModel.model_config | ConfigDict(extra="allow")
 
+    _embedding_caps: EmbeddingModelCapabilities | None = _get_settings()["provider"]["embedding"]
     _client: VectorStoreClient | None
     _provider: Provider
 
-    def _initialize(self) -> None:
+    async def _initialize(self) -> None:
         """Initialize the vector store provider.
 
         This method should be called after creating an instance to perform
         any async initialization. Override in subclasses for custom initialization.
         """
 
+    @abstractmethod
+    @staticmethod
+    def _ensure_client(client: Any) -> TypeIs[VectorStoreClient]:
+        """Ensure the vector store client is initialized.
+
+        Returns:
+            bool: True if the client is initialized and ready.
+        """
+
     @property
     def client(self) -> VectorStoreClient:
         """Returns the vector store client instance."""
+        if not self._ensure_client(self._client):
+            raise RuntimeError("Vector store client is not initialized.")
         return self._client
 
     @property
@@ -80,9 +159,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
 
     @abstractmethod
     async def search(
-        self,
-        vector: list[float] | dict[str, list[float] | Any],
-        query_filter: Filter | None = None,
+        self, vector: list[float] | dict[str, list[float] | Any], query_filter: Filter | None = None
     ) -> list[SearchResult]:
         """Search for similar vectors using query vector(s).
 

@@ -13,6 +13,7 @@ architecture spec §9.3:
 """
 
 import logging
+
 from pathlib import Path
 from typing import Any
 
@@ -189,8 +190,8 @@ def log_chunking_resource_limit(
     *,
     file_path: Path,
     limit_type: str,
-    limit_value: int | float,
-    actual_value: int | float,
+    limit_value: float,
+    actual_value: float,
     extra_context: dict[str, Any] | None = None,
 ) -> None:
     """Log resource limit violation during chunking.
@@ -242,9 +243,7 @@ def log_chunking_deduplication(
         "total_chunks": total_chunks,
         "duplicate_chunks": duplicate_chunks,
         "unique_chunks": unique_chunks,
-        "dedup_rate_percentage": (duplicate_chunks / total_chunks * 100)
-        if total_chunks > 0
-        else 0,
+        "dedup_rate_percentage": (duplicate_chunks / total_chunks * 100) if total_chunks > 0 else 0,
     }
 
     if extra_context:

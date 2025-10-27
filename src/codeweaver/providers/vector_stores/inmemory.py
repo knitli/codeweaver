@@ -7,13 +7,18 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
+import logging
+
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast, override
 
-from pydantic import UUID4
+from pydantic import UUID7
+from typing_extensions import TypeIs
 
+from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.providers import MemoryConfig
 from codeweaver.core.chunks import CodeChunk, SearchResult
 from codeweaver.core.spans import Span
@@ -22,6 +27,7 @@ from codeweaver.exceptions import PersistenceError, ProviderError
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
+
 try:
     from qdrant_client import AsyncQdrantClient
     from qdrant_client.models import Distance, PointStruct, VectorParams
@@ -29,6 +35,8 @@ except ImportError as e:
     raise ProviderError(
         "Qdrant client is required for MemoryVectorStore. Install it with: pip install qdrant-client"
     ) from e
+
+logger = logging.getLogger(__name__)
 
 
 class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
@@ -42,7 +50,8 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
     _provider: Provider = Provider.MEMORY
     _client: AsyncQdrantClient | None = None
 
-    async def _initialize(self) -> None:
+    @override
+    async def _initialize(self) -> None:  # type: ignore
         """Initialize in-memory Qdrant client and restore from disk.
 
         Raises:
@@ -50,7 +59,9 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
             ValidationError: Persistence file format invalid.
         """
         # Initialize persistence settings
-        persist_path = Path(self.config.get("persist_path", ".codeweaver/vector_store.json"))
+        persist_path = (
+            Path(self.config.get("persist_path") or get_user_config_dir()) / "vector_store.json"
+        )
         auto_persist = self.config.get("auto_persist", True)
         persist_interval = self.config.get("persist_interval", 300)
 
@@ -62,7 +73,9 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         object.__setattr__(self, "_shutdown", False)
 
         # Create in-memory Qdrant client
-        self._client = AsyncQdrantClient(location=":memory:")
+        self._client = AsyncQdrantClient(
+            location=":memory:", **(self.config.get("client_options", {}))
+        )
 
         # Restore from disk if persistence file exists
         if persist_path.exists():
@@ -91,13 +104,25 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         """
         return self.config.get("collection_name")
 
-    def _telemetry_keys(self) -> dict[str, str] | None:
+    @staticmethod
+    def _ensure_client(client: Any) -> TypeIs[AsyncQdrantClient]:
+        """Ensure the Qdrant client is initialized.
+
+        Returns:
+            bool: True if the client is initialized and ready.
+        """
+        return (
+            isinstance(client, AsyncQdrantClient)
+            and getattr(client, "location", None) == ":memory:"
+        )
+
+    def _telemetry_keys(self) -> None:
         """Get telemetry keys for the provider.
 
         Returns:
             None (no special telemetry handling needed for in-memory provider).
         """
-        return None
+        return
 
     async def _ensure_collection(self, collection_name: str, dense_dim: int = 768) -> None:
         """Ensure collection exists, creating it if necessary.
@@ -108,17 +133,18 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         """
         from qdrant_client.models import Distance, VectorParams
 
+        if self._client is None:
+            raise ProviderError("Qdrant client not initialized")
+
         # Check if collection exists
         collections = await self._client.get_collections()
-        collection_names = [col.name for col in collections.collections]
+        collection_names = tuple(col.name for col in collections.collections)
 
         if collection_name not in collection_names:
             # Create collection with dense and sparse vector support
             await self._client.create_collection(
                 collection_name=collection_name,
-                vectors_config={
-                    "dense": VectorParams(size=dense_dim, distance=Distance.COSINE)
-                },
+                vectors_config={"dense": VectorParams(size=dense_dim, distance=Distance.COSINE)},
                 sparse_vectors_config={"sparse": {}},  # type: ignore
             )
 
@@ -128,13 +154,13 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         Returns:
             List of collection names.
         """
+        if not self._ensure_client(self._client):
+            raise ProviderError("Qdrant client not initialized")
         collections = await self._client.get_collections()
         return [col.name for col in collections.collections]
 
     async def search(
-        self,
-        vector: list[float] | dict[str, list[float] | Any],
-        query_filter: Filter | None = None,
+        self, vector: list[float] | dict[str, list[float] | Any], query_filter: Filter | None = None
     ) -> list[SearchResult]:
         """Search for similar vectors using dense, sparse, or hybrid search.
 
@@ -149,6 +175,8 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
             CollectionNotFoundError: Collection doesn't exist.
             SearchError: Search operation failed.
         """
+        if not self._ensure_client(self._client):
+            raise ProviderError("Qdrant client not initialized")
         collection_name = self.collection
         if not collection_name:
             raise ProviderError("No collection configured")
@@ -162,35 +190,28 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
             # Dense-only search
             query_vector = "dense"
             query_value = vector
+        elif vector.get("dense"):
+            query_vector = "dense"
+            query_value = vector["dense"]
+        elif vector.get("sparse"):
+            query_vector = "sparse"
+            query_value = vector["sparse"]
         else:
-            # Hybrid or sparse-only search
-            # Prefer dense if available, otherwise use sparse
-            if vector.get("dense"):
-                query_vector = "dense"
-                query_value = vector["dense"]
-            elif vector.get("sparse"):
-                query_vector = "sparse"
-                query_value = vector["sparse"]
-            else:
-                raise ProviderError("No valid vector provided (expected 'dense' or 'sparse' key in dict)")
+            raise ProviderError(
+                "No valid vector provided (expected 'dense' or 'sparse' key in dict)"
+            )
 
         try:
             # Perform search using Qdrant's query_points for hybrid support
-            from qdrant_client.models import QueryRequest
 
             # Build Qdrant filter from our Filter if provided
             qdrant_filter = None
-            if query_filter:
-                # TODO: Implement filter translation when Filter type is defined
-                # For now, pass None to search all points
-                pass
-
             # For sparse vectors, need to convert dict to SparseVector model
             if query_vector == "sparse" and isinstance(query_value, dict):
                 from qdrant_client.models import SparseVector
+
                 query_value = SparseVector(
-                    indices=query_value.get("indices", []),
-                    values=query_value.get("values", []),
+                    indices=query_value.get("indices", []), values=query_value.get("values", [])
                 )
 
             # Search with vector
@@ -213,8 +234,11 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
                 # Reconstruct CodeChunk from payload using model_construct
                 from uuid import UUID
 
+                from codeweaver.common.utils import uuid7
+
+                chunk_id = UUID(payload.get("chunk_id")) if payload.get("chunk_id") else uuid7()
                 chunk = CodeChunk.model_construct(
-                    chunk_id=UUID(payload["chunk_id"]) if payload.get("chunk_id") else None,
+                    chunk_id=chunk_id,
                     chunk_name=payload.get("chunk_name"),
                     file_path=Path(payload["file_path"]) if payload.get("file_path") else None,
                     language=payload.get("language"),
@@ -222,6 +246,9 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
                     line_range=Span(
                         start=payload.get("line_start", 1),
                         end=payload.get("line_end", 1),
+                        _source_id=UUID(payload.get("source_id"))
+                        if payload.get("source_id")
+                        else chunk_id,
                     ),
                 )
 
@@ -229,15 +256,16 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
                 search_result = SearchResult.model_construct(
                     content=chunk,
                     file_path=Path(payload["file_path"]) if payload.get("file_path") else None,
-                    score=point.score if point.score is not None else 0.0,
+                    score=point.score,
                     metadata=None,  # TODO: Extract metadata from payload if needed
                 )
                 search_results.append(search_result)
 
-            return search_results
-
         except Exception as e:
             raise ProviderError(f"Search operation failed: {e}") from e
+
+        else:
+            return search_results
 
     async def upsert(self, chunks: list[CodeChunk]) -> None:
         """Insert or update code chunks with hybrid embeddings.
@@ -251,6 +279,8 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         """
         if not chunks:
             return
+        if not self._ensure_client(self._client):
+            raise ProviderError("Qdrant client not initialized")
 
         collection_name = self.collection
         if not collection_name:
@@ -311,6 +341,8 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         Args:
             file_path: File path to remove from index.
         """
+        if not self._ensure_client(self._client):
+            raise ProviderError("Qdrant client not initialized")
         collection_name = self.collection
         if not collection_name:
             raise ProviderError("No collection configured")
@@ -319,9 +351,10 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         await self._ensure_collection(collection_name)
 
         # Delete using filter on file_path
-        from qdrant_client.models import FieldCondition, Filter as QdrantFilter, MatchValue
+        from qdrant_client.models import FieldCondition, MatchValue
+        from qdrant_client.models import Filter as QdrantFilter
 
-        await self._client.delete(
+        _ = await self._client.delete(
             collection_name=collection_name,
             points_selector=QdrantFilter(
                 must=[FieldCondition(key="file_path", match=MatchValue(value=str(file_path)))]
@@ -332,7 +365,7 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         if self._auto_persist:
             await self._persist_to_disk()
 
-    async def delete_by_id(self, ids: list[UUID4]) -> None:
+    async def delete_by_id(self, ids: list[UUID7]) -> None:
         """Delete chunks by their unique identifiers.
 
         Args:
@@ -363,6 +396,8 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         Args:
             names: List of chunk names to delete.
         """
+        if not self._ensure_client(self._client):
+            raise ProviderError("Qdrant client not initialized")
         collection_name = self.collection
         if not collection_name:
             raise ProviderError("No collection configured")
@@ -371,9 +406,10 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         await self._ensure_collection(collection_name)
 
         # Delete using filter on chunk_name
-        from qdrant_client.models import FieldCondition, Filter as QdrantFilter, MatchAny
+        from qdrant_client.models import FieldCondition, MatchAny
+        from qdrant_client.models import Filter as QdrantFilter
 
-        await self._client.delete(
+        _ = await self._client.delete(
             collection_name=collection_name,
             points_selector=QdrantFilter(
                 must=[FieldCondition(key="chunk_name", match=MatchAny(any=names))]
@@ -390,6 +426,8 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         Raises:
             PersistenceError: Failed to write persistence file.
         """
+        if not self._ensure_client(self._client):
+            raise ProviderError("Qdrant client not initialized")
         try:
             # Get all collections
             collections_response = await self._client.get_collections()
@@ -404,7 +442,11 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
                 offset = None
                 while True:
                     result = await self._client.scroll(
-                        collection_name=col.name, limit=100, offset=offset, with_payload=True, with_vectors=True  # type: ignore
+                        collection_name=col.name,
+                        limit=100,
+                        offset=offset,
+                        with_payload=True,
+                        with_vectors=True,  # type: ignore
                     )
                     if not result[0]:  # No more points
                         break
@@ -415,30 +457,18 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
 
                 # Serialize collection data
                 # Extract dense vector config (vectors is a dict[str, VectorParams])
-                vectors_dict = col_info.config.params.vectors  # type: ignore
+                vectors_data = col_info.config.params.vectors  # type: ignore
                 dense_size = 768  # default
-                if isinstance(vectors_dict, dict) and "dense" in vectors_dict:
-                    dense_params = vectors_dict["dense"]
+                if isinstance(vectors_data, dict) and "dense" in vectors_data:
+                    dense_params = vectors_data["dense"]
                     dense_size = dense_params.size if hasattr(dense_params, "size") else 768
 
                 collections_data[col.name] = {
-                    "metadata": {
-                        "provider": "memory",
-                        "created_at": datetime.now(UTC).isoformat(),
-                    },
-                    "vectors_config": {
-                        "dense": {
-                            "size": dense_size,
-                            "distance": "Cosine",
-                        }
-                    },
+                    "metadata": {"provider": "memory", "created_at": datetime.now(UTC).isoformat()},
+                    "vectors_config": {"dense": {"size": dense_size, "distance": "Cosine"}},
                     "sparse_vectors_config": {"sparse": {}},
                     "points": [
-                        {
-                            "id": str(point.id),
-                            "vector": point.vector,
-                            "payload": point.payload,
-                        }
+                        {"id": str(point.id), "vector": point.vector, "payload": point.payload}
                         for point in points
                     ],
                 }
@@ -471,13 +501,19 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
             PersistenceError: Failed to read or parse persistence file.
             ValidationError: Persistence file format invalid.
         """
+
+        def _raise_persistence_error(msg: str) -> None:
+            raise PersistenceError(msg)
+
+        if not self._ensure_client(self._client):
+            raise ProviderError("Qdrant client not initialized")
         try:
             # Read and parse JSON
-            data = json.loads(self._persist_path.read_text())
+            data = json.loads(cast(Path, self._persist_path).read_text())
 
             # Validate version
             if data.get("version") != "1.0":
-                raise PersistenceError(f"Unsupported persistence version: {data.get('version')}")
+                _raise_persistence_error(f"Unsupported persistence version: {data.get('version')}")
 
             # Restore each collection
             for collection_name, collection_data in data.get("collections", {}).items():
@@ -501,11 +537,13 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
                     batch = points_data[i : i + 100]
                     points = [
                         PointStruct(
-                            id=point["id"], vector=point["vector"], payload=point["payload"]  # type: ignore
+                            id=point["id"],
+                            vector=point["vector"],
+                            payload=point["payload"],  # type: ignore
                         )
                         for point in batch
                     ]
-                    await self._client.upsert(collection_name=collection_name, points=points)
+                    _ = await self._client.upsert(collection_name=collection_name, points=points)
 
         except Exception as e:
             raise PersistenceError(f"Failed to restore from disk: {e}") from e
@@ -536,17 +574,15 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         # Cancel periodic task
         if self._periodic_task:
             self._periodic_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._periodic_task
-            except asyncio.CancelledError:
-                pass
 
         # Final persistence
         try:
             await self._persist_to_disk()
         except Exception:
             # Log but don't raise on shutdown
-            print(f"Final persistence failed: {e}")  # noqa: F821
+            logger.exception("Final persistence on shutdown failed")
 
         # Close client
         if self._client:

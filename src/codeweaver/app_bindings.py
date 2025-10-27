@@ -85,8 +85,8 @@ async def find_code_tool(
         total_results=0,
         token_count=0,
         execution_time_ms=0.0,
-        search_strategy=tuple(),
-        languages_found=tuple(),
+        search_strategy=(),
+        languages_found=(),
     )
 
     # Original implementation (commented out during refactor)
@@ -124,6 +124,7 @@ async def find_code_tool(
     else:
         return response
     """
+    return None
 
 
 # -------------------------
