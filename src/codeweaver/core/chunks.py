@@ -185,6 +185,7 @@ class CodeChunk(BasedModel):
         ),
     ] = None
 
+    # TODO: Add method to retrieve embedding information (model capabilities, dimensions and other settings)
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
@@ -192,6 +193,7 @@ class CodeChunk(BasedModel):
             FilteredKey("content"): AnonymityConversion.TEXT_COUNT,
             FilteredKey("file_path"): AnonymityConversion.BOOLEAN,
             FilteredKey("metadata"): AnonymityConversion.AGGREGATE,
+            FilteredKey("embeddings"): AnonymityConversion.BOOLEAN,
         }
 
     def serialize(self) -> SerializedCodeChunk[CodeChunk]:

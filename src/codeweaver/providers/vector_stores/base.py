@@ -90,7 +90,10 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
 
     model_config = BasedModel.model_config | ConfigDict(extra="allow")
 
-    _embedding_caps: EmbeddingModelCapabilities | None = _get_settings()["provider"]["embedding"]
+    _embedding_caps: dict[
+        Literal["dense", "sparse"],
+        list[EmbeddingModelCapabilities] | list[SparseEmbeddingModelCapabilities],
+    ] = _assemble_caps()
     _client: VectorStoreClient | None
     _provider: Provider
 
