@@ -63,9 +63,7 @@ class ChildTypeDTO(NamedTuple):
     ]
     types: Annotated[
         list[SimpleNodeTypeDTO],
-        Field(
-            description="List of type objects for the allowed child types.", default_factory=list
-        ),
+        Field(description="List of type objects for the allowed child types."),
     ]
 
 

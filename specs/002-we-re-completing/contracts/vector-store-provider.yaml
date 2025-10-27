@@ -1,0 +1,259 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+# Contract: VectorStoreProvider Abstract Interface
+# Description: Defines the contract all vector store providers must implement
+# Version: 1.0
+# Date: 2025-10-25
+
+contract:
+  name: VectorStoreProvider
+  type: abstract_interface
+  location: src/codeweaver/providers/vector_stores/base.py
+
+operations:
+  - name: list_collections
+    description: List all collections in the vector store
+    method: async
+    parameters: []
+    returns:
+      type: list[str] | None
+      description: List of collection names, or None if operation not supported
+    errors:
+      - ConnectionError: Failed to connect to vector store
+      - ProviderError: Provider-specific operation failure
+    success_criteria:
+      - Returns list of collection names when collections exist
+      - Returns empty list when no collections exist
+      - Returns None if provider doesn't support collection listing
+    examples:
+      - input: {}
+        output: ["codeweaver-mcp", "test-project"]
+      - input: {}
+        output: []
+
+  - name: search
+    description: Search for similar vectors using query vector(s)
+    method: async
+    parameters:
+      - name: vector
+        type: list[float] | dict[str, list[float] | SparseVector]
+        required: true
+        description: Query vector (single or named vectors for hybrid search)
+        constraints:
+          - Dense vector length must match collection configuration
+          - Named vectors must exist in collection schema
+          - Sparse vector indices must be sorted and unique
+      - name: query_filter
+        type: Filter | None
+        required: false
+        default: null
+        description: Optional filter to apply to search results
+        constraints:
+          - Filter fields must exist in payload schema
+          - Filter values must match field types
+    returns:
+      type: list[SearchResult]
+      description: List of search results sorted by relevance score (descending)
+      constraints:
+        - Maximum 100 results returned per query
+        - Each result includes score between 0.0 and 1.0
+        - Results include full CodeChunk with metadata
+    errors:
+      - CollectionNotFoundError: Collection doesn't exist
+      - DimensionMismatchError: Query vector dimension doesn't match collection
+      - InvalidFilterError: Filter contains invalid fields or values
+      - SearchError: Search operation failed
+    success_criteria:
+      - Returns results ordered by descending relevance score
+      - Filters results against current filesystem state (file exists check)
+      - Hybrid search combines scores from multiple vector types
+      - Empty list when no results match query/filter
+    examples:
+      - description: Dense vector search
+        input:
+          vector: [0.1, 0.2, 0.3, ...]
+          query_filter: null
+        output:
+          - score: 0.95
+            chunk: {chunk_id: "...", file_path: "src/auth.py", ...}
+          - score: 0.87
+            chunk: {chunk_id: "...", file_path: "src/login.py", ...}
+      - description: Hybrid search with filter
+        input:
+          vector:
+            dense: [0.1, 0.2, ...]
+            sparse: {indices: [1, 5, 10], values: [0.8, 0.6, 0.4]}
+          query_filter:
+            languages: ["python"]
+            file_paths: ["src/**/*.py"]
+        output:
+          - score: 0.92
+            chunk: {file_path: "src/auth.py", language: "python", ...}
+
+  - name: upsert
+    description: Insert or update code chunks with their embeddings
+    method: async
+    parameters:
+      - name: chunks
+        type: list[CodeChunk]
+        required: true
+        description: List of code chunks to insert/update
+        constraints:
+          - Each chunk must have unique chunk_id
+          - Each chunk must have at least one embedding (sparse or dense)
+          - Embedding dimensions must match collection configuration
+          - Maximum 1000 chunks per batch
+    returns:
+      type: None
+      description: No return value on success
+    errors:
+      - CollectionNotFoundError: Collection doesn't exist
+      - DimensionMismatchError: Embedding dimension doesn't match collection
+      - ValidationError: Chunk data validation failed
+      - UpsertError: Upsert operation failed
+    success_criteria:
+      - All chunks successfully inserted or updated
+      - Existing chunks with same ID are replaced
+      - Payload indexes updated for new/modified chunks
+      - Operation is atomic (all-or-nothing for batch)
+    examples:
+      - description: Insert new chunks
+        input:
+          chunks:
+            - chunk_id: "uuid-1"
+              file_path: "src/auth.py"
+              embeddings: {dense: [...], sparse: {...}}
+            - chunk_id: "uuid-2"
+              file_path: "src/login.py"
+              embeddings: {dense: [...]}
+        output: null
+      - description: Update existing chunk
+        input:
+          chunks:
+            - chunk_id: "uuid-1"  # Existing ID
+              file_path: "src/auth.py"
+              embeddings: {dense: [...], sparse: {...}}
+        output: null
+
+  - name: delete_by_file
+    description: Delete all chunks for a specific file
+    method: async
+    parameters:
+      - name: file_path
+        type: Path
+        required: true
+        description: Path of file to remove from index
+        constraints:
+          - Must be relative path from project root
+          - Use forward slashes for cross-platform compatibility
+    returns:
+      type: None
+      description: No return value on success
+    errors:
+      - CollectionNotFoundError: Collection doesn't exist
+      - DeleteError: Delete operation failed
+    success_criteria:
+      - All chunks with matching file_path are deleted
+      - No error if file has no chunks (idempotent)
+      - Payload indexes updated to remove deleted chunks
+    examples:
+      - description: Delete all chunks for file
+        input:
+          file_path: "src/auth.py"
+        output: null
+      - description: Delete non-existent file (no-op)
+        input:
+          file_path: "src/missing.py"
+        output: null
+
+  - name: delete_by_id
+    description: Delete specific code chunks by their unique identifiers
+    method: async
+    parameters:
+      - name: ids
+        type: list[UUID4]
+        required: true
+        description: List of chunk IDs to delete
+        constraints:
+          - Each ID must be valid UUID4
+          - Maximum 1000 IDs per batch
+    returns:
+      type: None
+      description: No return value on success
+    errors:
+      - CollectionNotFoundError: Collection doesn't exist
+      - DeleteError: Delete operation failed
+    success_criteria:
+      - All chunks with matching IDs are deleted
+      - No error if some IDs don't exist (idempotent)
+      - Operation is atomic (all-or-nothing for batch)
+    examples:
+      - description: Delete specific chunks
+        input:
+          ids: ["uuid-1", "uuid-2", "uuid-3"]
+        output: null
+
+  - name: delete_by_name
+    description: Delete specific code chunks by their unique names
+    method: async
+    parameters:
+      - name: names
+        type: list[str]
+        required: true
+        description: List of chunk names to delete
+        constraints:
+          - Each name must be non-empty string
+          - Maximum 1000 names per batch
+    returns:
+      type: None
+      description: No return value on success
+    errors:
+      - CollectionNotFoundError: Collection doesn't exist
+      - DeleteError: Delete operation failed
+    success_criteria:
+      - All chunks with matching names are deleted
+      - No error if some names don't exist (idempotent)
+      - Operation is atomic (all-or-nothing for batch)
+    examples:
+      - description: Delete by chunk names
+        input:
+          names: ["auth.py:authenticate", "login.py:validate_credentials"]
+        output: null
+
+properties:
+  - name: collection
+    type: str | None
+    description: Name of the currently configured collection
+    constraints:
+      - Alphanumeric characters, underscores, hyphens only
+      - Maximum 255 characters
+      - None if no collection configured
+
+  - name: base_url
+    type: str | None
+    description: The base URL for the provider's API, if applicable
+    constraints:
+      - Valid HTTP/HTTPS URL or None
+
+invariants:
+  - Collection must exist before any operations (except list_collections)
+  - Embedding dimensions must remain consistent within a collection
+  - Chunk IDs must be unique within a collection
+  - All async operations must be non-blocking
+  - Provider must be initialized before any operations
+  - Operations must be idempotent where specified
+
+performance_requirements:
+  - search: <200ms p95 for local deployments with <100k chunks
+  - upsert_batch: <1s for 100 chunks
+  - delete_by_file: <100ms for typical files (<100 chunks)
+  - list_collections: <100ms
+
+concurrency:
+  - Multiple concurrent reads (search) must be supported
+  - Concurrent reads and writes must be safe
+  - Eventual consistency acceptable for writes
+  - No read blocking during writes

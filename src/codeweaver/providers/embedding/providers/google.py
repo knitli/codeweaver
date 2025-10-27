@@ -4,6 +4,8 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 """Google embedding provider."""
 
+from __future__ import annotations
+
 import logging
 
 from collections.abc import Iterable, Mapping, Sequence

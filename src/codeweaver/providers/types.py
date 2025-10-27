@@ -1,5 +1,7 @@
 """Types for providers."""
 
+from __future__ import annotations
+
 from typing import Literal
 
 from codeweaver.providers.provider import Provider, ProviderKind

@@ -5,6 +5,8 @@
 
 """Cohere reranking model capabilities."""
 
+from __future__ import annotations
+
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 

@@ -5,6 +5,8 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """ThingRegistry manages the registration and retrieval of grammar Things and Categories for programming languages."""
 
+from __future__ import annotations
+
 import logging
 
 from collections import defaultdict
@@ -110,6 +112,14 @@ class ThingRegistry:
         | RoleT,
     ) -> bool:
         """Check if a thing, category, or connection is registered -- by instance or name."""
+        from codeweaver.semantic.grammar import (
+            Category,
+            CompositeThing,
+            DirectConnection,
+            PositionalConnections,
+            Token,
+        )
+
         if isinstance(obj, Category | Token | CompositeThing):
             return self.is_registered(obj)
         if isinstance(obj, DirectConnection | PositionalConnections):
@@ -127,6 +137,8 @@ class ThingRegistry:
 
     def is_registered(self, thing: ThingOrCategoryType) -> bool:
         """Check if a Thing or Category is already registered."""
+        from codeweaver.semantic.grammar import Category, Token
+
         if isinstance(thing, Category):
             return thing.name in self._categories.get(thing.language, {})
         if isinstance(thing, Token):
@@ -143,6 +155,8 @@ class ThingRegistry:
 
     def _register_category(self, category: Category) -> None:
         """Register a Category."""
+        from codeweaver.semantic.grammar import Category
+
         self._categories[category.language][category.name] = category
         if category.language == SemanticSearchLanguage.JAVASCRIPT:
             self._categories[SemanticSearchLanguage.JSX][category.name] = Category.model_construct(
@@ -156,6 +170,8 @@ class ThingRegistry:
 
     def _register_token(self, token: Token) -> None:
         """Register a Token."""
+        from codeweaver.semantic.grammar import Token
+
         self._tokens[token.language][token.name] = token
         if token.language == SemanticSearchLanguage.JAVASCRIPT:
             self._tokens[SemanticSearchLanguage.JSX][token.name] = Token.model_construct(
@@ -169,14 +185,20 @@ class ThingRegistry:
 
     def register_thing(self, thing: ThingOrCategoryType) -> None:
         """Register a Thing in the appropriate category."""
+        from codeweaver.semantic.grammar import Category
+
         if isinstance(thing, Category):
             self._register_category(thing)
             return
+        from codeweaver.semantic.grammar import Token
+
         if isinstance(thing, Token):
             self._register_token(thing)
             return
         self._composite_things[thing.language][thing.name] = thing
         if thing.language == SemanticSearchLanguage.JAVASCRIPT:
+            from codeweaver.semantic.grammar import CompositeThing
+
             self._composite_things[SemanticSearchLanguage.JSX][thing.name] = (
                 CompositeThing.model_construct(  # type: ignore
                     thing.model_fields_set,
@@ -198,6 +220,8 @@ class ThingRegistry:
 
     def _register_positional_connection(self, connection: PositionalConnections) -> None:
         """Register a PositionalConnections."""
+        from codeweaver.semantic.grammar import PositionalConnections
+
         if connection.source_thing in self._positional_connections[connection.language]:
             return
         self._positional_connections[connection.language][connection.source_thing] = connection
@@ -230,6 +254,8 @@ class ThingRegistry:
 
     def register_connection(self, connection: DirectConnection | PositionalConnections) -> None:
         """Register a Connection in the appropriate category."""
+        from codeweaver.semantic.grammar import DirectConnection, PositionalConnections
+
         if isinstance(connection, PositionalConnections):
             self._register_positional_connection(connection)
             return
@@ -274,6 +300,8 @@ class ThingRegistry:
         """Register multiple Connections."""
         if connections is None:
             return
+        from codeweaver.semantic.grammar import Connection
+
         if isinstance(connections, Connection):
             self.register_connection(connections)
             return
@@ -440,6 +468,23 @@ class ThingRegistry:
 _registry: ThingRegistry | None = None
 
 
+def build_models() -> None:
+    """Build models to populate the registry."""
+    from codeweaver.semantic.grammar import (
+        Category,
+        CompositeThing,
+        DirectConnection,
+        PositionalConnections,
+        Token,
+    )
+
+    models = (Category, CompositeThing, Token, DirectConnection, PositionalConnections)
+    for model in models:
+        if model.__pydantic_complete__:
+            continue
+        _ = model.model_rebuild()
+
+
 def get_registry() -> ThingRegistry:
     """Get the ThingRegistry instance."""
     global _registry
@@ -456,6 +501,7 @@ def get_registry() -> ThingRegistry:
             from codeweaver.semantic.node_type_parser import NodeTypeParser
 
             parser = NodeTypeParser()
+            build_models()
             _ = parser.parse_all_nodes()
     return _registry
 

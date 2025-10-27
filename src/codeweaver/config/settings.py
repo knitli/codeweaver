@@ -13,7 +13,6 @@ clear precedence hierarchy and validation.
 from __future__ import annotations
 
 import contextlib
-import importlib
 import inspect
 import logging
 
@@ -21,18 +20,7 @@ from collections.abc import Callable
 from functools import cached_property, partial
 from importlib import util
 from pathlib import Path
-from textwrap import dedent
-from typing import (
-    TYPE_CHECKING,
-    Annotated,
-    Any,
-    Literal,
-    NotRequired,
-    Self,
-    TypedDict,
-    Unpack,
-    cast,
-)
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Self, Unpack, cast
 
 from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.server.server import DuplicateBehavior
@@ -51,10 +39,17 @@ from pydantic import (
 from pydantic.fields import ComputedFieldInfo, FieldInfo
 from pydantic_ai.settings import merge_model_settings
 from pydantic_core import from_json
-from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+from pydantic_settings import (
+    BaseSettings,
+    JsonConfigSettingsSource,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+    TomlConfigSettingsSource,
+    YamlConfigSettingsSource,
+)
 
 from codeweaver.common.utils.lazy_importer import lazy_import
-from codeweaver.config.language import CustomDelimiter, CustomLanguage
+from codeweaver.config.chunker import ChunkerSettings
 from codeweaver.config.logging import LoggingSettings
 from codeweaver.config.middleware import (
     AVAILABLE_MIDDLEWARE,
@@ -70,17 +65,15 @@ from codeweaver.config.providers import (
     DataProviderSettings,
     EmbeddingModelSettings,
     EmbeddingProviderSettings,
-    ProviderSettingsDict,
     RerankingModelSettings,
     RerankingProviderSettings,
     SparseEmbeddingModelSettings,
+    VectorStoreSettings,
 )
 from codeweaver.config.types import (
-    FastMcpServerSettingsDict,
-    FileFilterSettingsDict,
+    CodeWeaverSettingsDict,
     RignoreSettings,
     UvicornServerSettings,
-    UvicornServerSettingsDict,
     default_config_file_locations,
 )
 from codeweaver.core.file_extensions import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_EXTENSIONS
@@ -92,7 +85,7 @@ from codeweaver.providers.provider import Provider
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types.aliases import FilteredKey
+    from codeweaver.core.types.aliases import FilteredKeyT
     from codeweaver.core.types.enum import AnonymityConversion
 
 
@@ -221,8 +214,7 @@ class FileFilterSettings(BasedModel):
     other_ignore_kwargs: Annotated[
         RignoreSettings | Unset,
         Field(
-            default_factory=dict,
-            description="""Other kwargs to pass to `rignore`. See <https://pypi.org/project/rignore/>. By default we set max_filesize to 5MB and same_file_system to True.""",
+            description="""Other kwargs to pass to `rignore`. See <https://pypi.org/project/rignore/>. By default we set max_filesize to 5MB and same_file_system to True."""
         ),
     ] = UNSET
 
@@ -237,7 +229,7 @@ class FileFilterSettings(BasedModel):
         "follow_links": False,
     })
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {
@@ -361,12 +353,15 @@ class ProviderSettings(BasedModel):
         tuple[RerankingProviderSettings, ...] | Unset,
         Field(description="""Reranking provider configuration"""),
     ] = DefaultRerankingProviderSettings
-    """
-    vector: Annotated[
-        tuple[BaseVectorStoreConfig, ...],
-        Field(default_factory=QdrantVectorStore, description="Vector store provider configuration"),
-    ] = QdrantConfig()
-    """
+
+    vector_store: Annotated[
+        VectorStoreSettings,
+        Field(
+            default_factory=lambda: VectorStoreSettings(provider="memory"),
+            description="""Vector store provider configuration (Qdrant or in-memory)""",
+        ),
+    ]
+
     agent: Annotated[
         tuple[AgentProviderSettings, ...] | Unset,
         Field(description="""Agent provider configuration"""),
@@ -429,7 +424,7 @@ class FastMcpServerSettings(BasedModel):
         ),
     ] = None
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {
@@ -558,9 +553,6 @@ class CodeWeaverSettings(BaseSettings):
             BasedModel.model_config["field_title_generator"],  # type: ignore
         ),
         json_file=default_config_file_locations(as_json=True),
-        json_schema_extra={
-            "NoTelemetryProps": ["project_path", "project_root", "project_name", "config_file"]
-        },
         nested_model_default_partial_update=True,
         str_strip_whitespace=True,
         title="CodeWeaver Settings",
@@ -575,7 +567,7 @@ class CodeWeaverSettings(BaseSettings):
     project_path: Annotated[
         DirectoryPath,
         Field(
-            default_factory=lazy_import("codeweaver.common.utils").get_project_root,  # type: ignore
+            default_factory=lambda: lazy_import("codeweaver.common.utils").get_project_root(),  # type: ignore
             description="""Root path of the codebase to analyze. CodeWeaver will try to detect the project root automatically if you don't provide one.""",
         ),
     ]
@@ -587,8 +579,7 @@ class CodeWeaverSettings(BaseSettings):
     provider: Annotated[
         ProviderSettings,
         Field(
-            default_factory=ProviderSettings,
-            description="""Provider and model configurations for agents, data, embedding, reranking, sparse embedding, and vector store providers. Will default to default profile if not provided.""",
+            description="""Provider and model configurations for agents, data, embedding, reranking, sparse embedding, and vector store providers. Will default to default profile if not provided."""
         ),
     ] = AllDefaultProviderSettings
 
@@ -616,9 +607,9 @@ class CodeWeaverSettings(BaseSettings):
         Field(description="""Optionally customize FastMCP server settings."""),
     ] = DefaultFastMcpServerSettings
 
-    logging: Annotated[
-        LoggingSettings | None, Field(default_factory=dict, description="""Logging configuration""")
-    ] = None
+    logging: Annotated[LoggingSettings | None, Field(description="""Logging configuration""")] = (
+        None
+    )
 
     middleware_settings: Annotated[
         MiddlewareOptions | None, Field(description="""Middleware settings""")
@@ -628,30 +619,9 @@ class CodeWeaverSettings(BaseSettings):
         FileFilterSettings, Field(description="""File filtering settings""")
     ] = FileFilterSettings()
 
-    custom_languages: Annotated[
-        list[CustomLanguage] | None,
-        Field(
-            description=dedent("""
-            If CodeWeaver's built-in language support doesn't cover your codebase sufficiently, you can do one of two things:
-            1. Define custom delimiters for the languages you want to improve support for. This is the recommended approach if you just want to improve chunking for a specific language or file type. Or if you want full control over how chunking is done for a specific language or file type. Do that with the `custom_delimiters` setting, by providing a list of `CustomDelimiter` objects.
-            2. You can optionally provide a list of custom languages for your codebase. This is useful if you use a language or file type that isn't natively supported by CodeWeaver. You can define the language name, file extensions, and the language's family for CodeWeaver to infer a chunking strategy. You can't define custom delimiters here -- use `custom_delimiters` for that.
-
-            Note that CodeWeaver has very extensive built-in language support (currently around 170 languages and 200+ file types), so you should only need to use this if you have a very niche or uncommon language or file type, or if we just missed the extension you are using in our definitions. In either case, please consider submitting a pull request to add it to our built-in definitions, or [file an issue](https://github.com/knitli/codeweaver-mcp/issues/) to let us know!
-            """)
-        ),
-    ] = None
-
-    custom_delimiters: Annotated[
-        list[CustomDelimiter] | None,
-        Field(
-            description=dedent("""
-        You can optionally provide a list of custom delimiters for your codebase. There are two scenarios where you might want to do this:
-        1. You use a language or file type that isn't natively supported by CodeWeaver, and you want to add support for it by defining custom delimiters (you could also submit a pull request! Our builtin delimiters are very extensive, and do a decent job of covering unknown languages, but anything explicitly defined will probably do better.
-        2. You want to override the default delimiters for a language or file type. For example, if you don't think the delimiters are providing good results, you can override them here.
-        3. (I said two...) You should NOT do this if you want a completely custom chunking strategy. You can add one programmatically to the `Chunker` class with `register._chunker.` Your chunker should subclass `codeweaver.services.chunker.base.BaseChunker`.
-        """)
-        ),
-    ] = None
+    chunker: Annotated[ChunkerSettings, Field(description="""Chunker system configuration""")] = (
+        ChunkerSettings()
+    )
 
     enable_background_indexing: Annotated[
         bool,
@@ -702,10 +672,7 @@ class CodeWeaverSettings(BaseSettings):
     ] = Path(".codeweaver/repo_index.json")
 
     uvicorn_settings: Annotated[
-        UvicornServerSettings | None,
-        Field(
-            default_factory=UvicornServerSettings, description="""Settings for the Uvicorn server"""
-        ),
+        UvicornServerSettings | None, Field(description="""Settings for the Uvicorn server""")
     ] = None
 
     __version__: Annotated[
@@ -727,7 +694,7 @@ class CodeWeaverSettings(BaseSettings):
             self._map = cast(DictView[CodeWeaverSettingsDict], DictView(self.model_dump()))
             globals()["_mapped_settings"] = self._map
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {
@@ -759,7 +726,9 @@ class CodeWeaverSettings(BaseSettings):
     def project_root(self) -> Path:
         """Get the project root directory."""
         if not hasattr(self, "project_path") or not self.project_path:
-            self.project_path = importlib.import_module("codeweaver._utils").get_project_root()
+            from codeweaver.common.utils.git import get_project_root
+
+            self.project_path = get_project_root()
         return self.project_path.resolve()
 
     @classmethod  # spellchecker:off
@@ -772,12 +741,35 @@ class CodeWeaverSettings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        """Customize the sources of settings for a specific settings class."""
-        # spellchecker:off
-        return super().settings_customise_sources(
-            settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings
-        )
-        # spellchecker:on
+        """Customize the sources of settings for a specific settings class.
+
+        Configuration precedence (highest to lowest):
+        1. init_settings - Direct initialization arguments
+        2. env_settings - Environment variables (CODEWEAVER_*)
+        3. dotenv_settings - .env files
+        4. toml_sources - TOML config files (.codeweaver.local.toml, .codeweaver.toml, etc.)
+        5. yaml_sources - YAML config files (.codeweaver.local.yaml, .codeweaver.yaml, etc.)
+        6. json_sources - JSON config files (.codeweaver.local.json, .codeweaver.json, etc.)
+        7. file_secret_settings - Secret files (lowest priority)
+        """
+        sources: list[PydanticBaseSettingsSource] = [init_settings, env_settings, dotenv_settings]
+
+        # Add TOML config source if configured
+        if toml_file := settings_cls.model_config.get("toml_file"):
+            sources.append(TomlConfigSettingsSource(settings_cls, toml_file=toml_file))
+
+        # Add YAML config source if configured
+        if yaml_file := settings_cls.model_config.get("yaml_file"):
+            sources.append(YamlConfigSettingsSource(settings_cls, yaml_file=yaml_file))
+
+        # Add JSON config source if configured
+        if json_file := settings_cls.model_config.get("json_file"):
+            sources.append(JsonConfigSettingsSource(settings_cls, json_file=json_file))
+
+        # Add file secret settings last (lowest priority)
+        sources.append(file_secret_settings)
+
+        return tuple(sources)
 
     def _update_settings(self, **kwargs: CodeWeaverSettingsDict) -> Self:
         """Update settings, validating a new CodeWeaverSettings instance and updating the global instance."""
@@ -811,33 +803,6 @@ class CodeWeaverSettings(BaseSettings):
         return self._map
 
 
-class CodeWeaverSettingsDict(TypedDict, total=False):
-    """A serialized `CodeWeaverSettings` object."""
-
-    project_path: NotRequired[Path | None]
-    project_name: NotRequired[str | None]
-    provider: NotRequired[ProviderSettingsDict | None]
-    config_file: NotRequired[FilePath | None]
-    token_limit: NotRequired[PositiveInt]
-    max_file_size: NotRequired[PositiveInt]
-    max_results: NotRequired[PositiveInt]
-    server: NotRequired[FastMcpServerSettingsDict]
-    logging: NotRequired[LoggingSettings]
-    middleware_settings: NotRequired[MiddlewareOptions]
-    project_root: NotRequired[Path | None]
-    uvicorn_settings: NotRequired[UvicornServerSettingsDict]
-    filter_settings: NotRequired[FileFilterSettingsDict]
-    enable_background_indexing: NotRequired[bool]
-    enable_telemetry: NotRequired[bool]
-    enable_health_endpoint: NotRequired[bool]
-    enable_statistics_endpoint: NotRequired[bool]
-    enable_settings_endpoint: NotRequired[bool]
-    enable_version_endpoint: NotRequired[bool]
-    allow_identifying_telemetry: NotRequired[bool]
-    enable_ai_intent_analysis: NotRequired[bool]
-    enable_precontext: NotRequired[bool]
-
-
 # Global settings instance
 _settings: CodeWeaverSettings | None = None
 """The global settings instance. Use `get_settings()` to access it."""
@@ -854,7 +819,9 @@ def get_settings(path: FilePath | None = None) -> CodeWeaverSettings:
     If you **really** need to get the mutable settings instance, you can use this function. It will create the global instance if it doesn't exist, optionally loading from a configuration file (like, .codeweaver.toml) if you provide a path.
     """
     global _settings
-    root = importlib.import_module("codeweaver._utils").get_project_root()
+    from codeweaver.common.utils.git import get_project_root
+
+    root = get_project_root()
     if _settings and path and path.exists():
         _settings = CodeWeaverSettings.from_config(path, **dict(_settings))
     elif path and path.exists():
@@ -920,7 +887,6 @@ __all__ = (
     "DefaultRerankingProviderSettings",
     "FastMcpServerSettings",
     "FileFilterSettings",
-    "FileFilterSettingsDict",
     "get_settings",
     "get_settings_map",
     "merge_agent_model_settings",

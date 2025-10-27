@@ -3,6 +3,8 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 """Settings for Google embedding models."""
 
+from __future__ import annotations
+
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.provider import Provider
 

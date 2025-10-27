@@ -5,6 +5,8 @@
 
 """Reranking model capabilities for Mixed Bread AI models."""
 
+from __future__ import annotations
+
 from collections.abc import Sequence
 
 from codeweaver.providers.provider import Provider

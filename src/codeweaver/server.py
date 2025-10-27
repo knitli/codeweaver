@@ -71,7 +71,7 @@ if TYPE_CHECKING:
     )
     from codeweaver.common.statistics import SessionStatistics
     from codeweaver.common.utils import LazyImport
-    from codeweaver.core.types import AnonymityConversion, FilteredKey
+    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 else:
     # lazy types for pydantic at runtime
     ProviderRegistry: LazyImport[ProviderRegistry] = lazy_import(
@@ -277,7 +277,7 @@ class AppState(DataclassSerializationMixin):
         global _state
         _state = self
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         # Each of the values that are BasedModel or DataclassSerializationMixin have their own filters
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 

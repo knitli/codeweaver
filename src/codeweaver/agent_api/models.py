@@ -23,7 +23,7 @@ from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
 if TYPE_CHECKING:
     from rich.table import Table
 
-    from codeweaver.core.types import AnonymityConversion, FilteredKey, LanguageName
+    from codeweaver.core.types import AnonymityConversion, FilteredKeyT, LanguageName
 
 
 class SearchStrategy(BaseEnum):
@@ -89,7 +89,7 @@ class CodeMatch(BasedModel):
         Field(default_factory=tuple, description="""Related functions, classes, or symbols"""),
     ]
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {FilteredKey("related_symbols"): AnonymityConversion.COUNT}
@@ -156,8 +156,8 @@ class FindCodeResponseSummary(BasedModel):
         ),
     ]
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
-        from codeweaver.core import AnonymityConversion, FilteredKey
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {FilteredKey("summary"): AnonymityConversion.TEXT_COUNT}
 
@@ -166,7 +166,7 @@ class FindCodeResponseSummary(BasedModel):
         """Get the JSON schema for the model as a Python dictionary."""
         return cls.model_json_schema(mode="serialization")
 
-    def _assemble_cli_summary(self) -> Table:
+    def assemble_cli_summary(self) -> Table:
         """Assemble a concise CLI summary of the response."""
         from rich.table import Table
 

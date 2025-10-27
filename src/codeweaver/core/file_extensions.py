@@ -422,7 +422,7 @@ CODE_FILES_EXTENSIONS: tuple[ExtLangPair, ...] = (
     LangPair(ext=FileExt(".txtpb"), language=LanguageName("protobuf")),
     LangPair(
         ext=FileExt(".v"), language=LanguageName("coq")
-    ),  # coq vernacular files -- could also be verilog. We have a parser for coq so we'll default to that.
+    ),  # coq vernacular files -- could also be verilog.
     LangPair(ext=FileExt(".vala"), language=LanguageName("vala")),
     LangPair(ext=FileExt(".vale"), language=LanguageName("vale")),
     LangPair(ext=FileExt(".vapi"), language=LanguageName("vala")),
@@ -471,7 +471,6 @@ CODE_FILES_EXTENSIONS: tuple[ExtLangPair, ...] = (
     LangPair(ext=FileExt("makefile.sco"), language=LanguageName("make")),
     LangPair(ext=FileExt("mkfile"), language=LanguageName("make")),
     LangPair(ext=FileExt("rebar.config"), language=LanguageName("erlang")),
-    # We're only going to cover the main ones for VB6, but langchain has a splitter for it so we'll support it.
     LangPair(ext=FileExt(".bas"), language=LanguageName("visualbasic6")),
     LangPair(ext=FileExt(".cls"), language=LanguageName("visualbasic6")),
     LangPair(ext=FileExt(".ctl"), language=LanguageName("visualbasic6")),
@@ -676,82 +675,76 @@ _js_fam_paths = frozenset((
 ))
 """Common paths for JavaScript family languages (JavaScript, TypeScript, JSX, TSX)."""
 
-LANGUAGE_SPECIFIC_PATHS: MappingProxyType[LanguageNameT, frozenset[Path]] = cast(
-    MappingProxyType[LanguageNameT, frozenset[Path]],
-    MappingProxyType({
-        LanguageName("csharp"): frozenset((*Path().glob("*.csproj"), Path("*.sln"))),
-        LanguageName(cast(LiteralStringT, "elixir")): frozenset((
-            Path("mix.exs"),
-            Path("mix.lock"),
-        )),
-        LanguageName("erlang"): frozenset((Path("rebar.config"), Path("rebar.lock"))),
-        LanguageName("go"): frozenset((
-            Path("go.mod"),
-            Path("go.sum"),
-            Path("go.work"),
-            Path("cmd"),
-            Path("internal"),
-        )),
-        LanguageName("haskell"): frozenset((
-            Path("stack.yaml"),
-            Path("cabal.project"),
-            Path("package.yaml"),
-        )),
-        LanguageName("java"): frozenset((
-            Path("build.gradle"),
-            Path("build.gradle.kts"),
-            Path("pom.xml"),
-            Path("pom.xml"),
-            Path("src/main/java"),
-            Path("src/main/tests"),
-        )),
-        LanguageName("javascript"): _js_fam_paths,
-        LanguageName("jsx"): _js_fam_paths,
-        LanguageName("kotlin"): frozenset((Path("src/main/kotlin"), Path("src/test/kotlin"))),
-        LanguageName("lua"): frozenset((Path("*.rockspec"),)),
-        LanguageName("php"): frozenset((Path("composer.json"), Path("composer.lock"))),
-        LanguageName("python"): frozenset((
-            Path("Pipfile"),
-            Path("Pipfile.lock"),
-            Path("pyproject.toml"),
-            Path("requirements-dev.txt"),
-            Path("requirements.txt"),
-            Path("setup.cfg"),
-            Path("setup.py"),
-        )),
-        LanguageName("ruby"): frozenset((
-            Path("*.gemspec"),
-            Path("Gemfile"),
-            Path("Gemfile.lock"),
-            Path("Rakefile"),
-            Path("config.ru"),
-            Path("spec"),
-        )),
-        LanguageName("rust"): frozenset((Path("Cargo.toml"), Path("Cargo.lock"))),
-        LanguageName("scala"): frozenset((
-            Path("build.sbt"),
-            Path("project/build.properties"),
-            Path("project/plugins.sbt"),
-            Path("src/main/scala"),
-            Path("src/test/scala"),
-        )),
-        LanguageName("solidity"): frozenset((
-            Path("contracts"),
-            Path("foundry.toml"),
-            Path("hardhat.config.js"),
-            Path("hardhat.config.ts"),
-            Path("truffle-config.js"),
-            Path("truffle-config.ts"),
-        )),
-        LanguageName("swift"): frozenset((
-            Path("Package.swift"),
-            Path(".xcodeproj"),
-            Path(".xcworkspace"),
-        )),
-        LanguageName("typescript"): _js_fam_paths,
-        LanguageName("tsx"): _js_fam_paths,
-    }),
-)
+LANGUAGE_SPECIFIC_PATHS: MappingProxyType[LanguageNameT, frozenset[Path]] = MappingProxyType({
+    LanguageName("csharp"): frozenset((*Path().glob("*.csproj"), Path("*.sln"))),
+    LanguageName(cast(LiteralStringT, "elixir")): frozenset((Path("mix.exs"), Path("mix.lock"))),
+    LanguageName("erlang"): frozenset((Path("rebar.config"), Path("rebar.lock"))),
+    LanguageName("go"): frozenset((
+        Path("go.mod"),
+        Path("go.sum"),
+        Path("go.work"),
+        Path("cmd"),
+        Path("internal"),
+    )),
+    LanguageName("haskell"): frozenset((
+        Path("stack.yaml"),
+        Path("cabal.project"),
+        Path("package.yaml"),
+    )),
+    LanguageName("java"): frozenset((
+        Path("build.gradle"),
+        Path("build.gradle.kts"),
+        Path("pom.xml"),
+        Path("pom.xml"),
+        Path("src/main/java"),
+        Path("src/main/tests"),
+    )),
+    LanguageName("javascript"): _js_fam_paths,
+    LanguageName("jsx"): _js_fam_paths,
+    LanguageName("kotlin"): frozenset((Path("src/main/kotlin"), Path("src/test/kotlin"))),
+    LanguageName("lua"): frozenset((Path("*.rockspec"),)),
+    LanguageName("php"): frozenset((Path("composer.json"), Path("composer.lock"))),
+    LanguageName("python"): frozenset((
+        Path("Pipfile"),
+        Path("Pipfile.lock"),
+        Path("pyproject.toml"),
+        Path("requirements-dev.txt"),
+        Path("requirements.txt"),
+        Path("setup.cfg"),
+        Path("setup.py"),
+    )),
+    LanguageName("ruby"): frozenset((
+        Path("*.gemspec"),
+        Path("Gemfile"),
+        Path("Gemfile.lock"),
+        Path("Rakefile"),
+        Path("config.ru"),
+        Path("spec"),
+    )),
+    LanguageName("rust"): frozenset((Path("Cargo.toml"), Path("Cargo.lock"))),
+    LanguageName("scala"): frozenset((
+        Path("build.sbt"),
+        Path("project/build.properties"),
+        Path("project/plugins.sbt"),
+        Path("src/main/scala"),
+        Path("src/test/scala"),
+    )),
+    LanguageName("solidity"): frozenset((
+        Path("contracts"),
+        Path("foundry.toml"),
+        Path("hardhat.config.js"),
+        Path("hardhat.config.ts"),
+        Path("truffle-config.js"),
+        Path("truffle-config.ts"),
+    )),
+    LanguageName("swift"): frozenset((
+        Path("Package.swift"),
+        Path(".xcodeproj"),
+        Path(".xcworkspace"),
+    )),
+    LanguageName("typescript"): _js_fam_paths,
+    LanguageName("tsx"): _js_fam_paths,
+})
 """A mapping of language names to their specific common project paths."""
 
 
@@ -776,6 +769,23 @@ FALLBACK_TEST: MappingProxyType[FileExtensionT, FallBackTestDef] = MappingProxyT
         "values": ("switch", "end", "parfor", "function"),
         "on": "not in",
         "fallback_to": LanguageName(cast(LiteralStringT, "objective-c")),  # type: ignore
+    }),
+    FileExt(""): FallBackTestDef({
+        "values": (
+            "#!/bin/bash",
+            "!#/bin/sh",
+            "#!/usr/bin/env bash",
+            "#!/usr/bin/env sh",
+            "#!/usr/bin/env zsh",
+            "#!/usr/bin/env fish",
+            "#!/usr/bin/env /bin/bash",
+            "#!/usr/bin/env /bin/sh",
+            "#!/usr/bin/env /bin/zsh",
+            "#!/usr/bin/env /usr/bin/zsh",
+            "#!/usr/bin/env /usr/bin/fish",
+        ),
+        "on": "in",
+        "fallback_to": LanguageName(cast(LiteralStringT, "bash")),  # type: ignore
     }),
 })
 """A mapping of file extensions to their fallback test definitions."""
@@ -808,9 +818,15 @@ def _get_languages_helper() -> tuple[
     frozenset[LanguageNameT],
 ]:
     """Helper function to get all languages as frozensets."""
-    code_langs: set[LanguageNameT] = {ext.language for ext in CODE_FILES_EXTENSIONS}
-    data_langs: set[LanguageNameT] = {ext.language for ext in DATA_FILES_EXTENSIONS}
-    doc_langs: set[LanguageNameT] = {ext.language for ext in DOC_FILES_EXTENSIONS}
+    code_langs: set[LanguageNameT] = cast(
+        set[LanguageNameT], {ext.language for ext in CODE_FILES_EXTENSIONS}
+    )
+    data_langs: set[LanguageNameT] = cast(
+        set[LanguageNameT], {ext.language for ext in DATA_FILES_EXTENSIONS}
+    )
+    doc_langs: set[LanguageNameT] = cast(
+        set[LanguageNameT], {ext.language for ext in DOC_FILES_EXTENSIONS}
+    )
     all_langs: set[LanguageNameT] = code_langs | data_langs | doc_langs
     return frozenset(code_langs), frozenset(data_langs), frozenset(doc_langs), frozenset(all_langs)
 

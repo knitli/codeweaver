@@ -17,7 +17,7 @@ from codeweaver.providers.provider import Provider
 class EmbeddingSettingsDict(TypedDict, total=False):
     """A dictionary representing the settings for an embedding client, embedding model, and the embedding call itself. If any."""
 
-    client_kwargs: dict[str, Any]
+    client_options: dict[str, Any]
     model_kwargs: dict[str, Any]
     call_kwargs: dict[str, Any]
 
@@ -214,17 +214,7 @@ class SparseEmbeddingModelCapabilities(BasedModel):
     provider: Annotated[
         Literal[Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS, Provider.UNSET],  # pyright: ignore[reportPrivateUsage]
         Field(
-            default_factory=lambda data: Provider.FASTEMBED
-            if HAS_FASTEMBED and data["name"].lower().startswith("qdrant")
-            else Provider.SENTENCE_TRANSFORMERS
-            if (
-                HAS_ST
-                and (
-                    data["name"].startswith("opensearch") or data["name"].startswith("ibm-granite")
-                )
-            )
-            else Provider.UNSET,  # pyright: ignore[reportPrivateUsage]
-            description="""The provider of the model. We currently only support local providers for sparse embeddings. Since Sparse embedding tend to be very efficient and low resource, they are well-suited for deployment in resource-constrained environments.""",
+            description="""The provider of the model. We currently only support local providers for sparse embeddings. Since Sparse embedding tend to be very efficient and low resource, they are well-suited for deployment in resource-constrained environments."""
         ),
     ] = (
         Provider.FASTEMBED

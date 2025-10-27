@@ -5,6 +5,8 @@
 
 """Model capabilities for Qwen reranking models."""
 
+from __future__ import annotations
+
 from collections.abc import Sequence
 
 from codeweaver.providers.provider import Provider

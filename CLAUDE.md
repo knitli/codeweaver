@@ -127,7 +127,7 @@ src/codeweaver/
 ### Follow CODE_STYLE.md Principles
 - **Line length**: 100 characters
 - **Docstrings**: Google convention, active voice, start with verbs
-- **Type hints**: Modern Python ≥3.11 syntax (`int | str`, `typing.Self`)
+- **Type hints**: Modern Python ≥3.12 syntax (`int | str`, `typing.Self`)
 - **Models**: Prefer `pydantic.BaseModel` with `frozen=True` for immutable data
 - **Lazy evaluation and immutables**: Use generators, tuples, frozensets when appropriate
 

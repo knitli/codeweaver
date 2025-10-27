@@ -19,7 +19,6 @@ classifiers = [
   "Natural Language :: English",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
@@ -40,10 +39,9 @@ dependencies = [
   "cyclopts>=4.0.0",
   "fastmcp>=2.12.5",
   "httpx>=0.28.1",
-  "langchain-text-splitters>=1.0.0",
   "mcp>=1.16.0",
   "numpy>=2.3.4",
-  "posthog>=6.7.9",
+  "posthog>=6.7.10",
   "pydantic-ai>=1.4.0",
   "pydantic-graph>=1.4.0",
   "pydantic-settings>=2.11.0",
@@ -51,6 +49,7 @@ dependencies = [
   "qdrant-client>=1.15.1",
   "rich>=14.2.0",
   "rignore>=0.7.1",
+  "textcase>=0.4.5",
   "tiktoken>=0.12.0",
   "tomli-w>=1.2.0",
   "typing_extensions>=4.15.0",
@@ -62,11 +61,15 @@ dependencies = [
 dynamic = ["version"]
 description = "Extensible MCP server for semantic code search with plugin architecture supporting multiple embedding providers, vector databases, and data sources."
 readme = { file = "README.md", content-type = "text/markdown" }
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 keywords = [
+  "agents",
   "ai",
+  "anthropic",
   "artificial intelligence",
   "ast-grep",
+  "azure",
+  "bedrock",
   "claude",
   "code analysis",
   "code embeddings",
@@ -79,27 +82,47 @@ keywords = [
   "codebase",
   "cohere",
   "docarray",
+  "embedding",
+  "embeddings",
   "extensible",
+  "fastembed",
   "fastmcp",
   "framework",
+  "genai",
+  "google",
+  "grok",
+  "groq",
   "huggingface",
+  "hybrid search",
+  "information retrieval",
   "large language models",
+  "llama",
   "llms",
   "mcp protocol",
   "mcp server",
   "mcp",
+  "mistral",
   "model context protocol",
   "natural language processing",
   "nlp",
   "openai",
+  "perplexity",
   "platform",
   "plugin architecture",
   "pydantic",
   "pydantic-ai",
   "qdrant",
+  "rerank",
+  "retrieval",
   "search",
   "semantic search",
+  "sentence transformers",
+  "tree-sitter",
+  "vector database",
+  "vector embeddings",
   "vector search",
+  "vector store",
+  "vector",
   "voyageai",
 ]
 
@@ -115,7 +138,7 @@ Issues = "https://github.com/knitli/codeweaver-mcp/issues"
 Repository = "https://github.com/knitli/codeweaver-mcp"
 
 [build-system]
-requires = ["hatchling>=1.14.1", "uv-dynamic-versioning>=0.7.0"]
+requires = ["hatchling>=1.27.0", "uv-dynamic-versioning>=0.11.2"]
 build-backend = "hatchling.build"
 
 
@@ -148,7 +171,7 @@ docs = [
   "mkdocs-rss-plugin>=1.17.4",
   "mkdocs>=1.6.1",
   "mkdocstrings[python]>=0.30.1",
-  "pygments>=2.19.1",
+  "pygments>=2.19.2",
   "pymdown-extensions>=10.16.1",
 ]
 dev = [
@@ -158,138 +181,135 @@ dev = [
   "jsonlines>=4.0.0",
   "mteb>=2.1.0",
   "pdbpp>=0.11.7",
-  "pydantic-ai>=1.4.0",
+  "pydantic-ai>=1.6.0",
   "pyperclip>=1.11.0",
-  "pyright>=1.1.406",
+  "pyright>=1.1.407",
   "ruff>=0.14.2",
   "superclaude>=4.1.6",
   "types-boto3-custom",
   "uv>=0.9.5",
 ]
 all-dev = [
-  "copychat>=0.7.2",
-  "py-cpuinfo>=9.0.0",
-  "dirty-equals>=0.10.0",
-  "hatchling>=1.27.0",
-  "httpx>=0.28.1",
-  "ipython>=9.6.0",
-  "jsonlines>=4.0.0",
-  "mkdocs-awesome-nav>=3.2.0",
-  "mkdocs-gen-files>=0.5.0",
-  "mkdocs-git-revision-date-localized-plugin>=1.4.7",
-  "mkdocs-material>=9.6.22",
-  "mkdocs-minify-plugin>=0.8.0",
-  "mkdocs-redirects>=1.2.2",
-  "mkdocs-rss-plugin==1.17.4",
-  "mkdocs>=1.6.1",
-  "mkdocstrings[python]>=0.30.1",
-  "mteb>=2.1.0",
-  "pdbpp>=0.11.7",
-  "pydantic>=2.12.3",
-  "pydantic-ai>=1.4.0",
-  "pygments>=2.19.2",
-  "pymdown-extensions>=10.16.1",
-  "pyperclip>=1.11.0",
-  "pyright>=1.1.406",
-  "pytest-asyncio>=1.2.0",
-  "pytest-cov>=7.0.0",
-  "pytest-env>=1.2.0",
-  "pytest-flakefinder>=1.1.0",
-  "pytest-httpx>=0.35.0",
-  "pytest-mock>=3.15.1",
-  "pytest-report>=0.2.1",
-  "pytest-timeout>=2.4.0",
-  "pytest>=8.4.2",
-  "ruff>=0.14.2",
-  "superclaude>=4.1.6",
+  "copychat",
+  "py-cpuinfo",
+  "dirty-equals",
+  "hatchling",
+  "httpx",
+  "ipython",
+  "jsonlines",
+  "mkdocs-awesome-nav",
+  "mkdocs-gen-files",
+  "mkdocs-git-revision-date-localized-plugin",
+  "mkdocs-material",
+  "mkdocs-minify-plugin",
+  "mkdocs-redirects",
+  "mkdocs-rss-plugin",
+  "mkdocs",
+  "mkdocstrings[python]",
+  "mteb",
+  "pdbpp",
+  "pydantic",
+  "pydantic-ai",
+  "pygments",
+  "pymdown-extensions",
+  "pyperclip",
+  "pyright",
+  "pytest-asyncio",
+  "pytest-cov",
+  "pytest-env",
+  "pytest-flakefinder",
+  "pytest-httpx",
+  "pytest-mock",
+  "pytest-report",
+  "pytest-timeout",
+  "pytest",
+  "ruff",
+  "superclaude",
   "types-boto3-custom",
-  "uv-dynamic-versioning>=0.11.2",
-  "uv>=0.9.5",
+  "uv-dynamic-versioning",
+  "uv",
 ]
 
 [project.optional-dependencies]
 
 recommended = [
-  "aenum>=3.1.16",
-  "ast-grep-py>=0.39.6",
-  "cyclopts>=4.0.0",
-  "py-cpuinfo>=9.0.0",
-  "fastmcp[websockets]>=2.12.5",
-  "langchain-text-splitters>=1.0.0",
-  "mcp>=1.19.0",
-  "numpy>=2.3.4",
-  "posthog>=6.7.9",
-  "pydantic-ai>=1.4.0",
-  "pydantic-graph>=1.4.0",
-  "pydantic-settings>=2.11.0",
-  "pydantic>=2.12.3",
-  "qdrant-client>=1.15.1",
-  "rich>=14.2.0",
-  "rignore>=0.7.1",
-  "textcase>=0.4.5",
-  "tiktoken>=0.12.0",
-  "tokenizers>=0.21.4",
-  "tomli-w>=1.2.0",
-  "typing_extensions>=4.15.0",
-  "uuid7>=0.1.0; python_version < '3.14'",
-  "uvicorn[standard]>=0.38.0",
-  "voyageai>=0.3.5",
-  "watchfiles>=1.1.1",
+  "aenum",
+  "ast-grep-py",
+  "cyclopts",
+  "py-cpuinfo",
+  "fastmcp",
+  "mcp",
+  "numpy",
+  "posthog",
+  "pydantic-ai",
+  "pydantic-graph",
+  "pydantic-settings",
+  "pydantic",
+  "qdrant-client",
+  "rich",
+  "rignore",
+  "textcase",
+  "tiktoken",
+  "tokenizers",
+  "tomli-w",
+  "typing_extensions",
+  "uuid7; python_version < '3.14'",
+  "uvicorn[standard]",
+  "voyageai",
+  "watchfiles",
 ]
 
 recommended-no-telemetry = [
-  "aenum>=3.1.16",
-  "ast-grep-py>=0.39.6",
-  "cyclopts>=4.0.0",
-  "py-cpuinfo>=9.0.0",
-  "fastmcp[websockets]>=2.12.5",
-  "langchain-text-splitters>=1.0.0",
-  "mcp>=1.19.0",
-  "numpy>=2.3.4",
-  "posthog>=6.7.9",
-  "pydantic-ai>=1.4.0",
-  "pydantic-graph>=1.4.0",
-  "pydantic-settings>=2.11.0",
-  "pydantic>=2.12.3",
-  "qdrant-client>=1.15.1",
-  "rich>=14.2.0",
-  "rignore>=0.7.1",
-  "textcase>=0.4.5",
-  "tiktoken>=0.12.0",
-  "tokenizers>=0.21.4",
-  "tomli-w>=1.2.0",
-  "typing-extensions>=4.15.0",
-  "uuid7>=0.1.0; python_version < '3.14'",
-  "uvicorn>=0.38.0",
-  "voyageai>=0.3.5",
-  "watchfiles>=1.1.1",
+  "aenum",
+  "ast-grep-py",
+  "cyclopts",
+  "py-cpuinfo",
+  "fastmcp",
+  "mcp",
+  "numpy",
+  "posthog",
+  "pydantic-ai",
+  "pydantic-graph",
+  "pydantic-settings",
+  "pydantic",
+  "qdrant-client",
+  "rich",
+  "rignore",
+  "textcase",
+  "tiktoken",
+  "tokenizers",
+  "tomli-w",
+  "typing-extensions",
+  "uuid7; python_version < '3.14'",
+  "uvicorn",
+  "voyageai",
+  "watchfiles",
 ]
 
 recommended-local-only = [
-  "aenum>=3.1.16",
-  "ast-grep-py>=0.39.6",
-  "cyclopts>=4.0.0",
-  "py-cpuinfo>=9.0.0",
-  "fastembed>=0.7.3",
-  "fastmcp[websockets]>=2.12.5",
-  "langchain-text-splitters>=1.0.0",
-  "mcp>=1.19.0",
-  "numpy>=2.3.4",
-  "posthog>=6.7.9",
-  "pydantic-graph>=1.4.0",
-  "pydantic-settings>=2.11.0",
-  "pydantic>=2.12.3",
-  "qdrant-client>=1.15.1",
-  "rich>=14.2.0",
-  "rignore>=0.7.1",
-  "textcase>=0.4.5",
-  "tiktoken>=0.12.0",
-  "tokenizers>=0.21.4",
-  "tomli-w>=1.2.0",
-  "typing-extensions>=4.15.0",
-  "uuid7>=0.1.0; python_version < '3.14'",
-  "uvicorn[standard]>=0.38.0",
-  "watchfiles>=1.1.1",
+  "aenum",
+  "ast-grep-py",
+  "cyclopts",
+  "py-cpuinfo",
+  "fastembed",
+  "fastmcp",
+  "mcp",
+  "numpy",
+  "posthog",
+  "pydantic-graph",
+  "pydantic-settings",
+  "pydantic",
+  "qdrant-client",
+  "rich",
+  "rignore",
+  "textcase",
+  "tiktoken",
+  "tokenizers",
+  "tomli-w",
+  "typing-extensions",
+  "uuid7; python_version < '3.14'",
+  "uvicorn[standard]",
+  "watchfiles",
 ]
 
 # =================  A-La-Carte =================
@@ -308,83 +328,82 @@ recommended-local-only = [
 #    `uv pip install 'codeweaver-mcp[required-core,provider-openai,provider-qdrant,source-filesystem]'`
 #    `uv pip install 'codeweaver-mcp[required-core,pre-context,provider-anthropic,provider-voyage,provider-qdrant]'`
 required-core = [
-  "aenum>=3.1.16",
-  "ast-grep-py>=0.39.6",
-  "fastmcp[websockets]>=2.12.5",
-  "langchain-text-splitters>=1.0.0",
-  "mcp>=1.19.0",
-  "numpy>=2.3.4",
-  "pydantic-graph>=1.4.0",
-  "pydantic-settings>=2.11.0",
-  "pydantic>=2.12.3",
-  "rignore>=0.7.1",
-  "textcase>=0.4.5",
-  "tiktoken>=0.12.0",
-  "typing-extensions>=4.15.0",
-  "uuid7>=0.1.0; python_version < '3.14'",
-  "uvicorn[standard]>=0.38.0",
+  "aenum",
+  "ast-grep-py",
+  "fastmcp",
+  "mcp",
+  "numpy",
+  "pydantic-graph",
+  "pydantic-settings",
+  "pydantic",
+  "rignore",
+  "textcase",
+  "tiktoken",
+  "typing-extensions",
+  "uuid7; python_version < '3.14'",
+  "uvicorn[standard]",
 ]
 
-cli = ["cyclopts>=4.0.0", "rich>=14.2.0", "tomli-w>=1.2.0"]
+cli = ["cyclopts", "rich", "tomli-w"]
 
 # also requires one agent-capable provider, one embedding-capable provider, and a vector store
 pre-context = [
-  "cyclopts>=4.0.0",
-  "rich>=14.2.0",
-  "tomli-w>=1.2.0",
-  "watchfiles>=1.1.1",
+  "cyclopts",
+  "rich",
+  "tomli-w",
+  "watchfiles",
 ]
 
 # ==== Providers ====
 #    --- Agent-only Providers --- (no embedding/rerank)
-provider-anthropic = ["pydantic-ai-slim[anthropic]>=0.6.2"]
-provider-groq = ["pydantic-ai-slim[groq]>=0.6.2"]
+provider-anthropic = ["pydantic-ai-slim[anthropic]"]
+provider-groq = ["pydantic-ai-slim[groq]"]
 
 #    --- Embedding and Agent Providers --- (no rerank)
-provider-huggingface = ["pydantic-ai-slim[huggingface]>=0.6.2"]
-provider-google = ["pydantic-ai-slim[google]>=0.6.2"]
-provider-openai = ["pydantic-ai-slim[openai]>=0.6.2"]
+provider-huggingface = ["pydantic-ai-slim[huggingface]"]
+provider-google = ["pydantic-ai-slim[google]"]
+provider-openai = ["pydantic-ai-slim[openai]"]
 # OpenAI includes support for:
 #   DeekSeek, Ollama, OpenRouter, Vercel, Perplexity, Moonshot, FireworksAI, 
 #   TogetherAI, Azure AI Foundry, Heroku, and Github Models, X-AI
 # which all use the OpenAI API
-provider-mistral = ["pydantic-ai-slim[mistral]>=0.6.2"]
+provider-mistral = ["pydantic-ai-slim[mistral]"]
 
 #    --- Embedding, Rerank and Agent Providers --- (the trifecta)
 
-provider-bedrock = ["pydantic-ai-slim[bedrock]>=0.6.2"]
-provider-cohere = ["pydantic-ai-slim[cohere]>=1.4.0"]
+provider-bedrock = ["pydantic-ai-slim[bedrock]"]
+provider-cohere = ["pydantic-ai-slim[cohere]"]
 
 #    --- Embedding and Rerank Only --- (no agent)
-provider-fastembed = ["fastembed>=0.7.3", "py-cpuinfo>=9.0.0"]
-provider-fastembed-gpu = ["fastembed-gpu>=0.7.3", "py-cpuinfo>=9.0.0"]
+provider-fastembed = ["fastembed", "py-cpuinfo"]
+provider-fastembed-gpu = ["fastembed-gpu", "py-cpuinfo"]
 provider-sentence-transformers = [
-  "sentence-transformers>=5.1.2",
-  "py-cpuinfo>=9.0.0",
+  "sentence-transformers",
+  "py-cpuinfo",
 ]
 provider-sentence-transformers-gpu = [
-  "sentence-transformers[onnx-gpu]>=5.1.2",
-  "py-cpuinfo>=9.0.0",
+  "sentence-transformers[onnx-gpu]",
+  "py-cpuinfo",
 ]
 
 # disabled until we can fully integrate and resolve dependency conflicts
 # provider-sentence-transformers-openvino = [
-#     "sentence-transformers[openvino]>=5.1.0",
-#     "py-cpuinfo>=9.0.0",
+#     "sentence-transformers[openvino]",
+#     "py-cpuinfo",
 # ]
 
-provider-voyageai = ["voyageai>=0.3.4"]
+provider-voyageai = ["voyageai"]
 # Requires additional setup, see https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/
 
 # ==== Vector Stores ====
-provider-in-memory = ["qdrant-client>=1.15.1", "tokenizers>=0.13.2"]
-provider-qdrant = ["qdrant-client>=1.15.0"]
+provider-in-memory = ["qdrant-client", "tokenizers"]
+provider-qdrant = ["qdrant-client"]
 
 # ==== Data Sources ====
 
-source-filesystem = ["langchain-text-splitters>=1.0.0", "watchfiles>=1.1.0"]
-source-tavily = ["pydantic-ai-slim[tavily]>=0.6.2"]
-source-duckduckgo = ["pydantic-ai-slim[duckduckgo]>=0.6.2"]
+source-filesystem = ["watchfiles"]
+source-tavily = ["pydantic-ai-slim[tavily]"]
+source-duckduckgo = ["pydantic-ai-slim[duckduckgo]"]
 
 
 # ==== Authentication and Authorization Middleware ====
@@ -394,10 +413,10 @@ source-duckduckgo = ["pydantic-ai-slim[duckduckgo]>=0.6.2"]
 
 # TODO: Implement authentication and authorization middleware -- should be simple to add
 # permit.io middleware - see https://gofastmcp.com/integrations/permit
-auth-permitio = ["permit-fastmcp>=0.1.1"]
+auth-permitio = ["permit-fastmcp"]
 
 # eunomia middleware - see https://gofastmcp.com/integrations/eunomia-authorization
-auth-eunomia = ["eunomia-mcp>=0.3.9"]
+auth-eunomia = ["eunomia-mcp"]
 
 # workos AuthKit middleware - see https://gofastmcp.com/integrations/authkit
 # No additional dependencies required, it's purely REST-based.
@@ -411,84 +430,79 @@ auth-eunomia = ["eunomia-mcp>=0.3.9"]
 
 # All groups for users
 all = [
-  "aenum>=3.1.16",
-  "ast-grep-py>=0.39.6",
-  "py-cpuinfo>=9.0.0",
-  "cyclopts>=4.0.0",
-  "eunomia-mcp>=0.3.9",
-  "fastembed>=0.7.3",
-  "fastmcp[websockets]>=2.12.5",
-  "httpx>=0.28.1",
-  "langchain-text-splitters>=1.0.0",
-  "mcp>=1.16.0",
-  "numpy>=2.3.4",
-  "permit-fastmcp>=0.1.2",
-  "posthog>=6.7.10",
-  "langchain-text-splitters>=0.3.9",
-  "mcp>=1.19.0",
-  "numpy>=2.3.4",
-  "permit-fastmcp>=0.1.2",
-  "pydantic-ai>=1.4.0",
-  "pydantic-graph>=1.4.0",
-  "pydantic-settings>=2.11.0",
-  "pydantic>=2.12.3",
-  "qdrant-client>=1.15.1",
-  "rich>=14.2.0",
-  "rignore>=0.7.1",
-  "sentence-transformers[onnx]>=5.1.2",
-  "textcase>=0.4.5",
-  "tiktoken>=0.12.0",
-  "tokenizers>=0.22.1",
+  "aenum",
+  "ast-grep-py",
+  "py-cpuinfo",
+  "cyclopts",
+  "eunomia-mcp",
+  "fastembed",
+  "fastmcp",
+  "httpx",
+  "mcp",
+  "numpy",
+  "permit-fastmcp",
+  "posthog",
+  "numpy",
+  "permit-fastmcp",
+  "pydantic-ai",
+  "pydantic-graph",
+  "pydantic-settings",
+  "pydantic",
+  "qdrant-client",
+  "rich",
+  "rignore",
+  "sentence-transformers[onnx]",
+  "textcase",
+  "tiktoken",
+  "tokenizers",
 
-  "pydantic-ai>=1.4.0",
-  "pydantic-graph>=1.4.0",
-  "pydantic-settings>=2.11.0",
-  "pydantic>=2.12.3",
-  "qdrant-client>=1.15.1",
-  "rich>=14.2.0",
-  "rignore>=0.7.1",
-  "textcase>=0.4.5",
-  "tiktoken>=0.12.0",
-  "tokenizers>=0.22.1",
-  "tomli-w>=1.2.0",
-  "typing-extensions>=4.15.0",
-  "uuid7>=0.1.0; python_version < '3.14'",
-  "uvicorn[standard]>=0.38.0",
-  "voyageai>=0.3.5",
-  "watchfiles>=1.1.1",
+  "pydantic-ai",
+  "pydantic-graph",
+  "pydantic-settings",
+  "pydantic",
+  "qdrant-client",
+  "rich",
+  "rignore",
+  "textcase",
+  "tiktoken",
+  "tokenizers",
+  "tomli-w",
+  "typing-extensions",
+  "uuid7; python_version < '3.14'",
+  "uvicorn[standard]",
+  "voyageai",
+  "watchfiles",
 ]
 
 all-gpu = [
-  "aenum>=3.1.16",
-  "ast-grep-py>=0.39.6",
-  "py-cpuinfo>=9.0.0",
-  "cyclopts>=4.0.0",
-  "eunomia-mcp>=0.3.9",
-  "fastembed-gpu>=0.7.3",
-  "fastmcp[websockets]>=2.12.5",
-  "httpx>=0.28.1",
-  "langchain-text-splitters>=1.0.0",
-  "mcp>=1.19.1",
-  "numpy>=2.3.4",
-  "permit-fastmcp>=0.1.2",
-  "posthog>=6.7.10",
-  "pydantic-ai-slim>=1.4.0",
-  "pydantic-ai>=1.4.0",
-  "pydantic-graph>=1.4.0",
-  "pydantic-settings>=2.11.0",
-  "pydantic>=2.12.3",
-  "qdrant-client>=1.15.1",
-  "rich>=14.2.0",
-  "rignore>=0.7.1",
-  "sentence-transformers[onnx-gpu]>=5.1.2",
-  "tiktoken>=0.12.0",
-  "tokenizers>=0.22.1",
-  "tomli-w>=1.2.0",
-  "typing-extensions>=4.15.0",
-  "uuid7>=0.1.0; python_version < '3.14'",
-  "uvicorn[standard]>=0.38.0",
-  "voyageai>=0.3.5",
-  "watchfiles>=1.1.1",
+  "aenum",
+  "ast-grep-py",
+  "py-cpuinfo",
+  "cyclopts",
+  "eunomia-mcp",
+  "fastembed-gpu",
+  "fastmcp",
+  "httpx",
+  "mcp",
+  "numpy",
+  "permit-fastmcp",
+  "posthog",
+  "pydantic-ai",
+  "pydantic-graph",
+  "pydantic-settings",
+  "pydantic",
+  "qdrant-client",
+  "rich",
+  "rignore",
+  "sentence-transformers[onnx-gpu]",
+  "tiktoken",
+  "tokenizers",
+  "tomli-w",
+  "typing-extensions",
+  "uuid7",
+  "uvicorn[standard]",
+  "voyageai",
+  "watchfiles",
 ]
 
 [tool.uv-dynamic-versioning]
@@ -521,6 +535,7 @@ packages = ["src/codeweaver"]
 [tool.hatch.build.targets.sdist]
 include = [
   ".gitignore",
+  "ARCHITECTURE.md",
   "CHANGELOG.md",
   "CONTRIBUTORS_LICENSE_AGREEMENT.py",
   "LICENSE",

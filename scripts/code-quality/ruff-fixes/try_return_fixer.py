@@ -27,7 +27,7 @@ class TryReturnFixer(ast.NodeTransformer):
     def visit_Try(self, node: ast.Try) -> ast.Try:
         """Transform try blocks that have return statements."""
         # First, recursively visit child nodes
-        self.generic_visit(node)
+        _ = self.generic_visit(node)
 
         # Check if this try block has return statements
         returns_in_try = self._extract_returns_from_try(node.body)
@@ -95,7 +95,7 @@ class TryReturnComplexFixer(ast.NodeTransformer):
     def visit_Try(self, node: ast.Try) -> ast.Try:
         """Transform try blocks with conditional returns."""
         # First, recursively visit child nodes
-        self.generic_visit(node)
+        _ = self.generic_visit(node)
 
         # Check for complex patterns like if/elif/else with returns
         if self._has_conditional_returns(node.body):
@@ -188,14 +188,13 @@ def process_file(file_path: Path) -> bool:
 
 def main() -> None:
     """Main entry point."""
-    if len(sys.argv) < 2:
-        print("Usage: python3 try_return_fixer.py <file_or_directory> [file_or_directory ...]")
-        sys.exit(1)
-
+    args = sys.argv
+    if len(args) < 2 or args[1] == ".":
+        args = [args[0], "./src", "./tests", "./scripts"]
     total_files = 0
     files_changed = 0
 
-    for arg in sys.argv[1:]:
+    for arg in args[1:]:
         path = Path(arg)
 
         if path.is_file() and path.suffix == ".py":

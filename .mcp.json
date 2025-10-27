@@ -15,15 +15,15 @@
       ],
       "command": "npx",
       "type": "stdio"
+    },
+    "serena": {
+      "args": [
+        "run",
+        "serena",
+        "start-mcp-server"
+      ],
+      "command": "uv",
+      "type": "stdio"
     }
-  },
-  "serena": {
-    "args": [
-      "run",
-      "serena",
-      "start-mcp-server"
-    ],
-    "command": "uv",
-    "type": "stdio"
   }
 }

@@ -5,6 +5,8 @@
 
 """Reranking model capabilities for JinaAI models."""
 
+from __future__ import annotations
+
 from collections.abc import Sequence
 
 from codeweaver.providers.provider import Provider

@@ -25,7 +25,7 @@ from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializatio
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types.aliases import FilteredKey
+    from codeweaver.core.types.aliases import FilteredKeyT
 
 
 type EnumExtend = Callable[[Enum, str], Enum]
@@ -55,20 +55,6 @@ class BaseEnumData(DataclassSerializationMixin):
     `BaseEnumData` provides a standard structure for enum member data, including name, value, aliases, and description. Subclasses can extend this dataclass to include additional fields as needed.
     """
 
-    _name: Annotated[
-        str,
-        Field(
-            description="The name of the enum member.",
-            default_factory=lambda x: textcase.upper(str(x)),
-        ),
-    ]
-    _value: Annotated[
-        str | int,
-        Field(
-            description="The value of the enum member.",
-            default_factory=lambda x: str(x).lower().replace(" ", "_").replace("-", "_"),
-        ),
-    ]
     aliases: Annotated[
         tuple[str, ...],
         Field(description="The aliases for the enum member.", default_factory=tuple, repr=False),
@@ -80,17 +66,13 @@ class BaseEnumData(DataclassSerializationMixin):
     # These are just generic fields, define more in subclasses as needed.
 
     def __init__(
-        self,
-        name: str,
-        value: str | int,
-        aliases: Sequence[str] | None = None,
-        description: str | None = None,
+        self, aliases: Sequence[str] | None = None, description: str | None = None, **kwargs: Any
     ) -> None:
         """Initialize the BaseEnumData dataclass."""
-        object.__setattr__(self, "_name", name)
-        object.__setattr__(self, "_value", value)
         object.__setattr__(self, "aliases", tuple(aliases) if aliases is not None else ())
         object.__setattr__(self, "_description", description)
+        for key, val in kwargs.items():
+            object.__setattr__(self, key, val)
 
 
 @unique
@@ -113,7 +95,7 @@ class BaseDataclassEnum(Enum):
             textcase.camel(s),
         }
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion] | None:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
         """Return a mapping of telemetry keys to their anonymity conversion methods."""
         raise NotImplementedError("Subclasses must implement _telemetry_keys method.")
 
@@ -194,16 +176,12 @@ class BaseDataclassEnum(Enum):
     @property
     def as_title(self) -> str:
         """Return the title-cased representation of the enum member."""
-        return (
-            textcase.title(self.value._value)
-            if hasattr(self.value, "_value")
-            else textcase.title(self.name)
-        )
+        return textcase.title(self.name)
 
     @classmethod
-    def add_member(cls, value: BaseEnumData) -> Self:
+    def add_member(cls, name: str, value: BaseEnumData) -> Self:
         """Dynamically add a new member to the enum."""
-        extend_enum(cls, textcase.upper(value._name), value)  # pyright: ignore[reportPrivateUsage, reportCallIssue, reportUnknownVariableType]
+        extend_enum(cls, textcase.upper(name), value)  # pyright: ignore[reportPrivateUsage, reportCallIssue, reportUnknownVariableType]
         return cls(value)
 
 

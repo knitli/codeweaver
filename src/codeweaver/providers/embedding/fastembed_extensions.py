@@ -6,6 +6,8 @@
 
 """Some added models for fastembed provider to modernize the offerings a bit."""
 
+from __future__ import annotations
+
 from codeweaver.exceptions import ConfigurationError
 
 

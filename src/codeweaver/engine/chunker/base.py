@@ -4,51 +4,38 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Base chunker services and definitions.
 
-CodeWeaver has a robust chunking system that allows it to extract meaningful information from any codebase. Chunks are created based on a few factors:
+CodeWeaver has a robust chunking system that allows it to extract meaningful information from any codebase. Chunks are created based on a graceful degradation strategy:
 
-1. The kind of chunk available.
+1. **Semantic Chunking**: When we have a tree-sitter grammar for a language (there are currently 26 supported languages, see `codeweaver.language.SemanticSearchLanguage`), semantic chunking is the primary strategy.
 
-    - When we have a tree-sitter grammar for a language (there are currently 26 supported languages, see `codeweaver.language.SemanticSearchLanguage`), then semantic chunking is the primary strategy.
-    - If semantic chunking isn't available, we fall back to specialized chunkers for the language, if we have one. These come from `langchain_text_splitters` and include chunkers for markdown, latex, protobuf, restructuredtext, perl, powershell, and visualbasic6.
-    - If one of those isn't available, we again fall back to a set of chunkers defined in
+2. **Delimiter Chunking**: If semantic chunking isn't available or fails (e.g., parse errors, oversized nodes without chunkable children), we fall back to delimiter-based chunking using language-specific patterns.
+
+3. **Generic Fallback**: If delimiter patterns don't match, we use generic delimiters (braces, newlines, etc.) to ensure we can always produce chunks.
+
+This multi-tiered approach ensures reliable chunking across 170+ languages while maintaining semantic quality for supported languages.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from functools import cached_property
-from pathlib import Path
-from typing import Annotated, Any, NamedTuple
+from typing import TYPE_CHECKING, Annotated, Any
 
 from pydantic import ConfigDict, Field, PositiveInt, computed_field
 
 from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.language import Chunker
 from codeweaver.core.types.models import BasedModel
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
+if TYPE_CHECKING:
+    from codeweaver.config.chunker import ChunkerSettings
+    from codeweaver.core.discovery import DiscoveredFile
+
+
 SAFETY_MARGIN = 0.1
 """A safety margin to apply to chunk sizes to account for metadata and tokenization variability."""
-
-SPLITTER_AVAILABLE = {
-    "protobuf": "proto",
-    "restructuredtext": "rst",
-    "markdown": "markdown",
-    "latex": "latex",
-    "perl": "perl",
-    "powershell": "powershell",
-    "visualbasic6": "visualbasic6",
-}
-"""Languages with langchain_text_splitters support that don't have semantic search support. The keys are the name of the language as defined in `codeweaver._supported_languages.SecondarySupportedLanguage`, and the values are the name of the language as defined in `langchain_text_splitters.Language`."""
-
-
-class ChunkerEntry(NamedTuple):
-    """An entry in the chunker registry."""
-
-    chunker_kind: Chunker
-    chunker: type[BaseChunker]
 
 
 class ChunkGovernor(BasedModel):
@@ -61,6 +48,11 @@ class ChunkGovernor(BasedModel):
         Field(description="""The model capabilities to infer chunking behavior from."""),
     ] = ()
 
+    settings: Annotated[
+        ChunkerSettings | None,
+        Field(default=None, description="""Chunker configuration settings."""),
+    ] = None
+
     @computed_field
     @cached_property
     def chunk_limit(self) -> PositiveInt:
@@ -72,7 +64,7 @@ class ChunkGovernor(BasedModel):
     def simple_overlap(self) -> int:
         """A simple overlap value to use for chunking without context or external factors.
 
-        Calculates as 20% of the chunk_limit, clamped between 50 and 200 tokens. Practically, we only use this value when we can't determine a better overlap based on the tokenizer or other factors. `ChunkMicroManager` may override this value based on more complex logic, aiming to identify and encapsulate logical boundaries within the text with no need for overlap.
+        Calculates as 20% of the chunk_limit, clamped between 50 and 200 tokens. Practically, we only use this value when we can't determine a better overlap based on the tokenizer or other factors. `ChunkGovernor` may override this value based on more complex logic, aiming to identify and encapsulate logical boundaries within the text with no need for overlap.
         """
         return int(max(50, min(200, self.chunk_limit * 0.2)))
 
@@ -84,7 +76,6 @@ class BaseChunker(ABC):
     """Base class for chunkers."""
 
     _governor: ChunkGovernor
-    chunker: Chunker
 
     def __init__(self, governor: ChunkGovernor) -> None:
         """Initialize the chunker."""
@@ -92,9 +83,22 @@ class BaseChunker(ABC):
 
     @abstractmethod
     def chunk(
-        self, content: str, *, file_path: Path | None = None, context: dict[str, Any] | None = None
+        self,
+        content: str,
+        *,
+        file: DiscoveredFile | None = None,
+        context: dict[str, Any] | None = None,
     ) -> list[CodeChunk]:
-        """Chunk the given content into code chunks using `self._governor` settings."""
+        """Chunk the given content into code chunks using `self._governor` settings.
+
+        Args:
+            content: The text content to chunk.
+            file: The DiscoveredFile object containing file metadata and source_id.
+            context: Additional context for chunking.
+
+        Returns:
+            List of CodeChunk objects with source_id from the DiscoveredFile.
+        """
 
     @property
     def governor(self) -> ChunkGovernor:
@@ -112,4 +116,21 @@ class BaseChunker(ABC):
         return self._governor.simple_overlap
 
 
-__all__ = ("BaseChunker", "ChunkGovernor", "ChunkerEntry")
+__all__ = ("BaseChunker", "ChunkGovernor")
+
+
+# Rebuild models to resolve forward references after all types are imported
+# This is done at module import time to ensure ChunkerSettings is available
+def _rebuild_models() -> None:
+    """Rebuild pydantic models after all types are defined."""
+    try:
+        # Import ChunkerSettings to make it available for model rebuild
+        from codeweaver.config.chunker import ChunkerSettings  # noqa: F401
+
+        ChunkGovernor.model_rebuild(force=True)
+    except Exception:
+        # If rebuild fails, model will still work but may have issues with ChunkerSettings
+        pass
+
+
+_rebuild_models()

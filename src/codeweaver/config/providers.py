@@ -58,7 +58,7 @@ class RerankingModelSettings(TypedDict, total=False):
     custom_prompt: NotRequired[str | None]
     call_kwargs: NotRequired[dict[str, Any] | None]
     """Keyword arguments to pass to the client model's `rerank` method."""
-    client_kwargs: NotRequired[dict[str, Any] | None]
+    client_options: NotRequired[dict[str, Any] | None]
     """Keyword arguments to pass to the client model's constructor."""
 
 
@@ -132,6 +132,56 @@ class FastembedGPUProviderSettings(TypedDict, total=False):
     """Whether to use CUDA (if available). If `None`, will auto-detect. We'll generally assume you want to use CUDA if it's available unless you provide a `False` value here."""
     provider_settings: NotRequired[list[int] | None]
     """List of GPU device IDs to use. If `None`, we will try to detect available GPUs using `nvidia-smi` if we can find it. We recommend specifying them because our checks aren't perfect."""
+
+
+# ===========================================================================
+# *            Vector Store Provider Settings
+# ===========================================================================
+
+
+class QdrantConfig(TypedDict, total=False):
+    """Configuration for Qdrant vector store provider."""
+
+    url: NotRequired[str | None]
+    """Qdrant server URL. Defaults to http://localhost:6333 if not specified."""
+    api_key: NotRequired[SecretStr | None]
+    """API key for authentication (required for remote instances)."""
+    collection_name: NotRequired[str | None]
+    """Collection name override. Defaults to project name if not specified."""
+    prefer_grpc: NotRequired[bool]
+    """Use gRPC instead of HTTP. Defaults to False."""
+    batch_size: NotRequired[PositiveInt]
+    """Batch size for bulk upsert operations. Defaults to 64."""
+    dense_vector_name: NotRequired[str]
+    """Named vector for dense embeddings. Defaults to 'dense'."""
+    sparse_vector_name: NotRequired[str]
+    """Named vector for sparse embeddings. Defaults to 'sparse'."""
+    client_options: NotRequired[dict[str, Any] | None]
+    """Additional keyword arguments to pass to the Qdrant client."""
+
+
+class MemoryConfig(TypedDict, total=False):
+    """Configuration for in-memory vector store provider."""
+
+    persist_path: NotRequired[str | None]
+    """Path for JSON persistence file. Defaults to .codeweaver/vector_store.json."""
+    auto_persist: NotRequired[bool]
+    """Automatically save after operations. Defaults to True."""
+    persist_interval: NotRequired[PositiveInt | None]
+    """Periodic persist interval in seconds. Defaults to 300 (5 minutes)."""
+    collection_name: NotRequired[str | None]
+    """Collection name override. Defaults to project name if not specified."""
+
+
+class VectorStoreSettings(TypedDict, total=False):
+    """Settings for vector store provider selection and configuration."""
+
+    provider: NotRequired[str]
+    """Vector store provider: 'qdrant' or 'memory'. Defaults to 'qdrant'."""
+    qdrant: NotRequired[QdrantConfig]
+    """Qdrant-specific configuration."""
+    memory: NotRequired[MemoryConfig]
+    """Memory provider-specific configuration."""
 
 
 type ProviderSpecificSettings = (
@@ -209,10 +259,13 @@ __all__ = (
     "EmbeddingModelSettings",
     "EmbeddingProviderSettings",
     "FastembedGPUProviderSettings",
+    "MemoryConfig",
     "ModelString",
     "ProviderSettingsDict",
     "ProviderSettingsView",
     "ProviderSpecificSettings",
+    "QdrantConfig",
     "RerankingModelSettings",
     "RerankingProviderSettings",
+    "VectorStoreSettings",
 )

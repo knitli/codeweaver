@@ -24,7 +24,7 @@ from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializatio
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types import AnonymityConversion, FilteredKey
+    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
     from codeweaver.engine.discovery import FileDiscoveryService
 
 _discovery: FileDiscoveryService | None = None
@@ -155,7 +155,7 @@ class RepoDirectory(DataclassSerializationMixin):
     _subdirectories: Sequence[Path] | None = None
     """Cache of subdirectories in the directory."""
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types.aliases import FilteredKey
 
         return {
@@ -292,7 +292,7 @@ class RepoChecklist(DataclassSerializationMixin):
         "modules": {"modules", "mod", "mods", "workspaces", "pkgspaces", "services", "svcs"},
     })
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {

@@ -31,7 +31,7 @@ from pydantic import BaseModel, ConfigDict, PrivateAttr, RootModel, TypeAdapter
 from pydantic.fields import ComputedFieldInfo, FieldInfo
 from pydantic.main import IncEx
 
-from codeweaver.core.types.aliases import FilteredKey, LiteralStringT
+from codeweaver.core.types.aliases import FilteredKey, FilteredKeyT, LiteralStringT
 
 
 if TYPE_CHECKING:
@@ -77,23 +77,29 @@ class DataclassSerializationMixin:
     _module: Annotated[str | None, PrivateAttr()] = None
     _adapter: Annotated[TypeAdapter[Self] | None, PrivateAttr()] = None
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion] | None:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
         """Get telemetry keys for the dataclass."""
         return None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the mixin and set the module name and adapter."""
-        self._module = (
+        object.__setattr__(
+            self,
+            "_module",
             self.__module__
             if hasattr(self, "__module__")
-            else self.__class__.__module__ or _sys.modules[__name__].__name__
+            else self.__class__.__module__ or _sys.modules[__name__].__name__,
         )
-        self._adapter = TypeAdapter(type(self), module=self._module)
+        object.__setattr__(self, "_adapter", TypeAdapter(type(self), module=self._module))
 
     @cached_property
     def _adapted_self(self) -> TypeAdapter[Self]:
         """Get a Pydantic TypeAdapter for the SessionStatistics instance."""
-        self._adapter = self._adapter or TypeAdapter(type(self), module=self._module)
+        object.__setattr__(
+            self, "_adapter", self._adapter or TypeAdapter(type(self), module=self._module)
+        )
+        if not self._adapter:
+            raise RuntimeError("TypeAdapter is not initialized.")
         if self._adapter.pydantic_complete:
             return self._adapter
         try:
@@ -159,7 +165,7 @@ class DataclassSerializationMixin:
     def _telemetry_handler(self, _serialized_self: dict[str, Any], /) -> dict[str, Any]:
         """An optional handler for subclasses to modify telemetry serialization. By default, it returns an empty dict.
 
-        We use any returns keys as overrides for the serialized_self.
+        We use any returned keys as overrides for the serialized_self.
         """
         return {}
 
@@ -167,11 +173,11 @@ class DataclassSerializationMixin:
         """Serialize the model for telemetry output, filtering sensitive keys."""
         from codeweaver.core.types.enum import AnonymityConversion
 
-        excludes: set[FilteredKey] = set()
-        default_group: dict[FilteredKey, Any] = {}
+        excludes: set[str] = set()
+        default_group: dict[FilteredKeyT, Any] = {}
         if telemetry_keys := (self._telemetry_keys() or {}):
             excludes = {
-                key
+                str(key)
                 for key, conversion in telemetry_keys.items()
                 if conversion == AnonymityConversion.FORBIDDEN
             }
@@ -305,7 +311,7 @@ class BasedModel(BaseModel):
         return self.model_dump(mode="python", round_trip=True, exclude_none=True) | self_map
 
     @abc.abstractmethod
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion] | None:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
         """Get telemetry keys for the dataclass."""
         raise NotImplementedError("Subclasses must implement _telemetry_keys method.")
 

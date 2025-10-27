@@ -86,16 +86,17 @@ Goals:
 
 
 
-## Strategy 2: StructuredTextChunker (Markdown, reST, LaTeX, etc.)
+## Strategy 2: DelimiterChunker (Structured Text and Fallback)
 
-- Use `langchain_text_splitters` where appropriate; prefer heading- or section-based splitting
+- Uses language-specific delimiter patterns for chunking when semantic parsing is unavailable
+- Supports 170+ languages through pattern-based boundary detection
 - Markdown specifics:
-  - Split by headers; use the lowest header level that keeps chunks ≤ budget
-  - Keep YAML frontmatter as a single preamble chunk or attach to first section’s metadata
+  - Split by headers using delimiter patterns; use the lowest header level that keeps chunks ≤ budget
+  - Keep YAML frontmatter as a single preamble chunk or attach to first section's metadata
   - If a section > budget, recursively split by subheaders; if none, split by paragraphs/fences with overlap
   - Metadata:
-    - `metadata.semantic_meta` contains heading hierarchy, anchors, and section level
-    - `metadata.name` is section title
+    - `metadata.context` contains delimiter information, nesting levels, and boundary types
+    - `metadata.name` is section title when available
 
 - reStructuredText specifics:
   - Split by underline-style sections and directives; similar recursive approach

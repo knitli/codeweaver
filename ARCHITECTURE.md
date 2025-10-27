@@ -489,7 +489,7 @@ class Span:
 - All public functions have type annotations (including `-> None`)
 - Use `TypedDict`, `Protocol`, `NamedTuple`, `enum.Enum` for structured data
 - Avoid generic types like `dict[str, Any]` when structure is known
-- Modern Python ≥3.11 syntax (`int | str`, `typing.Self`, `type` keyword)
+- Modern Python ≥3.12 syntax (`int | str`, `typing.Self`, `type` keyword)
 
 **Project-Specific Types**:
 ```python
@@ -576,7 +576,7 @@ async def test_find_code_authentication_query():
 
 **Auto-formatting**: Ruff configuration enabled
 
-**Python typing**: Modern ≥3.11 syntax
+**Python typing**: Modern ≥3.12 syntax
 
 ### Common Linting Patterns
 
@@ -924,13 +924,13 @@ These principles support CodeWeaver's evolution from search tool → context pla
 
 **Justification**: Constitutional Principle IV (Testing Philosophy) - one realistic integration test beats ten implementation tests. Coverage metrics don't prevent user-affecting bugs.
 
-### Constraint: Python ≥3.11 Required
+### Constraint: Python ≥3.12 Required
 
 **Reason**: Modern type syntax, performance improvements
 
 **Impact**: Excludes some legacy environments
 
-**Mitigation**: Clear documentation, most users on 3.11+ already
+**Mitigation**: Clear documentation, most users on 3.12+ already
 
 **Justification**: Modern syntax enables better type safety and code clarity (Simplicity Through Architecture)
 

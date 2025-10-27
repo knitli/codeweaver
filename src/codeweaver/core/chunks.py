@@ -50,7 +50,7 @@ from codeweaver.core.utils import truncate_text
 
 if TYPE_CHECKING:
     from codeweaver.core.discovery import DiscoveredFile
-    from codeweaver.core.types import AnonymityConversion, FilteredKey
+    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
 # ---------------------------------------------------------------------------
 # *                    Code Search and Chunks
@@ -84,7 +84,12 @@ class SearchResult(BasedModel):
         Metadata | None, Field(description="""Additional metadata about the result""")
     ] = None
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+    @property
+    def chunk(self) -> CodeChunk | str:
+        """Alias for content field for backward compatibility."""
+        return self.content
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         base = {FilteredKey("content"): AnonymityConversion.TEXT_COUNT}
@@ -109,6 +114,8 @@ class CodeChunkDict(TypedDict, total=False):
     chunk_id: NotRequired[UUID7]
     parent_id: NotRequired[UUID7 | None]
     metadata: NotRequired[Metadata | None]
+    chunk_name: NotRequired[str | None]
+    embeddings: NotRequired[dict[str, list[float] | dict[str, Any]] | None]
     _embedding_batch: NotRequired[UUID7 | None]
 
 
@@ -152,6 +159,21 @@ class CodeChunk(BasedModel):
         Metadata | None,
         Field(kw_only=True, description="""Additional metadata about the code chunk"""),
     ] = None
+
+    # Vector storage fields
+    chunk_name: Annotated[
+        str | None,
+        Field(
+            description="""Fully qualified chunk identifier (e.g., 'auth.py:UserAuth.validate')"""
+        ),
+    ] = None
+    embeddings: Annotated[
+        dict[str, list[float] | dict[str, Any]] | None,
+        Field(
+            description="""Hybrid embeddings with 'dense' (list[float]) and/or 'sparse' (dict) keys"""
+        ),
+    ] = None
+
     _version: Annotated[str, Field(repr=True, init=False, serialization_alias="chunk_version")] = (
         "1.0.0"
     )
@@ -163,7 +185,7 @@ class CodeChunk(BasedModel):
         ),
     ] = None
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {
@@ -246,7 +268,7 @@ class CodeChunk(BasedModel):
 
     @classmethod
     def from_file(cls, file: DiscoveredFile, line_range: Span, content: str) -> CodeChunk:
-        """Create a CodeChunk from a file."""
+        """Create a CodeChunk from a file. (This creates a chunk that consists of the entire file contents. To create smaller chunks, use a chunker.)."""
         return cls.model_validate({
             "file_path": file.path,
             "line_range": line_range,
@@ -255,6 +277,7 @@ class CodeChunk(BasedModel):
             if file.ext_kind
             else getattr(ExtKind.from_file(file.path), "language", None),
             "source": ChunkSource.FILE,
+            "parent_id": file.source_id,
         })
 
     @computed_field
@@ -277,6 +300,39 @@ class CodeChunk(BasedModel):
     def length(self) -> PositiveInt:
         """Return the length of the serialized content in characters."""
         return len(self.serialize_for_embedding())
+
+    @computed_field
+    @cached_property
+    def token_count(self) -> PositiveInt:
+        """Estimate token count for the chunk content.
+
+        Uses rough approximation of 1 token per 4 characters.
+        TODO: Replace with proper tokenizer (tiktoken, transformers).
+        """
+        return len(self.content) // 4
+
+    @computed_field
+    @cached_property
+    def line_start(self) -> PositiveInt:
+        """Return the starting line number from line_range."""
+        return self.line_range.start
+
+    @computed_field
+    @cached_property
+    def line_end(self) -> PositiveInt:
+        """Return the ending line number from line_range."""
+        return self.line_range.end
+
+    # Aliases for common naming conventions
+    @property
+    def start_line(self) -> PositiveInt:
+        """Alias for line_start for compatibility."""
+        return self.line_start
+
+    @property
+    def end_line(self) -> PositiveInt:
+        """Alias for line_end for compatibility."""
+        return self.line_end
 
     @classmethod
     def chunkify(cls, text: StructuredDataInput) -> Iterator[CodeChunk]:
@@ -313,6 +369,9 @@ class CodeChunk(BasedModel):
                 yield result.decode("utf-8") if isinstance(result, bytes | bytearray) else result
 
 
+import contextlib
+
+
 __all__ = (
     "ChunkSequence",
     "CodeChunk",
@@ -321,3 +380,11 @@ __all__ = (
     "SerializedCodeChunk",
     "StructuredDataInput",
 )
+
+# Rebuild models to resolve forward references
+# Force rebuild even if it fails - better to have working models than perfect ones
+with contextlib.suppress(Exception):
+    SearchResult.model_rebuild(force=True)
+
+with contextlib.suppress(Exception):
+    CodeChunk.model_rebuild(force=True)

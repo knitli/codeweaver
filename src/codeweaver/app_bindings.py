@@ -69,10 +69,28 @@ async def find_code_tool(
     include_tests: bool = False,
     focus_languages: tuple[SemanticSearchLanguage, ...] | None = None,
     context: Context | None = None,
-) -> FindCodeResponseSummary:  # sourcery skip: remove-unreachable-code
-    """Use CodeWeaver to find_code in the codebase."""
-    # temporary while this gets reimplemented in the agent_api
-    raise NotImplementedError("find_code_tool is not yet implemented")
+) -> FindCodeResponseSummary:
+    """Use CodeWeaver to find_code in the codebase.
+
+    NOTE: Temporarily disabled pending architectural improvements.
+    Returns a stub response to prevent MCP server errors.
+    Expected to be re-enabled within 1-2 days.
+    """
+    # Return stub response while find_code is being reimplemented
+    return FindCodeResponseSummary(
+        matches=[],
+        summary=f"⚠️  find_code is temporarily disabled during architectural improvements. Your query was: '{query}'",
+        query_intent=intent,
+        total_matches=0,
+        total_results=0,
+        token_count=0,
+        execution_time_ms=0.0,
+        search_strategy=(),
+        languages_found=(),
+    )
+
+    # Original implementation (commented out during refactor)
+    # Will be restored when new architecture is complete
     """
     try:
         response = await find_code(
@@ -106,6 +124,7 @@ async def find_code_tool(
     else:
         return response
     """
+    return None
 
 
 # -------------------------
@@ -218,8 +237,8 @@ def register_tool(app: FastMCP[AppState]) -> FastMCP[AppState]:
         Tool.from_function(
             find_code_tool,
             name="find_code",
-            description="""Find code in the codebase""",
-            enabled=True,
+            description="""Find code in the codebase (TEMPORARILY DISABLED - architectural improvements in progress)""",
+            enabled=False,  # Disabled during refactor - will be re-enabled soon
             exclude_args=["context"],
             tags={"user", "external", "code-context"},
             annotations=ToolAnnotations(

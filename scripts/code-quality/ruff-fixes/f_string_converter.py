@@ -28,7 +28,7 @@ class FStringConverter(ast.NodeTransformer):
 
     def visit_Call(self, node: ast.Call) -> ast.Call:
         """Convert f-strings in logging method calls."""
-        self.generic_visit(node)
+        _ = self.generic_visit(node)
 
         # Check if this is a logging call
         if (
@@ -159,14 +159,12 @@ def convert_file(file_path: Path) -> bool:
 
 def main() -> None:
     """Main entry point."""
-    if len(sys.argv) < 2:
-        print("Usage: python fstring_converter.py <file_or_directory> [file2] ...")
-        sys.exit(1)
-
     files_changed = 0
     total_files = 0
-
-    for arg in sys.argv[1:]:
+    args = sys.argv
+    if len(args) < 2 or args[1] == ".":
+        args = [args[0], "./src", "./tests", "./scripts"]
+    for arg in args[1:]:
         path = Path(arg)
 
         if path.is_file() and path.suffix == ".py":

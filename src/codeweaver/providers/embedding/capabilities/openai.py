@@ -5,6 +5,8 @@
 
 """Capabilities for OpenAI embedding models."""
 
+from __future__ import annotations
+
 from typing import Literal
 
 from codeweaver.providers.embedding.capabilities.base import (

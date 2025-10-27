@@ -255,7 +255,6 @@ from typing import TYPE_CHECKING, Annotated, Any, ClassVar, TypedDict, cast, ove
 from pydantic import DirectoryPath, Field, FilePath
 from pydantic_core import from_json
 
-from codeweaver.common.utils import lazy_import
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.types.aliases import CategoryNameT, ThingName
 from codeweaver.core.types.models import RootedRoot
@@ -272,14 +271,6 @@ if TYPE_CHECKING:
         ThingType,
         Token,
     )
-else:
-    Category = lazy_import("codeweaver.semantic.grammar", "Category")
-    CompositeThing = lazy_import("codeweaver.semantic.grammar", "CompositeThing")
-    Connection = lazy_import("codeweaver.semantic.grammar", "Connection")
-    DirectConnection = lazy_import("codeweaver.semantic.grammar", "DirectConnection")
-    PositionalConnections = lazy_import("codeweaver.semantic.grammar", "PositionalConnections")
-    Token = lazy_import("codeweaver.semantic.grammar", "Token")
-    ThingOrCategoryType = lazy_import("codeweaver.semantic.grammar", "ThingOrCategoryType")
 
 
 logger = logging.getLogger()
@@ -377,10 +368,7 @@ class NodeArray(RootedRoot[list[NodeTypeDTO]]):
     """
 
     root: Annotated[
-        list[NodeTypeDTO],
-        Field(
-            description="List of node type objects from the node types file.", default_factory=list
-        ),
+        list[NodeTypeDTO], Field(description="List of node type objects from the node types file.")
     ]
 
     @classmethod
@@ -398,6 +386,10 @@ class NodeArray(RootedRoot[list[NodeTypeDTO]]):
         if not self.root:
             raise ValueError("NodeArray is empty, cannot determine language.")
         return self.root[0].language
+
+    def _telemetry_keys(self) -> None:
+        """Telemetry keys for NodeArray."""
+        return
 
 
 class NodeTypeFileLoader:
@@ -644,6 +636,8 @@ class NodeTypeParser:
         Args:
             node_dto: NodeTypeDTO representing the category to create.
         """
+        from codeweaver.semantic.grammar import Category
+
         return Category.from_node_dto(node_dto)
 
     def _create_token(self, node_dto: NodeTypeDTO) -> Token:
@@ -652,6 +646,8 @@ class NodeTypeParser:
         Args:
             node_dto: NodeTypeDTO representing the token to create.
         """
+        from codeweaver.semantic.grammar import Token
+
         return self._build_thing(node_dto, Token)
 
     def _get_node_categories(self, node_dto: NodeTypeDTO) -> frozenset[CategoryNameT]:
@@ -676,6 +672,12 @@ class NodeTypeParser:
         Args:
             node_dto: NodeTypeDTO representing the composite to create.
         """
+        from codeweaver.semantic.grammar import (
+            CompositeThing,
+            DirectConnection,
+            PositionalConnections,
+        )
+
         composite_thing = self._build_thing(node_dto, CompositeThing)
         connections: list[DirectConnection | PositionalConnections] = []
         if node_dto.fields:
@@ -736,6 +738,7 @@ class NodeTypeParser:
 
     def _validate(self) -> None:
         """Validate the internal state of the parser."""
+        from codeweaver.semantic.grammar import CompositeThing, Token
         from codeweaver.semantic.registry import get_registry
 
         registry = get_registry()

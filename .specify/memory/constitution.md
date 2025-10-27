@@ -67,7 +67,7 @@ Hierarchical configuration via `pydantic-settings` with environment variables an
 ### Quality Standards
 - Google docstring convention written in plain language with active voice
 - 100-character line length limit
-- Modern Python typing (>=3.11) with latest syntax patterns
+- Modern Python typing (>=3.12) with latest syntax patterns
 - Ruff auto-formatting and linting compliance
 
 ### Red Flag Protocol

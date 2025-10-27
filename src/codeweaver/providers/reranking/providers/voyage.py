@@ -5,6 +5,8 @@
 
 """Voyage AI reranking provider implementation."""
 
+from __future__ import annotations
+
 from collections.abc import Callable, Iterator, Sequence
 from types import MappingProxyType
 from typing import Any, cast

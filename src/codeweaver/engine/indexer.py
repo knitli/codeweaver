@@ -26,7 +26,7 @@ import watchfiles
 from pydantic import PrivateAttr
 from watchfiles.main import Change, FileChange
 
-from codeweaver.config.settings import CodeWeaverSettingsDict, RignoreSettings
+from codeweaver.config.types import CodeWeaverSettingsDict, RignoreSettings
 from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.file_extensions import (
     CODE_FILES_EXTENSIONS,

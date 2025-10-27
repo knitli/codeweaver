@@ -241,7 +241,7 @@ Features at a glance
 Quickstart
 
 Requirements
-- Python 3.11+ (tested primarily on 3.12)
+- Python 3.12+ (tested primarily on 3.12)
 - Optional: Qdrant for vector storage (in progress), API keys for cloud providers if you choose them
 
 Install
@@ -503,7 +503,7 @@ Links
 Notes
 - Python package name: codeweaver-mcp
 - CLI entry point: codeweaver (module: codeweaver.cli.app:main)
-- Requires Python >= 3.11 (classifiers include 3.11–3.14)
+- Requires Python >= 3.12 (classifiers include 3.12–3.14)
 
 [^1]: CodeWeaver **will not index an unknown file extension**. If you want it to index an unsupported extension, then you **must** add it to your config file! If we don't know what it is, we don't want to add noise to your agent's context!
 

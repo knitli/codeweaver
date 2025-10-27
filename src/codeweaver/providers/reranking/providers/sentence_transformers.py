@@ -6,6 +6,8 @@
 # sourcery skip: no-complex-if-expressions
 """Reranking provider for FastEmbed."""
 
+from __future__ import annotations
+
 import asyncio
 import logging
 

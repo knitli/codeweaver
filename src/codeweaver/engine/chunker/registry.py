@@ -12,100 +12,137 @@ from weakref import WeakValueDictionary
 
 from pydantic import UUID7
 
-from codeweaver.common.utils.utils import uuid7
-from codeweaver.core.types.models import BasedModel
+from codeweaver.core.discovery import DiscoveredFile
+from codeweaver.core.stores import UUIDStore
+from codeweaver.core.types.aliases import UUID7Hex, UUID7HexT
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types import AnonymityConversion, FilteredKey
+    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
 
-class SourceIdRegistry(BasedModel):
+class SourceIdRegistry(UUIDStore[DiscoveredFile]):
     """Maintains per-file source IDs to ensure span consistency within files.
 
     This registry ensures that all spans from the same file share the same source_id, enabling set-like span operations and clean merging/splitting.
     """
 
+    store: dict[UUID7, DiscoveredFile]
+
+    _trash_heap: WeakValueDictionary[UUID7, DiscoveredFile]
+
     def __init__(self) -> None:
         """Initialize the registry."""
-        self._registry: dict[Path, UUID7] = {}
+        self.store: dict[UUID7, DiscoveredFile] = {}
         # Keep weak references to avoid memory leaks for temporary file processing
-        self._weak_registry: WeakValueDictionary[Path, UUID7] = WeakValueDictionary()
+        self._trash_heap: WeakValueDictionary[UUID7, DiscoveredFile] = WeakValueDictionary()
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        self._value_type = DiscoveredFile
+        self._size_limit = 1024 * 1024 * 5  # 5MB
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {
-            FilteredKey("_registry"): AnonymityConversion.COUNT,
-            FilteredKey("_weak_registry"): AnonymityConversion.FORBIDDEN,
+            FilteredKey("store"): AnonymityConversion.COUNT,
+            FilteredKey("_trash_heap"): AnonymityConversion.FORBIDDEN,
         }
 
-    def source_id_for(self, file_path: Path) -> UUID7:
-        """Get or create a source ID for the given file path.
+    def source_id_for(self, file: DiscoveredFile) -> UUID7HexT:
+        """Get or create a source ID for the given file.
+
+        Uses the DiscoveredFile's existing source_id instead of generating a new one.
+        This ensures consistency across the codeweaver system where DiscoveredFile
+        objects serve as the canonical source of truth for file identity.
 
         Args:
-            file_path: Path to the file
+            file: DiscoveredFile instance with existing source_id
 
         Returns:
-            Hex string representation of the UUID7 source ID
+            Hex string (newtype) representation of the file's UUID7 source_id
         """
-        if file_path not in self._registry:
-            self._registry[file_path] = uuid7()
-        return self._registry[file_path]
+        # Use the DiscoveredFile's existing source_id, don't generate a new one
+        if file not in self.store.values():
+            self.store[file.source_id] = file
+        return UUID7Hex(file.source_id.hex)
 
     def clear(self) -> None:
         """Clear the registry."""
-        self._registry.clear()
-        self._weak_registry.clear()
+        self.store.clear()
+        self._trash_heap.clear()
 
-    def remove(self, file_path: Path) -> bool:
+    def remove(self, value: UUID7 | DiscoveredFile) -> bool:
         """Remove a file from the registry.
 
         Args:
-            file_path: Path to remove
+            value: UUID7 source ID or DiscoveredFile instance to remove
 
         Returns:
             True if the file was in the registry, False otherwise
         """
         # TODO: We need to send a signal to vector stores to remove associated vectors
-        removed = file_path in self._registry
-        _ = self._registry.pop(file_path, None)
-        _ = self._weak_registry.pop(file_path, None)
+        if isinstance(value, DiscoveredFile):
+            file = next((k for k, v in self.store.items() if v == value), None)
+            if file is None:
+                return False
+        else:
+            file = value
+        removed = file in self.store
+        _ = self.store.pop(file, None)
+        _ = self._trash_heap.pop(file, None)
         return removed
-
-    def __len__(self) -> int:
-        """Return the number of files in the registry."""
-        return len(self._registry)
-
-    def __contains__(self, file_path: Path) -> bool:
-        """Check if a file path is in the registry."""
-        return file_path in self._registry
 
 
 # Global registry instance for the process
-_global_registry = SourceIdRegistry()
+_globalstore: SourceIdRegistry | None = None
 
 
-def source_id_for(file_path: Path) -> UUID7:
+def source_id_for(file: DiscoveredFile) -> UUID7HexT:
     """Get or create a source ID for the given file path using the global registry.
 
     Args:
-        file_path: Path to the file
+        file: DiscoveredFile instance
 
     Returns:
         Hex string representation of the UUID7 source ID
     """
-    return _global_registry.source_id_for(file_path)
+    global _globalstore
+    if _globalstore is None:
+        _globalstore = SourceIdRegistry()
+    return _globalstore.source_id_for(file)
 
 
-def clear_registry() -> None:
+def for_file_path(file_path: str | Path) -> UUID7HexT:
+    """Get or create a source ID for the given file path using the global registry.
+
+    Args:
+        file_path: Path to the file as a string or Path object
+
+    Returns:
+        Hex string representation of the UUID7 source ID
+    """
+    from codeweaver.core.discovery import DiscoveredFile
+
+    if discovered_file := DiscoveredFile.from_path(
+        file_path if isinstance(file_path, Path) else Path(file_path)
+    ):
+        return source_id_for(discovered_file)
+    raise ValueError(f"Could not discover file from path: {file_path}")
+
+
+def clear_store() -> None:
     """Clear the global registry."""
-    _global_registry.clear()
+    global _globalstore
+    if _globalstore is not None:
+        _globalstore.clear()
 
 
-def get_registry() -> SourceIdRegistry:
+def get_store() -> SourceIdRegistry:
     """Get the global registry instance."""
-    return _global_registry
+    global _globalstore
+    if _globalstore is None:
+        _globalstore = SourceIdRegistry()
+    return _globalstore
 
 
-__all__ = ("SourceIdRegistry", "clear_registry", "get_registry", "source_id_for")
+__all__ = ("SourceIdRegistry", "clear_store", "get_store", "source_id_for")

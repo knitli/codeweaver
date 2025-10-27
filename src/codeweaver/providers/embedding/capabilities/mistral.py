@@ -5,6 +5,8 @@
 
 """Mistral embedding capabilities."""
 
+from __future__ import annotations
+
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     PartialCapabilities,

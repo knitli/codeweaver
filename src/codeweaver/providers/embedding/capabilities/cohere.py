@@ -5,6 +5,8 @@
 
 """Capabilities for Cohere embedding models."""
 
+from __future__ import annotations
+
 from types import MappingProxyType
 
 from codeweaver.providers.embedding.capabilities.base import (

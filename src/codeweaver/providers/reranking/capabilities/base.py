@@ -5,6 +5,8 @@
 
 """Reranking model capabilities and settings."""
 
+from __future__ import annotations
+
 from collections.abc import Callable, Sequence
 from typing import Annotated, Any, Literal, NotRequired, Required, TypedDict
 

@@ -5,6 +5,8 @@
 
 """Base class for embedding providers."""
 
+from __future__ import annotations
+
 import asyncio
 import logging
 
@@ -42,7 +44,7 @@ statistics_module: LazyImport[ModuleType] = lazy_import("codeweaver.common.stati
 
 if TYPE_CHECKING:
     from codeweaver.common.statistics import SessionStatistics
-    from codeweaver.core.types import AnonymityConversion, FilteredKey
+    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 else:
     SessionStatistics = statistics_module.SessionStatistics
 
@@ -382,7 +384,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         except Exception:
             logger.exception("Error occurred while executing fire-and-forget task.")
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {

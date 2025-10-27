@@ -5,12 +5,16 @@
 
 """Text normalization and safety utilities."""
 
+from __future__ import annotations
+
 import logging
 import re
 import unicodedata
 
 from functools import cache
-from typing import Literal
+from typing import Literal, cast
+
+from codeweaver.core.types.aliases import FileExt, FileExtensionT, LiteralStringT
 
 
 # ===========================================================================
@@ -66,9 +70,14 @@ def sanitize_unicode(
 
 
 @cache
-def normalize_ext(ext: str) -> str:
+def normalize_ext(ext: FileExtensionT | str) -> FileExtensionT:
     """Normalize a file extension to a standard format. Cached because of hot/repetitive use."""
-    return ext.lower().strip() if ext.startswith(".") else f".{ext.lower().strip()}"
+    ext = str(ext)
+    return (
+        FileExt(cast(LiteralStringT, ext.lower().strip()))
+        if ext.startswith(".")
+        else FileExt(cast(LiteralStringT, f".{ext.lower().strip()}"))
+    )
 
 
 __all__ = ("normalize_ext", "sanitize_unicode")

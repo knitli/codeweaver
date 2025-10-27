@@ -27,7 +27,7 @@ class PunctuationCleaner(ast.NodeTransformer):
 
     def visit_Call(self, node: ast.Call) -> ast.Call:
         """Clean up logging.exception calls with redundant exception references."""
-        self.generic_visit(node)
+        _ = self.generic_visit(node)
 
         # Check if this is a logging.exception call and % format call with redundant exception
         if (
@@ -89,7 +89,7 @@ def clean_file(file_path: Path) -> bool:
         if cleaner.changes_made:
             # Convert back to source
             new_content = ast.unparse(new_tree)
-            file_path.write_text(new_content, encoding="utf-8")
+            _ = file_path.write_text(new_content, encoding="utf-8")
             return True
 
     except (SyntaxError, UnicodeDecodeError) as e:
@@ -100,14 +100,14 @@ def clean_file(file_path: Path) -> bool:
 
 def main() -> None:
     """Main entry point."""
-    if len(sys.argv) < 2:
-        print("Usage: python punctuation_cleaner.py <file_or_directory> [file2] ...")
-        sys.exit(1)
+    args = sys.argv
+    if len(args) < 2 or args[1] == ".":
+        args = [args[0], "./src", "./tests", "./scripts"]
 
     files_changed = 0
     total_files = 0
 
-    for arg in sys.argv[1:]:
+    for arg in args[1:]:
         path = Path(arg)
 
         if path.is_file() and path.suffix == ".py":

@@ -42,9 +42,9 @@ for arg in "$@"; do
     esac
 done
 
-# Default to current directory if no targets provided
-if [ ${#TARGETS[@]} -eq 0 ]; then
-    TARGETS=(".")
+# Default to src, tests, scripts directory if no targets provided
+if [ ${#TARGETS[@]} -eq 0 ] || [ "${TARGETS[0]}" == "." ]; then
+    TARGETS=("src" "tests" "scripts")
 fi
 
 # Debug output function

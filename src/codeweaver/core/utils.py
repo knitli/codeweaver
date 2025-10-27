@@ -5,6 +5,8 @@
 
 """Internal helper utilities for the core package."""
 
+from __future__ import annotations
+
 
 def truncate_text(text: str, max_length: int = 100, ellipsis: str = "...") -> str:
     """

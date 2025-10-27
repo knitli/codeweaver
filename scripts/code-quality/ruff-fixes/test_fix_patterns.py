@@ -13,12 +13,13 @@ import subprocess
 import sys
 
 from pathlib import Path
+from typing import cast
 
 
 class RuffPatternTester:
     """Test the fix-ruff-patterns.sh script with generated problematic files."""
 
-    def __init__(self, test_dir: str = "test_batch"):
+    def __init__(self, test_dir: str = "test_batch") -> None:
         """Initialize the tester with a test directory."""
         self.test_dir = Path(test_dir)
         self.script_dir = Path(__file__).parent
@@ -51,7 +52,13 @@ class RuffPatternTester:
         target = target or str(self.test_dir)
         try:
             result = subprocess.run(
-                [shutil.which("ruff"), "check", target, "--select=TRY401,G004,TRY300", "--no-fix"],
+                [
+                    cast(bytes, shutil.which("ruff")),
+                    "check",
+                    target,
+                    "--select=TRY401,G004,TRY300",
+                    "--no-fix",
+                ],
                 capture_output=True,
                 text=True,
                 timeout=30,

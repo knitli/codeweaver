@@ -679,15 +679,23 @@ def get_custom_patterns(language: str) -> list[DelimiterPattern]:
         6
     """
     from codeweaver.config.settings import get_settings
+    from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 
     language = textcase.snake(language)
     delimiters: list[DelimiterPattern] = []
-    if custom_delimiters := get_settings().custom_delimiters:
+    if custom_delimiters := get_settings().chunker.custom_delimiters:
         for delim in custom_delimiters:
             if (lang := delim.language) and language == textcase.snake(lang):
                 delimiters.extend(delim.delimiters)
             if (extensions := delim.extensions) and any(
-                ext for ext in extensions if textcase.snake(ext.language) == language
+                ext
+                for ext in extensions
+                if textcase.snake(
+                    ext.language.variable
+                    if isinstance(ext.language, SemanticSearchLanguage | ConfigLanguage)
+                    else str(ext.language)
+                )
+                == language
             ):
                 delimiters.extend(delim.delimiters)
     if "_pattern_registry" not in globals():

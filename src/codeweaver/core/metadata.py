@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import contextlib
+import re
 
 from collections.abc import Callable, Generator
 from pathlib import Path
@@ -22,11 +23,10 @@ from typing import (
     Self,
     TypedDict,
     cast,
-    overload,
 )
 
 from ast_grep_py import SgNode
-from pydantic import UUID7, ConfigDict, Field, PositiveFloat
+from pydantic import UUID7, ConfigDict, Field, PositiveFloat, SkipValidation
 
 from codeweaver.common.utils import normalize_ext, uuid7
 from codeweaver.core.language import (
@@ -78,14 +78,16 @@ class ChunkSource(BaseEnum):
 class SemanticMetadata(BasedModel):
     """Metadata associated with the semantics of a code chunk."""
 
-    model_config = FROZEN_BASEDMODEL_CONFIG | ConfigDict(validate_assignment=True)
+    model_config = FROZEN_BASEDMODEL_CONFIG | ConfigDict(
+        validate_assignment=True, arbitrary_types_allowed=True
+    )
 
     language: Annotated[
         SemanticSearchLanguage | str,
         Field(description="""The programming language of the code chunk"""),
     ]
-    thing: AstThing[SgNode] | None
-    positional_connections: tuple[AstThing[SgNode], ...] = ()
+    thing: Any = None  # AstThing[SgNode] | None - using Any to avoid forward reference issues
+    positional_connections: Any = ()  # tuple[AstThing[SgNode], ...] - using Any to avoid forward reference issues
     # TODO: Logic for symbol extraction from AST nodes
     symbol: Annotated[
         str | None,
@@ -107,6 +109,18 @@ class SemanticMetadata(BasedModel):
 
     def _telemetry_keys(self) -> None:
         return None  # we'll exclude identifying info in the value types
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Custom pickle support - exclude unpicklable AST nodes."""
+        state = self.__dict__.copy()
+        # Remove unpicklable fields (SgNode and AstThing objects)
+        state["thing"] = None
+        state["positional_connections"] = ()  # Clear AST node references
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Custom pickle support - restore state without AST nodes."""
+        self.__dict__.update(state)
 
     def _serialize_for_cli(self) -> dict[str, Any]:
         """Serialize the SemanticMetadata for CLI output."""
@@ -139,9 +153,12 @@ class SemanticMetadata(BasedModel):
     @classmethod
     def from_node(cls, thing: AstThing[SgNode] | SgNode, language: SemanticSearchLanguage) -> Self:
         """Create a SemanticMetadata instance from an AST node."""
+        from codeweaver.semantic.ast_grep import AstThing
+
         if isinstance(thing, SgNode):
             thing = AstThing.from_sg_node(thing, language=language)  # pyright: ignore[reportUnknownVariableType]
-        return cls(
+        # Use model_construct to bypass validation since AstThing may not be fully defined yet
+        return cls.model_construct(
             language=language or thing.language or "",
             thing=thing,
             positional_connections=tuple(thing.positional_connections),
@@ -164,6 +181,31 @@ class Metadata(TypedDict, total=False):
     name: NotRequired[
         Annotated[str | None, Field(description="""Name of the code chunk, if applicable""")]
     ]
+    kind: NotRequired[
+        Annotated[
+            Any | None,
+            Field(
+                description="""Optional kind/type classification of the chunk (e.g., DelimiterKind for delimiter chunks)"""
+            ),
+        ]
+    ]
+    nesting_level: NotRequired[
+        Annotated[
+            int | None, Field(description="""Nesting level for delimiter chunks (0 = top level)""")
+        ]
+    ]
+    priority: NotRequired[
+        Annotated[int | None, Field(description="""Priority value for delimiter chunks""")]
+    ]
+    line_start: NotRequired[
+        Annotated[int | None, Field(description="""Starting line number for the chunk""")]
+    ]
+    line_end: NotRequired[
+        Annotated[int | None, Field(description="""Ending line number for the chunk""")]
+    ]
+    fallback_to_generic: NotRequired[
+        Annotated[bool | None, Field(description="""Whether generic/fallback chunking was used""")]
+    ]
     updated_at: NotRequired[
         Annotated[
             PositiveFloat | None,
@@ -179,12 +221,7 @@ class Metadata(TypedDict, total=False):
         ]
     ]
     semantic_meta: NotRequired[
-        Annotated[
-            SemanticMetadata | None,
-            Field(
-                description="""Semantic metadata associated with the code chunk, if applicable. Should be included if the code chunk was from semantic chunking."""
-            ),
-        ]
+        SkipValidation[SemanticMetadata | None]  # type: ignore[valid-type]
     ]
     context: Annotated[
         dict[str, Any] | None,
@@ -193,6 +230,77 @@ class Metadata(TypedDict, total=False):
             description="""Optional context for evaluating the chunk's origin, transformation, etc. You can really put anything here.""",
         ),
     ]
+
+
+class ExtTestDef(NamedTuple):
+    """A NamedTuple defining a file extension test. Consists of the extension, the language if the test passes, and the test -- a callable that takes the file content and returns a bool."""
+
+    extension: FileExtensionT
+    language: LanguageNameT
+    test: Callable[[str], bool]
+    """A callable that takes the file content and returns a bool."""
+
+    def test_ext(self, extension: FileExtensionT, content: str) -> bool:
+        """Run the test callable with the given extension and content."""
+        return False if extension != self.extension else self.test(content)
+
+
+BASH_SHEBANG = re.compile(
+    r"^#!(/usr|/usr/local)?/bin/(ba|fi|da|k|z|c|tc)?sh|^#!/usr/bin/env ((/bin/|/usr/bin/|/usr/local/bin)?(ba|da|fi|k|z|c|tc)?sh).*",
+    re.IGNORECASE | re.DOTALL,
+)
+PYTHON_SHEBANG = re.compile(
+    r"^(#(/usr/bin/env (-S )?(/usr/bin/|/usr/local/bin/)?(python3?|uv (-s)?).*))",
+    re.IGNORECASE | re.DOTALL,
+)
+PERL_SHEBANG = re.compile(
+    r"^(#(/usr/bin/env (-S )?(/usr/bin/|/usr/local/bin/)?(perl).*))", re.IGNORECASE | re.DOTALL
+)
+
+
+EXTENSION_TESTS: tuple[ExtTestDef, ...] = (
+    ExtTestDef(
+        extension=FileExt(".v"),
+        language=LanguageName(cast(LiteralStringT, "coq")),
+        test=lambda content: any(kw in content for kw in ("Proof", "Qed", "Defined", "Admitted")),  # type: ignore # give me a way to type a lambda...
+    ),
+    ExtTestDef(
+        extension=FileExt(".v"),
+        language=LanguageName(cast(LiteralStringT, "verilog")),
+        test=lambda content: any(  # type: ignore
+            kw in content for kw in ("module", "endmodule", "assign", "wire", "reg")
+        ),
+    ),
+    ExtTestDef(
+        extension=FileExt(".m"),
+        language=LanguageName(cast(LiteralStringT, "matlab")),
+        test=lambda content: any(  # type: ignore
+            kw in content for kw in ("function", "end", "parfor", "switch")
+        ),
+    ),
+    ExtTestDef(
+        extension=FileExt(".m"),
+        language=LanguageName(cast(LiteralStringT, "objective-c")),
+        test=lambda content: all(  # type: ignore
+            kw not in content for kw in ("switch", "end", "parfor", "function")
+        ),
+    ),
+    ExtTestDef(
+        extension=FileExt(""),
+        language=LanguageName(cast(LiteralStringT, "bash")),
+        test=lambda content: bool(BASH_SHEBANG.match(content)),  # type: ignore
+    ),
+    ExtTestDef(
+        extension=FileExt(""),
+        language=LanguageName(cast(LiteralStringT, "python")),
+        test=lambda content: bool(PYTHON_SHEBANG.match(content)),  # type: ignore
+    ),
+    ExtTestDef(
+        extension=FileExt(""),
+        language=LanguageName(cast(LiteralStringT, "perl")),
+        test=lambda content: bool(PERL_SHEBANG.match(content)),  # type: ignore
+    ),
+)
 
 
 class ExtLangPair(NamedTuple):
@@ -205,7 +313,7 @@ class ExtLangPair(NamedTuple):
     ext: FileExtensionT
     """The file extension, including leading dot if it's a file extension. May also be a full file name."""
 
-    language: LanguageNameT
+    language: LanguageNameT | SemanticSearchLanguage | ConfigLanguage
     """The programming or config language associated with the file extension."""
 
     @property
@@ -223,7 +331,7 @@ class ExtLangPair(NamedTuple):
         """Check if the extension is a configuration file."""
         from codeweaver.core.file_extensions import CONFIG_FILE_LANGUAGES
 
-        return self.language in CONFIG_FILE_LANGUAGES
+        return self.language in CONFIG_FILE_LANGUAGES or isinstance(self.language, ConfigLanguage)
 
     @property
     def is_doc(self) -> bool:
@@ -271,7 +379,7 @@ class ExtLangPair(NamedTuple):
 
 
 def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
-    """Determine the ExtKind based on the validated data."""
+    """Determine the ExtKind based on validated data (`Metadata` extraction)."""
     if "file_path" in validated_data:
         return ExtKind.from_file(validated_data["file_path"])
     source = validated_data.get("source", ChunkSource.TEXT_BLOCK)
@@ -301,46 +409,56 @@ def get_ext_lang_pairs(*, include_data: bool = False) -> Generator[ExtLangPair]:
 
     if include_data:
         yield from (*CODE_FILES_EXTENSIONS, *DATA_FILES_EXTENSIONS, *DOC_FILES_EXTENSIONS)
-    yield from (*CODE_FILES_EXTENSIONS, *DOC_FILES_EXTENSIONS)
+    else:
+        yield from (*CODE_FILES_EXTENSIONS, *DOC_FILES_EXTENSIONS)
 
 
-@overload
-def _handle_fallback(
-    path: Path, *, pair: ExtLangPair, extension: None = None
-) -> ExtLangPair | None: ...
-@overload
-def _handle_fallback(
-    path: Path, *, pair: None = None, extension: FileExt
-) -> ExtLangPair | None: ...
-def _handle_fallback(
-    path: Path, *, pair: ExtLangPair | None = None, extension: FileExt | None = None
-) -> ExtLangPair | None:
-    """Handle fallback for a given ExtLangPair and file path."""
-    from codeweaver.core.file_extensions import FALLBACK_TEST
-
-    if extension is None and pair is None:
-        raise ValueError("You must provide either 'pair' or 'extension'.")
-    extension = extension or cast(ExtLangPair, pair).ext
-    if extension in FALLBACK_TEST:
-        return ExtLangPair(ext=extension, language=_run_fallback_test(extension, path))
-    return pair
+def get_semantic_or_config_lang(
+    test_info: Path | LanguageNameT,
+) -> SemanticSearchLanguage | ConfigLanguage | None:
+    """Get the `SemanticSearchLanguage` or `ConfigLanguage` for a given file path."""
+    is_file = isinstance(test_info, Path)
+    file_path = test_info if is_file else None
+    language_name = test_info if test_info and not is_file else None
+    if language_name is not None:
+        with contextlib.suppress(KeyError, ValueError, AttributeError):
+            if semantic_lang := SemanticSearchLanguage.from_string(str(language_name)):
+                return semantic_lang
+            if config_lang := ConfigLanguage.from_string(str(language_name)):
+                return config_lang
+        return None
+    if file_path:
+        with contextlib.suppress(KeyError, ValueError, AttributeError):
+            if semantic_lang := SemanticSearchLanguage.from_extension(
+                str(file_path.suffix or file_path.name)
+            ):
+                if semantic_lang.config_files and next(
+                    (cfg for cfg in semantic_lang.config_files if cfg.path.name == file_path.name),
+                    None,
+                ):
+                    return ConfigLanguage.from_string(str(language_name))
+                return semantic_lang
+            if config_lang := ConfigLanguage.from_extension(
+                str(file_path.suffix or file_path.name)
+            ):
+                return config_lang
+    return None
 
 
 def get_ext_lang_pair_for_file(
     file_path: Path, *, include_data: bool = False
 ) -> ExtLangPair | None:
     """Get the `ExtLangPair` for a given file path."""
-    from codeweaver.core.file_extensions import FALLBACK_TEST
-
-    if not file_path.is_file():
-        return None
-    filename = file_path.name
-    for pair in get_ext_lang_pairs(include_data=include_data):
-        if pair.is_same(filename):
-            if pair.ext in FALLBACK_TEST:
-                language = _run_fallback_test(pair.ext, file_path)
-                return ExtLangPair(ext=pair.ext, language=language)
-            return pair
+    if in_tests := ExtKind.resolve_extension_tests(file_path):
+        return ExtLangPair(
+            ext=FileExt(cast(LiteralStringT, file_path.suffix or file_path.name)),
+            language=get_semantic_or_config_lang(in_tests.language) or in_tests.language,  # type: ignore
+        )  # pyright: ignore[reportArgumentType]
+    if config_lang := ConfigLanguage.from_extension(file_path.suffix or file_path.name):
+        return ExtLangPair(
+            ext=FileExt(cast(LiteralStringT, file_path.suffix or file_path.name)),
+            language=config_lang,
+        )
     return None
 
 
@@ -348,37 +466,25 @@ def get_language_from_extension(
     extension: FileExt | LiteralStringT,
     *,
     path: Path | None = None,
-    hook: Callable[[FileExt, Path | None], LanguageName | None] | None = None,
-) -> LanguageName | None:
+    hook: Callable[[FileExt, Path | None], LanguageNameT | None] | None = None,
+) -> LanguageNameT | SemanticSearchLanguage | ConfigLanguage | None:
     """Get the language associated with a given file extension."""
     extension = FileExt(extension)
-    if path and path.is_file() and (fallback := _handle_fallback(path, extension=extension)):
-        return fallback.language
+    if semantic_ext := has_semantic_extension(extension):
+        return semantic_ext
+    if config_lang := next(
+        lang for lang in ConfigLanguage if lang.extensions and extension in lang.extensions
+    ):
+        return config_lang
     return next(
         (pair.language for pair in get_ext_lang_pairs() if pair and pair.ext == extension),
         hook(extension, path) if hook else None,
     )
 
 
-def _run_fallback_test(extension: FileExt, path: Path) -> LanguageName:
-    """Run the fallback test for a given extension and file path."""
-    from codeweaver.core.file_extensions import FALLBACK_TEST
-
-    if extension in FALLBACK_TEST and path.is_file():
-        test_def = FALLBACK_TEST[extension]
-        with contextlib.suppress(Exception):
-            content = path.read_text(errors="ignore")
-            if (
-                test_def["on"] == "in" and any(value in content for value in test_def["values"])
-            ) or (
-                test_def["on"] == "not in"
-                and all(value not in content for value in test_def["values"])
-            ):
-                return test_def["fallback_to"]
-    return LanguageName("matlab") if extension == FileExt(".m") else LanguageName("coq")
-
-
-def _categorize_language(language: LanguageName) -> ChunkKind:
+def _categorize_language(
+    language: LanguageNameT | SemanticSearchLanguage | ConfigLanguage,
+) -> ChunkKind:
     """Categorize a language into its corresponding ChunkKind."""
     from codeweaver.core.file_extensions import (
         CODE_LANGUAGES,
@@ -386,7 +492,7 @@ def _categorize_language(language: LanguageName) -> ChunkKind:
         DOCS_LANGUAGES,
     )
 
-    if language in CONFIG_FILE_LANGUAGES:
+    if language in CONFIG_FILE_LANGUAGES or isinstance(language, ConfigLanguage):
         return ChunkKind.CONFIG
     if language in CODE_LANGUAGES:
         return ChunkKind.CODE
@@ -441,6 +547,29 @@ class ExtKind(NamedTuple):
             return cls(language=lang_name, kind=categorized_kind)
 
         return cls(language=lang_name, kind=ChunkKind.OTHER)
+
+    @classmethod
+    def resolve_extension_tests(cls, file: str | Path) -> ExtKind | None:
+        """
+        Resolve the extension tests for a given file path.
+        """
+        file = Path(file) if isinstance(file, str) else file
+        ext = FileExt(cast(LiteralStringT, file.suffix or file.name))
+        return next(
+            (
+                cls.from_language(
+                    ext_test.language,
+                    (
+                        ChunkKind.CODE
+                        if ext_test.language not in (LanguageName("bash"), LanguageName("matlab"))
+                        else ChunkKind.OTHER
+                    ),
+                )
+                for ext_test in EXTENSION_TESTS
+                if ext_test.test_ext(ext, file.read_text(errors="ignore"))
+            ),
+            None,
+        )
 
     @classmethod
     def from_file(cls, file: str | Path) -> ExtKind | None:

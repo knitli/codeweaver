@@ -4,6 +4,8 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 # applies to new/modified code in this directory (`src/codeweaver/embedding_providers/`)
 
+from __future__ import annotations
+
 import os
 
 from collections.abc import Mapping, Sequence
@@ -100,32 +102,34 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
         self._caps = caps
         self._provider = caps.provider or self._provider
         kwargs = kwargs or {}
-        self.client_kwargs = kwargs.get("client_kwargs", {}) or kwargs
-        self.client_kwargs["client_name"] = "codeweaver"
-        if not self.client_kwargs.get("api_key"):
+        self.client_options = kwargs.get("client_options", {}) or kwargs
+        self.client_options["client_name"] = "codeweaver"
+        if not self.client_options.get("api_key"):
             if self._provider == Provider.COHERE:
-                self.client_kwargs["api_key"] = kwargs.get("api_key") or os.getenv("COHERE_API_KEY")
+                self.client_options["api_key"] = kwargs.get("api_key") or os.getenv(
+                    "COHERE_API_KEY"
+                )
             elif self._provider == Provider.AZURE:
-                self.client_kwargs["api_key"] = (
+                self.client_options["api_key"] = (
                     kwargs.get("api_key")
                     or os.getenv("AZURE_COHERE_API_KEY")
                     or os.getenv("COHERE_API_KEY")
                 )
             else:  # Heroku
-                self.client_kwargs["api_key"] = (
+                self.client_options["api_key"] = (
                     kwargs.get("api_key")
                     or os.getenv("HEROKU_API_KEY")
                     or os.getenv("INFERENCE_KEY")
                     or os.getenv("COHERE_API_KEY")
                 )
-            if not self.client_kwargs.get("api_key"):
+            if not self.client_options.get("api_key"):
                 raise ConfigurationError(
-                    "Cohere API key not found in client_kwargs or COHERE_API_KEY environment variable."
+                    "Cohere API key not found in client_options or COHERE_API_KEY environment variable."
                 )
-        self.client_kwargs["base_url"] = self.client_kwargs.get("base_url") or self.base_url
-        self.client_kwargs["model"] = self.model_name or caps.name
-        self._client = _client or CohereClient(**self.client_kwargs)
-        super().__init__(self._client, caps, **self.client_kwargs)
+        self.client_options["base_url"] = self.client_options.get("base_url") or self.base_url
+        self.client_options["model"] = self.model_name or caps.name
+        self._client = _client or CohereClient(**self.client_options)
+        super().__init__(self._client, caps, **self.client_options)
 
     @property
     def base_url(self) -> str:
@@ -136,8 +140,8 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
         """Get the base URLs for each provider."""
         return {
             Provider.COHERE: "https://api.cohere.com",
-            Provider.AZURE: try_for_azure_endpoint(self.client_kwargs),
-            Provider.HEROKU: try_for_heroku_endpoint(self.client_kwargs),
+            Provider.AZURE: try_for_azure_endpoint(self.client_options),
+            Provider.HEROKU: try_for_heroku_endpoint(self.client_options),
         }
 
     async def _fetch_embeddings(
@@ -146,17 +150,17 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
         """Fetch embeddings from the Cohere API."""
         embed_kwargs = {
             **kwargs,
-            **self.client_kwargs,
+            **self.client_options,
             "input_type": "search_query" if is_query else "search_document",
         }
         if self.model_name.endswith("4.0") and not embed_kwargs.get("embedding_types"):
             embed_kwargs["embedding_types"] = ["float"]  # pyright: ignore[reportArgumentType]
             attr = "float"
         else:
-            attr = self.client_kwargs.get("output_dtype") or self._caps.default_dtype or "float"
+            attr = self.client_options.get("output_dtype") or self._caps.default_dtype or "float"
         response = await self._client.embed(
             texts=texts,
-            model=self.client_kwargs["model"],
+            model=self.client_options["model"],
             **embed_kwargs,  # pyright: ignore[reportArgumentType]
         )
         embed_obj = response.embeddings
@@ -177,7 +181,7 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
     ) -> list[list[float]] | list[list[int]]:
         """Embed a list of documents."""
         kwargs = (
-            self.doc_kwargs.get("client_kwargs", {})
+            self.doc_kwargs.get("client_options", {})
             | self.doc_kwargs.get("model_kwargs", {})
             | kwargs
         )
@@ -191,7 +195,7 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
     ) -> list[list[float]] | list[list[int]]:
         """Embed a query or list of queries."""
         kwargs = (
-            self.query_kwargs.get("client_kwargs", {})
+            self.query_kwargs.get("client_options", {})
             | self.query_kwargs.get("model_kwargs", {})
             | kwargs
         )

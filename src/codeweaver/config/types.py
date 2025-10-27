@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import platform
 import ssl
 
 from collections.abc import Awaitable, Callable
@@ -28,7 +27,7 @@ from fastmcp.server.server import DuplicateBehavior
 from fastmcp.tools import Tool
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.lowlevel.server import LifespanResultT
-from pydantic import Field, PositiveFloat, PositiveInt, SecretStr
+from pydantic import Field, FilePath, NonNegativeFloat, PositiveFloat, PositiveInt, SecretStr
 from starlette.middleware import Middleware as ASGIMiddleware
 from uvicorn.config import (
     SSL_PROTOCOL_VERSION,
@@ -38,13 +37,18 @@ from uvicorn.config import (
     WSProtocolType,
 )
 
+from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.logging import LoggingConfigDict
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types import AnonymityConversion, DictView, FilteredKey, Unset
+    from codeweaver.config.chunker import CustomDelimiter, CustomLanguage
+    from codeweaver.config.logging import LoggingSettings
+    from codeweaver.config.middleware import MiddlewareOptions
+    from codeweaver.config.providers import ProviderSettingsDict
+    from codeweaver.core.types import AnonymityConversion, DictView, FilteredKeyT, Unset
     from codeweaver.providers.provider import Provider
 
 # ===========================================================================
@@ -117,8 +121,50 @@ class BaseProviderSettings(TypedDict, total=False):
     enabled: Required[bool]
     api_key: NotRequired[str | None]
     connection: NotRequired[ConnectionConfiguration | None]
-    client_kwargs: NotRequired[dict[str, Any] | None]
+    client_options: NotRequired[dict[str, Any] | None]
     other: NotRequired[dict[str, Any] | None]
+
+
+# ===========================================================================
+# *       TypedDict Representations of Chunker and Related Settings
+# ===========================================================================
+
+
+class PerformanceSettingsDict(TypedDict, total=False):
+    """TypedDict for performance settings.
+
+    Not intended to be used directly; used for internal type checking and validation.
+    """
+
+    max_file_size_mb: NotRequired[PositiveInt | None]
+    chunk_timeout_seconds: NotRequired[PositiveInt | None]
+    parse_timeout_seconds: NotRequired[PositiveInt | None]
+    max_chunks_per_file: NotRequired[PositiveInt | None]
+    max_memory_mb_per_operation: NotRequired[PositiveInt | None]
+    max_ast_depth: NotRequired[PositiveInt | None]
+
+
+class ConcurrencySettingsDict(TypedDict, total=False):
+    """TypedDict for concurrency settings.
+
+    Not intended to be used directly; used for internal type checking and validation.
+    """
+
+    max_parallel_files: NotRequired[PositiveInt | None]
+    use_process_pool: NotRequired[bool | None]
+
+
+class ChunkerSettingsDict(TypedDict, total=False):
+    """TypedDict for Chunker settings.
+
+    Not intended to be used directly; used for internal type checking and validation.
+    """
+
+    custom_delimiters: NotRequired[list[CustomDelimiter]] | None
+    custom_languages: NotRequired[list[CustomLanguage]] | None
+    semantic_importance_threshold: NotRequired[NonNegativeFloat | None]
+    performance: NotRequired[PerformanceSettingsDict | None]
+    concurrency: NotRequired[ConcurrencySettingsDict | None]
 
 
 # ===========================================================================
@@ -164,6 +210,37 @@ class FastMcpServerSettingsDict(TypedDict, total=False):
     resource_prefix_format: NotRequired[Literal["protocol", "path"] | None]
     middleware: NotRequired[list[str | Middleware] | None]
     tools: NotRequired[list[str | Tool] | None]
+
+
+class CodeWeaverSettingsDict(TypedDict, total=False):
+    """TypedDict for CodeWeaver settings.
+
+    Not intended to be used directly; used for internal type checking and validation.
+    """
+
+    project_path: NotRequired[Path | None]
+    project_name: NotRequired[str | None]
+    provider: NotRequired[ProviderSettingsDict | None]
+    config_file: NotRequired[FilePath | None]
+    token_limit: NotRequired[PositiveInt]
+    max_file_size: NotRequired[PositiveInt]
+    max_results: NotRequired[PositiveInt]
+    server: NotRequired[FastMcpServerSettingsDict]
+    logging: NotRequired[LoggingSettings]
+    middleware_settings: NotRequired[MiddlewareOptions]
+    chunker: NotRequired[ChunkerSettingsDict]
+    project_root: NotRequired[Path | None]
+    uvicorn_settings: NotRequired[UvicornServerSettingsDict]
+    filter_settings: NotRequired[FileFilterSettingsDict]
+    enable_background_indexing: NotRequired[bool]
+    enable_telemetry: NotRequired[bool]
+    enable_health_endpoint: NotRequired[bool]
+    enable_statistics_endpoint: NotRequired[bool]
+    enable_settings_endpoint: NotRequired[bool]
+    enable_version_endpoint: NotRequired[bool]
+    allow_identifying_telemetry: NotRequired[bool]
+    enable_ai_intent_analysis: NotRequired[bool]
+    enable_precontext: NotRequired[bool]
 
 
 # ===========================================================================
@@ -229,7 +306,7 @@ class UvicornServerSettings(BasedModel):
     factory: bool = False
     h11_max_incomplete_event_size: int | None = None
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {
@@ -314,14 +391,10 @@ def default_config_file_locations(
     """Get default file locations for configuration files."""
     # Determine base extensions
     extensions = (
-        ["yaml", "yml"] if not as_yaml and not as_json else ["yaml", "yml"] if as_yaml else ["json"]
+        ["toml"] if not as_yaml and not as_json else ["yaml", "yml"] if as_yaml else ["json"]
     )
     # Get user config directory
-    user_config_dir = (
-        os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))
-        if platform.system() == "Windows"
-        else os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))
-    )
+    user_config_dir = get_user_config_dir()
 
     # Build file paths maintaining precedence order
     base_paths = [
@@ -341,11 +414,15 @@ def default_config_file_locations(
 
 
 __all__ = (
+    "ChunkerSettingsDict",
+    "CodeWeaverSettingsDict",
+    "ConcurrencySettingsDict",
     "ConnectionConfiguration",
     "ConnectionRateLimitConfig",
     "FastMcpHttpRunArgs",
     "FastMcpServerSettingsDict",
     "FileFilterSettingsDict",
+    "PerformanceSettingsDict",
     "RignoreSettings",
     "UvicornServerSettings",
     "UvicornServerSettingsDict",

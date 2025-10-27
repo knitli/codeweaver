@@ -724,6 +724,25 @@ class SemanticClass(str, BaseEnum):
                     "function expressions",
                 ),
             ),
+            cls.SYNTAX_KEYWORD: ThingClass(
+                name=cls.SYNTAX_KEYWORD,
+                description="Language keywords and reserved words",
+                rank=ImportanceRank.SYNTAX_REFERENCES,
+                importance_scores=ImportanceScores(
+                    discovery=0.20,
+                    comprehension=0.30,
+                    modification=0.40,
+                    debugging=0.50,
+                    documentation=0.15,
+                ),
+                examples=(
+                    "control flow keywords (if, else, for)",
+                    "type keywords (int, string, class)",
+                    "access modifiers (public, private)",
+                    "declaration keywords (def, var, let)",
+                    "context keywords (async, await)",
+                ),
+            ),
             cls.SYNTAX_IDENTIFIER: ThingClass(
                 name=cls.SYNTAX_IDENTIFIER,
                 description="Variable names, type names, and symbol references excluding literals and operators",
@@ -879,58 +898,68 @@ class AgentTask(BaseAgentTask, BaseDataclassEnum):
         ImportanceScoresDict(
             discovery=0.2, comprehension=0.3, modification=0.1, debugging=0.35, documentation=0.05
         ),
-        "DEBUG",
-        "debug",
+        ("debugging", "debugger", "debug"),
         "Predefined task for debugging code.",
     )
-    DEFAULT = None, "DEFAULT", "default", "Default task with balanced context weights."
+    DEFAULT = (
+        ImportanceScoresDict(
+            discovery=0.05,
+            comprehension=0.05,
+            modification=0.05,
+            debugging=0.05,
+            documentation=0.05,
+        ),
+        ("default",),
+        "Default task with balanced context weights.",
+    )
     DOCUMENT = (
         ImportanceScoresDict(
             discovery=0.2, comprehension=0.2, modification=0.1, debugging=0.05, documentation=0.45
         ),
-        "DOCUMENT",
-        "document",
+        ("document", "documentation", "doc", "docs", "docstrings"),
         "Predefined task for documenting code.",
     )
     IMPLEMENT = (
         ImportanceScoresDict(
             discovery=0.3, comprehension=0.3, modification=0.2, debugging=0.1, documentation=0.1
         ),
-        "IMPLEMENT",
-        "implement",
+        ("implement", "implementation", "implementing", "create"),
         "Predefined task for implementing code.",
     )
     LOCAL_EDIT = (
         ImportanceScoresDict(
             discovery=0.4, comprehension=0.3, modification=0.2, debugging=0.05, documentation=0.05
         ),
-        "LOCAL_EDIT",
-        "local_edit",
+        ("local_edit", "editing", "edit", "modify", "modification", "local_change", "change"),
         "Predefined task for local code edits.",
     )
     REFACTOR = (
         ImportanceScoresDict(
             discovery=0.15, comprehension=0.25, modification=0.45, debugging=0.1, documentation=0.05
         ),
-        "REFACTOR",
-        "refactor",
+        ("refactor", "refactoring", "restructure", "restructuring", "improve", "reorganize"),
         "Predefined task for refactoring code.",
     )
     REVIEW = (
         ImportanceScoresDict(
             discovery=0.25, comprehension=0.35, modification=0.15, debugging=0.15, documentation=0.1
         ),
-        "REVIEW",
-        "review",
+        ("review", "code_review", "audit", "code_audit", "inspect", "inspection", "qa"),
         "Predefined task for reviewing code.",
     )
     SEARCH = (
         ImportanceScoresDict(
             discovery=0.5, comprehension=0.2, modification=0.15, debugging=0.1, documentation=0.05
         ),
-        "SEARCH",
-        "search",
+        ("search", "find", "lookup", "explore", "investigate"),
         "Predefined task for searching code.",
+    )
+    TEST = (
+        ImportanceScoresDict(
+            discovery=0.5, comprehension=0.2, modification=0.2, debugging=0.4, documentation=0.1
+        ),
+        ("test", "testing", "unittest", "tests", "write_tests", "test_code"),
+        "Predefined task for testing code or writing tests (discovery).",
     )
 
     def _telemetry_keys(self) -> None:
@@ -946,7 +975,7 @@ class AgentTask(BaseAgentTask, BaseDataclassEnum):
     @property
     def profile(self) -> ImportanceScoresDict:
         """Get the context weight profile for this task."""
-        return super()._profile
+        return self.value._profile  # type: ignore
 
 
 # =============================================================================

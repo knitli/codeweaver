@@ -11,6 +11,7 @@ from codeweaver.common.utils.checks import (
     is_class,
     is_debug,
     is_pydantic_basemodel,
+    is_test_environment,
     is_typeadapter,
 )
 from codeweaver.common.utils.git import (
@@ -52,6 +53,7 @@ __all__ = (
     "is_debug",
     "is_git_dir",
     "is_pydantic_basemodel",
+    "is_test_environment",
     "is_typeadapter",
     "lazy_import",
     "normalize_ext",

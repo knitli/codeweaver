@@ -189,13 +189,13 @@ def fix_file(file_path: Path) -> bool:
         content = file_path.read_text(encoding="utf-8")
 
         # Validate syntax before processing
-        ast.parse(content)
+        _ = ast.parse(content)
 
         fixer = SourcePatternFixer()
         new_content = fixer.fix_content(content)
 
         if fixer.changes_made:
-            file_path.write_text(new_content, encoding="utf-8")
+            _ = file_path.write_text(new_content, encoding="utf-8")
             print(f"Applied fixes: {', '.join(sorted(fixer.fixes_applied))}")
             return True
 
@@ -207,10 +207,9 @@ def fix_file(file_path: Path) -> bool:
 
 def main() -> None:
     """Main entry point."""
-    if len(sys.argv) < 2:
-        print("Usage: python ruff_fixer.py <file_or_directory> [file2] ...")
-        sys.exit(1)
-
+    args = sys.argv
+    if len(args) < 2 or args[1] == ".":
+        args = [args[0], "./src", "./tests", "./scripts"]
     files_changed = 0
     total_files = 0
 

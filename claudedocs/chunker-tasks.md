@@ -142,11 +142,9 @@ class ConcurrencySettings(BasedModel):
     use_process_pool: bool = True
 
 class ChunkerSettings(BasedModel):
-    semantic_importance_threshold: float = 0.3
-    custom_delimiters: dict[str, list[DelimiterPattern]] = Field(default_factory=dict)
-    prefer_semantic: bool = True
-    force_delimiter_for_languages: list[str] = Field(default_factory=list)
-    enable_hybrid_chunking: bool = True
+    semantic_importance_threshold: float = 0.2
+    custom_delimiters: dict[LanguageNameT, CustomDelimiter] = Field(default_factory=dict)    
+    custom_languages: list[CustomLanguage] = Field(default_factory=list)
     performance: PerformanceSettings = Field(default_factory=PerformanceSettings)
     concurrency: ConcurrencySettings = Field(default_factory=ConcurrencySettings)
 ```
@@ -220,29 +218,28 @@ Write tests for all edge cases per spec §2.6:
 
 ### T007 [P]: Semantic Chunker - Oversized Node Tests
 **File**: `tests/unit/engine/chunker/test_semantic_oversized.py`
-**Parallel**: Yes [P] (new test file)
+**Parallel**: Yes [P] (existing test file - updated)
+**Status**: ✅ COMPLETED - Tests renamed and updated
 
-Write tests for oversized node handling per spec §2.5:
+Tests for oversized node handling per spec §2.5:
 
-1. **test_oversized_node_fallback_to_delimiter()**:
+1. **test_oversized_file_chunks_via_child_nodes()** (renamed from test_oversized_node_fallback_to_delimiter):
    - Input: `huge_function.py` (>2000 tokens)
-   - Expected: Multiple chunks, all under token limit
-   - Verify: Chunks have `parent_semantic_node` in metadata
+   - Expected: Multiple chunks via recursive child processing, all under token limit
+   - Verify: Each chunk under limit, semantic chunking used
 
-2. **test_oversized_node_recursive_children()**:
+2. **test_oversized_class_chunks_via_methods()** (renamed from test_oversized_node_recursive_children):
    - Input: Class with large methods
    - Expected: Children chunked individually
    - Verify: Each chunk under limit
 
-3. **test_all_strategies_fail_uses_text_splitter()**:
-   - Input: Huge indivisible text block
-   - Expected: Falls back to `RecursiveTextSplitter`
-   - Verify: Metadata contains fallback indication
+**Note**: The original test #3 (`test_all_strategies_fail_uses_text_splitter`) was removed as the langchain RecursiveTextSplitter dependency has been eliminated. Delimiter chunking is now the primary fallback strategy.
 
 **Acceptance**:
-- [ ] Tests verify token limits enforced
-- [ ] Tests check fallback chain triggers correctly
-- [ ] All tests FAIL (implementation pending)
+- [x] Tests verify token limits enforced
+- [x] Tests renamed to accurately reflect recursive child processing
+- [x] Langchain references removed
+- [x] Tests verify semantic chunking works for oversized files with chunkable children
 
 ---
 
@@ -825,10 +822,10 @@ Implement structured logging utilities per spec §9.3:
 - All events include required context fields
 
 **Acceptance**:
-- [ ] Logging utilities importable
-- [ ] All event types supported
-- [ ] Structured logging format consistent
-- [ ] Integration with existing logging config
+- [x] Logging utilities importable
+- [x] All event types supported
+- [x] Structured logging format consistent
+- [x] Integration with existing logging config
 
 ---
 
@@ -844,10 +841,10 @@ Create performance benchmarks per spec §6.1:
 - Memory usage < 100MB per operation
 
 **Acceptance**:
-- [ ] Benchmarks for all file size categories
-- [ ] Performance targets documented
-- [ ] Memory profiling included
-- [ ] Results logged for regression tracking
+- [x] Benchmarks for all file size categories
+- [x] Performance targets documented
+- [x] Memory profiling included
+- [x] Results logged for regression tracking
 
 ---
 
@@ -864,9 +861,9 @@ Add comprehensive docstrings to all chunker modules:
 - `exceptions.py`: Exception hierarchy documentation
 
 **Acceptance**:
-- [ ] All modules have module-level docstrings
-- [ ] Public APIs documented with examples
-- [ ] Cross-references to spec sections included
+- [x] All modules have module-level docstrings
+- [x] Public APIs documented with examples
+- [x] Cross-references to spec sections included
 
 ---
 
@@ -883,10 +880,10 @@ Create comprehensive usage guide:
 - Parallel processing examples
 
 **Acceptance**:
-- [ ] All common use cases documented
-- [ ] Code examples tested and working
-- [ ] Configuration options explained
-- [ ] Troubleshooting section included
+- [x] All common use cases documented
+- [x] Code examples tested and working
+- [x] Configuration options explained
+- [x] Troubleshooting section included
 
 ---
 

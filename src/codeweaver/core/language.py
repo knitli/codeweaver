@@ -2,35 +2,40 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-# sourcery skip: docstrings-for-functions
+# sourcery skip: docstrings-for-functions, equality-identity, no-complex-if-expressions
 """Classes and functions for handling languages and their configuration files in the CodeWeaver project."""
 
 from __future__ import annotations
 
-import contextlib
 import os
 
-from collections.abc import Generator, Iterable
+from collections.abc import Generator
 from functools import cache
 from pathlib import Path
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, TypedDict, cast, overload
+from typing import TYPE_CHECKING, NamedTuple, TypedDict, cast
 
-from langchain_text_splitters import Language as LC_Language
-from pydantic import Field, computed_field
+from pydantic import computed_field
 
 from codeweaver.common.utils import LazyImport, get_project_root, lazy_import, normalize_ext
-from codeweaver.core.secondary_languages import SecondarySupportedLanguage
-from codeweaver.core.types.aliases import FileExt, FileExtensionT, FileNameT, LiteralStringT
+from codeweaver.core.types.aliases import (
+    DirectoryName,
+    DirectoryNameT,
+    FileExt,
+    FileExtensionT,
+    FileGlob,
+    FileGlobT,
+    FileName,
+    FileNameT,
+    LiteralStringT,
+)
 from codeweaver.core.types.enum import BaseEnum
-from codeweaver.core.types.models import BasedModel
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.language import CustomDelimiter
     from codeweaver.core.metadata import ExtLangPair
-else:
-    ExtLangPair: LazyImport[ExtLangPair] = lazy_import("codeweaver.core.metadata", "ExtLangPair")
+
+type KeyPath = tuple[LiteralStringT, ...]
 
 get_ext_lang_pairs: LazyImport[Generator[ExtLangPair, None, None]] = lazy_import(
     "codeweaver.core.metadata", "get_ext_lang_pairs"
@@ -48,142 +53,6 @@ ConfigNamePair = NamedTuple(
     (("filename", FileNameT), ("language", "SemanticSearchLanguage | ConfigLanguage")),
 )
 """A tuple representing a configuration file name and its associated language, like `("pyproject.toml", SemanticSearchLanguage.PYTHON)` or `("CMakeLists.txt", ConfigLanguage.CMAKE)`."""
-
-ExtPair = NamedTuple(
-    "ExtPair", (("extension", FileExtensionT), ("language", "SemanticSearchLanguage"))
-)
-"""Nearly identical to `ExtLangPair` in `codeweaver._constants` and `ConfigNamePair`, but here we use `SemanticSearchLanguage` instead of `LiteralStringT` or `ConfigLanguage`for the language type."""
-
-
-class ExtensionRegistry(BasedModel):
-    """
-    A registry for custom file extensions and their associated languages.
-    """
-
-    _registry: Annotated[
-        dict[
-            LiteralStringT,
-            SemanticSearchLanguage | SecondarySupportedLanguage | ConfigLanguage | LiteralStringT,
-        ],
-        Field(
-            default_factory=dict,
-            description="""A mapping of file extensions to their associated languages.""",
-        ),
-    ]
-
-    def __init__(self, *, include_data: bool = False, **kwargs: Any) -> None:
-        """
-        Initializes the ExtensionRegistry.
-
-        Args:
-            include_data: If False (default), omits extensions associated with data files (e.g., .csv, .db, .xlsx) from the registry. This will not exclude documentation and config files (e.g., .md, .json, .yaml). If True, includes all extensions.
-            **kwargs: Additional keyword arguments for the BasedModel.
-        """
-        super().__init__(**kwargs)
-        extpairs = get_ext_lang_pairs(include_data=include_data)
-        languages = {pair.language for pair in extpairs}
-        for lang in languages:
-            exts = tuple(pair.ext for pair in extpairs if pair.language == lang)
-            self._add_exts_to_registry(
-                cast(Iterable[LiteralStringT], exts), cast(SecondarySupportedLanguage, lang)
-            )
-        for lang in ConfigLanguage:
-            if lang.extensions:
-                self._add_exts_to_registry(cast(Iterable[LiteralStringT], lang.extensions), lang)
-        for lang in SemanticSearchLanguage:
-            if lang.extensions:
-                self._add_exts_to_registry(cast(Iterable[LiteralStringT], lang.extensions), lang)
-
-    def _telemetry_keys(self) -> None:
-        return None
-
-    def lookup(
-        self, ext: LiteralStringT
-    ) -> (
-        SemanticSearchLanguage | SecondarySupportedLanguage | ConfigLanguage | LiteralStringT | None
-    ):
-        """
-        Looks up the language associated with a given file extension.
-
-        Args:
-            ext: The file extension to look up.
-
-        Returns:
-            The associated language, or None if not found.
-        """
-        return self._registry.get(ext, None)
-
-    def _add_exts_to_registry(
-        self,
-        exts: Iterable[LiteralStringT] | None,
-        language: SemanticSearchLanguage
-        | SecondarySupportedLanguage
-        | ConfigLanguage
-        | LiteralStringT,
-    ) -> None:
-        """Adds file extensions to the registry."""
-        if not exts:
-            return
-        for ext in exts:
-            if ext in self._registry:
-                continue
-            self._registry[ext] = language
-
-    @overload
-    def register(
-        self, *, ext_tuple: ExtLangPair | ExtPair | ConfigNamePair | ConfigPathPair
-    ) -> None: ...  # sourcery skip: docstrings-for-functions
-    @overload
-    def register(
-        self,
-        *,
-        extension: LiteralStringT,
-        language: SemanticSearchLanguage
-        | ConfigLanguage
-        | SecondarySupportedLanguage
-        | LiteralStringT,
-    ) -> None: ...  # sourcery skip: docstrings-for-functions
-    def register(
-        self,
-        *,
-        ext_tuple: ExtLangPair | ExtPair | ConfigNamePair | ConfigPathPair | None = None,
-        extension: LiteralStringT | None = None,
-        language: SemanticSearchLanguage
-        | ConfigLanguage
-        | SecondarySupportedLanguage
-        | LiteralStringT
-        | None = None,
-    ) -> None:
-        """
-        Registers a new file extension and its associated language.
-
-        Args:
-            ext_tuple: A tuple containing the file extension and its associated language.
-            extension: The file extension to register.
-            language: The language associated with the file extension.
-        """
-        if ext_tuple is not None:
-            match ext_tuple:
-                case ConfigPathPair():
-                    exts = (*(ext_tuple.language.extensions or ()), ext_tuple.path.name)
-                    self._add_exts_to_registry(exts, ext_tuple.language)  # type: ignore
-                case ConfigNamePair():
-                    exts = ext_tuple.language.extensions
-                    self._add_exts_to_registry(
-                        cast(tuple[LiteralStringT, ...], (*(exts or ()), ext_tuple.filename)),
-                        ext_tuple.language,
-                    )  # type: ignore
-                case ExtPair() | ExtLangPair():
-                    self._add_exts_to_registry(
-                        (
-                            ext_tuple.ext
-                            if isinstance(ext_tuple, ExtLangPair)
-                            else ext_tuple.extension,
-                        ),
-                        ext_tuple.language,
-                    )
-        if extension is not None and language is not None:
-            self._add_exts_to_registry((extension,), language)
 
 
 class LanguageConfigFile(NamedTuple):
@@ -236,6 +105,7 @@ class ConfigLanguage(BaseEnum):
     BASH = "bash"
     CMAKE = "cmake"
     INI = "ini"
+    HCL = "hcl"
     JSON = "json"
     GROOVY = "groovy"  # Used for Gradle build scripts for Java
     KOTLIN = "kotlin"  # Used for Kotlin build scripts for Java
@@ -278,10 +148,13 @@ class ConfigLanguage(BaseEnum):
             ),
             ConfigLanguage.CMAKE: (".cmake", "CMakeLists.txt", "CMakefile", ".cmake.in"),
             ConfigLanguage.INI: (".ini", ".cfg"),
+            ConfigLanguage.HCL: (".tf", ".hcl", ".tfvars", ".nomad", ".workflow"),
             ConfigLanguage.JSON: (".json", ".jsonc", ".json5"),
             ConfigLanguage.GROOVY: (".gradle", ".gradle.kts"),
             ConfigLanguage.KOTLIN: (".kts",),
+            # spellchecker:off
             ConfigLanguage.MAKE: ("Makefile", "makefile", ".makefile", ".mak", ".make"),
+            # spellchecker:on
             ConfigLanguage.PROPERTIES: (".properties",),
             ConfigLanguage.SELF: ("SELF",),
             ConfigLanguage.TOML: (".toml",),
@@ -319,23 +192,27 @@ class RepoConventions(TypedDict, total=False):
     A TypedDict representing common repository conventions for a language.
     """
 
-    source_dirs: tuple[LiteralStringT, ...]
+    source_dirs: tuple[DirectoryNameT, ...]
     """Directories that typically contain source code files."""
-    test_dirs: tuple[LiteralStringT, ...]
+    test_dirs: tuple[DirectoryNameT, ...]
     """Directories that typically contain test files."""
-    test_patterns: tuple[LiteralStringT, ...]
+    test_patterns: tuple[FileGlobT, ...]
     """File name patterns commonly used for test files."""
-    binary_dirs: tuple[LiteralStringT, ...]
+    binary_dirs: tuple[DirectoryNameT, ...]
     """Directories that typically contain compiled binaries or build artifacts."""
-    private_package_dirs: tuple[LiteralStringT, ...]
-    workspace_dirs: tuple[LiteralStringT, ...]
+    binary_patterns: tuple[FileGlobT, ...]
+    """File name patterns commonly used for binary files."""
+    private_package_dirs: tuple[DirectoryNameT, ...]
+    workspace_dirs: tuple[DirectoryNameT, ...]
     """Directories that indicate a workspace, monorepo, or multi-package repository structure or that are used to group packages under a language's conventions."""
-    workspace_files: tuple[LiteralStringT, ...]
+    workspace_files: tuple[FileNameT | FileGlobT, ...]
     """Files that indicate a workspace, monorepo, or multi-package repository structure or that are used to group packages under a language's conventions."""
     workspace_defined_in_file: bool
     """Indicates whether the workspace is defined in a specific file (e.g., `settings.gradle.kts` for Kotlin)."""
-    workspace_definition_files: tuple[tuple[LiteralStringT, tuple[LiteralStringT, ...]], ...]
+    workspace_definition_files: tuple[tuple[FileGlobT | FileNameT, KeyPath], ...]
     """Tuple of files and keys or paths within those files that specify the workspace structure."""
+    ci_files: tuple[FileNameT | FileGlobT, ...]
+    """Common continuous integration (CI) configuration files associated with the language."""
 
 
 class SemanticSearchLanguage(str, BaseEnum):
@@ -353,6 +230,7 @@ class SemanticSearchLanguage(str, BaseEnum):
     ELIXIR = "elixir"
     GO = "go"
     HASKELL = "haskell"
+    HCL = "hcl"
     HTML = "html"
     JAVA = "java"
     JAVASCRIPT = "javascript"
@@ -388,6 +266,7 @@ class SemanticSearchLanguage(str, BaseEnum):
             SemanticSearchLanguage.C_LANG: "c",
             SemanticSearchLanguage.C_PLUS_PLUS: "c++",
             SemanticSearchLanguage.C_SHARP: "c#",
+            SemanticSearchLanguage.HCL: "terraform",
             SemanticSearchLanguage.JAVASCRIPT: "js",
             SemanticSearchLanguage.TYPESCRIPT: "ts",
             SemanticSearchLanguage.PYTHON: "py",
@@ -395,7 +274,7 @@ class SemanticSearchLanguage(str, BaseEnum):
         }.get(self)
 
     @classmethod
-    def extension_map(cls) -> MappingProxyType[SemanticSearchLanguage, tuple[str, ...]]:
+    def extension_map(cls) -> MappingProxyType[SemanticSearchLanguage, tuple[FileExtensionT, ...]]:
         """
         Returns a mapping of file extensions to their corresponding SemanticSearchLanguage.
         This is used to quickly look up the language based on file extension.
@@ -403,54 +282,68 @@ class SemanticSearchLanguage(str, BaseEnum):
         return MappingProxyType({
             # the bash grammar is pretty tolerant of posix shell scripts, so we include common shell script extensions here
             cls.BASH: (
-                ".bash",
-                ".bash_profile",
-                ".bashrc",
-                ".csh",
-                ".cshrc",
-                ".ksh",
-                ".kshrc",
-                ".profile",
-                ".sh",
-                ".tcsh",
-                ".tcshrc",
-                ".zprofile",
-                ".zsh",
-                ".zshrc",
+                FileExt(".bash"),
+                FileExt(".bash_profile"),
+                FileExt(".bashrc"),
+                FileExt(".csh"),
+                FileExt(".cshrc"),
+                FileExt(".ksh"),
+                FileExt(".kshrc"),
+                FileExt(".profile"),
+                FileExt(".sh"),
+                FileExt(".tcsh"),
+                FileExt(".tcshrc"),
+                FileExt(".zprofile"),
+                FileExt(".zsh"),
+                FileExt(".zshrc"),
             ),
-            cls.C_LANG: (".c", ".h"),
-            cls.C_PLUS_PLUS: (".cpp", ".hpp", ".cc", ".cxx"),
-            cls.C_SHARP: (".cs", ".csharp"),
-            cls.CSS: (".css",),
-            cls.ELIXIR: (".ex", ".exs"),
-            cls.GO: (".go",),
-            cls.HASKELL: (".hs",),
-            cls.HTML: (".html", ".htm", ".xhtml"),
-            cls.JAVA: (".java",),
-            cls.JAVASCRIPT: (".js", ".mjs", ".cjs"),
-            cls.JSON: (".json", ".jsonc", ".json5"),
-            cls.JSX: (".jsx",),
-            cls.KOTLIN: (".kt", ".kts", ".ktm"),
-            cls.LUA: (".lua",),
-            cls.NIX: (".nix",),
-            cls.PHP: (".php", ".phtml"),
-            cls.PYTHON: (".py", ".pyi", ".py3", ".bzl", ".ipynb"),
-            cls.RUBY: (".rb", ".gemspec", ".rake", ".ru"),
-            cls.RUST: (".rs",),
-            cls.SCALA: (".scala", ".sc", ".sbt"),
-            cls.SOLIDITY: (".sol",),
-            cls.SWIFT: (".swift",),
-            cls.TYPESCRIPT: (".ts", ".mts", ".cts"),
-            cls.TSX: (".tsx",),
-            cls.YAML: (".yaml", ".yml"),
+            cls.C_LANG: (FileExt(".c"), FileExt(".h")),
+            cls.C_PLUS_PLUS: (FileExt(".cpp"), FileExt(".hpp"), FileExt(".cc"), FileExt(".cxx")),
+            cls.C_SHARP: (FileExt(".cs"), FileExt(".csharp")),
+            cls.CSS: (FileExt(".css"),),
+            cls.ELIXIR: (FileExt(".ex"), FileExt(".exs")),
+            cls.GO: (FileExt(".go"),),
+            cls.HASKELL: (FileExt(".hs"),),
+            cls.HCL: (
+                FileExt(".tf"),
+                FileExt(".hcl"),
+                FileExt(".nomad"),
+                FileExt(".tf"),
+                FileExt(".tfvars"),
+                FileExt(".workflow"),
+            ),
+            cls.HTML: (FileExt(".html"), FileExt(".htm"), FileExt(".xhtml")),
+            cls.JAVA: (FileExt(".java"),),
+            cls.JAVASCRIPT: (FileExt(".js"), FileExt(".mjs"), FileExt(".cjs")),
+            cls.JSON: (FileExt(".json"), FileExt(".jsonc"), FileExt(".json5")),
+            cls.JSX: (FileExt(".jsx"),),
+            cls.KOTLIN: (FileExt(".kt"), FileExt(".kts"), FileExt(".ktm")),
+            cls.LUA: (FileExt(".lua"),),
+            cls.NIX: (FileExt(".nix"),),
+            cls.PHP: (FileExt(".php"), FileExt(".phtml")),
+            cls.PYTHON: (
+                FileExt(".py"),
+                FileExt(".pyi"),
+                FileExt(".py3"),
+                FileExt(".bzl"),
+                FileExt(".ipynb"),
+            ),
+            cls.RUBY: (FileExt(".rb"), FileExt(".gemspec"), FileExt(".rake"), FileExt(".ru")),
+            cls.RUST: (FileExt(".rs"),),
+            cls.SCALA: (FileExt(".scala"), FileExt(".sc"), FileExt(".sbt")),
+            cls.SOLIDITY: (FileExt(".sol"),),
+            cls.SWIFT: (FileExt(".swift"),),
+            cls.TYPESCRIPT: (FileExt(".ts"), FileExt(".mts"), FileExt(".cts")),
+            cls.TSX: (FileExt(".tsx"),),
+            cls.YAML: (FileExt(".yaml"), FileExt(".yml")),
         })
 
     @classmethod
-    def from_extension(cls, ext: str) -> SemanticSearchLanguage | None:
+    def from_extension(cls, ext: FileExtensionT | LiteralStringT) -> SemanticSearchLanguage | None:
         """
         Returns the SemanticSearchLanguage associated with the given file extension.
         """
-        ext = ext.lower() if ext.startswith(".") else f".{ext.lower()}"
+        ext = FileExt(ext.lower()) if ext.startswith(".") else FileExt(f".{ext.lower()}")
         return next(
             (language for language, extensions in cls.extension_map().items() if ext in extensions),
             None,
@@ -559,7 +452,9 @@ class SemanticSearchLanguage(str, BaseEnum):
                     ),
                     LanguageConfigFile(
                         language=self,
-                        path=next(iter(PROJECT_ROOT.glob("*.cabal"))),
+                        path=next(
+                            iter(PROJECT_ROOT.glob("*.cabal")), PROJECT_ROOT / "package.cabal"
+                        ),
                         language_type=ConfigLanguage.INI,
                         dependency_key_paths=(
                             ("build-depends",),
@@ -776,6 +671,38 @@ class SemanticSearchLanguage(str, BaseEnum):
             case _:
                 return None
 
+    @property
+    def ast_grep(self) -> str:
+        """
+        Returns the ast-grep language name for this language.
+        """
+        return {
+            SemanticSearchLanguage.BASH: "bash",
+            SemanticSearchLanguage.C_PLUS_PLUS: "cpp",
+            SemanticSearchLanguage.C_SHARP: "csharp",
+            SemanticSearchLanguage.CSS: "css",
+            SemanticSearchLanguage.ELIXIR: "elixir",
+            SemanticSearchLanguage.HCL: "hcl",
+            SemanticSearchLanguage.HTML: "html",
+            SemanticSearchLanguage.JAVA: "java",
+            SemanticSearchLanguage.JAVASCRIPT: "javascript",
+            SemanticSearchLanguage.JSX: "jsx",
+            SemanticSearchLanguage.JSON: "json",
+            SemanticSearchLanguage.KOTLIN: "kotlin",
+            SemanticSearchLanguage.LUA: "lua",
+            SemanticSearchLanguage.NIX: "nix",
+            SemanticSearchLanguage.PHP: "php",
+            SemanticSearchLanguage.PYTHON: "python",
+            SemanticSearchLanguage.RUBY: "ruby",
+            SemanticSearchLanguage.RUST: "rust",
+            SemanticSearchLanguage.SCALA: "scala",
+            SemanticSearchLanguage.SOLIDITY: "solidity",
+            SemanticSearchLanguage.SWIFT: "swift",
+            SemanticSearchLanguage.TYPESCRIPT: "typescript",
+            SemanticSearchLanguage.TSX: "tsx",
+            SemanticSearchLanguage.YAML: "yaml",
+        }[self]
+
     @classmethod
     def injection_languages(cls) -> tuple[SemanticSearchLanguage, ...]:
         """
@@ -837,7 +764,7 @@ class SemanticSearchLanguage(str, BaseEnum):
             ext
             for lang in cls
             for ext in cls.extension_map()[lang]
-            if isinstance(lang, cls) and lang.is_config_language and ext and ext != ".sh"
+            if isinstance(lang, cls) and lang.is_config_language and ext and ext != FileExt(".sh")
         )
 
     @property
@@ -905,12 +832,14 @@ class SemanticSearchLanguage(str, BaseEnum):
         )
 
     @classmethod
-    def ext_pairs(cls) -> Generator[ExtPair]:
+    def ext_pairs(cls) -> Generator[ExtLangPair]:
         """
         Returns a frozenset of tuples containing file extensions and their corresponding SemanticSearchLanguage.
         """
+        from codeweaver.core.metadata import ExtLangPair
+
         for lang, exts in cls.extension_map().items():
-            yield from (ExtPair(extension=FileExt(ext), language=lang) for ext in exts if ext)  # type: ignore
+            yield from (ExtLangPair(ext=FileExt(ext), language=lang) for ext in exts if ext)  # type: ignore
 
     @classmethod
     def config_pairs(cls) -> Generator[ConfigPathPair]:
@@ -953,6 +882,8 @@ class SemanticSearchLanguage(str, BaseEnum):
                 return SemanticSearchLanguage.C_PLUS_PLUS
             # Java's more common than Kotlin, but Kotlin is more likely to use 'build.gradle.kts' ... I think. 🤷‍♂️
             return SemanticSearchLanguage.KOTLIN
+        if config_file.suffix in cast(tuple[str, ...], cls.HCL.extensions):
+            return SemanticSearchLanguage.HCL
         return next(
             (
                 lang
@@ -999,351 +930,513 @@ class SemanticSearchLanguage(str, BaseEnum):
         Returns the repository conventions associated with this language.
         """
         defaults = RepoConventions(
-            source_dirs=("src", "source", "lib"),
-            test_dirs=("tests", "test", "spec"),
-            test_patterns=("test_", "_test"),
-            binary_dirs=("build", "bin", "obj"),
+            source_dirs=(DirectoryName("src"), DirectoryName("source"), DirectoryName("lib")),
+            test_dirs=(DirectoryName("tests"), DirectoryName("test"), DirectoryName("spec")),
+            test_patterns=(FileGlob("test_*"), FileGlob("_test")),
+            binary_dirs=(DirectoryName("build"), DirectoryName("bin"), DirectoryName("obj")),
             workspace_defined_in_file=False,
         )
         return {
             SemanticSearchLanguage.BASH: defaults
             | RepoConventions(
-                source_dirs=("scripts", "bin", "lib"),
-                test_dirs=("tests", "test"),
-                test_patterns=("test_", "_test.sh", ".bats"),
+                source_dirs=(DirectoryName("scripts"), DirectoryName("bin"), DirectoryName("lib")),
+                test_dirs=(DirectoryName("tests"), DirectoryName("test")),
+                test_patterns=(FileGlob("test_*"), FileGlob("_test.sh"), FileGlob(".bats")),
                 binary_dirs=(),
             ),
             SemanticSearchLanguage.C_LANG: defaults
             | RepoConventions(
-                source_dirs=("src",),
-                test_dirs=("tests", "test"),
-                test_patterns=("test_", "_test.c"),
-                binary_dirs=("build", "bin", "obj", ".o"),
-                workspace_files=("CMakeLists.txt", "Makefile"),
+                source_dirs=(DirectoryName("src"),),
+                test_dirs=(DirectoryName("tests"), DirectoryName("test")),
+                test_patterns=(FileGlob("test_*"), FileGlob("_test.c")),
+                binary_dirs=(DirectoryName("build"), DirectoryName("bin"), DirectoryName("obj")),
+                binary_patterns=(FileGlob("*.o"), FileGlob("*.out"), FileGlob("*.exe")),
+                workspace_files=(FileName("CMakeLists.txt"), FileName("Makefile")),
             ),
             SemanticSearchLanguage.C_PLUS_PLUS: defaults
             | RepoConventions(
-                source_dirs=("src", "include"),
-                test_dirs=("tests", "test"),
-                test_patterns=("test_", "_test.cpp", "_test.cc"),
-                binary_dirs=("build", "bin", "obj", "cmake-build-debug", "cmake-build-release"),
-                workspace_files=("CMakeLists.txt", "Makefile"),
+                source_dirs=(DirectoryName("src"), DirectoryName("include")),
+                test_dirs=(DirectoryName("tests"), DirectoryName("test")),
+                test_patterns=(FileGlob("test_*"), FileGlob("_test.cpp"), FileGlob("_test.cc")),
+                binary_dirs=(
+                    DirectoryName("build"),
+                    DirectoryName("bin"),
+                    DirectoryName("obj"),
+                    DirectoryName("cmake-build-debug"),
+                    DirectoryName("cmake-build-release"),
+                ),
+                workspace_files=(FileName("CMakeLists.txt"), FileName("Makefile")),
             ),
             SemanticSearchLanguage.C_SHARP: defaults
             | RepoConventions(
-                source_dirs=("src",),
-                test_dirs=("tests", "test"),
-                test_patterns=("Test.cs", "Tests.cs"),
-                binary_dirs=("bin", "obj"),
-                workspace_files=("*.sln",),
+                source_dirs=(DirectoryName("src"),),
+                test_dirs=(DirectoryName("tests"), DirectoryName("test")),
+                test_patterns=(FileGlob("Test.cs"), FileGlob("Tests.cs")),
+                binary_dirs=(DirectoryName("bin"), DirectoryName("obj")),
+                workspace_files=(FileName("*.sln"),),
                 workspace_defined_in_file=True,
                 workspace_definition_files=(
-                    ("*.sln", ("Project",)),  # Solution files list projects
+                    (
+                        FileGlob("*.sln"),
+                        ("Project",),
+                    ),  # Solution files list projects # type: ignore
                 ),
             ),
             SemanticSearchLanguage.CSS: defaults
             | RepoConventions(
-                source_dirs=("src", "styles", "css", "assets"),
+                source_dirs=(
+                    DirectoryName("src"),
+                    DirectoryName("styles"),
+                    DirectoryName("css"),
+                    DirectoryName("assets"),
+                ),
                 test_dirs=(),  # CSS rarely has dedicated test directories
                 test_patterns=(),
-                binary_dirs=("dist", "build"),
+                binary_dirs=(DirectoryName("dist"), DirectoryName("build")),
             ),
             SemanticSearchLanguage.ELIXIR: defaults
             | RepoConventions(
-                source_dirs=("lib",),
-                test_dirs=("test",),
-                test_patterns=("_test.exs",),
-                binary_dirs=("_build", "deps"),
-                workspace_dirs=("apps",),
-                workspace_files=("mix.exs",),
+                source_dirs=(DirectoryName("lib"),),
+                test_dirs=(DirectoryName("test"),),
+                test_patterns=(FileGlob("_test.exs"),),
+                binary_dirs=(DirectoryName("_build"), DirectoryName("deps")),
+                workspace_dirs=(DirectoryName("apps"),),
+                workspace_files=(FileName("mix.exs"),),
                 workspace_defined_in_file=True,
                 workspace_definition_files=(
-                    ("mix.exs", ("umbrella",)),  # umbrella: true in mix.exs
+                    (FileName("mix.exs"), ("umbrella",)),  # umbrella: true in mix.exs
                 ),
             ),
             SemanticSearchLanguage.GO: defaults
             | RepoConventions(
-                source_dirs=("internal", "pkg", "cmd"),
-                test_dirs=("tests", "test"),
-                test_patterns=("_test.go",),
-                binary_dirs=("bin", "build"),
-                private_package_dirs=("internal",),  # Compiler-enforced
-                workspace_files=("go.work", "go.mod"),
+                source_dirs=(DirectoryName("internal"), DirectoryName("pkg"), DirectoryName("cmd")),
+                test_dirs=(DirectoryName("tests"), DirectoryName("test")),
+                test_patterns=(FileGlob("_test.go"),),
+                binary_dirs=(DirectoryName("bin"), DirectoryName("build")),
+                private_package_dirs=(DirectoryName("internal"),),  # Compiler-enforced
+                workspace_files=(FileName("go.work"), FileName("go.mod")),
                 workspace_defined_in_file=True,
                 workspace_definition_files=(
-                    ("go.work", ("use",)),  # go.work lists workspace members
+                    (FileName("go.work"), ("use",)),  # go.work lists workspace members
                 ),
             ),
             SemanticSearchLanguage.HASKELL: defaults
             | RepoConventions(
-                source_dirs=("src",),
-                test_dirs=("test",),
-                test_patterns=("Spec.hs", "Test.hs", "*Spec.hs", "*Test.hs"),
-                binary_dirs=("dist", "dist-newstyle", ".stack-work"),
-                workspace_dirs=("app", "apps"),
-                workspace_files=("cabal.project", "stack.yaml", "package.yaml"),
+                source_dirs=(DirectoryName("src"),),
+                test_dirs=(DirectoryName("test"),),
+                test_patterns=(
+                    FileGlob("Spec.hs"),
+                    FileGlob("Test.hs"),
+                    FileGlob("*Spec.hs"),
+                    FileGlob("*Test.hs"),
+                ),
+                binary_dirs=(
+                    DirectoryName("dist"),
+                    DirectoryName("dist-newstyle"),
+                    DirectoryName(".stack-work"),
+                ),
+                workspace_dirs=(DirectoryName("app"), DirectoryName("apps")),
+                workspace_files=(
+                    FileName("cabal.project"),
+                    FileName("stack.yaml"),
+                    FileName("package.yaml"),
+                ),
                 workspace_defined_in_file=True,
                 workspace_definition_files=(
-                    ("cabal.project", ("packages",)),
-                    ("stack.yaml", ("packages",)),
+                    (FileName("cabal.project"), ("packages",)),
+                    (FileName("stack.yaml"), ("packages",)),
+                    (FileName("package.yaml"), ("packages",)),
                 ),
+            ),
+            SemanticSearchLanguage.HCL: defaults
+            | RepoConventions(
+                source_dirs=(
+                    DirectoryName("."),
+                    DirectoryName("infrastructure"),
+                    DirectoryName("infra"),
+                    DirectoryName("terraform"),
+                ),
+                test_dirs=(DirectoryName("test"),),
+                test_patterns=(),
+                binary_dirs=(DirectoryName("bin"), DirectoryName("build")),
             ),
             SemanticSearchLanguage.HTML: defaults
             | RepoConventions(
-                source_dirs=("src", "public", "static"),
+                source_dirs=(
+                    DirectoryName("src"),
+                    DirectoryName("public"),
+                    DirectoryName("static"),
+                ),
                 test_dirs=(),
                 test_patterns=(),
-                binary_dirs=("dist", "build"),
+                binary_dirs=(DirectoryName("dist"), DirectoryName("build")),
             ),
             SemanticSearchLanguage.JAVA: defaults
             | RepoConventions(
-                source_dirs=("src/main/java", "src"),
-                test_dirs=("src/test/java", "tests", "test"),
-                test_patterns=("Test.java", "*Test.java"),
-                binary_dirs=("target", "build", "out", "bin"),
+                source_dirs=(DirectoryName("src/main/java"), DirectoryName("src")),
+                test_dirs=(
+                    DirectoryName("src/test/java"),
+                    DirectoryName("tests"),
+                    DirectoryName("test"),
+                ),
+                test_patterns=(FileGlob("Test.java"), FileGlob("*Test.java")),
+                binary_dirs=(
+                    DirectoryName("target"),
+                    DirectoryName("build"),
+                    DirectoryName("out"),
+                    DirectoryName("bin"),
+                ),
                 workspace_files=(
-                    "settings.gradle",
-                    "settings.gradle.kts",
-                    "pom.xml",
-                    "build.gradle",
-                    "build.gradle.kts",
+                    FileName("settings.gradle"),
+                    FileName("settings.gradle.kts"),
+                    FileName("pom.xml"),
+                    FileName("build.gradle"),
+                    FileName("build.gradle.kts"),
                 ),
                 workspace_defined_in_file=True,
                 workspace_definition_files=(
-                    ("settings.gradle", ("include",)),
-                    ("settings.gradle.kts", ("include",)),
-                    ("pom.xml", ("modules",)),
+                    (FileName("settings.gradle"), ("include",)),
+                    (FileName("settings.gradle.kts"), ("include",)),
+                    (FileName("pom.xml"), ("modules",)),
                 ),
             ),
             SemanticSearchLanguage.JAVASCRIPT: defaults
             | RepoConventions(
-                source_dirs=("src", "lib"),
-                test_dirs=("tests", "test", "__tests__"),
-                test_patterns=(".*.test.js", ".*.spec.js", "test/*", "spec/*"),
-                binary_dirs=("node_modules", "dist", "build"),
-                private_package_dirs=("node_modules",),
-                workspace_dirs=("packages", "apps"),
+                source_dirs=(DirectoryName("src"), DirectoryName("lib")),
+                test_dirs=(
+                    DirectoryName("tests"),
+                    DirectoryName("test"),
+                    DirectoryName("__tests__"),
+                ),
+                test_patterns=(
+                    FileGlob(".*.test.js"),
+                    FileGlob(".*.spec.js"),
+                    FileGlob("test/*"),
+                    FileGlob("spec/*"),
+                ),
+                binary_dirs=(
+                    DirectoryName("node_modules"),
+                    DirectoryName("dist"),
+                    DirectoryName("build"),
+                ),
+                private_package_dirs=(DirectoryName("node_modules"),),
+                workspace_dirs=(DirectoryName("packages"), DirectoryName("apps")),
                 workspace_files=(
-                    "package.json",
-                    "lerna.json",
-                    "pnpm-workspace.yaml",
-                    "turbo.json",
-                    "nx.json",
+                    FileName("package.json"),
+                    FileName("lerna.json"),
+                    FileName("pnpm-workspace.yaml"),
+                    FileName("turbo.json"),
+                    FileName("nx.json"),
                 ),
                 workspace_defined_in_file=True,
                 workspace_definition_files=(
-                    ("package.json", ("workspaces",)),
-                    ("lerna.json", ("packages",)),
-                    ("pnpm-workspace.yaml", ("packages",)),
+                    (FileName("package.json"), ("workspaces",)),
+                    (FileName("lerna.json"), ("packages",)),
+                    (FileName("pnpm-workspace.yaml"), ("packages",)),
                 ),
             ),
             SemanticSearchLanguage.JSX: defaults
             | RepoConventions(
-                source_dirs=("src", "lib", "components"),
-                test_dirs=("tests", "test", "__tests__"),
-                test_patterns=(".*.test.jsx", ".*.spec.jsx", "test/*", "spec/*"),
-                binary_dirs=("node_modules", "dist", "build"),
-                private_package_dirs=("node_modules",),
-                workspace_dirs=("packages", "apps"),
+                source_dirs=(
+                    DirectoryName("src"),
+                    DirectoryName("lib"),
+                    DirectoryName("components"),
+                ),
+                test_dirs=(
+                    DirectoryName("tests"),
+                    DirectoryName("test"),
+                    DirectoryName("__tests__"),
+                ),
+                test_patterns=(
+                    FileGlob(".*.test.jsx"),
+                    FileGlob(".*.spec.jsx"),
+                    FileGlob("test/*"),
+                    FileGlob("spec/*"),
+                ),
+                binary_dirs=(
+                    DirectoryName("node_modules"),
+                    DirectoryName("dist"),
+                    DirectoryName("build"),
+                ),
+                private_package_dirs=(DirectoryName("node_modules"),),
+                workspace_dirs=(DirectoryName("packages"), DirectoryName("apps")),
                 workspace_files=(
-                    "package.json",
-                    "lerna.json",
-                    "pnpm-workspace.yaml",
-                    "turbo.json",
-                    "nx.json",
+                    FileName("package.json"),
+                    FileName("lerna.json"),
+                    FileName("pnpm-workspace.yaml"),
+                    FileName("turbo.json"),
+                    FileName("nx.json"),
                 ),
                 workspace_defined_in_file=True,
                 workspace_definition_files=(
-                    ("package.json", ("workspaces",)),
-                    ("lerna.json", ("packages",)),
-                    ("pnpm-workspace.yaml", ("packages",)),
+                    (FileName("package.json"), (FileName("workspaces"),)),
+                    (FileName("lerna.json"), (FileName("packages"),)),
+                    (FileName("pnpm-workspace.yaml"), (FileName("packages"),)),
                 ),
             ),
             SemanticSearchLanguage.JSON: defaults
             | RepoConventions(
-                source_dirs=("config", "data", "schemas"),
+                source_dirs=(
+                    DirectoryName("config"),
+                    DirectoryName("data"),
+                    DirectoryName("schemas"),
+                ),
                 test_dirs=(),
                 test_patterns=(),
                 binary_dirs=(),
             ),
             SemanticSearchLanguage.KOTLIN: defaults
             | RepoConventions(
-                source_dirs=("src/main/kotlin", "src"),
-                test_dirs=("src/test/kotlin", "tests", "test"),
-                test_patterns=("Test.kt", "*Test.kt"),
-                binary_dirs=("target", "build", "out"),
-                workspace_files=("settings.gradle", "settings.gradle.kts", "build.gradle.kts"),
+                source_dirs=(DirectoryName("src/main/kotlin"), DirectoryName("src")),
+                test_dirs=(
+                    DirectoryName("src/test/kotlin"),
+                    DirectoryName("tests"),
+                    DirectoryName("test"),
+                ),
+                test_patterns=(FileGlob("Test.kt"), FileGlob("*Test.kt")),
+                binary_dirs=(DirectoryName("target"), DirectoryName("build"), DirectoryName("out")),
+                workspace_files=(
+                    FileName("settings.gradle"),
+                    FileName("settings.gradle.kts"),
+                    FileName("build.gradle.kts"),
+                ),
                 workspace_defined_in_file=True,
                 workspace_definition_files=(
-                    ("settings.gradle", ("include",)),
-                    ("settings.gradle.kts", ("include",)),
+                    (FileName("settings.gradle"), ("include",)),
+                    (FileName("settings.gradle.kts"), ("include",)),
                 ),
             ),
             SemanticSearchLanguage.LUA: defaults
             | RepoConventions(
-                source_dirs=("src", "lib"),
-                test_dirs=("test", "spec"),
-                test_patterns=("_spec.lua", "_test.lua"),
-                workspace_files=("*.rockspec",),
+                source_dirs=(DirectoryName("src"), DirectoryName("lib")),
+                test_dirs=(DirectoryName("test"), DirectoryName("spec")),
+                test_patterns=(FileGlob("_spec.lua"), FileGlob("_test.lua")),
+                workspace_files=(FileName("*.rockspec"),),
             ),
             SemanticSearchLanguage.NIX: defaults
             | RepoConventions(
-                source_dirs=(".",),  # Nix files are often at root or in various locations
-                test_dirs=("tests",),
-                test_patterns=("test.nix",),
-                binary_dirs=("result",),  # Nix build output symlink
+                source_dirs=(
+                    DirectoryName("."),
+                ),  # Nix files are often at root or in various locations
+                test_dirs=(DirectoryName("tests"),),
+                test_patterns=(FileGlob("test.nix"),),
+                binary_dirs=(DirectoryName("result"),),  # Nix build output symlink
             ),
             SemanticSearchLanguage.PHP: defaults
             | RepoConventions(
-                source_dirs=("src", "lib", "app"),
-                test_dirs=("tests",),
-                test_patterns=("Test.php", "*Test.php"),
-                binary_dirs=("vendor", "build"),
-                private_package_dirs=("vendor",),
-                workspace_files=("composer.json",),
+                source_dirs=(DirectoryName("src"), DirectoryName("lib"), DirectoryName("app")),
+                test_dirs=(DirectoryName("tests"),),
+                test_patterns=(FileGlob("Test.php"), FileGlob("*Test.php")),
+                binary_dirs=(DirectoryName("vendor"), DirectoryName("build")),
+                private_package_dirs=(DirectoryName("vendor"),),
+                workspace_files=(FileName("composer.json"),),
                 workspace_defined_in_file=True,
                 workspace_definition_files=(
-                    ("composer.json", ("repositories",)),  # Path repositories for monorepos
+                    (
+                        FileName("composer.json"),
+                        (("repositories"),),
+                    ),  # Path repositories for monorepos
                 ),
             ),
             SemanticSearchLanguage.PYTHON: defaults
             | RepoConventions(
-                source_dirs=("src", "lib"),
-                test_dirs=("tests", "test"),
-                test_patterns=("test_", "_test.py"),
+                source_dirs=(DirectoryName("src"), DirectoryName("lib")),
+                test_dirs=(DirectoryName("tests"), DirectoryName("test")),
+                test_patterns=(FileGlob("test_*"), FileGlob("_test.py")),
                 binary_dirs=(
-                    "build",
-                    "dist",
-                    "__pycache__",
-                    ".pytest_cache",
-                    ".mypy_cache",
-                    "*.egg-info",
+                    DirectoryName("build"),
+                    DirectoryName("dist"),
+                    DirectoryName("__pycache__"),
+                    DirectoryName(".pytest_cache"),
+                    DirectoryName(".mypy_cache"),
+                    DirectoryName("*.egg-info"),
                 ),
-                private_package_dirs=(".venv", "venv", ".env", "env", "virtualenv"),
-                workspace_files=("pyproject.toml", "setup.py"),
+                private_package_dirs=(
+                    DirectoryName(".venv"),
+                    DirectoryName("venv"),
+                    DirectoryName(".env"),
+                    DirectoryName("env"),
+                    DirectoryName("virtualenv"),
+                ),
+                workspace_files=(FileName("pyproject.toml"), FileName("setup.py")),
                 workspace_defined_in_file=True,
                 workspace_definition_files=(
-                    ("pyproject.toml", ("tool.poetry",)),
-                    ("pyproject.toml", ("tool.hatch",)),  # Poetry/Hatch workspaces
+                    (FileName("pyproject.toml"), (("tool.poetry"),)),
+                    (FileName("pyproject.toml"), (("tool.hatch"),)),  # Poetry/Hatch workspaces
                 ),
             ),
             SemanticSearchLanguage.RUBY: defaults
             | RepoConventions(
-                source_dirs=("lib",),
-                test_dirs=("spec", "test"),
-                test_patterns=("_spec.rb", "_test.rb"),
-                binary_dirs=("vendor", "bundle"),
-                private_package_dirs=("vendor",),
-                workspace_files=("Gemfile", "*.gemspec"),
+                source_dirs=(DirectoryName("lib"),),
+                test_dirs=(DirectoryName("spec"), DirectoryName("test")),
+                test_patterns=(FileGlob("_spec.rb"), FileGlob("_test.rb")),
+                binary_dirs=(DirectoryName("vendor"), DirectoryName("bundle")),
+                private_package_dirs=(DirectoryName("vendor"),),
+                workspace_files=(FileName("Gemfile"), FileGlob("*.gemspec")),
                 workspace_defined_in_file=True,
                 workspace_definition_files=(
-                    ("Gemfile", ("path:",)),  # Local gems via path: option
+                    (FileName("Gemfile"), (("path:"),)),  # Local gems via path: option
                 ),
             ),
             SemanticSearchLanguage.RUST: defaults
             | RepoConventions(
-                source_dirs=("src", "crates"),
-                test_dirs=("tests",),
-                test_patterns=("test_", "_test.rs"),
-                binary_dirs=("target",),
-                workspace_dirs=("crates",),
-                workspace_files=("Cargo.toml",),
+                source_dirs=(DirectoryName("src"), DirectoryName("crates")),
+                test_dirs=(DirectoryName("tests"),),
+                test_patterns=(FileGlob("test_*"), FileGlob("_test.rs")),
+                binary_dirs=(DirectoryName("target"),),
+                workspace_dirs=(DirectoryName("crates"),),
+                workspace_files=(FileName("Cargo.toml"),),
                 workspace_defined_in_file=True,
                 workspace_definition_files=(
-                    ("Cargo.toml", ("workspace",)),  # [workspace] section
+                    (FileName("Cargo.toml"), (("workspace"),)),  # [workspace] section
                 ),
             ),
             SemanticSearchLanguage.SCALA: defaults
             | RepoConventions(
-                source_dirs=("src/main/scala",),
-                test_dirs=("src/test/scala",),
-                test_patterns=("Test.scala", "*Test.scala", "*Spec.scala"),
-                binary_dirs=("target", "project/target"),
-                workspace_files=("build.sbt",),
+                source_dirs=(DirectoryName("src/main/scala"),),
+                test_dirs=(DirectoryName("src/test/scala"),),
+                test_patterns=(
+                    FileGlob("Test.scala"),
+                    FileGlob("*Test.scala"),
+                    FileGlob("*Spec.scala"),
+                ),
+                binary_dirs=(DirectoryName("target"), DirectoryName("project/target")),
+                workspace_files=(FileName("build.sbt"),),
                 workspace_defined_in_file=True,
                 workspace_definition_files=(
                     (
-                        "build.sbt",
-                        ("lazy val",),
+                        FileName("build.sbt"),
+                        (("lazy val"),),
                     ),  # Multiple lazy val definitions indicate subprojects
                 ),
             ),
             SemanticSearchLanguage.SOLIDITY: defaults
             | RepoConventions(
-                source_dirs=("contracts", "src"),
-                test_dirs=("test",),
-                test_patterns=(".*.test.sol", ".*.t.sol"),  # Foundry uses .t.sol
-                binary_dirs=("artifacts", "cache", "out"),
+                source_dirs=(DirectoryName("contracts"), DirectoryName("src")),
+                test_dirs=(DirectoryName("test"),),
+                test_patterns=(
+                    FileGlob(".*.test.sol"),
+                    FileGlob(".*.t.sol"),
+                ),  # Foundry uses .t.sol
+                binary_dirs=(
+                    DirectoryName("artifacts"),
+                    DirectoryName("cache"),
+                    DirectoryName("out"),
+                ),
                 workspace_files=(
-                    "hardhat.config.js",
-                    "hardhat.config.ts",
-                    "foundry.toml",
-                    "truffle-config.js",
+                    FileName("hardhat.config.js"),
+                    FileName("hardhat.config.ts"),
+                    FileName("foundry.toml"),
+                    FileName("truffle-config.js"),
                 ),
             ),
             SemanticSearchLanguage.SWIFT: defaults
             | RepoConventions(
-                source_dirs=("Sources", "src"),
-                test_dirs=("Tests",),
-                test_patterns=("Tests.swift", "*Tests.swift"),
-                binary_dirs=(".build", "build"),
-                workspace_files=("Package.swift", "*.xcodeproj", "*.xcworkspace"),
+                source_dirs=(DirectoryName("Sources"), DirectoryName("src")),
+                test_dirs=(DirectoryName("Tests"),),
+                test_patterns=(FileGlob("Tests.swift"), FileGlob("*Tests.swift")),
+                binary_dirs=(DirectoryName(".build"), DirectoryName("build")),
+                workspace_files=(
+                    FileName("Package.swift"),
+                    FileGlob("*.xcodeproj"),
+                    FileGlob("*.xcworkspace"),
+                ),
                 workspace_defined_in_file=True,
                 workspace_definition_files=(
-                    ("Package.swift", ("targets",)),  # SPM defines targets
+                    (FileName("Package.swift"), ("targets",)),  # SPM defines targets
                 ),
             ),
             SemanticSearchLanguage.TYPESCRIPT: defaults
             | RepoConventions(
-                source_dirs=("src", "lib"),
-                test_dirs=("tests", "test", "__tests__"),
-                test_patterns=(".*.test.ts", ".*.spec.ts", "test/*", "spec/*"),
-                binary_dirs=("node_modules", "dist", "build"),
-                private_package_dirs=("node_modules",),
-                workspace_dirs=("packages", "apps"),
+                source_dirs=(DirectoryName("src"), DirectoryName("lib")),
+                test_dirs=(
+                    DirectoryName("tests"),
+                    DirectoryName("test"),
+                    DirectoryName("__tests__"),
+                ),
+                test_patterns=(
+                    FileGlob(".*.test.ts"),
+                    FileGlob(".*.spec.ts"),
+                    FileGlob("test/*"),
+                    FileGlob("spec/*"),
+                ),
+                binary_dirs=(
+                    DirectoryName("node_modules"),
+                    DirectoryName("dist"),
+                    DirectoryName("build"),
+                ),
+                private_package_dirs=(DirectoryName("node_modules"),),
+                workspace_dirs=(DirectoryName("packages"), DirectoryName("apps")),
                 workspace_files=(
-                    "package.json",
-                    "lerna.json",
-                    "pnpm-workspace.yaml",
-                    "turbo.json",
-                    "nx.json",
-                    "tsconfig.json",
+                    FileName("package.json"),
+                    FileName("lerna.json"),
+                    FileName("pnpm-workspace.yaml"),
+                    FileName("turbo.json"),
+                    FileName("nx.json"),
+                    FileName("tsconfig.json"),
                 ),
                 workspace_defined_in_file=True,
                 workspace_definition_files=(
-                    ("package.json", ("workspaces",)),
-                    ("lerna.json", ("packages",)),
-                    ("pnpm-workspace.yaml", ("packages",)),
+                    (FileName("package.json"), ("workspaces",)),
+                    (FileName("lerna.json"), ("packages",)),
+                    (FileName("pnpm-workspace.yaml"), ("packages",)),
                 ),
             ),
             SemanticSearchLanguage.TSX: defaults
             | RepoConventions(
-                source_dirs=("src", "lib", "components"),
-                test_dirs=("tests", "test", "__tests__"),
-                test_patterns=(".*.test.tsx", ".*.spec.tsx", "test/*", "spec/*"),
-                binary_dirs=("node_modules", "dist", "build"),
-                private_package_dirs=("node_modules",),
-                workspace_dirs=("packages", "apps"),
+                source_dirs=(
+                    DirectoryName("src"),
+                    DirectoryName("lib"),
+                    DirectoryName("components"),
+                ),
+                test_dirs=(
+                    DirectoryName("tests"),
+                    DirectoryName("test"),
+                    DirectoryName("__tests__"),
+                ),
+                test_patterns=(
+                    FileGlob(".*.test.tsx"),
+                    FileGlob(".*.spec.tsx"),
+                    FileGlob("test/*"),
+                    FileGlob("spec/*"),
+                ),
+                binary_dirs=(
+                    DirectoryName("node_modules"),
+                    DirectoryName("dist"),
+                    DirectoryName("build"),
+                ),
+                private_package_dirs=(DirectoryName("node_modules"),),
+                workspace_dirs=(DirectoryName("packages"), DirectoryName("apps")),
                 workspace_files=(
-                    "package.json",
-                    "lerna.json",
-                    "pnpm-workspace.yaml",
-                    "turbo.json",
-                    "nx.json",
+                    FileName("package.json"),
+                    FileName("lerna.json"),
+                    FileName("pnpm-workspace.yaml"),
+                    FileName("turbo.json"),
+                    FileName("nx.json"),
                 ),
                 workspace_defined_in_file=True,
                 workspace_definition_files=(
-                    ("package.json", ("workspaces",)),
-                    ("lerna.json", ("packages",)),
-                    ("pnpm-workspace.yaml", ("packages",)),
+                    (FileName("package.json"), ("workspaces",)),
+                    (FileName("lerna.json"), ("packages",)),
+                    (FileName("pnpm-workspace.yaml"), ("packages",)),
                 ),
             ),
             SemanticSearchLanguage.YAML: defaults
             | RepoConventions(
-                source_dirs=("config", "ci", ".github", ".gitlab-ci.yml"),
+                source_dirs=(
+                    DirectoryName("config"),
+                    DirectoryName("ci"),
+                    DirectoryName(".github"),
+                ),
                 test_dirs=(),
                 test_patterns=(),
                 binary_dirs=(),
+                ci_files=(
+                    FileGlob(".github/workflows/*.yml"),
+                    FileGlob(".github/workflows/*.yaml"),
+                    FileGlob(".gitlab-ci.yml"),
+                    FileGlob(".circleci/config.yml"),
+                ),
             ),
         }.get(self, RepoConventions())
 
@@ -1352,13 +1445,11 @@ class SemanticSearchLanguage(str, BaseEnum):
 
 
 @cache
-def has_semantic_extension(ext: str) -> SemanticSearchLanguage | None:
+def has_semantic_extension(ext: FileExtensionT) -> SemanticSearchLanguage | None:
     """Check if the given extension is a semantic search language."""
-    if found_lang := next(
+    return next(
         (lang for lang_ext, lang in SemanticSearchLanguage.ext_pairs() if lang_ext == ext), None
-    ):
-        return found_lang
-    return None
+    )  # type: ignore
 
 
 @cache
@@ -1410,214 +1501,7 @@ def languages_present_from_configs() -> tuple[SemanticSearchLanguage, ...] | Non
     return None
 
 
-codeweaver_to_langchain = {
-    k.value: k.value for k in LC_Language if k.value not in ("js", "ts", "proto", "rst", "sol", "c")
-} | {
-    "javascript": "js",
-    "typescript": "ts",
-    "protobuf": "proto",
-    "solidity": "sol",
-    "c_lang": "c",
-    "restructuredtext": "rst",
-}
-
-
-_custom_delimiters: list[CustomDelimiter] = []
-"""A global list to hold custom delimiters registered by the user.
-
-Note: We had previously used a set here but realized the order may be important if defining multiple CustomDelimiters for the same language. Users should provide them in priority order, and we want to respect that order when using them.
-"""
-
-
-class Chunker(int, BaseEnum):
-    """Defines chunkers/parsers/splitters that CodeWeaver supports.
-
-    An int enum, the members are in order of preference/robustness with the most general and least robust at lower numbers, and the richest at higher numbers. The final fallback (lowest value) is `langchain_text_splitters.RecursiveCharacterTextSplitter`. The richest/best is our own semantic chunker, which uses `ast_grep_py` (tree-sitter).
-    """
-
-    LANGCHAIN_RECURSIVE = 0
-    """The final fallback chunker, `langchain_text_splitters.RecursiveCharacterTextSplitter`"""
-    LANGCHAIN_SPECIAL = 1
-    """A language-specific chunker provided by `langchain_text_splitters`, such as for markdown. These chunkers are more robust than the generic recursive chunker, but not as robust as CodeWeaver's semantic chunker, with the exception of the experimental markdown chunker which is quite good -- we use it for markdown files before our own. That is the only langchain splitter that takes priority over our own chunkers."""
-    # TODO: We included the langchain dependency before we got ... carried away ... with our own chunkers. Ours are much more robust. We'd need to improve markdown handling, but otherwise, we can probably drop the langchain dependency and remove this chunker.
-    BUILTIN_DELIMITER = 2
-    """CodeWeaver's delimiter-based text chunkers; delimiters are defined in //LINK - src/codeweaver/services/chunker/delimiters/families.py"""
-    USER_DELIMITER = 3
-    """A user-defined delimiter, using our delimiter-based chunker. Defined in config files and registered at runtime."""
-    SEMANTIC = 4
-    """CodeWeaver's semantic chunker. The most robust chunker, using `ast_grep_py` (tree-sitter)."""
-
-    def _chunkers(self) -> list[CustomDelimiter]:
-        global _custom_delimiters
-        return _custom_delimiters
-
-    @classmethod
-    def for_language(cls, language: LiteralStringT) -> Chunker:
-        """
-        Returns the most robust chunker that supports the given language.
-
-        Args:
-            language (str): The programming language to find a chunker for.
-
-        Returns:
-            Chunker: The most robust chunker that supports the given language.
-
-        Raises:
-            ValueError: If no chunker supports the given language.
-        """
-        with contextlib.suppress(AttributeError, ValueError):
-            # try to interpret the language as a SemanticSearchLanguage first
-            language = SemanticSearchLanguage.from_string(language)  # type: ignore
-        if not isinstance(language, SemanticSearchLanguage):
-            with contextlib.suppress(AttributeError, ValueError):
-                # try to interpret the language as a ConfigLanguage next
-                language = ConfigLanguage.from_string(language)  # type: ignore
-        # now language is either a SemanticSearchLanguage, ConfigLanguage, or a str that doesn't match either enum
-        if not isinstance(
-            language, SemanticSearchLanguage | ConfigLanguage
-        ) and language.lower() in ("markdown", "md"):
-            # markdown and latex have special chunkers in langchain
-            return cls.LANGCHAIN_SPECIAL
-        if isinstance(language, SemanticSearchLanguage) or (
-            isinstance(language, ConfigLanguage)
-            and (
-                cast(ConfigLanguage, language) == ConfigLanguage.SELF
-                or language.is_semantic_search_language
-            )
-        ):  # type: ignore
-            return cls.SEMANTIC
-        if cls.custom_delimiters() and next(
-            (d for d in cls.custom_delimiters() if d.language == language), None
-        ):
-            return cls.USER_DELIMITER
-        return cls.BUILTIN_DELIMITER
-
-    @staticmethod
-    def _as_literal_tuple(values: Iterable[str]) -> tuple[LiteralStringT, ...]:
-        """
-        Internal helper to coerce an iterable of str into tuple[LiteralStringT, ...].
-
-        We centralize the cast to keep callsites clean and ensure type checkers
-        narrow the union branch for supported_languages correctly.
-        """
-        return cast(tuple[LiteralStringT, ...], tuple(values))
-
-    @classmethod
-    def _recursive_all_languages(cls) -> tuple[LiteralStringT, ...]:
-        """
-        Build the complete language set used by LANGCHAIN_RECURSIVE.
-
-        Returns a homogeneous tuple[LiteralStringT, ...].
-
-        Composition:
-          - All SemanticSearchLanguage member values
-          - ALL_LANGUAGES (code + data + docs)
-          - Any custom delimiter languages (if registered)
-
-        Deterministic ordering (sorted) improves cacheability & test stability.
-        """
-        from codeweaver.core.file_extensions import ALL_LANGUAGES
-
-        languages: set[LiteralStringT] = set(ALL_LANGUAGES)
-        languages.update(cast(LiteralStringT, lang.variable) for lang in SemanticSearchLanguage)
-        languages.update(cast(LiteralStringT, lang.variable) for lang in ConfigLanguage)
-        if custom := cls._custom_delimiter_languages():
-            languages.update(custom)
-        return cls._as_literal_tuple(sorted(languages))
-
-    @property
-    def supported_languages(
-        self,
-    ) -> (
-        tuple[SemanticSearchLanguage, ...]
-        | tuple[SecondarySupportedLanguage, ...]
-        | tuple[LiteralStringT, ...]
-        | tuple[SemanticSearchLanguage | SecondarySupportedLanguage, ...]
-    ):
-        """
-        Returns a tuple of supported languages for the chunker.
-
-        LANGCHAIN_RECURSIVE:
-            Returns tuple[LiteralStringT, ...] built from semantic + secondary + custom.
-        BUILTIN_DELIMITER, LANGCHAIN_SPECIAL, USER_DELIMITER:
-            Return tuple[LiteralStringT, ...].
-        SEMANTIC:
-            Returns tuple[SemanticSearchLanguage, ...].
-        """
-        from codeweaver.engine.chunker.delimiters.families import defined_languages
-
-        if self is Chunker.LANGCHAIN_RECURSIVE:
-            return type(self)._recursive_all_languages()
-        if self is Chunker.BUILTIN_DELIMITER:
-            return type(self)._as_literal_tuple(sorted(defined_languages()))
-        if self is Chunker.LANGCHAIN_SPECIAL:
-            return type(self)._as_literal_tuple(sorted(codeweaver_to_langchain.keys()))
-        if self is Chunker.USER_DELIMITER:
-            return type(self)._as_literal_tuple(sorted(type(self)._custom_delimiter_languages()))
-        if self is Chunker.SEMANTIC:
-            return tuple(SemanticSearchLanguage)
-        raise AssertionError(f"Unhandled chunker: {self}")
-
-    @classmethod
-    def custom_delimiters(cls) -> list[CustomDelimiter]:
-        """
-        Returns a set of custom delimiters registered by the user.
-
-        Returns:
-            set: A set of CustomDelimiter instances.
-        """
-        global _custom_delimiters
-        return _custom_delimiters
-
-    @classmethod
-    def _custom_delimiter_languages(cls) -> frozenset[LiteralStringT]:
-        """
-        Returns a frozenset of language names for which custom chunkers have been registered.
-
-        Returns:
-            frozenset: A frozenset of language names.
-        """
-        languages: set[LiteralStringT] = set()
-        global _custom_delimiters
-        for d in _custom_delimiters:
-            if d.language:
-                languages.add(d.language)
-            if d.extensions:
-                languages |= {ext.language for ext in d.extensions if ext.language}
-        return frozenset(languages)
-
-    @classmethod
-    def register_custom_delimiter(cls, delimiter: CustomDelimiter) -> None:
-        """
-        Registers a custom delimiter for a given language.
-
-        Args:
-            delimiter (CustomDelimiter): The custom delimiter to register.
-        """
-        global _custom_delimiters
-        _custom_delimiters.append(delimiter)
-
-    def next_chunker(self, *, language: LiteralStringT | None = None) -> Chunker | None:
-        """
-        Returns the next chunker in the order of preference/robustness.
-
-        Returns:
-            Chunker | None: The next chunker, or None if this is the last chunker.
-        """
-        if language and language.lower() in ("markdown", "md"):
-            # markdown and latex have special chunkers in langchain
-            if self == type(self).BUILTIN_DELIMITER:
-                return type(self).LANGCHAIN_RECURSIVE
-            return (
-                Chunker.LANGCHAIN_SPECIAL
-                if self != Chunker.LANGCHAIN_SPECIAL
-                else Chunker.BUILTIN_DELIMITER
-            )
-        return None if self == Chunker.LANGCHAIN_RECURSIVE else Chunker(self - 1)
-
-
 __all__ = (
-    "Chunker",
     "ConfigLanguage",
     "ConfigNamePair",
     "ConfigPathPair",

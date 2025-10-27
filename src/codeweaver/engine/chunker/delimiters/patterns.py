@@ -92,38 +92,21 @@ class DelimiterPattern(NamedTuple):
         DelimiterKind.UNKNOWN
     )
     priority_override: (
-        Annotated[
-            PositiveInt,
-            Field(
-                gt=0,
-                lt=100,
-                default_factory=lambda data: data["kind"].default_priority,
-                description="The priority of the delimiter.",
-            ),
-        ]
+        Annotated[PositiveInt, Field(gt=0, lt=100, description="The priority of the delimiter.")]
         | None
     ) = None
     inclusive: Annotated[
-        bool | None,
-        Field(
-            description="Whether to include the delimiters in the resulting chunk.",
-            default_factory=lambda data: data["kind"].infer_inline_strategy().inclusive,
-        ),
+        bool | None, Field(description="Whether to include the delimiters in the resulting chunk.")
     ] = None
     take_whole_lines: Annotated[
         bool | None,
         Field(
-            description="Whether to expand the chunk to include whole lines if matched within it.",
-            default_factory=lambda data: data["kind"].infer_inline_strategy().take_whole_lines,
+            description="Whether to expand the chunk to include whole lines if matched within it."
         ),
     ] = None
-    nestable: Annotated[
-        bool | None,
-        Field(
-            default_factory=lambda data: data["kind"].infer_nestable(),
-            description="Whether the delimiter can be nested.",
-        ),
-    ] = None
+    nestable: Annotated[bool | None, Field(description="Whether the delimiter can be nested.")] = (
+        None
+    )
 
     formatter: Annotated[
         Callable[[str], str] | None,

@@ -56,7 +56,7 @@ from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializatio
 
 
 if TYPE_CHECKING:
-    from codeweaver.core import AnonymityConversion, FilteredKey
+    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
 
 @dataclass(config=DATACLASS_CONFIG | ConfigDict(extra="forbid", defer_build=True))
@@ -363,8 +363,8 @@ class _LanguageStatistics(DataclassSerializationMixin):
         Annotated[set[Path], Field(default_factory=set, init=False, repr=False, exclude=True)]
     ] = set()
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
-        from codeweaver.core import AnonymityConversion, FilteredKey
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {FilteredKey("unique_files"): AnonymityConversion.FORBIDDEN}
 
@@ -916,7 +916,9 @@ class SessionStatistics(DataclassSerializationMixin):
             if (hasattr(self, attr) and getattr(self, attr)) is None or (not hasattr(self, attr)):
                 setattr(self, attr, [])
 
-    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
+
         return {
             FilteredKey("_successful_request_log"): AnonymityConversion.FORBIDDEN,
             FilteredKey("_failed_request_log"): AnonymityConversion.FORBIDDEN,

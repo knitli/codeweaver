@@ -9,6 +9,8 @@
 Pydantic models and provider class for Bedrock reranking. Excuse the many pyright ignores -- boto3 is boto3.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 

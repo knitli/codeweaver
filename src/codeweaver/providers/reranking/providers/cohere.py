@@ -6,6 +6,8 @@
 # sourcery skip: avoid-single-character-names-variables
 """Cohere reranking provider implementation."""
 
+from __future__ import annotations
+
 import asyncio
 import os
 
@@ -43,17 +45,19 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
         self._caps = caps
         self._provider = caps.provider or self._provider
         kwargs = kwargs or {}
-        self.client_kwargs = kwargs.get("client_kwargs", {}) or kwargs
-        self.client_kwargs["client_name"] = "codeweaver"
-        if not self.client_kwargs.get("api_key"):
+        self.client_options = kwargs.get("client_options", {}) or kwargs
+        self.client_options["client_name"] = "codeweaver"
+        if not self.client_options.get("api_key"):
             if self._provider == Provider.COHERE:
-                self.client_kwargs["api_key"] = kwargs.get("api_key") or os.getenv("COHERE_API_KEY")
+                self.client_options["api_key"] = kwargs.get("api_key") or os.getenv(
+                    "COHERE_API_KEY"
+                )
 
-            if not self.client_kwargs.get("api_key"):
+            if not self.client_options.get("api_key"):
                 raise ConfigurationError(
                     f"API key not found for {self._provider.value} provider. Please set the API key in the client kwargs or as an environment variable."
                 )
-        self._client = _client or CohereClient(**self.client_kwargs)
+        self._client = _client or CohereClient(**self.client_options)
         super().__init__(self._client, caps, **kwargs)
 
     @property

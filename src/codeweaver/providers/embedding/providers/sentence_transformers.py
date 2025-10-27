@@ -6,6 +6,8 @@
 # sourcery skip: avoid-single-character-names-variables
 """Provider for Sentence Transformers models."""
 
+from __future__ import annotations
+
 import asyncio
 
 from collections.abc import Sequence
@@ -94,8 +96,8 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
     _provider: Provider = Provider.SENTENCE_TRANSFORMERS
     _caps: EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities  # pyright: ignore[reportIncompatibleVariableOverride]
 
-    _doc_kwargs: ClassVar[dict[str, Any]] = {"client_kwargs": {"trust_remote_code": True}}
-    _query_kwargs: ClassVar[dict[str, Any]] = {"client_kwargs": {"trust_remote_code": True}}
+    _doc_kwargs: ClassVar[dict[str, Any]] = {"client_options": {"trust_remote_code": True}}
+    _query_kwargs: ClassVar[dict[str, Any]] = {"client_options": {"trust_remote_code": True}}
 
     def __init__(
         self,
@@ -114,7 +116,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
                 else SparseEncoder
             )
             self._client = _client(
-                model_name_or_path=capabilities.name, **self.doc_kwargs["client_kwargs"]
+                model_name_or_path=capabilities.name, **self.doc_kwargs["client_options"]
             )
         else:
             self._client = client
@@ -123,16 +125,16 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
     def _initialize(self) -> None:
         """Initialize the Sentence Transformers embedding provider."""
         for keyword_args in (self.doc_kwargs, self.query_kwargs):
-            keyword_args.setdefault("client_kwargs", {})
-            if "normalize_embeddings" not in keyword_args["client_kwargs"]:
-                keyword_args["client_kwargs"]["normalize_embeddings"] = True
-            if "trust_remote_code" not in keyword_args["client_kwargs"]:
-                keyword_args["client_kwargs"]["trust_remote_code"] = True
+            keyword_args.setdefault("client_options", {})
+            if "normalize_embeddings" not in keyword_args["client_options"]:
+                keyword_args["client_options"]["normalize_embeddings"] = True
+            if "trust_remote_code" not in keyword_args["client_options"]:
+                keyword_args["client_options"]["trust_remote_code"] = True
             if (
-                "model_name" not in keyword_args["client_kwargs"]
-                and "model_name_or_path" not in keyword_args["client_kwargs"]
+                "model_name" not in keyword_args["client_options"]
+                and "model_name_or_path" not in keyword_args["client_options"]
             ):
-                keyword_args["client_kwargs"]["model_name_or_path"] = self._caps.name
+                keyword_args["client_options"]["model_name_or_path"] = self._caps.name
         name = self.doc_kwargs.pop("model_name", self.doc_kwargs.pop("model_name_or_path"))
         self.query_kwargs.pop("model_name", self.query_kwargs.pop("model_name_or_path", None))
         self._client = self._client(name, **(self.doc_kwargs or {}))
@@ -156,7 +158,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         embed_partial = rpartial(  # type: ignore
             self._client.encode,  # type: ignore
             **(
-                self.doc_kwargs.get("client_kwargs", {})
+                self.doc_kwargs.get("client_options", {})
                 | {"model_kwargs": self.doc_kwargs.get("model_kwargs", {})}
                 | {**kwargs, "convert_to_numpy": True}
             ),
@@ -178,7 +180,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         embed_partial = rpartial(  # type: ignore
             self._client.encode,  # type: ignore
             **(
-                self.query_kwargs.get("client_kwargs", {})
+                self.query_kwargs.get("client_options", {})
                 | {"model_kwargs": self.query_kwargs.get("model_kwargs", {})}
                 | {**kwargs, "convert_to_numpy": True}
             ),
@@ -219,7 +221,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         except Exception:
             has_flash_attention = None
         if has_flash_attention:
-            self.doc_kwargs["client_kwargs"]["model_kwargs"]["attention_implementation"] = (
+            self.doc_kwargs["client_options"]["model_kwargs"]["attention_implementation"] = (
                 "flash_attention_2"
             )
 

@@ -20,6 +20,8 @@ Nevertheless, because we use semantic chunking for most code, you're not likely 
 
 """
 
+from __future__ import annotations
+
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     PartialCapabilities,

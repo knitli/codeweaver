@@ -5,6 +5,8 @@
 
 """Common NewTypes and type aliases used throughout CodeWeaver."""
 
+from __future__ import annotations
+
 from os import PathLike
 from pathlib import Path
 from typing import Annotated, LiteralString, NewType
@@ -23,8 +25,39 @@ We occasionally skirt the restrictions on LiteralString, such as for config sett
 SentinelName = NewType("SentinelName", LiteralStringT)
 """The name of a sentinel value, e.g. "UNSET"."""
 
+SentinelNameT = Annotated[
+    SentinelName,
+    Field(
+        description="""The name of a sentinel value as the `SentinelName` NewType, e.g. 'UNSET'.""",
+        pattern=r"^[A-Za-z0-9_+-]+$",
+        max_length=50,
+    ),
+]
+
 FilteredKey = NewType("FilteredKey", LiteralStringT)
 """A key in a dictionary that must go through a privacy filter for telemetry purposes."""
+
+type FilteredKeyT = Annotated[
+    FilteredKey,
+    Field(
+        description="""A field name in a dataclass or BaseModel that must go through a privacy filter for telemetry purposes.""",
+        pattern=r"^[a-zA-Z0-9_+-]+$",
+        max_length=50,
+    ),
+]
+
+UUID7Hex = NewType("UUID7Hex", str)
+"""A UUID7 represented as a hex string."""
+
+UUID7HexT = Annotated[
+    UUID7Hex,
+    Field(
+        description="A UUID7 represented as a hex string.",
+        pattern=r"^[0-9a-f]{32}$",
+        min_length=32,
+        max_length=32,
+    ),
+]
 
 # ================================================
 # *       File and Directory NewTypes/Aliases
@@ -134,6 +167,7 @@ type ModelNameT = Annotated[
     Field(
         description="""The name of a model as the `ModelName` NewType, e.g. 'gpt-4', 'bert-base-uncased'.""",
         pattern=r"^[A-Za-z0-9_+-]+$",
+        min_length=1,
         max_length=50,
     ),
 ]
@@ -146,7 +180,8 @@ type CategoryNameT = Annotated[
     Field(
         description="""The name of a semantic category as the `CategoryName` NewType, e.g. 'expression'.""",
         pattern=r"^[A-Za-z0-9_+-]+$",
-        max_length=30,
+        min_length=1,
+        max_length=40,
     ),
 ]
 
@@ -157,8 +192,7 @@ type ThingNameT = Annotated[
     ThingName,
     Field(
         description="""The name of a semantic thing as the `ThingName` NewType, e.g. 'if_statement'.""",
-        pattern=r"^[A-Za-z0-9_+-]+$",
-        max_length=30,
+        max_length=40,
     ),
 ]
 
@@ -170,7 +204,7 @@ type RoleT = Annotated[
     Field(
         description="""The role of a thing as the `Role` NewType, e.g. 'name', 'condition', 'body'.""",
         pattern=r"^[A-Za-z0-9_+-]+$",
-        max_length=30,
+        max_length=40,
     ),
 ]
 
@@ -254,6 +288,7 @@ __all__ = (
     "FilePath",
     "FilePathT",
     "FilteredKey",
+    "FilteredKeyT",
     "LanguageName",
     "LanguageNameT",
     "LiteralStringT",
@@ -266,7 +301,10 @@ __all__ = (
     "Role",
     "RoleT",
     "SentinelName",
+    "SentinelNameT",
     "ThingName",
     "ThingNameT",
     "ThingOrCategoryNameT",
+    "UUID7Hex",
+    "UUID7HexT",
 )
