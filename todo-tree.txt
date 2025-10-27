@@ -12,8 +12,6 @@
    │  │     └─ line 74: TODO : WHY IS THIS COMMENTED OUT? ... here's why:
    │  ├─ common
    │  │  ├─ utils
-   │  │  │  ├─ git.py
-   │  │  │  │  └─ line 140: TODO : (big one): This is a precursor for future functionality. We'd like to be able to associate indexes and other artifacts with a specific git commit. Because there's nothing worse than an Agent working from a totally different context than the one you expect. We need to track changes across commits, branches, etc. This is a first step. We'll need to figure out how manage partial indexes, diffs, etc. later.
    │  │  │  └─ normalize.py
    │  │  │     ├─ line 26: TODO : Add Rebuff.ai integration, and/or other advanced sanitization options. Probably as middleware.
    │  │  │     └─ line 52: TODO : Need to add a mechanism to override or customize the injection patterns.
@@ -82,9 +80,6 @@
    │  │  └─ provider.py
    │  │     └─ line 110: TODO : We need to allow for dynamic providers in the future, we would check if there's a provider class registered for the value, then register the provider here with `cls.add_member("NEW_PROVIDER", "new_provider")`.
    │  ├─ semantic
-   │  │  └─ __init__.py
-   │  │     └─ line 67: TODO : We can probably refactor out the need for this, but a problem for another day.
-   │  ├─ exceptions.py
    │  │  └─ line 17: TODO : We got into a bad habit of not using native exception types. We need to systematically go through and improve exception handling and information.
    │  └─ server.py
    │     ├─ line 141: TODO : Expand to be more dynamic, computing health based on service status, etc.

@@ -135,10 +135,7 @@ def _get_git_dir(directory: Path) -> Path | Missing:
 
 
 def get_git_revision(directory: Path) -> str | Missing:
-    """Get the SHA-1 of the HEAD of a git repository.
-
-    TODO: (big one): This is a precursor for future functionality. We'd like to be able to associate indexes and other artifacts with a specific git commit. Because there's nothing worse than an Agent working from a totally different context than the one you expect. We need to track changes across commits, branches, etc. This is a first step. We'll need to figure out how manage partial indexes, diffs, etc. later.
-    """
+    """Get the SHA-1 of the HEAD of a git repository."""
     git_dir = _get_git_dir(directory)
     if git_dir is MISSING:
         return MISSING

@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any, cast
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.types.aliases import FileExt, LiteralStringT
 from codeweaver.engine.chunker.base import BaseChunker
+from codeweaver.engine.chunker.delimiter import DelimiterChunker
 from codeweaver.engine.chunker.exceptions import ParseError
 from codeweaver.engine.chunker.semantic import SemanticChunker
 
@@ -155,17 +156,15 @@ class ChunkerSelector:
                     extra={"file_path": str(file.path), "language": str(language)},
                 )
 
-        # Delimiter fallback (TODO: implement DelimiterChunker)
-        # For now, return semantic even for unsupported (will fail gracefully)
-        logger.warning(
-            "DelimiterChunker not yet implemented. Attempting semantic for %s",
+        # Delimiter fallback for unsupported languages
+        language_str = language if isinstance(language, str) else "generic"
+        logger.info(
+            "Using DelimiterChunker for %s (detected language: %s)",
             file.path,
-            extra={"file_path": str(file.path), "detected_language": str(language)},
+            language_str,
+            extra={"file_path": str(file.path), "detected_language": language_str},
         )
-        return SemanticChunker(
-            self.governor,
-            SemanticSearchLanguage.PYTHON,  # default fallback
-        )
+        return DelimiterChunker(self.governor, language=language_str)
 
     def _detect_language(self, file: DiscoveredFile) -> SemanticSearchLanguage | str:
         """Detect language from file extension.
