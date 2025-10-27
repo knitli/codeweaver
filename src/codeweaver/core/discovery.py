@@ -50,18 +50,11 @@ class DiscoveredFile(DataclassSerializationMixin):
     _file_hash: Annotated[
         BlakeHashKey | None,
         Field(
-            default_factory=lambda data: get_blake_hash(data["path"].read_bytes()),
-            description="""blake3 hash of the file contents. File hashes are from non-normalized content, so two files with different line endings, white spaces, unicode characters, etc. will have different hashes.""",
-            init=False,
+            description="""blake3 hash of the file contents. File hashes are from non-normalized content, so two files with different line endings, white spaces, unicode characters, etc. will have different hashes."""
         ),
     ] = None
     _git_branch: Annotated[
-        str | Missing,
-        Field(
-            init=False,
-            default_factory=lambda data: get_git_branch(data["path"]),
-            description="""Git branch the file was discovered in, if detected.""",
-        ),
+        str | Missing, Field(description="""Git branch the file was discovered in, if detected.""")
     ] = Missing  # type: ignore
 
     source_id: Annotated[
