@@ -320,7 +320,7 @@ class DelimiterChunker(BaseChunker):
 
         # Define structural delimiters that can complete keywords
         # Map opening structural chars to their closing counterparts
-        STRUCTURAL_PAIRS = {
+        structural_pairs = {
             "{": "}",
             ":": "\n",  # Python uses : followed by indented block (simplified to newline)
             "=>": "",  # Arrow functions often have expression bodies
@@ -341,7 +341,7 @@ class DelimiterChunker(BaseChunker):
                 struct_start, struct_char = self._find_next_structural_with_char(
                     content,
                     start=keyword_pos + len(delimiter.start),
-                    allowed=set(STRUCTURAL_PAIRS.keys()),
+                    allowed=set(structural_pairs.keys()),
                 )
 
                 if struct_start is None:
@@ -349,7 +349,7 @@ class DelimiterChunker(BaseChunker):
 
                 # Find the matching closing delimiter for the structural character
                 struct_end = self._find_matching_close(
-                    content, struct_start, struct_char, STRUCTURAL_PAIRS.get(struct_char, "")
+                    content, struct_start, struct_char, structural_pairs.get(struct_char, "")
                 )
 
                 if struct_end is not None:

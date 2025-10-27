@@ -48,6 +48,8 @@ def _assemble_caps() -> dict[
     Returns:
         EmbeddingModelCapabilities instance or None if not configured.
     """
+    from codeweaver.common.registry import get_model_registry
+
     settings_map: dict[Literal["dense", "sparse"], list[dict[str, Any]]] = {
         "dense": [],
         "sparse": [],
@@ -90,12 +92,16 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
 
     model_config = BasedModel.model_config | ConfigDict(extra="allow")
 
-    _embedding_caps: dict[
-        Literal["dense", "sparse"],
-        list[EmbeddingModelCapabilities] | list[SparseEmbeddingModelCapabilities],
-    ] = _assemble_caps()
     _client: VectorStoreClient | None
     _provider: Provider
+
+    def __init__(self, **data: Any) -> None:
+        """Initialize the vector store provider with embedding capabilities."""
+        super().__init__(**data)
+        # Initialize embedding caps on first instance creation if not already set at class level
+        if not hasattr(type(self), "_embedding_caps_initialized"):
+            type(self)._embedding_caps = _assemble_caps()
+            type(self)._embedding_caps_initialized = True
 
     async def _initialize(self) -> None:
         """Initialize the vector store provider.
@@ -104,8 +110,8 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         any async initialization. Override in subclasses for custom initialization.
         """
 
-    @abstractmethod
     @staticmethod
+    @abstractmethod
     def _ensure_client(client: Any) -> TypeIs[VectorStoreClient]:
         """Ensure the vector store client is initialized.
 
