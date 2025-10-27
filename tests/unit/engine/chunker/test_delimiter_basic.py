@@ -398,8 +398,6 @@ def another_function():
         # Create DiscoveredFile and chunk the code
         from codeweaver.core.discovery import DiscoveredFile
 
-
-
         discovered_file = DiscoveredFile.from_path(test_file)
         chunks = delimiter_chunker.chunk(code, file=discovered_file)
 
