@@ -20,8 +20,8 @@ from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.core.spans import Span
 from codeweaver.providers.vector_stores.inmemory import MemoryVectorStore
 
-
 pytestmark = pytest.mark.unit
+
 
 
 @pytest.fixture

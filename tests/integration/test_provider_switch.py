@@ -19,9 +19,7 @@ from codeweaver.exceptions import ProviderSwitchError
 from codeweaver.providers.vector_stores.inmemory import MemoryVectorStore
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
 
-
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
-
 
 async def test_provider_switch_detection():
     """

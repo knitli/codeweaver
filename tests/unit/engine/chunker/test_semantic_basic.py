@@ -11,11 +11,13 @@ Tests verify core chunking behavior for supported languages including
 Python, JavaScript, and Rust.
 """
 
-
+import pytest
 
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.engine.chunker import SemanticChunker
 from codeweaver.engine.chunker.base import ChunkGovernor
+
+pytestmark = [pytest.mark.unit]
 
 
 def test_semantic_chunks_python_file(

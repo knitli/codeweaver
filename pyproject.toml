@@ -566,6 +566,7 @@ addopts = [
   "--cov-report=html",
   "--cov-report=xml",
   "--cov-fail-under=80",
+  "--import-mode=importlib",
 ]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
