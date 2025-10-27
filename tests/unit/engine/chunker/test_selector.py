@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import Mock
 
 from codeweaver.engine.chunker.base import ChunkGovernor
+from codeweaver.engine.chunker.delimiter import DelimiterChunker
 from codeweaver.engine.chunker.selector import ChunkerSelector
 from codeweaver.engine.chunker.semantic import SemanticChunker
 
@@ -25,12 +26,7 @@ def test_selector_chooses_semantic_for_python(chunk_governor: ChunkGovernor) -> 
 
 
 def test_selector_falls_back_to_delimiter_for_unknown(chunk_governor: ChunkGovernor) -> None:
-    """Verify selector uses delimiter for unsupported language.
-
-    NOTE: Currently returns SemanticChunker as fallback since DelimiterChunker
-    is not yet fully implemented. This test will need to be updated when
-    DelimiterChunker implementation is complete.
-    """
+    """Verify selector uses delimiter for unsupported language."""
     selector = ChunkerSelector(chunk_governor)
 
     # Create mock file with unknown extension
@@ -38,9 +34,8 @@ def test_selector_falls_back_to_delimiter_for_unknown(chunk_governor: ChunkGover
     file.path = Path("test.xyz")
 
     chunker = selector.select_for_file(file)
-    # TODO: Change to DelimiterChunker when implementation is complete
-    assert isinstance(chunker, SemanticChunker), (
-        "Currently falls back to SemanticChunker for unsupported languages"
+    assert isinstance(chunker, DelimiterChunker), (
+        "Should use DelimiterChunker for unsupported languages"
     )
 
 

@@ -95,14 +95,14 @@ class ChunkerSelector:
 
         Returns:
             Fresh BaseChunker instance appropriate for file's language.
-            Currently returns SemanticChunker for supported languages or
-            SemanticChunker with Python fallback (DelimiterChunker TODO).
+            Returns SemanticChunker for supported languages or
+            DelimiterChunker for unsupported languages.
 
         Notes:
             - Each call creates a new chunker instance (no reuse)
+            - Falls back to DelimiterChunker for unsupported languages
             - Falls back to delimiter chunking on semantic parse errors
             - Logs warnings when fallback occurs
-            - TODO: Implement DelimiterChunker for proper fallback
             - Checks max_file_size_mb from settings before chunking
 
         Examples:
@@ -157,7 +157,7 @@ class ChunkerSelector:
                 )
 
         # Delimiter fallback for unsupported languages
-        language_str = language if isinstance(language, str) else "generic"
+        language_str = language.value if isinstance(language, SemanticSearchLanguage) else language
         logger.info(
             "Using DelimiterChunker for %s (detected language: %s)",
             file.path,
