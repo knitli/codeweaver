@@ -21,11 +21,6 @@ from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
 
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
-
-
-
-
-
 async def test_provider_switch_detection():
     """
     User Story: Warn when switching providers to prevent data loss.
