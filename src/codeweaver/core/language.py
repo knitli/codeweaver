@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 
 from collections.abc import Generator
@@ -27,6 +28,7 @@ from codeweaver.core.types.aliases import (
     FileGlobT,
     FileName,
     FileNameT,
+    LanguageNameT,
     LiteralStringT,
 )
 from codeweaver.core.types.enum import BaseEnum
@@ -1498,6 +1500,48 @@ def languages_present_from_configs() -> tuple[SemanticSearchLanguage, ...] | Non
         associated_languages := [language_from_config_file(p) for p in config_paths]
     ):
         return tuple(lang for lang in associated_languages if lang)
+    return None
+
+
+def language_from_path(
+    file_path: Path,
+) -> SemanticSearchLanguage | ConfigLanguage | LanguageNameT | None:
+    """
+    Returns the SemanticSearchLanguage for a given file path based on its extension.
+
+    Args:
+        file_path: The path to the file.
+    """
+    ext = normalize_ext(file_path.suffix)
+    lang = None
+    with contextlib.suppress(ValueError, KeyError, AttributeError):
+        if has_semantic_extension(ext):
+            lang = SemanticSearchLanguage.lang_from_ext(ext)
+    if lang:
+        return lang
+    with contextlib.suppress(ValueError, KeyError, AttributeError):
+        if (
+            FileExt(ext) in ConfigLanguage.all_extensions()
+            or file_path.name in ConfigLanguage.all_extensions()
+        ):
+            lang = ConfigLanguage.from_extension(ext)
+    if lang:
+        return lang
+    from codeweaver.core.file_extensions import ALL_LANGUAGES, LangPair
+
+    all_languages: tuple[LangPair, ...] = ALL_LANGUAGES  # type: ignore
+    # Check if the extension or filename matches any known language extensions
+    if (
+        (all_exts := tuple(ext_pair.ext for ext_pair in all_languages)) and FileExt(ext) in all_exts  # type: ignore
+    ) or FileExt(file_path.name) in all_exts:  # type: ignore
+        return next(
+            (
+                ext_pair.language  # type: ignore
+                for ext_pair in all_languages  # type: ignore
+                if ext_pair.ext in [FileExt(ext), FileExt(file_path.name)]  # type: ignore
+            ),  # type: ignore
+            None,
+        )
     return None
 
 

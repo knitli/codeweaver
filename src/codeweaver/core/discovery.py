@@ -11,7 +11,7 @@ import contextlib
 
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, cast
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
 from pydantic import UUID7, AfterValidator, Field, NonNegativeInt, computed_field
 from pydantic.dataclasses import dataclass
@@ -47,21 +47,22 @@ class DiscoveredFile(DataclassSerializationMixin):
     ]
     ext_kind: ExtKind
 
-    file_hash: Annotated[
-        BlakeHashKey,
+    _file_hash: Annotated[
+        BlakeHashKey | None,
         Field(
             default_factory=lambda data: get_blake_hash(data["path"].read_bytes()),
             description="""blake3 hash of the file contents. File hashes are from non-normalized content, so two files with different line endings, white spaces, unicode characters, etc. will have different hashes.""",
             init=False,
         ),
-    ]
-    git_branch: Annotated[
+    ] = None
+    _git_branch: Annotated[
         str | Missing,
         Field(
+            init=False,
             default_factory=lambda data: get_git_branch(data["path"]),
             description="""Git branch the file was discovered in, if detected.""",
         ),
-    ]
+    ] = Missing  # type: ignore
 
     source_id: Annotated[
         UUID7,
@@ -69,6 +70,30 @@ class DiscoveredFile(DataclassSerializationMixin):
             description="Unique identifier for the source of the file. All chunks from this file will share this ID."
         ),
     ] = uuid7()
+
+    def __init__(
+        self,
+        path: Path,
+        ext_kind: ExtKind | None = None,
+        file_hash: BlakeKey | None = None,
+        git_branch: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize DiscoveredFile with optional file_hash and git_branch."""
+        object.__setattr__(self, "path", path)
+        if ext_kind:
+            object.__setattr__(self, "ext_kind", ext_kind)
+        else:
+            object.__setattr__(self, "ext_kind", ExtKind.from_file(path))
+        if file_hash:
+            object.__setattr__(self, "_file_hash", file_hash)
+        else:
+            object.__setattr__(self, "_file_hash", get_blake_hash(path.read_bytes()))
+        if git_branch and git_branch is not Missing:
+            object.__setattr__(self, "_git_branch", git_branch)
+        else:
+            object.__setattr__(self, "_git_branch", get_git_branch(path) or Missing)
+        object.__setattr__(self, "source_id", kwargs.get("source_id", uuid7()))
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
@@ -88,7 +113,7 @@ class DiscoveredFile(DataclassSerializationMixin):
             if file_hash and new_hash != file_hash:
                 raise ValueError("Provided file_hash does not match the computed hash.")
             return cls(
-                path=path, ext_kind=ext_kind, file_hash=new_hash, git_branch=cast(str, branch)
+                path=path, ext_kind=ext_kind, _file_hash=new_hash, _git_branch=cast(str, branch)
             )
         return None
 
@@ -101,9 +126,23 @@ class DiscoveredFile(DataclassSerializationMixin):
 
     @computed_field
     @property
+    def git_branch(self) -> str | Missing:
+        """Return the git branch the file was discovered in, if available."""
+        if self._git_branch is Missing:
+            return get_git_branch(self.path.parent) or Missing  # type: ignore
+        return self._git_branch
+
+    @computed_field
+    @property
     def size(self) -> NonNegativeInt:
         """Return the size of the file in bytes."""
         return self.path.stat().st_size
+
+    @computed_field
+    @property
+    def file_hash(self) -> BlakeHashKey | None:
+        """Return the blake3 hash of the file contents, if available."""
+        return self._file_hash
 
     def is_same(self, other_path: Path) -> bool:
         """Checks if a file at other_path is the same as this one, by comparing blake3 hashes.

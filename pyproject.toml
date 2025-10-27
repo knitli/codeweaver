@@ -179,6 +179,7 @@ dev = [
   "copychat>=0.7.2",
   "ipython>=9.6.0",
   "jsonlines>=4.0.0",
+  "memory-profiler>=0.61.0",
   "mteb>=2.1.0",
   "pdbpp>=0.11.7",
   "pydantic-ai>=1.6.0",

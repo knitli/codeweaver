@@ -75,10 +75,7 @@ class TestChunkerPerformance:
         """Create chunk governor with default settings."""
         # Create mock capabilities with typical context window
         mock_cap = EmbeddingModelCapabilities(
-            model_name="test-model",
-            embedding_dimensions=768,
-            context_window=8192,
-            max_batch_size=100,
+            name="test-model", default_dimension=768, output_dimensions=(768,), context_window=8192
         )
         return ChunkGovernor(capabilities=(mock_cap,))
 
@@ -168,8 +165,21 @@ class TestChunkerPerformance:
         content = generate_python_file(7000)
         file_path = Path("very_large_benchmark.py")
 
-        def chunk_file():
-            discovered_file = DiscoveredFile(path=file_path)
+        def chunk_file(*, include_data: bool = False):
+            from codeweaver.core.language import language_from_path
+            from codeweaver.core.metadata import (
+                ChunkSource,
+                determine_ext_kind,
+                get_ext_lang_pair_for_file,
+            )
+
+            language = language_from_path(file_path)
+            ext_pair = get_ext_lang_pair_for_file(file_path=file_path, include_data=include_data)
+            kind = determine_ext_kind({
+                "semantic_meta": {"language": language},
+                "source": ext_pair.as_source if ext_pair else ChunkSource.FILE,
+            })
+            discovered_file = DiscoveredFile(path=file_path, ext_kind=kind)
             chunker = selector.select_for_file(discovered_file)
             return chunker.chunk(content, file_path=file_path)
 
@@ -294,14 +304,15 @@ class TestChunkerPerformance:
         semantic_chunker = SemanticChunker(governor, SemanticSearchLanguage.PYTHON)
 
         start = time.perf_counter()
-        semantic_result = semantic_chunker.chunk(content, file_path=file_path)
+        file = DiscoveredFile.from_path(file_path)
+        semantic_result = semantic_chunker.chunk(content, file=file)
         semantic_time = time.perf_counter() - start
 
         # Test delimiter chunker
         delimiter_chunker = DelimiterChunker(governor, "python")
 
         start = time.perf_counter()
-        delimiter_result = delimiter_chunker.chunk(content, file_path=file_path)
+        delimiter_result = delimiter_chunker.chunk(content, file=file)
         delimiter_time = time.perf_counter() - start
 
         # Log results for regression tracking
@@ -322,10 +333,7 @@ class TestChunkerScalability:
         """Create chunk governor with default settings."""
         # Create mock capabilities with typical context window
         mock_cap = EmbeddingModelCapabilities(
-            model_name="test-model",
-            embedding_dimensions=768,
-            context_window=8192,
-            max_batch_size=100,
+            name="test-model", default_dimension=768, output_dimensions=(768,), context_window=8192
         )
         return ChunkGovernor(capabilities=(mock_cap,))
 
@@ -377,4 +385,4 @@ class TestChunkerScalability:
 
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v", "--benchmark-only"])
+    _ = pytest.main([__file__, "-v", "--benchmark-only"])

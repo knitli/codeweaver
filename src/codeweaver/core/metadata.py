@@ -1,3 +1,4 @@
+# sourcery skip: no-complex-if-expressions
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -62,8 +63,18 @@ class ChunkKind(BaseEnum):
     CONFIG = "config"
     CODE_OR_CONFIG = "code_or_config"
     """The Chunk is either code or a config, but requires further analysis to determine which. This happens in a narrow set of cases where the file belongs to a language that is used in configs and code, usually for itself, primarily this is for Kotlin and Groovy."""
+    DATA = "data"
     DOCS = "docs"
     OTHER = "other"
+
+    @classmethod
+    def from_path(cls, path: Path, *, include_data: bool = False) -> ChunkKind | None:
+        """Create a ChunkKind from a file path."""
+        from codeweaver.core.metadata import get_ext_lang_pair_for_file
+
+        if ext_lang_pair := get_ext_lang_pair_for_file(path, include_data=include_data):
+            return cls.from_string(ext_lang_pair.category)
+        return None
 
 
 class ChunkSource(BaseEnum):
@@ -346,7 +357,23 @@ class ExtLangPair(NamedTuple):
         return not self.is_config and not self.is_doc and not self.is_file_name
 
     @property
-    def category(self) -> Literal["code", "docs", "config"]:
+    def is_data(self) -> bool:
+        """Check if the extension is a data file."""
+        from codeweaver.core.file_extensions import DATA_FILES_EXTENSIONS
+
+        return next((True for data_ext in DATA_FILES_EXTENSIONS if data_ext.ext == self.ext), False)
+
+    @property
+    def as_source(self) -> ChunkSource:
+        """Return the chunk source based on the extension type."""
+        if isinstance(self.language, SemanticSearchLanguage) or (
+            isinstance(self.language, ConfigLanguage) and self.language.is_semantic_search_language
+        ):
+            return ChunkSource.SEMANTIC
+        return ChunkSource.FILE
+
+    @property
+    def category(self) -> Literal["code", "docs", "config", "data"]:
         """Return the language of file based on its extension."""
         if self.is_code:
             return "code"
@@ -354,7 +381,9 @@ class ExtLangPair(NamedTuple):
             return "docs"
         if self.is_config:
             return "config"
-        raise ValueError(f"Unknown category for {self.ext}")
+        if self.is_data:
+            return "data"
+        raise ValueError(f"Unknown category for extension: {self.ext}")
 
     @property
     def is_weird_extension(self) -> bool:
@@ -382,21 +411,45 @@ def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
     """Determine the ExtKind based on validated data (`Metadata` extraction)."""
     if "file_path" in validated_data:
         return ExtKind.from_file(validated_data["file_path"])
-    source = validated_data.get("source", ChunkSource.TEXT_BLOCK)
-    if (
-        source == ChunkSource.SEMANTIC
-        and "metadata" in validated_data
-        and "semantic_meta" in validated_data["metadata"]
-        and (language := validated_data["metadata"]["semantic_meta"].get("language"))
+    source = (
+        validated_data.get("source")
+        or validated_data.get("metadata", {}).get("source")
+        or ChunkSource.TEXT_BLOCK
+    )
+    meta = validated_data.get("metadata", validated_data.get("semantic_meta", {}))
+    if "semantic_meta" in meta:
+        meta = meta["semantic_meta"]
+    if not meta:
+        return None
+    if (language := meta.get("language") or validated_data.get("language")) and isinstance(
+        language, SemanticSearchLanguage
     ):
-        return ExtKind.from_language(language, "code")
-    if "language" in validated_data and source != source.TEXT_BLOCK:
-        if source == ChunkSource.EXTERNAL:
-            return ExtKind.from_language(validated_data["language"], ChunkKind.OTHER)
-        if source in (ChunkSource.FILE):
-            return ExtKind.from_language(validated_data["language"], "docs")
-        return ExtKind.from_language(validated_data["language"], "code")
-    return None
+        if language == SemanticSearchLanguage.KOTLIN:
+            return ExtKind.from_language(language, ChunkKind.CODE_OR_CONFIG)
+        return (
+            ExtKind.from_language(language, source or ChunkKind.CODE)
+            if language
+            not in (
+                SemanticSearchLanguage.JSON,
+                SemanticSearchLanguage.YAML,
+                SemanticSearchLanguage.HCL,
+            )
+            else ExtKind.from_language(language, source or ChunkKind.CONFIG)
+        )
+
+    if language and isinstance(language, ConfigLanguage):
+        return ExtKind.from_language(
+            language.as_semantic_search_language or language, ChunkKind.CONFIG
+        )
+    from codeweaver.core.file_extensions import CODE_LANGUAGES, DATA_LANGUAGES, DOCS_LANGUAGES
+
+    if language and language in {pair.language for pair in DATA_LANGUAGES}:  # type: ignore
+        return ExtKind.from_language(language, ChunkKind.DATA)
+    if language and language in {pair.language for pair in DOCS_LANGUAGES}:  # type: ignore
+        return ExtKind.from_language(language, ChunkKind.DOCS)
+    if language and language in {pair.language for pair in CODE_LANGUAGES}:  # type: ignore
+        return ExtKind.from_language(language, ChunkKind.CODE)
+    return ExtKind.from_language(language, ChunkKind.OTHER) if language else None
 
 
 def get_ext_lang_pairs(*, include_data: bool = False) -> Generator[ExtLangPair]:
@@ -430,7 +483,7 @@ def get_semantic_or_config_lang(
     if file_path:
         with contextlib.suppress(KeyError, ValueError, AttributeError):
             if semantic_lang := SemanticSearchLanguage.from_extension(
-                str(file_path.suffix or file_path.name)
+                FileExt(cast(LiteralStringT, file_path.suffix or file_path.name))
             ):
                 if semantic_lang.config_files and next(
                     (cfg for cfg in semantic_lang.config_files if cfg.path.name == file_path.name),
@@ -459,6 +512,15 @@ def get_ext_lang_pair_for_file(
             ext=FileExt(cast(LiteralStringT, file_path.suffix or file_path.name)),
             language=config_lang,
         )
+    if other_lang := next(
+        (
+            pair
+            for pair in get_ext_lang_pairs(include_data=include_data)
+            if pair.is_same(file_path.name)
+        ),
+        None,
+    ):
+        return other_lang
     return None
 
 
