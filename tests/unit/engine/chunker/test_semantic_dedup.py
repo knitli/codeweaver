@@ -20,6 +20,9 @@ import pytest
 from codeweaver.engine.chunker.base import ChunkGovernor
 from codeweaver.engine.chunker.semantic import SemanticChunker
 
+pytestmark = [pytest.mark.unit]
+
+
 
 @pytest.fixture
 def chunk_governor() -> ChunkGovernor:
@@ -256,6 +259,9 @@ def test_batch_id_tracking(
 
     # Create DiscoveredFile and chunk the file
     from codeweaver.core.discovery import DiscoveredFile
+
+
+
 
     discovered_file = DiscoveredFile.from_path(python_file_with_unique_functions)
     chunks = semantic_chunker.chunk(content, file=discovered_file)

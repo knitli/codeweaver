@@ -33,6 +33,9 @@ from codeweaver.engine.chunker.exceptions import (
 if TYPE_CHECKING:
     from pytest import MonkeyPatch
 
+pytestmark = [pytest.mark.unit]
+
+
 # Path to test fixtures directory
 FIXTURES_DIR = Path(__file__).parent.parent.parent.parent / "fixtures"
 
@@ -257,6 +260,9 @@ class TestChunkLimitErrors:
         """
         from codeweaver.core.language import SemanticSearchLanguage
         from codeweaver.engine.chunker.semantic import SemanticChunker
+
+
+
 
         # Arrange: Create chunker with very low chunk limit
         mock_governor.settings.performance.max_chunks_per_file = 10  # Very low limit for testing

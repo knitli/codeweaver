@@ -16,6 +16,12 @@ import pytest
 from codeweaver.engine.chunker.exceptions import ChunkingTimeoutError, ChunkLimitExceededError
 from codeweaver.engine.chunker.governance import ResourceGovernor
 
+pytestmark = [pytest.mark.unit]
+
+
+
+
+
 
 class PerformanceSettings(Protocol):
     """Minimal protocol for testing."""

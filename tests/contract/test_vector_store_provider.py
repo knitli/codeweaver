@@ -16,6 +16,12 @@ import pytest
 
 from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
+pytestmark = [pytest.mark.unit, pytest.mark.validation]
+
+
+
+
+
 
 class TestVectorStoreProviderContract:
     """Test VectorStoreProvider abstract interface contract compliance."""

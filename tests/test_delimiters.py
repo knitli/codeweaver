@@ -23,6 +23,8 @@ from codeweaver.engine.chunker.delimiters.families import (
     detect_language_family,
 )
 from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
+
+pytestmark = [pytest.mark.unit]
 from codeweaver.engine.chunker.delimiters.patterns import (
     ALL_PATTERNS,
     CONDITIONAL_PATTERN,

@@ -25,6 +25,9 @@ from codeweaver.engine.chunker.base import ChunkGovernor
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
 from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
 
+pytestmark = [pytest.mark.unit]
+
+
 
 @pytest.fixture
 def governor() -> ChunkGovernor:
@@ -394,6 +397,8 @@ def another_function():
 
         # Create DiscoveredFile and chunk the code
         from codeweaver.core.discovery import DiscoveredFile
+
+
 
         discovered_file = DiscoveredFile.from_path(test_file)
         chunks = delimiter_chunker.chunk(code, file=discovered_file)

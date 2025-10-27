@@ -34,6 +34,12 @@ from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.providers.vector_stores.inmemory import MemoryVectorStore
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
 
+pytestmark = [pytest.mark.async_test, pytest.mark.performance, pytest.mark.slow]
+
+
+
+
+
 
 # Test data generation helpers
 def create_test_chunk(

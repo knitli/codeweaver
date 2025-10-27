@@ -23,6 +23,9 @@ from codeweaver.engine.chunker.base import ChunkGovernor
 from codeweaver.engine.chunker.selector import ChunkerSelector
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
+pytestmark = [pytest.mark.benchmark, pytest.mark.performance, pytest.mark.slow]
+
+
 
 # Test data generators
 def generate_python_file(num_lines: int) -> str:
@@ -366,6 +369,9 @@ class TestChunkerScalability:
     def test_concurrent_chunking_safety(self, selector):
         """Verify concurrent chunking operations are safe."""
         import concurrent.futures
+
+
+
 
         def chunk_file(file_id: int):
             content = generate_python_file(300)

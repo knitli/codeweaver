@@ -20,8 +20,8 @@ from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.core.spans import Span
 from codeweaver.providers.vector_stores.inmemory import MemoryVectorStore
 
-
 pytestmark = pytest.mark.unit
+
 
 
 @pytest.fixture
@@ -157,6 +157,9 @@ class TestMemoryProviderContract:
     async def test_persistence_file_format(self, memory_provider, memory_config, sample_chunk):
         """Test persistence file has correct JSON structure."""
         import json
+
+
+
 
         await memory_provider.upsert([sample_chunk])
         await memory_provider._persist_to_disk()

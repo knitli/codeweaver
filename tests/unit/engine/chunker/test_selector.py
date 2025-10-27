@@ -7,10 +7,18 @@
 from pathlib import Path
 from unittest.mock import Mock
 
+import pytest
+
 from codeweaver.engine.chunker.base import ChunkGovernor
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
 from codeweaver.engine.chunker.selector import ChunkerSelector
 from codeweaver.engine.chunker.semantic import SemanticChunker
+
+pytestmark = [pytest.mark.unit]
+
+
+
+
 
 
 def test_selector_chooses_semantic_for_python(chunk_governor: ChunkGovernor) -> None:
