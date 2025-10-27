@@ -17,7 +17,7 @@ import re
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
 from codeweaver.common.utils import uuid7
 from codeweaver.core.chunks import CodeChunk
@@ -36,6 +36,18 @@ from codeweaver.engine.chunker.exceptions import (
 
 if TYPE_CHECKING:
     from codeweaver.core.discovery import DiscoveredFile
+
+
+class StringParseState(NamedTuple):
+    """State for tracking string boundaries during parsing.
+
+    Attributes:
+        in_string: Whether currently inside a string literal
+        delimiter: The string delimiter character ('"', "'", or '`'), or None if not in string
+    """
+
+    in_string: bool
+    delimiter: str | None
 
 
 class DelimiterChunker(BaseChunker):
@@ -192,9 +204,8 @@ class DelimiterChunker(BaseChunker):
 
         if not matches:
             matches = self._fallback_paragraph_chunking(content)
-            if matches:
-                if context is not None:
-                    context["fallback_to_generic"] = True
+            if matches and context is not None:
+                context["fallback_to_generic"] = True
 
         return matches
 
@@ -486,8 +497,7 @@ class DelimiterChunker(BaseChunker):
             Tuple of (position of structural delimiter, the delimiter character/string), or (None, None)
         """
         pos = start
-        in_string = False
-        string_char = None
+        string_state = StringParseState(in_string=False, delimiter=None)
         paren_depth = 0
         content_len = len(content)
 
@@ -495,13 +505,11 @@ class DelimiterChunker(BaseChunker):
             char = content[pos]
 
             # Handle string boundaries
-            if self._handle_string_boundary(content, pos, char, in_string, string_char):
-                in_string, string_char = self._update_string_state(
-                    content, pos, char, in_string, string_char
-                )
+            if self._is_string_boundary(char):
+                string_state = self._update_string_state(content, pos, char, string_state)
 
             # Skip if inside string
-            if in_string:
+            if string_state.in_string:
                 pos += 1
                 continue
 
@@ -526,43 +534,36 @@ class DelimiterChunker(BaseChunker):
 
         return None, None
 
-    def _handle_string_boundary(
-        self, content: str, pos: int, char: str, in_string: bool, string_char: str | None  # noqa: FBT001
-    ) -> bool:
-        """Check if current position is a string boundary.
+    def _is_string_boundary(self, char: str) -> bool:
+        """Check if character is a string boundary.
 
         Args:
-            content: Source code
-            pos: Current position
-            char: Current character
-            in_string: Whether we're inside a string
-            string_char: Current string delimiter character
+            char: Character to check
 
         Returns:
-            True if this is a string boundary character
+            True if character is a string delimiter
         """
         return char in ('"', "'", "`")
 
     def _update_string_state(
-        self, content: str, pos: int, char: str, in_string: bool, string_char: str | None  # noqa: FBT001
-    ) -> tuple[bool, str | None]:
+        self, content: str, pos: int, char: str, state: StringParseState
+    ) -> StringParseState:
         """Update string state based on current character.
 
         Args:
             content: Source code
             pos: Current position
             char: Current character
-            in_string: Current string state
-            string_char: Current string delimiter
+            state: Current string parse state
 
         Returns:
-            Updated (in_string, string_char) tuple
+            Updated StringParseState
         """
-        if not in_string:
-            return True, char
-        if char == string_char and pos > 0 and content[pos - 1] != "\\":
-            return False, None
-        return in_string, string_char
+        if not state.in_string:
+            return StringParseState(in_string=True, delimiter=char)
+        if char == state.delimiter and pos > 0 and content[pos - 1] != "\\":
+            return StringParseState(in_string=False, delimiter=None)
+        return state
 
     def _skip_comment(self, content: str, pos: int, content_len: int) -> int | None:
         """Skip comment if found at current position.
@@ -691,19 +692,16 @@ class DelimiterChunker(BaseChunker):
         """
         pos = open_pos + len(open_char)
         depth = 1
-        in_string = False
-        string_char = None
+        string_state = StringParseState(in_string=False, delimiter=None)
         content_len = len(content)
 
         while pos < content_len and depth > 0:
             char = content[pos]
 
             # Handle string boundaries
-            in_string, string_char = self._process_string_in_matching(
-                content, pos, char, in_string, string_char
-            )
+            string_state = self._process_string_in_matching(content, pos, char, string_state)
 
-            if not in_string:
+            if not string_state.in_string:
                 # Skip comments
                 comment_skip = self._skip_comment_in_matching(content, pos, content_len)
                 if comment_skip is not None:
@@ -728,26 +726,25 @@ class DelimiterChunker(BaseChunker):
         return None  # No matching close found
 
     def _process_string_in_matching(
-        self, content: str, pos: int, char: str, in_string: bool, string_char: str | None  # noqa: FBT001
-    ) -> tuple[bool, str | None]:
+        self, content: str, pos: int, char: str, state: StringParseState
+    ) -> StringParseState:
         """Process string state during delimiter matching.
 
         Args:
             content: Source code
             pos: Current position
             char: Current character
-            in_string: Whether in string
-            string_char: Current string delimiter
+            state: Current string parse state
 
         Returns:
-            Updated (in_string, string_char) tuple
+            Updated StringParseState
         """
         if char in ('"', "'", "`"):
-            if not in_string:
-                return True, char
-            if char == string_char and pos > 0 and content[pos - 1] != "\\":
-                return False, None
-        return in_string, string_char
+            if not state.in_string:
+                return StringParseState(in_string=True, delimiter=char)
+            if char == state.delimiter and pos > 0 and content[pos - 1] != "\\":
+                return StringParseState(in_string=False, delimiter=None)
+        return state
 
     def _skip_comment_in_matching(
         self, content: str, pos: int, content_len: int

@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import threading
+
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -87,6 +89,10 @@ def _assemble_caps() -> dict[
     )
 
 
+# Lock for thread-safe initialization of class-level embedding capabilities
+_embedding_caps_lock = threading.Lock()
+
+
 class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
     """Abstract interface for vector storage providers."""
 
@@ -99,9 +105,13 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         """Initialize the vector store provider with embedding capabilities."""
         super().__init__(**data)
         # Initialize embedding caps on first instance creation if not already set at class level
+        # Use double-checked locking pattern for thread safety
         if not hasattr(type(self), "_embedding_caps_initialized"):
-            type(self)._embedding_caps = _assemble_caps()
-            type(self)._embedding_caps_initialized = True
+            with _embedding_caps_lock:
+                # Double-check after acquiring lock to avoid race condition
+                if not hasattr(type(self), "_embedding_caps_initialized"):
+                    type(self)._embedding_caps = _assemble_caps()
+                    type(self)._embedding_caps_initialized = True
 
     async def _initialize(self) -> None:
         """Initialize the vector store provider.
