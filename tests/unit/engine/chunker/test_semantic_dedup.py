@@ -261,8 +261,6 @@ def test_batch_id_tracking(
     from codeweaver.core.discovery import DiscoveredFile
 
 
-
-
     discovered_file = DiscoveredFile.from_path(python_file_with_unique_functions)
     chunks = semantic_chunker.chunk(content, file=discovered_file)
 
