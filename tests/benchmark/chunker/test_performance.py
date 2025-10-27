@@ -370,9 +370,6 @@ class TestChunkerScalability:
         """Verify concurrent chunking operations are safe."""
         import concurrent.futures
 
-
-
-
         def chunk_file(file_id: int):
             content = generate_python_file(300)
             file_path = Path(f"concurrent_{file_id}.py")
