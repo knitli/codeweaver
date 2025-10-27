@@ -17,10 +17,6 @@ from codeweaver.engine.chunker.semantic import SemanticChunker
 pytestmark = [pytest.mark.unit]
 
 
-
-
-
-
 def test_selector_chooses_semantic_for_python(chunk_governor: ChunkGovernor) -> None:
     """Verify selector picks semantic for supported language."""
     selector = ChunkerSelector(chunk_governor)

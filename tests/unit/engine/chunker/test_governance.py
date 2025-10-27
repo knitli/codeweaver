@@ -19,10 +19,6 @@ from codeweaver.engine.chunker.governance import ResourceGovernor
 pytestmark = [pytest.mark.unit]
 
 
-
-
-
-
 class PerformanceSettings(Protocol):
     """Minimal protocol for testing."""
 

@@ -25,10 +25,6 @@ from codeweaver.engine.chunker.semantic import SemanticChunker
 pytestmark = [pytest.mark.unit]
 
 
-
-
-
-
 @pytest.fixture
 def python_chunker(chunk_governor: ChunkGovernor) -> SemanticChunker:
     """Create semantic chunker for Python."""

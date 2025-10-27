@@ -15,10 +15,6 @@ from codeweaver.engine.chunker.exceptions import BinaryFileError
 pytestmark = [pytest.mark.unit]
 
 
-
-
-
-
 def test_empty_file(chunk_governor: ChunkGovernor, discovered_empty_file) -> None:
     """Verify empty file returns empty list."""
     content = discovered_empty_file.contents

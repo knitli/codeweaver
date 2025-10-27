@@ -20,10 +20,6 @@ from codeweaver.engine.chunker.base import ChunkGovernor
 pytestmark = [pytest.mark.unit]
 
 
-
-
-
-
 def test_semantic_chunks_python_file(
     chunk_governor: ChunkGovernor, discovered_sample_python_file
 ) -> None:
