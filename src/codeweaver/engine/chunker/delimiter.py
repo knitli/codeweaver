@@ -17,7 +17,7 @@ import re
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
 from codeweaver.common.utils import uuid7
 from codeweaver.core.chunks import CodeChunk
@@ -36,6 +36,18 @@ from codeweaver.engine.chunker.exceptions import (
 
 if TYPE_CHECKING:
     from codeweaver.core.discovery import DiscoveredFile
+
+
+class StringParseState(NamedTuple):
+    """State for tracking string boundaries during parsing.
+
+    Attributes:
+        in_string: Whether currently inside a string literal
+        delimiter: The string delimiter character ('"', "'", or '`'), or None if not in string
+    """
+
+    in_string: bool
+    delimiter: str | None
 
 
 class DelimiterChunker(BaseChunker):
@@ -107,74 +119,25 @@ class DelimiterChunker(BaseChunker):
         if not content or not content.strip():
             return []
 
-        # Extract file_path and source_id from DiscoveredFile
         file_path = file.path if file else None
-
-        # Edge case: binary content detection
-        try:
-            _ = content.encode("utf-8")
-        except UnicodeEncodeError as e:
-            raise BinaryFileError(
-                "Binary content detected in file",
-                file_path=str(file_path) if file_path else None,
-                details={"error": str(e)},
-            ) from e
-
-        # Get performance settings from governor, or use defaults
-        if (
-            self.governor.settings is not None
-            and hasattr(self.governor.settings, "performance")
-            and (performance_settings := self.governor.settings.performance)
-        ):
-            pass  # performance_settings already assigned in walrus operator
-        else:
-            from codeweaver.config.chunker import PerformanceSettings
-
-            performance_settings = PerformanceSettings()
+        self._validate_content_encoding(content, file_path)
+        performance_settings = self._get_performance_settings()
 
         with ResourceGovernor(performance_settings) as governor:
             try:
-                # Use the DiscoveredFile's existing source_id instead of generating a new one
                 source_id = UUID7Hex(file.source_id.hex) if file else uuid7()
 
-                # Phase 1: Find all delimiter matches
-                governor.check_timeout()
-                matches = self._find_delimiter_matches(content)
+                if context is None:
+                    context = {}
 
-                # Edge case: no matches found - try paragraph fallback
-                used_fallback = False
+                matches = self._get_matches_with_fallback(content, governor, context)
+
                 if not matches:
-                    matches = self._fallback_paragraph_chunking(content)
-                    used_fallback = True
-                    if not matches:
-                        return []
-
-                # Add fallback indicator to context if needed
-                if used_fallback:
-                    if context is None:
-                        context = {}
-                    context["fallback_to_generic"] = True
-
-                # Phase 2: Extract boundaries from matches
-                governor.check_timeout()
-                boundaries = self._extract_boundaries(matches)
-
-                # Edge case: no complete boundaries
-                if not boundaries:
                     return []
 
-                # Phase 3: Resolve overlapping boundaries
-                governor.check_timeout()
-                resolved = self._resolve_overlaps(boundaries)
-
-                # Convert boundaries to chunks
-                chunks = self._boundaries_to_chunks(
-                    resolved, content, file_path, source_id, context
+                chunks = self._process_matches_to_chunks(
+                    matches, content, file_path, source_id, context, governor
                 )
-
-                # Register each chunk with the governor for resource tracking
-                for _ in chunks:
-                    governor.register_chunk()
 
             except ChunkingError:
                 raise
@@ -186,6 +149,107 @@ class DelimiterChunker(BaseChunker):
                 ) from e
             else:
                 return chunks
+
+    def _validate_content_encoding(self, content: str, file_path: Path | None) -> None:
+        """Validate that content is valid UTF-8 encoded text.
+
+        Args:
+            content: Content to validate
+            file_path: Optional file path for error reporting
+
+        Raises:
+            BinaryFileError: If content contains binary data
+        """
+        try:
+            _ = content.encode("utf-8")
+        except UnicodeEncodeError as e:
+            raise BinaryFileError(
+                "Binary content detected in file",
+                file_path=str(file_path) if file_path else None,
+                details={"error": str(e)},
+            ) from e
+
+    def _get_performance_settings(self) -> Any:
+        """Get performance settings from governor or use defaults.
+
+        Returns:
+            Performance settings instance
+        """
+        if (
+            self.governor.settings is not None
+            and hasattr(self.governor.settings, "performance")
+            and (performance_settings := self.governor.settings.performance)
+        ):
+            return performance_settings
+
+        from codeweaver.config.chunker import PerformanceSettings
+
+        return PerformanceSettings()
+
+    def _get_matches_with_fallback(
+        self, content: str, governor: Any, context: dict[str, Any] | None
+    ) -> list[DelimiterMatch]:
+        """Find delimiter matches with fallback to paragraph chunking.
+
+        Args:
+            content: Source code to scan
+            governor: Resource governor for timeout checks
+            context: Optional context to update with fallback indicator
+
+        Returns:
+            List of delimiter matches
+        """
+        governor.check_timeout()
+        matches = self._find_delimiter_matches(content)
+
+        if not matches:
+            matches = self._fallback_paragraph_chunking(content)
+            if matches and context is not None:
+                context["fallback_to_generic"] = True
+
+        return matches
+
+    def _process_matches_to_chunks(
+        self,
+        matches: list[DelimiterMatch],
+        content: str,
+        file_path: Path | None,
+        source_id: Any,
+        context: dict[str, Any] | None,
+        governor: Any,
+    ) -> list[CodeChunk]:
+        """Process delimiter matches into code chunks.
+
+        Args:
+            matches: Delimiter matches to process
+            content: Source code content
+            file_path: Optional file path
+            source_id: Source identifier
+            context: Optional context
+            governor: Resource governor for tracking
+
+        Returns:
+            List of code chunks
+        """
+        # Phase 2: Extract boundaries from matches
+        governor.check_timeout()
+        boundaries = self._extract_boundaries(matches)
+
+        if not boundaries:
+            return []
+
+        # Phase 3: Resolve overlapping boundaries
+        governor.check_timeout()
+        resolved = self._resolve_overlaps(boundaries)
+
+        # Convert boundaries to chunks
+        chunks = self._boundaries_to_chunks(resolved, content, file_path, source_id, context)
+
+        # Register each chunk with the governor for resource tracking
+        for _ in chunks:
+            governor.register_chunk()
+
+        return chunks
 
     def _enforce_chunk_limit(self, chunks: list[CodeChunk], file_path: Path | None) -> None:
         """Enforce maximum chunk count limit.
@@ -320,7 +384,7 @@ class DelimiterChunker(BaseChunker):
 
         # Define structural delimiters that can complete keywords
         # Map opening structural chars to their closing counterparts
-        STRUCTURAL_PAIRS = {
+        structural_pairs = {
             "{": "}",
             ":": "\n",  # Python uses : followed by indented block (simplified to newline)
             "=>": "",  # Arrow functions often have expression bodies
@@ -341,7 +405,7 @@ class DelimiterChunker(BaseChunker):
                 struct_start, struct_char = self._find_next_structural_with_char(
                     content,
                     start=keyword_pos + len(delimiter.start),
-                    allowed=set(STRUCTURAL_PAIRS.keys()),
+                    allowed=set(structural_pairs.keys()),
                 )
 
                 if struct_start is None:
@@ -349,7 +413,7 @@ class DelimiterChunker(BaseChunker):
 
                 # Find the matching closing delimiter for the structural character
                 struct_end = self._find_matching_close(
-                    content, struct_start, struct_char, STRUCTURAL_PAIRS.get(struct_char, "")
+                    content, struct_start, struct_char, structural_pairs.get(struct_char, "")
                 )
 
                 if struct_end is not None:
@@ -433,8 +497,7 @@ class DelimiterChunker(BaseChunker):
             Tuple of (position of structural delimiter, the delimiter character/string), or (None, None)
         """
         pos = start
-        in_string = False
-        string_char = None
+        string_state = StringParseState(in_string=False, delimiter=None)
         paren_depth = 0
         content_len = len(content)
 
@@ -442,55 +505,132 @@ class DelimiterChunker(BaseChunker):
             char = content[pos]
 
             # Handle string boundaries
-            if char in ('"', "'", "`"):
-                if not in_string:
-                    in_string = True
-                    string_char = char
-                elif char == string_char:
-                    # Check if escaped
-                    if pos > 0 and content[pos - 1] != "\\":
-                        in_string = False
-                        string_char = None
+            if self._is_string_boundary(char):
+                string_state = self._update_string_state(content, pos, char, string_state)
 
             # Skip if inside string
-            if in_string:
+            if string_state.in_string:
                 pos += 1
                 continue
 
-            # Skip line comments
-            if pos + 1 < content_len:
-                two_chars = content[pos : pos + 2]
-                if two_chars in ("//", "#"):
-                    # Skip to end of line
-                    newline_pos = content.find("\n", pos)
-                    if newline_pos == -1:
-                        return None, None  # Comment goes to end of file
-                    pos = newline_pos + 1
-                    continue
-                if two_chars == "/*":
-                    # Skip block comment
-                    end_comment = content.find("*/", pos + 2)
-                    if end_comment == -1:
-                        return None, None  # Unclosed comment
-                    pos = end_comment + 2
-                    continue
+            # Skip comments
+            comment_skip = self._skip_comment(content, pos, content_len)
+            if comment_skip is not None:
+                if comment_skip == -1:
+                    return None, None
+                pos = comment_skip
+                continue
 
-            # Track parenthesis depth (for skipping parameter lists)
-            if char == "(":
-                paren_depth += 1
-            elif char == ")":
-                paren_depth -= 1
+            # Track parenthesis depth
+            paren_depth = self._update_paren_depth(char, paren_depth)
 
             # Check for structural delimiter (only at paren depth 0)
-            if paren_depth == 0:
-                for struct in sorted(allowed, key=len, reverse=True):  # Check longer patterns first
-                    struct_len = len(struct)
-                    if content[pos : pos + struct_len] == struct:
-                        return pos, struct
+            if paren_depth == 0 and (
+                found := self._check_structural_delimiter(content, pos, allowed)
+            ):
+                return found
 
             pos += 1
 
         return None, None
+
+    def _is_string_boundary(self, char: str) -> bool:
+        """Check if character is a string boundary.
+
+        Args:
+            char: Character to check
+
+        Returns:
+            True if character is a string delimiter
+        """
+        return char in ('"', "'", "`")
+
+    def _update_string_state(
+        self, content: str, pos: int, char: str, state: StringParseState
+    ) -> StringParseState:
+        """Update string state based on current character.
+
+        Args:
+            content: Source code
+            pos: Current position
+            char: Current character
+            state: Current string parse state
+
+        Returns:
+            Updated StringParseState
+        """
+        if not state.in_string:
+            return StringParseState(in_string=True, delimiter=char)
+        if char == state.delimiter and pos > 0 and content[pos - 1] != "\\":
+            return StringParseState(in_string=False, delimiter=None)
+        return state
+
+    def _skip_comment(self, content: str, pos: int, content_len: int) -> int | None:
+        """Skip comment if found at current position.
+
+        Args:
+            content: Source code
+            pos: Current position
+            content_len: Length of content
+
+        Returns:
+            New position after comment, -1 if comment to EOF, None if no comment
+        """
+        if pos + 1 >= content_len:
+            return None
+
+        two_chars = content[pos : pos + 2]
+
+        # Line comments
+        if two_chars in ("//", "#"):
+            newline_pos = content.find("\n", pos)
+            if newline_pos == -1:
+                return -1  # Comment goes to end of file
+            return newline_pos + 1
+
+        # Block comments
+        if two_chars == "/*":
+            end_comment = content.find("*/", pos + 2)
+            if end_comment == -1:
+                return -1  # Unclosed comment
+            return end_comment + 2
+
+        return None
+
+    def _update_paren_depth(self, char: str, paren_depth: int) -> int:
+        """Update parenthesis depth counter.
+
+        Args:
+            char: Current character
+            paren_depth: Current depth
+
+        Returns:
+            Updated depth
+        """
+        if char == "(":
+            return paren_depth + 1
+        if char == ")":
+            return paren_depth - 1
+        return paren_depth
+
+    def _check_structural_delimiter(
+        self, content: str, pos: int, allowed: set[str]
+    ) -> tuple[int, str] | None:
+        """Check if current position has a structural delimiter.
+
+        Args:
+            content: Source code
+            pos: Current position
+            allowed: Set of allowed delimiters
+
+        Returns:
+            (position, delimiter) tuple or None
+        """
+        for struct in sorted(allowed, key=len, reverse=True):
+            struct_len = len(struct)
+            if content[pos : pos + struct_len] == struct:
+                return pos, struct
+        return None
 
     def _find_matching_close(
         self, content: str, open_pos: int, open_char: str, close_char: str
@@ -508,75 +648,162 @@ class DelimiterChunker(BaseChunker):
         Returns:
             Position after the closing delimiter, or None if not found
         """
+        # Handle special cases
         if not close_char:
-            # No explicit close (e.g., arrow functions with expression bodies)
-            # Find the next statement terminator
-            pos = open_pos + len(open_char)
-            # For now, just extend to end of line as a simple heuristic
-            newline = content.find("\n", pos)
-            return newline if newline != -1 else len(content)
+            return self._handle_no_close_char(content, open_pos, open_char)
 
         if close_char == "\n":
-            # Python-style: find end of indented block
-            # For simplicity, find the next line at same/lower indentation
-            # This is a simplified heuristic - full Python parsing would be more complex
             return self._find_python_block_end(content, open_pos)
 
         # Standard brace/bracket matching with nesting support
+        return self._find_nested_close(content, open_pos, open_char, close_char)
+
+    def _handle_no_close_char(self, content: str, open_pos: int, open_char: str) -> int:
+        """Handle delimiters with no explicit close character.
+
+        Args:
+            content: Source code
+            open_pos: Position of opening delimiter
+            open_char: Opening delimiter string
+
+        Returns:
+            Position after statement end
+        """
+        # No explicit close (e.g., arrow functions with expression bodies)
+        # Find the next statement terminator
+        pos = open_pos + len(open_char)
+        # For now, just extend to end of line as a simple heuristic
+        newline = content.find("\n", pos)
+        return newline if newline != -1 else len(content)
+
+    def _find_nested_close(
+        self, content: str, open_pos: int, open_char: str, close_char: str
+    ) -> int | None:
+        """Find matching close with nesting support.
+
+        Args:
+            content: Source code
+            open_pos: Position of opening delimiter
+            open_char: Opening delimiter string
+            close_char: Closing delimiter string
+
+        Returns:
+            Position after closing delimiter, or None if not found
+        """
         pos = open_pos + len(open_char)
         depth = 1
-        in_string = False
-        string_char = None
+        string_state = StringParseState(in_string=False, delimiter=None)
         content_len = len(content)
 
         while pos < content_len and depth > 0:
             char = content[pos]
 
             # Handle string boundaries
-            if char in ('"', "'", "`"):
-                if not in_string:
-                    in_string = True
-                    string_char = char
-                elif char == string_char:
-                    # Check if escaped
-                    if pos > 0 and content[pos - 1] != "\\":
-                        in_string = False
-                        string_char = None
+            string_state = self._process_string_in_matching(content, pos, char, string_state)
 
-            if not in_string:
+            if not string_state.in_string:
                 # Skip comments
-                if pos + 1 < content_len:
-                    two_chars = content[pos : pos + 2]
-                    if two_chars in ("//", "#"):
-                        newline = content.find("\n", pos)
-                        if newline == -1:
-                            break
-                        pos = newline
-                        continue
-                    if two_chars == "/*":
-                        end_comment = content.find("*/", pos + 2)
-                        if end_comment == -1:
-                            break
-                        pos = end_comment + 2
-                        continue
-
-                # Check for nested open
-                if content[pos : pos + len(open_char)] == open_char:
-                    depth += 1
-                    pos += len(open_char)
+                comment_skip = self._skip_comment_in_matching(content, pos, content_len)
+                if comment_skip is not None:
+                    if comment_skip == -1:
+                        break
+                    pos = comment_skip
                     continue
 
-                # Check for close
-                if content[pos : pos + len(close_char)] == close_char:
-                    depth -= 1
+                # Check for nested open or close
+                depth_change = self._check_delimiter_nesting(
+                    content, pos, open_char, close_char, depth
+                )
+                if depth_change is not None:
+                    depth, new_pos = depth_change
                     if depth == 0:
-                        return pos + len(close_char)
-                    pos += len(close_char)
+                        return new_pos
+                    pos = new_pos
                     continue
 
             pos += 1
 
         return None  # No matching close found
+
+    def _process_string_in_matching(
+        self, content: str, pos: int, char: str, state: StringParseState
+    ) -> StringParseState:
+        """Process string state during delimiter matching.
+
+        Args:
+            content: Source code
+            pos: Current position
+            char: Current character
+            state: Current string parse state
+
+        Returns:
+            Updated StringParseState
+        """
+        if char in ('"', "'", "`"):
+            if not state.in_string:
+                return StringParseState(in_string=True, delimiter=char)
+            if char == state.delimiter and pos > 0 and content[pos - 1] != "\\":
+                return StringParseState(in_string=False, delimiter=None)
+        return state
+
+    def _skip_comment_in_matching(
+        self, content: str, pos: int, content_len: int
+    ) -> int | None:
+        """Skip comment during delimiter matching.
+
+        Args:
+            content: Source code
+            pos: Current position
+            content_len: Length of content
+
+        Returns:
+            New position, -1 if end reached, None if no comment
+        """
+        if pos + 1 >= content_len:
+            return None
+
+        two_chars = content[pos : pos + 2]
+
+        if two_chars in ("//", "#"):
+            newline = content.find("\n", pos)
+            if newline == -1:
+                return -1
+            return newline
+
+        if two_chars == "/*":
+            end_comment = content.find("*/", pos + 2)
+            if end_comment == -1:
+                return -1
+            return end_comment + 2
+
+        return None
+
+    def _check_delimiter_nesting(
+        self, content: str, pos: int, open_char: str, close_char: str, depth: int
+    ) -> tuple[int, int] | None:
+        """Check for nested open or close delimiters.
+
+        Args:
+            content: Source code
+            pos: Current position
+            open_char: Opening delimiter
+            close_char: Closing delimiter
+            depth: Current nesting depth
+
+        Returns:
+            (new_depth, new_position) or None if no match
+        """
+        # Check for nested open
+        if content[pos : pos + len(open_char)] == open_char:
+            return depth + 1, pos + len(open_char)
+
+        # Check for close
+        if content[pos : pos + len(close_char)] == close_char:
+            new_depth = depth - 1
+            new_pos = pos + len(close_char)
+            return new_depth, new_pos
+
+        return None
 
     def _find_python_block_end(self, content: str, colon_pos: int) -> int | None:
         """Find the end of a Python indented block starting after a colon.

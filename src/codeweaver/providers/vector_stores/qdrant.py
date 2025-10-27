@@ -1,8 +1,11 @@
 """Qdrant provider for vector and hybrid search/store."""
 from __future__ import annotations
+
 from pathlib import Path
 from typing import Any
+
 from pydantic import UUID4
+
 from codeweaver.config.providers import QdrantConfig
 from codeweaver.core.chunks import CodeChunk, SearchResult
 from codeweaver.core.spans import Span
@@ -12,6 +15,8 @@ from codeweaver.providers.embedding.providers import EmbeddingProvider
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking import RerankingProvider
 from codeweaver.providers.vector_stores.base import VectorStoreProvider
+
+
 QdrantClient = None
 try:
     from qdrant_client import AsyncQdrantClient
@@ -168,6 +173,7 @@ class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
             dense_dim = len(first_embedding.get('dense', [])) if first_embedding else 768
             await self._ensure_collection(collection_name, dense_dim)
         from datetime import UTC, datetime
+
         from qdrant_client.models import PointStruct
         points = []
         for chunk in chunks:

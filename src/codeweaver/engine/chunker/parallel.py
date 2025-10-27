@@ -25,16 +25,22 @@ Performance Considerations:
 - Iterator pattern prevents loading all results in memory
 """
 from __future__ import annotations
+
 import contextlib
 import logging
 import multiprocessing
+
 from collections.abc import Iterator
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import TYPE_CHECKING
+
 from codeweaver.engine.chunker.selector import ChunkerSelector
+
+
 if TYPE_CHECKING:
     from concurrent.futures import Future
+
     from codeweaver.core.chunks import CodeChunk
     from codeweaver.core.discovery import DiscoveredFile
     from codeweaver.engine.chunker.base import ChunkGovernor

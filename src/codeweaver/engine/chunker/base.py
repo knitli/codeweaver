@@ -17,6 +17,8 @@ This multi-tiered approach ensures reliable chunking across 170+ languages while
 
 from __future__ import annotations
 
+import logging
+
 from abc import ABC, abstractmethod
 from functools import cached_property
 from typing import TYPE_CHECKING, Annotated, Any
@@ -123,14 +125,15 @@ __all__ = ("BaseChunker", "ChunkGovernor")
 # This is done at module import time to ensure ChunkerSettings is available
 def _rebuild_models() -> None:
     """Rebuild pydantic models after all types are defined."""
+    logger = logging.getLogger(__name__)
     try:
         # Import ChunkerSettings to make it available for model rebuild
         from codeweaver.config.chunker import ChunkerSettings  # noqa: F401
 
         ChunkGovernor.model_rebuild(force=True)
-    except Exception:
+    except Exception as e:
         # If rebuild fails, model will still work but may have issues with ChunkerSettings
-        pass
+        logger.debug("Failed to rebuild ChunkGovernor model: %s", e, exc_info=True)
 
 
 _rebuild_models()

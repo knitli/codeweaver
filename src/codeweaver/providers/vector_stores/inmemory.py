@@ -286,16 +286,6 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         if not collection_name:
             raise ProviderError("No collection configured")
 
-        # Ensure collection exists (infer dimension from first chunk)
-        dense_dim = (
-            self._embedding_caps["dense"][0]["dimension"] if self._embedding_caps["dense"] else 768
-        )
-        sparse_dim = (
-            self._embedding_caps["sparse"][0]["dimension"]
-            if self._embedding_caps["sparse"]
-            else None
-        )
-
         # Convert chunks to Qdrant points
         points = []
         for chunk in chunks:
