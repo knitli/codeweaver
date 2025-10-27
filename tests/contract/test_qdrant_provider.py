@@ -84,9 +84,6 @@ class TestQdrantProviderContract:
         """Verify QdrantVectorStore implements VectorStoreProvider interface."""
         from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
-
-
-
         assert issubclass(QdrantVectorStore, VectorStoreProvider)
 
     async def test_list_collections(self, qdrant_provider):
