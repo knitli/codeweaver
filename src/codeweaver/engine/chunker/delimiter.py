@@ -193,7 +193,8 @@ class DelimiterChunker(BaseChunker):
         if not matches:
             matches = self._fallback_paragraph_chunking(content)
             if matches:
-                context["fallback_to_generic"] = True
+                if context is not None:
+                    context["fallback_to_generic"] = True
 
         return matches
 
