@@ -152,28 +152,13 @@ class SemanticChunker(BaseChunker):
             ASTDepthExceededError: If AST nesting exceeds safe depth limit
         """
         from codeweaver.common.statistics import get_session_statistics
-        from codeweaver.core.types.aliases import UUID7Hex
 
         statistics = get_session_statistics()
         start_time = time.perf_counter()
         batch_id = uuid7()
 
-        # Extract file_path and source_id from DiscoveredFile
-        file_path = file.path if file else None
-        # Ensure file_path is absolute for error messages
-        if file_path:
-            file_path = file_path.resolve()
-        # Use the DiscoveredFile's existing source_id instead of generating a new one
-        source_id = UUID7Hex(file.source_id.hex) if file else uuid7()
-
-        # Get performance settings from governor, or use defaults
-        if self.governor.settings is not None:
-            performance_settings = self.governor.settings.performance
-        else:
-            # Fallback defaults if no settings provided
-            from codeweaver.config.chunker import PerformanceSettings
-
-            performance_settings = PerformanceSettings()
+        file_path, source_id = self._extract_file_metadata(file)
+        performance_settings = self._get_performance_settings_semantic()
 
         with ResourceGovernor(performance_settings) as governor:
             try:
@@ -181,58 +166,176 @@ class SemanticChunker(BaseChunker):
                 if edge_result := self._handle_edge_cases(content, file_path, source_id):
                     return edge_result
 
-                # Parse content to AST
-                root: FileThing[SgRoot] = self._parse_file(content, file_path)
-
-                # Find chunkable nodes filtered by classification and importance
-                nodes: list[AstThing[SgNode]] = self._find_chunkable_nodes(
-                    root, max_depth=performance_settings.max_ast_depth, file_path=file_path
+                # Parse and process AST
+                chunks = self._parse_and_chunk(
+                    content, file_path, source_id, performance_settings, governor
                 )
 
-                # Convert nodes to chunks with size enforcement
-                chunks: list[CodeChunk] = []
-                for node in nodes:
-                    governor.check_timeout()
+                # Deduplicate and finalize
+                unique_chunks = self._finalize_chunks(chunks, batch_id)
 
-                    node_text = node.text
-                    # TODO: Implement proper token estimation
-                    tokens = len(node_text) // 4  # Rough approximation
-
-                    if tokens <= self.chunk_limit:
-                        chunks.append(self._create_chunk_from_node(node, file_path, source_id))
-                    else:
-                        chunks.extend(self._handle_oversized_node(node, file_path, source_id))
-
-                    governor.register_chunk()
-
-                # Deduplicate using content hashing
-                unique_chunks = self._deduplicate_chunks(chunks, batch_id)
-
-                # Set batch ID on all chunks first
-                for chunk in unique_chunks:
-                    chunk.set_batch_id(batch_id)
-
-                # Store batch
-                self._store.set(batch_id, unique_chunks)
-
-                # Track statistics (best-effort, don't fail if file doesn't exist)
-                with contextlib.suppress(ValueError, OSError):
-                    if file_path and (ext_kind := ExtKind.from_file(file_path)):
-                        statistics.add_file_operations_by_extkind([
-                            (file_path, ext_kind, "processed")
-                        ])
-                self._track_chunk_metrics(unique_chunks, time.perf_counter() - start_time)
+                # Track statistics and metrics
+                self._track_statistics(file_path, statistics, unique_chunks, start_time)
 
             except ParseError:
                 logger.exception("Parse error in %s", file_path)
-                with contextlib.suppress(ValueError, OSError):
-                    if file_path and (ext_kind := ExtKind.from_file(file_path)):
-                        statistics.add_file_operations_by_extkind([
-                            (file_path, ext_kind, "skipped")
-                        ])
+                self._track_skipped_file(file_path, statistics)
                 raise
             else:
                 return unique_chunks
+
+    def _extract_file_metadata(self, file: DiscoveredFile | None) -> tuple[Path | None, Any]:
+        """Extract file path and source ID from DiscoveredFile.
+
+        Args:
+            file: Optional discovered file
+
+        Returns:
+            Tuple of (file_path, source_id)
+        """
+        from codeweaver.core.types.aliases import UUID7Hex
+
+        file_path = file.path if file else None
+        if file_path:
+            file_path = file_path.resolve()
+
+        source_id = UUID7Hex(file.source_id.hex) if file else uuid7()
+        return file_path, source_id
+
+    def _get_performance_settings_semantic(self) -> Any:
+        """Get performance settings for semantic chunking.
+
+        Returns:
+            Performance settings instance
+        """
+        if self.governor.settings is not None:
+            return self.governor.settings.performance
+
+        from codeweaver.config.chunker import PerformanceSettings
+
+        return PerformanceSettings()
+
+    def _parse_and_chunk(
+        self,
+        content: str,
+        file_path: Path | None,
+        source_id: Any,
+        performance_settings: Any,
+        governor: Any,
+    ) -> list[CodeChunk]:
+        """Parse AST and convert to chunks.
+
+        Args:
+            content: Source code
+            file_path: Optional file path
+            source_id: Source identifier
+            performance_settings: Performance settings
+            governor: Resource governor
+
+        Returns:
+            List of code chunks
+        """
+        # Parse content to AST
+        root: FileThing[SgRoot] = self._parse_file(content, file_path)
+
+        # Find chunkable nodes
+        nodes: list[AstThing[SgNode]] = self._find_chunkable_nodes(
+            root, max_depth=performance_settings.max_ast_depth, file_path=file_path
+        )
+
+        # Convert nodes to chunks
+        return self._convert_nodes_to_chunks(nodes, file_path, source_id, governor)
+
+    def _convert_nodes_to_chunks(
+        self,
+        nodes: list[AstThing[SgNode]],
+        file_path: Path | None,
+        source_id: Any,
+        governor: Any,
+    ) -> list[CodeChunk]:
+        """Convert AST nodes to code chunks with size enforcement.
+
+        Args:
+            nodes: List of AST nodes
+            file_path: Optional file path
+            source_id: Source identifier
+            governor: Resource governor
+
+        Returns:
+            List of code chunks
+        """
+        chunks: list[CodeChunk] = []
+        for node in nodes:
+            governor.check_timeout()
+
+            node_text = node.text
+            tokens = len(node_text) // 4  # Rough approximation
+
+            if tokens <= self.chunk_limit:
+                chunks.append(self._create_chunk_from_node(node, file_path, source_id))
+            else:
+                chunks.extend(self._handle_oversized_node(node, file_path, source_id))
+
+            governor.register_chunk()
+
+        return chunks
+
+    def _finalize_chunks(self, chunks: list[CodeChunk], batch_id: Any) -> list[CodeChunk]:
+        """Deduplicate chunks and set batch metadata.
+
+        Args:
+            chunks: List of chunks to finalize
+            batch_id: Batch identifier
+
+        Returns:
+            List of unique chunks with batch metadata
+        """
+        # Deduplicate using content hashing
+        unique_chunks = self._deduplicate_chunks(chunks, batch_id)
+
+        # Set batch ID on all chunks
+        for chunk in unique_chunks:
+            chunk.set_batch_id(batch_id)
+
+        # Store batch
+        self._store.set(batch_id, unique_chunks)
+
+        return unique_chunks
+
+    def _track_statistics(
+        self,
+        file_path: Path | None,
+        statistics: Any,
+        chunks: list[CodeChunk],
+        start_time: float,
+    ) -> None:
+        """Track file operations and chunk metrics.
+
+        Args:
+            file_path: Optional file path
+            statistics: Statistics tracker
+            chunks: List of chunks
+            start_time: Start time for duration calculation
+        """
+        with contextlib.suppress(ValueError, OSError):
+            if file_path and (ext_kind := ExtKind.from_file(file_path)):
+                statistics.add_file_operations_by_extkind([
+                    (file_path, ext_kind, "processed")
+                ])
+        self._track_chunk_metrics(chunks, time.perf_counter() - start_time)
+
+    def _track_skipped_file(self, file_path: Path | None, statistics: Any) -> None:
+        """Track skipped file in statistics.
+
+        Args:
+            file_path: Optional file path
+            statistics: Statistics tracker
+        """
+        with contextlib.suppress(ValueError, OSError):
+            if file_path and (ext_kind := ExtKind.from_file(file_path)):
+                statistics.add_file_operations_by_extkind([
+                    (file_path, ext_kind, "skipped")
+                ])
 
     def _handle_edge_cases(
         self, content: str, file_path: Path | None, source_id: UUID7
