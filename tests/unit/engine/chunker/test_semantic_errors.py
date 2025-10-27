@@ -261,9 +261,6 @@ class TestChunkLimitErrors:
         from codeweaver.core.language import SemanticSearchLanguage
         from codeweaver.engine.chunker.semantic import SemanticChunker
 
-
-
-
         # Arrange: Create chunker with very low chunk limit
         mock_governor.settings.performance.max_chunks_per_file = 10  # Very low limit for testing
 
