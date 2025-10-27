@@ -158,9 +158,6 @@ class TestMemoryProviderContract:
         """Test persistence file has correct JSON structure."""
         import json
 
-
-
-
         await memory_provider.upsert([sample_chunk])
         await memory_provider._persist_to_disk()
 
