@@ -336,14 +336,14 @@ class RepoChecklist(DataclassSerializationMixin):
 
     @classmethod
     def _find_directory_variant(
-        cls, base_name: str, root_level_dir_names: set[str], project_root: Path
+        cls, base_name: str, root_level_dir_names: set[str], project_path: Path
     ) -> Path | None:
         """Find a directory matching one of the known variants for a base name.
 
         Args:
             base_name: The base name to look for (e.g., 'tests', 'ci', 'src', 'lib').
             root_level_dir_names: Set of directory names at the project root.
-            project_root: The project root path.
+            project_path: The project root path.
 
         Returns:
             The path to the matching directory, or None if not found.
@@ -354,16 +354,16 @@ class RepoChecklist(DataclassSerializationMixin):
         variants = cls._DIR_VARIANTS[base_name]
         return next(
             (
-                project_root / d
+                project_path / d
                 for d in root_level_dir_names
-                if d in variants and (project_root / d).exists()
+                if d in variants and (project_path / d).exists()
             ),
             None,
         )
 
     @classmethod
     def _determine_root_attrs(
-        cls, dir_checks: set[str], project_root: Path, root_level_dir_names: set[str]
+        cls, dir_checks: set[str], project_path: Path, root_level_dir_names: set[str]
     ) -> RepoChecklistDict:
         """Determine which root-level directories are present.
 
@@ -377,32 +377,32 @@ class RepoChecklist(DataclassSerializationMixin):
         })  # type: ignore # it doesn't infer the keys
         for name in dir_checks:
             if name in root_level_dir_names:
-                attrs[f"has_{name}_dir"] = project_root / name
+                attrs[f"has_{name}_dir"] = project_path / name
             elif name == "parent_named" and (
-                (project_root / project_root.name).is_dir()
+                (project_path / project_path.name).is_dir()
                 or any(
                     n
                     for n in root_level_dir_names
-                    if n in project_root.name or project_root.name in n
+                    if n in project_path.name or project_path.name in n
                 )
             ):
                 attrs["has_parent_named_dir"] = (
-                    (project_root / project_root.name)
-                    if (project_root / project_root.name).is_dir()
+                    (project_path / project_path.name)
+                    if (project_path / project_path.name).is_dir()
                     else cast(
                         PathOrFalse,
                         next(
                             (
-                                project_root / n
+                                project_path / n
                                 for n in root_level_dir_names
-                                if n in project_root.name or project_root.name in n
+                                if n in project_path.name or project_path.name in n
                             ),
                             False,
                         ),
                     )
                 )
             elif name in cls._DIR_VARIANTS and (
-                found_dir := cls._find_directory_variant(name, root_level_dir_names, project_root)
+                found_dir := cls._find_directory_variant(name, root_level_dir_names, project_path)
             ):
                 attrs[f"has_{name}_dir"] = found_dir
         return attrs
@@ -410,14 +410,14 @@ class RepoChecklist(DataclassSerializationMixin):
     @staticmethod
     def _gather_tooling_paths(
         files: Sequence[Path],
-        project_root: Path,
+        project_path: Path,
         common_tooling_paths: tuple[tuple[LiteralStringT, tuple[Path, ...]], ...],
     ) -> tuple[tuple[str, Path], ...]:
         """Gather common tooling paths from the repository files."""
         tooling_paths: list[tuple[str, Path]] = []
         for tool_name, possible_paths in common_tooling_paths:
             for rel_path in possible_paths:
-                abs_path = project_root / rel_path
+                abs_path = project_path / rel_path
                 if abs_path.exists() and abs_path in files:
                     tooling_paths.append((tool_name, abs_path))
                     break  # don't check more paths, but we stay in the outer loop
@@ -426,27 +426,27 @@ class RepoChecklist(DataclassSerializationMixin):
     @staticmethod
     def _gather_llm_tooling_paths(
         files: Sequence[Path],
-        project_root: Path,
+        project_path: Path,
         common_llm_tooling_paths: tuple[tuple[LiteralStringT, tuple[Path, ...]], ...],
     ) -> tuple[tuple[str, Path], ...]:
         """Gather common LLM tooling paths from the repository files."""
         llm_tooling_paths: list[tuple[str, Path]] = []
         for tool_name, possible_paths in common_llm_tooling_paths:
             if valid_paths := (
-                project_root / rel_path
+                project_path / rel_path
                 for rel_path in possible_paths
-                if (project_root / rel_path).exists() and (project_root / rel_path) in files
+                if (project_path / rel_path).exists() and (project_path / rel_path) in files
             ):
                 llm_tooling_paths.extend((tool_name, path) for path in valid_paths)
         return tuple(llm_tooling_paths)
 
     @classmethod
-    async def from_files(cls, files: Sequence[Path], project_root: Path) -> Self:
+    async def from_files(cls, files: Sequence[Path], project_path: Path) -> Self:
         """Create a RepoChecklist from a list of file paths.
 
         Args:
             files: A sequence of file paths in the repository.
-            project_root: The root directory of the project.
+            project_path: The root directory of the project.
 
         Returns:
             An instance of RepoChecklist with detected directories and files.
@@ -454,30 +454,30 @@ class RepoChecklist(DataclassSerializationMixin):
         from codeweaver.core.file_extensions import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
 
         root_level_dir_names: set[str] = {
-            f.name for f in files if f.parent == project_root and f.is_dir()
+            f.name for f in files if f.parent == project_path and f.is_dir()
         }
         dir_checks = {
             cls._attr_name(attr)
             for attr in cls.__dataclass_fields__
             if attr.startswith("has_") and attr.endswith("_dir")
         }
-        root_dir_attrs = cls._determine_root_attrs(dir_checks, project_root, root_level_dir_names)
+        root_dir_attrs = cls._determine_root_attrs(dir_checks, project_path, root_level_dir_names)
         root_dir_attrs["has_gitlab_file"] = (
-            project_root / ".gitlab-ci.yml"
-            if (project_root / ".gitlab-ci.yml").exists()
+            project_path / ".gitlab-ci.yml"
+            if (project_path / ".gitlab-ci.yml").exists()
             else cast(PathOrFalse, False)
         )
         root_dir_attrs["has_jenkins_file"] = (
-            project_root / "Jenkinsfile"
-            if (project_root / "Jenkinsfile").exists()
+            project_path / "Jenkinsfile"
+            if (project_path / "Jenkinsfile").exists()
             else cast(PathOrFalse, False)
         )
 
         root_dir_attrs["tooling"] = cls._gather_tooling_paths(
-            files, project_root, COMMON_TOOLING_PATHS
+            files, project_path, COMMON_TOOLING_PATHS
         )
         root_dir_attrs["llm_tooling"] = cls._gather_llm_tooling_paths(
-            files, project_root, COMMON_LLM_TOOLING_PATHS
+            files, project_path, COMMON_LLM_TOOLING_PATHS
         )
         # configuration files
         config_files: list[tuple[str, Path]] = []
@@ -499,7 +499,7 @@ class RepoChecklist(DataclassSerializationMixin):
             for ext in language.extensions:
                 config_files.extend(
                     (language.variable, path)
-                    for path in project_root.rglob(f"*{ext}")
+                    for path in project_path.rglob(f"*{ext}")
                     if path in files and path.exists()
                 )
         configs = [
@@ -513,7 +513,7 @@ class RepoChecklist(DataclassSerializationMixin):
         instance = cls(**root_dir_attrs)
         children = {
             app: await RepoChecklist.from_files(
-                [f for f in files if str(app) in str(f)], project_root
+                [f for f in files if str(app) in str(f)], project_path
             )
             for app in instance.apps
             if instance.apps

@@ -37,7 +37,7 @@ from pydantic_core import to_json
 
 from codeweaver import __version__ as version
 from codeweaver.common.logging import setup_logger
-from codeweaver.common.utils import get_project_root, lazy_import, rpartial
+from codeweaver.common.utils import get_project_path, lazy_import, rpartial
 from codeweaver.config.logging import LoggingSettings
 from codeweaver.config.middleware import (
     ErrorHandlingMiddlewareSettings,
@@ -50,7 +50,6 @@ from codeweaver.config.settings import (
     CodeWeaverSettings,
     CodeWeaverSettingsDict,
     FastMcpServerSettings,
-    IndexerSettings,
     get_settings_map,
 )
 from codeweaver.config.types import FastMcpServerSettingsDict
@@ -228,10 +227,10 @@ class AppState(DataclassSerializationMixin):
             description="Path to the configuration file, if any",
         ),
     ]
-    project_root: Annotated[
+    project_path: Annotated[
         Path,
         Field(
-            default_factory=lambda data: data["settings"].get("project_path") or get_project_root(),
+            default_factory=lambda data: data["settings"].get("project_path") or get_project_path(),
             description="Path to the project root",
         ),
     ]
@@ -285,7 +284,7 @@ class AppState(DataclassSerializationMixin):
             # TODO: These can all be boolean but need to differentiate from defaults vs set values
             # We'd need to make broader use of the Unset sentinel for that to work well
             FilteredKey("config_path"): AnonymityConversion.BOOLEAN,
-            FilteredKey("project_root"): AnonymityConversion.HASH,
+            FilteredKey("project_path"): AnonymityConversion.HASH,
             FilteredKey("middleware_stack"): AnonymityConversion.COUNT,
         }
 
@@ -328,9 +327,9 @@ async def lifespan(
             settings=settings,
             health=get_health_info(),
             statistics=statistics or get_session_statistics(),
-            project_root=settings.project_root
+            project_path=settings.project_path
             if settings
-            else get_settings().project_root or get_project_root(),
+            else get_settings().project_path or get_project_path(),
             config_path=settings.config_file if settings else get_settings().config_file,
             provider_registry=get_provider_registry(),
             services_registry=get_services_registry(),
@@ -397,50 +396,6 @@ def resolve_globs(path_string: str, repo_root: Path) -> set[Path]:
     return set()
 
 
-def resolve_includes_and_excludes(
-    indexing: IndexerSettings, repo_root: Path
-) -> tuple[frozenset[Path], frozenset[Path]]:
-    """Resolve included and excluded files based on filter settings.
-
-    Resolves glob patterns for include and exclude paths, filtering includes for excluded extensions.
-    If a file is specifically included in the `forced_includes`, it will not be excluded even if it matches an excluded extension or excludes.
-    "Specifically included" means that it was defined directly in the `forced_includes`, and **not** as a glob pattern.
-    """
-    settings = indexing.model_dump(mode="python")
-    other_files: set[Path] = set()
-    specifically_included_files = {
-        Path(file)
-        for file in settings.get("forced_includes", set())
-        if file
-        and "*" not in file
-        and ("?" not in file)
-        and Path(file).exists()
-        and Path(file).is_file()
-    }
-    for include in settings.get("forced_includes", set()):
-        other_files |= resolve_globs(include, repo_root)
-    for ext in settings.get("excluded_extensions", set()):
-        if not ext:
-            continue
-        ext = ext.lstrip("*?[]")
-        ext = ext if ext.startswith(".") else f".{ext}"
-        other_files -= {
-            file
-            for file in other_files
-            if file.suffix == ext and file not in specifically_included_files
-        }
-    excludes: set[Path] = set()
-    excluded_files = settings.get("excluded_files", set())
-    for exclude in excluded_files:
-        if exclude:
-            excludes |= resolve_globs(exclude, repo_root)
-    excludes |= specifically_included_files
-    other_files -= {exclude for exclude in excludes if exclude not in specifically_included_files}
-    other_files -= {None, Path(), Path("./"), Path("./.")}
-    excludes -= {None, Path(), Path("./"), Path("./.")}
-    return (frozenset(other_files), frozenset(excludes))
-
-
 def setup_local_logger(level: int = logging.INFO) -> None:
     """Set up a local logger for the current module."""
     global logger
@@ -503,7 +458,7 @@ def _setup_logger(
 
 def _configure_middleware(
     settings: DictView[CodeWeaverSettingsDict], app_logger: logging.Logger, level: int
-) -> tuple[MiddlewareOptions, Any]:
+) -> tuple[MiddlewareOptions, type[LoggingMiddleware | StructuredLoggingMiddleware]]:
     """Configure middleware settings and determine logging middleware type.
 
     Returns:
@@ -601,9 +556,6 @@ def _setup_file_filters_and_lifespan(
     Returns:
         Configured lifespan function
     """
-    settings.indexing.forced_includes, settings.indexing.excludes = (
-        resolve_includes_and_excludes(settings.indexing, settings.project_root)
-    )
     return rpartial(lifespan, settings, session_statistics)
 
 
@@ -634,7 +586,7 @@ class ServerSetup(TypedDict):
 
     app: Required[FastMCP[AppState]]
     settings: Required[CodeWeaverSettings]
-    middleware: NotRequired[MiddlewareOptions]
+    middleware_settings: NotRequired[MiddlewareOptions]
     host: NotRequired[str | None]
     port: NotRequired[int | None]
     streamable_http_path: NotRequired[str | None]
@@ -649,7 +601,7 @@ def build_app() -> ServerSetup:
     local_logger: logging.Logger = globals()["logger"]
     local_logger.info("Initializing CodeWeaver server. Logging set up.")
     settings_view = get_settings_map()
-    middleware, logging_middleware = _configure_middleware(
+    middleware_settings, logging_middleware = _configure_middleware(
         settings_view, app_logger, level
     )
     filtered_server_settings = _filter_server_settings(settings_view.get("server", {}))
@@ -665,11 +617,11 @@ def build_app() -> ServerSetup:
     _ = base_fast_mcp_settings.pop("transport", "http")
     final_app_logger, _final_level = _setup_logger(settings_view)
     int_level = next((k for k, v in LEVEL_MAP.items() if v == _final_level), "INFO")
-    for key, middleware_setting in middleware.items():
+    for key, middleware_setting in middleware_settings.items():
         if "logger" in cast(dict[str, Any], middleware_setting):
-            middleware[key]["logger"] = final_app_logger
+            middleware_settings[key]["logger"] = final_app_logger
         if "log_level" in cast(dict[str, Any], middleware_setting):
-            middleware[key]["log_level"] = int_level
+            middleware_settings[key]["log_level"] = int_level
     global _logger
     _logger = final_app_logger
     host = base_fast_mcp_settings.pop("host", "127.0.0.1")
@@ -680,7 +632,7 @@ def build_app() -> ServerSetup:
     return ServerSetup(
         app=server,
         settings=get_settings(),
-        middleware=middleware,
+        middleware_settings=middleware_settings,
         host=host or "127.0.0.1",
         port=port or 9328,
         streamable_http_path=cast(str, http_path or "/codeweaver"),

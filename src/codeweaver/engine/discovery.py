@@ -86,7 +86,7 @@ class FileDiscoveryService:
             if not include_tests:
                 extra_ignores.extend(TEST_FILE_PATTERNS)
             walker = rignore.walk(
-                self.settings["project_root"],
+                self.settings["project_path"],
                 max_filesize=max_file_size or self.settings["max_file_size"],
                 case_insensitive=True,
                 read_git_ignore=read_git_ignore
@@ -105,14 +105,14 @@ class FileDiscoveryService:
             )
             with contextlib.suppress(ValueError):
                 discovered.extend(
-                    file_path.relative_to(self.settings["project_root"])
+                    file_path.relative_to(self.settings["project_path"])
                     for file_path in walker
                     if not self._is_filtered(file_path)
                 )
 
         except Exception as e:
             raise IndexingError(
-                f"Failed to discover files in {self.settings['project_root']}",
+                f"Failed to discover files in {self.settings['project_path']}",
                 details={"error": str(e)},
                 suggestions=[
                     "Check that the project root exists and is readable",

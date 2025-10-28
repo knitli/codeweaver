@@ -15,12 +15,13 @@ from __future__ import annotations
 import contextlib
 import inspect
 import logging
+import re
 
 from collections.abc import Callable
 from functools import cached_property, partial
 from importlib import util
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, Literal, Self, Unpack, cast
+from typing import TYPE_CHECKING, Annotated, Any, Literal, NamedTuple, Self, Unpack, cast
 
 from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.server.server import DuplicateBehavior
@@ -92,6 +93,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+BRACKET_PATTERN: re.Pattern[str] = re.compile("\\[.+\\]")
+
 
 DefaultDataProviderSettings = (
     DataProviderSettings(provider=Provider.TAVILY, enabled=False, api_key=None, other=None),
@@ -155,14 +158,14 @@ def merge_agent_model_settings(
     return merge_model_settings(base, override)
 
 
-def get_project_name() -> str:
+def _get_project_name() -> str:
     """Get the current project name from settings."""
     # we'll try to get it from the project root but it might not be initialized yet
     with contextlib.suppress(PydanticUserError, ValidationError, ValueError):
         settings = get_settings()
         if settings.project_name:
             return settings.project_name
-        return settings.project_root.name
+        return settings.project_path.name
     return "your_project_name"
 
 
@@ -170,7 +173,71 @@ def get_storage_path() -> Path:
     """Get the default storage path for index data."""
     from codeweaver.common.utils import get_user_config_dir
 
-    return Path(get_user_config_dir()) / f"{get_project_name()}_index.json"
+    return Path(get_user_config_dir()) / f"{_get_project_name()}_index.json"
+
+
+def _resolve_globs(path_string: str, repo_root: Path) -> set[Path]:
+    """Resolve glob patterns in a path string."""
+    if "*" in path_string or "?" in path_string or BRACKET_PATTERN.search(path_string):
+        return set(repo_root.glob(path_string))
+    if (path := (repo_root / path_string)) and path.exists():
+        return {path} if path.is_file() else set(path.glob("**/*"))
+    return set()
+
+
+class FilteredPaths(NamedTuple):
+    """Tuple of included and excluded file paths."""
+
+    includes: frozenset[Path]
+    excludes: frozenset[Path]
+
+    @classmethod
+    async def from_settings(cls, indexing: IndexerSettings, repo_root: Path) -> FilteredPaths:
+        """Resolve included and excluded files based on filter settings.
+
+        Resolves glob patterns for include and exclude paths, filtering includes for excluded extensions.
+
+        If a file is specifically included in the `forced_includes`, it will not be excluded even if it matches an excluded extension or excludes.
+
+        "Specifically included" means that it was defined directly in the `forced_includes`, and **not** as a glob pattern.
+
+        This constructor is async so that it can resolve quietly in the background without slowing initialization.
+        """
+        settings = indexing.model_dump(mode="python")
+        other_files: set[Path] = set()
+        specifically_included_files = {
+            Path(file)
+            for file in settings.get("forced_includes", set())
+            if file
+            and "*" not in file
+            and ("?" not in file)
+            and Path(file).exists()
+            and Path(file).is_file()
+        }
+        for include in settings.get("forced_includes", set()):
+            other_files |= _resolve_globs(include, repo_root)
+        for ext in settings.get("excluded_extensions", set()):
+            if not ext:
+                continue
+            ext = ext.lstrip("*?[]")
+            ext = ext if ext.startswith(".") else f".{ext}"
+            other_files -= {
+                file
+                for file in other_files
+                if file.suffix == ext and file not in specifically_included_files
+            }
+        excludes: set[Path] = set()
+        excluded_files = settings.get("excluded_files", set())
+        for exclude in excluded_files:
+            if exclude:
+                excludes |= _resolve_globs(exclude, repo_root)
+        excludes |= specifically_included_files
+        other_files -= {
+            exclude for exclude in excludes if exclude not in specifically_included_files
+        }
+        other_files -= {None, Path(), Path("./"), Path("./.")}
+        excludes -= {None, Path(), Path("./"), Path("./.")}
+        return FilteredPaths(frozenset(other_files), frozenset(excludes))
 
 
 class IndexerSettings(BasedModel):
@@ -233,7 +300,7 @@ class IndexerSettings(BasedModel):
     index_storage_path: Annotated[
         Path,
         Field(
-            description=rf"""Path to store index data locally. The default is in your user configuration directory (like ~/.config/codeweaver/{get_project_name()}_index.json or c:\Users\your_username\AppData\Roaming\codeweaver\{get_project_name()}_index.json)."""
+            description=rf"""Path to store index data locally. The default is in your user configuration directory (like ~/.config/codeweaver/{_get_project_name()}_index.json or c:\Users\your_username\AppData\Roaming\codeweaver\{_get_project_name()}_index.json)."""
         ),
     ] = Path(".codeweaver/repo_index.json")
     other_ignore_kwargs: Annotated[
@@ -260,6 +327,8 @@ class IndexerSettings(BasedModel):
         ),
     ] = False
 
+    _inc_exc_set: Annotated[bool, PrivateAttr()] = False
+
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
@@ -272,6 +341,45 @@ class IndexerSettings(BasedModel):
         """Post-initialization processing."""
         if self.include_github_dir:
             self.forced_includes |= {"**/.github/**"}
+        if self.include_tooling_dirs:
+            from codeweaver.core.file_extensions import (
+                COMMON_LLM_TOOLING_PATHS,
+                COMMON_TOOLING_PATHS,
+            )
+
+            file_endings = {
+                ".json",
+                ".yaml",
+                ".yml",
+                ".toml",
+                ".lock",
+                ".sbt",
+                ".properties",
+                ".js",
+                ".ts",
+                ".cmd",
+                ".xml",
+            }
+
+            tooling_dirs = {
+                path
+                for tool in COMMON_TOOLING_PATHS
+                for path in tool[1]
+                if path.name.startswith(".")
+                or (str(path).startswith(".") and path.suffix not in file_endings)
+            } | {
+                path
+                for tool in COMMON_LLM_TOOLING_PATHS
+                for path in tool[1]
+                if path.name.startswith(".")
+                or (str(path).startswith(".") and path.suffix not in file_endings)
+            }
+            self.forced_includes |= {f"**/{directory}/**" for directory in tooling_dirs}
+
+    async def set_inc_exc(self, project_path: Path) -> None:
+        """Set that includes and excludes have been configured."""
+        self.forced_includes, self.excludes = await FilteredPaths.from_settings(self, project_path)
+        self._inc_exc_set = True
 
     def _as_settings(self) -> RignoreSettings:
         """Convert self, either as an instance or as a serialized python dictionary, to kwargs for rignore."""
@@ -598,7 +706,7 @@ class CodeWeaverSettings(BaseSettings):
     project_path: Annotated[
         DirectoryPath,
         Field(
-            default_factory=lambda: lazy_import("codeweaver.common.utils").get_project_root(),  # type: ignore
+            default_factory=lambda: lazy_import("codeweaver.common.utils").get_project_path(),  # type: ignore
             description="""Root path of the codebase to analyze. CodeWeaver will try to detect the project root automatically if you don't provide one.""",
         ),
     ]
@@ -701,8 +809,8 @@ class CodeWeaverSettings(BaseSettings):
     def model_post_init(self, __context: Any, /) -> None:
         """Post-initialization validation."""
         # Ensure project path exists and is readable
-        if not self.project_name and self.project_root:
-            self.project_name = self.project_root.name
+        if not self.project_name and self.project_path:
+            self.project_name = self.project_path.name
         if type(self).__pydantic_complete__:
             self._map = cast(DictView[CodeWeaverSettingsDict], DictView(self.model_dump()))
             globals()["_mapped_settings"] = self._map
@@ -712,7 +820,6 @@ class CodeWeaverSettings(BaseSettings):
 
         return {
             FilteredKey("project_path"): AnonymityConversion.HASH,
-            FilteredKey("project_root"): AnonymityConversion.HASH,
             FilteredKey("project_name"): AnonymityConversion.BOOLEAN,
             FilteredKey("config_file"): AnonymityConversion.HASH,
         }
@@ -730,18 +837,18 @@ class CodeWeaverSettings(BaseSettings):
                 cls.model_config["yaml_file"] = path
             case _:
                 raise ValueError(f"Unsupported configuration file format: {extension}")
-        from codeweaver.common.utils import get_project_root
+        from codeweaver.common.utils import get_project_path
 
-        return cls(project_path=get_project_root(), **{**kwargs, "config_file": path})  # type: ignore
+        return cls(project_path=get_project_path(), **{**kwargs, "config_file": path})  # type: ignore
 
     @computed_field
     @cached_property
     def project_root(self) -> Path:
-        """Get the project root directory."""
+        """Get the project root directory. Alias for `project_path`."""
         if not hasattr(self, "project_path") or not self.project_path:
-            from codeweaver.common.utils.git import get_project_root
+            from codeweaver.common.utils.git import get_project_path
 
-            self.project_path = get_project_root()
+            self.project_path = get_project_path()
         return self.project_path.resolve()
 
     @classmethod  # spellchecker:off
@@ -832,9 +939,9 @@ def get_settings(path: FilePath | None = None) -> CodeWeaverSettings:
     If you **really** need to get the mutable settings instance, you can use this function. It will create the global instance if it doesn't exist, optionally loading from a configuration file (like, .codeweaver.toml) if you provide a path.
     """
     global _settings
-    from codeweaver.common.utils.git import get_project_root
+    from codeweaver.common.utils.git import get_project_path
 
-    root = get_project_root()
+    root = get_project_path()
     if _settings and path and path.exists():
         _settings = CodeWeaverSettings.from_config(path, **dict(_settings))
     elif path and path.exists():

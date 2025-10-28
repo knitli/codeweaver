@@ -84,7 +84,7 @@ def _root_path_checks_out(root_path: Path) -> bool:
     return root_path.is_dir() and is_git_dir(root_path)
 
 
-def get_project_root(root_path: Path | None = None) -> Path:
+def get_project_path(root_path: Path | None = None) -> Path:
     """Get the root directory of the project."""
     return (
         root_path
@@ -104,7 +104,7 @@ def set_relative_path(path: Path | str | None) -> Path | None:
     if not path_obj.is_absolute():
         return path_obj
 
-    base_path = get_project_root()
+    base_path = get_project_path()
     try:
         return path_obj.relative_to(base_path)
     except ValueError:
@@ -128,7 +128,7 @@ def _get_git_dir(directory: Path) -> Path | Missing:
     """Get the .git directory of a git repository."""
     if not is_git_dir(directory):
         with contextlib.suppress(FileNotFoundError):
-            directory = get_project_root() or Path.cwd()
+            directory = get_project_path() or Path.cwd()
         if not directory or not is_git_dir(directory):
             return MISSING
     return directory
@@ -176,7 +176,7 @@ def get_git_branch(directory: Path) -> str | Missing:
     directory = cast(Path, git_dir)
     if has_git():
         git = shutil.which("git")
-        if git_dir is MISSING and (git_dir := get_project_root(directory)):
+        if git_dir is MISSING and (git_dir := get_project_path(directory)):
             directory = git_dir
         else:
             return MISSING
@@ -208,7 +208,7 @@ __all__ = (
     "Missing",
     "get_git_branch",
     "get_git_revision",
-    "get_project_root",
+    "get_project_path",
     "has_git",
     "in_codeweaver_clone",
     "is_git_dir",

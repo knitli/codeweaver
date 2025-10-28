@@ -104,7 +104,7 @@ async def search(
 
             settings = update_settings(project_path=project_path)  # type: ignore
 
-        console.print(f"{CODEWEAVER_PREFIX} [blue]Searching in: {settings['project_root']}[/blue]")
+        console.print(f"{CODEWEAVER_PREFIX} [blue]Searching in: {settings['project_path']}[/blue]")
         console.print(f"{CODEWEAVER_PREFIX} [blue]Query: {query}[/blue]")
 
         # Use stub find_code_tool during refactor
@@ -252,7 +252,7 @@ def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
     table.add_column("Value", style="white")
 
     # Core settings
-    table.add_row("Project Path", str(settings["project_root"]))
+    table.add_row("Project Path", str(settings["project_path"]))
     table.add_row("Project Name", settings["project_name"] or "auto-detected")
     table.add_row("Token Limit", str(settings["token_limit"]))
     table.add_row("Max File Size", f"{settings['max_file_size']:,} bytes")

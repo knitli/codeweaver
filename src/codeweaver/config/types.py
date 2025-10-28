@@ -85,6 +85,7 @@ class IndexerSettingsDict(TypedDict, total=False):
     use_gitignore: NotRequired[bool]
     use_other_ignore_files: NotRequired[bool]
     ignore_hidden: NotRequired[bool]
+    index_storage_path: NotRequired[Path | None]
     include_github_dir: NotRequired[bool]
     include_tooling_dirs: NotRequired[bool]
     other_ignore_kwargs: NotRequired[RignoreSettings | Unset]

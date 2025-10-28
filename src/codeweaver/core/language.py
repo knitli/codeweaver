@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, NamedTuple, TypedDict, cast
 
 from pydantic import computed_field
 
-from codeweaver.common.utils import LazyImport, get_project_root, lazy_import, normalize_ext
+from codeweaver.common.utils import LazyImport, get_project_path, lazy_import, normalize_ext
 from codeweaver.core.types.aliases import (
     DirectoryName,
     DirectoryNameT,
@@ -43,7 +43,7 @@ get_ext_lang_pairs: LazyImport[Generator[ExtLangPair, None, None]] = lazy_import
     "codeweaver.core.metadata", "get_ext_lang_pairs"
 )
 
-PROJECT_ROOT = get_project_root() or Path.cwd().resolve()
+PROJECT_ROOT = get_project_path() or Path.cwd().resolve()
 
 ConfigPathPair = NamedTuple(
     "ConfigPathPair", (("path", Path), ("language", "SemanticSearchLanguage"))

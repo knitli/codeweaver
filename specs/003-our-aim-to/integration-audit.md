@@ -514,10 +514,10 @@ attr = self.embedding_kind.value  # "dense" or "sparse"
 # In core/discovery.py
 class DiscoveredFile:
     @classmethod
-    def from_path(cls, path: Path, project_root: Path) -> DiscoveredFile:
+    def from_path(cls, path: Path, project_path: Path) -> DiscoveredFile:
         """Create DiscoveredFile from path."""
         return cls(
-            path=path.relative_to(project_root),
+            path=path.relative_to(project_path),
             ext_kind=ExtKind.from_file(path),
             source_id=uuid7(),
             # ... other fields
@@ -570,7 +570,7 @@ async def test_discovery_to_chunks():
     paths = await discovery._discover_files()
 
     # Convert to DiscoveredFile
-    discovered = [DiscoveredFile.from_path(p, project_root) for p in paths]
+    discovered = [DiscoveredFile.from_path(p, project_path) for p in paths]
 
     chunker = SemanticChunker(...)
     chunks = list(chunker.chunk_file(discovered[0]))
