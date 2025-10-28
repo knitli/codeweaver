@@ -963,27 +963,20 @@ class CodeWeaverSettings(BaseSettings):
 
     _map: Annotated[DictView[CodeWeaverSettingsDict] | None, PrivateAttr()] = None
 
-    def model_post_init(self, __context: Any, /) -> None:
-        """Post-initialization validation."""
-        # Ensure project path exists and is readable
+    def __init__(self, **data: Any) -> None:
+        """Initialize CodeWeaverSettings and set global instance."""
+        for key in list(data.keys()):
+            if key in type(self).model_fields:
+                setattr(self, key, data.pop(key))
         if not self.project_name and self.project_path:
             self.project_name = self.project_path.name
         if not self.indexing:
-            if not IndexerSettings.__pydantic_complete__:
-                result = IndexerSettings.model_rebuild()
-                logger.debug(
-                    "Rebuilt IndexerSettings during CodeWeaverSettings post-init, result: %s",
-                    result,
-                )
             self.indexing = IndexerSettings()
-            if not self.chunker:
-                if not ChunkerSettings.__pydantic_complete__:
-                    result = ChunkerSettings.model_rebuild()
-                    logger.debug(
-                        "Rebuilt ChunkerSettings during CodeWeaverSettings post-init, result: %s",
-                        result,
-                    )
-                self.chunker = ChunkerSettings()
+        if not self.chunker:
+            self.chunker = ChunkerSettings()
+
+    def model_post_init(self, __context: Any, /) -> None:
+        """Post-initialization validation."""
         if not type(self).__pydantic_complete__:
             result = type(self).model_rebuild()
             logger.debug("Rebuilt CodeWeaverSettings during post-init, result: %s", result)

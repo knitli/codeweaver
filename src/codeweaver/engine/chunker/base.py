@@ -21,13 +21,15 @@ import logging
 
 from abc import ABC, abstractmethod
 from functools import cached_property
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
 from pydantic import ConfigDict, Field, PositiveInt, computed_field
 
+from codeweaver.config.providers import EmbeddingProviderSettings, RerankingProviderSettings
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.models import BasedModel
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
@@ -46,9 +48,10 @@ class ChunkGovernor(BasedModel):
     model_config = BasedModel.model_config | ConfigDict(validate_assignment=True, defer_build=True)
 
     capabilities: Annotated[
-        tuple[EmbeddingModelCapabilities | RerankingModelCapabilities, ...],
+        tuple[EmbeddingModelCapabilities]
+        | tuple[EmbeddingModelCapabilities, RerankingModelCapabilities],
         Field(description="""The model capabilities to infer chunking behavior from."""),
-    ] = ()
+    ] = ()  # type: ignore[assignment]
 
     settings: Annotated[
         ChunkerSettings | None,
@@ -72,6 +75,106 @@ class ChunkGovernor(BasedModel):
 
     def _telemetry_keys(self) -> None:
         return None
+
+    @staticmethod
+    def _get_provider_settings() -> tuple[
+        EmbeddingProviderSettings, RerankingProviderSettings | None
+    ]:
+        from codeweaver.common.registry import get_provider_registry
+        from codeweaver.providers.provider import ProviderKind
+
+        registry = get_provider_registry()
+        return (
+            cast(
+                EmbeddingProviderSettings,
+                registry.get_configured_provider_settings(ProviderKind.EMBEDDING),
+            ),
+            cast(
+                RerankingProviderSettings | None,
+                registry.get_configured_provider_settings(ProviderKind.RERANKING),
+            ),
+        )
+
+    @staticmethod
+    def _get_providers(
+        settings: EmbeddingProviderSettings | RerankingProviderSettings | None,
+    ) -> Provider:
+        from codeweaver.providers.provider import Provider
+
+        return Provider.UNSET if settings is None else settings["provider"]
+
+    @staticmethod
+    def _get_caps_for_provider(
+        settings: EmbeddingProviderSettings | RerankingProviderSettings, provider: Provider
+    ) -> EmbeddingModelCapabilities | RerankingModelCapabilities | None:
+        from codeweaver.common.registry import get_model_registry
+
+        model_registry = get_model_registry()
+        if (
+            settings
+            and (model_settings := settings.get("model_settings"))
+            and (model_name := model_settings.get("model"))
+        ):
+            from codeweaver.common.registry import get_model_registry
+
+            model_registry = get_model_registry()
+            model_name = model_name
+            if (
+                any(
+                    item
+                    for item in ("dimension", "data_type", "model_kwargs")
+                    if item in model_settings
+                )
+                and (caps := model_registry.get_embedding_capabilities(provider, model_name))
+            ) or (
+                not any(
+                    item
+                    for item in ("dimension", "data_type", "model_kwargs")
+                    if item in model_settings
+                )
+                and (caps := model_registry.get_reranking_capabilities(provider, model_name))
+            ):
+                return caps[0]
+        return None
+
+    @classmethod
+    def from_settings(cls, settings: ChunkerSettings) -> ChunkGovernor:
+        """Create a ChunkGovernor from ChunkerSettings.
+
+        Args:
+            settings: The ChunkerSettings to create the governor from.
+
+        Returns:
+            A ChunkGovernor instance.
+        """
+        embedding_settings, reranking_settings = cls._get_provider_settings()
+        embedding_provider = cls._get_providers(embedding_settings)
+        reranking_provider = cls._get_providers(reranking_settings)
+        embedding_caps = cls._get_caps_for_provider(embedding_settings, embedding_provider)
+        if (
+            reranking_settings
+            and reranking_provider is not Provider.UNSET
+            and (
+                reranking_caps := cls._get_caps_for_provider(reranking_settings, reranking_provider)
+            )
+        ):
+            caps = (embedding_caps, reranking_caps)
+            if not embedding_caps or not reranking_caps:
+                raise RuntimeError(
+                    "Could not determine capabilities for embedding or reranking models."
+                )
+        elif embedding_caps:
+            caps = (embedding_caps,)
+        else:
+            raise RuntimeError("Could not determine capabilities for embedding model.")
+        return cls(
+            capabilities=cast(
+                tuple[EmbeddingModelCapabilities, RerankingModelCapabilities]
+                | tuple[EmbeddingModelCapabilities],
+                caps,
+            ),
+            settings=settings,
+        )
 
 
 class BaseChunker(ABC):
@@ -127,10 +230,13 @@ def _rebuild_models() -> None:
     """Rebuild pydantic models after all types are defined."""
     logger = logging.getLogger(__name__)
     try:
-        # Import ChunkerSettings to make it available for model rebuild
-        from codeweaver.config.chunker import ChunkerSettings  # noqa: F401
+        if not ChunkGovernor.__pydantic_complete__:
+            from codeweaver.config.settings import get_settings
 
-        ChunkGovernor.model_rebuild(force=True)
+            chunk_settings = get_settings().chunker
+            if not type(chunk_settings).__pydantic_complete__:
+                _ = chunk_settings.model_rebuild()
+            _ = ChunkGovernor.model_rebuild()
     except Exception as e:
         # If rebuild fails, model will still work but may have issues with ChunkerSettings
         logger.debug("Failed to rebuild ChunkGovernor model: %s", e, exc_info=True)

@@ -29,7 +29,7 @@ from pydantic import Field, PrivateAttr
 from pydantic.dataclasses import dataclass
 from watchfiles.main import Change, FileChange
 
-from codeweaver.config.types import CodeWeaverSettingsDict, IndexerSettingsDict, RignoreSettings
+from codeweaver.config.types import CodeWeaverSettingsDict, RignoreSettings
 from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.file_extensions import (
     CODE_FILES_EXTENSIONS,
@@ -42,6 +42,7 @@ from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.stores import BlakeStore
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.models import BasedModel
+from codeweaver.engine.chunking_service import ChunkingService
 from codeweaver.exceptions import ConfigurationError
 
 
@@ -52,18 +53,6 @@ if TYPE_CHECKING:
 
     from codeweaver.core.chunks import CodeChunk
     from codeweaver.providers.embedding.providers.base import EmbeddingProvider
-
-
-def _get_settings_map() -> DictView[CodeWeaverSettingsDict]:
-    """Stub function to get settings map. Replace with actual implementation."""
-    from codeweaver.config.settings import get_settings_map
-
-    return get_settings_map()
-
-
-def _get_indexer_settings() -> DictView[IndexerSettingsDict]:
-    """Retrieve indexer settings from the global settings map."""
-    return DictView(_get_settings_map()["indexing"])
 
 
 def _get_embedding_instance(*, sparse: bool = False) -> EmbeddingProvider[Any] | None:
@@ -80,16 +69,6 @@ def _get_embedding_instance(*, sparse: bool = False) -> EmbeddingProvider[Any] |
     return None
 
 
-def _get_reranking_instance() -> Any | None:
-    """Stub function to get reranking provider instance."""
-    from codeweaver.common.registry import get_provider_registry
-
-    registry = get_provider_registry()
-    if provider := registry.get_reranking_provider():
-        return registry.get_reranking_provider_instance(provider=provider, singleton=True)
-    return None
-
-
 def _get_vector_store_instance() -> Any | None:
     """Stub function to get vector store provider instance."""
     from codeweaver.common.registry import get_provider_registry
@@ -98,6 +77,18 @@ def _get_vector_store_instance() -> Any | None:
     if provider := registry.get_vector_store_provider():
         return registry.get_vector_store_provider_instance(provider=provider, singleton=True)
     return None
+
+
+def _get_chunking_service() -> ChunkingService:
+    """Stub function to get chunking service instance."""
+    # TODO: This should probably come from the services registry but that's not fully implemented yet
+    from codeweaver.config.settings import get_settings
+    from codeweaver.engine.chunker import ChunkGovernor
+    from codeweaver.engine.chunking_service import ChunkingService
+
+    chunk_settings = get_settings().chunker
+    governor = ChunkGovernor.from_settings(chunk_settings)
+    return ChunkingService(governor=governor)
 
 
 @dataclass
@@ -332,7 +323,6 @@ class Indexer(BasedModel):
     """Main indexer class. Wraps a DiscoveredFilestore and chunkers."""
 
     _store: BlakeStore[DiscoveredFile] = PrivateAttr()
-    _parsers: Annotated[Sequence[Callable[[Path], Any]], PrivateAttr(default_factory=list)]
     _walker: rignore.Walker | None = PrivateAttr(default=None)
 
     def __init__(
@@ -351,10 +341,9 @@ class Indexer(BasedModel):
             chunking_service: Service for chunking files (optional)
             auto_initialize_providers: Auto-initialize providers from global registry
         """
-        self._parsers = []
         self._store = store or BlakeStore[DiscoveredFile](_value_type=DiscoveredFile)
         self._walker = walker
-        self._chunking_service = chunking_service
+        self._chunking_service = chunking_service or _get_chunking_service()
         self._stats = IndexingStats()
 
         # Pipeline provider Fields (initialized below or lazily)
@@ -394,6 +383,8 @@ class Indexer(BasedModel):
             except Exception as e:
                 logger.warning("No vector store configured: %s", e)
                 self._vector_store = None
+
+            self._chunking_service = self._chunking_service or _get_chunking_service()
 
         except ImportError:
             logger.warning("Provider registry not available, providers not initialized")
@@ -460,6 +451,9 @@ class Indexer(BasedModel):
         except Exception:
             logger.exception("Failed to index file %s", path)
             self._stats.files_with_errors.append(path)
+
+    def _telemetry_keys(self) -> None:
+        return None
 
     async def _embed_chunks(self, chunks: list[Any]) -> None:
         """Embed chunks with both dense and sparse providers.
@@ -600,6 +594,101 @@ class Indexer(BasedModel):
 
         return self._stats.files_processed
 
+    def _discover_files_for_batch(self, files: list[Path]) -> list[DiscoveredFile]:
+        """Convert file paths to DiscoveredFile objects.
+
+        Args:
+            files: List of file paths to discover
+
+        Returns:
+            List of valid DiscoveredFile objects
+        """
+        discovered_files: list[DiscoveredFile] = []
+        for path in files:
+            try:
+                discovered_file = DiscoveredFile.from_path(path)
+                if discovered_file and discovered_file.is_text:
+                    discovered_files.append(discovered_file)
+                    self._store.set(discovered_file.file_hash, discovered_file)
+            except Exception:
+                logger.exception("Failed to discover file %s", path)
+                self._stats.files_with_errors.append(path)
+        return discovered_files
+
+    def _chunk_discovered_files(self, discovered_files: list[DiscoveredFile]) -> list[CodeChunk]:
+        """Chunk discovered files using the chunking service.
+
+        Args:
+            discovered_files: List of discovered files to chunk
+
+        Returns:
+            List of code chunks created from the files
+        """
+        if not self._chunking_service:
+            self._chunking_service = _get_chunking_service()
+        all_chunks: list[CodeChunk] = []
+        for file_path, chunks in self._chunking_service.chunk_files(discovered_files):
+            all_chunks.extend(chunks)
+            self._stats.chunks_created += len(chunks)
+            logger.debug("Chunked %s: %d chunks", file_path, len(chunks))
+        return all_chunks
+
+    async def _embed_chunks_in_batches(
+        self, chunks: list[CodeChunk], batch_size: int = 100
+    ) -> None:
+        """Embed chunks in batches.
+
+        Args:
+            chunks: List of chunks to embed
+            batch_size: Number of chunks per batch
+        """
+        for i in range(0, len(chunks), batch_size):
+            batch = chunks[i : i + batch_size]
+            try:
+                await self._embed_chunks(batch)
+                self._stats.chunks_embedded += len(batch)
+                logger.debug("Embedded batch %d-%d (%d chunks)", i, i + len(batch), len(batch))
+            except Exception:
+                logger.exception("Failed to embed batch %d-%d", i, i + len(batch))
+
+    def _retrieve_embedded_chunks(self, chunks: list[CodeChunk]) -> list[CodeChunk]:
+        """Retrieve embedded chunks from registry, falling back to originals if needed.
+
+        Args:
+            chunks: Original chunks to look up in registry
+
+        Returns:
+            Updated chunks from registry, or original chunks if none found
+        """
+        from codeweaver.providers.embedding.registry import get_embedding_registry
+
+        registry = get_embedding_registry()
+        updated_chunks = [
+            registry[chunk.chunk_id].chunk for chunk in chunks if chunk.chunk_id in registry
+        ]
+
+        if not updated_chunks:
+            logger.warning("No chunks were embedded, using original chunks")
+            return chunks
+        return updated_chunks
+
+    async def _index_chunks_to_store(self, chunks: list[CodeChunk]) -> None:
+        """Index chunks to the vector store.
+
+        Args:
+            chunks: List of chunks to index
+        """
+        if not self._vector_store:
+            logger.warning("No vector store configured, skipping indexing")
+            return
+
+        try:
+            await self._vector_store.upsert(chunks)
+            self._stats.chunks_indexed = len(chunks)
+            logger.info("Indexed %d chunks to vector store", len(chunks))
+        except Exception:
+            logger.exception("Failed to index to vector store")
+
     async def _index_files_batch(self, files: list[Path]) -> None:
         """Index multiple files in batch using the chunking service.
 
@@ -613,71 +702,31 @@ class Indexer(BasedModel):
             logger.warning("No chunking service configured, cannot batch index files")
             return
 
-        # Convert paths to DiscoveredFile objects
-        discovered_files: list[DiscoveredFile] = []
-        for path in files:
-            try:
-                discovered_file = DiscoveredFile.from_path(path)
-                if discovered_file and discovered_file.is_text:
-                    discovered_files.append(discovered_file)
-                    self._store.set(discovered_file.file_hash, discovered_file)
-            except Exception:
-                logger.exception("Failed to discover file %s", path)
-                self._stats.files_with_errors.append(path)
-
+        # Phase 1: Discover files
+        discovered_files = self._discover_files_for_batch(files)
         if not discovered_files:
             logger.info("No valid files to index in batch")
             return
 
-        # Chunk files using ChunkingService (handles parallelization)
-        all_chunks: list[CodeChunk] = []
-        for file_path, chunks in self._chunking_service.chunk_files(discovered_files):
-            all_chunks.extend(chunks)
-            self._stats.chunks_created += len(chunks)
-            logger.debug("Chunked %s: %d chunks", file_path, len(chunks))
-
+        # Phase 2: Chunk files
+        all_chunks = self._chunk_discovered_files(discovered_files)
         if not all_chunks:
             logger.info("No chunks created from files")
             return
 
         logger.info("Created %d chunks from %d files", len(all_chunks), len(discovered_files))
 
-        # Embed in batches of 100 chunks
-        batch_size = 100
-        for i in range(0, len(all_chunks), batch_size):
-            batch = all_chunks[i : i + batch_size]
-            try:
-                await self._embed_chunks(batch)
-                self._stats.chunks_embedded += len(batch)
-                logger.debug("Embedded batch %d-%d (%d chunks)", i, i + len(batch), len(batch))
-            except Exception:
-                logger.exception("Failed to embed batch %d-%d", i, i + len(batch))
+        # Phase 3: Embed chunks in batches
+        await self._embed_chunks_in_batches(all_chunks)
 
-        # Retrieve updated chunks from registry
-        from codeweaver.providers.embedding.registry import get_embedding_registry
+        # Phase 4: Retrieve embedded chunks from registry
+        updated_chunks = self._retrieve_embedded_chunks(all_chunks)
 
-        registry = get_embedding_registry()
-        updated_chunks = [
-            registry[chunk.chunk_id].chunk for chunk in all_chunks if chunk.chunk_id in registry
-        ]
+        # Phase 5: Index to vector store
+        await self._index_chunks_to_store(updated_chunks)
 
-        # If no chunks were embedded, use original chunks
-        if not updated_chunks:
-            logger.warning("No chunks were embedded, using original chunks")
-            updated_chunks = all_chunks
-
-        # Index to vector store
-        if self._vector_store:
-            try:
-                await self._vector_store.upsert(updated_chunks)
-                self._stats.chunks_indexed = len(updated_chunks)
-                logger.info("Indexed %d chunks to vector store", len(updated_chunks))
-            except Exception:
-                logger.exception("Failed to index to vector store")
-        else:
-            logger.warning("No vector store configured, skipping indexing")
-
-        self._stats.files_processed = len(discovered_files)
+        # Update stats with successful file count
+        self._stats.files_processed += len(discovered_files)
 
     @property
     def stats(self) -> IndexingStats:
