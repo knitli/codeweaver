@@ -89,6 +89,37 @@ Cost: $0.03-$0.06 per query
 
 ---
 
+## Installation
+
+[![PyPI](https://img.shields.io/pypi/v/codeweaver-mcp.svg)](https://pypi.org/project/codeweaver-mcp/)
+[![Python Versions](https://img.shields.io/pypi/pyversions/codeweaver-mcp.svg)](https://pypi.org/project/codeweaver-mcp/)
+
+Install CodeWeaver from PyPI:
+
+```bash
+pip install codeweaver-mcp
+```
+
+**Requirements:**
+- Python 3.12, 3.13, or 3.14
+
+**Supported Installation Options:**
+
+For basic usage with recommended defaults:
+```bash
+pip install codeweaver-mcp[recommended]
+```
+
+For à-la-carte installation with specific providers:
+```bash
+# Core + OpenAI embedding + Qdrant vector store + filesystem source
+pip install 'codeweaver-mcp[required-core,provider-openai,provider-qdrant,source-filesystem]'
+```
+
+See the [installation documentation](https://dev.knitli.com/codeweaver) for detailed provider options and configuration.
+
+---
+
 **📊 For Product Managers & Decision Makers**: See [PRODUCT.md](PRODUCT.md) for comprehensive product overview, user personas, success metrics, competitive positioning, and roadmap details. We don't hide our plans -- we want your input and needs to drive them!
 
 **🚀 Strategic Vision**: CodeWeaver evolves from best-in-class search tool → context platform → unified MCP orchestration hub. See [PRODUCT.md - Product Vision](PRODUCT.md#product-vision) for our 4-phase evolution from search to "context-as-a-service."
