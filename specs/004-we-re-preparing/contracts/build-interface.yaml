@@ -1,0 +1,399 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
+# Build System Command Interface Contract
+
+# This contract defines the expected inputs and outputs for build system operations.
+# It is not an HTTP API but a command-line interface contract.
+
+## Build Command Contract
+
+### Command: `uv build`
+
+**Purpose**: Create distributable package artifacts (wheel + sdist)
+
+**Preconditions**:
+- Repository is a valid Python project with `pyproject.toml`
+- `pyproject.toml` contains valid PEP 621 metadata
+- Git repository is initialized (for version detection)
+- Build backend dependencies available (hatchling, uv-versioning)
+
+**Inputs** (Configuration):
+```yaml
+pyproject.toml:
+  build-system:
+    requires:
+      - hatchling
+      - uv-versioning
+    build-backend: "hatchling.build"
+
+  project:
+    name: string  # Required: PyPI package name
+    description: string  # Required: One-line summary
+    readme: string  # Required: Path to README
+    requires-python: string  # Required: e.g., ">=3.12"
+    license: object  # Required: SPDX identifier
+    authors: array  # Required: [{name, email}]
+    keywords: array  # Optional: Search keywords
+    classifiers: array  # Optional: PyPI classifiers
+    urls: object  # Optional: {homepage, repository, etc.}
+    dependencies: array  # Optional: Runtime deps
+    optional-dependencies: object  # Optional: {dev, test, docs}
+
+  tool.hatch.version:
+    source: "vcs"  # Delegate to uv-versioning
+
+  tool.uv-versioning:
+    # Default configuration - auto-detection
+```
+
+**Inputs** (Environment):
+```yaml
+git_state:
+  latest_tag: string | null  # Most recent version tag (e.g., "v0.1.0")
+  commits_since_tag: integer  # Number of commits since tag
+  current_commit: string  # Current git commit hash
+  working_directory_clean: boolean  # No uncommitted changes
+```
+
+**Outputs** (Success):
+```yaml
+exit_code: 0
+artifacts:
+  - filename: "{name}-{version}-py3-none-any.whl"
+    type: "wheel"
+    size_bytes: integer
+    sha256: string  # 64-char hex
+    location: "dist/{filename}"
+
+  - filename: "{name}-{version}.tar.gz"
+    type: "sdist"
+    size_bytes: integer
+    sha256: string  # 64-char hex
+    location: "dist/{filename}"
+
+derived_version:
+  format: string  # PEP 440 compliant
+  examples:
+    tagged_release: "0.1.0"
+    pre_release: "0.1.0rc295+gfc4f90a"
+    dirty: "0.1.0rc295+gfc4f90a.dirty"
+
+stdout:
+  - "Building wheel..."
+  - "Built {wheel_filename}"
+  - "Building source distribution..."
+  - "Built {sdist_filename}"
+```
+
+**Outputs** (Failure):
+```yaml
+exit_code: non-zero
+stderr:
+  - error_type: string  # e.g., "MetadataError", "BuildError"
+  - error_message: string  # Human-readable description
+  - suggested_fix: string  # Actionable remediation
+  - context: object  # Relevant configuration or state
+
+common_errors:
+  missing_metadata:
+    message: "Required metadata field missing: {field}"
+    fix: "Add '{field}' to [project] table in pyproject.toml"
+
+  invalid_version:
+    message: "Version '{version}' does not comply with PEP 440"
+    fix: "Ensure git tags follow semantic versioning (e.g., v0.1.0)"
+
+  build_backend_error:
+    message: "Build backend failed: {backend_error}"
+    fix: "Check build-system configuration in pyproject.toml"
+```
+
+**Postconditions** (Success):
+- `dist/` directory contains exactly 2 artifacts (wheel + sdist)
+- Both artifacts have valid filenames per PEP conventions
+- Artifacts are non-empty and checksums are computable
+- Version embedded in artifacts matches derived version
+- All source files and metadata included in sdist
+- Wheel is installable on Python >=3.12
+
+**Validation Contract**:
+```python
+def validate_build_output(dist_dir: Path) -> bool:
+    """
+    Contract test for build command output.
+
+    Returns True if all postconditions satisfied.
+    """
+    artifacts = list(dist_dir.glob("*"))
+
+    # Must create exactly 2 artifacts
+    assert len(artifacts) == 2, f"Expected 2 artifacts, found {len(artifacts)}"
+
+    # Must include one wheel and one sdist
+    wheels = [a for a in artifacts if a.suffix == ".whl"]
+    sdists = [a for a in artifacts if a.suffix == ".gz"]
+    assert len(wheels) == 1, "Expected exactly 1 wheel"
+    assert len(sdists) == 1, "Expected exactly 1 sdist"
+
+    # Filenames must follow conventions
+    wheel = wheels[0]
+    assert wheel.name.startswith("codeweaver_mcp-"), "Wheel name must start with package name"
+    assert "-py3-none-any.whl" in wheel.name, "Wheel must be pure Python"
+
+    sdist = sdists[0]
+    assert sdist.name.startswith("codeweaver_mcp-"), "Sdist name must start with package name"
+    assert sdist.name.endswith(".tar.gz"), "Sdist must be .tar.gz"
+
+    # Artifacts must be non-empty
+    assert wheel.stat().st_size > 0, "Wheel must be non-empty"
+    assert sdist.stat().st_size > 0, "Sdist must be non-empty"
+
+    # Version must be consistent across artifacts
+    # Extract version from both filenames and verify they match
+    wheel_version = wheel.name.split("-")[1]
+    sdist_version = sdist.name.split("-")[1].replace(".tar.gz", "")
+    assert wheel_version == sdist_version, "Version must match across artifacts"
+
+    return True
+```
+
+## Publish Command Contract
+
+### Command: `gh-action-pypi-publish` (GitHub Actions)
+
+**Purpose**: Upload build artifacts to PyPI or TestPyPI
+
+**Preconditions**:
+- Build artifacts exist in `dist/` directory
+- Artifacts pass `twine check` validation
+- CI tests passed on Python 3.12, 3.13, 3.14
+- GitHub Actions trusted publisher configured for repository
+- Version does not already exist on target PyPI repository
+
+**Inputs** (Artifacts):
+```yaml
+dist_directory: "dist/"
+artifacts:
+  - wheel: "{name}-{version}-py3-none-any.whl"
+  - sdist: "{name}-{version}.tar.gz"
+
+metadata:
+  package_name: "codeweaver-mcp"
+  version: string  # PEP 440 version from build
+```
+
+**Inputs** (Configuration):
+```yaml
+repository_url: string
+  production: "https://upload.pypi.org/legacy/"
+  test: "https://test.pypi.org/legacy/"
+
+authentication:
+  method: "trusted_publisher"  # GitHub Actions OAuth
+  permissions:
+    id-token: write  # Required for OIDC
+    contents: read
+
+environment:
+  name: "pypi"  # Optional: GitHub environment protection
+  protection_rules:
+    - required_reviewers: optional
+    - deployment_branches: tags only
+```
+
+**Outputs** (Success):
+```yaml
+exit_code: 0
+published_urls:
+  package_page: "https://pypi.org/project/{name}/{version}/"
+  wheel_url: "https://files.pythonhosted.org/packages/.../{wheel_filename}"
+  sdist_url: "https://files.pythonhosted.org/packages/.../{sdist_filename}"
+
+stdout:
+  - "Uploading distributions to {repository_url}"
+  - "Uploaded {wheel_filename}"
+  - "Uploaded {sdist_filename}"
+  - "View at: {package_page}"
+```
+
+**Outputs** (Failure):
+```yaml
+exit_code: non-zero
+stderr:
+  - error_type: string
+  - error_message: string
+  - suggested_fix: string
+
+common_errors:
+  version_already_exists:
+    message: "Version {version} already exists on PyPI"
+    fix: "Version numbers on PyPI are immutable. Increment version and create new release."
+
+  authentication_failed:
+    message: "Trusted publisher authentication failed"
+    fix: "Verify GitHub Actions trusted publisher configured at https://pypi.org/manage/account/publishing/"
+
+  metadata_validation_failed:
+    message: "Package metadata validation failed: {details}"
+    fix: "Run 'twine check dist/*' locally to identify metadata issues"
+
+  upload_interrupted:
+    message: "Upload interrupted: {reason}"
+    fix: "Retry publishing. Previously uploaded artifacts will be skipped (idempotent)."
+```
+
+**Postconditions** (Success):
+- Package visible on PyPI at `https://pypi.org/project/codeweaver-mcp/{version}/`
+- Both wheel and sdist installable via `pip install codeweaver-mcp=={version}`
+- Package metadata displayed correctly on PyPI project page
+- Installation works on Python 3.12, 3.13, 3.14
+
+**Validation Contract**:
+```python
+def validate_publish_output(package_name: str, version: str, repository: str = "pypi") -> bool:
+    """
+    Contract test for publish command output.
+
+    Returns True if package successfully published and installable.
+    """
+    import subprocess
+    import tempfile
+    from pathlib import Path
+
+    # Construct expected PyPI URL
+    if repository == "pypi":
+        base_url = "https://pypi.org"
+    else:
+        base_url = "https://test.pypi.org"
+
+    package_url = f"{base_url}/project/{package_name}/{version}/"
+
+    # Verify package page exists (HTTP 200)
+    import urllib.request
+    try:
+        response = urllib.request.urlopen(package_url)
+        assert response.status == 200, f"Package page not found: {package_url}"
+    except urllib.error.HTTPError as e:
+        raise AssertionError(f"Package not accessible: {e}")
+
+    # Verify package installable in clean environment
+    with tempfile.TemporaryDirectory() as tmpdir:
+        venv_path = Path(tmpdir) / "venv"
+
+        # Create virtual environment
+        subprocess.run(["python", "-m", "venv", str(venv_path)], check=True)
+        pip = venv_path / "bin" / "pip"
+
+        # Install from PyPI
+        index_url = f"{base_url}/simple/" if repository == "test-pypi" else None
+        install_cmd = [str(pip), "install", f"{package_name}=={version}"]
+        if index_url:
+            install_cmd.extend(["--index-url", index_url])
+
+        result = subprocess.run(install_cmd, capture_output=True, text=True)
+        assert result.returncode == 0, f"Installation failed: {result.stderr}"
+
+        # Verify importable
+        python = venv_path / "bin" / "python"
+        import_cmd = [str(python), "-c", "import codeweaver; print(codeweaver.__version__)"]
+        result = subprocess.run(import_cmd, capture_output=True, text=True)
+        assert result.returncode == 0, f"Import failed: {result.stderr}"
+
+        # Verify installed version matches expected
+        installed_version = result.stdout.strip()
+        assert installed_version == version, f"Version mismatch: expected {version}, got {installed_version}"
+
+    return True
+```
+
+## Verification Command Contract
+
+### Command: `twine check`
+
+**Purpose**: Validate package metadata before publishing
+
+**Preconditions**:
+- Build artifacts exist in `dist/` directory
+
+**Inputs**:
+```yaml
+artifacts:
+  - "dist/*.whl"
+  - "dist/*.tar.gz"
+```
+
+**Outputs** (Success):
+```yaml
+exit_code: 0
+stdout:
+  - "Checking dist/codeweaver_mcp-{version}-py3-none-any.whl: PASSED"
+  - "Checking dist/codeweaver_mcp-{version}.tar.gz: PASSED"
+```
+
+**Outputs** (Failure):
+```yaml
+exit_code: 1
+stderr:
+  - artifact: string  # Filename with issue
+  - error_type: string  # e.g., "MetadataError"
+  - error_message: string  # Specific issue
+  - field: string  # Problematic metadata field
+
+common_errors:
+  missing_required_field:
+    message: "Required field missing: {field}"
+    fix: "Add '{field}' to [project] table in pyproject.toml"
+
+  invalid_classifier:
+    message: "Invalid classifier: {classifier}"
+    fix: "Use valid classifier from https://pypi.org/classifiers/"
+
+  malformed_description:
+    message: "Long description rendering failed: {details}"
+    fix: "Ensure README.md is valid Markdown"
+```
+
+**Validation Contract**:
+```python
+def validate_twine_check() -> bool:
+    """
+    Contract test for twine check validation.
+
+    Returns True if all artifacts pass validation.
+    """
+    import subprocess
+
+    result = subprocess.run(
+        ["twine", "check", "dist/*"],
+        capture_output=True,
+        text=True
+    )
+
+    # Must exit successfully
+    assert result.returncode == 0, f"Validation failed: {result.stderr}"
+
+    # Must check both artifacts
+    stdout_lines = result.stdout.strip().split("\n")
+    assert len(stdout_lines) == 2, "Expected validation for 2 artifacts"
+
+    # Both must pass
+    assert all("PASSED" in line for line in stdout_lines), "All artifacts must pass validation"
+
+    return True
+```
+
+## Contract Testing Strategy
+
+All contracts must be validated by automated tests:
+
+1. **Unit Contract Tests**: Test each validation function in isolation
+2. **Integration Contract Tests**: Test full build → verify → publish flow
+3. **Smoke Tests**: Install from TestPyPI and verify basic functionality
+4. **Regression Tests**: Ensure changes don't break existing contracts
+
+Tests must fail before implementation (TDD approach).

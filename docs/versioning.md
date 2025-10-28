@@ -1,0 +1,147 @@
+# Version Management
+
+CodeWeaver uses automatic version derivation from git tags powered by `uv-dynamic-versioning`.
+
+## Version Formats
+
+### Tagged Release (Production)
+**Format**: `X.Y.Z`
+**Example**: `0.1.0`
+
+When you tag a commit with a version number:
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The build will create packages with version `0.1.0` (clean semantic version).
+
+### Pre-Release (Development)
+**Format**: `X.Y.ZrcN+gHASH`
+**Example**: `0.1.0rc295+gfc4f90a`
+
+For untagged commits (commits after the latest tag):
+- `X.Y.Z`: Version from latest tag
+- `rcN`: Release candidate with commit distance N from tag
+- `+gHASH`: Git commit short hash
+
+### Dirty Working Directory
+**Format**: `X.Y.ZrcN+gHASH.dirty`
+**Example**: `0.1.0rc295+gfc4f90a.dirty`
+
+Building with uncommitted changes appends `.dirty` suffix.
+
+⚠️ **Warning**: Dirty builds should not be published to PyPI.
+
+## Version Workflow
+
+### Development Workflow
+1. Work on features on feature branches
+2. Each commit gets unique pre-release version
+3. Build creates: `codeweaver_mcp-0.1.0rc298+g2080710-py3-none-any.whl`
+
+### Release Workflow
+1. Merge to main branch
+2. Create version tag:
+   ```bash
+   git tag v0.1.0
+   git push origin v0.1.0
+   ```
+3. GitHub Actions automatically:
+   - Runs tests on Python 3.12, 3.13, 3.14
+   - Builds package with version `0.1.0`
+   - Publishes to PyPI
+   - Creates GitHub release
+
+### Testing TestPyPI
+To test publishing without affecting production:
+1. Go to GitHub Actions
+2. Run "Publish to TestPyPI" workflow manually
+3. Package published to https://test.pypi.org/project/codeweaver-mcp/
+
+## Version Configuration
+
+Version management is configured in `pyproject.toml`:
+
+```toml
+[project]
+version = "dynamic"  # Version derived from git
+
+[build-system]
+requires = ["hatchling>=1.27.0", "uv-dynamic-versioning>=0.11.2"]
+build-backend = "hatchling.build"
+
+[tool.uv-dynamic-versioning]
+vcs = "git"
+style = "semver"
+bump = true
+tag-branch = "main"
+commit-prefix = "g"
+
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+```
+
+## Checking Current Version
+
+To see what version will be built from current git state:
+
+```bash
+# Build locally and check artifacts
+uv build
+ls dist/
+
+# Output: codeweaver_mcp-{version}-py3-none-any.whl
+```
+
+The version in the filename is what will be used for PyPI.
+
+## Troubleshooting
+
+### Version is 0.0.0
+**Cause**: No git tags exist
+**Fix**: Create initial tag
+```bash
+git tag v0.0.1
+git push origin v0.0.1
+```
+
+### Version doesn't match expected
+**Cause**: Git state doesn't match expectations
+**Fix**: Check current git state
+```bash
+git describe --tags --always --dirty
+```
+
+### Version collision on PyPI
+**Cause**: Version already published (PyPI versions are immutable)
+**Fix**: Create new tag with incremented version
+```bash
+git tag v0.1.1
+git push origin v0.1.1
+```
+
+## Best Practices
+
+1. **Use semantic versioning**: Major.Minor.Patch (e.g., 1.2.3)
+2. **Tag on main branch**: Only create release tags after merging to main
+3. **Clean working directory**: Commit all changes before tagging
+4. **Test on TestPyPI first**: Use TestPyPI workflow to validate before production
+5. **Document changes**: Update CHANGELOG.md before tagging
+
+## Integration with Changesets
+
+This project uses changesets for changelog management. The version workflow integrates with changesets:
+
+1. Create changeset for your changes:
+   ```bash
+   changeset add
+   ```
+
+2. Changesets create entries in `.changeset/` directory
+
+3. When ready to release, changeset updates version and CHANGELOG
+
+4. Tag the release and push
+
+See project changeset configuration for details.

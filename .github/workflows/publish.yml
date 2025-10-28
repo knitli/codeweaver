@@ -1,0 +1,163 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - v*
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version:
+          - "3.12"
+          - "3.13"
+          - "3.14"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b3498302c5c423fa896b97a26bb183df735d08f8
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@9b03c627221f32cb88b299427119da30671cf9cc
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y zsh
+
+      - name: Cache mise tools
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            ~/.local/share/mise
+            ~/.local/bin/mise
+            ~/.local/share/mise/shims
+            ~/.cache/uv
+            ./.cache/uv
+            ~/.local/bin
+            ./scripts
+            ~/.cache/mise
+          key: mise-${{ runner.os }}-${{ hashFiles('mise.toml') }}
+          restore-keys: |
+            mise-${{ runner.os }}-
+
+      - name: Cache UV dependencies
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            ~/.cache/uv
+            ./.cache/uv
+          key: uv-${{ runner.os }}-python${{ matrix.python-version }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-python${{ matrix.python-version }}-
+            uv-${{ runner.os }}-
+
+      - name: Install mise
+        run: |
+          if [ ! -f "$HOME/.local/bin/mise" ]; then
+            curl https://mise.run | sh
+            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          fi
+
+      - name: Install tools with mise
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          mise run setup > /dev/null 2>&1 || true
+
+      - name: Run quality checks
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          mise run check
+
+      - name: Run tests with coverage
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          mise run test-cov
+
+  build:
+    name: Build Distribution
+    needs: tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@9b03c627221f32cb88b299427119da30671cf9cc
+        with:
+          python-version: "3.12"
+
+      - name: Cache UV dependencies
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ~/.cache/uv
+          key: uv-build-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-build-${{ runner.os }}-
+
+      - name: Install UV and build tools
+        run: |
+          python -m pip install uv twine
+
+      - name: Build package
+        run: |
+          uv build --clean
+
+      - name: Verify build artifacts
+        run: |
+          ls -la dist/
+          echo "Built packages:"
+          for file in dist/*; do
+            echo "📦 $(basename "$file")"
+          done
+
+      - name: Check package integrity with twine
+        run: |
+          uv pip install twine
+          twine check dist/*
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: python-package-distributions
+          path: dist/
+
+  publish-to-pypi:
+    name: Publish to PyPI
+    needs: [tests, build]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/codeweaver-mcp
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://upload.pypi.org/legacy/
+          attestations: true
