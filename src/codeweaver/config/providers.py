@@ -10,13 +10,17 @@ Provides configuration settings for all supported providers, including embedding
 
 from __future__ import annotations
 
-from typing import Annotated, Any, NotRequired, Required, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, NotRequired, Required, TypedDict
 
 from pydantic import Field, PositiveInt, SecretStr
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
 
 from codeweaver.config.types import BaseProviderSettings
 from codeweaver.core.types import DictView
+
+
+if TYPE_CHECKING:
+    from codeweaver.providers.provider import Provider
 
 
 # ===========================================================================
@@ -28,6 +32,7 @@ class DataProviderSettings(BaseProviderSettings):
     """Settings for data providers."""
 
 
+# TODO: Standardize field names
 class EmbeddingModelSettings(TypedDict, total=False):
     """Embedding model settings. Use this class for dense (vector) models."""
 
@@ -35,6 +40,7 @@ class EmbeddingModelSettings(TypedDict, total=False):
     dimension: NotRequired[PositiveInt | None]
     data_type: NotRequired[str | None]
     custom_prompt: NotRequired[str | None]
+    """A custom prompt to use for the embedding model, if supported. Most models do not support custom prompts for embedding."""
     call_kwargs: NotRequired[dict[str, Any] | None]
     """Keyword arguments to pass to the client model's `embed` method."""
     model_kwargs: NotRequired[dict[str, Any] | None]
@@ -173,17 +179,6 @@ class MemoryConfig(TypedDict, total=False):
     """Collection name override. Defaults to project name if not specified."""
 
 
-class VectorStoreSettings(TypedDict, total=False):
-    """Settings for vector store provider selection and configuration."""
-
-    provider: NotRequired[str]
-    """Vector store provider: 'qdrant' or 'memory'. Defaults to 'qdrant'."""
-    qdrant: NotRequired[QdrantConfig]
-    """Qdrant-specific configuration."""
-    memory: NotRequired[MemoryConfig]
-    """Memory provider-specific configuration."""
-
-
 type ProviderSpecificSettings = (
     FastembedGPUProviderSettings
     | AWSProviderSettings
@@ -215,6 +210,17 @@ class RerankingProviderSettings(BaseProviderSettings):
     top_n: NotRequired[PositiveInt | None]
 
 
+class VectorStoreSettings(TypedDict, total=False):
+    """Settings for vector store provider selection and configuration."""
+
+    provider: NotRequired[Provider | str]
+    """Vector store provider: 'qdrant' or 'memory'. Defaults to 'qdrant'."""
+    qdrant: NotRequired[QdrantConfig]
+    """Qdrant-specific configuration."""
+    memory: NotRequired[MemoryConfig]
+    """Memory provider-specific configuration."""
+
+
 # Agent model settings are imported/defined from `pydantic_ai`
 
 type ModelString = Annotated[
@@ -244,7 +250,7 @@ class ProviderSettingsDict(TypedDict, total=False):
     data: NotRequired[tuple[DataProviderSettings, ...] | None]
     embedding: NotRequired[tuple[EmbeddingProviderSettings, ...] | None]
     reranking: NotRequired[tuple[RerankingProviderSettings, ...] | None]
-    # vector: NotRequired[tuple[VectorProviderSettings, ...] | None]
+    vector: NotRequired[tuple[VectorStoreSettings, ...] | None]
     agent: NotRequired[tuple[AgentProviderSettings, ...] | None]
 
 
@@ -267,5 +273,6 @@ __all__ = (
     "QdrantConfig",
     "RerankingModelSettings",
     "RerankingProviderSettings",
+    "SparseEmbeddingModelSettings",
     "VectorStoreSettings",
 )

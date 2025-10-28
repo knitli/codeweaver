@@ -12,8 +12,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
+import time
 
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -27,7 +29,7 @@ from pydantic import Field, PrivateAttr
 from pydantic.dataclasses import dataclass
 from watchfiles.main import Change, FileChange
 
-from codeweaver.config.types import CodeWeaverSettingsDict, RignoreSettings
+from codeweaver.config.types import CodeWeaverSettingsDict, IndexerSettingsDict, RignoreSettings
 from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.file_extensions import (
     CODE_FILES_EXTENSIONS,
@@ -39,6 +41,8 @@ from codeweaver.core.file_extensions import (
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.stores import BlakeStore
 from codeweaver.core.types.dictview import DictView
+from codeweaver.core.types.models import BasedModel
+from codeweaver.exceptions import ConfigurationError
 
 
 logger = logging.getLogger(__name__)
@@ -47,11 +51,7 @@ if TYPE_CHECKING:
     from typing import Any
 
     from codeweaver.core.chunks import CodeChunk
-
-
-# Additional imports for pipeline orchestration
-import asyncio
-import time
+    from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 
 
 def _get_settings_map() -> DictView[CodeWeaverSettingsDict]:
@@ -61,9 +61,43 @@ def _get_settings_map() -> DictView[CodeWeaverSettingsDict]:
     return get_settings_map()
 
 
-def _get_indexing() -> RignoreSettings:
-    """Retrieve rignore filter settings from the global settings map."""
-    return _get_settings_map()[""]
+def _get_indexer_settings() -> DictView[IndexerSettingsDict]:
+    """Retrieve indexer settings from the global settings map."""
+    return DictView(_get_settings_map()["indexing"])
+
+
+def _get_embedding_instance(*, sparse: bool = False) -> EmbeddingProvider[Any] | None:
+    """Stub function to get embedding provider instance."""
+    from codeweaver.common.registry import get_provider_registry
+
+    registry = get_provider_registry()
+    if provider := registry.get_embedding_provider(sparse=sparse):
+        if sparse:
+            return registry.get_sparse_embedding_provider_instance(
+                provider=provider, singleton=True
+            )
+        return registry.get_embedding_provider_instance(provider=provider, singleton=True)
+    return None
+
+
+def _get_reranking_instance() -> Any | None:
+    """Stub function to get reranking provider instance."""
+    from codeweaver.common.registry import get_provider_registry
+
+    registry = get_provider_registry()
+    if provider := registry.get_reranking_provider():
+        return registry.get_reranking_provider_instance(provider=provider, singleton=True)
+    return None
+
+
+def _get_vector_store_instance() -> Any | None:
+    """Stub function to get vector store provider instance."""
+    from codeweaver.common.registry import get_provider_registry
+
+    registry = get_provider_registry()
+    if provider := registry.get_vector_store_provider():
+        return registry.get_vector_store_provider_instance(provider=provider, singleton=True)
+    return None
 
 
 @dataclass
@@ -75,14 +109,13 @@ class IndexingStats:
     chunks_created: int = 0
     chunks_embedded: int = 0
     chunks_indexed: int = 0
-    files_with_errors: Annotated[
-        list[Path],
-        Field(
-            default_factory=list,
-            description="""List of file paths that encountered errors during indexing.""",
-        ),
-    ] = Field(default_factory=list)
-    start_time: float = Field(default_factory=time.time)
+    start_time: float = time.time()
+    files_with_errors: ClassVar[
+        Annotated[
+            list[Path],
+            Field(description="""List of file paths that encountered errors during indexing."""),
+        ]
+    ] = []
 
     @property
     def elapsed_time(self) -> float:
@@ -277,11 +310,17 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         cls, settings: DictView[CodeWeaverSettingsDict] | None = None
     ) -> IgnoreFilter[rignore.Walker]:
         """Create an IgnoreFilter instance from settings."""
-        from codeweaver.config.settings import get_settings_map
+        # we actually need the full object here
+        from codeweaver.config.settings import get_settings, get_settings_map
 
-        settings = settings or get_settings_map()
-        indexing = settings["indexing"].to_settings()
-        return cls(base_path=None, settings=None, walker=rignore.walk(**indexing))
+        settings_map = settings or get_settings_map()
+        index_settings = get_settings().indexing
+        if not index_settings.inc_exc_set:
+            _ = asyncio.run(index_settings.set_inc_exc(get_settings().project_path))
+        indexing = index_settings.to_settings()
+        return cls(
+            base_path=settings_map["project_path"], settings=None, walker=rignore.walk(**indexing)
+        )
 
     @property
     def walker(self) -> rignore.Walker:
@@ -289,7 +328,7 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         return self._walker
 
 
-class Indexer:
+class Indexer(BasedModel):
     """Main indexer class. Wraps a DiscoveredFilestore and chunkers."""
 
     _store: BlakeStore[DiscoveredFile] = PrivateAttr()
@@ -329,12 +368,8 @@ class Indexer:
     def _initialize_providers(self) -> None:
         """Initialize pipeline providers from global registry."""
         try:
-            from codeweaver.common.registry import get_provider_registry
-
-            registry = get_provider_registry()
-
             try:
-                self._embedding_provider = registry.get_embedding_provider_instance(singleton=True)
+                self._embedding_provider = _get_embedding_instance(sparse=False)
                 logger.info(
                     "Initialized embedding provider: %s", type(self._embedding_provider).__name__
                 )
@@ -343,16 +378,18 @@ class Indexer:
                 self._embedding_provider = None
 
             try:
-                self._sparse_provider = registry.get_sparse_embedding_provider_instance(
-                    singleton=True
-                )
+                self._sparse_provider = _get_embedding_instance(sparse=True)
                 logger.info("Initialized sparse provider: %s", type(self._sparse_provider).__name__)
             except Exception as e:
                 logger.debug("No sparse embedding provider configured: %s", e)
                 self._sparse_provider = None
 
+            if not self._embedding_provider and not self._sparse_provider:
+                logger.warning("No embedding providers configured")
+                raise ConfigurationError("No embedding providers configured")
+
             try:
-                self._vector_store = registry.get_vector_store_provider_instance(singleton=True)
+                self._vector_store = _get_vector_store_instance()
                 logger.info("Initialized vector store: %s", type(self._vector_store).__name__)
             except Exception as e:
                 logger.warning("No vector store configured: %s", e)
@@ -689,11 +726,14 @@ class Indexer:
         """
         logger.debug("Persistence from vector store not yet implemented")
 
+    def save_state(self, state_path: Path) -> None:
+        """Save current indexer state to a file."""
+
     def save_checkpoint(self, checkpoint_path: Path | None = None) -> None:
         """Save indexing state to checkpoint file.
 
         TODO: Implement in T008
-        - Save to .codeweaver/index_checkpoint.json
+        - Save to index_settings["checkpoint_file"]
         - Include files_discovered, files_processed, chunks stats
         - Include error list and timestamp
 
@@ -702,16 +742,17 @@ class Indexer:
         """
         logger.debug("Checkpoint save not yet implemented")
 
-    def load_checkpoint(self, checkpoint_path: Path | None = None) -> bool:
+    def load_checkpoint(self, _checkpoint_path: Path | None = None) -> bool:
         """Load indexing state from checkpoint file.
 
         TODO: Implement in T008
-        - Load from .codeweaver/index_checkpoint.json
+        - argument primarily for testing, we use the configured path in production
+        - Load from index_settings["checkpoint_file"]
         - Verify settings hash matches current config
         - Skip if checkpoint >24 hours old
 
         Args:
-            checkpoint_path: Optional custom checkpoint file path
+            _checkpoint_path: Optional custom checkpoint file path
 
         Returns:
             True if checkpoint was loaded successfully

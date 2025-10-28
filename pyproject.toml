@@ -191,6 +191,7 @@ dev = [
   "uv>=0.9.5",
 ]
 all-dev = [
+  "black",
   "copychat",
   "py-cpuinfo",
   "dirty-equals",

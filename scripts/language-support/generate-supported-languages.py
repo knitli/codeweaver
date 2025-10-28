@@ -19,7 +19,7 @@ import textcase
 
 from codeweaver.core.file_extensions import ALL_LANGUAGES
 from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.types import LiteralStringT
+from codeweaver.core.types.aliases import LanguageNameT
 
 
 ALL_LANGUAGES = sorted(ALL_LANGUAGES)
@@ -31,13 +31,13 @@ MARKDOWN_PATH = CW_ROOT / "overrides" / "partials" / "languages.md"
 LITERAL_TYPE_PATH = CW_ROOT / "src" / "codeweaver" / "core" / "secondary_languages.py"
 
 
-def generate_literal_type(languages: list[LiteralStringT]) -> str:
+def generate_literal_type(languages: list[LanguageNameT]) -> str:
     """Generate a Python Literal type definition for the supported languages."""
     literals = ", ".join(f'"{lang}"' for lang in languages)
     return f"type SecondarySupportedLanguage = Literal[{literals}]"
 
 
-def generate_literal_type_file(languages: list[LiteralStringT], path: Path) -> None:
+def generate_literal_type_file(languages: list[LanguageNameT], path: Path) -> None:
     """Generate the supported languages literal type file."""
     intro = dedent("""
         # SPDX-FileCopyrightText: 2025 Knitli Inc.
@@ -64,9 +64,9 @@ def generate_literal_type_file(languages: list[LiteralStringT], path: Path) -> N
         ),
         mode=black.FileMode(
             target_versions={
-                black.TargetVersion.PY311,
                 black.TargetVersion.PY312,
                 black.TargetVersion.PY313,
+                black.TargetVersion.PY314,
             }
         ),
     )
@@ -77,7 +77,7 @@ def generate_literal_type_file(languages: list[LiteralStringT], path: Path) -> N
     print(f"Wrote literal type file to {path} ({outcome} characters).")
 
 
-def generate_markdown_list(languages: list[LiteralStringT]) -> str:
+def generate_markdown_list(languages: list[LanguageNameT]) -> str:
     """Generate a markdown list of supported languages."""
 
     def list_item(lang: str) -> str:
@@ -96,7 +96,7 @@ def generate_markdown_list(languages: list[LiteralStringT]) -> str:
     return f"## Supported Languages\n\n{semantic_markdown}\n{other_markdown}"
 
 
-def generate_markdown_file(languages: list[LiteralStringT], path: Path) -> None:
+def generate_markdown_file(languages: list[LanguageNameT], path: Path) -> None:
     """Generate the supported languages markdown file."""
     content = dedent(f"""<!--
         SPDX-FileCopyrightText: 2025 Knitli Inc.

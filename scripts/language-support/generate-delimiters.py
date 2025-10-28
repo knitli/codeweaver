@@ -15,6 +15,9 @@ with language-specific customizations.
 
 Usage:
     python scripts/generate_delimiters.py [--output OUTPUT_FILE] [--language LANG]
+
+TODO: I'm fairly sure we aren't using this anymore, and instead we construct them dynamically
+      at runtime. Consider removing this script if confirmed.
 """
 
 from __future__ import annotations

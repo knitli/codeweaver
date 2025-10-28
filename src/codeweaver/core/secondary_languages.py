@@ -1,3 +1,4 @@
+
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 # SPDX-License-Identifier: MIT OR Apache-2.0
@@ -14,6 +15,7 @@ type SecondarySupportedLanguage = Literal[
     "asciidoc",
     "assembly",
     "assemblyscript",
+    "astro",
     "batch",
     "beef",
     "carbon",
@@ -27,8 +29,8 @@ type SecondarySupportedLanguage = Literal[
     "creole",
     "crystal",
     "csv",
-    "cue",
     "cuda",
+    "cue",
     "cython",
     "dart",
     "data",
@@ -39,7 +41,10 @@ type SecondarySupportedLanguage = Literal[
     "dlang",
     "docbook",
     "docker",
+    "duck",
     "dyck",
+    "ecl",
+    "eiffel",
     "elm",
     "elvish",
     "emacs",
@@ -65,6 +70,8 @@ type SecondarySupportedLanguage = Literal[
     "io",
     "janet",
     "jelly",
+    "jinja",
+    "json",
     "jule",
     "julia",
     "jupyter",
@@ -84,7 +91,6 @@ type SecondarySupportedLanguage = Literal[
     "mojo",
     "move",
     "newick",
-    "nim",
     "nimble",
     "nushell",
     "nw",
@@ -95,7 +101,7 @@ type SecondarySupportedLanguage = Literal[
     "pascal",
     "perl",
     "pharo",
-    "pmd",
+    "pkl",
     "pod",
     "pony",
     "powershell",
@@ -108,7 +114,6 @@ type SecondarySupportedLanguage = Literal[
     "rake",
     "raku",
     "rakudo",
-    "rdoc",
     "reason",
     "red",
     "rescript",
@@ -123,11 +128,14 @@ type SecondarySupportedLanguage = Literal[
     "scheme",
     "scss",
     "smali",
+    "sml",
     "sql",
     "svelte",
     "texinfo",
     "text",
     "textile",
+    "toml",
+    "tsv",
     "vala",
     "vale",
     "vbscript",
@@ -138,11 +146,13 @@ type SecondarySupportedLanguage = Literal[
     "vue",
     "wiki",
     "xml",
+    "xonsh",
     "yard",
     "zig",
+    "zsh",
 ]
-"""Literal type for supported secondary languages. These languages have basic parsing/chunking support.
-Level of support varies by language. One thing in common: no semantic support.
+"""Literal type for supported secondary languages. These languages have pseudo-semantic parsing support using heuristics.
+Level of support varies by language.
 """
 
 __all__ = ("SecondarySupportedLanguage",)

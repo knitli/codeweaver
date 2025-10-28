@@ -526,7 +526,7 @@ class DiscoveredFile:
 
 ---
 
-## Integration Checpoints (Pre-T003)
+## Integration Checkpoints (Pre-T003)
 
 Before implementing T003 pipeline, validate these integration checkpoints:
 

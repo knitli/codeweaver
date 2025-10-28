@@ -59,6 +59,7 @@ if TYPE_CHECKING:
 class RignoreSettings(TypedDict, total=False):
     """Settings for the rignore library."""
 
+    path: NotRequired[Path]
     ignore_hidden: NotRequired[bool]
     read_ignore_files: NotRequired[bool]
     read_parents_ignores: NotRequired[bool]
@@ -66,8 +67,8 @@ class RignoreSettings(TypedDict, total=False):
     read_global_git_ignore: NotRequired[bool]
     read_git_exclude: NotRequired[bool]
     require_git: NotRequired[bool]
-    additional_ignores: NotRequired[list[str | Path]]
-    additional_ignore_paths: NotRequired[list[str | Path]]
+    additional_ignores: NotRequired[list[str]]
+    additional_ignore_paths: NotRequired[list[str]]
     max_depth: NotRequired[int]
     max_filesize: NotRequired[int]
     follow_links: NotRequired[bool]

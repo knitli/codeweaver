@@ -1,3 +1,4 @@
+# sourcery skip: name-type-suffix, no-complex-if-expressions
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -102,31 +103,140 @@ DefaultDataProviderSettings = (
     DataProviderSettings(provider=Provider.DUCKDUCKGO, enabled=True, api_key=None, other=None),
 )
 
+
+# TODO: move defaault computation to provider module.
+class DeterminedDefaults(NamedTuple):
+    """Tuple for determined default embedding settings."""
+
+    provider: Provider
+    model: str
+    enabled: bool
+
+
+def _get_default_embedding_settings() -> DeterminedDefaults:
+    """Determine the default embedding provider, model, and enabled status based on available libraries."""
+    for lib in (
+        "voyageai",
+        "mistral",
+        "google",
+        "fastembed_gpu",
+        "fastembed",
+        "sentence_transformers",
+    ):
+        if util.find_spec(lib) is not None:
+            # all three of the top defaults are extremely capable
+            if lib == "voyageai":
+                return DeterminedDefaults(
+                    provider=Provider.VOYAGE, model="voyage:voyage-code-3", enabled=True
+                )
+            if lib == "mistral":
+                return DeterminedDefaults(
+                    provider=Provider.MISTRAL, model="mistral:codestral-embed", enabled=True
+                )
+            if lib == "google":
+                return DeterminedDefaults(
+                    provider=Provider.GOOGLE, model="google/gemini-embedding-001", enabled=True
+                )
+            if lib in {"fastembed_gpu", "fastembed"}:
+                return DeterminedDefaults(
+                    # showing its age but it's still a solid lightweight option
+                    provider=Provider.FASTEMBED,
+                    model="fastembed:BAAI/bge-small-en-v1.5",
+                    enabled=True,
+                )
+            if lib == "sentence_transformers":
+                return DeterminedDefaults(
+                    provider=Provider.SENTENCE_TRANSFORMERS,
+                    # embedding-small-english-r2 is *very lightweight* and quite capable with a good context window (8192 tokens)
+                    model="sentence-transformers:ibm-granite/granite-embedding-small-english-r2",
+                    enabled=True,
+                )
+    logger.warning(
+        "No default embedding provider libraries found. Embedding functionality will be disabled unless explicitly set in your config or environment variables."
+    )
+    return DeterminedDefaults(provider=Provider.UNSET, model="NONE", enabled=False)
+
+
+_embedding_defaults = _get_default_embedding_settings()
+
 DefaultEmbeddingProviderSettings = (
     EmbeddingProviderSettings(
-        provider=Provider.VOYAGE,
-        enabled=True,
-        model_settings=EmbeddingModelSettings(model="voyage:voyage-code-3"),
-    ),
-)
-HAS_ST = util.find_spec("sentence_transformers") is not None
-DefaultSparseEmbeddingProviderSettings = (
-    EmbeddingProviderSettings(
-        provider=Provider.SENTENCE_TRANSFORMERS,
-        enabled=HAS_ST,
-        sparse_model_settings=SparseEmbeddingModelSettings(
-            model="opensearch:opensearch-neural-sparse-encoding-doc-v3-gte"
-        ),
+        provider=_embedding_defaults.provider,
+        enabled=_embedding_defaults.enabled,
+        model_settings=EmbeddingModelSettings(model=_embedding_defaults.model),
     ),
 )
 
-DefaultRerankingProviderSettings = (
-    RerankingProviderSettings(
-        provider=Provider.VOYAGE,
-        enabled=True,
-        model_settings=RerankingModelSettings(model="voyage:rerank-2.5"),
+
+def _get_default_sparse_embedding_settings() -> DeterminedDefaults:
+    """Determine the default sparse embedding provider, model, and enabled status based on available libraries."""
+    for lib in ("sentence_transformers", "fastembed_gpu", "fastembed"):
+        if util.find_spec(lib) is not None:
+            if lib == "sentence_transformers":
+                return DeterminedDefaults(
+                    provider=Provider.SENTENCE_TRANSFORMERS,
+                    model="opensearch:opensearch-neural-sparse-encoding-doc-v3-gte",
+                    enabled=True,
+                )
+            if lib in {"fastembed_gpu", "fastembed"}:
+                return DeterminedDefaults(
+                    provider=Provider.FASTEMBED, model="prithivida/Splade_PP_en_v2", enabled=True
+                )
+    # Sentence-Transformers and Fastembed are the *only* sparse embedding options we support
+    logger.warning(
+        "No sparse embedding provider libraries found. Sparse embedding functionality disabled."
+    )
+    return DeterminedDefaults(provider=Provider.UNSET, model="NONE", enabled=False)
+
+
+_sparse_embedding_defaults = _get_default_sparse_embedding_settings()
+
+DefaultSparseEmbeddingProviderSettings = (
+    EmbeddingProviderSettings(
+        provider=_sparse_embedding_defaults.provider,
+        enabled=_sparse_embedding_defaults.enabled,
+        sparse_model_settings=SparseEmbeddingModelSettings(model=_sparse_embedding_defaults.model),
     ),
 )
+
+
+def _get_default_reranking_settings() -> DeterminedDefaults:
+    """Determine the default reranking provider, model, and enabled status based on available libraries."""
+    for lib in ("voyageai", "fastembed_gpu", "fastembed", "sentence_transformers"):
+        if util.find_spec(lib) is not None:
+            if lib == "voyageai":
+                return DeterminedDefaults(
+                    provider=Provider.VOYAGE, model="voyage:rerank-2.5", enabled=True
+                )
+            if lib in {"fastembed_gpu", "fastembed"}:
+                return DeterminedDefaults(
+                    provider=Provider.FASTEMBED,
+                    model="fastembed:jinaai/jina-reranker-v2-base-multilingual",
+                    enabled=True,
+                )
+            if lib == "sentence_transformers":
+                return DeterminedDefaults(
+                    provider=Provider.SENTENCE_TRANSFORMERS,
+                    # on the heavier side for what we aim for as a default but very capable
+                    model="sentence-transformers:BAAI/bge-reranker-v2-m3",
+                    enabled=True,
+                )
+    logger.warning(
+        "No default reranking provider libraries found. Reranking functionality will be disabled unless explicitly set in your config or environment variables."
+    )
+    return DeterminedDefaults(provider=Provider.UNSET, model="NONE", enabled=False)
+
+
+_reranking_defaults = _get_default_reranking_settings()
+
+DefaultRerankingProviderSettings = (
+    RerankingProviderSettings(
+        provider=_reranking_defaults.provider,
+        enabled=_reranking_defaults.enabled,
+        model_settings=RerankingModelSettings(model=_reranking_defaults.model),
+    ),
+)
+
 HAS_ANTHROPIC = util.find_spec("anthropic") is not None
 DefaultAgentProviderSettings = (
     AgentProviderSettings(
@@ -297,12 +407,6 @@ class IndexerSettings(BasedModel):
             description="""Whether to include common hidden tooling directories in search and indexing. This is enabled by default and recommended for most users. Still respects .gitignore rules, so any gitignored files will be excluded."""
         ),
     ] = True
-    index_storage_path: Annotated[
-        Path,
-        Field(
-            description=rf"""Path to store index data locally. The default is in your user configuration directory (like ~/.config/codeweaver/{_get_project_name()}_index.json or c:\Users\your_username\AppData\Roaming\codeweaver\{_get_project_name()}_index.json)."""
-        ),
-    ] = Path(".codeweaver/repo_index.json")
     other_ignore_kwargs: Annotated[
         RignoreSettings | Unset,
         Field(
@@ -326,15 +430,66 @@ class IndexerSettings(BasedModel):
             description="""Disabled by default and usually **not recommended**. This setting disables background indexing, requiring you to manually trigger indexing by command or program call. CodeWeaver uses background indexing to ensure it always has an accurate view of the codebase, so disabling this can severely impact the quality of results. We expose this setting for troubleshooting, debugging, and some isolated use cases where codeweaver may be orchestrated externally or supplied with data from other sources."""
         ),
     ] = False
+    _index_storage_path: Annotated[
+        Path | None,
+        Field(
+            description=rf"""\
+            Path to store index data locally. The default is in your user configuration directory (like ~/.config/codeweaver/{_get_project_name()}_index.json or c:\Users\your_username\AppData\Roaming\codeweaver\your_project_name_index.json).  If not set, CodeWeaver will use the default path.
+
+            Developer Note: We set the default lazily after initialization to avoid circular import issues. Internally, we use the `cache_dir` property to get the effective storage path. We recommend you do too if you need to programmatically access this value. We only keep this field public for user configuration.
+            """,
+            serialization_alias="index_storage_path",
+            validation_alias="index_storage_path",
+        ),
+    ] = None
 
     _inc_exc_set: Annotated[bool, PrivateAttr()] = False
+
+    @computed_field
+    @property
+    def cache_dir(self) -> DirectoryPath:
+        """Effective storage path for index data."""
+        path = self._index_storage_path or get_storage_path()
+        if not path.parent.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.exists():
+            path.touch()
+        return path
+
+    @computed_field
+    @property
+    def storage_file(self) -> FilePath:
+        """Effective storage file path for index data."""
+        if self._index_storage_path:
+            return self._index_storage_path
+        project_name = _get_project_name()
+        self._index_storage_path = self.cache_dir / f"{project_name}_index.json"
+        return self._index_storage_path
+
+    @computed_field
+    @property
+    def inc_exc_set(self) -> bool:
+        """Whether includes and excludes have been set."""
+        return self._inc_exc_set
+
+    @computed_field
+    @property
+    def checkpoint_file(self) -> FilePath:
+        """Path to the checkpoint file for indexing progress."""
+        return self.cache_dir / "indexing_checkpoint.json"
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {
-            FilteredKey("forced_includes"): AnonymityConversion.COUNT,
+            FilteredKey("_index_storage_path"): AnonymityConversion.HASH,
+            FilteredKey("additional_ignores"): AnonymityConversion.COUNT,
+            FilteredKey("cache_dir"): AnonymityConversion.HASH,
+            FilteredKey("checkpoint_file"): AnonymityConversion.HASH,
+            FilteredKey("excluded_extensions"): AnonymityConversion.COUNT,
             FilteredKey("excludes"): AnonymityConversion.COUNT,
+            FilteredKey("forced_includes"): AnonymityConversion.COUNT,
+            FilteredKey("storage_file"): AnonymityConversion.HASH,
         }
 
     def model_post_init(self, _context: MiddlewareContext[Any] | None = None, /) -> None:
@@ -383,37 +538,25 @@ class IndexerSettings(BasedModel):
 
     def _as_settings(self) -> RignoreSettings:
         """Convert self, either as an instance or as a serialized python dictionary, to kwargs for rignore."""
-        return RignoreSettings(
-            **cast(
-                RignoreSettings,
-                {
-                    "path": get_settings_map()["project_path"],
-                    **self.default_rignore_settings,
-                    # The filter function handles the include_github_dir and include_tooling_dirs logic
-                    "ignore_hidden": bool(
-                        self.ignore_hidden
-                        and not (self.include_github_dir or self.include_tooling_dirs)
-                    ),
-                    "read_ignore_files": self.use_other_ignore_files,
-                    "read_git_ignore": self.use_gitignore,
-                    **(
-                        {}
-                        if isinstance(self.other_ignore_kwargs, Unset)
-                        else self.other_ignore_kwargs
-                    ),
-                    "additional_ignores": [
-                        *(
-                            f"*.{ext}"
-                            if not ext.startswith("*") or ext.startswith(".")
-                            else (ext if ext.startswith("*") else f"*{ext}")
-                            for ext in self.excluded_extensions
-                        ),
-                        *self.excludes,
-                    ],
-                    "should_exclude_entry": self.filter,
-                },
-            )
+        rignore_settings = self.default_rignore_settings | (
+            {} if isinstance(self.other_ignore_kwargs, Unset) else self.other_ignore_kwargs
         )
+        rignore_settings["path"] = get_settings_map()["project_path"]
+        rignore_settings["ignore_hidden"] = bool(
+            self.ignore_hidden and not self.include_github_dir and not self.include_tooling_dirs
+        )
+        rignore_settings["read_ignore_files"] = self.use_other_ignore_files
+        rignore_settings["read_git_ignore"] = self.use_gitignore
+        rignore_settings["additional_ignore_paths"] = [
+            str(p) for p in self.excludes if not any(char for char in ("*?[]") if char in str(p))
+        ]
+        rignore_settings["additional_ignores"] = [
+            str(p)
+            for p in self.excludes
+            if str(p) not in rignore_settings["additional_ignore_paths"]
+        ]
+        rignore_settings["should_exclude_entry"] = self.filter
+        return RignoreSettings(rignore_settings)
 
     def construct_filter(self) -> Callable[[Path], bool]:
         """Constructs the filter function for rignore's `should_exclude_entry` parameter.
@@ -484,13 +627,19 @@ class ProviderSettings(BasedModel):
     ] = DefaultDataProviderSettings
 
     embedding: Annotated[
-        tuple[EmbeddingProviderSettings, ...] | Unset,
-        Field(description="""Embedding provider configuration"""),
+        tuple[EmbeddingProviderSettings, EmbeddingProviderSettings]
+        | tuple[EmbeddingProviderSettings]
+        | Unset,
+        Field(
+            description="""Embedding provider configuration. You can provide up to two embedding providers: one for dense embeddings and one for sparse embeddings."""
+        ),
     ] = DefaultEmbeddingProviderSettings
 
     reranking: Annotated[
         tuple[RerankingProviderSettings, ...] | Unset,
-        Field(description="""Reranking provider configuration"""),
+        Field(
+            description="""Reranking provider configuration. Note: while this field is a tuple (for consistency across settings), you can only configure one active reranking provider at a time."""
+        ),
     ] = DefaultRerankingProviderSettings
 
     vector_store: Annotated[
@@ -754,13 +903,21 @@ class CodeWeaverSettings(BaseSettings):
         MiddlewareOptions | None, Field(description="""Middleware settings""")
     ] = DefaultMiddlewareSettings
 
-    indexing: Annotated[IndexerSettings, Field(description="""File filtering settings""")] = (
-        IndexerSettings()
-    )
+    indexing: Annotated[
+        IndexerSettings,
+        Field(
+            description="""File filtering settings""", init=False, default_factory=IndexerSettings
+        ),
+    ]
 
-    chunker: Annotated[ChunkerSettings, Field(description="""Chunker system configuration""")] = (
-        ChunkerSettings()
-    )
+    chunker: Annotated[
+        ChunkerSettings,
+        Field(
+            description="""Chunker system configuration""",
+            init=False,
+            default_factory=ChunkerSettings,
+        ),
+    ]
 
     # TODO: I don't think we're actually checking for these before initializing the server. We should.
     enable_health_endpoint: Annotated[
@@ -811,6 +968,25 @@ class CodeWeaverSettings(BaseSettings):
         # Ensure project path exists and is readable
         if not self.project_name and self.project_path:
             self.project_name = self.project_path.name
+        if not self.indexing:
+            if not IndexerSettings.__pydantic_complete__:
+                result = IndexerSettings.model_rebuild()
+                logger.debug(
+                    "Rebuilt IndexerSettings during CodeWeaverSettings post-init, result: %s",
+                    result,
+                )
+            self.indexing = IndexerSettings()
+            if not self.chunker:
+                if not ChunkerSettings.__pydantic_complete__:
+                    result = ChunkerSettings.model_rebuild()
+                    logger.debug(
+                        "Rebuilt ChunkerSettings during CodeWeaverSettings post-init, result: %s",
+                        result,
+                    )
+                self.chunker = ChunkerSettings()
+        if not type(self).__pydantic_complete__:
+            result = type(self).model_rebuild()
+            logger.debug("Rebuilt CodeWeaverSettings during post-init, result: %s", result)
         if type(self).__pydantic_complete__:
             self._map = cast(DictView[CodeWeaverSettingsDict], DictView(self.model_dump()))
             globals()["_mapped_settings"] = self._map
