@@ -31,7 +31,7 @@ from typing import NamedTuple
 
 from pydantic import NonNegativeInt, PositiveInt
 
-from codeweaver.core import Span
+from codeweaver.core.spans import Span
 
 
 class MatchedSection(NamedTuple):
@@ -75,23 +75,8 @@ __all__ = ("MatchedSection", "find_code")
 # I commented this out because it's a remanent of the old architecture. It needs to be re-integrated into the new architecture.
 # This was written before:
 # 1) Code Chunk existed,
-# and 2) the new File Discovery Service existed.
+# and 2) the new File Discovery Service and Indexer existed.
 #
-# In practice, it goes like this (or will):
-# 1) Use FileDiscoveryService to get the list of files.
-# 2) For each file, create CodeChunks using the best chunker available for that language.
-# 3) Each chunk is registered in the chunk registry
-# 4) Chunks are sent to the embedding (and sparse embedding) service(s) to get (document) embeddings.
-# 5) Embeddings are sent to the vector database for storage.
-# 6) When a query comes in, the query is embedded using the same embedding service(s).
-# 7) The vector database is queried for the most relevant chunks.
-# 8) Initial results are sent to the reranking service (if available) for reranking.
-# 9) For semantically indexed languages, the results are weighted based on semantic importance/relevance based on the task and objectives (see semantic/classification.py).
-# 10) Those are reranked based on that.
-# 11) Results go to the *context agent* if available for final filtering and selection, and potential re-querying.
-# 12) Final results are returned to the user's agent.
-
-# in phase 3 we'll use graph orchestration to manage this entire flow.
 """
 async def find_code(
     query: str,

@@ -63,10 +63,8 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
             "log_level": server_setup.pop("log_level", "INFO"),
             "path": server_setup.pop("streamable_http_path", "/codeweaver"),
             "middleware": server_setup.pop("middleware", set()),
-            "uvicorn_config": settings.uvicorn_settings.model_dump(
-                mode="python", exclude_unset=True
-            )
-            if settings.uvicorn_settings
+            "uvicorn_config": settings.uvicorn.model_dump(mode="python", exclude_unset=True)
+            if settings.uvicorn
             else {},
         }
         resolved_kwargs = new_kwargs | kwargs  # pyright: ignore[reportUnknownVariableType]
@@ -113,7 +111,7 @@ async def run(
     server_setup["app"], server_setup["middleware"] = await register_app_bindings(  # type: ignore
         server_setup["app"],
         server_setup.get("middleware", set()),  # pyright: ignore[reportArgumentType]
-        server_setup.get("middleware_settings", {}),
+        server_setup.get("middleware", {}),
     )
     server_setup["app"] = register_tool(server_setup["app"])
     await start_server(server_setup)

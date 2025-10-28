@@ -1,0 +1,312 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "find_code MCP Tool Contract",
+  "description": "MCP tool contract for semantic code search via CodeWeaver",
+  "type": "object",
+  "tool": {
+    "name": "find_code",
+    "description": "Search codebase using natural language query with semantic ranking",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Natural language search query",
+          "minLength": 1,
+          "examples": [
+            "authentication logic",
+            "database connection pooling",
+            "how does chunking work"
+          ]
+        },
+        "intent": {
+          "type": "string",
+          "enum": [
+            "understand",
+            "implement",
+            "debug",
+            "optimize",
+            "test",
+            "configure",
+            "document"
+          ],
+          "description": "Optional search intent to adjust ranking weights",
+          "default": null
+        },
+        "token_limit": {
+          "type": "integer",
+          "description": "Maximum tokens in response",
+          "minimum": 1000,
+          "maximum": 100000,
+          "default": 10000
+        },
+        "include_tests": {
+          "type": "boolean",
+          "description": "Include test files in results",
+          "default": false
+        },
+        "focus_languages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Filter results by programming languages",
+          "default": null,
+          "examples": [
+            ["python"],
+            ["python", "typescript"]
+          ]
+        },
+        "max_results": {
+          "type": "integer",
+          "description": "Maximum number of matches to return",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 50
+        }
+      },
+      "required": ["query"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "matches": {
+          "type": "array",
+          "description": "Ranked code matches",
+          "items": {
+            "$ref": "#/definitions/CodeMatch"
+          }
+        },
+        "summary": {
+          "type": "string",
+          "description": "High-level explanation of results",
+          "maxLength": 1000
+        },
+        "query_intent": {
+          "type": "string",
+          "enum": [
+            "understand",
+            "implement",
+            "debug",
+            "optimize",
+            "test",
+            "configure",
+            "document",
+            null
+          ],
+          "description": "Detected or specified intent"
+        },
+        "total_matches": {
+          "type": "integer",
+          "description": "Total candidates before ranking",
+          "minimum": 0
+        },
+        "total_results": {
+          "type": "integer",
+          "description": "Results in this response",
+          "minimum": 0
+        },
+        "token_count": {
+          "type": "integer",
+          "description": "Actual tokens used in response",
+          "minimum": 0
+        },
+        "execution_time_ms": {
+          "type": "number",
+          "description": "Total processing time in milliseconds",
+          "minimum": 0
+        },
+        "search_strategy": {
+          "type": "array",
+          "description": "Search methods used",
+          "items": {
+            "type": "string",
+            "enum": [
+              "HYBRID_SEARCH",
+              "SEMANTIC_RERANK",
+              "SPARSE_ONLY",
+              "DENSE_ONLY",
+              "KEYWORD_FALLBACK"
+            ]
+          }
+        },
+        "languages_found": {
+          "type": "array",
+          "description": "Languages in results",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "matches",
+        "summary",
+        "query_intent",
+        "total_matches",
+        "total_results",
+        "token_count",
+        "execution_time_ms",
+        "search_strategy",
+        "languages_found"
+      ]
+    }
+  },
+  "definitions": {
+    "CodeMatch": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "$ref": "#/definitions/DiscoveredFile"
+        },
+        "content": {
+          "$ref": "#/definitions/CodeChunk"
+        },
+        "span": {
+          "type": "array",
+          "description": "Line range [start, end]",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "relevance_score": {
+          "type": "number",
+          "description": "Multi-layered weighted score",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "match_type": {
+          "type": "string",
+          "enum": ["SEMANTIC", "SYNTACTIC", "KEYWORD", "FILE_PATTERN"]
+        },
+        "related_symbols": {
+          "type": "array",
+          "description": "Related functions/classes",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "file",
+        "content",
+        "span",
+        "relevance_score",
+        "match_type",
+        "related_symbols"
+      ]
+    },
+    "DiscoveredFile": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Absolute or relative file path"
+        },
+        "language": {
+          "type": "string",
+          "description": "Programming language identifier"
+        }
+      },
+      "required": ["path", "language"]
+    },
+    "CodeChunk": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "string",
+          "description": "Code content",
+          "minLength": 1
+        },
+        "line_range": {
+          "type": "array",
+          "description": "Line range [start, end]",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "language": {
+          "type": "string",
+          "description": "Programming language"
+        }
+      },
+      "required": ["content", "line_range", "language"]
+    }
+  },
+  "examples": [
+    {
+      "description": "Simple search query",
+      "request": {
+        "query": "authentication logic"
+      },
+      "response": {
+        "matches": [
+          {
+            "file": {
+              "path": "src/auth/middleware.py",
+              "language": "python"
+            },
+            "content": {
+              "content": "class AuthMiddleware:\n    def __init__(self, config: AuthConfig):\n        ...",
+              "line_range": [15, 85],
+              "language": "python"
+            },
+            "span": [15, 85],
+            "relevance_score": 0.92,
+            "match_type": "SEMANTIC",
+            "related_symbols": ["AuthConfig", "authenticate_request"]
+          }
+        ],
+        "summary": "Found authentication middleware implementation in auth module",
+        "query_intent": "understand",
+        "total_matches": 47,
+        "total_results": 1,
+        "token_count": 450,
+        "execution_time_ms": 850,
+        "search_strategy": ["HYBRID_SEARCH", "SEMANTIC_RERANK"],
+        "languages_found": ["python"]
+      }
+    },
+    {
+      "description": "Search with intent and filters",
+      "request": {
+        "query": "database connection pooling implementation",
+        "intent": "implement",
+        "max_results": 3,
+        "focus_languages": ["python"]
+      },
+      "response": {
+        "matches": [
+          {
+            "file": {
+              "path": "src/database/pool.py",
+              "language": "python"
+            },
+            "content": {
+              "content": "class ConnectionPool:\n    def __init__(self, config: PoolConfig):\n        ...",
+              "line_range": [12, 45],
+              "language": "python"
+            },
+            "span": [12, 45],
+            "relevance_score": 0.94,
+            "match_type": "SEMANTIC",
+            "related_symbols": ["PoolConfig", "DatabaseConnection"]
+          }
+        ],
+        "summary": "Found 1 connection pool implementation in database module",
+        "query_intent": "implement",
+        "total_matches": 8,
+        "total_results": 3,
+        "token_count": 450,
+        "execution_time_ms": 720,
+        "search_strategy": ["HYBRID_SEARCH", "SEMANTIC_RERANK"],
+        "languages_found": ["python"]
+      }
+    }
+  ]
+}

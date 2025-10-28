@@ -36,6 +36,7 @@ from codeweaver.core.stores import BlakeStore, UUIDStore, make_blake_store, make
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BasedModel
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+from codeweaver.providers.embedding.registry import EmbeddingRegistry
 from codeweaver.providers.provider import Provider
 from codeweaver.tokenizers import Tokenizer, get_tokenizer
 
@@ -53,6 +54,12 @@ _get_statistics: LazyImport[SessionStatistics] = lazy_import(
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _get_registry() -> EmbeddingRegistry:
+    from codeweaver.providers.embedding.registry import get_embedding_registry
+
+    return get_embedding_registry()
 
 
 class EmbeddingErrorInfo(TypedDict):
@@ -220,6 +227,12 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         except Exception as e:
             return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)  # type: ignore
         else:
+            if not is_old_batch:
+                self._register_chunks(
+                    chunks=tuple(chunks),
+                    batch_id=cast(UUID7, batch_id or cache_key),
+                    embeddings=results,
+                )
             return results
 
     @abstractmethod
@@ -352,6 +365,41 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         passed_kwargs = passed_kwargs or {}
         return cast(dict[str, Any], instance_kwargs) | cast(dict[str, Any], passed_kwargs)
 
+    def _register_chunks(
+        self,
+        chunks: Sequence[CodeChunk],
+        batch_id: UUID7,
+        embeddings: Sequence[Sequence[float]] | Sequence[Sequence[int]],
+    ) -> None:
+        """Register chunks in the embedding registry."""
+        from codeweaver.core.types.aliases import LiteralStringT, ModelName
+        from codeweaver.providers.embedding.types import ChunkEmbeddings, EmbeddingBatchInfo
+
+        registry = _get_registry()
+        attr = "sparse" if type(self).__name__.lower().startswith("sparse") else "dense"
+        chunk_infos = [
+            getattr(EmbeddingBatchInfo, f"create_{attr}")(
+                batch_id=batch_id,
+                batch_index=i,
+                chunk_id=chunk.chunk_id,
+                model=ModelName(cast(LiteralStringT, self.model_name)),
+                embeddings=embedding,
+            )
+            for i, (chunk, embedding) in enumerate(zip(chunks, embeddings, strict=True))
+        ]
+        for i, info in enumerate(chunk_infos):
+            if (registered := registry.get(info.chunk_id)) is not None:
+                registry[info.chunk_id] = registered.add(info)
+                if registered.chunk != chunks[i]:
+                    # because we create new CodeChunk instances during processing, we need to update the chunk reference
+                    registry[info.chunk_id] = registry[info.chunk_id]._replace(chunk=chunks[i])
+            else:
+                registry[info.chunk_id] = ChunkEmbeddings(
+                    dense=info if attr == "dense" else None,
+                    sparse=info if attr == "sparse" else None,
+                    chunk=chunks[i],
+                )
+
     def _process_input(
         self, input_data: StructuredDataInput, *, is_old_batch: bool = False
     ) -> tuple[Iterator[CodeChunk], UUID7 | None]:
@@ -359,17 +407,23 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         processed_chunks = default_input_transformer(input_data)
         if is_old_batch:
             return processed_chunks, None
+        from codeweaver.core.chunks import BatchKeys
+
         key = uuid7()
+        final_chunks: list[CodeChunk] = []
         hashes = [self._hash_store.keygen.__call__(chunk.content) for chunk in processed_chunks]
-        for i, chunk in enumerate(processed_chunks):
-            chunk.set_batch_id(key)
-            if hashes[i] not in self._hash_store:
-                self._hash_store[hashes[i]] = key
-            else:
-                chunk = None
-        final_chunks = [chunk for chunk in processed_chunks if chunk]
-        if self._store:  # type: ignore
-            self._store[key] = final_chunks  # type: ignore
+        starter_chunks = [
+            chunk
+            for i, chunk in enumerate(processed_chunks)
+            if chunk and hashes[i] not in self._hash_store
+        ]
+        for i, chunk in enumerate(starter_chunks):
+            batch_keys = BatchKeys(id=key, idx=i)
+            final_chunks.append(chunk.set_batch_keys(batch_keys))
+            self._hash_store[hashes[i]] = key
+        if not self._store:  # type: ignore
+            self._store = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)  # type: ignore
+        self._store[key] = final_chunks  # type: ignore
         return iter(final_chunks), key
 
     def _process_output(self, output_data: Any) -> list[list[float]] | list[list[int]]:

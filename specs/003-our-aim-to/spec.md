@@ -24,10 +24,10 @@ SPDX-License-Identifier: MIT OR Apache-2.0
    → Data: code chunks, embeddings, search results
    → Constraints: must work today, realistic documentation
 3. For each unclear aspect:
-   → RESOLVED: Embedding provider = VoyageAI-code-3 (default in settings)
+   → RESOLVED: Embedding provider = voyage-code-3 (default in settings)
    → RESOLVED: Vector store = Qdrant local (in-memory for dev, with persistence)
    → RESOLVED: Sparse embeddings = FastEmbed with prithivida/Splade-PP_en_v2
-   → RESOLVED: Reranker = VoyageAI-rerank-2.5 (default)
+   → RESOLVED: Reranker = voyage-rerank-2.5 (default)
    → RESOLVED: Auto-indexing is default behavior (can be disabled in settings)
    → RESOLVED: Performance target = "it works and is useful" for v0.1
 4. Fill User Scenarios & Testing section
@@ -57,7 +57,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 ### Session 2025-10-27
 - Q: When indexing fails for individual files (e.g., corrupted file, unsupported encoding), how should the system behave? → A: Retry once, then log and continue. If ≥25 errors, show warning to stderr
-- Q: How does the user specify which codebase directory to index when starting the CodeWeaver server? → A: Config file (CodeWeaverSettings from FileFilterSettings)
+- Q: How does the user specify which codebase directory to index when starting the CodeWeaver server? → A: Config file (CodeWeaverSettings from IndexerSettings)
 - Q: When the embedding provider API (VoyageAI) is unavailable or returns errors during indexing, what should happen? → A: During indexing: log and continue with exponential backoff, still collect sparse indexes if configured. During query: try sparse-only search, warn user (MCP: context object, CLI: stdout), raise error only if no results possible
 - Q: What level of detail should progress feedback show during indexing operations? → A: Index status reports through /health/ endpoint with detailed information (server.py, app_bindings.py). Also exposed via CLI command. Both need implementation
 - Q: When the vector store (Qdrant) is unavailable at server startup or becomes unavailable during operation, what should happen? → A: Log and warn, exponential backoff. If problem persists, raise error and stop. Respond with error for queries until contact re-established (between identifying issue and raise + stop)
@@ -104,9 +104,9 @@ An AI agent using MCP can connect to the running CodeWeaver server and use the `
    **When** the `find_code` tool processes the query
    **Then** the system executes the following pipeline:
    - Analyzes query to determine IntentType heuristically
-   - Embeds query using both dense (VoyageAI-code-3) and sparse (Splade) methods
+   - Embeds query using both dense (voyage-code-3) and sparse (Splade) methods
    - Retrieves candidate results using hybrid search from Qdrant
-   - Reranks candidates using VoyageAI-rerank-2.5
+   - Reranks candidates using voyage-rerank-2.5
    - Rescores results based on AgentTask, IntentType, and ImportanceScores category
    - Returns top-k results with all relevance scores included
 
@@ -256,10 +256,14 @@ Found 5 matches (sparse search in 450ms)
 #### Installation & Setup
 - **FR-001**: System MUST be installable from a cloned repository following documented steps
 - **FR-002**: System MUST provide clear error messages if prerequisites are missing
-- **FR-003**: System MUST start a server process without errors when all prerequisites are met
+  - **Acceptance Criteria**:
+    - Error messages MUST include: (1) root cause, (2) operation context, (3) suggested action
+    - Example: "Failed to connect to Qdrant at localhost:6333. Check Qdrant is running: `docker run -p 6333:6333 qdrant/qdrant`"
+    - Example: "VoyageAI API key not found. Set VOYAGE_API_KEY environment variable or add to .env file"
+- **FR-003**: System MUST start a server process without errors when all prerequisites are met. This means it MUST: start, initiate the MCP server and all necessary services for indexing/embedding generation, and MCP without error and successfully respond to a search request through MCP and cli
 
 #### Indexing
-- **FR-004**: System MUST accept a codebase directory path via config file (CodeWeaverSettings from FileFilterSettings)
+- **FR-004**: System MUST accept a codebase directory path via config file (CodeWeaverSettings from IndexerSettings)
 
 - **FR-005**: System MUST discover code files in the codebase using the following filters:
   - Exclude files matching .gitignore rules
@@ -275,7 +279,7 @@ Found 5 matches (sparse search in 450ms)
     - Chunk size range: 200-800 tokens (95th percentile)
   - **Validation**: Parse random sample of 100 chunks per language, verify syntactic completeness by re-parsing without errors
 
-- **FR-007**: System MUST generate embeddings for each code chunk using VoyageAI-code-3 (configurable via settings)
+- **FR-007**: System MUST generate embeddings for each code chunk using voyage-code-3 (Provider.VOYAGE, configurable via settings)
 
 - **FR-008**: System MUST store embeddings in Qdrant vector database (local in-memory with persistence for dev, configurable for remote)
 
@@ -456,9 +460,9 @@ Found 5 matches (sparse search in 450ms)
 
 #### Search Quality
 
-- **FR-017**: Search MUST use hybrid search combining dense vectors (VoyageAI-code-3 embeddings) and sparse vectors (FastEmbed with prithivida/Splade-PP_en_v2)
+- **FR-017**: Search MUST use hybrid search combining dense vectors (voyage-code-3 embeddings) and sparse vectors (FastEmbed with prithivida/Splade-PP_en_v2)
 
-- **FR-018**: Search results MUST be reranked using VoyageAI-rerank-2.5 (configurable via settings)
+- **FR-018**: Search results MUST be reranked using voyage-rerank-2.5 (configurable via settings)
 
 - **FR-019**: System MUST apply ImportanceScores from SemanticClass categories when ranking search results. Scoring weights MUST be adjusted based on query IntentType or AgentTask context.
   - **Weighting Rules**:
@@ -619,11 +623,11 @@ All entities below reference actual Pydantic models in the codebase:
 - `line_range: Span` - Line range in source file
 - `file_path: Path | None` - Source file path
 - `language: SemanticSearchLanguage | str | None`
-- `source: ChunkSource` - TEXT_BLOCK | FILE | AST_NODE
+- `source: ChunkSource` - TEXT_BLOCK | FILE | SEMANTIC
 - `ext_kind: ExtKind | None` - File extension metadata
 - `timestamp: float` - Creation/modification timestamp
 - `chunk_id: UUID7` - Unique identifier
-- `parent_id: UUID7 | None` - Parent chunk (e.g., file ID)
+- `parent_id: UUID7 | None` - Parent chunk (e.g., DiscoveredFile's source_id)
 - `metadata: Metadata | None` - Additional metadata
 - `chunk_name: str | None` - Fully qualified identifier (e.g., "auth.py:UserAuth.validate")
 - `embeddings: dict | None` - Dense and/or sparse embeddings
@@ -638,6 +642,21 @@ All entities below reference actual Pydantic models in the codebase:
 - `relevance_score: float [0.0-1.0]` - Multi-layered weighted score
 - `match_type: CodeMatchType` - SEMANTIC | SYNTACTIC | KEYWORD | FILE_PATTERN
 - `related_symbols: tuple[str]` - Related functions/classes
+
+### CodeMatchType
+**Module**: `codeweaver/agent_api/models.py`
+**Description**: Classification of match method (enum)
+**Values**: SEMANTIC, SYNTACTIC, KEYWORD, FILE_PATTERN
+
+### SearchStrategy
+**Module**: `codeweaver/agent_api/models.py`
+**Description**: Search methods applied to query (enum)
+**Values**: HYBRID_SEARCH, SEMANTIC_RERANK, SPARSE_ONLY, DENSE_ONLY, KEYWORD_FALLBACK
+
+### ChunkSource
+**Module**: `codeweaver/core/metadata.py`
+**Description**: Origin of chunk data (enum)
+**Values**: TEXT_BLOCK, FILE, AST_NODE
 
 ### FindCodeResponseSummary
 **Module**: `codeweaver/agent_api/models.py`
@@ -659,9 +678,10 @@ All entities below reference actual Pydantic models in the codebase:
 - `focus_areas: tuple[str]` - Specific areas of focus
 - `complexity_level: QueryComplexity` - SIMPLE | MODERATE | COMPLEX
 
-### IntentResult
+### IntentResult *(v0.2 Future Feature)*
 **Module**: `codeweaver/agent_api/intent.py`
-**Description**: Intent analysis with strategy recommendations (v0.2+ agent integration)
+**Description**: Intent analysis with strategy recommendations requiring agent feedback loop
+**Status**: Deferred to v0.2 - not required for v0.1 MVP
 **Key Fields**: Search strategy weights, file patterns, response formatting preferences
 
 ### ImportanceScores

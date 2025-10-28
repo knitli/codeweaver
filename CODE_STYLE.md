@@ -82,7 +82,7 @@ Study pydantic ecosystem patterns: [pydantic](https://github.com/pydantic/pydant
 from typing import Annotated
 from pydantic import ConfigDict, Field
 
-from codeweaver.core import BasedModel
+from codeweaver.core.types import BasedModel
 
 class MyModel(BasedModel):
     model_config = ConfigDict(extra="allow")

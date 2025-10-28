@@ -211,7 +211,8 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
                 from qdrant_client.models import SparseVector
 
                 query_value = SparseVector(
-                    indices=query_value.get("indices", []), values=query_value.get("values", [])
+                    indices=query_value.get("indices", []),  # type: ignore
+                    values=query_value.get("values", []),  # type: ignore
                 )
 
             # Search with vector
@@ -287,31 +288,29 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
             raise ProviderError("No collection configured")
 
         # Convert chunks to Qdrant points
-        points = []
+        points: list[PointStruct] = []
         for chunk in chunks:
             # Prepare vectors dict for named vectors
             vectors: dict[str, list[float]] = {}
-            if chunk.embeddings.get("dense"):
-                vectors["dense"] = chunk.embeddings["dense"]
-            if chunk.embeddings.get("sparse"):
+            if chunk.dense_embeddings:
+                vectors["dense"] = list(chunk.dense_embeddings.embeddings)
+            if chunk.sparse_embeddings:
                 # Qdrant sparse vector format
-                sparse = chunk.embeddings["sparse"]
-                vectors["sparse"] = sparse  # type: ignore
+                sparse = chunk.sparse_embeddings
+                vectors["sparse"] = list(sparse.embeddings)
 
             # Prepare payload with chunk metadata
             payload = {
                 "chunk_id": str(chunk.chunk_id),
                 "chunk_name": chunk.chunk_name,
                 "file_path": str(chunk.file_path),
-                "language": chunk.language.value,
+                "language": chunk.language,
                 "content": chunk.content,
                 "line_start": chunk.line_start,
                 "line_end": chunk.line_end,
                 "indexed_at": datetime.now(UTC).isoformat(),
                 "provider_name": "memory",
-                "embedding_complete": bool(
-                    chunk.embeddings.get("dense") and chunk.embeddings.get("sparse")
-                ),
+                "embedding_complete": bool(chunk.dense_embeddings and chunk.sparse_embeddings),
             }
 
             points.append(
@@ -323,10 +322,10 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
             )
 
         # Upsert points
-        await self._client.upsert(collection_name=collection_name, points=points)
+        _result = await self._client.upsert(collection_name=collection_name, points=points)
 
         # Trigger persistence if auto_persist enabled
-        if self._auto_persist:
+        if self._auto_persist:  # type: ignore
             await self._persist_to_disk()
 
     async def delete_by_file(self, file_path: Path) -> None:
@@ -356,7 +355,7 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         )
 
         # Trigger persistence
-        if self._auto_persist:
+        if self._auto_persist:  # type: ignore
             await self._persist_to_disk()
 
     async def delete_by_id(self, ids: list[UUID7]) -> None:
@@ -381,7 +380,7 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
             await self._client.delete(collection_name=collection_name, points_selector=batch)  # type: ignore
 
         # Trigger persistence
-        if self._auto_persist:
+        if self._auto_persist:  # type: ignore
             await self._persist_to_disk()
 
     async def delete_by_name(self, names: list[str]) -> None:
@@ -411,7 +410,7 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         )
 
         # Trigger persistence
-        if self._auto_persist:
+        if self._auto_persist:  # type: ignore
             await self._persist_to_disk()
 
     async def _persist_to_disk(self) -> None:
@@ -432,7 +431,7 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
                 col_info = await self._client.get_collection(collection_name=col.name)
 
                 # Scroll all points
-                points = []
+                points: list[PointStruct] = []
                 offset = None
                 while True:
                     result = await self._client.scroll(
@@ -444,7 +443,7 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
                     )
                     if not result[0]:  # No more points
                         break
-                    points.extend(result[0])
+                    points.extend(result[0])  # type: ignore
                     offset = result[1]  # Next offset
                     if offset is None:  # Reached end
                         break
@@ -478,12 +477,12 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
             }
 
             # Write to temporary file first (atomic write)
-            temp_path = self._persist_path.with_suffix(".tmp")
-            temp_path.parent.mkdir(parents=True, exist_ok=True)
-            temp_path.write_text(json.dumps(persistence_data, indent=2))
+            temp_path = self._persist_path.with_suffix(".tmp")  # type: ignore
+            temp_path.parent.mkdir(parents=True, exist_ok=True)  # type: ignore
+            temp_path.write_text(json.dumps(persistence_data, indent=2))  # type: ignore
 
             # Atomic rename
-            temp_path.replace(self._persist_path)
+            temp_path.replace(self._persist_path)  # type: ignore
 
         except Exception as e:
             raise PersistenceError(f"Failed to persist to disk: {e}") from e
@@ -495,6 +494,7 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
             PersistenceError: Failed to read or parse persistence file.
             ValidationError: Persistence file format invalid.
         """
+        from pydantic_core import from_json
 
         def _raise_persistence_error(msg: str) -> None:
             raise PersistenceError(msg)
@@ -503,7 +503,7 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
             raise ProviderError("Qdrant client not initialized")
         try:
             # Read and parse JSON
-            data = json.loads(cast(Path, self._persist_path).read_text())
+            data = from_json(cast(Path, self._persist_path).read_bytes())  # type: ignore
 
             # Validate version
             if data.get("version") != "1.0":
@@ -549,7 +549,7 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         """
         while not self._shutdown:
             try:
-                await asyncio.sleep(self._persist_interval or 300)
+                await asyncio.sleep(self._persist_interval or 300)  # type: ignore
                 if not self._shutdown:
                     await self._persist_to_disk()
             except asyncio.CancelledError:
@@ -566,10 +566,10 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         self._shutdown = True
 
         # Cancel periodic task
-        if self._periodic_task:
-            self._periodic_task.cancel()
+        if self._periodic_task:  # type: ignore
+            self._periodic_task.cancel()  # type: ignore
             with contextlib.suppress(asyncio.CancelledError):
-                await self._periodic_task
+                await self._periodic_task  # type: ignore
 
         # Final persistence
         try:

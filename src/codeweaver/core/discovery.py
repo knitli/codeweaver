@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 
 from functools import cached_property
 from pathlib import Path
@@ -30,6 +31,9 @@ if TYPE_CHECKING:
 
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
     from codeweaver.semantic.ast_grep import FileThing
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True, config=DATACLASS_CONFIG)
@@ -104,7 +108,10 @@ class DiscoveredFile(DataclassSerializationMixin):
         if ext_kind := (ext_kind := ExtKind.from_file(path)):
             new_hash = get_blake_hash(path.read_bytes())
             if file_hash and new_hash != file_hash:
-                raise ValueError("Provided file_hash does not match the computed hash.")
+                logger.warning(
+                    "Provided file_hash does not match computed hash for %s. Using computed hash.",
+                    path,
+                )
             return cls(
                 path=path, ext_kind=ext_kind, _file_hash=new_hash, _git_branch=cast(str, branch)
             )
@@ -133,9 +140,13 @@ class DiscoveredFile(DataclassSerializationMixin):
 
     @computed_field
     @property
-    def file_hash(self) -> BlakeHashKey | None:
+    def file_hash(self) -> BlakeHashKey:
         """Return the blake3 hash of the file contents, if available."""
-        return self._file_hash
+        content_hash = self._file_hash or get_blake_hash(self.path.read_bytes())
+        if self._file_hash is None:
+            with contextlib.suppress(Exception):
+                object.__setattr__(self, "_file_hash", content_hash)
+        return content_hash
 
     def is_same(self, other_path: Path) -> bool:
         """Checks if a file at other_path is the same as this one, by comparing blake3 hashes.

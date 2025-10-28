@@ -18,12 +18,13 @@ import logging
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from time import sleep
-from typing import Annotated, Any, ClassVar, Unpack, cast, overload
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Unpack, cast, overload
 
 import rignore
 import watchfiles
 
-from pydantic import PrivateAttr
+from pydantic import Field, PrivateAttr
+from pydantic.dataclasses import dataclass
 from watchfiles.main import Change, FileChange
 
 from codeweaver.config.types import CodeWeaverSettingsDict, RignoreSettings
@@ -41,6 +42,59 @@ from codeweaver.core.types.dictview import DictView
 
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from typing import Any
+
+    from codeweaver.core.chunks import CodeChunk
+
+
+# Additional imports for pipeline orchestration
+import asyncio
+import time
+
+
+def _get_settings_map() -> DictView[CodeWeaverSettingsDict]:
+    """Stub function to get settings map. Replace with actual implementation."""
+    from codeweaver.config.settings import get_settings_map
+
+    return get_settings_map()
+
+
+def _get_indexing() -> RignoreSettings:
+    """Retrieve rignore filter settings from the global settings map."""
+    return _get_settings_map()[""]
+
+
+@dataclass
+class IndexingStats:
+    """Statistics tracking for indexing progress."""
+
+    files_discovered: int = 0
+    files_processed: int = 0
+    chunks_created: int = 0
+    chunks_embedded: int = 0
+    chunks_indexed: int = 0
+    files_with_errors: Annotated[
+        list[Path],
+        Field(
+            default_factory=list,
+            description="""List of file paths that encountered errors during indexing.""",
+        ),
+    ] = Field(default_factory=list)
+    start_time: float = Field(default_factory=time.time)
+
+    @property
+    def elapsed_time(self) -> float:
+        """Calculate elapsed time since indexing started."""
+        return time.time() - self.start_time
+
+    @property
+    def processing_rate(self) -> float:
+        """Files processed per second."""
+        if self.elapsed_time == 0:
+            return 0.0
+        return self.files_processed / self.elapsed_time
 
 
 class DefaultFilter(watchfiles.DefaultFilter):
@@ -226,8 +280,8 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         from codeweaver.config.settings import get_settings_map
 
         settings = settings or get_settings_map()
-        filter_settings = settings["filter_settings"].to_settings()
-        return cls(base_path=None, settings=None, walker=rignore.walk(**filter_settings))
+        indexing = settings["indexing"].to_settings()
+        return cls(base_path=None, settings=None, walker=rignore.walk(**indexing))
 
     @property
     def walker(self) -> rignore.Walker:
@@ -236,25 +290,190 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
 
 
 class Indexer:
-    """Main indexer class. Wraps a vector store and parsers."""
+    """Main indexer class. Wraps a DiscoveredFilestore and chunkers."""
 
     _store: BlakeStore[DiscoveredFile] = PrivateAttr()
     _parsers: Annotated[Sequence[Callable[[Path], Any]], PrivateAttr(default_factory=list)]
     _walker: rignore.Walker | None = PrivateAttr(default=None)
 
     def __init__(
-        self, walker: rignore.Walker | None = None, store: BlakeStore[DiscoveredFile] | None = None
+        self,
+        walker: rignore.Walker | None = None,
+        store: BlakeStore[DiscoveredFile] | None = None,
+        chunking_service: Any | None = None,  # ChunkingService type
+        *,
+        auto_initialize_providers: bool = True,
     ) -> None:
-        """Initialize the Indexer."""
+        """Initialize the Indexer with optional pipeline components.
+
+        Args:
+            walker: rignore walker for file discovery
+            store: Store for discovered file metadata
+            chunking_service: Service for chunking files (optional)
+            auto_initialize_providers: Auto-initialize providers from global registry
+        """
         self._parsers = []
         self._store = store or BlakeStore[DiscoveredFile](_value_type=DiscoveredFile)
         self._walker = walker
+        self._chunking_service = chunking_service
+        self._stats = IndexingStats()
+
+        # Pipeline provider Fields (initialized below or lazily)
+        self._embedding_provider: Any | None = None
+        self._sparse_provider: Any | None = None
+        self._vector_store: Any | None = None
+
+        if auto_initialize_providers:
+            self._initialize_providers()
+
+    def _initialize_providers(self) -> None:
+        """Initialize pipeline providers from global registry."""
+        try:
+            from codeweaver.common.registry import get_provider_registry
+
+            registry = get_provider_registry()
+
+            try:
+                self._embedding_provider = registry.get_embedding_provider_instance(singleton=True)
+                logger.info(
+                    "Initialized embedding provider: %s", type(self._embedding_provider).__name__
+                )
+            except Exception as e:
+                logger.warning("No embedding provider configured: %s", e)
+                self._embedding_provider = None
+
+            try:
+                self._sparse_provider = registry.get_sparse_embedding_provider_instance(
+                    singleton=True
+                )
+                logger.info("Initialized sparse provider: %s", type(self._sparse_provider).__name__)
+            except Exception as e:
+                logger.debug("No sparse embedding provider configured: %s", e)
+                self._sparse_provider = None
+
+            try:
+                self._vector_store = registry.get_vector_store_provider_instance(singleton=True)
+                logger.info("Initialized vector store: %s", type(self._vector_store).__name__)
+            except Exception as e:
+                logger.warning("No vector store configured: %s", e)
+                self._vector_store = None
+
+        except ImportError:
+            logger.warning("Provider registry not available, providers not initialized")
+
+    async def _index_file(self, path: Path) -> None:
+        """Execute full pipeline for a single file: discover → chunk → embed → index.
+
+        Args:
+            path: Path to the file to index
+        """
+        try:
+            # 1. Discover and store file metadata
+            discovered_file = DiscoveredFile.from_path(path)
+            if not discovered_file or not discovered_file.is_text:
+                logger.debug("Skipping non-text file: %s", path)
+                return
+
+            self._store.set(discovered_file.file_hash, discovered_file)
+            self._stats.files_discovered += 1
+            logger.debug("Discovered file: %s (%s bytes)", path, discovered_file.size)
+
+            # 2. Chunk via ChunkingService (if available)
+            if not self._chunking_service:
+                logger.warning("No chunking service configured, skipping file: %s", path)
+                return
+
+            chunks = self._chunking_service.chunk_file(discovered_file)
+            self._stats.chunks_created += len(chunks)
+            logger.debug("Created %d chunks from %s", len(chunks), path)
+
+            # 3. Embed chunks (if embedding providers available)
+            if self._embedding_provider or self._sparse_provider:
+                await self._embed_chunks(chunks)
+                self._stats.chunks_embedded += len(chunks)
+            else:
+                logger.warning(
+                    "No embedding providers configured, skipping embedding for: %s", path
+                )
+
+            # 4. Retrieve updated chunks from registry (single source of truth!)
+            from codeweaver.providers.embedding.registry import get_embedding_registry
+
+            registry = get_embedding_registry()
+            updated_chunks = [
+                registry[chunk.chunk_id].chunk for chunk in chunks if chunk.chunk_id in registry
+            ]
+
+            # If no chunks were embedded, use original chunks
+            if not updated_chunks:
+                logger.debug("No embedded chunks, using original chunks for: %s", path)
+                updated_chunks = chunks
+
+            # 5. Index to vector store (if available)
+            if self._vector_store:
+                await self._vector_store.upsert(updated_chunks)
+                self._stats.chunks_indexed += len(updated_chunks)
+                logger.debug("Indexed %d chunks to vector store from %s", len(updated_chunks), path)
+            else:
+                logger.warning("No vector store configured, skipping indexing for: %s", path)
+
+            self._stats.files_processed += 1
+            logger.info("Successfully processed file: %s (%d chunks)", path, len(chunks))
+
+        except Exception:
+            logger.exception("Failed to index file %s", path)
+            self._stats.files_with_errors.append(path)
+
+    async def _embed_chunks(self, chunks: list[Any]) -> None:
+        """Embed chunks with both dense and sparse providers.
+
+        Args:
+            chunks: List of CodeChunk objects to embed
+        """
+        if not chunks:
+            return
+
+        # Dense embeddings
+        if self._embedding_provider:
+            try:
+                await self._embedding_provider.embed_documents(chunks)
+                logger.debug("Generated dense embeddings for %d chunks", len(chunks))
+            except Exception:
+                logger.exception("Dense embedding failed")
+
+        # Sparse embeddings
+        if self._sparse_provider:
+            try:
+                await self._sparse_provider.embed_documents(chunks)
+                logger.debug("Generated sparse embeddings for %d chunks", len(chunks))
+            except Exception:
+                logger.exception("Sparse embedding failed")
+
+    async def _delete_file(self, path: Path) -> None:
+        """Remove file from store and vector store.
+
+        Args:
+            path: Path to the file to remove
+        """
+        try:
+            if removed := self._remove_path(path):
+                logger.debug("Removed %d entries from store for: %s", removed, path)
+
+            # Remove from vector store
+            if self._vector_store:
+                try:
+                    await self._vector_store.delete_by_file(path)
+                    logger.debug("Removed chunks from vector store for: %s", path)
+                except Exception:
+                    logger.exception("Failed to remove from vector store")
+        except Exception:
+            logger.exception("Failed to delete file %s", path)
 
     async def index(self, change: FileChange) -> None:
         """Index a single file based on a watchfiles change event.
 
-        Handles added, modified, and deleted file events. For add/modify, the file is hashed and
-        stored if it's an indexable file type. For delete, any indexed entries matching the path are removed.
+        Enhanced version that executes full pipeline: file → chunks → embeddings → vector store.
+        Handles added, modified, and deleted file events.
         """
         try:
             change_type, path_str = change
@@ -269,49 +488,164 @@ class Indexer:
                 # Skip non-files quickly
                 if not path.exists() or not path.is_file():
                     return
-                # Only index files we recognize (code/config/docs) via DiscoveredFile
-                discovered_file = DiscoveredFile.from_path(path)
-                if not discovered_file or not discovered_file.is_text:
-                    return
-                # Remove any prior entries for this path (hash may have changed)
-                _ = self._remove_path(path)
-                # Persist using the discovered file's own content hash as the key
-                self._store.set(discovered_file.file_hash, discovered_file)
-                logger.debug(
-                    "Indexed %s [%s] (%s bytes)",
-                    discovered_file.path,
-                    discovered_file.ext_kind,
-                    discovered_file.size,
-                )
+                # Execute full pipeline
+                await self._index_file(path)
+
             case Change.deleted:
-                if removed := self._remove_path(path):
-                    logger.debug("Removed %d index entries for deleted path %s", removed, path)
+                # Remove from store and vector store
+                await self._delete_file(path)
+
             case _:
                 logger.debug("Unhandled change type %s for %s", change_type, path)
 
     # ---- public helpers ----
-    def prime_index(self) -> int:
+    def prime_index(self, *, force_reindex: bool = False) -> int:
         """Perform an initial indexing pass using the configured rignore walker.
 
-        Returns the number of files indexed. If no walker was provided, does nothing.
+        Enhanced version with persistence support and batch processing.
+
+        Args:
+            force_reindex: If True, skip persistence checks and reindex everything
+
+        Returns:
+            Number of files indexed
         """
         if not self._walker:
+            logger.warning("No walker configured, cannot prime index")
             return 0
 
-        count = 0
+        # Try to restore from persistence (unless force_reindex)
+        if not force_reindex:
+            try:
+                # TODO: Implement persistence methods in next phase
+                # asyncio.run(self.initialize_from_vector_store())
+                # if not self._store.is_empty:
+                #     logger.info("Restored index from vector store")
+                #     return len(self._store)
+                pass
+            except Exception as e:
+                logger.debug("Could not restore from persistence: %s", e)
+
+        # Reset stats for new indexing run
+        self._stats = IndexingStats()
+
+        # Collect files to index
+        files_to_index: list[Path] = []
         try:
             with contextlib.suppress(StopIteration):
-                for p in self._walker:
-                    # rignore returns absolute paths typically; ensure it's a file
-                    if not p or not p.is_file():
-                        continue
-                    if discovered_file := DiscoveredFile.from_path(p):
-                        _ = self._remove_path(discovered_file.path)
-                        self._store.set(discovered_file.file_hash, discovered_file)
-                        count += 1
+                files_to_index.extend(p for p in self._walker if p and p.is_file())
         except Exception:
-            logger.exception("Failure during initial indexing pass")
-        return count
+            logger.exception("Failure during file discovery")
+            return 0
+
+        if not files_to_index:
+            logger.info("No files found to index")
+            return 0
+
+        logger.info("Discovered %d files to index", len(files_to_index))
+        self._stats.files_discovered = len(files_to_index)
+
+        # Index files in batch (synchronous wrapper for async pipeline)
+        try:
+            asyncio.run(self._index_files_batch(files_to_index))
+        except Exception:
+            logger.exception("Failure during batch indexing")
+
+        logger.info(
+            "Indexing complete: %d files processed, %d chunks created, %d indexed, %d errors in %.2fs (%.2f files/sec)",
+            self._stats.files_processed,
+            self._stats.chunks_created,
+            self._stats.chunks_indexed,
+            len(self._stats.files_with_errors),
+            self._stats.elapsed_time,
+            self._stats.processing_rate,
+        )
+
+        return self._stats.files_processed
+
+    async def _index_files_batch(self, files: list[Path]) -> None:
+        """Index multiple files in batch using the chunking service.
+
+        Args:
+            files: List of file paths to index
+        """
+        if not files:
+            return
+
+        if not self._chunking_service:
+            logger.warning("No chunking service configured, cannot batch index files")
+            return
+
+        # Convert paths to DiscoveredFile objects
+        discovered_files: list[DiscoveredFile] = []
+        for path in files:
+            try:
+                discovered_file = DiscoveredFile.from_path(path)
+                if discovered_file and discovered_file.is_text:
+                    discovered_files.append(discovered_file)
+                    self._store.set(discovered_file.file_hash, discovered_file)
+            except Exception:
+                logger.exception("Failed to discover file %s", path)
+                self._stats.files_with_errors.append(path)
+
+        if not discovered_files:
+            logger.info("No valid files to index in batch")
+            return
+
+        # Chunk files using ChunkingService (handles parallelization)
+        all_chunks: list[CodeChunk] = []
+        for file_path, chunks in self._chunking_service.chunk_files(discovered_files):
+            all_chunks.extend(chunks)
+            self._stats.chunks_created += len(chunks)
+            logger.debug("Chunked %s: %d chunks", file_path, len(chunks))
+
+        if not all_chunks:
+            logger.info("No chunks created from files")
+            return
+
+        logger.info("Created %d chunks from %d files", len(all_chunks), len(discovered_files))
+
+        # Embed in batches of 100 chunks
+        batch_size = 100
+        for i in range(0, len(all_chunks), batch_size):
+            batch = all_chunks[i : i + batch_size]
+            try:
+                await self._embed_chunks(batch)
+                self._stats.chunks_embedded += len(batch)
+                logger.debug("Embedded batch %d-%d (%d chunks)", i, i + len(batch), len(batch))
+            except Exception:
+                logger.exception("Failed to embed batch %d-%d", i, i + len(batch))
+
+        # Retrieve updated chunks from registry
+        from codeweaver.providers.embedding.registry import get_embedding_registry
+
+        registry = get_embedding_registry()
+        updated_chunks = [
+            registry[chunk.chunk_id].chunk for chunk in all_chunks if chunk.chunk_id in registry
+        ]
+
+        # If no chunks were embedded, use original chunks
+        if not updated_chunks:
+            logger.warning("No chunks were embedded, using original chunks")
+            updated_chunks = all_chunks
+
+        # Index to vector store
+        if self._vector_store:
+            try:
+                await self._vector_store.upsert(updated_chunks)
+                self._stats.chunks_indexed = len(updated_chunks)
+                logger.info("Indexed %d chunks to vector store", len(updated_chunks))
+            except Exception:
+                logger.exception("Failed to index to vector store")
+        else:
+            logger.warning("No vector store configured, skipping indexing")
+
+        self._stats.files_processed = len(discovered_files)
+
+    @property
+    def stats(self) -> IndexingStats:
+        """Get current indexing statistics."""
+        return self._stats
 
     # ---- internal helpers ----
     def _remove_path(self, path: Path) -> int:
@@ -342,6 +676,48 @@ class Indexer:
         except KeyboardInterrupt:
             # allow graceful stop
             return
+
+    # ---- Persistence methods (stubs for T007-T008) ----
+
+    async def initialize_from_vector_store(self) -> None:
+        """Query vector store for indexed files on cold start.
+
+        TODO: Implement in T007/T008
+        - Query vector store for all indexed chunks
+        - Reconstruct file metadata store from chunk payloads
+        - Populate self._store with DiscoveredFile objects
+        """
+        logger.debug("Persistence from vector store not yet implemented")
+
+    def save_checkpoint(self, checkpoint_path: Path | None = None) -> None:
+        """Save indexing state to checkpoint file.
+
+        TODO: Implement in T008
+        - Save to .codeweaver/index_checkpoint.json
+        - Include files_discovered, files_processed, chunks stats
+        - Include error list and timestamp
+
+        Args:
+            checkpoint_path: Optional custom checkpoint file path
+        """
+        logger.debug("Checkpoint save not yet implemented")
+
+    def load_checkpoint(self, checkpoint_path: Path | None = None) -> bool:
+        """Load indexing state from checkpoint file.
+
+        TODO: Implement in T008
+        - Load from .codeweaver/index_checkpoint.json
+        - Verify settings hash matches current config
+        - Skip if checkpoint >24 hours old
+
+        Args:
+            checkpoint_path: Optional custom checkpoint file path
+
+        Returns:
+            True if checkpoint was loaded successfully
+        """
+        logger.debug("Checkpoint load not yet implemented")
+        return False
 
     @property
     def is_empty(self) -> bool:

@@ -50,7 +50,7 @@ from codeweaver.config.settings import (
     CodeWeaverSettings,
     CodeWeaverSettingsDict,
     FastMcpServerSettings,
-    FileFilterSettings,
+    IndexerSettings,
     get_settings_map,
 )
 from codeweaver.config.types import FastMcpServerSettingsDict
@@ -231,7 +231,7 @@ class AppState(DataclassSerializationMixin):
     project_root: Annotated[
         Path,
         Field(
-            default_factory=lambda data: data["settings"].get("project_root") or get_project_root(),
+            default_factory=lambda data: data["settings"].get("project_path") or get_project_root(),
             description="Path to the project root",
         ),
     ]
@@ -398,7 +398,7 @@ def resolve_globs(path_string: str, repo_root: Path) -> set[Path]:
 
 
 def resolve_includes_and_excludes(
-    filter_settings: FileFilterSettings, repo_root: Path
+    indexing: IndexerSettings, repo_root: Path
 ) -> tuple[frozenset[Path], frozenset[Path]]:
     """Resolve included and excluded files based on filter settings.
 
@@ -406,7 +406,7 @@ def resolve_includes_and_excludes(
     If a file is specifically included in the `forced_includes`, it will not be excluded even if it matches an excluded extension or excludes.
     "Specifically included" means that it was defined directly in the `forced_includes`, and **not** as a glob pattern.
     """
-    settings = filter_settings.model_dump(mode="python")
+    settings = indexing.model_dump(mode="python")
     other_files: set[Path] = set()
     specifically_included_files = {
         Path(file)
@@ -507,17 +507,17 @@ def _configure_middleware(
     """Configure middleware settings and determine logging middleware type.
 
     Returns:
-        Tuple of (middleware_settings, logging_middleware_class)
+        Tuple of (middleware, logging_middleware_class)
     """
-    middleware_settings = settings.get("middleware_settings", settings.get("middleware", {})) or {}
-    middleware_logging_settings = middleware_settings.get("logging", {}) or {}
+    middleware = settings.get("middleware", settings.get("middleware", {})) or {}
+    middleware_logging_settings = middleware.get("logging", {}) or {}
     use_structured_logging = middleware_logging_settings.get("use_structured_logging", False)
     logging_middleware = (
         StructuredLoggingMiddleware if use_structured_logging else LoggingMiddleware
     )
     middleware_defaults: MiddlewareOptions = get_default_middleware_settings(app_logger, level)
-    middleware_settings: MiddlewareOptions = middleware_defaults | middleware_settings
-    return (middleware_settings, logging_middleware)
+    middleware: MiddlewareOptions = middleware_defaults | middleware
+    return (middleware, logging_middleware)
 
 
 def get_default_middleware() -> list[type[Middleware]]:
@@ -601,8 +601,8 @@ def _setup_file_filters_and_lifespan(
     Returns:
         Configured lifespan function
     """
-    settings.filter_settings.forced_includes, settings.filter_settings.excludes = (
-        resolve_includes_and_excludes(settings.filter_settings, settings.project_root)
+    settings.indexing.forced_includes, settings.indexing.excludes = (
+        resolve_includes_and_excludes(settings.indexing, settings.project_root)
     )
     return rpartial(lifespan, settings, session_statistics)
 
@@ -634,7 +634,7 @@ class ServerSetup(TypedDict):
 
     app: Required[FastMCP[AppState]]
     settings: Required[CodeWeaverSettings]
-    middleware_settings: NotRequired[MiddlewareOptions]
+    middleware: NotRequired[MiddlewareOptions]
     host: NotRequired[str | None]
     port: NotRequired[int | None]
     streamable_http_path: NotRequired[str | None]
@@ -649,7 +649,7 @@ def build_app() -> ServerSetup:
     local_logger: logging.Logger = globals()["logger"]
     local_logger.info("Initializing CodeWeaver server. Logging set up.")
     settings_view = get_settings_map()
-    middleware_settings, logging_middleware = _configure_middleware(
+    middleware, logging_middleware = _configure_middleware(
         settings_view, app_logger, level
     )
     filtered_server_settings = _filter_server_settings(settings_view.get("server", {}))
@@ -665,11 +665,11 @@ def build_app() -> ServerSetup:
     _ = base_fast_mcp_settings.pop("transport", "http")
     final_app_logger, _final_level = _setup_logger(settings_view)
     int_level = next((k for k, v in LEVEL_MAP.items() if v == _final_level), "INFO")
-    for key, middleware_setting in middleware_settings.items():
+    for key, middleware_setting in middleware.items():
         if "logger" in cast(dict[str, Any], middleware_setting):
-            middleware_settings[key]["logger"] = final_app_logger
+            middleware[key]["logger"] = final_app_logger
         if "log_level" in cast(dict[str, Any], middleware_setting):
-            middleware_settings[key]["log_level"] = int_level
+            middleware[key]["log_level"] = int_level
     global _logger
     _logger = final_app_logger
     host = base_fast_mcp_settings.pop("host", "127.0.0.1")
@@ -680,7 +680,7 @@ def build_app() -> ServerSetup:
     return ServerSetup(
         app=server,
         settings=get_settings(),
-        middleware_settings=middleware_settings,
+        middleware=middleware,
         host=host or "127.0.0.1",
         port=port or 9328,
         streamable_http_path=cast(str, http_path or "/codeweaver"),

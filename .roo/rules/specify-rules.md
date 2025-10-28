@@ -11,6 +11,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-25
 
 ## Active Technologies
 - Python 3.11+ (supports 3.11, 3.12, 3.13, 3.14) + FastAPI/FastMCP ecosystem, pydantic 2.12+, pydantic-settings, qdrant-client 1.15+, pydantic-graph 1.4+ (002-we-re-completing)
+- Python 3.12+ + FastMCP, qdrant-client, voyageai, ast-grep-py, pydantic, cyclopts, fastembed, rignore (003-our-aim-to)
+- Qdrant vector database (local in-memory with persistence for dev) (003-our-aim-to)
 
 ## Project Structure
 ```
@@ -25,6 +27,7 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11+ (supports 3.11, 3.12, 3.13, 3.14): Follow standard conventions
 
 ## Recent Changes
+- 003-our-aim-to: Added Python 3.12+ + FastMCP, qdrant-client, voyageai, ast-grep-py, pydantic, cyclopts, fastembed, rignore
 - 002-we-re-completing: Added Python 3.11+ (supports 3.11, 3.12, 3.13, 3.14) + FastAPI/FastMCP ecosystem, pydantic 2.12+, pydantic-settings, qdrant-client 1.15+, pydantic-graph 1.4+
 
 <!-- MANUAL ADDITIONS START -->

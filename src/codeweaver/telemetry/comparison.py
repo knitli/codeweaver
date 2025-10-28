@@ -22,7 +22,7 @@ from typing import Annotated, ClassVar
 from pydantic import Field, NonNegativeFloat, NonNegativeInt, computed_field
 from pydantic.dataclasses import dataclass
 
-from codeweaver.core import (
+from codeweaver.core.types import (
     DATACLASS_CONFIG,
     DataclassSerializationMixin,
     LanguageName,

@@ -31,6 +31,7 @@ from codeweaver.common.utils.utils import (
     ensure_iterable,
     estimate_tokens,
     get_possible_env_vars,
+    get_user_config_dir,
     rpartial,
     uuid7,
 )
@@ -47,6 +48,7 @@ __all__ = (
     "get_git_revision",
     "get_possible_env_vars",
     "get_project_root",
+    "get_user_config_dir",
     "has_package",
     "in_codeweaver_clone",
     "is_class",

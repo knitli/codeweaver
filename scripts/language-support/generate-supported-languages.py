@@ -17,9 +17,9 @@ from textwrap import dedent
 import black
 import textcase
 
-from codeweaver.core import LiteralStringT
 from codeweaver.core.file_extensions import ALL_LANGUAGES
 from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.core.types import LiteralStringT
 
 
 ALL_LANGUAGES = sorted(ALL_LANGUAGES)

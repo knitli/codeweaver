@@ -206,7 +206,7 @@ async def health(_request: Request) -> PlainTextResponse:
 
 
 def setup_middleware(
-    middleware: Container[type[Middleware]], middleware_settings: MiddlewareOptions
+    middleware: Container[type[Middleware]], middleware: MiddlewareOptions
 ) -> Container[Middleware]:
     """Setup middleware for the application."""
     # Apply middleware settings
@@ -215,15 +215,15 @@ def setup_middleware(
         mw: type[Middleware]  # type: ignore
         match mw.__name__:  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
             case "ErrorHandlingMiddleware":
-                mw = mw(**middleware_settings.get("error_handling", {}))  # type: ignore[reportCallIssue]
+                mw = mw(**middleware.get("error_handling", {}))  # type: ignore[reportCallIssue]
             case "RetryMiddleware":
-                mw = mw(**middleware_settings.get("retry", {}))  # type: ignore[reportCallIssue]
+                mw = mw(**middleware.get("retry", {}))  # type: ignore[reportCallIssue]
             case "RateLimitingMiddleware":
-                mw = mw(**middleware_settings.get("rate_limiting", {}))  # type: ignore[reportCallIssue]
+                mw = mw(**middleware.get("rate_limiting", {}))  # type: ignore[reportCallIssue]
             case "LoggingMiddleware" | "StructuredLoggingMiddleware":
-                mw = mw(**middleware_settings.get("logging", {}))  # type: ignore[reportCallIssue]
+                mw = mw(**middleware.get("logging", {}))  # type: ignore[reportCallIssue]
             case _:  # pyright: ignore[reportUnknownVariableType]
-                if any_settings := middleware_settings.get(mw.__name__.lower()):  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
+                if any_settings := middleware.get(mw.__name__.lower()):  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
                     mw = mw(**any_settings)  # type: ignore[reportCallIssue, reportUnknownVariableType]
                 else:
                     mw = mw()  # type: ignore[reportCallIssue, reportUnknownVariableType]
@@ -259,7 +259,7 @@ def register_tool(app: FastMCP[AppState]) -> FastMCP[AppState]:
 # Registration entrypoint
 # -------------------------
 async def register_app_bindings(
-    app: FastMCP[AppState], middleware: set[Middleware], middleware_settings: MiddlewareOptions
+    app: FastMCP[AppState], middleware: set[Middleware], middleware: MiddlewareOptions
 ) -> tuple[FastMCP[AppState], set[Middleware]]:
     """Register application bindings for tools and routes."""
     # Routes
@@ -274,16 +274,14 @@ async def register_app_bindings(
     app.custom_route("/health", methods=["GET"], name="health", include_in_schema=True)(health)  # type: ignore[arg-type]
     # todo: add status endpoint (more what I'm doing right now/progress than health)
 
-    middleware = setup_middleware(
-        cast(Container[type[Middleware]], middleware), middleware_settings
-    )  # pyright: ignore[reportAssignmentType]
+    middleware = setup_middleware(cast(Container[type[Middleware]], middleware), middleware)  # pyright: ignore[reportAssignmentType]
     middleware.add(
         StatisticsMiddleware(
             statistics=statistics(),
-            logger=cast(dict, middleware_settings.get("logging", {})).get(  # type: ignore[unknown-attribute]
+            logger=cast(dict, middleware.get("logging", {})).get(  # type: ignore[unknown-attribute]
                 "logger", logging.getLogger(__name__)
             ),
-            log_level=cast(dict, middleware_settings.get("logging", {})).get("log_level", 20),  # type: ignore[unknown-attribute]
+            log_level=cast(dict, middleware.get("logging", {})).get("log_level", 20),  # type: ignore[unknown-attribute]
         )
     )
     return app, middleware

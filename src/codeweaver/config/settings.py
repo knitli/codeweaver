@@ -32,6 +32,7 @@ from pydantic import (
     FilePath,
     PositiveInt,
     PrivateAttr,
+    PydanticUserError,
     ValidationError,
     computed_field,
     field_validator,
@@ -154,8 +155,26 @@ def merge_agent_model_settings(
     return merge_model_settings(base, override)
 
 
-class FileFilterSettings(BasedModel):
-    """Settings for file filtering.
+def get_project_name() -> str:
+    """Get the current project name from settings."""
+    # we'll try to get it from the project root but it might not be initialized yet
+    with contextlib.suppress(PydanticUserError, ValidationError, ValueError):
+        settings = get_settings()
+        if settings.project_name:
+            return settings.project_name
+        return settings.project_root.name
+    return "your_project_name"
+
+
+def get_storage_path() -> Path:
+    """Get the default storage path for index data."""
+    from codeweaver.common.utils import get_user_config_dir
+
+    return Path(get_user_config_dir()) / f"{get_project_name()}_index.json"
+
+
+class IndexerSettings(BasedModel):
+    """Settings for indexing and file filtering.
 
     ## Path Resolution and Deconfliction
 
@@ -211,6 +230,12 @@ class FileFilterSettings(BasedModel):
             description="""Whether to include common hidden tooling directories in search and indexing. This is enabled by default and recommended for most users. Still respects .gitignore rules, so any gitignored files will be excluded."""
         ),
     ] = True
+    index_storage_path: Annotated[
+        Path,
+        Field(
+            description=rf"""Path to store index data locally. The default is in your user configuration directory (like ~/.config/codeweaver/{get_project_name()}_index.json or c:\Users\your_username\AppData\Roaming\codeweaver\{get_project_name()}_index.json)."""
+        ),
+    ] = Path(".codeweaver/repo_index.json")
     other_ignore_kwargs: Annotated[
         RignoreSettings | Unset,
         Field(
@@ -228,6 +253,12 @@ class FileFilterSettings(BasedModel):
         "same_file_system": True,
         "follow_links": False,
     })
+    only_index_on_command: Annotated[
+        bool,
+        Field(
+            description="""Disabled by default and usually **not recommended**. This setting disables background indexing, requiring you to manually trigger indexing by command or program call. CodeWeaver uses background indexing to ensure it always has an accurate view of the codebase, so disabling this can severely impact the quality of results. We expose this setting for troubleshooting, debugging, and some isolated use cases where codeweaver may be orchestrated externally or supplied with data from other sources."""
+        ),
+    ] = False
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
@@ -282,7 +313,7 @@ class FileFilterSettings(BasedModel):
         Returns *True* for paths that should **not** be included (i.e., excluded paths).
         """
 
-        def filter_func(settings: FileFilterSettings, path: Path | str) -> bool:
+        def filter_func(settings: IndexerSettings, path: Path | str) -> bool:
             """Default filter function that respects forced includes and other settings."""
             path_obj = Path(path) if isinstance(path, str) else path
             if settings.ignore_hidden and (
@@ -611,30 +642,18 @@ class CodeWeaverSettings(BaseSettings):
         None
     )
 
-    middleware_settings: Annotated[
+    middleware: Annotated[
         MiddlewareOptions | None, Field(description="""Middleware settings""")
     ] = DefaultMiddlewareSettings
 
-    filter_settings: Annotated[
-        FileFilterSettings, Field(description="""File filtering settings""")
-    ] = FileFilterSettings()
+    indexing: Annotated[IndexerSettings, Field(description="""File filtering settings""")] = (
+        IndexerSettings()
+    )
 
     chunker: Annotated[ChunkerSettings, Field(description="""Chunker system configuration""")] = (
         ChunkerSettings()
     )
 
-    enable_background_indexing: Annotated[
-        bool,
-        Field(
-            description="""Enable automatic background indexing (default behavior and recommended). If disabled, it will only index files when you explicitly tell it to, which will make it much harder to deliver quality context to your agents."""
-        ),
-    ] = True
-    enable_telemetry: Annotated[
-        bool,
-        Field(
-            description="""Enable privacy-friendly usage telemetry. ON by default. We do not collect any identifying information -- we hash all file and directory paths, repository names, and other identifiers to ensure privacy while still gathering useful aggregate data for improving CodeWeaver. We add a second round of filters within Posthog cloud before we get the data just to be sure we caught everything. You can see exactly what we collect, and how we collect it [here](services/telemetry.py). You can disable telemetry if you prefer not to send any data. You can also provide your own PostHog Project Key to collect your own telemetry data. **We will only ever use this data to improve CodeWeaver. We will never sell or share it with anyone else, and we won't use it for targeted marketing (we will use high level aggregate data, like how many people use it, and how many tokens CodeWeaver has saved.)**"""
-        ),
-    ] = True
     # TODO: I don't think we're actually checking for these before initializing the server. We should.
     enable_health_endpoint: Annotated[
         bool, Field(description="""Enable the health check endpoint""")
@@ -657,21 +676,15 @@ class CodeWeaverSettings(BaseSettings):
     enable_ai_intent_analysis: Annotated[
         bool, Field(description="""Enable AI-powered intent analysis via FastMCP sampling""")
     ] = False  # ! Phase 2 feature, switch to True when implemented
-    enable_precontext: Annotated[
+
+    enable_telemetry: Annotated[
         bool,
         Field(
-            description="""Enable precontext code generation. Recommended, but requires you set up an agent model. This allows CodeWeaver to call an agent model outside of an MCP tool request (it still requires either a CLI call from you or a hook you setup). This is required for our recommended *precontext workflow*. This setting dictionary is a `pydantic_ai.settings.ModelSettings` object. If you already use `pydantic_ai.settings.ModelSettings`, then you can provide the same settings here."""
+            description="""Enable privacy-friendly usage telemetry. ON by default. We do not collect any identifying information -- we hash all file and directory paths, repository names, and other identifiers to ensure privacy while still gathering useful aggregate data for improving CodeWeaver. We add a second round of filters within Posthog cloud before we get the data just to be sure we caught everything. You can see exactly what we collect, and how we collect it [here](../telemetry). You can disable telemetry if you prefer not to send any data. You can also provide your own PostHog Project Key to collect your own telemetry data. **We will only ever use this data to improve CodeWeaver. We will never sell or share it with anyone else, and we won't use it for targeted marketing (we will use high level aggregate data, like how many people use it, and how many tokens CodeWeaver has saved.)**"""
         ),
-    ] = False  # ! Phase 2 feature, switch to True when implemented
+    ] = True
 
-    index_storage_path: Annotated[
-        Path,
-        Field(
-            description="""Path to store index data locally. Unless you include private files in your file filter settings (`FileFilterSettings`), we recommend you set this to a directory *inside* your project tree. This provides a single point of reference for anyone working on the repo, and prevents constant re-indexing of the same files. The default location is `.codeweaver/repo_index.json` in your project directory."""
-        ),
-    ] = Path(".codeweaver/repo_index.json")
-
-    uvicorn_settings: Annotated[
+    uvicorn: Annotated[
         UvicornServerSettings | None, Field(description="""Settings for the Uvicorn server""")
     ] = None
 
@@ -886,7 +899,7 @@ __all__ = (
     "DefaultFastMcpServerSettings",
     "DefaultRerankingProviderSettings",
     "FastMcpServerSettings",
-    "FileFilterSettings",
+    "IndexerSettings",
     "get_settings",
     "get_settings_map",
     "merge_agent_model_settings",

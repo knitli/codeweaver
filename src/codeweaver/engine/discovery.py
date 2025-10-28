@@ -14,13 +14,13 @@ from typing import TYPE_CHECKING
 
 import rignore
 
-from codeweaver.core import DiscoveredFile, SemanticSearchLanguage
+from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.exceptions import IndexingError
 
 
 if TYPE_CHECKING:
-    from codeweaver.config import CodeWeaverSettingsDict
-    from codeweaver.core import DictView
+    from codeweaver.config.types import CodeWeaverSettingsDict
+    from codeweaver.core.types import DictView
 TEST_FILE_PATTERNS = ["*.test.*", "*.spec.*", "test/**/*", "spec/**/*"]
 
 _tooling_dirs: set[Path] | None = None
@@ -57,7 +57,6 @@ class FileDiscoveryService:
             settings: CodeWeaver configuration settings
         """
         self.settings = settings
-        self._language_extensions = SemanticSearchLanguage.extension_map()
 
     async def _discover_files(
         self,
@@ -92,15 +91,15 @@ class FileDiscoveryService:
                 case_insensitive=True,
                 read_git_ignore=read_git_ignore
                 if read_git_ignore in (True, False)
-                else self.settings["filter_settings"].use_gitignore,
+                else self.settings["indexing"].use_gitignore,
                 read_ignore_files=read_ignore_files
-                or self.settings["filter_settings"].use_other_ignore_files,
+                or self.settings["indexing"].use_other_ignore_files,
                 # in all but this narrow case defined here, ignore_hidden_files is False
                 # otherwise we need to resolve whether to include .github/ and tooling dirs before we can discard other hidden files
                 ignore_hidden=bool(
-                    self.settings["filter_settings"].ignore_hidden_files
-                    and self.settings["filter_settings"].include_github_dir is False
-                    and self.settings["filter_settings"].include_tooling_dirs is False
+                    self.settings["indexing"].ignore_hidden_files
+                    and self.settings["indexing"].include_github_dir is False
+                    and self.settings["indexing"].include_tooling_dirs is False
                 ),
                 additional_ignore_paths=extra_ignores,
             )
@@ -149,15 +148,15 @@ class FileDiscoveryService:
                     return True
             return False
 
-        if not self.settings["filter_settings"].ignore_hidden_files:
+        if not self.settings["indexing"].ignore_hidden_files:
             return False
         return bool(
             (
-                not self.settings["filter_settings"].include_github_dir
+                not self.settings["indexing"].include_github_dir
                 and target_dir_in_path({Path(".github"), Path(".circleci")}, file)
             )
             or (
-                not self.settings["filter_settings"].include_tooling_dirs
+                not self.settings["indexing"].include_tooling_dirs
                 and target_dir_in_path(get_tooling_dirs(), file)
             )
         )

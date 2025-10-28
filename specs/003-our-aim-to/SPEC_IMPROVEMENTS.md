@@ -856,7 +856,7 @@ FR-036: Reference Test Suite
     intent: understand
     expected_top_3:
       - file: "src/middleware/filtering.py"
-        symbol: "FileFilterSettings"
+        symbol: "IndexerSettings"
         min_score: 0.80
       - file: "src/middleware/discovery.py"
         symbol: "FileDiscoveryService"

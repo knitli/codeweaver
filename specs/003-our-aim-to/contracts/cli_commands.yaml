@@ -1,0 +1,322 @@
+# CLI Command Contracts for CodeWeaver v0.1
+# Based on FR-011a through FR-011d
+
+commands:
+  - name: search
+    description: Execute semantic code search query
+    usage: "codeweaver search <query> [OPTIONS]"
+    parameters:
+      - name: query
+        type: string
+        required: true
+        description: Natural language search query
+        examples:
+          - "authentication logic"
+          - "database setup"
+          - "how does chunking work"
+
+      - name: --intent / -i
+        type: choice
+        required: false
+        choices: [understand, implement, debug, optimize, test, configure, document]
+        description: Search intent for ranking adjustment
+        examples:
+          - "--intent understand"
+          - "-i implement"
+
+      - name: --limit / -l
+        type: integer
+        required: false
+        default: 10
+        min: 1
+        max: 100
+        description: Maximum results to return
+        examples:
+          - "--limit 5"
+          - "-l 20"
+
+      - name: --include-tests
+        type: boolean
+        required: false
+        default: true
+        description: Include test files in results (flag, default true)
+        examples:
+          - "--include-tests"
+          - "--no-include-tests"
+
+      - name: --project / -p
+        type: path
+        required: false
+        description: Project directory path (overrides config)
+        examples:
+          - "--project /path/to/codebase"
+          - "-p ./my-project"
+
+      - name: --output-format / -o
+        type: choice
+        required: false
+        default: table
+        choices: [json, table, markdown]
+        description: Output format
+        examples:
+          - "--output-format json"
+          - "-o markdown"
+
+    output:
+      table_format: |
+        Found <N> matches (<M> candidates processed in <T>ms)
+
+        1. <file>:<lines> (relevance: <score>, type: <classification>)
+           <code_snippet>
+
+        2. <file>:<lines> (relevance: <score>, type: <classification>)
+           <code_snippet>
+
+      json_format:
+        type: object
+        schema:
+          matches:
+            type: array
+            items:
+              file: string
+              span: [int, int]
+              relevance_score: float
+              content: string
+              match_type: string
+          summary: string
+          total_matches: int
+          execution_time_ms: float
+
+      markdown_format: |
+        # Search Results: "<query>"
+
+        **Found <N> matches** (<M> candidates, <T>ms)
+
+        ## 1. `<file>:<lines>` (relevance: <score>)
+        ```<language>
+        <code_snippet>
+        ```
+
+    examples:
+      - command: codeweaver search "authentication logic" --limit 5
+        description: Basic search with result limit
+        expected_exit_code: 0
+
+      - command: codeweaver search "database setup" --intent implement --project ./my-project
+        description: Search with intent and project override
+        expected_exit_code: 0
+
+      - command: codeweaver search "auth" --output-format json | jq '.matches[0].file'
+        description: JSON output for scripting
+        expected_exit_code: 0
+
+  - name: server
+    description: Start CodeWeaver MCP server
+    usage: "codeweaver server [OPTIONS]"
+    parameters:
+      - name: --config / -c
+        type: filepath
+        required: false
+        description: Path to configuration file (TOML)
+        examples:
+          - "--config ./codeweaver.toml"
+          - "-c ~/.config/codeweaver/config.toml"
+
+      - name: --project / -p
+        type: path
+        required: false
+        description: Project directory to index
+        examples:
+          - "--project /path/to/codebase"
+          - "-p ./my-project"
+
+      - name: --host
+        type: string
+        required: false
+        default: "127.0.0.1"
+        description: Host address to bind server
+        examples:
+          - "--host 0.0.0.0"
+          - "--host localhost"
+
+      - name: --port
+        type: integer
+        required: false
+        default: 9328
+        min: 1024
+        max: 65535
+        description: Port number for server
+        examples:
+          - "--port 9328"
+          - "--port 8080"
+
+      - name: --debug
+        type: boolean
+        required: false
+        default: false
+        description: Enable debug mode with verbose logging
+        examples:
+          - "--debug"
+
+    output:
+      startup_message: |
+        CodeWeaver MCP server starting...
+        Project: <path>
+        Host: <host>:<port>
+        Indexing: <status>
+
+        Server ready. Listening for MCP requests.
+
+      error_conditions:
+        - condition: Port already in use
+          message: "Error: Port <port> already in use"
+          exit_code: 1
+
+        - condition: Invalid config file
+          message: "Error: Invalid configuration at <path>: <reason>"
+          exit_code: 1
+
+        - condition: Project path does not exist
+          message: "Error: Project path does not exist: <path>"
+          exit_code: 1
+
+    examples:
+      - command: codeweaver server --project /path/to/codebase --port 9328
+        description: Start server with specific project and port
+        expected_exit_code: 0
+        expected_behavior: Server starts, indexes project, waits for MCP requests
+
+      - command: codeweaver server --config ./codeweaver.toml --debug
+        description: Start with config file and debug logging
+        expected_exit_code: 0
+        expected_behavior: Verbose logging enabled, server operational
+
+  - name: config
+    description: Display current configuration
+    usage: "codeweaver config [OPTIONS]"
+    parameters:
+      - name: --show
+        type: boolean
+        required: false
+        default: true
+        description: Display current configuration
+        examples:
+          - "--show"
+
+      - name: --project / -p
+        type: path
+        required: false
+        description: Project directory path
+        examples:
+          - "--project ./my-project"
+          - "-p /path/to/codebase"
+
+    output:
+      format: |
+        CodeWeaver Configuration
+        ========================
+
+        Project Settings:
+          path: <project_path>
+          indexed: <yes/no>
+          last_indexed: <timestamp>
+
+        Embedding Provider:
+          provider: <provider_name>
+          model: <model_name>
+          status: <up/down>
+
+        Vector Store:
+          type: <qdrant/other>
+          location: <local/remote>
+          status: <up/down>
+
+        Search Settings:
+          max_results: <int>
+          hybrid_search: <enabled/disabled>
+          reranking: <enabled/disabled>
+
+        File Filtering:
+          extensions: <list>
+          exclude_patterns: <list>
+
+    examples:
+      - command: codeweaver config --show
+        description: Display current configuration
+        expected_exit_code: 0
+
+      - command: codeweaver config --project ./my-project --show
+        description: Display configuration for specific project
+        expected_exit_code: 0
+
+  - name: status
+    description: Display indexing progress and system health
+    usage: "codeweaver status [OPTIONS]"
+    note: "NOT YET IMPLEMENTED - needs v0.1 implementation"
+    parameters:
+      - name: --watch / -w
+        type: boolean
+        required: false
+        default: false
+        description: Continuously update status display
+        examples:
+          - "--watch"
+          - "-w"
+
+    output:
+      format: |
+        CodeWeaver Status
+        =================
+
+        Server: <running/stopped>
+        Uptime: <duration>
+
+        Indexing:
+          State: <idle/indexing/error>
+          Files Processed: <count>/<total>
+          Chunks Created: <count>
+          Progress: <percentage>%
+          Current: <filename>
+
+        Services:
+          Vector Store: <up/down> (<latency>ms)
+          Embedding Provider: <up/down> (<latency>ms)
+          Reranker: <up/down> (<latency>ms)
+
+        Statistics:
+          Total Chunks: <count>
+          Total Files: <count>
+          Languages: <list>
+          Queries Processed: <count>
+          Avg Query Latency: <ms>
+
+    examples:
+      - command: codeweaver status
+        description: Display current status
+        expected_exit_code: 0
+
+      - command: codeweaver status --watch
+        description: Watch status updates in real-time
+        expected_exit_code: 0
+
+error_handling:
+  global_patterns:
+    - error_type: InvalidQuery
+      message: "Error: Invalid search query: {reason}"
+      exit_code: 1
+
+    - error_type: IndexNotFound
+      message: "Error: No index found for project: {path}\nRun 'codeweaver server' to index the project first."
+      exit_code: 1
+
+    - error_type: ConfigurationError
+      message: "Error: Configuration error: {details}"
+      exit_code: 1
+
+    - error_type: ServiceUnavailable
+      message: "Warning: {service} unavailable, using fallback: {fallback}"
+      exit_code: 0  # Warning, not error
+
+    - error_type: NetworkError
+      message: "Error: Network error: {details}"
+      exit_code: 1

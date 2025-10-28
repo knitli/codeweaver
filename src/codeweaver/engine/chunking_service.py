@@ -106,11 +106,7 @@ class ChunkingService:
             logger.debug("No files to chunk")
             return
 
-        use_parallel = force_parallel or (
-            self.enable_parallel and len(files) >= self.parallel_threshold
-        )
-
-        if use_parallel:
+        if force_parallel or (self.enable_parallel and len(files) >= self.parallel_threshold):
             logger.info(
                 "Chunking %d files in parallel (threshold: %d)", len(files), self.parallel_threshold
             )
@@ -155,8 +151,8 @@ class ChunkingService:
                     file.path,
                     extra={
                         "file_path": str(file.path),
-                        "ext_kind": file.ext_kind.value if file.ext_kind else None,
-                    },
+                        "ext_kind": file.ext_kind.value if file.ext_kind else None,  # type: ignore
+                    },  # type: ignore
                 )
                 # Continue processing other files
 

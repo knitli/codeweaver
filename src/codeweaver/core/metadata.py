@@ -29,13 +29,8 @@ from typing import (
 from ast_grep_py import SgNode
 from pydantic import UUID7, ConfigDict, Field, PositiveFloat, SkipValidation
 
-from codeweaver.common.utils import normalize_ext, uuid7
-from codeweaver.core.language import (
-    ConfigLanguage,
-    SemanticSearchLanguage,
-    has_semantic_extension,
-    is_semantic_config_ext,
-)
+from codeweaver.common.utils import uuid7
+from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage, has_semantic_extension
 from codeweaver.core.types.aliases import (
     FileExt,
     FileExtensionT,
@@ -638,7 +633,10 @@ class ExtKind(NamedTuple):
         """
         Create an ExtKind from a file path.
         """
-        filename = Path(file).name if isinstance(file, str) else file.name
+        from codeweaver.core.language import language_from_path
+
+        file = Path(file) if isinstance(file, str) else file
+        filename = file.name
         # The order we do this in is important:
         if semantic_config_file := next(
             (
@@ -650,27 +648,15 @@ class ExtKind(NamedTuple):
         ):
             return cls(language=semantic_config_file.language, kind=ChunkKind.CONFIG)
 
-        filename_parts = tuple(part for part in filename.split(".") if part)
-        extension = (
-            normalize_ext(filename_parts[-1]) if filename_parts else filename_parts[0].lower()
-        )
-
-        if (
-            semantic_config_language := has_semantic_extension(extension)
-        ) and is_semantic_config_ext(extension):
-            return cls(language=semantic_config_language, kind=ChunkKind.CONFIG)
-
-        if semantic_language := has_semantic_extension(extension):
-            return cls(language=semantic_language, kind=ChunkKind.CODE)
-
-        return next(
-            (
-                cls(language=extpair.language, kind=ChunkKind.from_string(extpair.category))  # pyright: ignore[reportArgumentType]
-                for extpair in get_ext_lang_pairs()
-                if extpair.is_same(filename)
-            ),
-            None,
-        )
+        if language := language_from_path(file):
+            if isinstance(language, ConfigLanguage):
+                return cls(
+                    language=language.as_semantic_search_language or language, kind=ChunkKind.CONFIG
+                )
+            if not isinstance(language, SemanticSearchLanguage):
+                return cls(language=language, kind=_categorize_language(language))
+            return cls(language=language, kind=ChunkKind.CODE)
+        return None
 
     def serialize_for_cli(self) -> dict[str, Any]:
         """Serialize the ExtKind for CLI output."""

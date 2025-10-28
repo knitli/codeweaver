@@ -76,8 +76,8 @@ class RignoreSettings(TypedDict, total=False):
     should_exclude_entry: NotRequired[Callable[[Path], bool]]
 
 
-class FileFilterSettingsDict(TypedDict, total=False):
-    """A serialized `FileFilterSettings` object."""
+class IndexerSettingsDict(TypedDict, total=False):
+    """A serialized `IndexerSettings` object."""
 
     forced_includes: NotRequired[frozenset[str | Path]]
     excludes: NotRequired[frozenset[str | Path]]
@@ -86,9 +86,10 @@ class FileFilterSettingsDict(TypedDict, total=False):
     use_other_ignore_files: NotRequired[bool]
     ignore_hidden: NotRequired[bool]
     include_github_dir: NotRequired[bool]
-    include_tooling_dir: NotRequired[bool]
+    include_tooling_dirs: NotRequired[bool]
     other_ignore_kwargs: NotRequired[RignoreSettings | Unset]
     default_rignore_settings: NotRequired[DictView[RignoreSettings]]
+    only_index_on_command: NotRequired[bool]
 
 
 # ===========================================================================
@@ -227,20 +228,17 @@ class CodeWeaverSettingsDict(TypedDict, total=False):
     max_results: NotRequired[PositiveInt]
     server: NotRequired[FastMcpServerSettingsDict]
     logging: NotRequired[LoggingSettings]
-    middleware_settings: NotRequired[MiddlewareOptions]
+    middleware: NotRequired[MiddlewareOptions]
     chunker: NotRequired[ChunkerSettingsDict]
-    project_root: NotRequired[Path | None]
-    uvicorn_settings: NotRequired[UvicornServerSettingsDict]
-    filter_settings: NotRequired[FileFilterSettingsDict]
-    enable_background_indexing: NotRequired[bool]
-    enable_telemetry: NotRequired[bool]
+    uvicorn: NotRequired[UvicornServerSettingsDict]
+    indexing: NotRequired[IndexerSettingsDict]
     enable_health_endpoint: NotRequired[bool]
     enable_statistics_endpoint: NotRequired[bool]
     enable_settings_endpoint: NotRequired[bool]
     enable_version_endpoint: NotRequired[bool]
+    enable_telemetry: NotRequired[bool]
     allow_identifying_telemetry: NotRequired[bool]
     enable_ai_intent_analysis: NotRequired[bool]
-    enable_precontext: NotRequired[bool]
 
 
 # ===========================================================================
@@ -421,7 +419,7 @@ __all__ = (
     "ConnectionRateLimitConfig",
     "FastMcpHttpRunArgs",
     "FastMcpServerSettingsDict",
-    "FileFilterSettingsDict",
+    "IndexerSettingsDict",
     "PerformanceSettingsDict",
     "RignoreSettings",
     "UvicornServerSettings",
