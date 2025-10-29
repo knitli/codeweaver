@@ -12,7 +12,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 **Updated**: 2025-10-27 (Expert Panel Review Integrated)
 **Status**: Ready for Implementation
 **Quality Score**: 9.0/10 (Post-Review)
-**Input**: User description: "Our aim to is to ship v.1 of CodeWeaver today. The main thing preventing that is a lack of integration. Here are the goals for where we want to be for 0.1: I can clone the repo, user can run codeweaver server and it starts without errors, user can point it at a codebase (CodeWeaver is fine) and it indexes, chunks, creates and stores embeddings, user through the CLI or an agent through MCP (using find_code tool) can run a search query and they receive useful results based on hybrid search (dense/sparse vectors) that have been reranked with a reranker and weighted by the semantic scoring system (see codeweaver.semantic.classifications), The README has a Quickstart section with commands that work, The README is rewritten to reflect the current state, not the aspiration, or at least, what we want it to do is clearly dilineated from what it can do today"
+**Input**: User description: "Our aim to is to ship v.1 of CodeWeaver today. The main thing preventing that is a lack of integration. Here are the goals for where we want to be for 0.1: I can clone the repo, user can run codeweaver server and it starts without errors, user can point it at a codebase (CodeWeaver is fine) and it indexes, chunks, creates and stores embeddings, user through the CLI or an agent through MCP (using find_code tool) can run a search query and they receive useful results based on hybrid search (dense/sparse vectors) that have been reranked with a reranking and weighted by the semantic scoring system (see codeweaver.semantic.classifications), The README has a Quickstart section with commands that work, The README is rewritten to reflect the current state, not the aspiration, or at least, what we want it to do is clearly dilineated from what it can do today"
 
 ## Execution Flow (main)
 ```
@@ -27,7 +27,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
    → RESOLVED: Embedding provider = voyage-code-3 (default in settings)
    → RESOLVED: Vector store = Qdrant local (in-memory for dev, with persistence)
    → RESOLVED: Sparse embeddings = FastEmbed with prithivida/Splade-PP_en_v2
-   → RESOLVED: Reranker = voyage-rerank-2.5 (default)
+   → RESOLVED: Reranking = voyage-rerank-2.5 (default)
    → RESOLVED: Auto-indexing is default behavior (can be disabled in settings)
    → RESOLVED: Performance target = "it works and is useful" for v0.1
 4. Fill User Scenarios & Testing section
@@ -88,7 +88,7 @@ An AI agent using MCP can connect to the running CodeWeaver server and use the `
 
 4. **Given** a codebase has been indexed
    **When** the developer runs a search query via CLI
-   **Then** they receive ranked search results based on hybrid search (dense and sparse vectors), reranked by a reranker, and weighted by semantic classification scores
+   **Then** they receive ranked search results based on hybrid search (dense and sparse vectors), reranked by a reranking, and weighted by semantic classification scores
 
 #### AI Agent MCP Integration
 5. **Given** an AI agent supports MCP
@@ -323,7 +323,7 @@ Found 5 matches (sparse search in 450ms)
       "vector_store": {"status": "up|down|degraded", "latency_ms": int},
       "embedding_provider": {"status": "up|down", "model": str, "latency_ms": int, "circuit_breaker_state": "closed|open|half_open"},
       "sparse_embedding": {"status": "up", "provider": "fastembed_local"},
-      "reranker": {"status": "up|down", "model": str, "latency_ms": int}
+      "reranking": {"status": "up|down", "model": str, "latency_ms": int}
     },
     "statistics": {
       "total_chunks_indexed": int,
@@ -490,7 +490,7 @@ Found 5 matches (sparse search in 450ms)
 
 - **FR-024**: System MUST retrieve candidate results from the vector store using hybrid search
 
-- **FR-025**: System MUST rerank candidates using the configured reranker model
+- **FR-025**: System MUST rerank candidates using the configured reranking model
 
 - **FR-026**: System MUST rescore results based on analyzed AgentTask, IntentType, and ImportanceScores category
 
@@ -510,7 +510,7 @@ Found 5 matches (sparse search in 450ms)
 - **FR-033**: External Service Timeouts
   - All external service calls MUST timeout after 30 seconds
   - Timeout triggers retry logic with exponential backoff
-  - Applies to: embedding API calls, vector store operations, reranker calls
+  - Applies to: embedding API calls, vector store operations, reranking calls
 
 - **FR-034**: Indexing Checkpoint and Resume
   - System MUST persist indexing state to enable resumption after interruption

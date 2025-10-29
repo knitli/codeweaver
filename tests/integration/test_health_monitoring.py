@@ -9,7 +9,7 @@ Tests comprehensive health endpoint functionality with FR-010-Enhanced schema va
 - Health endpoint response structure and schema compliance
 - Health status determination (healthy/degraded/unhealthy)
 - Indexing progress tracking during operations
-- Service health checks (vector_store, embedding_provider, sparse_embedding, reranker)
+- Service health checks (vector_store, embedding_provider, sparse_embedding, reranking)
 - Circuit breaker state exposure from T006
 - Statistics collection from SessionStatistics
 - Performance requirements (<200ms p95)
@@ -128,14 +128,14 @@ def mock_provider_registry(mocker) -> MagicMock:
     )
     registry.get_sparse_embedding_provider_instance.return_value = sparse_instance
 
-    # Mock reranker provider with circuit breaker
-    reranker_provider_enum = mocker.MagicMock()
-    reranker_instance = mocker.MagicMock()
-    reranker_instance.model_name = "voyage-rerank-2.5"
-    reranker_instance.circuit_breaker_state = mocker.MagicMock()
-    reranker_instance.circuit_breaker_state.value = "closed"
-    registry.get_reranker_provider.return_value = reranker_provider_enum
-    registry.get_reranker_provider_instance.return_value = reranker_instance
+    # Mock reranking provider with circuit breaker
+    reranking_provider_enum = mocker.MagicMock()
+    reranking_instance = mocker.MagicMock()
+    reranking_instance.model_name = "voyage-rerank-2.5"
+    reranking_instance.circuit_breaker_state = mocker.MagicMock()
+    reranking_instance.circuit_breaker_state.value = "closed"
+    registry.get_reranking_provider.return_value = reranking_provider_enum
+    registry.get_reranking_provider_instance.return_value = reranking_instance
 
     return registry
 
@@ -218,8 +218,8 @@ async def test_health_response_schema_validation(health_service: HealthService):
     assert services.embedding_provider.circuit_breaker_state in ("closed", "open", "half_open")
     assert services.embedding_provider.latency_ms >= 0
     assert services.sparse_embedding.status in ("up", "down")
-    assert services.reranker.status in ("up", "down")
-    assert services.reranker.latency_ms >= 0
+    assert services.reranking.status in ("up", "down")
+    assert services.reranking.latency_ms >= 0
 
     # Validate statistics structure
     stats = response.statistics
@@ -397,7 +397,7 @@ async def test_health_service_states(health_service: HealthService):
     assert response.services.vector_store is not None
     assert response.services.embedding_provider is not None
     assert response.services.sparse_embedding is not None
-    assert response.services.reranker is not None
+    assert response.services.reranking is not None
 
     # Verify vector store
     assert response.services.vector_store.status in ("up", "down", "degraded")
@@ -416,9 +416,9 @@ async def test_health_service_states(health_service: HealthService):
     assert response.services.sparse_embedding.status in ("up", "down")
     assert response.services.sparse_embedding.provider == "FastEmbed_Local"
 
-    # Verify reranker
-    assert response.services.reranker.status in ("up", "down")
-    assert response.services.reranker.model == "voyage-rerank-2.5"
+    # Verify reranking
+    assert response.services.reranking.status in ("up", "down")
+    assert response.services.reranking.model == "voyage-rerank-2.5"
 
 
 @pytest.mark.integration

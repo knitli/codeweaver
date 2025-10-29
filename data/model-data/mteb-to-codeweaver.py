@@ -518,7 +518,7 @@ def generate_capabilities_file(models: list[SimplifiedModelMeta], model_maker: M
         "# SPDX-FileCopyrightText: 2025 (c) 2025 Knitli Inc.",
         "# SPDX-License-Identifier: MIT OR Apache-2.0",
         "# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>",
-    # REUSE-IgnoreEnd
+        # REUSE-IgnoreEnd
         "from __future__ import annotations",
         "",
         "from typing import Literal",

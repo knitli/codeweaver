@@ -466,9 +466,9 @@ async def find_code(
         )
 
     # 5. Rerank (existing provider, optional)
-    reranker = registry.get_reranker()
-    if reranker:
-        candidates = await reranker.rerank(query, candidates)
+    reranking = registry.get_reranking()
+    if reranking:
+        candidates = await reranking.rerank(query, candidates)
 
     # 6. Rescore with semantic weights (existing ImportanceScores)
     for candidate in candidates:
@@ -504,7 +504,7 @@ The complete `find_code()` pipeline has been successfully implemented with all 7
 2. **Query Embedding** - Embeds query with dense (required) + sparse (optional) providers
 3. **Hybrid Search** - Queries vector store with over-fetching (3x for reranking)
 4. **Static Weighting** - Applies dense=0.65, sparse=0.35 weights (v0.1 static values)
-5. **Reranking** - Optional reranker provider, skips gracefully if unavailable
+5. **Reranking** - Optional reranking provider, skips gracefully if unavailable
 6. **Semantic Rescoring** - Applies ImportanceScores weighting based on intent and AgentTask
 7. **Sort & Response** - Returns `FindCodeResponseSummary` with ranked results
 
@@ -677,7 +677,7 @@ The health endpoint has been fully augmented with FR-010-Enhanced schema support
 1. **health_models.py** - Pydantic models matching FR-010-Enhanced contract:
    - `HealthResponse` - Complete health response with all required fields
    - `IndexingInfo` + `IndexingProgressInfo` - Indexing state and progress tracking
-   - `ServicesInfo` - Health for vector_store, embedding_provider, sparse_embedding, reranker
+   - `ServicesInfo` - Health for vector_store, embedding_provider, sparse_embedding, reranking
    - `StatisticsInfo` - Queries, latency, index size, languages metrics
    - Service-specific models with circuit breaker states from T006
 
@@ -748,7 +748,7 @@ The health endpoint has been fully augmented with FR-010-Enhanced schema support
       "status": "up",
       "provider": "fastembed_local"
     },
-    "reranker": {
+    "reranking": {
       "status": "up",
       "model": "voyage-rerank-2.5",
       "latency_ms": 180,

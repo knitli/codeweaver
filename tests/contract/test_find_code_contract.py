@@ -231,13 +231,11 @@ class TestCodeMatchSchema:
         if "allOf" in relevance_schema:
             # Extract constraints from allOf structure
             assert any(
-                constraint.get("minimum") == 0.0
-                or constraint.get("exclusiveMinimum") == 0.0
+                constraint.get("minimum") == 0.0 or constraint.get("exclusiveMinimum") == 0.0
                 for constraint in relevance_schema["allOf"]
             ), "relevance_score must have minimum 0.0"
             assert any(
-                constraint.get("maximum") == 1.0
-                for constraint in relevance_schema["allOf"]
+                constraint.get("maximum") == 1.0 for constraint in relevance_schema["allOf"]
             ), "relevance_score must have maximum 1.0"
         else:
             # Check directly if not nested

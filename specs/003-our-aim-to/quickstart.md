@@ -62,7 +62,7 @@ model = "voyage-code-3"                   # VoyageAI code embedding model
 provider = "fastembed"                    # Local sparse embeddings
 model = "prithivida/Splade-PP_en_v2"     # SPLADE model
 
-[reranker]
+[reranking]
 provider = "voyageai"
 model = "voyage-rerank-2.5"
 # api_key set via VOYAGE_API_KEY env var
@@ -76,7 +76,7 @@ path = ".codeweaver/qdrant"              # Persistence directory
 **Environment Variables**:
 
 ```bash
-# Required for VoyageAI (dense embeddings + reranker)
+# Required for VoyageAI (dense embeddings + reranking)
 export VOYAGE_API_KEY="your-api-key-here"
 
 # Optional alternatives
@@ -235,7 +235,7 @@ codeweaver status
 # Services:
 #   Vector Store: up (12ms)
 #   Embedding Provider: up (185ms)
-#   Reranker: up (150ms)
+#   Reranking: up (150ms)
 ```
 
 **Validation**:
@@ -469,7 +469,7 @@ curl http://localhost:9328/health/ | jq '.services'
 # Expected:
 # - vector_store.latency_ms: <50ms
 # - embedding_provider.latency_ms: <300ms
-# - reranker.latency_ms: <200ms
+# - reranking.latency_ms: <200ms
 
 # If high latency:
 # - Check network connection to VoyageAI

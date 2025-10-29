@@ -377,12 +377,20 @@ class SemanticChunker(BaseChunker):
             ]
 
         # Single line (no semantic structure to parse)
-        if "\n" not in content:
+        # Count non-comment, non-blank lines to handle files with license headers
+        code_lines = [
+            line
+            for line in content.splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        ]
+
+        if len(code_lines) <= 1:
             ext_kind = ExtKind.from_file(file_path) if file_path else None
+            total_lines = content.count("\n") + 1
             return [
                 CodeChunk.model_construct(
                     content=content,
-                    line_range=Span(1, 1, source_id),
+                    line_range=Span(1, total_lines, source_id),
                     file_path=file_path,
                     ext_kind=ext_kind,
                     language=self.language,

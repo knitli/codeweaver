@@ -224,7 +224,7 @@ async def health(_request: Request) -> PlainTextResponse:
             HealthResponse,
             IndexingInfo,
             IndexingProgressInfo,
-            RerankerServiceInfo,
+            RerankingServiceInfo,
             ServicesInfo,
             SparseEmbeddingServiceInfo,
             StatisticsInfo,
@@ -253,7 +253,7 @@ async def health(_request: Request) -> PlainTextResponse:
                     status="down", model="unknown", latency_ms=0, circuit_breaker_state="open"
                 ),
                 sparse_embedding=SparseEmbeddingServiceInfo(status="down", provider="unknown"),
-                reranker=RerankerServiceInfo(status="down", model="unknown", latency_ms=0),
+                reranking=RerankingServiceInfo(status="down", model="unknown", latency_ms=0),
             ),
             statistics=StatisticsInfo(
                 total_chunks_indexed=0,

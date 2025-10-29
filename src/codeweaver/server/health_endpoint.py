@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 from codeweaver.server.health_models import (
     EmbeddingProviderServiceInfo,
     HealthResponse,
-    RerankerServiceInfo,
+    RerankingServiceInfo,
     SparseEmbeddingServiceInfo,
     VectorStoreServiceInfo,
 )
@@ -33,7 +33,7 @@ async def get_health() -> HealthResponse | Any:
     This endpoint provides comprehensive health information including:
     - Overall system status (healthy/degraded/unhealthy)
     - Indexing progress and state
-    - Service health for vector store, embedding providers, reranker
+    - Service health for vector store, embedding providers, reranking
     - Statistics on indexed content and query performance
 
     Implements FR-010-Enhanced schema for operational visibility.
@@ -91,7 +91,7 @@ async def get_health() -> HealthResponse | Any:
                     status="down", model="unknown", latency_ms=0, circuit_breaker_state="open"
                 ),
                 sparse_embedding=SparseEmbeddingServiceInfo(status="down", provider="unknown"),
-                reranker=RerankerServiceInfo(status="down", model="unknown", latency_ms=0),
+                reranking=RerankingServiceInfo(status="down", model="unknown", latency_ms=0),
             ),
             statistics=StatisticsInfo(
                 total_chunks_indexed=0,

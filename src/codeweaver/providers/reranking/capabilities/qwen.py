@@ -19,8 +19,9 @@ if TYPE_CHECKING:
 def _get_shared_capabilities() -> PartialRerankingCapabilities:
     """Returns shared_capabilities across all Qwen reranking models."""
     from codeweaver.providers.provider import Provider
+
     return {
-        "name": "Qwen/Qwen3-Reranker-",
+        "name": "Qwen/Qwen3-Reranking-",
         "provider": Provider.HUGGINGFACE_INFERENCE,
         "max_input": 32_000,
         "context_window": 32_000,
@@ -39,6 +40,7 @@ def get_qwen_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
     Get the Qwen reranking capabilities.
     """
     from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+
     shared_capabilities = _get_shared_capabilities()
     models = ("06B", "4B", "8B")
     assembled_capabilities: list[RerankingModelCapabilities] = []
@@ -46,7 +48,7 @@ def get_qwen_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
         RerankingModelCapabilities.model_validate({
             **shared_capabilities,
             "name": f"{shared_capabilities['name']}{model}",
-            "tokenizer_model": f"Qwen/Qwen3-Reranker-{model}",
+            "tokenizer_model": f"Qwen/Qwen3-Reranking-{model}",
         })
         for model in models
     )

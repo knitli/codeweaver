@@ -95,8 +95,7 @@ def clean_file(file_path: Path) -> bool:
         print(f"Warning: Could not process {file_path}: {e}", file=sys.stderr)
 
     else:
-
-    return False
+        return False
 
 
 def main() -> None:

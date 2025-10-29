@@ -24,7 +24,7 @@ class OnnxCrossEncoderModel(OnnxModel[float]):
     
 
 
-class TextRerankerWorker(EmbeddingWorker[float]):
+class TextRerankingWorker(EmbeddingWorker[float]):
     def __init__(self, model_name: str, cache_dir: str, **kwargs: Any) -> None:
         ...
     

@@ -112,7 +112,7 @@ All technical decisions were resolved during the feature specification clarifica
 - No reranking: Lower search quality (unacceptable)
 
 **Evidence**:
-- VoyageAI reranker docs: https://docs.voyageai.com/docs/reranker
+- VoyageAI reranking docs: https://docs.voyageai.com/docs/reranking
 - Default config: `src/codeweaver/_settings.py`
 
 ### 6. CLI Framework

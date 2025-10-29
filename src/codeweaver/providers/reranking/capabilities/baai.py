@@ -22,7 +22,7 @@ def get_baai_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
     from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilities
 
     shared_capabilities: PartialRerankingCapabilities = {
-        "name": "BAAI/bge-reranker-",
+        "name": "BAAI/bge-reranking-",
         "tokenizer": "tokenizers",
         "supports_custom_prompt": False,
     }

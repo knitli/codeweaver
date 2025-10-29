@@ -47,14 +47,14 @@ def test_set_batch_keys_returns_new_instance(sample_chunk: CodeChunk) -> None:
     """Test that set_batch_keys returns a new CodeChunk instance."""
     batch_keys = BatchKeys(id=uuid7(), idx=0)
     updated_chunk = sample_chunk.set_batch_keys(batch_keys)
-    
+
     # Should return a new instance
     assert updated_chunk is not sample_chunk
-    
+
     # New instance should have batch keys
     assert updated_chunk._embedding_batches is not None
     assert batch_keys in updated_chunk._embedding_batches
-    
+
     # Original should remain unchanged
     assert sample_chunk._embedding_batches is None
 
@@ -77,7 +77,7 @@ def test_set_batch_keys_does_not_duplicate(sample_chunk: CodeChunk) -> None:
     batch_keys = BatchKeys(id=uuid7(), idx=0)
     first_update = sample_chunk.set_batch_keys(batch_keys)
     second_update = first_update.set_batch_keys(batch_keys)
-    
+
     # Should return same instance if batch keys already set
     assert first_update is second_update
 
@@ -87,10 +87,10 @@ def test_set_batch_keys_allows_multiple_batches(sample_chunk: CodeChunk) -> None
     batch_id = uuid7()
     batch_keys_1 = BatchKeys(id=batch_id, idx=0)
     batch_keys_2 = BatchKeys(id=batch_id, idx=1)
-    
+
     updated_1 = sample_chunk.set_batch_keys(batch_keys_1)
     updated_2 = updated_1.set_batch_keys(batch_keys_2)
-    
+
     # Should have both batch keys
     assert updated_2._embedding_batches is not None
     assert len(updated_2._embedding_batches) == 2

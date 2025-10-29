@@ -87,9 +87,9 @@ class IndexingCheckpoint(BaseModel):
     session_id: Annotated[
         UUID7, Field(description="Unique session identifier (UUIDv7) for this indexing checkpoint")
     ] = uuid7()  # type: ignore
-    project_path: Annotated[
-        Path | None, Field(description="Path to the indexed codebase")
-    ] = Field(default_factory=lambda: _get_settings_map().get("project_path"))
+    project_path: Annotated[Path | None, Field(description="Path to the indexed codebase")] = Field(
+        default_factory=lambda: _get_settings_map().get("project_path")
+    )
     start_time: datetime = Field(
         default_factory=lambda: datetime.now(UTC), description="When indexing started (ISO8601 UTC)"
     )

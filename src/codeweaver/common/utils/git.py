@@ -38,20 +38,22 @@ def try_git_rev_parse() -> Path | None:
     if not git:
         return None
     with contextlib.suppress(subprocess.CalledProcessError):
+        # Try superproject first (for submodules)
         output = subprocess.run(
-            [
-                git,
-                "rev-parse",
-                "--show-superproject-working-tree",
-                "--show-toplevel",
-                "|",
-                "head",
-                "-1",
-            ],
+            [git, "rev-parse", "--show-superproject-working-tree"],
             capture_output=True,
             text=True,
-        )  # type: ignore
-        return Path(output.stdout.strip())
+            check=False,
+        )
+        if output.returncode == 0 and output.stdout.strip():
+            return Path(output.stdout.strip())
+
+        # Fall back to toplevel
+        output = subprocess.run(
+            [git, "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=False
+        )
+        if output.returncode == 0 and output.stdout.strip():
+            return Path(output.stdout.strip())
     return None
 
 

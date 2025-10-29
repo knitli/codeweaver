@@ -20,6 +20,7 @@ import asyncio
 from pathlib import Path
 
 import pytest
+
 from watchfiles.main import Change, FileChange
 
 from codeweaver.engine.indexer import Indexer
@@ -87,7 +88,7 @@ def test_auth_manager_create_session():
     assert session_id in manager.sessions
     assert manager.sessions[session_id] == "user123"
 ''',
-    "README.md": '''# Test Project
+    "README.md": """# Test Project
 
 Small test project for CodeWeaver integration tests.
 
@@ -101,13 +102,13 @@ Small test project for CodeWeaver integration tests.
 from src.auth import authenticate
 result = authenticate("admin", "secret")
 ```
-''',
-    ".gitignore": '''__pycache__/
+""",
+    ".gitignore": """__pycache__/
 *.pyc
 .pytest_cache/
 .coverage
 *.db
-''',
+""",
 }
 
 
@@ -128,10 +129,7 @@ def test_project_path(tmp_path: Path) -> Path:
 @pytest.fixture
 def indexer(test_project_path: Path) -> Indexer:
     """Create indexer instance for test project."""
-    return Indexer(
-        project_root=test_project_path,
-        auto_initialize_providers=True,
-    )
+    return Indexer(project_root=test_project_path, auto_initialize_providers=True)
 
 
 @pytest.mark.integration
@@ -191,11 +189,11 @@ async def test_indexing_progress_via_health(indexer: Indexer):
     stats = indexer.stats
 
     # Verify stats structure
-    assert hasattr(stats, 'total_files_discovered')
-    assert hasattr(stats, 'total_files_processed')
-    assert hasattr(stats, 'total_chunks_created')
-    assert hasattr(stats, 'total_errors')
-    assert hasattr(stats, 'start_time')
+    assert hasattr(stats, "total_files_discovered")
+    assert hasattr(stats, "total_files_processed")
+    assert hasattr(stats, "total_chunks_created")
+    assert hasattr(stats, "total_errors")
+    assert hasattr(stats, "start_time")
 
     # Verify values are reasonable
     assert stats.total_files_discovered >= 0
@@ -248,16 +246,13 @@ async def test_indexing_error_recovery(test_project_path: Path):
     """
     # Add a "corrupted" file (binary content)
     corrupted_file = test_project_path / "corrupted.bin"
-    corrupted_file.write_bytes(b'\x00\x01\x02\xFF\xFE\xFD')
+    corrupted_file.write_bytes(b"\x00\x01\x02\xff\xfe\xfd")
 
     # Create indexer
-    indexer = Indexer(
-        project_root=test_project_path,
-        auto_initialize_providers=True,
-    )
+    indexer = Indexer(project_root=test_project_path, auto_initialize_providers=True)
 
     # Run indexing
-    discovered_count = indexer.prime_index(force_reindex=True)
+    indexer.prime_index(force_reindex=True)
 
     # Allow indexing to complete
     await asyncio.sleep(2)
@@ -297,14 +292,13 @@ async def test_file_change_indexing(indexer: Indexer, test_project_path: Path):
     # Modify a file
     auth_file = test_project_path / "src" / "auth.py"
     original_content = auth_file.read_text()
-    modified_content = original_content + '\n\ndef new_function():\n    """New function."""\n    pass\n'
+    modified_content = (
+        original_content + '\n\ndef new_function():\n    """New function."""\n    pass\n'
+    )
     auth_file.write_text(modified_content)
 
     # Simulate file change event
-    change = FileChange(
-        path=auth_file,
-        change_type=Change.modified,
-    )
+    change = FileChange(path=auth_file, change_type=Change.modified)
     await indexer.index(change)
 
     # Allow reindexing to complete

@@ -12,7 +12,11 @@
     "properties": {
       "status": {
         "type": "string",
-        "enum": ["healthy", "degraded", "unhealthy"],
+        "enum": [
+          "healthy",
+          "degraded",
+          "unhealthy"
+        ],
         "description": "Overall system health status"
       },
       "timestamp": {
@@ -30,7 +34,11 @@
         "properties": {
           "state": {
             "type": "string",
-            "enum": ["idle", "indexing", "error"],
+            "enum": [
+              "idle",
+              "indexing",
+              "error"
+            ],
             "description": "Current indexing state"
           },
           "progress": {
@@ -84,7 +92,10 @@
             "description": "Last successful indexing completion"
           }
         },
-        "required": ["state", "progress"]
+        "required": [
+          "state",
+          "progress"
+        ]
       },
       "services": {
         "type": "object",
@@ -94,21 +105,31 @@
             "properties": {
               "status": {
                 "type": "string",
-                "enum": ["up", "down", "degraded"]
+                "enum": [
+                  "up",
+                  "down",
+                  "degraded"
+                ]
               },
               "latency_ms": {
                 "type": "number",
                 "minimum": 0
               }
             },
-            "required": ["status", "latency_ms"]
+            "required": [
+              "status",
+              "latency_ms"
+            ]
           },
           "embedding_provider": {
             "type": "object",
             "properties": {
               "status": {
                 "type": "string",
-                "enum": ["up", "down"]
+                "enum": [
+                  "up",
+                  "down"
+                ]
               },
               "model": {
                 "type": "string"
@@ -119,30 +140,48 @@
               },
               "circuit_breaker_state": {
                 "type": "string",
-                "enum": ["closed", "open", "half_open"]
+                "enum": [
+                  "closed",
+                  "open",
+                  "half_open"
+                ]
               }
             },
-            "required": ["status", "model", "latency_ms", "circuit_breaker_state"]
+            "required": [
+              "status",
+              "model",
+              "latency_ms",
+              "circuit_breaker_state"
+            ]
           },
           "sparse_embedding": {
             "type": "object",
             "properties": {
               "status": {
                 "type": "string",
-                "enum": ["up", "down"]
+                "enum": [
+                  "up",
+                  "down"
+                ]
               },
               "provider": {
                 "type": "string"
               }
             },
-            "required": ["status", "provider"]
+            "required": [
+              "status",
+              "provider"
+            ]
           },
-          "reranker": {
+          "reranking": {
             "type": "object",
             "properties": {
               "status": {
                 "type": "string",
-                "enum": ["up", "down"]
+                "enum": [
+                  "up",
+                  "down"
+                ]
               },
               "model": {
                 "type": "string"
@@ -152,14 +191,18 @@
                 "minimum": 0
               }
             },
-            "required": ["status", "model", "latency_ms"]
+            "required": [
+              "status",
+              "model",
+              "latency_ms"
+            ]
           }
         },
         "required": [
           "vector_store",
           "embedding_provider",
           "sparse_embedding",
-          "reranker"
+          "reranking"
         ]
       },
       "statistics": {
@@ -271,7 +314,7 @@
             "status": "up",
             "provider": "fastembed_local"
           },
-          "reranker": {
+          "reranking": {
             "status": "up",
             "model": "voyage-rerank-2.5",
             "latency_ms": 150
@@ -280,7 +323,11 @@
         "statistics": {
           "total_chunks_indexed": 3250,
           "total_files_indexed": 450,
-          "languages_indexed": ["python", "typescript", "rust"],
+          "languages_indexed": [
+            "python",
+            "typescript",
+            "rust"
+          ],
           "index_size_mb": 45,
           "queries_processed": 127,
           "avg_query_latency_ms": 850
@@ -318,7 +365,7 @@
             "status": "up",
             "provider": "fastembed_local"
           },
-          "reranker": {
+          "reranking": {
             "status": "down",
             "model": "voyage-rerank-2.5",
             "latency_ms": 0
@@ -327,7 +374,12 @@
         "statistics": {
           "total_chunks_indexed": 8500,
           "total_files_indexed": 1247,
-          "languages_indexed": ["python", "typescript", "rust", "go"],
+          "languages_indexed": [
+            "python",
+            "typescript",
+            "rust",
+            "go"
+          ],
           "index_size_mb": 120,
           "queries_processed": 450,
           "avg_query_latency_ms": 450
@@ -365,7 +417,7 @@
             "status": "up",
             "provider": "fastembed_local"
           },
-          "reranker": {
+          "reranking": {
             "status": "up",
             "model": "voyage-rerank-2.5",
             "latency_ms": 150
@@ -374,7 +426,12 @@
         "statistics": {
           "total_chunks_indexed": 8500,
           "total_files_indexed": 1247,
-          "languages_indexed": ["python", "typescript", "rust", "go"],
+          "languages_indexed": [
+            "python",
+            "typescript",
+            "rust",
+            "go"
+          ],
           "index_size_mb": 120,
           "queries_processed": 450,
           "avg_query_latency_ms": 0

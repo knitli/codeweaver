@@ -20,8 +20,21 @@ from codeweaver.providers.embedding.types import EmbeddingBatchInfo  # noqa: F40
 
 # Rebuild models to resolve forward references
 # This must happen after all imports to ensure all referenced types are available
-ChunkGovernor.model_rebuild()
-CodeChunk.model_rebuild()
+# Import types needed for forward reference resolution
+from codeweaver.engine.chunker.delimiters import DelimiterPattern, LanguageFamily
+
+# Build namespace for Pydantic to resolve string annotations
+namespace = {
+    "DelimiterPattern": DelimiterPattern,
+    "LanguageFamily": LanguageFamily,
+    "ChunkerSettings": ChunkerSettings,
+    "CodeChunk": CodeChunk,
+}
+# Ensure ChunkerSettings models are rebuilt first
+ChunkerSettings._ensure_models_rebuilt()
+# Then rebuild ChunkGovernor and CodeChunk with full namespace
+ChunkGovernor.model_rebuild(_types_namespace=namespace)
+CodeChunk.model_rebuild(_types_namespace=namespace)
 
 
 @pytest.fixture

@@ -145,7 +145,7 @@ This task list implements the vector storage provider system with Qdrant and in-
 
 - [ ] **T017** Implement QdrantVectorStore.__init__ in `src/codeweaver/providers/vector_stores/qdrant.py`
   - Accept QdrantConfig, EmbeddingProvider, optional RerankingProvider
-  - Initialize fields: _client, _embedder, _reranker, config, _metadata cache
+  - Initialize fields: _client, _embedder, _reranking, config, _metadata cache
   - Call super().__init__()
 
 - [ ] **T018** Implement QdrantVectorStore._initialize in `src/codeweaver/providers/vector_stores/qdrant.py`

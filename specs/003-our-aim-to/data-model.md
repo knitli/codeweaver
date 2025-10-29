@@ -111,7 +111,7 @@ related_symbols: tuple[str, ...]               # Related functions/classes
 **Scoring Calculation**:
 ```python
 relevance_score = (
-    rerank_score * 0.5 +                       # Reranker score (VoyageAI)
+    rerank_score * 0.5 +                       # Reranking score (VoyageAI)
     dense_similarity * 0.3 +                   # Dense vector similarity
     sparse_similarity * 0.1 +                  # Sparse vector similarity
     semantic_weight * 0.1                      # ImportanceScores adjustment
@@ -402,7 +402,7 @@ FILE_PATTERN = "file_pattern"  # File path/name match
 **Values**:
 ```python
 HYBRID_SEARCH = "hybrid_search"              # Dense + sparse vectors
-SEMANTIC_RERANK = "semantic_rerank"          # Reranker applied
+SEMANTIC_RERANK = "semantic_rerank"          # Reranking applied
 SPARSE_ONLY = "sparse_only"                  # Fallback (API down)
 DENSE_ONLY = "dense_only"                    # Legacy/future
 KEYWORD_FALLBACK = "keyword_fallback"        # Last resort

@@ -22,14 +22,14 @@ if TYPE_CHECKING:
 def get_vector_store_provider(
     settings: VectorStoreSettings,
     embedder: EmbeddingProvider[Any] | None = None,
-    reranker: RerankingProvider[Any] | None = None,
+    reranking: RerankingProvider[Any] | None = None,
 ) -> VectorStoreProvider[Any]:
     """Create vector store provider from settings.
 
     Args:
         settings: Vector store configuration with provider selection and config.
         embedder: Optional embedding provider for dimension validation (required for Qdrant).
-        reranker: Optional reranking provider for search result optimization.
+        reranking: Optional reranking provider for search result optimization.
 
     Returns:
         Configured vector store provider instance (QdrantVectorStore or MemoryVectorStore).
@@ -66,7 +66,7 @@ def get_vector_store_provider(
         return QdrantVectorStore.model_construct(
             config=qdrant_config,
             _embedder=embedder,
-            _reranker=reranker,
+            _reranking=reranking,
             _client=None,
             _metadata=None,
         )

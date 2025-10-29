@@ -259,9 +259,7 @@ class CodeChunk(BasedModel):
 
         Returns the ID from the dense batch key for backward compatibility.
         """
-        if batch_key := self.dense_batch_key:
-            return batch_key.id
-        return None
+        return batch_key.id if (batch_key := self.dense_batch_key) else None
 
     @property
     def dense_embeddings(self) -> EmbeddingBatchInfo | None:
@@ -291,7 +289,13 @@ class CodeChunk(BasedModel):
 
     def serialize_for_embedding(self) -> SerializedCodeChunk[CodeChunk]:
         """Serialize the CodeChunk for embedding."""
-        self_map = self.model_dump(round_trip=True, exclude_unset=True, exclude=self._base_excludes)
+        self_map = self.model_dump(
+            round_trip=True,
+            exclude_unset=True,
+            exclude=self._base_excludes,
+            exclude_computed_fields=True,  # Exclude all computed fields
+            warnings=False,  # Suppress serialization warnings
+        )
         if metadata := self.metadata:
             metadata = {k: v for k, v in metadata.items() if k in ("name", "tags", "semantic_meta")}
         self_map["version"] = self._version
@@ -305,11 +309,18 @@ class CodeChunk(BasedModel):
         return {
             "_version",
             "_embedding_batch",
+            "_embedding_batches",
             "chunk_version",
             "timestamp",
             "chunk_id",
             "parent_id",
             "length",
+            "dense_batch_key",
+            "sparse_batch_key",
+            "token_estimate",
+            "line_start",
+            "line_end",
+            "title",
         }
 
     def set_batch_keys(self, batch_keys: BatchKeys) -> Self:
@@ -448,7 +459,7 @@ class CodeChunk(BasedModel):
     def dechunkify(chunks: StructuredDataInput, *, for_embedding: bool = False) -> Iterator[str]:
         """Convert a sequence of CodeChunks or mixed serialized and deserialized chunks back to json strings."""
         for chunk in ensure_iterable(chunks):
-            if isinstance(chunk, str | bytes | bytearray):
+            if isinstance(chunk, str | bytes | bytearray):  # type: ignore
                 yield chunk.decode("utf-8") if isinstance(chunk, bytes | bytearray) else chunk
             elif is_typeddict(chunk):
                 result = (

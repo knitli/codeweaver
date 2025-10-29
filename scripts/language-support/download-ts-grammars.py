@@ -125,7 +125,8 @@ class TreeSitterGrammarResult:
             return None
 
         else:
-                return response_data.get("content", "")
+            return response_data.get("content", "")
+
     async def get_grammar_file(self) -> str:
         """Returns the grammar file content."""
         try:
@@ -157,7 +158,8 @@ class TreeSitterGrammarResult:
             ) from e
 
         else:
-                return content
+            return content
+
     async def save(
         self, content: str | bytes | None = None, save_dir: Path = GRAMMAR_SAVE_DIR
     ) -> None:
@@ -541,6 +543,7 @@ class AstGrepSupportedLanguage(Enum):
         except KeyError as e:
             # __members__ raises KeyError on missing item
             raise ValueError(f"{value} is not a valid AstGrepSupportedLanguage.") from e
+
     @classmethod
     def languages(cls) -> Generator[str, None, None]:
         """Returns names of all supported languages (excluding _ALL)."""

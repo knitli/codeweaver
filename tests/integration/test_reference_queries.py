@@ -150,9 +150,7 @@ def reference_queries() -> list[ReferenceQuery]:
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_reference_queries_comprehensive(
-    reference_queries: list[ReferenceQuery],
-) -> None:
+async def test_reference_queries_comprehensive(reference_queries: list[ReferenceQuery]) -> None:
     """Execute all reference queries and validate precision targets.
 
     This is the main comprehensive test that:
@@ -217,12 +215,14 @@ async def test_reference_queries_comprehensive(
     # Calculate aggregate metrics
     # ========================================================================
 
-    precision_at_3 = sum(precision_at_3_scores) / len(precision_at_3_scores) if precision_at_3_scores else 0.0
-    precision_at_5 = sum(precision_at_5_scores) / len(precision_at_5_scores) if precision_at_5_scores else 0.0
-
-    overall_precision = (
-        sum([r.precision for r in results]) / len(results) if results else 0.0
+    precision_at_3 = (
+        sum(precision_at_3_scores) / len(precision_at_3_scores) if precision_at_3_scores else 0.0
     )
+    precision_at_5 = (
+        sum(precision_at_5_scores) / len(precision_at_5_scores) if precision_at_5_scores else 0.0
+    )
+
+    overall_precision = sum([r.precision for r in results]) / len(results) if results else 0.0
 
     # ========================================================================
     # Report detailed results
@@ -241,8 +241,16 @@ async def test_reference_queries_comprehensive(
     logger.info("  Precision@5: %.2f%%", precision_at_5 * 100)
     logger.info("")
     logger.info("QUALITY TARGETS:")
-    logger.info("  P@3 Target: 70%% (Actual: %.2f%%) %s", precision_at_3 * 100, "✓" if precision_at_3 >= 0.70 else "✗")
-    logger.info("  P@5 Target: 80%% (Actual: %.2f%%) %s", precision_at_5 * 100, "✓" if precision_at_5 >= 0.80 else "✗")
+    logger.info(
+        "  P@3 Target: 70%% (Actual: %.2f%%) %s",
+        precision_at_3 * 100,
+        "✓" if precision_at_3 >= 0.70 else "✗",
+    )
+    logger.info(
+        "  P@5 Target: 80%% (Actual: %.2f%%) %s",
+        precision_at_5 * 100,
+        "✓" if precision_at_5 >= 0.80 else "✗",
+    )
     logger.info("=" * 80)
 
     # ========================================================================
@@ -305,7 +313,8 @@ async def test_reference_queries_comprehensive(
 @pytest.mark.integration
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "query_index", range(25)  # 25 reference queries in fixture
+    "query_index",
+    range(25),  # 25 reference queries in fixture
 )
 async def test_individual_reference_query(query_index: int) -> None:
     """Test individual reference queries for targeted debugging.
@@ -352,9 +361,7 @@ async def test_individual_reference_query(query_index: int) -> None:
 
     # Soft assertion for individual queries (don't fail, just warn)
     if precision < 0.5:
-        logger.warning(
-            "Query precision (%.2f%%) significantly below expectations", precision * 100
-        )
+        logger.warning("Query precision (%.2f%%) significantly below expectations", precision * 100)
 
 
 # ============================================================================
@@ -379,7 +386,7 @@ def test_intent_coverage_complete(reference_queries: list[ReferenceQuery]) -> No
     )
 
     # Report coverage statistics
-    intent_counts = {intent: 0 for intent in IntentType}
+    intent_counts = dict.fromkeys(IntentType, 0)
     for query in reference_queries:
         intent_counts[query.intent] += 1
 
@@ -403,7 +410,7 @@ def test_query_diversity_metrics(reference_queries: list[ReferenceQuery]) -> Non
     - Variety of expected file counts (1-5 files)
     """
     # Check intent distribution
-    intent_counts = {intent: 0 for intent in IntentType}
+    intent_counts = dict.fromkeys(IntentType, 0)
     for query in reference_queries:
         intent_counts[query.intent] += 1
 
@@ -436,12 +443,12 @@ def test_query_diversity_metrics(reference_queries: list[ReferenceQuery]) -> Non
 
 
 __all__ = (
-    "ReferenceQuery",
     "QueryResult",
-    "load_reference_queries",
+    "ReferenceQuery",
     "calculate_precision",
-    "test_reference_queries_comprehensive",
+    "load_reference_queries",
     "test_individual_reference_query",
     "test_intent_coverage_complete",
     "test_query_diversity_metrics",
+    "test_reference_queries_comprehensive",
 )

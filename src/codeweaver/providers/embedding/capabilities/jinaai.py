@@ -168,6 +168,7 @@ ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (
 def get_jinaai_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
     """Get the capabilities for jinaai embedding models."""
     from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+
     capabilities: list[EmbeddingCapabilities] = []
     for cap in ALL_CAPABILITIES:
         capabilities.extend([

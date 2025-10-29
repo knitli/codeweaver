@@ -65,7 +65,7 @@ Any -> Error (on operation failure)
 |-------|------|----------|-------------|------------------|
 | `_client` | `AsyncQdrantClient` | Yes | Qdrant async client | Must be initialized |
 | `_embedder` | `EmbeddingProvider` | Yes | Embedding provider | Must support required dimensions |
-| `_reranker` | `RerankingProvider \| None` | No | Optional reranking provider | - |
+| `_reranking` | `RerankingProvider \| None` | No | Optional reranking provider | - |
 | `config` | `QdrantConfig` | Yes | Qdrant-specific configuration | Validated via pydantic |
 | `_metadata` | `dict[str, Any] \| None` | No | Collection metadata cache | - |
 

@@ -117,7 +117,7 @@ def test_e2e_multiple_files_parallel_process(sample_files):
         pytest.skip("No fixture files available for parallel processing test")
 
     # Create real governor with capabilities
-    capabilities = EmbeddingModelCapabilities(context_window=8192, embedding_dimensions=1536)
+    capabilities = EmbeddingModelCapabilities(context_window=8192, default_dimension=1536)
     settings = ChunkerSettings(
         performance=PerformanceSettings(
             max_ast_depth=200, chunk_timeout_seconds=30, max_chunks_per_file=5000
@@ -126,14 +126,12 @@ def test_e2e_multiple_files_parallel_process(sample_files):
     governor = ChunkGovernor(capabilities=(capabilities,), settings=settings)
 
     # Process files in parallel
-    results = {}
-    for file_path, chunks in chunk_files_parallel(
-        sample_files, governor, max_workers=2, executor_type="process"
-    ):
-        results[file_path] = chunks
+    results = dict(
+        chunk_files_parallel(sample_files, governor, max_workers=2, executor_type="process")
+    )
 
     # Verify results
-    assert len(results) > 0, "Should process at least one file"
+    assert results, "Should process at least one file"
     assert len(results) <= len(sample_files), "Should not have more results than input files"
 
     # Quality checks on all results
@@ -159,7 +157,7 @@ def test_e2e_multiple_files_parallel_thread(sample_files):
         pytest.skip("No fixture files available for parallel processing test")
 
     # Create real governor
-    capabilities = EmbeddingModelCapabilities(context_window=8192, embedding_dimensions=1536)
+    capabilities = EmbeddingModelCapabilities(context_window=8192, default_dimension=1536)
     settings = ChunkerSettings(
         performance=PerformanceSettings(
             max_ast_depth=200, chunk_timeout_seconds=30, max_chunks_per_file=5000
@@ -168,14 +166,12 @@ def test_e2e_multiple_files_parallel_thread(sample_files):
     governor = ChunkGovernor(capabilities=(capabilities,), settings=settings)
 
     # Process files in parallel with threads
-    results = {}
-    for file_path, chunks in chunk_files_parallel(
-        sample_files, governor, max_workers=2, executor_type="thread"
-    ):
-        results[file_path] = chunks
+    results = dict(
+        chunk_files_parallel(sample_files, governor, max_workers=2, executor_type="thread")
+    )
 
     # Verify results
-    assert len(results) > 0, "Should process at least one file"
+    assert results, "Should process at least one file"
     assert len(results) <= len(sample_files), "Should not have more results than input files"
 
     # Quality checks
@@ -213,16 +209,12 @@ def test_e2e_parallel_error_handling(tmp_path):
     files = [good_discovered, bad_discovered, another_discovered]
 
     # Create governor
-    capabilities = EmbeddingModelCapabilities(context_window=8192, embedding_dimensions=1536)
+    capabilities = EmbeddingModelCapabilities(context_window=8192, default_dimension=1536)
     governor = ChunkGovernor(capabilities=(capabilities,), settings=ChunkerSettings())
 
     # Process in parallel - should continue despite bad file
     # Use thread executor to avoid process pickling issues
-    results = {}
-    for file_path, chunks in chunk_files_parallel(
-        files, governor, max_workers=2, executor_type="thread"
-    ):
-        results[file_path] = chunks
+    results = dict(chunk_files_parallel(files, governor, max_workers=2, executor_type="thread"))
 
     # Should have processed the good files even though one failed
     # Note: Depending on error handling, bad file might produce chunks via fallback
@@ -245,7 +237,7 @@ def test_e2e_parallel_empty_file_list():
     from codeweaver.engine.chunker.parallel import chunk_files_parallel
     from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
-    capabilities = EmbeddingModelCapabilities(context_window=8192, embedding_dimensions=1536)
+    capabilities = EmbeddingModelCapabilities(context_window=8192, default_dimension=1536)
     governor = ChunkGovernor(capabilities=(capabilities,))
 
     # Process empty list
@@ -274,7 +266,7 @@ def test_e2e_parallel_dict_convenience():
         pytest.skip("No sample files available")
 
     # Create governor
-    capabilities = EmbeddingModelCapabilities(context_window=8192, embedding_dimensions=1536)
+    capabilities = EmbeddingModelCapabilities(context_window=8192, default_dimension=1536)
     governor = ChunkGovernor(capabilities=(capabilities,), settings=ChunkerSettings())
 
     # Get results as dict

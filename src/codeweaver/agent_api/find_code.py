@@ -186,11 +186,11 @@ async def find_code(
                 )
 
         # Step 5: Rerank (optional, if provider configured)
-        reranker_enum = registry.get_reranking_provider()
-        if reranker_enum and len(candidates) > 0:
+        reranking_enum = registry.get_reranking_provider()
+        if reranking_enum and len(candidates) > 0:
             try:
-                reranker = registry.get_reranking_provider_instance(reranker_enum, singleton=True)
-                candidates = await reranker.rerank(query, candidates, top_k=max_results * 2)
+                reranking = registry.get_reranking_provider_instance(reranking_enum, singleton=True)
+                candidates = await reranking.rerank(query, candidates, top_k=max_results * 2)
                 strategies_used.append(SearchStrategy.SEMANTIC_RERANK)
                 logger.info("Reranked to %d candidates", len(candidates))
             except Exception as e:

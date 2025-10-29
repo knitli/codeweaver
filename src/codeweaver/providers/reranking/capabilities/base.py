@@ -34,8 +34,8 @@ def _is_correct_return_type(output: Any) -> bool:
 
 
 def default_input_transformer(
-    input_chunks: list["CodeChunk"],
-) -> list["SerializedCodeChunk[CodeChunk]"]:
+    input_chunks: list[CodeChunk],
+) -> list[SerializedCodeChunk[CodeChunk]]:
     """Default input transformer for reranking models."""
     return [chunk.serialize_for_embedding() for chunk in input_chunks]
 
@@ -69,12 +69,12 @@ class RerankingModelCapabilities(BasedModel):
         ),
     ] = None
     max_input: Annotated[
-        Callable[[Sequence["CodeChunk"], str], tuple[bool, NonNegativeInt]] | PositiveInt | None,
+        Callable[[Sequence[CodeChunk], str], tuple[bool, NonNegativeInt]] | PositiveInt | None,
         Field(
             description="""In the simple case, takes an integer for the maximum number of tokens the model can handle. A function that returns a tuple where the first value is a boolean indicating if the passed input exceeds the model's maximum input length, and the second value is an integer -- if the returned boolean is True (within limits), will be 0, but if it exceeds limits, the integer will be the maximum safe index of the input that can be provided. Callable receives a list of CodeChunks and the query string."""
         ),
     ] = None
-    input_transformer: Callable[[Sequence["CodeChunk"]], Any] | None = None
+    input_transformer: Callable[[Sequence[CodeChunk]], Any] | None = None
     output_transformer: (
         Callable[..., Sequence[Sequence[float]] | Sequence[Sequence[int]]] | None
     ) = default_output_transformer
@@ -168,7 +168,7 @@ class RerankingModelCapabilities(BasedModel):
         return self._process_max_input_with_tokenizer(input_chunks)
 
     def is_within_limits(
-        self, input_chunks: Sequence["CodeChunk"], query: str
+        self, input_chunks: Sequence[CodeChunk], query: str
     ) -> tuple[bool, NonNegativeInt]:
         """Check if the input chunks are within the model's limits."""
         if not self.max_input:

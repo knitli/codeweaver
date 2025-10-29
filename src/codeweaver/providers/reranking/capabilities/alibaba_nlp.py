@@ -24,9 +24,9 @@ def get_alibaba_reranking_capabilities() -> Sequence[RerankingModelCapabilities]
 
     return [
         RerankingModelCapabilities.model_validate({
-            "name": "Alibaba-NLP/gte-multilingual-reranker-base",
+            "name": "Alibaba-NLP/gte-multilingual-reranking-base",
             "tokenizer": "tokenizers",
-            "tokenizer_model": "Alibaba-NLP/gte-multilingual-reranker-base",
+            "tokenizer_model": "Alibaba-NLP/gte-multilingual-reranking-base",
             "supports_custom_prompt": False,
             "max_input": 8192,
             "context_window": 8192,

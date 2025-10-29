@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, Self
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Self
 
 from pydantic import ConfigDict, Field, NonNegativeFloat, PositiveInt, model_validator
 
@@ -16,7 +16,10 @@ from codeweaver.core.metadata import ExtLangPair
 from codeweaver.core.secondary_languages import SecondarySupportedLanguage
 from codeweaver.core.types.aliases import LanguageNameT
 from codeweaver.core.types.models import FROZEN_BASEDMODEL_CONFIG, BasedModel
-from codeweaver.engine.chunker.delimiters import DelimiterPattern, LanguageFamily
+
+# Lazy imports to avoid circular dependency with engine.chunker
+if TYPE_CHECKING:
+    from codeweaver.engine.chunker.delimiters import DelimiterPattern, LanguageFamily
 
 
 class CustomLanguage(BasedModel):
@@ -35,7 +38,7 @@ class CustomLanguage(BasedModel):
         ),
     ]
     language_family: Annotated[
-        LanguageFamily | None,
+        "LanguageFamily | None",
         Field(
             description="The language family this language belongs to. This is used to determine the best chunking strategy for the language. If not provided, CodeWeaver will test it against known language families."
         ),
@@ -51,7 +54,7 @@ class CustomDelimiter(BasedModel):
     model_config = FROZEN_BASEDMODEL_CONFIG
 
     delimiters: Annotated[
-        list[DelimiterPattern],
+        "list[DelimiterPattern]",
         Field(
             default_factory=list,
             min_length=1,
@@ -168,7 +171,7 @@ class ChunkerSettings(BasedModel):
     ] = None
 
     custom_languages: Annotated[
-        dict[LanguageNameT, LanguageFamily] | None,
+        "dict[LanguageNameT, LanguageFamily] | None",
         Field(
             description="""Associate a new language with an existing CodeWeaver language family for chunking purposes. If you want to define custom delimiters for a new language, use `custom_delimiters` instead. Most languages can be reasonably chunked by CodeWeaver's existing delimiter strategies once you tell it what language to use."""
         ),
@@ -197,20 +200,26 @@ class ChunkerSettings(BasedModel):
     def _telemetry_keys(self) -> None:
         return None
 
-    def __init__(
-        self,
-        *,
-        custom_delimiters: list[CustomDelimiter] | None = None,
-        custom_languages: dict[LanguageNameT, LanguageFamily] | None = None,
-        **data: Any,
-    ) -> None:
-        """Initialize ChunkerSettings with optional custom delimiters."""
-        # Pass values through to super().__init__ instead of setting them directly
-        super().__init__(
-            custom_delimiters=custom_delimiters or [],
-            custom_languages=custom_languages or {},
-            **data,
-        )
+    @classmethod
+    def _ensure_models_rebuilt(cls) -> None:
+        """Ensure forward references are resolved before first use."""
+        if not cls.__pydantic_complete__:
+            # Import the actual types now (after module initialization)
+            from codeweaver.engine.chunker.delimiters import (
+                DelimiterPattern,
+                LanguageFamily,
+            )
+
+            # Pass the types to model_rebuild so Pydantic can resolve string annotations
+            namespace = {"DelimiterPattern": DelimiterPattern, "LanguageFamily": LanguageFamily}
+            _ = cls.model_rebuild(_types_namespace=namespace)
+            _ = CustomLanguage.model_rebuild(_types_namespace=namespace)
+            _ = CustomDelimiter.model_rebuild(_types_namespace=namespace)
+
+    def model_post_init(self, __context: Any) -> None:
+        """Ensure models are rebuilt on first instantiation."""
+        self._ensure_models_rebuilt()
+        super().model_post_init(__context)
 
 
 __all__ = (

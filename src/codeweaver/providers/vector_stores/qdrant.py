@@ -41,7 +41,7 @@ class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
 
     _client: AsyncQdrantClient | None = None
     _embedder: EmbeddingProvider[Any]
-    _reranker: RerankingProvider[Any] | None = None
+    _reranking: RerankingProvider[Any] | None = None
     config: QdrantConfig
     _metadata: dict[str, Any] | None = None
     _provider: Provider = Provider.QDRANT

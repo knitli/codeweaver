@@ -211,14 +211,14 @@ def _get_default_reranking_settings() -> DeterminedDefaults:
             if lib in {"fastembed_gpu", "fastembed"}:
                 return DeterminedDefaults(
                     provider=Provider.FASTEMBED,
-                    model="fastembed:jinaai/jina-reranker-v2-base-multilingual",
+                    model="fastembed:jinaai/jina-reranking-v2-base-multilingual",
                     enabled=True,
                 )
             if lib == "sentence_transformers":
                 return DeterminedDefaults(
                     provider=Provider.SENTENCE_TRANSFORMERS,
                     # on the heavier side for what we aim for as a default but very capable
-                    model="sentence-transformers:BAAI/bge-reranker-v2-m3",
+                    model="sentence-transformers:BAAI/bge-reranking-v2-m3",
                     enabled=True,
                 )
     logger.warning(
@@ -270,12 +270,20 @@ def merge_agent_model_settings(
 
 def _get_project_name() -> str:
     """Get the current project name from settings."""
-    # we'll try to get it from the project root but it might not be initialized yet
-    with contextlib.suppress(PydanticUserError, ValidationError, ValueError):
-        settings = get_settings()
-        if settings.project_name:
-            return settings.project_name
-        return settings.project_path.name
+    # Avoid circular dependency: check if settings exist without triggering initialization
+    global _settings
+    if _settings is not None:
+        with contextlib.suppress(AttributeError, ValueError):
+            if hasattr(_settings, 'project_name') and _settings.project_name:
+                return _settings.project_name
+            if hasattr(_settings, 'project_path'):
+                return _settings.project_path.name
+
+    # Fallback: try to get project path directly
+    with contextlib.suppress(Exception):
+        from codeweaver.common.utils.git import get_project_path
+        return get_project_path().name
+
     return "your_project_name"
 
 
@@ -448,13 +456,13 @@ class IndexerSettings(BasedModel):
     @computed_field
     @property
     def cache_dir(self) -> DirectoryPath:
-        """Effective storage path for index data."""
+        """Effective storage directory for index data."""
         path = self._index_storage_path or get_storage_path()
-        if not path.parent.exists():
-            path.parent.mkdir(parents=True, exist_ok=True)
-        if not path.exists():
-            path.touch()
-        return path
+        # Get the parent directory (cache_dir should be a directory, not a file)
+        dir_path = path.parent
+        if not dir_path.exists():
+            dir_path.mkdir(parents=True, exist_ok=True)
+        return dir_path
 
     @computed_field
     @property
@@ -536,12 +544,22 @@ class IndexerSettings(BasedModel):
         self.forced_includes, self.excludes = await FilteredPaths.from_settings(self, project_path)
         self._inc_exc_set = True
 
-    def _as_settings(self) -> RignoreSettings:
+    def _as_settings(self, project_path: Path | None = None) -> RignoreSettings:
         """Convert self, either as an instance or as a serialized python dictionary, to kwargs for rignore."""
         rignore_settings = self.default_rignore_settings | (
             {} if isinstance(self.other_ignore_kwargs, Unset) else self.other_ignore_kwargs
         )
-        rignore_settings["path"] = get_settings_map()["project_path"]
+        # Avoid circular dependency: use provided path or try to get it safely
+        if project_path is None:
+            # Try to get from global settings without triggering recursion
+            global _settings
+            if _settings is not None and hasattr(_settings, 'project_path'):
+                project_path = _settings.project_path
+            else:
+                # Fallback to current working directory during initialization
+                from codeweaver.common.utils.git import get_project_path
+                project_path = get_project_path()
+        rignore_settings["path"] = project_path
         rignore_settings["ignore_hidden"] = bool(
             self.ignore_hidden and not self.include_github_dir and not self.include_tooling_dirs
         )
@@ -1130,6 +1148,10 @@ def get_settings(config_file: FilePath | None = None) -> CodeWeaverSettings:
     global _settings
     from codeweaver.common.utils.git import get_project_path
 
+    # Ensure chunker models are rebuilt before creating settings
+    if not ChunkerSettings.__pydantic_complete__:
+        ChunkerSettings._ensure_models_rebuilt()
+
     root = get_project_path()
     if isinstance(_settings, CodeWeaverSettings):
         if isinstance(_settings.project_path, Unset):
@@ -1137,12 +1159,15 @@ def get_settings(config_file: FilePath | None = None) -> CodeWeaverSettings:
         if isinstance(_settings.project_name, Unset):
             _settings.project_name = root.name
         return _settings
+
+    # Rebuild CodeWeaverSettings if needed before instantiation
+    if not CodeWeaverSettings.__pydantic_complete__:
+        _ = CodeWeaverSettings.model_rebuild()
+
     if config_file and config_file.exists():
         _settings = CodeWeaverSettings(project_path=root, config_file=config_file)
     if _settings is None:
         _settings = CodeWeaverSettings(project_path=root)  # type: ignore
-    if not CodeWeaverSettings.__pydantic_complete__:
-        _ = CodeWeaverSettings.model_rebuild()
 
     return _settings
 

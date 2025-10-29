@@ -134,7 +134,7 @@ model = "voyage-code-3"
 provider = "fastembed"
 model = "prithivida/Splade-PP_en_v2"
 
-[reranker]
+[reranking]
 provider = "voyageai"
 model = "voyage-rerank-2.5"
 
@@ -427,7 +427,7 @@ curl http://localhost:9328/health/ | jq '.services'
 # Expected latencies:
 # - vector_store: <50ms
 # - embedding_provider: <300ms
-# - reranker: <200ms
+# - reranking: <200ms
 ```
 
 **Optimization Tips**:

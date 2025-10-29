@@ -364,6 +364,7 @@ class Indexer(BasedModel):
             self._checkpoint_manager = CheckpointManager(project_path=project_path)
         else:
             from codeweaver.config.settings import get_settings
+
             self._checkpoint_manager = CheckpointManager(project_path=get_settings().project_path)
 
         self._checkpoint = None
@@ -381,6 +382,7 @@ class Indexer(BasedModel):
 
     def _register_signal_handlers(self) -> None:
         """Register signal handlers for graceful shutdown with checkpoint saving."""
+
         def handle_shutdown_signal(signum: int, frame: Any) -> None:
             """Handle shutdown signal by saving checkpoint and exiting gracefully."""
             signal_name = signal.Signals(signum).name
@@ -821,8 +823,11 @@ class Indexer(BasedModel):
         # Save checkpoint if threshold reached
         if self._should_checkpoint():
             self.save_checkpoint()
-            logger.info("Checkpoint saved at %d/%d files processed",
-                       self._stats.files_processed, self._stats.files_discovered)
+            logger.info(
+                "Checkpoint saved at %d/%d files processed",
+                self._stats.files_processed,
+                self._stats.files_discovered,
+            )
 
     def _should_checkpoint(self) -> bool:
         """Check if checkpoint should be saved based on frequency criteria.
@@ -836,10 +841,7 @@ class Indexer(BasedModel):
 
         # Check time threshold (300 seconds = 5 minutes)
         elapsed_time = time.time() - self._last_checkpoint_time
-        if elapsed_time >= 300:
-            return True
-
-        return False
+        return elapsed_time >= 300
 
     @property
     def stats(self) -> IndexingStats:
@@ -909,6 +911,7 @@ class Indexer(BasedModel):
 
         # Compute settings hash
         from codeweaver.config.settings import get_settings
+
         settings = get_settings()
         settings_dict = {
             "project_path": str(settings.project_path),
@@ -920,8 +923,7 @@ class Indexer(BasedModel):
         # Create or update checkpoint
         if not self._checkpoint:
             self._checkpoint = IndexingCheckpoint(
-                project_path=settings.project_path,
-                settings_hash=settings_hash,
+                project_path=settings.project_path, settings_hash=settings_hash
             )
 
         # Update checkpoint with current stats
@@ -964,6 +966,7 @@ class Indexer(BasedModel):
 
         # Verify checkpoint is valid for resumption
         from codeweaver.config.settings import get_settings
+
         settings = get_settings()
         settings_dict = {
             "project_path": str(settings.project_path),

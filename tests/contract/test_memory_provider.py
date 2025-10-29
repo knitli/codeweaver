@@ -54,6 +54,8 @@ async def memory_provider(memory_config):
 @pytest.fixture
 def sample_chunk():
     """Create a sample CodeChunk for testing."""
+    from codeweaver.common.utils.utils import uuid7
+
     # Use model_construct to bypass Pydantic validation and avoid AstThing forward reference issues
     return CodeChunk.model_construct(
         chunk_name="memory_test.py:test_func",
@@ -61,7 +63,7 @@ def sample_chunk():
         language=Language.PYTHON,
         content="def test_func():\n    return True",
         embeddings={"dense": [0.5, 0.5, 0.5] * 256},
-        line_range=Span(start=1, end=2),
+        line_range=Span(start=1, end=2, _source_id=uuid7()),
     )
 
 
@@ -152,7 +154,12 @@ class TestMemoryProviderContract:
         # Verify data was restored
         results = await provider2.search(vector={"dense": [0.5, 0.5, 0.5] * 256})
         assert len(results) > 0
-        assert any(r.chunk.chunk_id == sample_chunk.chunk_id for r in results)
+        assert any(
+            r.chunk.chunk_id == sample_chunk.chunk_id
+            if isinstance(r.chunk, CodeChunk)
+            else r.chunk == sample_chunk.chunk_id
+            for r in results
+        )
 
     async def test_persistence_file_format(self, memory_provider, memory_config, sample_chunk):
         """Test persistence file has correct JSON structure."""
@@ -161,9 +168,7 @@ class TestMemoryProviderContract:
         await memory_provider.upsert([sample_chunk])
         await memory_provider._persist_to_disk()
 
-        with open(memory_config["persist_path"]) as f:
-            data = json.load(f)
-
+        data = json.loads(memory_config["persist_path"].read_text())
         # Verify top-level structure
         assert "version" in data
         assert "collections" in data or "metadata" in data

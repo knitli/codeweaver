@@ -231,7 +231,7 @@ ios/ or android/
   - Scenario 5: Error recovery + graceful degradation
   - Scenario 6: Reference test suite (dogfooding)
 - **Implementation Tasks** (to make tests pass):
-  - Provider implementations (embedding, vector store, reranker)
+  - Provider implementations (embedding, vector store, reranking)
   - Pipeline implementation (chunking → embedding → indexing → search → ranking)
   - CLI command handlers (server, search, config, status)
   - MCP find_code tool implementation

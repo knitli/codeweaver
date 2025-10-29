@@ -624,7 +624,7 @@ FR-010-Enhanced: Health Endpoint Specification
         "provider": "fastembed_local",
         "model": "Splade-PP_en_v2"
       },
-      "reranker": {
+      "reranking": {
         "status": "up" | "down",
         "provider": "voyageai",
         "model": "rerank-2.5",

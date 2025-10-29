@@ -17,7 +17,6 @@ the corresponding implementation is complete.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
@@ -29,9 +28,6 @@ from codeweaver.engine.chunker.exceptions import (
     ParseError,
 )
 
-
-if TYPE_CHECKING:
-    from pytest import MonkeyPatch
 
 # Path to test fixtures directory
 FIXTURES_DIR = Path(__file__).parent.parent.parent.parent / "fixtures"
@@ -178,7 +174,10 @@ class TestTimeoutErrors:
     """Tests for chunking timeout enforcement."""
 
     def test_timeout_exceeded(
-        self, mock_governor: MagicMock, monkeypatch: MonkeyPatch, discovered_sample_python_file
+        self,
+        mock_governor: MagicMock,
+        monkeypatch: pytest.MonkeyPatch,
+        discovered_sample_python_file,
     ) -> None:
         """Verify that slow operations raise ChunkingTimeoutError.
 

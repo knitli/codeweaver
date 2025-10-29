@@ -18,6 +18,7 @@ Reference: Quickstart Scenario 5 (spec lines 227-249, edge cases)
 
 import asyncio
 import time
+
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -40,8 +41,8 @@ def test_project_path(tmp_path: Path) -> Path:
     (project_root / "good2.py").write_text("def world(): pass")
 
     # Corrupted files
-    (project_root / "corrupted1.bin").write_bytes(b"\x00\xFF\xFE\xFD")
-    (project_root / "corrupted2.bin").write_bytes(b"\xDE\xAD\xBE\xEF")
+    (project_root / "corrupted1.bin").write_bytes(b"\x00\xff\xfe\xfd")
+    (project_root / "corrupted2.bin").write_bytes(b"\xde\xad\xbe\xef")
 
     return project_root
 
@@ -189,7 +190,7 @@ async def test_circuit_breaker_half_open():
     # Next request should transition to half-open
     # Note: Implementation should check time and allow one test request
     try:
-        result = await provider.embed_query("test_half_open")
+        await provider.embed_query("test_half_open")
         # If it succeeds, circuit should close
         assert provider.circuit_breaker_state == CircuitBreakerState.CLOSED
     except CircuitBreakerOpenError:
@@ -250,16 +251,13 @@ async def test_warning_at_25_errors(tmp_path: Path):
 
     # Create 30 binary files
     for i in range(30):
-        (project_root / f"corrupt{i}.bin").write_bytes(b"\xFF" * 1000)
+        (project_root / f"corrupt{i}.bin").write_bytes(b"\xff" * 1000)
 
     # Add a few good files
     (project_root / "good1.py").write_text("def test(): pass")
     (project_root / "good2.py").write_text("def hello(): pass")
 
-    indexer = Indexer(
-        project_root=project_root,
-        auto_initialize_providers=False,
-    )
+    indexer = Indexer(project_root=project_root, auto_initialize_providers=False)
 
     # Capture stderr
     import io
@@ -272,7 +270,7 @@ async def test_warning_at_25_errors(tmp_path: Path):
         await asyncio.sleep(2)
 
         # Check if warning was logged
-        stderr_output = captured_stderr.getvalue()
+        captured_stderr.getvalue()
 
         # Note: Warning might be in logs rather than stderr
         # Implementation should log warning when errors >= 25
@@ -293,7 +291,6 @@ async def test_health_shows_degraded_status():
     When: Query /health/ endpoint
     Then: Status = degraded, circuit_breaker_state = open
     """
-    from codeweaver.server.health_models import HealthResponse
     from codeweaver.server.health_service import HealthService
 
     # Mock provider registry with degraded state
@@ -317,10 +314,7 @@ async def test_health_shows_degraded_status():
         mock_reg.get_vector_store_provider_instance.return_value = mock_vector
 
         # Create health service
-        health_service = HealthService(
-            provider_registry=mock_reg,
-            startup_time=time.time(),
-        )
+        health_service = HealthService(provider_registry=mock_reg, startup_time=time.time())
 
         # Get health response
         response = await health_service.get_health_response()
@@ -395,20 +389,17 @@ async def test_graceful_shutdown_with_checkpoint():
     When: SIGTERM received
     Then: Checkpoint saved before exit
     """
-    from codeweaver.engine.checkpoint import CheckpointManager
-    from codeweaver.engine.indexer import Indexer
-
     # Create test project
     import tempfile
+
+    from codeweaver.engine.checkpoint import CheckpointManager
+    from codeweaver.engine.indexer import Indexer
 
     with tempfile.TemporaryDirectory() as tmpdir:
         project_root = Path(tmpdir)
         (project_root / "test.py").write_text("def test(): pass")
 
-        indexer = Indexer(
-            project_root=project_root,
-            auto_initialize_providers=False,
-        )
+        indexer = Indexer(project_root=project_root, auto_initialize_providers=False)
 
         # Start indexing
         indexer.prime_index(force_reindex=True)
@@ -437,6 +428,7 @@ async def test_error_logging_structured():
     Then: Logged with timestamp, level, component, operation, error fields
     """
     import logging
+
     from io import StringIO
 
     # Capture log output
@@ -454,8 +446,7 @@ async def test_error_logging_structured():
 
         with pytest.raises(Exception):
             indexer = Indexer(
-                project_root=Path("/nonexistent/path"),
-                auto_initialize_providers=False,
+                project_root=Path("/nonexistent/path"), auto_initialize_providers=False
             )
             indexer.prime_index(force_reindex=True)
 

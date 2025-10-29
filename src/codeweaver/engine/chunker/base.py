@@ -76,6 +76,11 @@ class ChunkGovernor(BasedModel):
     def _telemetry_keys(self) -> None:
         return None
 
+    def model_post_init(self, __context: Any) -> None:
+        """Ensure models are rebuilt on first instantiation."""
+        _rebuild_models()
+        super().model_post_init(__context)
+
     @staticmethod
     def _get_provider_settings() -> tuple[
         EmbeddingProviderSettings, RerankingProviderSettings | None
@@ -225,9 +230,19 @@ __all__ = ("BaseChunker", "ChunkGovernor")
 
 
 # Rebuild models to resolve forward references after all types are imported
-# This is done at module import time to ensure ChunkerSettings is available
+# This is done lazily on first use to avoid circular import with settings module
+_models_rebuilt = False
+
+
 def _rebuild_models() -> None:
-    """Rebuild pydantic models after all types are defined."""
+    """Rebuild pydantic models after all types are defined.
+
+    This is called lazily on first use to avoid circular imports with the settings module.
+    """
+    global _models_rebuilt
+    if _models_rebuilt:
+        return
+
     logger = logging.getLogger(__name__)
     try:
         if not ChunkGovernor.__pydantic_complete__:
@@ -237,9 +252,7 @@ def _rebuild_models() -> None:
             if not type(chunk_settings).__pydantic_complete__:
                 _ = chunk_settings.model_rebuild()
             _ = ChunkGovernor.model_rebuild()
+        _models_rebuilt = True
     except Exception as e:
         # If rebuild fails, model will still work but may have issues with ChunkerSettings
         logger.debug("Failed to rebuild ChunkGovernor model: %s", e, exc_info=True)
-
-
-_rebuild_models()

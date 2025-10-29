@@ -286,7 +286,7 @@ commands:
         Services:
           Vector Store: <up/down> (<latency>ms)
           Embedding Provider: <up/down> (<latency>ms)
-          Reranker: <up/down> (<latency>ms)
+          Reranking: <up/down> (<latency>ms)
 
         Statistics:
           Total Chunks: <count>

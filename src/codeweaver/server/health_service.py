@@ -18,7 +18,7 @@ from codeweaver.server.health_models import (
     HealthResponse,
     IndexingInfo,
     IndexingProgressInfo,
-    RerankerServiceInfo,
+    RerankingServiceInfo,
     ServicesInfo,
     SparseEmbeddingServiceInfo,
     StatisticsInfo,
@@ -162,24 +162,38 @@ class HealthService:
         vector_store_task = asyncio.create_task(self._check_vector_store_health())
         embedding_task = asyncio.create_task(self._check_embedding_provider_health())
         sparse_task = asyncio.create_task(self._check_sparse_embedding_health())
-        reranker_task = asyncio.create_task(self._check_reranker_health())
+        reranking_task = asyncio.create_task(self._check_reranking_health())
 
-        vector_store, embedding, sparse, reranker = await asyncio.gather(
-            vector_store_task, embedding_task, sparse_task, reranker_task
+        vector_store, embedding, sparse, reranking = await asyncio.gather(
+            vector_store_task, embedding_task, sparse_task, reranking_task
         )
 
         return ServicesInfo(
             vector_store=vector_store,
             embedding_provider=embedding,
             sparse_embedding=sparse,
-            reranker=reranker,
+            reranking=reranking,
         )
 
     async def _check_vector_store_health(self) -> VectorStoreServiceInfo:
         """Check vector store health with latency measurement."""
+        from codeweaver.providers.provider import ProviderKind
+
         try:
-            vector_store = self._provider_registry.get_vector_store_provider_instance(
-                singleton=True
+            vector_provider = self._provider_registry.get_configured_provider_settings(
+                provider_kind=ProviderKind.VECTOR_STORE
+            )
+            provider = (
+                vector_provider["provider"]
+                if isinstance(vector_provider, dict)
+                else vector_provider[0]["provider"]
+                if vector_provider
+                else None
+            )
+            if not provider:
+                raise RuntimeError("No vector store provider configured")
+            self._provider_registry.get_vector_store_provider_instance(
+                provider=provider, singleton=True
             )
             start = time.time()
             # TODO: Add ping/health check method to vector store providers
@@ -199,7 +213,7 @@ class HealthService:
                         provider=embedding_provider, singleton=True
                     )
                 )
-                circuit_state = embedding_provider_instance.circuit_breaker_state.value
+                circuit_state = embedding_provider_instance.circuit_breaker_state
                 model_name = embedding_provider_instance.model_name
 
                 # Check if circuit breaker is open -> service is down
@@ -226,10 +240,8 @@ class HealthService:
         """Check sparse embedding provider health."""
         try:
             if sparse_provider := self._provider_registry.get_embedding_provider(sparse=True):
-                sparse_provider_instance = (
-                    self._provider_registry.get_sparse_embedding_provider_instance(
-                        provider=sparse_provider, singleton=True
-                    )
+                _ = self._provider_registry.get_sparse_embedding_provider_instance(
+                    provider=sparse_provider, singleton=True
                 )
                 # Sparse embedding is local, so typically always available
                 return SparseEmbeddingServiceInfo(status="up", provider=sparse_provider.as_title)
@@ -239,23 +251,24 @@ class HealthService:
             logger.warning("Sparse embedding health check failed: %s", e)
             return SparseEmbeddingServiceInfo(status="down", provider="unknown")
 
-    async def _check_reranker_health(self) -> RerankerServiceInfo:
-        """Check reranker service health."""
+    async def _check_reranking_health(self) -> RerankingServiceInfo:
+        """Check reranking service health."""
         try:
-            if reranking_provider := self._provider_registry.get_reranker_provider():
-                reranking_instance = self._provider_registry.get_reranker_provider_instance(
+            if reranking_provider := self._provider_registry.get_reranking_provider():
+                reranking_instance = self._provider_registry.get_reranking_provider_instance(
                     provider=reranking_provider, singleton=True
                 )
-                circuit_state = reranking_instance.circuit_breaker_state.value
+                circuit_state = reranking_instance.circuit_breaker_state
                 model_name = reranking_instance.model_name
-                status = "down" if circuit_state and circuit_state.value == "open" else "up"
+                status = "down" if circuit_state and circuit_state == "open" else "up"
 
                 # Estimate latency
                 latency_ms = 180.0 if status == "up" else 0.0
-                return RerankerServiceInfo(status=status, model=model_name, latency_ms=latency_ms)
+                return RerankingServiceInfo(status=status, model=model_name, latency_ms=latency_ms)
         except Exception as e:
-            logger.warning("Reranker health check failed: %s", e)
-            return RerankerServiceInfo(status="down", model="unknown", latency_ms=0)
+            logger.warning("Reranking health check failed: %s", e)
+            return RerankingServiceInfo(status="down", model="unknown", latency_ms=0)
+        return RerankingServiceInfo(status="down", model="unknown", latency_ms=0)
 
     async def _get_statistics_info(self) -> StatisticsInfo:
         """Get statistics and metrics information."""
@@ -272,16 +285,18 @@ class HealthService:
         # Calculate average query latency from timing statistics
         timing_stats = stats.get_timing_statistics()
         avg_latency = 0.0
-        if timing_stats and "queries" in timing_stats:
-            query_timings = timing_stats["queries"]
-            if query_timings:
-                avg_latency = sum(query_timings) / len(query_timings) * 1000  # Convert to ms
+        if (
+            timing_stats
+            and "queries" in timing_stats
+            and (query_timings := timing_stats["queries"])
+        ):
+            avg_latency = sum(query_timings) / len(query_timings) * 1000  # Convert to ms
 
         # Get total queries processed
         total_queries = stats.total_requests
 
         # Get indexed languages
-        languages = sorted(list(self._indexed_languages))
+        languages = sorted(self._indexed_languages)
 
         # Estimate index size (rough estimate: ~1KB per chunk)
         index_size_mb = int((total_chunks * 1024) / (1024 * 1024))
@@ -316,11 +331,7 @@ class HealthService:
         ):
             return "degraded"
 
-        if indexing.progress.errors >= 25:
-            return "degraded"
-
-        # Healthy: All critical services up, indexing normal
-        return "healthy"
+        return "degraded" if indexing.progress.errors >= 25 else "healthy"
 
 
 __all__ = ("HealthService",)

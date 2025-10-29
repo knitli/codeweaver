@@ -31,6 +31,8 @@ from qdrant_client.async_qdrant_client import AsyncQdrantClient
 from codeweaver.config.providers import MemoryConfig, QdrantConfig
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.core.metadata import ChunkKind, ExtKind
+from codeweaver.core.spans import Span
 from codeweaver.providers.vector_stores.inmemory import MemoryVectorStore
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
 
@@ -45,23 +47,17 @@ def create_test_chunk(
 ) -> CodeChunk:
     """Create a test CodeChunk with embeddings."""
     chunk_id = uuid4()
-    dense_embedding = [0.1] * dense_dim
-    sparse_embedding = models.SparseVector(
-        indices=list(range(sparse_indices)), values=[0.5] * sparse_indices
-    )
+    [0.1] * dense_dim
+    models.SparseVector(indices=list(range(sparse_indices)), values=[0.5] * sparse_indices)
 
     return CodeChunk(
         chunk_id=chunk_id,
         file_path=file_path,
-        chunk_index=chunk_index,
-        start_line=chunk_index * 10,
-        end_line=(chunk_index + 1) * 10,
+        ext_kind=ExtKind(kind=ChunkKind.CODE, language=SemanticSearchLanguage.PYTHON),
+        line_range=Span(chunk_index * 10, (chunk_index + 1) * 10, chunk_id),
         language=SemanticSearchLanguage.PYTHON,
         content=content,
         chunk_name=f"test_function_{chunk_index}",
-        parent_name=None,
-        dense_embedding=dense_embedding,
-        sparse_embedding=sparse_embedding,
     )
 
 
@@ -97,7 +93,7 @@ async def qdrant_store(qdrant_client: AsyncQdrantClient) -> QdrantVectorStore:
     config = QdrantConfig(
         url="http://localhost:6333", collection_name=f"perf_test_{uuid4().hex[:8]}", batch_size=64
     )
-    store = QdrantVectorStore(config=config, embedder=None, reranker=None)
+    store = QdrantVectorStore(config=config, embedder=None, reranking=None)
     await store._initialize()
     yield store
     # Cleanup
@@ -116,7 +112,7 @@ async def memory_store() -> MemoryVectorStore:
             auto_persist=False,
             collection_name=f"perf_test_{uuid4().hex[:8]}",
         )
-        store = MemoryVectorStore(config=config, embedder=None, reranker=None)
+        store = MemoryVectorStore(config=config, embedder=None, reranking=None)
         await store._initialize()
         yield store
 
@@ -254,7 +250,7 @@ async def test_memory_persistence_performance(chunk_count: int) -> None:
         )
 
         # Create store and populate
-        store = MemoryVectorStore(config=config, embedder=None, reranker=None)
+        store = MemoryVectorStore(config=config, embedder=None, reranking=None)
         await store._initialize()
 
         chunks = create_test_chunks(count=chunk_count, files=10)
@@ -275,7 +271,7 @@ async def test_memory_persistence_performance(chunk_count: int) -> None:
         print(f"  Throughput: {chunk_count / persist_duration:.0f} chunks/sec")
 
         # Measure restore performance
-        new_store = MemoryVectorStore(config=config, embedder=None, reranker=None)
+        new_store = MemoryVectorStore(config=config, embedder=None, reranking=None)
 
         start = time.perf_counter()
         await new_store._restore_from_disk()
@@ -440,8 +436,7 @@ async def test_performance_regression_check(qdrant_store: QdrantVectorStore) -> 
     # Save baseline (for CI/CD tracking)
     baseline_path = Path(__file__).parent / "performance_baseline.json"
     if baseline_path.exists():
-        with open(baseline_path) as f:
-            baseline = json.load(f)
+        baseline = json.loads(baseline_path.read_text())
 
         # Compare against baseline
         search_regression = (metrics["search"]["p95_ms"] - baseline["search"]["p95_ms"]) / baseline[

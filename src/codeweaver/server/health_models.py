@@ -86,11 +86,11 @@ class SparseEmbeddingServiceInfo(BasedModel):
         return None
 
 
-class RerankerServiceInfo(BasedModel):
-    """Reranker service health information."""
+class RerankingServiceInfo(BasedModel):
+    """Reranking service health information."""
 
-    status: Annotated[Literal["up", "down"], Field(description="Reranker status")]
-    model: Annotated[str, Field(description="Reranker model name")]
+    status: Annotated[Literal["up", "down"], Field(description="Reranking status")]
+    model: Annotated[str, Field(description="Reranking model name")]
     latency_ms: Annotated[float, Field(ge=0, description="Latency in milliseconds")]
 
     def _telemetry_keys(self) -> None:
@@ -107,7 +107,7 @@ class ServicesInfo(BasedModel):
     sparse_embedding: Annotated[
         SparseEmbeddingServiceInfo, Field(description="Sparse embedding health")
     ]
-    reranker: Annotated[RerankerServiceInfo, Field(description="Reranker health")]
+    reranking: Annotated[RerankingServiceInfo, Field(description="Reranking health")]
 
     def _telemetry_keys(self) -> None:
         return None
@@ -179,7 +179,7 @@ __all__ = (
     "HealthResponse",
     "IndexingInfo",
     "IndexingProgressInfo",
-    "RerankerServiceInfo",
+    "RerankingServiceInfo",
     "ServicesInfo",
     "SparseEmbeddingServiceInfo",
     "StatisticsInfo",
