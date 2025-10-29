@@ -286,7 +286,6 @@ class SemanticChunker(BaseChunker):
         Returns:
             List of unique chunks with batch metadata
         """
-
         # Deduplicate using content hashing (already sets batch keys internally)
         unique_chunks = self._deduplicate_chunks(chunks, batch_id)
 
