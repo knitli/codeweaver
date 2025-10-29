@@ -50,14 +50,10 @@ from codeweaver.config.settings import CodeWeaverSettingsDict
 from codeweaver.core.types import BasedModel, BaseEnum, LiteralStringT, ModelName
 from codeweaver.core.types.dictview import DictView
 from codeweaver.exceptions import ConfigurationError
-from codeweaver.providers import (
-    EmbeddingProvider,
-    Provider,
-    ProviderKind,
-    RerankingProvider,
-    SparseEmbeddingModelCapabilities,
-    VectorStoreProvider,
-)
+from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+from codeweaver.providers.provider import Provider, ProviderKind
+from codeweaver.providers.reranking.providers.base import RerankingProvider
+from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
 
 if TYPE_CHECKING:
@@ -71,11 +67,11 @@ if TYPE_CHECKING:
         RerankingProviderSettings,
         VectorStoreSettings,
     )
-    from codeweaver.providers.embedding.capabilities import (
+    from codeweaver.providers.embedding.capabilities.base import (
         EmbeddingModelCapabilities,
         SparseEmbeddingModelCapabilities,
     )
-    from codeweaver.providers.reranking.capabilities import RerankingModelCapabilities
+    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
 type AgenticProfile = Any
@@ -664,9 +660,9 @@ class ProviderRegistry(BasedModel):
     _sparse_prefix: ClassVar[LiteralStringT] = "codeweaver.providers.embedding.providers."
     _rerank_prefix: ClassVar[LiteralStringT] = "codeweaver.providers.reranking.providers."
     _agent_import: ClassVar[LiteralStringT] = (
-        "codeweaver.agent_providers"  # no end dot because it's a module
+        "codeweaver.providers.agent"  # no end dot because it's a module
     )
-    _vector_store_prefix: ClassVar[LiteralStringT] = "codeweaver.providers.vector_stores.providers."
+    _vector_store_prefix: ClassVar[LiteralStringT] = "codeweaver.providers.vector_stores."
     _provider_map: ClassVar[
         MappingProxyType[ProviderKind, MappingProxyType[Provider, LiteralStringT]]
     ] = MappingProxyType({
@@ -691,7 +687,7 @@ class ProviderRegistry(BasedModel):
                     Provider.VERCEL,
                     Provider.X_AI,
                 ),
-                _agent_import,
+                f"{_agent_import}.agent_providers",
             )
         ),
         ProviderKind.EMBEDDING: MappingProxyType({
@@ -724,11 +720,12 @@ class ProviderRegistry(BasedModel):
             Provider.VOYAGE: f"{_rerank_prefix}voyage",
         }),
         ProviderKind.VECTOR_STORE: MappingProxyType({
-            Provider.QDRANT: f"{_vector_store_prefix}qdrant"
+            Provider.QDRANT: f"{_vector_store_prefix}qdrant",
+            Provider.MEMORY: f"{_vector_store_prefix}inmemory",
         }),
         ProviderKind.DATA: MappingProxyType({
-            Provider.DUCKDUCKGO: "codeweaver.agent_api",
-            Provider.TAVILY: "codeweaver.agent_api",
+            Provider.DUCKDUCKGO: "codeweaver.providers.tools",
+            Provider.TAVILY: "codeweaver.providers.tools",
         }),
     })
 

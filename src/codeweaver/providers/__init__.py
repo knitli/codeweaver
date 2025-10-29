@@ -35,16 +35,18 @@ from codeweaver.providers.capabilities import (
     VECTOR_PROVIDER_CAPABILITIES,
     get_provider_kinds,
 )
-from codeweaver.providers.embedding import (
-    EmbeddingModelCapabilities,
-    EmbeddingProvider,
-    SparseEmbeddingModelCapabilities,
-    get_embedding_model_provider,
-    user_settings_to_provider_settings,
-)
-from codeweaver.providers.embedding import (
-    load_default_capabilities as load_embedding_default_capabilities,
-)
+
+# TEMPORARILY DISABLED: Circular import causing test collection hang
+# from codeweaver.providers.embedding import (
+#     EmbeddingModelCapabilities,
+#     EmbeddingProvider,
+#     SparseEmbeddingModelCapabilities,
+#     get_embedding_model_provider,
+#     user_settings_to_provider_settings,
+# )
+# from codeweaver.providers.embedding import (
+#     load_default_capabilities as load_embedding_default_capabilities,
+# )
 from codeweaver.providers.optimize import (
     AvailableOptimizations,
     OptimizationDecisions,
@@ -76,8 +78,9 @@ __all__ = (
     "AvailableOptimizations",
     "CombinedToolset",
     "DownloadedItem",
-    "EmbeddingModelCapabilities",
-    "EmbeddingProvider",
+    # TEMPORARILY DISABLED: Circular import
+    # "EmbeddingModelCapabilities",
+    # "EmbeddingProvider",
     "ExternalToolset",
     "FilteredToolset",
     "FunctionToolset",
@@ -94,8 +97,8 @@ __all__ = (
     "RenamedToolset",
     "RerankingModelCapabilities",
     "RerankingProvider",
-    "SparseEmbeddingModelCapabilities",
-    "SparseEmbeddingModelCapabilities",
+    # TEMPORARILY DISABLED: Circular import
+    # "SparseEmbeddingModelCapabilities",
     "ToolsetTool",
     "VectorStoreProvider",
     "WrapperToolset",
@@ -104,7 +107,8 @@ __all__ = (
     "download_item",
     "get_agent_model_provider",
     "get_data_provider",
-    "get_embedding_model_provider",
+    # TEMPORARILY DISABLED: Circular import
+    # "get_embedding_model_provider",
     "get_optimizations",
     "get_provider_kinds",
     "get_rerank_model_provider",
@@ -112,9 +116,11 @@ __all__ = (
     "infer_model",
     "load_default_agent_providers",
     "load_default_data_providers",
-    "load_embedding_default_capabilities",
+    # TEMPORARILY DISABLED: Circular import
+    # "load_embedding_default_capabilities",
     "load_reranking_default_capabilities",
     "override_allow_model_requests",
     "reranking_dependency_map",
-    "user_settings_to_provider_settings",
+    # TEMPORARILY DISABLED: Circular import
+    # "user_settings_to_provider_settings",
 )

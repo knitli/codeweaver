@@ -68,7 +68,7 @@ class RerankingResult(NamedTuple):
 @cache
 def _get_statistics() -> SessionStatistics:
     """Get the statistics source for the reranking provider."""
-    statistics_module = importlib.import_module("codeweaver._statistics")
+    statistics_module = importlib.import_module("codeweaver.common.statistics")
     # we need SessionStatistics in this namespace at runtime for pydantic to find it
     SessionStatistics = statistics_module.SessionStatistics  # type: ignore # noqa: F841, N806
     return statistics_module.get_session_statistics()
@@ -269,9 +269,9 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
                 self._failure_count,
             )
             raise
-        except Exception as e:
+        except Exception:
             # Non-retryable errors don't affect circuit breaker
-            logger.exception("Non-retryable error in reranking: %s", str(e))
+            logger.exception("Non-retryable error in reranking")
             raise
         else:
             return result
@@ -306,16 +306,16 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
             reranked = await self._execute_rerank_with_retry(
                 query, processed_docs, top_n=self.top_n, **processed_kwargs
             )
-        except CircuitBreakerOpenError as e:
-            logger.warning("Circuit breaker open for reranking: %s", str(e))
+        except CircuitBreakerOpenError:
+            logger.warning("Circuit breaker open for reranking")
             # Return empty results when circuit breaker is open
             return []
-        except RetryError as e:
-            logger.exception("All retry attempts exhausted for reranking: %s", str(e))
+        except RetryError:
+            logger.exception("All retry attempts exhausted for reranking")
             # Return empty results when all retries exhausted
             return []
-        except Exception as e:
-            logger.exception("Reranking failed with error: %s", str(e))
+        except Exception:
+            logger.exception("Reranking failed with error")
             # Return empty results on other errors
             return []
 

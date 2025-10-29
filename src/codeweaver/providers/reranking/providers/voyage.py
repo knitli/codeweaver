@@ -9,15 +9,17 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Sequence
 from types import MappingProxyType
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import ConfigDict
 
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult
+
+
+if TYPE_CHECKING:
+    from codeweaver.core.chunks import CodeChunk
 
 
 try:
@@ -26,6 +28,8 @@ try:
     from voyageai.object.reranking import RerankingResult as VoyageRerankingResult
 
 except ImportError as e:
+    from codeweaver.exceptions import ConfigurationError
+
     raise ConfigurationError(
         "Voyage AI SDK is not installed. Please install it with `pip install codeweaver[provider-voyage]`."
     ) from e
@@ -33,6 +37,9 @@ except ImportError as e:
 
 class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
     """Base class for reranking providers."""
+
+    # pydantic needs it at runtime
+    from codeweaver.core.chunks import CodeChunk
 
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 

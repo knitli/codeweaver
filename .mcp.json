@@ -8,6 +8,18 @@
       "command": "npx",
       "type": "stdio"
     },
+    "morph-llm-fast-apply": {
+      "args": [
+        "-y",
+        "@morph-llm/morph-fast-apply@latest"
+      ],
+      "command": "npx",
+      "env": {
+        "ALL_TOOLS": "false",
+        "MORPH_API_KEY": "${env:MORPH_API_KEY}"
+      },
+      "type": "stdio"
+    },
     "sequential-thinking": {
       "args": [
         "-y",
@@ -23,6 +35,17 @@
         "start-mcp-server"
       ],
       "command": "uv",
+      "type": "stdio"
+    },
+    "tavily": {
+      "args": [
+        "-y",
+        "tavily-mcp@latest"
+      ],
+      "command": "npx",
+      "env": {
+        "TAVILY_API_KEY": "${env:TAVILY_API_KEY}"
+      },
       "type": "stdio"
     }
   }

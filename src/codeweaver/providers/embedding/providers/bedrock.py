@@ -11,6 +11,7 @@ import logging
 from collections.abc import Mapping, Sequence
 from io import BytesIO
 from typing import (
+    TYPE_CHECKING,
     Annotated,
     Any,
     ClassVar,
@@ -36,13 +37,15 @@ from pydantic import (
 from pydantic.alias_generators import to_camel, to_snake
 from types_boto3_bedrock_runtime import BedrockRuntimeClient
 
-from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.models import BasedModel
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.embedding.capabilities import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 from codeweaver.providers.provider import Provider
 
+
+if TYPE_CHECKING:
+    from codeweaver.core.chunks import CodeChunk
 
 logger = logging.getLogger(__name__)
 
@@ -481,6 +484,8 @@ class BedrockEmbeddingProvider(EmbeddingProvider[bedrock_client]):
         self, response: BedrockInvokeEmbeddingResponse, doc: CodeChunk | None = None
     ) -> list[float] | list[int]:
         """Handle the response from Titan for embedding requests."""
+        from codeweaver.core.chunks import CodeChunk
+
         if (
             isinstance(response.body, TitanEmbeddingV2Response)
             and hasattr(response.body, "input_text_token_count")
@@ -555,6 +560,8 @@ class BedrockEmbeddingProvider(EmbeddingProvider[bedrock_client]):
         **kwargs: Mapping[str, Any],
     ) -> list[InvokeRequestDict]:
         """Create the Titan embedding request."""
+        from codeweaver.core.chunks import CodeChunk
+
         body_kwargs = (
             {
                 k: v

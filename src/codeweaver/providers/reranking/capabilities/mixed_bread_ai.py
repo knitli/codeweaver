@@ -8,15 +8,20 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
-from codeweaver.providers.provider import Provider
-from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+
+if TYPE_CHECKING:
+    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
 def get_mixed_bread_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
     """
     Get the reranking capabilities for Mixed Bread AI models.
     """
+    from codeweaver.providers.provider import Provider
+    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+
     models = ("large-v2", "base-v2", "xsmall-v1", "base-v1")
     return [
         RerankingModelCapabilities.model_validate({

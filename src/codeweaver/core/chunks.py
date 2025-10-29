@@ -473,8 +473,9 @@ import contextlib
 
 # Rebuild models to resolve forward references
 # Force rebuild even if it fails - better to have working models than perfect ones
-with contextlib.suppress(Exception):
-    _ = SearchResult.model_rebuild(force=True)
+# TEMPORARILY DISABLED: Causing circular import hang during test collection
+# with contextlib.suppress(Exception):
+#     _ = SearchResult.model_rebuild(force=True)
 
-with contextlib.suppress(Exception):
-    _ = CodeChunk.model_rebuild(force=True)
+# with contextlib.suppress(Exception):
+#     _ = CodeChunk.model_rebuild(force=True)

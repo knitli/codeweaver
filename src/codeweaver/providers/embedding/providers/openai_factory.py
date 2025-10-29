@@ -254,6 +254,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
 
     def _base_urls(self) -> dict[Provider, AnyHttpUrl | str]:
         return {
+            # TODO: Add LiteLLM, Cerebras
             Provider.FIREWORKS: "https://api.fireworks.ai/inference/v1",
             Provider.GROQ: "https://api.groq.com/openai/v1",
             Provider.OPENAI: "https://api.openai.com/v1",

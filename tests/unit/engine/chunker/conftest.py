@@ -20,8 +20,9 @@ from codeweaver.providers.embedding.registry import EmbeddingBatchInfo  # noqa: 
 
 # Rebuild models to resolve forward references
 # This must happen after all imports to ensure all referenced types are available
-ChunkGovernor.model_rebuild()
-CodeChunk.model_rebuild()
+# TEMPORARILY DISABLED: Causing circular import hang during test collection
+# ChunkGovernor.model_rebuild()
+# CodeChunk.model_rebuild()
 
 
 @pytest.fixture

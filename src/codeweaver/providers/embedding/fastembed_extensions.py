@@ -8,8 +8,6 @@
 
 from __future__ import annotations
 
-from codeweaver.exceptions import ConfigurationError
-
 
 try:
     from dataclasses import asdict
@@ -23,6 +21,8 @@ try:
     from fastembed.text import TextEmbedding
 
 except ImportError as e:
+    from codeweaver.exceptions import ConfigurationError
+
     raise ConfigurationError(
         "fastembed is not installed. Please install it with `pip install codeweaver[provider-fastembed]` or `codeweaver[provider-fastembed-gpu]`."
     ) from e

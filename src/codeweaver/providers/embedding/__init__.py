@@ -63,8 +63,6 @@ def _process_model_settings(model_settings: EmbeddingModelSettings) -> dict[str,
                 model_settings, {"client_options": "kwargs"}
             )
 
-    return processed_settings
-
 
 def user_settings_to_provider_settings(
     user_settings: EmbeddingProviderSettings,

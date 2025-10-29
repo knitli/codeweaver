@@ -12,13 +12,15 @@ import asyncio
 import os
 
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult
+
+
+if TYPE_CHECKING:
+    from codeweaver.core.chunks import CodeChunk
 
 
 try:
@@ -26,6 +28,8 @@ try:
     from cohere.v2.types.v2rerank_response import V2RerankResponse
     from cohere.v2.types.v2rerank_response_results_item import V2RerankResponseResultsItem
 except ImportError as e:
+    from codeweaver.exceptions import ConfigurationError
+
     raise ConfigurationError(
         'Please install the `cohere` package to use the Cohere provider, \nyou can use the `cohere` optional group — `pip install "codeweaver[provider-cohere]"`'
     ) from e
@@ -54,6 +58,8 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
                 )
 
             if not self.client_options.get("api_key"):
+                from codeweaver.exceptions import ConfigurationError
+
                 raise ConfigurationError(
                     f"API key not found for {self._provider.value} provider. Please set the API key in the client kwargs or as an environment variable."
                 )

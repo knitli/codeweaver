@@ -40,7 +40,6 @@ from tenacity import (
 )
 
 from codeweaver.common.utils import LazyImport, lazy_import, uuid7
-from codeweaver.core.chunks import CodeChunk, SerializedCodeChunk, StructuredDataInput
 from codeweaver.core.stores import BlakeStore, UUIDStore, make_blake_store, make_uuid_store
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BasedModel
@@ -54,9 +53,9 @@ statistics_module: LazyImport[ModuleType] = lazy_import("codeweaver.common.stati
 
 if TYPE_CHECKING:
     from codeweaver.common.statistics import SessionStatistics
+    from codeweaver.core.chunks import CodeChunk, SerializedCodeChunk, StructuredDataInput
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
-else:
-    SessionStatistics = statistics_module.SessionStatistics
+
 
 _get_statistics: LazyImport[SessionStatistics] = lazy_import(
     "codeweaver.common.statistics", "get_statistics"
@@ -98,6 +97,8 @@ class EmbeddingErrorInfo(TypedDict):
 
 def default_input_transformer(chunks: StructuredDataInput) -> Iterator[CodeChunk]:
     """Default input transformer that serializes CodeChunks to strings."""
+    from codeweaver.core.chunks import CodeChunk
+
     return CodeChunk.chunkify(chunks)
 
 
@@ -130,6 +131,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
     The primary example of this one-to-many relationship is the OpenAI provider, which supports any OpenAI-compatible provider (Azure, Ollama, Fireworks, Heroku, Together, Github).
     """
+
+    from codeweaver.core.chunks import StructuredDataInput
 
     model_config = BasedModel.model_config | ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
@@ -292,9 +295,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 self._failure_count,
             )
             raise
-        except Exception as e:
+        except Exception:
             # Non-retryable errors don't affect circuit breaker
-            logger.exception("Non-retryable error in embedding: %s", str(e))
+            logger.exception("Non-retryable error in embedding")
             raise
         else:
             return result
@@ -345,11 +348,11 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             ) = await self._embed_documents_with_retry(tuple(chunks), **kwargs)
         except CircuitBreakerOpenError as e:
             # Circuit breaker open - return error immediately
-            logger.warning("Circuit breaker open for %s: %s", self._provider, str(e))
+            logger.warning("Circuit breaker open for %s", self._provider)
             return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)  # type: ignore
         except RetryError as e:
             # All retry attempts exhausted
-            logger.exception("All retry attempts exhausted for %s: %s", self._provider, str(e))
+            logger.exception("All retry attempts exhausted for %s", self._provider)
             return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)  # type: ignore
         except Exception as e:
             return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)  # type: ignore
@@ -380,14 +383,14 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         except (ConnectionError, TimeoutError, OSError) as e:
             self._record_failure()
             logger.warning(
-                "Query embedding failed for %s: %s (attempt %d/5)",
+                "Query embedding failed for %s(attempt %d/5)",
                 self._provider,
-                str(e),
                 self._failure_count,
+                extra={"query": query, "error": str(e)},
             )
             raise
-        except Exception as e:
-            logger.exception("Non-retryable error in query embedding: %s", str(e))
+        except Exception:
+            logger.exception("Non-retryable error in query embedding")
             raise
         else:
             return result
@@ -410,10 +413,10 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 Sequence[Sequence[float]] | Sequence[Sequence[int]]
             ) = await self._embed_query_with_retry(queries, **processed_kwargs)  # pyright: ignore[reportUnknownVariableType, reportGeneralTypeIssues]
         except CircuitBreakerOpenError as e:
-            logger.warning("Circuit breaker open for query embedding: %s", str(e))
+            logger.warning("Circuit breaker open for query embedding")
             return self._handle_embedding_error(e, batch_id=None, documents=None, queries=queries)
         except RetryError as e:
-            logger.exception("All retry attempts exhausted for query embedding: %s", str(e))
+            logger.exception("All retry attempts exhausted for query embedding")
             return self._handle_embedding_error(e, batch_id=None, documents=None, queries=queries)
         except Exception as e:
             return self._handle_embedding_error(e, batch_id=None, documents=None, queries=queries)

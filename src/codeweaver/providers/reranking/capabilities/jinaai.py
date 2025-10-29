@@ -8,13 +8,18 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
-from codeweaver.providers.provider import Provider
-from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+
+if TYPE_CHECKING:
+    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
 def get_jinaai_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
     """Get the JinaAI reranking model capabilities."""
+    from codeweaver.providers.provider import Provider
+    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+
     capabilities = {
         "jinaai/jina-reranker-v2-base-multilingual": {
             "provider": Provider.FASTEMBED,

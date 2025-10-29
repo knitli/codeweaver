@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from typing import Literal
 
-from codeweaver.providers.embedding.capabilities.base import (
+from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+from codeweaver.providers.embedding.capabilities.types import (
     EmbeddingCapabilities,
-    EmbeddingModelCapabilities,
     PartialCapabilities,
 )
 from codeweaver.providers.provider import Provider

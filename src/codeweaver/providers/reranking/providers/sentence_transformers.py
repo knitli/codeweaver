@@ -18,7 +18,6 @@ from typing import Any, cast
 import numpy as np
 
 from codeweaver.common.utils.utils import rpartial
-from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider
@@ -31,6 +30,8 @@ try:
 
 except ImportError as e:
     logger.exception("Failed to import CrossEncoder from sentence_transformers")
+    from codeweaver.exceptions import ConfigurationError
+
     raise ConfigurationError(
         "SentenceTransformers is not installed. Please install it with `pip install codeweaver[provider-sentence-transformers]` or `codeweaver[provider-sentence-transformers-gpu]`."
     ) from e

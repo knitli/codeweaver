@@ -11,12 +11,11 @@ from __future__ import annotations
 import asyncio
 
 from collections.abc import Sequence
-from typing import Any, ClassVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 import numpy as np
 
 from codeweaver.common.utils.utils import rpartial
-from codeweaver.core.chunks import CodeChunk
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
@@ -24,6 +23,10 @@ from codeweaver.providers.embedding.capabilities.base import (
 )
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 from codeweaver.providers.provider import Provider
+
+
+if TYPE_CHECKING:
+    from codeweaver.core.chunks import CodeChunk
 
 
 try:

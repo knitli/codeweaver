@@ -22,11 +22,14 @@ Nevertheless, because we use semantic chunking for most code, you're not likely 
 
 from __future__ import annotations
 
-from codeweaver.providers.embedding.capabilities.base import (
-    EmbeddingModelCapabilities,
-    PartialCapabilities,
-)
+from typing import TYPE_CHECKING
+
+from codeweaver.providers.embedding.capabilities.types import PartialCapabilities
 from codeweaver.providers.provider import Provider
+
+
+if TYPE_CHECKING:
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
 
 def _get_shared_capabilities() -> PartialCapabilities:
@@ -48,6 +51,8 @@ def _get_shared_capabilities() -> PartialCapabilities:
 
 def get_voyage_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
     """Get the capabilities for Voyage AI embedding models."""
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+
     models = "voyage-3-large", "voyage-3.5", "voyage-3.5-lite", "voyage-code-3", "voyage-context-3"
     settings = [{**_get_shared_capabilities()} for _ in models]
     for i, model in enumerate(models):

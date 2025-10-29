@@ -8,16 +8,17 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from pydantic import NonNegativeInt
 
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.providers.reranking.capabilities.base import (
-    PartialRerankingCapabilities,
-    Provider,
-    RerankingModelCapabilities,
-)
 from codeweaver.tokenizers import get_tokenizer
+
+
+if TYPE_CHECKING:
+    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+    from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilities
 
 
 def cohere_max_input(chunks: Sequence[CodeChunk], query: str) -> tuple[bool, NonNegativeInt]:
@@ -46,6 +47,9 @@ def _get_common_capabilities() -> PartialRerankingCapabilities:
 
 def get_cohere_reranking_capabilities() -> tuple[RerankingModelCapabilities, ...]:
     """Get the capabilities of the Cohere reranking model."""
+    from codeweaver.providers.provider import Provider
+    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+
     base_capabilities = _get_common_capabilities()
     capabilities: list[RerankingModelCapabilities] = [
         RerankingModelCapabilities.model_validate({
