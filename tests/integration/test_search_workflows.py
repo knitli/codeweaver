@@ -24,7 +24,6 @@ Tests that do run validate the response structure using the stub implementation.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import time
 
@@ -84,10 +83,10 @@ class UserRepository:
         cursor.execute("SELECT id, username, email FROM users WHERE username = ?", (username,))
         return cursor.fetchone()
 ''',
-    "README.md": '''# Test Project
+    "README.md": """# Test Project
 
 Small test project for CodeWeaver integration tests with authentication and database modules.
-''',
+""",
 }
 
 
@@ -109,6 +108,7 @@ def test_project_path(tmp_path: Path) -> Path:
 # T010: CLI Search Tests
 # =============================================================================
 
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_cli_search_returns_results(test_project_path: Path):
@@ -121,7 +121,7 @@ async def test_cli_search_returns_results(test_project_path: Path):
     Note: Currently validates stub response. When find_code is re-enabled,
     this test will validate actual search results.
     """
-    from codeweaver.app_bindings import find_code_tool
+    from codeweaver.server.app_bindings import find_code_tool
 
     # Execute search via find_code_tool (CLI uses this internally)
     response = await find_code_tool(
@@ -168,7 +168,7 @@ async def test_cli_search_output_formats(test_project_path: Path):
     When: Output format specified (json, table, markdown)
     Then: Results render correctly in each format
     """
-    from codeweaver.app_bindings import find_code_tool
+    from codeweaver.server.app_bindings import find_code_tool
 
     # Get search results
     response = await find_code_tool(
@@ -205,6 +205,7 @@ async def test_cli_search_output_formats(test_project_path: Path):
 # T010: MCP find_code Tool Tests
 # =============================================================================
 
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_mcp_find_code_tool(test_project_path: Path):
@@ -217,8 +218,8 @@ async def test_mcp_find_code_tool(test_project_path: Path):
     Reference: specs/003-our-aim-to/contracts/find_code_mcp_tool.json
     """
     from codeweaver.agent_api.intent import IntentType
-    from codeweaver.agent_api.models import CodeMatchType, SearchStrategy
-    from codeweaver.app_bindings import find_code_tool
+    from codeweaver.agent_api.models import CodeMatchType
+    from codeweaver.server.app_bindings import find_code_tool
 
     # Invoke MCP tool
     response = await find_code_tool(
@@ -276,7 +277,7 @@ async def test_mcp_find_code_required_parameters(test_project_path: Path):
     When: Parameters provided (including edge cases)
     Then: Appropriate handling occurs
     """
-    from codeweaver.app_bindings import find_code_tool
+    from codeweaver.server.app_bindings import find_code_tool
 
     # Test with empty query
     response = await find_code_tool(
@@ -310,6 +311,7 @@ async def test_mcp_find_code_required_parameters(test_project_path: Path):
 # T010: Search with Intent Parameter
 # =============================================================================
 
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_search_with_intent_parameter():
@@ -320,7 +322,7 @@ async def test_search_with_intent_parameter():
     Then: Intent reflected in response
     """
     from codeweaver.agent_api.intent import IntentType
-    from codeweaver.app_bindings import find_code_tool
+    from codeweaver.server.app_bindings import find_code_tool
 
     intents_to_test = [
         IntentType.UNDERSTAND,
@@ -343,7 +345,9 @@ async def test_search_with_intent_parameter():
         )
 
         # Validate intent is reflected in response
-        assert response.query_intent == intent, f"Expected intent {intent}, got {response.query_intent}"
+        assert response.query_intent == intent, (
+            f"Expected intent {intent}, got {response.query_intent}"
+        )
 
         # Validate response structure
         from codeweaver.agent_api import FindCodeResponseSummary
@@ -356,6 +360,7 @@ async def test_search_with_intent_parameter():
 # T010: Search Filters and Parameters
 # =============================================================================
 
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_search_filters_work():
@@ -365,7 +370,7 @@ async def test_search_filters_work():
     When: Filters applied (include_tests=True/False)
     Then: Both return valid responses
     """
-    from codeweaver.app_bindings import find_code_tool
+    from codeweaver.server.app_bindings import find_code_tool
 
     # Test include_tests filter
     response_with_tests = await find_code_tool(
@@ -402,7 +407,7 @@ async def test_search_token_limit():
     When: token_limit parameter provided
     Then: Response respects limit
     """
-    from codeweaver.app_bindings import find_code_tool
+    from codeweaver.server.app_bindings import find_code_tool
 
     response = await find_code_tool(
         query="authentication",
@@ -421,6 +426,7 @@ async def test_search_token_limit():
 # T010: Edge Cases and Error Handling
 # =============================================================================
 
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_empty_query_handling():
@@ -430,7 +436,7 @@ async def test_empty_query_handling():
     When: Search executed
     Then: Returns graceful response
     """
-    from codeweaver.app_bindings import find_code_tool
+    from codeweaver.server.app_bindings import find_code_tool
 
     # Test empty query
     response = await find_code_tool(
@@ -457,7 +463,7 @@ async def test_no_results_scenario():
     When: Search executed
     Then: Returns empty results with clear summary
     """
-    from codeweaver.app_bindings import find_code_tool
+    from codeweaver.server.app_bindings import find_code_tool
 
     response = await find_code_tool(
         query="xyzabc123nonexistentquerythatmatchesnothing",
@@ -478,6 +484,7 @@ async def test_no_results_scenario():
 # =============================================================================
 # T010: Performance Requirements (FR-037) - SKIPPED UNTIL REAL IMPLEMENTATION
 # =============================================================================
+
 
 @pytest.mark.integration
 @pytest.mark.asyncio
@@ -523,7 +530,7 @@ async def test_search_response_time_tracking():
     When: Response returned
     Then: execution_time_ms tracked (even for stub)
     """
-    from codeweaver.app_bindings import find_code_tool
+    from codeweaver.server.app_bindings import find_code_tool
 
     start_time = time.time()
 
@@ -550,6 +557,7 @@ async def test_search_response_time_tracking():
 # T010: Search Strategy Validation - SKIPPED UNTIL REAL IMPLEMENTATION
 # =============================================================================
 
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 @pytest.mark.skip(reason="Strategy validation requires real implementation")
@@ -573,8 +581,10 @@ async def test_search_strategy_reporting(test_project_path: Path):
     )
 
     # Should use hybrid search with both dense and sparse embeddings
-    assert SearchStrategy.HYBRID_SEARCH in response.search_strategy or \
-           SearchStrategy.DENSE_ONLY in response.search_strategy
+    assert (
+        SearchStrategy.HYBRID_SEARCH in response.search_strategy
+        or SearchStrategy.DENSE_ONLY in response.search_strategy
+    )
 
 
 @pytest.mark.integration
@@ -586,7 +596,7 @@ async def test_search_languages_found():
     When: Results returned
     Then: languages_found has correct structure
     """
-    from codeweaver.app_bindings import find_code_tool
+    from codeweaver.server.app_bindings import find_code_tool
 
     response = await find_code_tool(
         query="authentication database",
