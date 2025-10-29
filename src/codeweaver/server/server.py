@@ -31,7 +31,7 @@ from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware, Re
 from fastmcp.server.middleware.logging import LoggingMiddleware, StructuredLoggingMiddleware
 from fastmcp.server.middleware.middleware import Middleware
 from fastmcp.server.middleware.rate_limiting import RateLimitingMiddleware
-from pydantic import ConfigDict, Field, NonNegativeInt, computed_field
+from pydantic import ConfigDict, DirectoryPath, Field, NonNegativeInt, computed_field
 from pydantic.dataclasses import dataclass
 from pydantic_core import to_json
 
@@ -214,7 +214,7 @@ class AppState(DataclassSerializationMixin):
         ),
     ]
     project_path: Annotated[
-        Path,
+        DirectoryPath,
         Field(
             default_factory=lambda data: data["settings"].get("project_path") or get_project_path(),
             description="Path to the project root",

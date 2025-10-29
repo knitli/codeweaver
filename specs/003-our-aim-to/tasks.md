@@ -160,7 +160,7 @@ The `ProviderRegistry` in `common/registry.py` already provides complete vector 
 **Usage Pattern**:
 ```python
 from codeweaver.common.registry import get_provider_registry
-from codeweaver.providers import Provider
+from codeweaver.providers.provider import Provider
 
 registry = get_provider_registry()
 

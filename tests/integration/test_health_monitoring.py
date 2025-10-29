@@ -18,7 +18,7 @@ Reference:
 - Contract: specs/003-our-aim-to/contracts/health_endpoint.json
 - Health models: src/codeweaver/server/health_models.py
 - Health service: src/codeweaver/server/health_service.py
-- Health endpoint: src/codeweaver/app_bindings.py (/health route)
+- Health endpoint: src/codeweaver/server/app_bindings.py (/health route)
 """
 
 from __future__ import annotations
@@ -327,8 +327,8 @@ async def test_health_status_unhealthy(health_service: HealthService, mocker):
     Then: Status is 'unhealthy' (no search functionality available)
     """
     # Mock vector store as down
-    health_service._provider_registry.get_vector_store_provider_instance.side_effect = (
-        RuntimeError("Vector store unavailable")
+    health_service._provider_registry.get_vector_store_provider_instance.side_effect = RuntimeError(
+        "Vector store unavailable"
     )
 
     response = await health_service.get_health_response()
@@ -358,7 +358,9 @@ async def test_health_indexing_progress(health_service: HealthService, mocker):
     response1 = await health_service.get_health_response()
 
     assert response1.indexing.state == "indexing"
-    assert response1.indexing.progress.files_processed < response1.indexing.progress.files_discovered
+    assert (
+        response1.indexing.progress.files_processed < response1.indexing.progress.files_discovered
+    )
 
     # Stage 2: Indexing complete
     mock_indexer.stats.files_processed = 50

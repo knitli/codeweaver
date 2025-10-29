@@ -30,7 +30,7 @@ from codeweaver.config.settings import CodeWeaverSettingsDict, get_settings_map
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.types.dictview import DictView
 from codeweaver.middleware.statistics import StatisticsMiddleware
-from codeweaver.server import AppState, HealthInfo, get_health_info
+from codeweaver.server.server import AppState, HealthInfo, get_health_info
 
 
 _logger = logging.getLogger(__name__)
@@ -184,7 +184,7 @@ async def version_info(_request: Request) -> PlainTextResponse:
 @timed_http("state")
 async def state_info(_request: Request) -> PlainTextResponse:
     """Return the complete application state as JSON."""
-    from codeweaver.server import get_state
+    from codeweaver.server.server import get_state
 
     state = get_state()
     return PlainTextResponse(content=state.dump_json(), media_type="application/json")
@@ -200,11 +200,12 @@ async def health(_request: Request) -> PlainTextResponse:
     - Service health for all providers
     - Statistics on indexed content and queries
     """
-    from codeweaver.server import get_state
+    from codeweaver.server.server import get_state
 
     try:
         state = get_state()
         if state.health_service is None:
+            _logger.warning("Health service not initialized, returning basic health info")
             # Fallback to basic health if service not initialized
             info = health_info()
             return PlainTextResponse(content=info.report(), media_type="application/json")

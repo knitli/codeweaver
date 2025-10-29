@@ -610,7 +610,7 @@ class ModelRegistry(BasedModel):
 
     def _register_builtin_agentic_profiles(self) -> None:
         """Register built-in agentic profiles."""
-        from codeweaver.providers import KnownAgentModelName, infer_model
+        from codeweaver.providers.agent import KnownAgentModelName, infer_model
 
         model_names = KnownAgentModelName.__value__.__dict__["__args__"][:-1]
         for model_name in model_names:

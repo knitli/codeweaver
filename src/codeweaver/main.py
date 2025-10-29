@@ -16,10 +16,8 @@ from typing import TYPE_CHECKING, Any, TypeGuard, is_typeddict
 
 from pydantic import FilePath
 
-from codeweaver.app_bindings import register_app_bindings, register_tool
 from codeweaver.common.utils import lazy_import
 from codeweaver.providers.provider import Provider as Provider  # needed for pydantic models
-from codeweaver.server import build_app
 
 
 if TYPE_CHECKING:
@@ -27,6 +25,8 @@ if TYPE_CHECKING:
 
     from codeweaver.config.settings import CodeWeaverSettings
     from codeweaver.server import AppState, ServerSetup
+
+logger = logging.getLogger(__name__)
 
 
 def is_server_setup(obj: Any) -> TypeGuard[ServerSetup]:
@@ -55,9 +55,7 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
             "log_level": server_setup.pop("log_level", "INFO"),
             "path": server_setup.pop("streamable_http_path", "/codeweaver"),
             "middleware": server_setup.pop("middleware", set()),
-            "uvicorn_config": settings.uvicorn.model_dump(mode="python", exclude_unset=True)
-            if settings.uvicorn
-            else {},
+            "uvicorn_config": settings.uvicorn or {},
         }
         resolved_kwargs = new_kwargs | kwargs  # pyright: ignore[reportUnknownVariableType]
     else:
@@ -84,6 +82,9 @@ async def run(
     port: int = 9328,
 ) -> None:
     """Run the CodeWeaver server."""
+    from codeweaver.server import build_app
+    from codeweaver.server.app_bindings import register_app_bindings, register_tool
+
     server_setup = build_app()
     if host:
         server_setup["host"] = host
@@ -92,10 +93,11 @@ async def run(
     if config_file or project_path:
         from codeweaver.config.settings import get_settings
 
-        server_setup["settings"] = get_settings(path=config_file)
+        server_setup["settings"] = get_settings(config_file=config_file)
     if project_path:
         from codeweaver.config.settings import update_settings
 
+        logger.debug("Type of server_setup['settings']: %s", type(server_setup["settings"]))
         _ = update_settings(**{
             **server_setup["settings"].model_dump(),
             "project_path": project_path,
@@ -103,7 +105,7 @@ async def run(
     server_setup["app"], server_setup["middleware"] = await register_app_bindings(  # type: ignore
         server_setup["app"],
         server_setup.get("middleware", set()),  # pyright: ignore[reportArgumentType]
-        server_setup.get("middleware", {}),
+        server_setup.get("middleware_settings", {}),
     )
     server_setup["app"] = register_tool(server_setup["app"])
     await start_server(server_setup)

@@ -108,7 +108,7 @@ async def search(
         console.print(f"{CODEWEAVER_PREFIX} [blue]Query: {query}[/blue]")
 
         # Use stub find_code_tool during refactor
-        from codeweaver.app_bindings import find_code_tool
+        from codeweaver.server.app_bindings import find_code_tool
 
         response = await find_code_tool(
             query=query,

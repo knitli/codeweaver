@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """CodeWeaver server package initialization."""
 
+from codeweaver.server.app_bindings import find_code_tool, register_app_bindings, register_tool
 from codeweaver.server.health_endpoint import get_health
 from codeweaver.server.health_models import (
     EmbeddingProviderServiceInfo,
@@ -45,8 +46,11 @@ __all__ = (
     "StatisticsInfo",
     "VectorStoreServiceInfo",
     "build_app",
+    "find_code_tool",
     "get_health",
     "get_health_info",
     "get_state",
     "lifespan",
+    "register_app_bindings",
+    "register_tool",
 )
