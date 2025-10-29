@@ -12,7 +12,6 @@ Python, JavaScript, and Rust.
 """
 
 
-
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.engine.chunker import SemanticChunker
 from codeweaver.engine.chunker.base import ChunkGovernor

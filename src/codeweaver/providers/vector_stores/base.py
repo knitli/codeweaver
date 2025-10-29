@@ -7,12 +7,15 @@
 from __future__ import annotations
 
 import threading
+import time
 
 from abc import ABC, abstractmethod
+from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import UUID4, ConfigDict
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 from typing_extensions import TypeIs
 
 from codeweaver.core.chunks import CodeChunk, SearchResult
@@ -93,6 +96,18 @@ def _assemble_caps() -> dict[
 _embedding_caps_lock = threading.Lock()
 
 
+class CircuitBreakerState(Enum):
+    """Circuit breaker states for provider resilience."""
+
+    CLOSED = "closed"  # Normal operation
+    OPEN = "open"  # Failing, rejecting requests
+    HALF_OPEN = "half_open"  # Testing if service recovered
+
+
+class CircuitBreakerOpenError(Exception):
+    """Raised when circuit breaker is open and rejecting requests."""
+
+
 class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
     """Abstract interface for vector storage providers."""
 
@@ -100,6 +115,12 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
 
     _client: VectorStoreClient | None
     _provider: Provider
+
+    # Circuit breaker state tracking
+    _circuit_state: CircuitBreakerState = CircuitBreakerState.CLOSED
+    _failure_count: int = 0
+    _last_failure_time: float | None = None
+    _circuit_open_duration: float = 30.0  # 30 seconds as per spec FR-008a
 
     def __init__(self, **data: Any) -> None:
         """Initialize the vector store provider with embedding capabilities."""
@@ -112,6 +133,11 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                 if not hasattr(type(self), "_embedding_caps_initialized"):
                     type(self)._embedding_caps = _assemble_caps()
                     type(self)._embedding_caps_initialized = True
+
+        # Initialize circuit breaker state
+        self._circuit_state = CircuitBreakerState.CLOSED
+        self._failure_count = 0
+        self._last_failure_time = None
 
     async def _initialize(self) -> None:
         """Initialize the vector store provider.
@@ -163,6 +189,64 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         """
         return None
 
+    def _check_circuit_breaker(self) -> None:
+        """Check circuit breaker state before making API calls.
+
+        Raises:
+            CircuitBreakerOpenError: If circuit breaker is open.
+        """
+        current_time = time.time()
+
+        if self._circuit_state == CircuitBreakerState.OPEN:
+            if (
+                self._last_failure_time
+                and (current_time - self._last_failure_time) > self._circuit_open_duration
+            ):
+                # Transition to half-open to test recovery
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.info(
+                    "Circuit breaker transitioning to half-open state for %s", self._provider
+                )
+                self._circuit_state = CircuitBreakerState.HALF_OPEN
+            else:
+                raise CircuitBreakerOpenError(
+                    f"Circuit breaker is open for {self._provider}. Failing fast."
+                )
+
+    def _record_success(self) -> None:
+        """Record successful API call and reset circuit breaker if needed."""
+        if self._circuit_state in (CircuitBreakerState.HALF_OPEN, CircuitBreakerState.OPEN):
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.info("Circuit breaker closing for %s after successful operation", self._provider)
+        self._circuit_state = CircuitBreakerState.CLOSED
+        self._failure_count = 0
+        self._last_failure_time = None
+
+    def _record_failure(self) -> None:
+        """Record failed API call and update circuit breaker state."""
+        self._failure_count += 1
+        self._last_failure_time = time.time()
+
+        if self._failure_count >= 3:  # 3 failures threshold as per spec FR-008a
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                "Circuit breaker opening for %s after %d consecutive failures",
+                self._provider,
+                self._failure_count,
+            )
+            self._circuit_state = CircuitBreakerState.OPEN
+
+    @property
+    def circuit_breaker_state(self) -> str:
+        """Get current circuit breaker state for health monitoring."""
+        return self._circuit_state.value
+
     @abstractmethod
     async def list_collections(self) -> list[str] | None:
         """List all collections in the vector store.
@@ -175,6 +259,42 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
             ConnectionError: Failed to connect to vector store.
             ProviderError: Provider-specific operation failure.
         """
+
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=1, min=1, max=16),  # 1s, 2s, 4s, 8s, 16s
+        retry=retry_if_exception_type((ConnectionError, TimeoutError, OSError)),
+        reraise=True,
+    )
+    async def _search_with_retry(
+        self, vector: list[float] | dict[str, list[float] | Any], query_filter: Filter | None = None
+    ) -> list[SearchResult]:
+        """Wrapper around search with retry logic and circuit breaker."""
+        self._check_circuit_breaker()
+
+        try:
+            result = await self.search(vector, query_filter)
+            self._record_success()
+        except (ConnectionError, TimeoutError, OSError) as e:
+            self._record_failure()
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                "Vector store search failed for %s: %s (attempt %d/5)",
+                self._provider,
+                str(e),
+                self._failure_count,
+            )
+            raise
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.exception("Non-retryable error in vector store search: %s", str(e))
+            raise
+        else:
+            return result
 
     @abstractmethod
     async def search(
@@ -206,6 +326,38 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
             InvalidFilterError: Filter contains invalid fields or values.
             SearchError: Search operation failed.
         """
+
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=1, min=1, max=16),
+        retry=retry_if_exception_type((ConnectionError, TimeoutError, OSError)),
+        reraise=True,
+    )
+    async def _upsert_with_retry(self, chunks: list[CodeChunk]) -> None:
+        """Wrapper around upsert with retry logic and circuit breaker."""
+        self._check_circuit_breaker()
+
+        try:
+            await self.upsert(chunks)
+            self._record_success()
+        except (ConnectionError, TimeoutError, OSError) as e:
+            self._record_failure()
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                "Vector store upsert failed for %s: %s (attempt %d/5)",
+                self._provider,
+                str(e),
+                self._failure_count,
+            )
+            raise
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.exception("Non-retryable error in vector store upsert: %s", str(e))
+            raise
 
     @abstractmethod
     async def upsert(self, chunks: list[CodeChunk]) -> None:

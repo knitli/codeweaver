@@ -6,6 +6,7 @@
 """Contract test: validate build output artifacts."""
 
 import subprocess
+
 from pathlib import Path
 
 import pytest
@@ -23,6 +24,7 @@ def clean_dist(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
     # Clean existing dist
     import shutil
+
     if (project_root / "dist").exists():
         shutil.rmtree(project_root / "dist")
 
@@ -49,12 +51,7 @@ def test_validate_build_output(clean_dist: Path):
     dist_dir = clean_dist
 
     # Run build command
-    result = subprocess.run(
-        ["uv", "build"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    result = subprocess.run(["uv", "build"], capture_output=True, text=True, check=False)
 
     # Build should succeed
     assert result.returncode == 0, f"Build failed: {result.stderr}"
@@ -62,7 +59,9 @@ def test_validate_build_output(clean_dist: Path):
     # Verify artifacts created (filter out .gitignore and other non-artifacts)
     all_files = list(dist_dir.glob("*"))
     artifacts = [a for a in all_files if a.is_file() and a.name not in [".gitignore", ".DS_Store"]]
-    assert len(artifacts) == 2, f"Expected 2 artifacts, found {len(artifacts)}: {[a.name for a in artifacts]}"
+    assert len(artifacts) == 2, (
+        f"Expected 2 artifacts, found {len(artifacts)}: {[a.name for a in artifacts]}"
+    )
 
     # Must include one wheel and one sdist
     wheels = [a for a in artifacts if a.suffix == ".whl"]
@@ -75,10 +74,14 @@ def test_validate_build_output(clean_dist: Path):
     sdist = sdists[0]
 
     # Filenames must follow conventions
-    assert wheel.name.startswith("codeweaver_mcp-"), f"Wheel name must start with package name, got: {wheel.name}"
+    assert wheel.name.startswith("codeweaver_mcp-"), (
+        f"Wheel name must start with package name, got: {wheel.name}"
+    )
     assert "-py3-none-any.whl" in wheel.name, f"Wheel must be pure Python, got: {wheel.name}"
 
-    assert sdist.name.startswith("codeweaver_mcp-"), f"Sdist name must start with package name, got: {sdist.name}"
+    assert sdist.name.startswith("codeweaver_mcp-"), (
+        f"Sdist name must start with package name, got: {sdist.name}"
+    )
     assert sdist.name.endswith(".tar.gz"), f"Sdist must be .tar.gz, got: {sdist.name}"
 
     # Artifacts must be non-empty
@@ -95,19 +98,16 @@ def test_validate_build_output(clean_dist: Path):
     sdist_parts = sdist.name.replace(".tar.gz", "").split("-")
     sdist_version = sdist_parts[1] if len(sdist_parts) > 1 else ""
 
-    assert wheel_version == sdist_version, f"Version mismatch: wheel={wheel_version}, sdist={sdist_version}"
+    assert wheel_version == sdist_version, (
+        f"Version mismatch: wheel={wheel_version}, sdist={sdist_version}"
+    )
     assert wheel_version != "", "Version must not be empty"
 
 
 @pytest.mark.integration
 def test_build_command_success():
     """Verify uv build command succeeds with expected output."""
-    result = subprocess.run(
-        ["uv", "build", "--help"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    result = subprocess.run(["uv", "build", "--help"], capture_output=True, text=True, check=False)
 
     # At minimum, uv build command should be available
     assert result.returncode == 0, "uv build command not available"

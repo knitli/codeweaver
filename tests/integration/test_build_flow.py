@@ -7,6 +7,7 @@
 
 import shutil
 import subprocess
+
 from pathlib import Path
 
 import pytest
@@ -37,11 +38,7 @@ def test_build_and_validate_flow():
 
     # Step 2: Run uv build
     build_result = subprocess.run(
-        ["uv", "build"],
-        cwd=project_root,
-        capture_output=True,
-        text=True,
-        check=False,
+        ["uv", "build"], cwd=project_root, capture_output=True, text=True, check=False
     )
 
     # Verify build succeeded
@@ -50,7 +47,9 @@ def test_build_and_validate_flow():
 
     # Step 3: Verify artifacts
     artifacts = [f for f in dist_dir.glob("*") if f.is_file() and f.name not in [".gitignore"]]
-    assert len(artifacts) == 2, f"Expected 2 artifacts, found {len(artifacts)}: {[a.name for a in artifacts]}"
+    assert len(artifacts) == 2, (
+        f"Expected 2 artifacts, found {len(artifacts)}: {[a.name for a in artifacts]}"
+    )
 
     wheels = [a for a in artifacts if a.suffix == ".whl"]
     sdists = [a for a in artifacts if a.name.endswith(".tar.gz")]
@@ -60,10 +59,7 @@ def test_build_and_validate_flow():
 
     # Step 4: Install twine and run check
     twine_install = subprocess.run(
-        ["uv", "pip", "install", "twine"],
-        capture_output=True,
-        text=True,
-        check=False,
+        ["uv", "pip", "install", "twine"], capture_output=True, text=True, check=False
     )
     assert twine_install.returncode == 0, f"Failed to install twine: {twine_install.stderr}"
 
@@ -77,7 +73,9 @@ def test_build_and_validate_flow():
     )
 
     # Verify twine check passed
-    assert check_result.returncode == 0, f"Twine check failed: {check_result.stderr}\n{check_result.stdout}"
+    assert check_result.returncode == 0, (
+        f"Twine check failed: {check_result.stderr}\n{check_result.stdout}"
+    )
     assert "PASSED" in check_result.stdout, f"Expected PASSED in output: {check_result.stdout}"
 
     # Count PASSED occurrences
@@ -101,11 +99,7 @@ def test_incremental_build():
 
     # First build
     result1 = subprocess.run(
-        ["uv", "build"],
-        cwd=project_root,
-        capture_output=True,
-        text=True,
-        check=False,
+        ["uv", "build"], cwd=project_root, capture_output=True, text=True, check=False
     )
     assert result1.returncode == 0, "First build failed"
 
@@ -114,11 +108,7 @@ def test_incremental_build():
 
     # Second build (should rebuild)
     result2 = subprocess.run(
-        ["uv", "build"],
-        cwd=project_root,
-        capture_output=True,
-        text=True,
-        check=False,
+        ["uv", "build"], cwd=project_root, capture_output=True, text=True, check=False
     )
     assert result2.returncode == 0, "Second build failed"
 
@@ -150,11 +140,7 @@ def test_build_with_clean_flag():
 
     # Build with --clean
     result = subprocess.run(
-        ["uv", "build", "--clean"],
-        cwd=project_root,
-        capture_output=True,
-        text=True,
-        check=False,
+        ["uv", "build", "--clean"], cwd=project_root, capture_output=True, text=True, check=False
     )
 
     assert result.returncode == 0, f"Clean build failed: {result.stderr}"

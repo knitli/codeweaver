@@ -34,6 +34,11 @@ class SearchStrategy(BaseEnum):
     LANGUAGE_SEARCH = "language_search"
     SYMBOL_SEARCH = "symbol_search"
     TEXT_SEARCH = "text_search"
+    HYBRID_SEARCH = "hybrid_search"
+    SEMANTIC_RERANK = "semantic_rerank"
+    SPARSE_ONLY = "sparse_only"
+    DENSE_ONLY = "dense_only"
+    KEYWORD_FALLBACK = "keyword_fallback"
 
 
 class CodeMatchType(BaseEnum):

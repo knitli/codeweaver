@@ -247,11 +247,7 @@ class SemanticChunker(BaseChunker):
         return self._convert_nodes_to_chunks(nodes, file_path, source_id, governor)
 
     def _convert_nodes_to_chunks(
-        self,
-        nodes: list[AstThing[SgNode]],
-        file_path: Path | None,
-        source_id: Any,
-        governor: Any,
+        self, nodes: list[AstThing[SgNode]], file_path: Path | None, source_id: Any, governor: Any
     ) -> list[CodeChunk]:
         """Convert AST nodes to code chunks with size enforcement.
 
@@ -303,11 +299,7 @@ class SemanticChunker(BaseChunker):
         return unique_chunks
 
     def _track_statistics(
-        self,
-        file_path: Path | None,
-        statistics: Any,
-        chunks: list[CodeChunk],
-        start_time: float,
+        self, file_path: Path | None, statistics: Any, chunks: list[CodeChunk], start_time: float
     ) -> None:
         """Track file operations and chunk metrics.
 
@@ -319,9 +311,7 @@ class SemanticChunker(BaseChunker):
         """
         with contextlib.suppress(ValueError, OSError):
             if file_path and (ext_kind := ExtKind.from_file(file_path)):
-                statistics.add_file_operations_by_extkind([
-                    (file_path, ext_kind, "processed")
-                ])
+                statistics.add_file_operations_by_extkind([(file_path, ext_kind, "processed")])
         self._track_chunk_metrics(chunks, time.perf_counter() - start_time)
 
     def _track_skipped_file(self, file_path: Path | None, statistics: Any) -> None:
@@ -333,9 +323,7 @@ class SemanticChunker(BaseChunker):
         """
         with contextlib.suppress(ValueError, OSError):
             if file_path and (ext_kind := ExtKind.from_file(file_path)):
-                statistics.add_file_operations_by_extkind([
-                    (file_path, ext_kind, "skipped")
-                ])
+                statistics.add_file_operations_by_extkind([(file_path, ext_kind, "skipped")])
 
     def _handle_edge_cases(
         self, content: str, file_path: Path | None, source_id: UUID7

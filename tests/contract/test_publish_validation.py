@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 import urllib.error
 import urllib.request
+
 from pathlib import Path
 
 import pytest
@@ -21,16 +22,13 @@ def package_info():
 
     # Build package
     import shutil
+
     dist_dir = project_root / "dist"
     if dist_dir.exists():
         shutil.rmtree(dist_dir)
 
     result = subprocess.run(
-        ["uv", "build"],
-        capture_output=True,
-        text=True,
-        check=False,
-        cwd=project_root,
+        ["uv", "build"], capture_output=True, text=True, check=False, cwd=project_root
     )
 
     if result.returncode != 0:
@@ -88,10 +86,7 @@ def test_validate_publish_output_testpypi(package_info: dict):
 
         # Create virtual environment
         result = subprocess.run(
-            ["python", "-m", "venv", str(venv_path)],
-            capture_output=True,
-            text=True,
-            check=False,
+            ["python", "-m", "venv", str(venv_path)], capture_output=True, text=True, check=False
         )
         assert result.returncode == 0, f"Failed to create venv: {result.stderr}"
 
@@ -119,8 +114,9 @@ def test_validate_publish_output_testpypi(package_info: dict):
 
         # Verify installed version matches expected
         installed_version = result.stdout.strip()
-        assert installed_version == version, \
+        assert installed_version == version, (
             f"Version mismatch: expected {version}, got {installed_version}"
+        )
 
 
 @pytest.mark.integration
@@ -156,10 +152,7 @@ def test_validate_publish_output_pypi(package_info: dict):
 
         # Create virtual environment
         result = subprocess.run(
-            ["python", "-m", "venv", str(venv_path)],
-            capture_output=True,
-            text=True,
-            check=False,
+            ["python", "-m", "venv", str(venv_path)], capture_output=True, text=True, check=False
         )
         assert result.returncode == 0, f"Failed to create venv: {result.stderr}"
 
@@ -179,8 +172,9 @@ def test_validate_publish_output_pypi(package_info: dict):
 
         # Verify installed version matches expected
         installed_version = result.stdout.strip()
-        assert installed_version == version, \
+        assert installed_version == version, (
             f"Version mismatch: expected {version}, got {installed_version}"
+        )
 
 
 @pytest.mark.integration
@@ -190,16 +184,13 @@ def test_local_installation():
 
     # Build package
     import shutil
+
     dist_dir = project_root / "dist"
     if dist_dir.exists():
         shutil.rmtree(dist_dir)
 
     result = subprocess.run(
-        ["uv", "build"],
-        capture_output=True,
-        text=True,
-        check=False,
-        cwd=project_root,
+        ["uv", "build"], capture_output=True, text=True, check=False, cwd=project_root
     )
 
     if result.returncode != 0:
@@ -218,10 +209,7 @@ def test_local_installation():
 
         # Create virtual environment
         result = subprocess.run(
-            ["python", "-m", "venv", str(venv_path)],
-            capture_output=True,
-            text=True,
-            check=False,
+            ["python", "-m", "venv", str(venv_path)], capture_output=True, text=True, check=False
         )
         assert result.returncode == 0, f"Failed to create venv: {result.stderr}"
 
@@ -230,10 +218,7 @@ def test_local_installation():
 
         # Install from local wheel
         result = subprocess.run(
-            [str(pip), "install", str(wheel_path)],
-            capture_output=True,
-            text=True,
-            check=False,
+            [str(pip), "install", str(wheel_path)], capture_output=True, text=True, check=False
         )
         assert result.returncode == 0, f"Installation failed: {result.stderr}"
 

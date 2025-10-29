@@ -9,19 +9,28 @@ from __future__ import annotations
 import asyncio
 import importlib
 import logging
+import time
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from functools import cache
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, cast, overload
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, cast, overload, override
 
 from pydantic import ConfigDict, PositiveInt, TypeAdapter
 from pydantic import ValidationError as PydanticValidationError
 from pydantic.main import IncEx
 from pydantic_core import from_json
+from tenacity import (
+    RetryError,
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from codeweaver.core.chunks import CodeChunk, StructuredDataInput
+from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.models import BasedModel
 from codeweaver.exceptions import RerankingProviderError, ValidationError
 from codeweaver.providers.provider import Provider
@@ -33,6 +42,18 @@ if TYPE_CHECKING:
     from codeweaver.common.statistics import SessionStatistics
 
 logger = logging.getLogger(__name__)
+
+
+class CircuitBreakerState(BaseEnum):
+    """Circuit breaker states for provider resilience."""
+
+    CLOSED = "closed"  # Normal operation
+    OPEN = "open"  # Failing, rejecting requests
+    HALF_OPEN = "half_open"  # Testing if service recovered
+
+
+class CircuitBreakerOpenError(Exception):
+    """Raised when circuit breaker is open and rejecting requests."""
 
 
 class RerankingResult(NamedTuple):
@@ -126,6 +147,12 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     _chunk_store: tuple[CodeChunk, ...] | None = None
     """Stores the chunks while they are processed. We do this because we don't send the whole chunk to the provider, so we save them for later, like squirrels."""
 
+    # Circuit breaker state tracking
+    _circuit_state: CircuitBreakerState = CircuitBreakerState.CLOSED
+    _failure_count: int = 0
+    _last_failure_time: float | None = None
+    _circuit_open_duration: float = 30.0  # 30 seconds as per spec FR-008a
+
     def __init__(
         self,
         client: RerankingClient,
@@ -144,6 +171,11 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         self._top_n = cast(int, self.kwargs.get("top_n", top_n))
         logger.debug("Initialized RerankingProvider with top_n=%d", self._top_n)
 
+        # Initialize circuit breaker state
+        self._circuit_state = CircuitBreakerState.CLOSED
+        self._failure_count = 0
+        self._last_failure_time = None
+
         self._initialize()
 
     def _initialize(self) -> None:
@@ -153,6 +185,96 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     def top_n(self) -> PositiveInt:
         """Get the top_n value."""
         return self._top_n
+
+    def _check_circuit_breaker(self) -> None:
+        """Check circuit breaker state before making API calls.
+
+        Raises:
+            CircuitBreakerOpenError: If circuit breaker is open.
+        """
+        current_time = time.time()
+
+        if self._circuit_state == CircuitBreakerState.OPEN:
+            if (
+                self._last_failure_time
+                and (current_time - self._last_failure_time) > self._circuit_open_duration
+            ):
+                # Transition to half-open to test recovery
+                logger.info(
+                    "Circuit breaker transitioning to half-open state for %s", self._provider
+                )
+                self._circuit_state = CircuitBreakerState.HALF_OPEN
+            else:
+                raise CircuitBreakerOpenError(
+                    f"Circuit breaker is open for {self._provider}. Failing fast."
+                )
+
+    def _record_success(self) -> None:
+        """Record successful API call and reset circuit breaker if needed."""
+        if self._circuit_state in (CircuitBreakerState.HALF_OPEN, CircuitBreakerState.OPEN):
+            logger.info("Circuit breaker closing for %s after successful operation", self._provider)
+        self._circuit_state = CircuitBreakerState.CLOSED
+        self._failure_count = 0
+        self._last_failure_time = None
+
+    def _record_failure(self) -> None:
+        """Record failed API call and update circuit breaker state."""
+        self._failure_count += 1
+        self._last_failure_time = time.time()
+
+        if self._failure_count >= 3:  # 3 failures threshold as per spec FR-008a
+            logger.warning(
+                "Circuit breaker opening for %s after %d consecutive failures",
+                self._provider,
+                self._failure_count,
+            )
+            self._circuit_state = CircuitBreakerState.OPEN
+
+    @property
+    def circuit_breaker_state(self) -> str:
+        """Get current circuit breaker state for health monitoring."""
+        return self._circuit_state.value
+
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(
+            multiplier=1, min=1, max=16
+        ),  # 1s, 2s, 4s, 8s, 16s as per spec FR-009c
+        retry=retry_if_exception_type((ConnectionError, TimeoutError, OSError)),
+        reraise=True,
+    )
+    async def _execute_rerank_with_retry(
+        self,
+        query: str,
+        documents: Sequence[str],
+        *,
+        top_n: int = 40,
+        **kwargs: Mapping[str, Any] | None,
+    ) -> Any:
+        """Wrapper around _execute_rerank with retry logic and circuit breaker.
+
+        Applies exponential backoff (1s, 2s, 4s, 8s, 16s) and circuit breaker pattern.
+        """
+        self._check_circuit_breaker()
+
+        try:
+            result = await self._execute_rerank(query, documents, top_n=top_n, **kwargs)
+            self._record_success()
+        except (ConnectionError, TimeoutError, OSError) as e:
+            self._record_failure()
+            logger.warning(
+                "Reranking API call failed for %s: %s (attempt %d/5)",
+                self._provider,
+                str(e),
+                self._failure_count,
+            )
+            raise
+        except Exception as e:
+            # Non-retryable errors don't affect circuit breaker
+            logger.exception("Non-retryable error in reranking: %s", str(e))
+            raise
+        else:
+            return result
 
     @abstractmethod
     async def _execute_rerank(
@@ -178,9 +300,25 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         transformed_docs = CodeChunk.chunkify(documents)
         self._chunk_store = tuple(transformed_docs)
         processed_docs = self._input_transformer(transformed_docs)
-        reranked = await self._execute_rerank(
-            query, processed_docs, top_n=self.top_n, **processed_kwargs
-        )
+
+        try:
+            # Use retry wrapper instead of calling _execute_rerank directly
+            reranked = await self._execute_rerank_with_retry(
+                query, processed_docs, top_n=self.top_n, **processed_kwargs
+            )
+        except CircuitBreakerOpenError as e:
+            logger.warning("Circuit breaker open for reranking: %s", str(e))
+            # Return empty results when circuit breaker is open
+            return []
+        except RetryError as e:
+            logger.exception("All retry attempts exhausted for reranking: %s", str(e))
+            # Return empty results when all retries exhausted
+            return []
+        except Exception as e:
+            logger.exception("Reranking failed with error: %s", str(e))
+            # Return empty results on other errors
+            return []
+
         loop = asyncio.get_event_loop()
         processed_results = self._process_results(reranked, processed_docs)
         if len(processed_results) > self.top_n:
@@ -337,7 +475,8 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
                 ],
             ) from e
 
-    def model_dump_json(
+    @override
+    def model_dump_json(  # type: ignore
         self,
         *,
         indent: int | None = None,

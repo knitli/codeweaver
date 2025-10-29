@@ -6,6 +6,7 @@
 """Contract test: validate package metadata with twine check."""
 
 import subprocess
+
 from pathlib import Path
 
 import pytest
@@ -19,16 +20,12 @@ def build_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
     # Clean and build
     import shutil
+
     dist_dir = project_root / "dist"
     if dist_dir.exists():
         shutil.rmtree(dist_dir)
 
-    result = subprocess.run(
-        ["uv", "build"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    result = subprocess.run(["uv", "build"], capture_output=True, text=True, check=False)
 
     if result.returncode != 0:
         pytest.skip(f"Build failed, skipping metadata validation: {result.stderr}")
@@ -61,11 +58,7 @@ def test_validate_twine_check(build_artifacts: Path):
         pytest.fail(f"Expected 2 artifacts, found {len(artifacts)}")
 
     # Install twine if not available
-    subprocess.run(
-        ["uv", "pip", "install", "twine"],
-        capture_output=True,
-        check=False,
-    )
+    subprocess.run(["uv", "pip", "install", "twine"], capture_output=True, check=False)
 
     # Run twine check
     result = subprocess.run(
@@ -83,7 +76,9 @@ def test_validate_twine_check(build_artifacts: Path):
     stdout_lines = result.stdout.strip().split("\n")
     passed_lines = [line for line in stdout_lines if "PASSED" in line]
 
-    assert len(passed_lines) == 2, f"Expected 2 PASSED results, found {len(passed_lines)}: {stdout_lines}"
+    assert len(passed_lines) == 2, (
+        f"Expected 2 PASSED results, found {len(passed_lines)}: {stdout_lines}"
+    )
 
     # Verify no warnings or errors
     assert "WARNING" not in result.stdout, f"Metadata warnings detected: {result.stdout}"
@@ -104,14 +99,7 @@ def test_metadata_completeness():
     project = pyproject.get("project", {})
 
     # Required PEP 621 fields
-    required_fields = [
-        "name",
-        "description",
-        "readme",
-        "requires-python",
-        "license",
-        "authors",
-    ]
+    required_fields = ["name", "description", "readme", "requires-python", "license", "authors"]
 
     for field in required_fields:
         assert field in project, f"Required field '{field}' missing from [project]"
@@ -121,5 +109,9 @@ def test_metadata_completeness():
 
     # Verify build system
     build_system = pyproject.get("build-system", {})
-    assert "hatchling" in str(build_system.get("requires", [])), "hatchling must be in build-system.requires"
-    assert build_system.get("build-backend") == "hatchling.build", "Build backend must be hatchling.build"
+    assert "hatchling" in str(build_system.get("requires", [])), (
+        "hatchling must be in build-system.requires"
+    )
+    assert build_system.get("build-backend") == "hatchling.build", (
+        "Build backend must be hatchling.build"
+    )

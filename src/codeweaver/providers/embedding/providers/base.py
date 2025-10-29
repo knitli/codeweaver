@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator, Mapping, Sequence
+from enum import Enum
 from types import ModuleType
 from typing import (
     TYPE_CHECKING,
@@ -29,6 +31,13 @@ from uuid import UUID
 
 from pydantic import UUID7, ConfigDict
 from pydantic.main import IncEx
+from tenacity import (
+    RetryError,
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from codeweaver.common.utils import LazyImport, lazy_import, uuid7
 from codeweaver.core.chunks import CodeChunk, SerializedCodeChunk, StructuredDataInput
@@ -54,6 +63,18 @@ _get_statistics: LazyImport[SessionStatistics] = lazy_import(
 )
 
 logger = logging.getLogger(__name__)
+
+
+class CircuitBreakerState(Enum):
+    """Circuit breaker states for provider resilience."""
+
+    CLOSED = "closed"  # Normal operation
+    OPEN = "open"  # Failing, rejecting requests
+    HALF_OPEN = "half_open"  # Testing if service recovered
+
+
+class CircuitBreakerOpenError(Exception):
+    """Raised when circuit breaker is open and rejecting requests."""
 
 
 def _get_registry() -> EmbeddingRegistry:
@@ -137,6 +158,12 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     Note that we're only storing the hash keys and batch ID values, not the full CodeChunk objects. This keeps the store size small. We can lookup by batch ID in the main `_store` if needed, or if it has been ejected, in the `_store`'s `_trash_heap`. `SimpleTypedStore`, the parent class, handles that for us with a simple "get" method.
     """
 
+    # Circuit breaker state tracking
+    _circuit_state: CircuitBreakerState = CircuitBreakerState.CLOSED
+    _failure_count: int = 0
+    _last_failure_time: float | None = None
+    _circuit_open_duration: float = 30.0  # 30 seconds as per spec FR-008a
+
     def __init__(
         self,
         client: EmbeddingClient,
@@ -154,6 +181,12 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         self._add_kwargs(kwargs or {})
         """Add any user-provided kwargs to the embedding provider, after we merge the defaults together."""
         self._store: UUIDStore[list] = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)  # type: ignore # 3mb limit
+
+        # Initialize circuit breaker state
+        self._circuit_state = CircuitBreakerState.CLOSED
+        self._failure_count = 0
+        self._last_failure_time = None
+
         self._initialize()
 
     def _add_kwargs(self, kwargs: dict[str, Any]) -> None:
@@ -180,6 +213,91 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     @abstractmethod
     def base_url(self) -> str | None:
         """Get the base URL of the embedding provider, if any."""
+
+    def _check_circuit_breaker(self) -> None:
+        """Check circuit breaker state before making API calls.
+
+        Raises:
+            CircuitBreakerOpenError: If circuit breaker is open.
+        """
+        current_time = time.time()
+
+        if self._circuit_state == CircuitBreakerState.OPEN:
+            if (
+                self._last_failure_time
+                and (current_time - self._last_failure_time) > self._circuit_open_duration
+            ):
+                # Transition to half-open to test recovery
+                logger.info(
+                    "Circuit breaker transitioning to half-open state for %s", self._provider
+                )
+                self._circuit_state = CircuitBreakerState.HALF_OPEN
+            else:
+                raise CircuitBreakerOpenError(
+                    f"Circuit breaker is open for {self._provider}. Failing fast."
+                )
+
+    def _record_success(self) -> None:
+        """Record successful API call and reset circuit breaker if needed."""
+        if self._circuit_state in (CircuitBreakerState.HALF_OPEN, CircuitBreakerState.OPEN):
+            logger.info("Circuit breaker closing for %s after successful operation", self._provider)
+        self._circuit_state = CircuitBreakerState.CLOSED
+        self._failure_count = 0
+        self._last_failure_time = None
+
+    def _record_failure(self) -> None:
+        """Record failed API call and update circuit breaker state."""
+        self._failure_count += 1
+        self._last_failure_time = time.time()
+
+        if self._failure_count >= 3:  # 3 failures threshold as per spec FR-008a
+            logger.warning(
+                "Circuit breaker opening for %s after %d consecutive failures",
+                self._provider,
+                self._failure_count,
+            )
+            self._circuit_state = CircuitBreakerState.OPEN
+
+    @property
+    def circuit_breaker_state(self) -> str:
+        """Get current circuit breaker state for health monitoring."""
+        return self._circuit_state.value
+
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(
+            multiplier=1, min=1, max=16
+        ),  # 1s, 2s, 4s, 8s, 16s as per spec FR-009c
+        retry=retry_if_exception_type((ConnectionError, TimeoutError, OSError)),
+        reraise=True,
+    )
+    async def _embed_documents_with_retry(
+        self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any] | None
+    ) -> list[list[float]] | list[list[int]]:
+        """Wrapper around _embed_documents with retry logic and circuit breaker.
+
+        Applies exponential backoff (1s, 2s, 4s, 8s, 16s) and circuit breaker pattern.
+        """
+        self._check_circuit_breaker()
+
+        try:
+            result = await self._embed_documents(documents, **kwargs)
+            self._record_success()
+        except (ConnectionError, TimeoutError, OSError) as e:
+            self._record_failure()
+            logger.warning(
+                "API call failed for %s: %s (attempt %d/5)",
+                self._provider,
+                str(e),
+                self._failure_count,
+            )
+            raise
+        except Exception as e:
+            # Non-retryable errors don't affect circuit breaker
+            logger.exception("Non-retryable error in embedding: %s", str(e))
+            raise
+        else:
+            return result
 
     @abstractmethod
     async def _embed_documents(
@@ -221,9 +339,18 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             is_old_batch = True
         chunks, cache_key = self._process_input(documents, is_old_batch=is_old_batch)  # type: ignore
         try:
+            # Use retry wrapper instead of calling _embed_documents directly
             results: (
                 Sequence[Sequence[float]] | Sequence[Sequence[int]]
-            ) = await self._embed_documents(tuple(chunks), **kwargs)
+            ) = await self._embed_documents_with_retry(tuple(chunks), **kwargs)
+        except CircuitBreakerOpenError as e:
+            # Circuit breaker open - return error immediately
+            logger.warning("Circuit breaker open for %s: %s", self._provider, str(e))
+            return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)  # type: ignore
+        except RetryError as e:
+            # All retry attempts exhausted
+            logger.exception("All retry attempts exhausted for %s: %s", self._provider, str(e))
+            return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)  # type: ignore
         except Exception as e:
             return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)  # type: ignore
         else:
@@ -234,6 +361,36 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                     embeddings=results,
                 )
             return results
+
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=1, min=1, max=16),  # 1s, 2s, 4s, 8s, 16s
+        retry=retry_if_exception_type((ConnectionError, TimeoutError, OSError)),
+        reraise=True,
+    )
+    async def _embed_query_with_retry(
+        self, query: Sequence[str], **kwargs: Mapping[str, Any] | None
+    ) -> list[list[float]] | list[list[int]]:
+        """Wrapper around _embed_query with retry logic and circuit breaker."""
+        self._check_circuit_breaker()
+
+        try:
+            result = await self._embed_query(query, **kwargs)
+            self._record_success()
+        except (ConnectionError, TimeoutError, OSError) as e:
+            self._record_failure()
+            logger.warning(
+                "Query embedding failed for %s: %s (attempt %d/5)",
+                self._provider,
+                str(e),
+                self._failure_count,
+            )
+            raise
+        except Exception as e:
+            logger.exception("Non-retryable error in query embedding: %s", str(e))
+            raise
+        else:
+            return result
 
     @abstractmethod
     async def _embed_query(
@@ -248,18 +405,20 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         processed_kwargs: Mapping[str, Any] = self._set_kwargs(self.query_kwargs, kwargs or {})
         queries: Sequence[str] = query if isinstance(query, list | tuple | set) else [query]  # pyright: ignore[reportAssignmentType]
         try:
-            results: Sequence[Sequence[float]] | Sequence[Sequence[int]] = await self._embed_query(
-                queries, **processed_kwargs
-            )  # pyright: ignore[reportUnknownVariableType, reportGeneralTypeIssues]
+            # Use retry wrapper instead of calling _embed_query directly
+            results: (
+                Sequence[Sequence[float]] | Sequence[Sequence[int]]
+            ) = await self._embed_query_with_retry(queries, **processed_kwargs)  # pyright: ignore[reportUnknownVariableType, reportGeneralTypeIssues]
+        except CircuitBreakerOpenError as e:
+            logger.warning("Circuit breaker open for query embedding: %s", str(e))
+            return self._handle_embedding_error(e, batch_id=None, documents=None, queries=queries)
+        except RetryError as e:
+            logger.exception("All retry attempts exhausted for query embedding: %s", str(e))
+            return self._handle_embedding_error(e, batch_id=None, documents=None, queries=queries)
         except Exception as e:
             return self._handle_embedding_error(e, batch_id=None, documents=None, queries=queries)
         else:
             return results
-
-    @property
-    @abstractmethod
-    def dimension(self) -> int:
-        """Get the size of the vector for the collection."""
 
     @property
     def client(self) -> EmbeddingClient:

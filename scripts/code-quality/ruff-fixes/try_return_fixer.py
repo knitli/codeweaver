@@ -158,8 +158,7 @@ def fix_try_returns(source_code: str) -> tuple[str, bool]:
         except Exception as e:
             print(f"❌ Error unparsing AST: {e}")
             return source_code, False
-    else:
-        return source_code, False
+    return source_code, False
 
 
 def process_file(file_path: Path) -> bool:

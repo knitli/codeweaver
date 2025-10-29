@@ -7,6 +7,7 @@
 
 import subprocess
 import tempfile
+
 from pathlib import Path
 
 import pytest
@@ -14,7 +15,9 @@ import pytest
 
 @pytest.mark.external_api
 @pytest.mark.network
-@pytest.mark.skip(reason="Requires package published to PyPI - run manually after production publish")
+@pytest.mark.skip(
+    reason="Requires package published to PyPI - run manually after production publish"
+)
 def test_install_from_pypi():
     """
     Smoke test for production PyPI installation.
@@ -40,10 +43,7 @@ def test_install_from_pypi():
 
         # Create virtual environment
         result = subprocess.run(
-            ["python", "-m", "venv", str(venv_path)],
-            capture_output=True,
-            text=True,
-            check=False,
+            ["python", "-m", "venv", str(venv_path)], capture_output=True, text=True, check=False
         )
         assert result.returncode == 0, f"Failed to create venv: {result.stderr}"
 
@@ -66,15 +66,13 @@ def test_install_from_pypi():
 
         # Verify version is semantic (not pre-release with +g hash)
         import re
-        assert re.match(r"^\d+\.\d+\.\d+", installed_version), \
+
+        assert re.match(r"^\d+\.\d+\.\d+", installed_version), (
             f"Production version should be clean semantic version, got: {installed_version}"
+        )
 
         # Basic functionality test
-        check_cmd = [
-            str(python),
-            "-c",
-            "import codeweaver; print('Package loaded successfully')",
-        ]
+        check_cmd = [str(python), "-c", "import codeweaver; print('Package loaded successfully')"]
         result = subprocess.run(check_cmd, capture_output=True, text=True, check=False)
         assert result.returncode == 0, f"Basic functionality check failed: {result.stderr}"
         assert "Package loaded successfully" in result.stdout

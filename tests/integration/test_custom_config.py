@@ -8,7 +8,6 @@ From quickstart.md:342-373
 Validates acceptance criteria spec.md:88
 """
 
-
 import pytest
 
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore

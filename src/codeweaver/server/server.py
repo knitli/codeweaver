@@ -270,6 +270,7 @@ class AppState(DataclassSerializationMixin):
         Field(description="Tuple of FastMCP middleware instances applied to the server"),
     ] = ()
     indexer: None = None
+    health_service: None = None
 
     def __post_init__(self) -> None:
         """Post-initialization to set the global state reference."""
@@ -310,6 +311,20 @@ def get_state() -> AppState:
     return _state
 
 
+def _get_health_service() -> Any:
+    """Get the health service instance."""
+    from codeweaver.server.health_service import HealthService
+
+    state = get_state()
+
+    return HealthService(
+        provider_registry=state.provider_registry,
+        statistics=state.statistics,
+        indexer=state.indexer,
+        startup_time=state.health.startup_time,
+    )
+
+
 @asynccontextmanager
 async def lifespan(
     app: FastMCP[AppState],
@@ -335,6 +350,7 @@ async def lifespan(
             services_registry=get_services_registry(),
             model_registry=get_model_registry(),
             middleware_stack=tuple(getattr(app, "middleware", ())),
+            health_service=_get_health_service(),
         )
         object.__setattr__(app, "state", state)
     state: AppState = app.state  # type: ignore
@@ -349,6 +365,7 @@ async def lifespan(
         console.print(f"{CODEWEAVER_PREFIX} [bold green]Ensuring services set up...[/bold green]")
         if not state.health:
             state.health.initialize()
+
         console.print(
             f"{CODEWEAVER_PREFIX} [bold aqua]Lifespan start actions complete, server initialized.[/bold aqua]"
         )
@@ -647,6 +664,7 @@ __all__ = (
     "HealthStatus",
     "ServerSetup",
     "build_app",
+    "get_health_info",
     "get_state",
     "lifespan",
 )

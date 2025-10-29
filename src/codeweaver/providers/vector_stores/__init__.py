@@ -76,8 +76,7 @@ def get_vector_store_provider(
         return MemoryVectorStore.model_construct(config=memory_config, _client=None)
 
     raise ValueError(
-        f"Unknown vector store provider: {provider_type}. "
-        f"Supported providers: 'qdrant', 'memory'"
+        f"Unknown vector store provider: {provider_type}. Supported providers: 'qdrant', 'memory'"
     )
 
 

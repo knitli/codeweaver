@@ -91,9 +91,10 @@ def clean_file(file_path: Path) -> bool:
             new_content = ast.unparse(new_tree)
             _ = file_path.write_text(new_content, encoding="utf-8")
             return True
-
     except (SyntaxError, UnicodeDecodeError) as e:
         print(f"Warning: Could not process {file_path}: {e}", file=sys.stderr)
+
+    else:
 
     return False
 

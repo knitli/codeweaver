@@ -746,9 +746,7 @@ class DelimiterChunker(BaseChunker):
                 return StringParseState(in_string=False, delimiter=None)
         return state
 
-    def _skip_comment_in_matching(
-        self, content: str, pos: int, content_len: int
-    ) -> int | None:
+    def _skip_comment_in_matching(self, content: str, pos: int, content_len: int) -> int | None:
         """Skip comment during delimiter matching.
 
         Args:

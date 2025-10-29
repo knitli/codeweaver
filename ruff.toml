@@ -31,6 +31,7 @@ exclude = [
     "site-packages",
     "venv",
     "typings",
+    "tests/fixtures/malformed.py",
 ]
 extend-include = ["*.ipynb"]
 

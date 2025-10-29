@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Edge case tests for SemanticChunker."""
 
-
 import pytest
 
 from codeweaver.core.language import SemanticSearchLanguage

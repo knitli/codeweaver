@@ -7,6 +7,7 @@
 
 import subprocess
 import tempfile
+
 from pathlib import Path
 
 import pytest
@@ -36,21 +37,17 @@ def test_install_from_testpypi():
     - Clean Python environment
     """
     # Get expected version from current build
-    project_root = Path(__file__).parent.parent.parent
+    Path(__file__).parent.parent.parent
 
     # You would get this from the published version
     # For manual testing, replace with actual version
-    expected_version = "0.0.1"  # TODO: Get from environment or parameter
 
     with tempfile.TemporaryDirectory() as tmpdir:
         venv_path = Path(tmpdir) / "venv"
 
         # Create virtual environment
         result = subprocess.run(
-            ["python", "-m", "venv", str(venv_path)],
-            capture_output=True,
-            text=True,
-            check=False,
+            ["python", "-m", "venv", str(venv_path)], capture_output=True, text=True, check=False
         )
         assert result.returncode == 0, f"Failed to create venv: {result.stderr}"
 
@@ -80,11 +77,7 @@ def test_install_from_testpypi():
         print(f"Installed version: {installed_version}")
 
         # Basic functionality test - verify package structure
-        check_cmd = [
-            str(python),
-            "-c",
-            "import codeweaver; print('Package loaded successfully')",
-        ]
+        check_cmd = [str(python), "-c", "import codeweaver; print('Package loaded successfully')"]
         result = subprocess.run(check_cmd, capture_output=True, text=True, check=False)
         assert result.returncode == 0, f"Basic functionality check failed: {result.stderr}"
         assert "Package loaded successfully" in result.stdout

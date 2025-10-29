@@ -155,7 +155,6 @@ class ChunkerSelector:
                     e,
                     extra={"file_path": str(file.path), "language": str(language)},
                 )
-
         # Delimiter fallback for unsupported languages
         language_str = language.value if isinstance(language, SemanticSearchLanguage) else language
         logger.info(

@@ -192,21 +192,84 @@ async def state_info(_request: Request) -> PlainTextResponse:
 
 @timed_http("health")
 async def health(_request: Request) -> PlainTextResponse:
-    """Return current health information as JSON."""
-    info = health_info()
+    """Return enhanced health information as JSON (FR-010-Enhanced).
+
+    Provides comprehensive system health including:
+    - Overall status (healthy/degraded/unhealthy)
+    - Indexing progress and state
+    - Service health for all providers
+    - Statistics on indexed content and queries
+    """
+    from codeweaver.server import get_state
+
     try:
-        return PlainTextResponse(content=info.report(), media_type="application/json")
-    except Exception as e:
-        _logger.exception("Failed to update health status")
+        state = get_state()
+        if state.health_service is None:
+            # Fallback to basic health if service not initialized
+            info = health_info()
+            return PlainTextResponse(content=info.report(), media_type="application/json")
+
+        # Get health response from health service
+        health_response = await state.health_service.get_health_response()
         return PlainTextResponse(
-            content=to_json({"error": f"Failed to update health status: {e}"}),
-            status_code=500,
-            media_type="application/json",
+            content=health_response.model_dump_json(), media_type="application/json"
+        )
+    except Exception:
+        _logger.exception("Failed to get health status")
+        # Return unhealthy status on error
+
+        from codeweaver.server.health_models import (
+            EmbeddingProviderServiceInfo,
+            HealthResponse,
+            IndexingInfo,
+            IndexingProgressInfo,
+            RerankerServiceInfo,
+            ServicesInfo,
+            SparseEmbeddingServiceInfo,
+            StatisticsInfo,
+            VectorStoreServiceInfo,
+        )
+
+        error_response = HealthResponse.create_with_current_timestamp(
+            status="unhealthy",
+            uptime_seconds=0,
+            indexing=IndexingInfo(
+                state="error",
+                last_indexed=None,
+                progress=IndexingProgressInfo(
+                    files_discovered=0,
+                    files_processed=0,
+                    chunks_created=0,
+                    errors=0,
+                    current_file=None,
+                    start_time=None,
+                    estimated_completion=None,
+                ),
+            ),
+            services=ServicesInfo(
+                vector_store=VectorStoreServiceInfo(status="down", latency_ms=0),
+                embedding_provider=EmbeddingProviderServiceInfo(
+                    status="down", model="unknown", latency_ms=0, circuit_breaker_state="open"
+                ),
+                sparse_embedding=SparseEmbeddingServiceInfo(status="down", provider="unknown"),
+                reranker=RerankerServiceInfo(status="down", model="unknown", latency_ms=0),
+            ),
+            statistics=StatisticsInfo(
+                total_chunks_indexed=0,
+                total_files_indexed=0,
+                languages_indexed=[],
+                index_size_mb=0,
+                queries_processed=0,
+                avg_query_latency_ms=0,
+            ),
+        )
+        return PlainTextResponse(
+            content=error_response.model_dump_json(), status_code=503, media_type="application/json"
         )
 
 
 def setup_middleware(
-    middleware: Container[type[Middleware]], middleware: MiddlewareOptions
+    middleware: Container[type[Middleware]], middleware_settings: MiddlewareOptions
 ) -> Container[Middleware]:
     """Setup middleware for the application."""
     # Apply middleware settings
@@ -215,15 +278,15 @@ def setup_middleware(
         mw: type[Middleware]  # type: ignore
         match mw.__name__:  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
             case "ErrorHandlingMiddleware":
-                mw = mw(**middleware.get("error_handling", {}))  # type: ignore[reportCallIssue]
+                mw = mw(**middleware_settings.get("error_handling", {}))  # type: ignore[reportCallIssue]
             case "RetryMiddleware":
-                mw = mw(**middleware.get("retry", {}))  # type: ignore[reportCallIssue]
+                mw = mw(**middleware_settings.get("retry", {}))  # type: ignore[reportCallIssue]
             case "RateLimitingMiddleware":
-                mw = mw(**middleware.get("rate_limiting", {}))  # type: ignore[reportCallIssue]
+                mw = mw(**middleware_settings.get("rate_limiting", {}))  # type: ignore[reportCallIssue]
             case "LoggingMiddleware" | "StructuredLoggingMiddleware":
-                mw = mw(**middleware.get("logging", {}))  # type: ignore[reportCallIssue]
+                mw = mw(**middleware_settings.get("logging", {}))  # type: ignore[reportCallIssue]
             case _:  # pyright: ignore[reportUnknownVariableType]
-                if any_settings := middleware.get(mw.__name__.lower()):  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
+                if any_settings := middleware_settings.get(mw.__name__.lower()):  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
                     mw = mw(**any_settings)  # type: ignore[reportCallIssue, reportUnknownVariableType]
                 else:
                     mw = mw()  # type: ignore[reportCallIssue, reportUnknownVariableType]
@@ -259,7 +322,7 @@ def register_tool(app: FastMCP[AppState]) -> FastMCP[AppState]:
 # Registration entrypoint
 # -------------------------
 async def register_app_bindings(
-    app: FastMCP[AppState], middleware: set[Middleware], middleware: MiddlewareOptions
+    app: FastMCP[AppState], middleware: set[Middleware], middleware_settings: MiddlewareOptions
 ) -> tuple[FastMCP[AppState], set[Middleware]]:
     """Register application bindings for tools and routes."""
     # Routes
@@ -274,14 +337,16 @@ async def register_app_bindings(
     app.custom_route("/health", methods=["GET"], name="health", include_in_schema=True)(health)  # type: ignore[arg-type]
     # todo: add status endpoint (more what I'm doing right now/progress than health)
 
-    middleware = setup_middleware(cast(Container[type[Middleware]], middleware), middleware)  # pyright: ignore[reportAssignmentType]
+    middleware = setup_middleware(
+        cast(Container[type[Middleware]], middleware), middleware_settings
+    )  # pyright: ignore[reportAssignmentType]
     middleware.add(
         StatisticsMiddleware(
             statistics=statistics(),
-            logger=cast(dict, middleware.get("logging", {})).get(  # type: ignore[unknown-attribute]
+            logger=cast(dict, middleware_settings.get("logging", {})).get(  # type: ignore[unknown-attribute]
                 "logger", logging.getLogger(__name__)
             ),
-            log_level=cast(dict, middleware.get("logging", {})).get("log_level", 20),  # type: ignore[unknown-attribute]
+            log_level=cast(dict, middleware_settings.get("logging", {})).get("log_level", 20),  # type: ignore[unknown-attribute]
         )
     )
     return app, middleware

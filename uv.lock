@@ -663,6 +663,7 @@ dependencies = [
     { name = "qdrant-client" },
     { name = "rich" },
     { name = "rignore" },
+    { name = "tenacity" },
     { name = "textcase" },
     { name = "tiktoken" },
     { name = "tomli-w" },
@@ -907,6 +908,7 @@ source-tavily = [
 
 [package.dev-dependencies]
 all-dev = [
+    { name = "black" },
     { name = "copychat" },
     { name = "dirty-equals" },
     { name = "hatchling" },
@@ -1132,6 +1134,7 @@ requires-dist = [
     { name = "sentence-transformers", extras = ["onnx"], marker = "extra == 'all'" },
     { name = "sentence-transformers", extras = ["onnx-gpu"], marker = "extra == 'all-gpu'" },
     { name = "sentence-transformers", extras = ["onnx-gpu"], marker = "extra == 'provider-sentence-transformers-gpu'" },
+    { name = "tenacity", specifier = ">=9.1.2" },
     { name = "textcase", specifier = ">=0.4.5" },
     { name = "textcase", marker = "extra == 'all'" },
     { name = "textcase", marker = "extra == 'recommended'" },
@@ -1199,6 +1202,7 @@ provides-extras = ["all", "all-gpu", "auth-eunomia", "auth-permitio", "cli", "pr
 
 [package.metadata.requires-dev]
 all-dev = [
+    { name = "black" },
     { name = "copychat" },
     { name = "dirty-equals" },
     { name = "hatchling" },

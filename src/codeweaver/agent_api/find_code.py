@@ -26,12 +26,22 @@ For example, your agent might say:
 
 from __future__ import annotations
 
+import logging
+import time
+
 from pathlib import Path
 from typing import NamedTuple
 
 from pydantic import NonNegativeInt, PositiveInt
 
+from codeweaver.agent_api.intent import INTENT_TO_AGENT_TASK, IntentType, detect_intent
+from codeweaver.agent_api.models import FindCodeResponseSummary, SearchStrategy
+from codeweaver.common.registry import get_provider_registry
 from codeweaver.core.spans import Span
+from codeweaver.semantic.classifications import AgentTask
+
+
+logger = logging.getLogger(__name__)
 
 
 class MatchedSection(NamedTuple):
@@ -45,189 +55,224 @@ class MatchedSection(NamedTuple):
     chunk_number: PositiveInt | None = None
 
 
-# Temporary stub for find_code during refactoring
 async def find_code(
     query: str,
-    *,
-    intent: str | None = None,
-    token_limit: int = 10000,
-    include_tests: bool = False,
-    focus_languages: tuple[str, ...] | None = None,
-    max_results: int = 50,
-) -> dict:
-    """Stub implementation of find_code tool during refactoring.
-
-    Returns a placeholder response indicating the tool is temporarily disabled.
-    """
-    return {
-        "matches": [],
-        "summary": "find_code tool temporarily disabled during refactoring",
-        "query": query,
-        "total_matches": 0,
-        "token_count": 0,
-    }
-
-
-__all__ = ("MatchedSection", "find_code")
-
-
-# TODO: WHY IS THIS COMMENTED OUT? ... here's why:
-# I commented this out because it's a remanent of the old architecture. It needs to be re-integrated into the new architecture.
-# This was written before:
-# 1) Code Chunk existed,
-# and 2) the new File Discovery Service and Indexer existed.
-#
-"""
-async def find_code(
-    query: str,
-    settings: DictView[CodeWeaverSettingsDict],
     *,
     intent: IntentType | None = None,
     token_limit: int = 10000,
     include_tests: bool = False,
-    focus_languages: tuple[SemanticSearchLanguage, ...] | Sequence[str] | None = None,
-    max_results: PositiveInt = 50,
-    statistics: SessionStatistics | None = None,
+    focus_languages: tuple[str, ...] | None = None,
+    max_results: int = 50,
 ) -> FindCodeResponseSummary:
+    """Find relevant code based on semantic search with intent-driven ranking.
 
+    This is the main entry point for the CodeWeaver search pipeline:
+    1. Intent detection (keyword-based for v0.1)
+    2. Query embedding (dense + sparse)
+    3. Hybrid vector search
+    4. Apply static dense/sparse weights
+    5. Rerank (if provider available)
+    6. Rescore with semantic importance weights
+    7. Sort, limit, and build response
+
+    Args:
+        query: Natural language search query
+        intent: Optional explicit intent (if None, will be detected)
+        token_limit: Maximum tokens to return (default: 10000)
+        include_tests: Whether to include test files in results
+        focus_languages: Optional language filter
+        max_results: Maximum number of results to return (default: 50)
+
+    Returns:
+        FindCodeResponseSummary with ranked matches and metadata
+
+    Examples:
+        >>> response = await find_code("how does authentication work")
+        >>> response.query_intent
+        IntentType.UNDERSTAND
+
+        >>> response = await find_code("fix login bug", intent=IntentType.DEBUG)
+        >>> response.search_strategy
+        (SearchStrategy.HYBRID_SEARCH, SearchStrategy.SEMANTIC_RERANK)
+    """
     start_time = time.time()
+    strategies_used: list[SearchStrategy] = []
+
     try:
-        discovery_service = FileDiscoveryService(settings)
-        discovered_files, _filtered_files = await discovery_service.get_discovered_files()
-        if statistics:
-            for file in discovered_files:
-                statistics.add_file_operation(file.path, "retrieved")
-        if focus_languages:
-            test_languages: set[str] = {str(lang) for lang in focus_languages}
-            focus_filtered_languages: list[DiscoveredFile] = [
-                file for file in discovered_files if str(file.ext_kind.language) in test_languages
-            ]
-            discovered_files = focus_filtered_languages
-        matches = await basic_text_search(query, discovered_files, settings, token_limit)
-        execution_time_ms = (time.time() - start_time) * 1000
-        if statistics:
-            processed_files = {match.file.path for match in matches}
-            for file_path in processed_files:
-                statistics.add_file_operation(file_path, "processed")
-            total_tokens = sum(
-                estimate_tokens(cast(str, match.content.serialize_for_embedding()))
-                for match in matches
-            )
-            statistics.add_token_usage(search_results=total_tokens)
-    except Exception as e:
-        raise QueryError(
-            f"Failed to execute find_code query: {query}",
-            details={"error": str(e)},
-            suggestions=[
-                "Check that the query is valid",
-                "Ensure the project directory is accessible",
-                "Try a simpler query",
-            ],
-        ) from e
-    else:
-        return FindCodeResponseSummary(
-            matches=matches,
-            summary=f"Found {len(matches)} matches for '{query}'",
-            query_intent=intent,
-            total_matches=len(matches),
-            token_count=sum(
-                estimate_tokens(cast(str, match.content.serialize_for_embedding()))
-                for match in matches
-            ),
-            total_results=max(len(matches), max_results),
-            execution_time_ms=execution_time_ms,
-            search_strategy=(SearchStrategy.FILE_DISCOVERY, SearchStrategy.TEXT_SEARCH),
-            languages_found=cast(
-                tuple[SemanticSearchLanguage | str, ...],
-                tuple(str(file.ext_kind.language) for file in discovered_files),
-            ),
-        )
-
-
-async def basic_text_search(
-    query: str,
-    files: Sequence[DiscoveredFile],
-    settings: DictView[CodeWeaverSettingsDict],
-    token_limit: int,
-) -> list[CodeMatch]:
-    matches: list[CodeMatch] = []
-    query_terms = query.lower().split()
-    current_token_count = 0
-    for file in files:
-        abs_path = file.path.absolute()
-        try:
-            content = abs_path.read_text(encoding="utf-8", errors="ignore")
-            if content and len(content) > 3 and (content[:3] == "ï»¿"):
-                continue
-        except OSError:
-            continue
-        content_lower = content.lower()
-        score = sum(content_lower.count(term) for term in query_terms)
-        if score > 0:
-            lines = content.split("\n")
-            if best_section := find_best_section(lines, query_terms):
-                match = CodeMatch(
-                    file=file,
-                    related_symbols=("",),
-                    content=CodeChunk.from_file(file)
-                    span=best_section.span,
-                    relevance_score=min(score / 10.0, 1.0),
-                    match_type=CodeMatchType.KEYWORD,
-                )
-                match_tokens = len(match.content.serialize_for_embedding())
-                if current_token_count + match_tokens <= token_limit:
-                    matches.append(match)
-                    current_token_count += match_tokens
-                else:
-                    break
-    matches.sort(key=lambda m: m.relevance_score, reverse=True)
-    return matches
-
-
-def find_best_section(lines: list[str], query_terms: list[str]) -> MatchedSection | None:
-    if not lines:
-        return None
-    best_score = 0
-    best_start = 0
-    best_end = min(50, len(lines))
-    window_size = 50
-    source_id = uuid7()
-    for start in range(0, len(lines), 25):
-        end = min(start + window_size, len(lines))
-        section_lines = lines[start:end]
-        section_content = "\n".join(section_lines).lower()
-        score = sum(section_content.count(term) for term in query_terms)
-        if score > best_score:
-            best_score = score
-            best_start = start
-            best_end = end
-    if best_score == 0:
-        return MatchedSection(
-            content="\n".join(lines[:window_size]),
-            span=Span(1, min(window_size, len(lines)), source_id),
-            score=0,
-        )
-    return MatchedSection(
-        content="\n".join(lines[best_start:best_end]),
-        span=Span(best_start + 1, best_end, source_id),
-        score=best_score,
-    )
-
-
-def get_surrounding_context(lines: list[str], span: Span, context_lines: int = 5) -> str:
-    start_line, end_line = span
-    start_idx = max(0, start_line - 1 - context_lines)
-    end_idx = min(len(lines), end_line + context_lines)
-    context_section = lines[start_idx:end_idx]
-    result_lines: list[str] = []
-    for i, line in enumerate(context_section):
-        line_num = start_idx + i + 1
-        if start_line <= line_num <= end_line:
-            result_lines.append(f"> {line_num:4d}: {line}")
+        # Step 1: Intent detection
+        if intent is not None:
+            query_intent_obj = None
+            intent_type = intent
+            confidence = 1.0
         else:
-            result_lines.append(f"  {line_num:4d}: {line}")
-    return "\n".join(result_lines)
+            query_intent_obj = detect_intent(query)
+            intent_type = query_intent_obj.intent_type
+            confidence = query_intent_obj.confidence
+
+        agent_task_str = INTENT_TO_AGENT_TASK.get(intent_type, "DEFAULT")
+        agent_task = AgentTask[agent_task_str]
+
+        logger.info("Query intent detected: %s (confidence: %.2f)", intent_type, confidence)
+
+        # Get provider registry
+        registry = get_provider_registry()
+
+        # Step 2: Embed query (dense + sparse)
+        dense_provider_enum = registry.get_embedding_provider(sparse=False)
+        sparse_provider_enum = registry.get_embedding_provider(sparse=True)
+
+        if not dense_provider_enum:
+            raise ValueError("No dense embedding provider configured")
+
+        dense_provider = registry.get_embedding_provider_instance(
+            dense_provider_enum, singleton=True
+        )
+        sparse_provider = (
+            registry.get_embedding_provider_instance(sparse_provider_enum, singleton=True)
+            if sparse_provider_enum
+            else None
+        )
+
+        # Embed query
+        dense_query_embedding = await dense_provider.embed_query(query)
+
+        sparse_query_embedding = None
+        if sparse_provider:
+            try:
+                sparse_query_embedding = await sparse_provider.embed_query(query)
+            except Exception as e:
+                logger.warning("Sparse embedding failed, continuing with dense only: %s", e)
+
+        # Step 3: Hybrid search
+        vector_store_enum = registry.get_vector_store_provider()
+        if not vector_store_enum:
+            raise ValueError("No vector store provider configured")
+
+        vector_store = registry.get_vector_store_provider_instance(
+            vector_store_enum, singleton=True
+        )
+
+        # Build query vector (unified search API)
+        if sparse_query_embedding:
+            strategies_used.append(SearchStrategy.HYBRID_SEARCH)
+            query_vector = {"dense": dense_query_embedding, "sparse": sparse_query_embedding}
+        else:
+            strategies_used.append(SearchStrategy.DENSE_ONLY)
+            logger.warning("Using dense-only search (sparse embeddings unavailable)")
+            query_vector = dense_query_embedding
+
+        # Execute search (returns max 100 results)
+        # Note: Filter support deferred to v0.2 - we over-fetch and filter post-search
+        candidates = await vector_store.search(vector=query_vector, query_filter=None)
+
+        # Post-search filtering (v0.1 simple approach)
+        if not include_tests:
+            candidates = [c for c in candidates if not getattr(c.chunk.file, "is_test", False)]
+        if focus_languages:
+            lang_set = set(focus_languages)
+            candidates = [
+                c for c in candidates if getattr(c.chunk.file, "language", None) in lang_set
+            ]
+
+        logger.info("Vector search returned %d candidates", len(candidates))
+
+        # Step 4: Apply static dense/sparse weights (v0.1)
+        if sparse_query_embedding and SearchStrategy.HYBRID_SEARCH in strategies_used:
+            for candidate in candidates:
+                # Static weights for v0.1: dense=0.65, sparse=0.35
+                candidate.score = (
+                    getattr(candidate, "dense_score", candidate.score) * 0.65
+                    + getattr(candidate, "sparse_score", 0.0) * 0.35
+                )
+
+        # Step 5: Rerank (optional, if provider configured)
+        reranker_enum = registry.get_reranking_provider()
+        if reranker_enum and len(candidates) > 0:
+            try:
+                reranker = registry.get_reranking_provider_instance(reranker_enum, singleton=True)
+                candidates = await reranker.rerank(query, candidates, top_k=max_results * 2)
+                strategies_used.append(SearchStrategy.SEMANTIC_RERANK)
+                logger.info("Reranked to %d candidates", len(candidates))
+            except Exception as e:
+                logger.warning("Reranking failed, continuing without: %s", e)
+
+        # Step 6: Rescore with semantic weights
+        for candidate in candidates:
+            base_score = getattr(candidate, "rerank_score", candidate.score)
+
+            # Apply semantic weighting if semantic class available
+            semantic_class = getattr(candidate.chunk, "semantic_class", None)
+            if semantic_class and hasattr(semantic_class, "importance_scores"):
+                importance = semantic_class.importance_scores.for_task(agent_task)
+
+                # Use appropriate importance dimension based on intent
+                if intent_type == IntentType.DEBUG:
+                    semantic_boost = importance.debugging
+                elif intent_type == IntentType.IMPLEMENT:
+                    semantic_boost = (importance.discovery + importance.modification) / 2
+                elif intent_type == IntentType.UNDERSTAND:
+                    semantic_boost = importance.comprehension
+                else:
+                    semantic_boost = importance.discovery
+
+                # Apply semantic boost (20% adjustment)
+                candidate.relevance_score = base_score * (1 + semantic_boost * 0.2)
+            else:
+                candidate.relevance_score = base_score
+
+        # Step 7: Sort and limit
+        candidates.sort(key=lambda x: x.relevance_score, reverse=True)
+        results = candidates[:max_results]
+
+        # Build response
+        execution_time_ms = (time.time() - start_time) * 1000
+
+        # Calculate token count
+        total_tokens = sum(
+            len(result.chunk.content.split()) * 1.3  # Rough token estimate
+            for result in results
+            if result.chunk and result.chunk.content
+        )
+        total_tokens = min(int(total_tokens), token_limit)
+
+        # Generate summary
+        if results:
+            top_files = list({r.file.path.name for r in results[:3]})
+            summary = (
+                f"Found {len(results)} relevant matches "
+                f"for {intent_type.value} query. "
+                f"Top results in: {', '.join(top_files[:3])}"
+            )
+        else:
+            summary = f"No matches found for query: '{query}'"
+
+        return FindCodeResponseSummary(
+            matches=results,
+            summary=summary[:1000],  # Enforce max_length
+            query_intent=intent_type,
+            total_matches=len(candidates),
+            total_results=len(results),
+            token_count=total_tokens,
+            execution_time_ms=execution_time_ms,
+            search_strategy=tuple(strategies_used),
+            languages_found=tuple({r.file.ext_kind.language for r in results if r.file.ext_kind}),
+        )
+
+    except Exception as e:
+        logger.exception("find_code failed")
+        # Return empty response on failure (graceful degradation)
+        execution_time_ms = (time.time() - start_time) * 1000
+        return FindCodeResponseSummary(
+            matches=[],
+            summary=f"Search failed: {str(e)[:500]}",
+            query_intent=intent,
+            total_matches=0,
+            total_results=0,
+            token_count=0,
+            execution_time_ms=execution_time_ms,
+            search_strategy=(SearchStrategy.KEYWORD_FALLBACK,),
+            languages_found=(),
+        )
 
 
-__all__ = ("MatchedSection", "find_best_section", "find_code", "get_surrounding_context")
-"""
+__all__ = ("MatchedSection", "find_code")

@@ -61,14 +61,14 @@ class SourcePatternFixer:
     def fix_redundant_exception_logging(self, content: str) -> str:
         """Fix TRY401: Remove redundant exception references in logging.exception calls."""
         patterns = [
-            # logging.exception(f"Error: {e}")
+            # logging.exception("Error: ")
             (r'(\.exception\([f"]?)([^"]*?)\{(e|exc|exception)\}([^"]*?)(["]?\))', r"\1\2\4\5"),
-            # logging.exception("Error: %s", e)
+            # logging.exception("Error: ")
             (
                 r'(\.exception\(["]?)([^"]*?)%s([^"]*?)(["]?),\s*(e|exc|exception)\s*\)',
                 r"\1\2\3\4)",
             ),
-            # logging.exception("Error occurred", e)  -> logging.exception("Error occurred")
+            # logging.exception("Error occurred")  -> logging.exception("Error occurred")
             (r'(\.exception\(["][^"]*?["])\s*,\s*(e|exc|exception)\s*\)', r"\1)"),
         ]
 
@@ -198,10 +198,8 @@ def fix_file(file_path: Path) -> bool:
             _ = file_path.write_text(new_content, encoding="utf-8")
             print(f"Applied fixes: {', '.join(sorted(fixer.fixes_applied))}")
             return True
-
     except (SyntaxError, UnicodeDecodeError) as e:
         print(f"Warning: Could not process {file_path}: {e}")
-
     return False
 
 

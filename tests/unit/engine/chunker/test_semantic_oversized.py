@@ -15,7 +15,6 @@ These tests verify that oversized files with chunkable children are successfully
 processed via recursive child node chunking.
 """
 
-
 import pytest
 
 from codeweaver.core.language import SemanticSearchLanguage

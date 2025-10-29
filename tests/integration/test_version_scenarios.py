@@ -8,6 +8,7 @@
 import re
 import shutil
 import subprocess
+
 from pathlib import Path
 
 import pytest
@@ -21,11 +22,7 @@ def get_version_from_build(project_root: Path) -> str:
         shutil.rmtree(dist_dir)
 
     result = subprocess.run(
-        ["uv", "build"],
-        cwd=project_root,
-        capture_output=True,
-        text=True,
-        check=False,
+        ["uv", "build"], cwd=project_root, capture_output=True, text=True, check=False
     )
 
     if result.returncode != 0:
@@ -78,7 +75,9 @@ def test_version_scenarios():
             text=True,
             check=False,
         )
-        commit_distance = int(distance_result.stdout.strip()) if distance_result.returncode == 0 else 0
+        commit_distance = (
+            int(distance_result.stdout.strip()) if distance_result.returncode == 0 else 0
+        )
     else:
         commit_distance = 1  # Assume not on tagged commit
 
@@ -102,23 +101,25 @@ def test_version_scenarios():
     if commit_distance == 0 and not is_dirty:
         # Scenario 1: Tagged release
         # Should be clean semantic version like "0.1.0"
-        assert re.match(r"^\d+\.\d+\.\d+$", version) or re.match(r"^\d+\.\d+\.\d+(a|b|rc)\d+$", version), \
-            f"Tagged release should have semantic version, got: {version}"
+        assert re.match(r"^\d+\.\d+\.\d+$", version) or re.match(
+            r"^\d+\.\d+\.\d+(a|b|rc)\d+$", version
+        ), f"Tagged release should have semantic version, got: {version}"
     else:
         # Scenario 2 or 3: Pre-release or dirty
         if is_dirty:
             # Scenario 3: Dirty working directory
-            assert "dirty" in version.lower(), \
+            assert "dirty" in version.lower(), (
                 f"Dirty working directory should include 'dirty', got: {version}"
+            )
         else:
             # Scenario 2: Pre-release (untagged commit)
-            assert re.search(r"(rc|dev|\+g)", version), \
+            assert re.search(r"(rc|dev|\+g)", version), (
                 f"Pre-release should include commit indicator, got: {version}"
+            )
 
     # All versions must be PEP 440 compliant
     pep440_pattern = r"^\d+\.\d+\.\d+([a-zA-Z0-9\.\+\-]*)?$"
-    assert re.match(pep440_pattern, version), \
-        f"Version must be PEP 440 compliant, got: {version}"
+    assert re.match(pep440_pattern, version), f"Version must be PEP 440 compliant, got: {version}"
 
     # Cleanup
     dist_dir = project_root / "dist"
@@ -137,11 +138,7 @@ def test_version_consistency_across_formats():
 
     # Build
     result = subprocess.run(
-        ["uv", "build"],
-        cwd=project_root,
-        capture_output=True,
-        text=True,
-        check=False,
+        ["uv", "build"], cwd=project_root, capture_output=True, text=True, check=False
     )
     assert result.returncode == 0, f"Build failed: {result.stderr}"
 
@@ -162,8 +159,9 @@ def test_version_consistency_across_formats():
     sdist_version = sdist_match.group(1)
 
     # Versions must match exactly
-    assert wheel_version == sdist_version, \
+    assert wheel_version == sdist_version, (
         f"Version mismatch: wheel={wheel_version}, sdist={sdist_version}"
+    )
 
     # Cleanup
     if dist_dir.exists():
