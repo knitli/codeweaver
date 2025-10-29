@@ -302,14 +302,33 @@ class CodeChunk(BasedModel):
         }
 
     def set_batch_keys(self, batch_keys: BatchKeys) -> Self:
-        """Set the batch keys for the code chunk."""
+        """Set the batch keys for the code chunk.
+        
+        Returns a new CodeChunk instance with updated batch keys.
+        Explicitly copies metadata dict to prevent shared references between instances.
+        
+        Args:
+            batch_keys: The batch keys to set
+            
+        Returns:
+            New CodeChunk instance with batch keys set
+        """
         if self._embedding_batches and batch_keys in self._embedding_batches:
             return self
+        
+        # Create explicit copy of metadata to avoid shared references
+        # Shallow copy the dict but keep nested objects (like SgNode) as references
+        # since they are read-only and cannot be pickled
+        metadata_copy = None
+        if self.metadata:
+            metadata_copy = {k: v for k, v in self.metadata.items()}
+        
         return self.model_copy(
             update={
                 "_embedding_batches": (*self._embedding_batches, batch_keys)
                 if self._embedding_batches
-                else (batch_keys,)
+                else (batch_keys,),
+                "metadata": metadata_copy,
             },
             deep=False,  # Shallow copy to avoid pickling issues with SgNode in metadata
         )

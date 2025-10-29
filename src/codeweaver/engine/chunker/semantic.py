@@ -276,7 +276,7 @@ class SemanticChunker(BaseChunker):
 
         return chunks
 
-    def _finalize_chunks(self, chunks: list[CodeChunk], batch_id: Any) -> list[CodeChunk]:
+    def _finalize_chunks(self, chunks: list[CodeChunk], batch_id: UUID7) -> list[CodeChunk]:
         """Deduplicate chunks and set batch metadata.
 
         Args:
@@ -286,12 +286,8 @@ class SemanticChunker(BaseChunker):
         Returns:
             List of unique chunks with batch metadata
         """
-        # Deduplicate using content hashing
+        # Deduplicate using content hashing (already sets batch keys internally)
         unique_chunks = self._deduplicate_chunks(chunks, batch_id)
-
-        # Set batch ID on all chunks
-        for chunk in unique_chunks:
-            chunk.set_batch_keys(batch_id)
 
         # Store batch
         self._store.set(batch_id, unique_chunks)
@@ -798,24 +794,26 @@ class SemanticChunker(BaseChunker):
         Returns:
             List of unique chunks
         """
+        from codeweaver.core.chunks import BatchKeys
+
         deduplicated: list[CodeChunk] = []
 
-        for chunk in chunks:
+        for idx, chunk in enumerate(chunks):
             if not chunk.metadata or "context" not in chunk.metadata:
-                chunk.set_batch_keys(batch_id)
-                deduplicated.append(chunk)
+                batch_keys = BatchKeys(id=batch_id, idx=idx)
+                deduplicated.append(chunk.set_batch_keys(batch_keys))
                 continue
 
             context = chunk.metadata.get("context")
             if not context:
-                chunk.set_batch_keys(batch_id)
-                deduplicated.append(chunk)
+                batch_keys = BatchKeys(id=batch_id, idx=idx)
+                deduplicated.append(chunk.set_batch_keys(batch_keys))
                 continue
 
             content_hash = context.get("content_hash")
             if not content_hash:
-                chunk.set_batch_keys(batch_id)
-                deduplicated.append(chunk)
+                batch_keys = BatchKeys(id=batch_id, idx=idx)
+                deduplicated.append(chunk.set_batch_keys(batch_keys))
                 continue
 
             # Check if we've seen this content before
@@ -829,8 +827,8 @@ class SemanticChunker(BaseChunker):
 
             # New unique chunk
             self._hash_store.set(content_hash, batch_id)
-            chunk.set_batch_keys(batch_id)
-            deduplicated.append(chunk)
+            batch_keys = BatchKeys(id=batch_id, idx=idx)
+            deduplicated.append(chunk.set_batch_keys(batch_keys))
 
         return deduplicated
 
