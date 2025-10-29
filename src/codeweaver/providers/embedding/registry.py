@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """A UUIDStore registry for embedding providers.
 
 This registry maps embedding batch IDs and indexes to their corresponding embedding vectors.

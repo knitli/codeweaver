@@ -91,90 +91,195 @@ Cost: $0.03-$0.06 per query
 
 ## Installation
 
-[![PyPI](https://img.shields.io/pypi/v/codeweaver-mcp.svg)](https://pypi.org/project/codeweaver-mcp/)
-[![Python Versions](https://img.shields.io/pypi/pyversions/codeweaver-mcp.svg)](https://pypi.org/project/codeweaver-mcp/)
+**Current Status**: v0.1 Development - Install from repository for working features
 
-Install CodeWeaver from PyPI:
+### Prerequisites
+- Python 3.12 or higher
+- Git for cloning repository
+- 8GB RAM minimum for vector operations
+- VoyageAI API key (for embeddings and reranking)
+
+### Quick Install
 
 ```bash
-pip install codeweaver-mcp
+# Clone repository
+git clone https://github.com/knitli/codeweaver-mcp.git
+cd codeweaver-mcp
+
+# Set up environment (requires mise: https://mise.jdx.dev)
+mise run setup
+
+# Install dependencies
+uv sync --all-groups
+
+# Activate environment
+mise run activate
 ```
 
-**Requirements:**
-- Python 3.12, 3.13, or 3.14
+### Configuration
 
-**Supported Installation Options:**
+Create `codeweaver.toml` in your project:
 
-For basic usage with recommended defaults:
+```toml
+[codeweaver]
+project_path = "/path/to/your/codebase"  # Required
+max_chunk_size = 800                      # Optional: default 800 tokens
+
+[embedding]
+provider = "voyageai"
+model = "voyage-code-3"
+# Set VOYAGE_API_KEY environment variable
+
+[sparse_embedding]
+provider = "fastembed"
+model = "prithivida/Splade-PP_en_v2"
+
+[reranker]
+provider = "voyageai"
+model = "voyage-rerank-2.5"
+
+[vector_store]
+type = "qdrant"
+location = "local"
+path = ".codeweaver/qdrant"
+```
+
+**Set API Key**:
 ```bash
-pip install codeweaver-mcp[recommended]
+export VOYAGE_API_KEY="your-api-key-here"
 ```
-
-For à-la-carte installation with specific providers:
-```bash
-# Core + OpenAI embedding + Qdrant vector store + filesystem source
-pip install 'codeweaver-mcp[required-core,provider-openai,provider-qdrant,source-filesystem]'
-```
-
-See the [installation documentation](https://dev.knitli.com/codeweaver) for detailed provider options and configuration.
 
 ---
 
-**📊 For Product Managers & Decision Makers**: See [PRODUCT.md](PRODUCT.md) for comprehensive product overview, user personas, success metrics, competitive positioning, and roadmap details. We don't hide our plans -- we want your input and needs to drive them!
+## Quick Start
 
-**🚀 Strategic Vision**: CodeWeaver evolves from best-in-class search tool → context platform → unified MCP orchestration hub. See [PRODUCT.md - Product Vision](PRODUCT.md#product-vision) for our 4-phase evolution from search to "context-as-a-service."
+### 1. Start Server with Auto-Indexing
 
-**🎛️ Three-Tier API Design**: Different interfaces for different users:
-- **Human API**: Deep configurability (TOML/YAML config, extensive CLI, plugin architecture)
-- **User Agent API**: Radical simplicity (1 tool: `find_code` with natural language)
-- **Context Agent API**: Controlled expansion (3-8 specialized curation tools)
+```bash
+# Start CodeWeaver MCP server (auto-indexes project from config)
+codeweaver server --config ./codeweaver.toml
 
-See [PRODUCT.md - Three-Tier API Architecture](PRODUCT.md#three-tier-api-architecture) for detailed design rationale.
+# Expected output:
+# CodeWeaver MCP server starting...
+# Project: /path/to/your/codebase
+# Host: 127.0.0.1:9328
+# Indexing: starting...
+# Discovering files...
+# Found 1,247 files
+# Indexing complete: 1,247 files, 8,500 chunks in 180s
+# Server ready. Listening for MCP requests.
+```
 
-**🏗️ Architecture & Design Decisions**: See [ARCHITECTURE.md](ARCHITECTURE.md) for the authoritative reference on CodeWeaver's architectural decisions, design principles, technical philosophy, and key technical decisions. This document consolidates all design decisions into a unified resource.
+### 2. Search Your Code (CLI)
+
+```bash
+# Basic search
+codeweaver search "authentication logic" --limit 5
+
+# Intent-specific search
+codeweaver search "how does chunking work" --intent understand
+codeweaver search "database connection pooling" --intent implement --limit 3
+
+# JSON output for scripting
+codeweaver search "config loading" --output-format json | jq '.matches[0].file'
+```
+
+### 3. Check Indexing Progress
+
+```bash
+# Query health endpoint (server must be running)
+curl http://localhost:9328/health/ | jq
+
+# Example response:
+# {
+#   "status": "healthy",
+#   "indexing": {
+#     "state": "idle",
+#     "progress": {
+#       "files_processed": 1247,
+#       "chunks_created": 8500
+#     }
+#   },
+#   "services": {
+#     "vector_store": {"status": "up"},
+#     "embedding_provider": {"status": "up", "model": "voyage-code-3"}
+#   }
+# }
+```
+
+### 4. Use with AI Agents (MCP)
+
+Add to your MCP client configuration (e.g., `claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "codeweaver": {
+      "command": "codeweaver",
+      "args": ["server", "--config", "/path/to/codeweaver.toml"],
+      "env": {
+        "VOYAGE_API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+Then use natural language from your AI agent:
+```
+User: "Find the authentication middleware implementation"
+
+Agent: [Calls find_code tool with query]
+Agent receives structured results with:
+- Exact file paths and line ranges
+- Code content with syntax highlighting
+- Relevance scores (0.0-1.0)
+- Related symbols and dependencies
+```
 
 ---
 
-## Architectural Goals
+---
 
-1. **Provide semantically-rich, ranked and prioritized search results for developers and their coding agents.**
-   
-  **How**
-  - CodeWeaver uses ast-grep, and support for dozens of embedding and reranking models, local and remote, to provide weighted responses to searches.
-  - CodeWeaver is fully pluggable. You can add embedding providers, reranking providers, agent providers, services and middleware, and *new data sources* beyond your codebase.
+## What Works Today (v0.1)
 
-2. **Eliminate 'cognitive load' on coding agents trying to get context on the codebase.**
+✅ **Core Functionality**:
+- Hybrid search (dense + sparse vectors)
+- Semantic reranking with voyage-rerank-2.5
+- CLI and MCP interfaces
+- Auto-indexing on server startup
+- Health monitoring endpoint
+- Circuit breaker resilience
+- Error recovery and graceful degradation
+- Checkpoint/resume for interrupted indexing
 
-  **How**
-  - **Reduces all operations to a single, simple, plain language tool** -- `find_code` -- allowing your coding agent to request what it needs, explain what it's trying to do, and get exactly the information it needs in response.
-  - Uses **mcp sampling** to search and curate context for your coding agent -- using your coding agent! (also supports this outside of an MCP context where sampling isn't enabled or MCP is not available). CodeWeaver uses a *different instance* of your agent to evaluate your agent's needs and curate a response, keeping your agent unburdened with all the associated context from searching.
+✅ **Search Features**:
+- Natural language queries
+- Intent-based ranking (UNDERSTAND, IMPLEMENT, DEBUG, etc.)
+- Exact line/column references
+- Multi-language support (20+ with AST, 170+ with heuristics)
+- JSON, table, and markdown output formats
 
-3. **Significantly cut context bloat, and costs**. This also helps keep agents razor focused on their tasks.
+✅ **Operational**:
+- Local Qdrant vector store
+- VoyageAI embeddings (voyage-code-3)
+- FastEmbed sparse vectors (SPLADE)
+- Graceful degradation when services unavailable
+- Structured logging and metrics
 
-  **How**
-  - CodeWeaver aims to *restrict* context to your coding agent to *only the information it needs*. Of course, that's not easy to do, but we hope to get close.
-  - By reducing the context that's returned to your Agent, your Agent no longer has to "carry" all of that extra, unused, context with them -- reducing token use *with every turn* and reducing its exponential growth.
+## Planned for v0.2
 
-## Design Principles
+🔮 **Coming Soon**:
+- Real-time code change watching (FileWatcher exists but not fully wired)
+- Agent-driven intent analysis (currently keyword-based heuristics)
+- Search result explanations
+- Advanced filters (date, file type, size)
 
-CodeWeaver is built on five core principles that guide every technical decision:
+---
 
-**1. AI-First Context**
-Every feature enhances AI agent understanding of code through precise context delivery. We design for AI consumption first, human inspection second.
+**📊 For Product Managers**: See [PRODUCT.md](PRODUCT.md) for product overview, user personas, competitive positioning, and roadmap.
 
-**2. Proven Patterns Over Reinvention**
-We use proven patterns from successful open source projects in the pydantic ecosystem (i.e. FastAPI). Familiar interfaces reduce learning curve and increase developer adoption and contribution.
-
-**3. Evidence-Based Development**
-All technical decisions backed by verifiable evidence: documentation, testing, metrics, or reproducible demonstrations. No workarounds, no placeholder code, no "it should work" assumptions.
-
-**4. Effectiveness Over Coverage**
-Testing focuses on critical behavior affecting user experience. One realistic integration test beats ten implementation detail tests. Code coverage scores don't measure outcomes.
-
-**5. Simplicity Through Architecture**
-We transform complexity into clarity using simple modularity with extensible design where purpose is obvious. Flat structure, clear naming, minimal nesting.
-
-**In Practice**: These principles led to our single-tool interface (simplicity), plugin architecture (proven patterns), and span-based precision (evidence-based).
+**🏗️ Architecture Reference**: See [ARCHITECTURE.md](ARCHITECTURE.md) for design decisions, principles, and technical philosophy.
 
 ## How It Works 
 
@@ -269,273 +374,364 @@ Features at a glance
 - Multiple interfaces: MCP server, HTTP, CLI search, config management
 
 
-Quickstart
+## Troubleshooting
+
+### Server Fails to Start
+
+**Check Prerequisites**:
+```bash
+# Verify Python version (must be 3.12+)
+python --version
 
-Requirements
-- Python 3.12+ (tested primarily on 3.12)
-- Optional: Qdrant for vector storage (in progress), API keys for cloud providers if you choose them
+# Verify dependencies installed
+uv sync --all-groups
 
-Install
-Pick one of the extras that fits your environment:
+# Check port availability (should be empty)
+lsof -i :9328
+```
 
-- Recommended (cloud-capable; includes telemetry)
-  uv pip install "codeweaver-mcp[recommended]"
+### No Search Results Found
 
-- Recommended without telemetry
-  uv pip install "codeweaver-mcp[recommended-no-telemetry]"
+**Verify Indexing**:
+```bash
+# Check indexing completed
+curl http://localhost:9328/health/ | jq '.indexing.state'  # Should be "idle"
 
-- Local-only (no cloud calls; CPU embeddings via fastembed)
-  uv pip install "codeweaver-mcp[recommended-local-only]"
-
-A-la-carte (advanced)
-You need:
-- required-core
-- at least one agent-capable provider (e.g., provider-openai or provider-anthropic)
-- at least one embedding-capable provider (e.g., provider-voyageai or provider-fastembed)
-- at least one vector store (provider-qdrant or provider-in-memory)
+# Check statistics
+curl http://localhost:9328/health/ | jq '.statistics.total_chunks_indexed'  # Should be > 0
 
-Example:
-uv pip install "codeweaver-mcp[required-core,cli,provider-openai,provider-qdrant,source-filesystem]"
+# Verify project path
+codeweaver config --show | grep "path:"
+```
+
+### VoyageAI API Unavailable
 
-Run the server
-codeweaver server
-- Starts the MCP server with FastMCP.
-- Use --help to see options.
+**Graceful Degradation**:
+- System automatically falls back to sparse-only search (local FastEmbed)
+- Warning message displayed: "Dense embedding service unavailable"
+- Search continues with reduced semantic accuracy
+- Health endpoint shows `"status": "degraded"`
+
+**Check Circuit Breaker**:
+```bash
+curl http://localhost:9328/health/ | jq '.services.embedding_provider.circuit_breaker_state'
+# Should be "closed" (healthy) or "open" (failed)
+```
 
-Run a search locally
-codeweaver search "how do we configure providers?"
-- Use --format json|table|markdown
-- Use --help to explore options.
+### Slow Search Queries
 
-Configure
-codeweaver config --help
-- Centralized config powered by pydantic-settings (multi-source).
-- Supports selecting providers and setting provider-specific options (e.g., API keys when applicable).
+**Monitor Service Latencies**:
+```bash
+curl http://localhost:9328/health/ | jq '.services'
+
+# Expected latencies:
+# - vector_store: <50ms
+# - embedding_provider: <300ms
+# - reranker: <200ms
+```
+
+**Optimization Tips**:
+- Use local Qdrant (already default in config)
+- Reduce `--limit` parameter for searches
+- Check network connection to VoyageAI
+- Consider smaller codebase or filtering
+
+### High Error Count During Indexing
+
+**Check Errors**:
+```bash
+curl http://localhost:9328/health/ | jq '.indexing.progress.errors'
 
+# If ≥25 errors:
+# - Check file permissions
+# - Review unsupported file types
+# - Examine server logs for details
+```
 
 
-CLI overview
 
-The CLI includes:
-- Server: codeweaver server
-  - Runs the MCP server with proper lifespan and application state management (integration in progress where noted).
-- Search: codeweaver search "query" [--format {json|table|markdown}]
-  - Runs a local search pipeline using the span-based assembly and available providers.
-- Config: codeweaver config …
-  - Manages settings, validates configuration, and helps you choose providers.
+## CLI Commands
 
-Use --help on any subcommand for full options.
+### Server
+Start the MCP server with auto-indexing:
+```bash
+codeweaver server --config ./codeweaver.toml
+codeweaver server --project /path/to/codebase --port 9328
+codeweaver server --debug  # Enable debug logging
+```
+
+### Search
+Execute semantic code searches:
+```bash
+codeweaver search "query" [--format {json|table|markdown}]
+codeweaver search "authentication logic" --limit 5
+codeweaver search "how does chunking work" --intent understand
+codeweaver search "database setup" --intent implement --project ./my-project
+```
+
+### Config
+Manage configuration settings:
+```bash
+codeweaver config --show                    # Display current configuration
+codeweaver config --project ./my-project    # Show project-specific config
+```
+
+**Use `--help`** on any command for full options.
+
+
+
+## Architecture Overview (v0.1)
+
+### Core Components
+
+**Semantic Chunking**:
+- AST-based boundaries for 20+ languages (functions, classes, methods)
+- Delimiter-based heuristics for 170+ additional languages
+- Target chunk size: 200-800 tokens
+- Preserves complete logical units
+
+**Hybrid Search Pipeline**:
+1. Dense embeddings: VoyageAI voyage-code-3 (768 dimensions)
+2. Sparse embeddings: FastEmbed Splade-PP (local, no API)
+3. Vector storage: Qdrant (local with persistence)
+4. Reranking: VoyageAI voyage-rerank-2.5
+5. Semantic scoring: ImportanceScores weighted by IntentType
+
+**Intent-Based Ranking**:
+- `UNDERSTAND`: Boost definitions and interfaces
+- `IMPLEMENT`: Boost definitions and boundaries
+- `DEBUG`: Boost control flow and operations
+- `TEST`: Boost test definitions
+- `CONFIGURE`: Boost configuration patterns
+- `DOCUMENT`: Boost documentation blocks
+
+**Provider System**:
+- Embedding: default primary is VoyageAI voyage-code-3 (requires API key); fallback local to 
+- Vector Store: Qdrant local or remote
+- Reranking: VoyageAI rerank-2.5
+- Circuit breaker resilience for all external APIs
+
+**Configuration**:
+- Multi-source: TOML/YAML/JSON files, environment variables
+- Pydantic-settings validation
+- Token budgeting and batch tracking
+
+
+## Performance Expectations (v0.1)
+
+### Indexing Performance
+- Small codebases (<1k files): 2-5 minutes
+- Medium codebases (1k-10k files): 10-30 minutes
+- Large codebases (10k-50k files): 1-3 hours
+- Rate: ≥100 files/minute
+
+### Search Performance
+- Small codebases (<1k files): <1 second
+- Medium codebases (1k-10k files): <3 seconds
+- Large codebases (10k-100k files): <10 seconds
+
+
+### Resource Limits
+- Maximum chunk size: 4000 tokens (hard limit, truncate if exceeded)
+- Maximum concurrent embedding requests: 10
+- Maximum memory per indexing session: 2GB resident set size
+- Warning at 50,000 files
+- Error at 500,000 files (v0.1 limit)
+
+
+## MCP Tool Interface
+
+### find_code Tool
+
+**Purpose**: Single natural language interface for semantic code search
+
+**Parameters**:
+- `query` (str, required): Natural language search query
+- `intent` (str, optional): Search intent (understand|implement|debug|optimize|test|configure|document)
+- `token_limit` (int, default=10000): Maximum tokens in response
+- `include_tests` (bool, default=False): Include test files in results
+- `focus_languages` (tuple[str], optional): Filter by programming languages
+- `max_results` (int, default=50): Maximum matches to return
+
+**Response Structure** (`FindCodeResponseSummary`):
+```python
+{
+  "matches": [
+    {
+      "file": {"path": "src/auth.py", "language": "python"},
+      "content": {"content": "...", "line_range": [15, 85]},
+      "span": [15, 85],
+      "relevance_score": 0.92,
+      "match_type": "SEMANTIC",
+      "related_symbols": ["AuthConfig", "authenticate"]
+    }
+  ],
+  "summary": "Found authentication implementation in auth module",
+  "query_intent": "understand",
+  "total_matches": 47,
+  "total_results": 5,
+  "token_count": 450,
+  "execution_time_ms": 850,
+  "search_strategy": ["HYBRID_SEARCH", "SEMANTIC_RERANK"],
+  "languages_found": ["python"]
+}
+```
+
+## Development
+
+### Setup Development Environment
+
+```bash
+# Clone and install full dev environment
+git clone https://github.com/knitli/codeweaver-mcp.git
+cd codeweaver-mcp
+# if you don't have mise installed, first run:
+# chmod +x scripts/ && ./scripts/dev-env/install-mise.sh
+mise run setup
+uv sync --all-groups
+```
+
+### Code Quality Commands
+
+```bash
+# Fix code issues (imports, formatting, linting)
+mise run fix
+
+# Run linting checks
+mise run lint
+
+# Format code
+mise run format-fix
+
+# Type checking
+mise run check
+```
+
+### Testing
+
+```bash
+# Run tests
+mise run test
 
-
-
-Concepts and architecture
+# Run with coverage
+mise run test-cov
 
-Span-based core
-- Spans precisely represent code locations (line/column), and SpanGroups allow composition.
-- Immutable, set-like operations enable accurate merging of results across passes (text, semantic, AST).
-- CodeChunk and CodeMatch carry spans and metadata, enabling token-aware, context-safe assembly.
-
-Semantic metadata from AST-Aware indexing
-- ExtKind enumerates language and chunk types.
-- SemanticMetadata tracks AST nodes and classifications to improve chunk boundaries and ranking.
-- Extensive semantic metadata classification and task-based priority ranking system for nuanced searches
-- Supports 26 programming languages
+# Watch mode
+mise run test-watch
 
-*Backup Code-Aware Indexing Support for 170+ languages! [^1]
-- CodeWeaver's backup chunking system is not semantically aware, but it does have sophisticated heuristics to identify context-relevant code blocks based on language-specific patterns found in 170+ programming languages.
-- Allows CodeWeaver to approximate semantic context for even obscure or aging codebases. If you maintain a codebase with legacy "it just works so keep it" code, this is for you -- assembly, cobol, pascal, perl -- we've got you!
-- From Agda, Beef, Coq, Dhall, and Factor to SAS, Smali, Xaml and Zig -- your language is probably supported.
-- Really not supported? Define some delimiters with metadata and file extensions in your config and CodeWeaver will take care of the rest! (or, just associate it with file extensions and a family pattern like C style, python, ML, lisp, markup, shell, functional latex, ruby, or matlab and it'll 'just work'.)
+# Run specific markers
+pytest -m "unit"              # Unit tests only
+pytest -m "integration"       # Integration tests only
+pytest -m "not network"       # Skip network-dependent tests
+```
 
-Provider ecosystem
-- Embedding providers: VoyageAI, AWS Bedrock, Cohere (including Azure), Google, Huggingface Hub, Mistral, FastEmbed, SentenceTransformers, Openai Compatible (OpenAI, Azure, Fireworks, Groq, Ollama, Heroku) 
-- Rerank providers: VoyageAI, AWS Bedrock, Cohere, FastEmbed, Sentence Transformers.
-- Agent providers: All pydantic-ai providers (OpenAI, Anthropic, Google, Mistral, Groq, Hugging Face, Bedrock, etc.).
-- Vector stores: in-memory or Qdrant (both use Qdrant-client and both not fully implemented yet), others planned after initial release.
-- Data sources:
-  - Now: filesystem (with file watching), Tavily, DuckDuckGo
-  - Planned: Context7 (external API docs)
+### Build
 
-Advanced filtering (vendored)
-- Rich, validated filters for keyword, numeric, range, boolean, etc.
-- Dynamic tool signature generation via decorator-based wrappers.
-- Based on Qdrant's filtering abilities, but abstracted to be vendor agnostic.
+```bash
+# Build package
+mise run build
 
-Configuration and settings
-- Multi-source configuration via pydantic-settings.
-- Capability-based provider selection and dynamic instantiation (registry completing).
-- Token budgeting and caching strategies planned.
+# Clean build artifacts
+mise run clean
 
+# Full CI pipeline
+mise run ci
+```
 
-Providers and optional extras
+### Contributing
 
-Top-level extras (convenience)
+**License**: Dual-licensed (MIT OR Apache-2.0)
+**Requirements**: Read `CONTRIBUTORS_LICENSE_AGREEMENT.py`
+**Issues & PRs**: Welcome for providers, vector stores, pipelines, and all improvements
 
-Default install (VoyageAI for rerank/embedding, FastEmbed for sparse indexing, Anthropic for agents, Qdrant local or cloud for vector storage and hybrid search)
-- recommended: end-to-end features with cloud support 
-- recommended-no-telemetry: same as above without telemetry
-- recommended-local-only: local embedding/rerank (fastembed), no cloud calls
+**Code Standards**:
+- Follow `CODE_STYLE.md` principles
+- Line length: 100 characters
+- Google-style docstrings
+- Type hints required (strict pyright)
+- Pydantic models for data structures
 
-A-la-carte extras (compose what you need)
-- required-core: the minimal core of CodeWeaver
-- cli: CLI niceties (rich, cyclopts)
-- pre-context: components used for pre-context and watching
-- Agent-only providers: provider-anthropic, provider-groq
-- Agent + embeddings providers: provider-openai, provider-google, provider-huggingface, provider-mistral
-- Embedding + rerank + agent: provider-bedrock, provider-cohere
-- Embedding-only: provider-fastembed, provider-sentence-transformers (CPU/GPU variants), provider-voyageai
-- Vector stores: provider-in-memory, provider-qdrant
-- Data sources: source-filesystem, source-tavily, source-duckduckgo
 
-See pyproject.toml for exact versions and groups.
 
+## Roadmap
 
-Current tool surface (MCP + CLI)
+### ✅ v0.1 MVP (Current Release)
+- ✅ Core integration complete
+- ✅ Provider registry and statistics
+- ✅ FastMCP server with find_code tool
+- ✅ CLI commands (server, search, config)
+- ✅ Hybrid search (dense + sparse vectors)
+- ✅ Semantic reranking
+- ✅ AST-aware chunking
+- ✅ Health monitoring endpoint
+- ✅ Error recovery and graceful degradation
+- ✅ Checkpoint/resume indexing
 
-MCP server
-- Primary tool: find_code (being integrated)
-  - Query: natural language
-  - Filters (planned defaults -- for agent searches, these are applied by strategies):
-    - language: keyword (any)
-    - file_type: keyword (code, docs, config)
-    - on/after dates, semantic and text patterns, repository locations (i.e. frontend only), 
-  - Output: span-based code matches with semantic/relational metadata
-- Additional tool surfaces will evolve as pipelines and strategies are implemented.
+### 🚧 v0.2 (Next Release)
+- Real-time file watching (FileWatcher wiring)
+- Agent-driven intent analysis (pydantic-ai integration)
+- Search result explanations
+- Advanced filters (language, file type, date ranges)
+- Multiple simultaneous codebases
+- Comprehensive test coverage (unit + integration)
+- Telemetry and observability improvements
 
-CLI search
-- codeweaver search "your query" --format table
-- Uses the same underlying discovery and assembly model, outputting structured results.
+### 🔮 v0.3+ (Future)
+- pydantic-graph pipelines for multi-stage workflows
+- Additional vector stores (Pinecone, Weaviate)
+- Add LiteLLM and MorphLLM to providers
+- Web UI for search and monitoring
+- Performance optimizations for large codebases (let us know how it handles!)
 
+---
 
+## Documentation
 
-Project status (what works vs. WIP)
+- **[README.md](README.md)**: This file - project overview and quickstart
+- **[ARCHITECTURE.md](ARCHITECTURE.md)**: Design decisions and principles
+- **[PRODUCT.md](PRODUCT.md)**: Product overview, vision, and roadmap
+- **[CLAUDE.md](CLAUDE.md)**: AI agent context for Claude Code
+- **[CODE_STYLE.md](CODE_STYLE.md)**: Coding standards and conventions
+- **API Documentation**: See `context/apis/` directory
+- **MkDocs Site**: Run `mise run docs-serve` for local development
 
-What’s built
-- Strong span-based type system and semantic metadata
-- Sophisticated data models: DiscoveredFile, CodeChunk, CodeMatch
-- Deep pydantic-ai provider integration
-- Capability-based provider selection scaffolding
-- CLI (server, search, config) with rich output and robust error handling
-- Vendored filtering system that’s production-ready and provider-agnostic
-- FastMCP middleware and application state management
-- File discovery + indexing: rignore-based discovery; background indexing with watchfiles
-- Provider registry (_registry.py) and final glue code
-- Authentication and authorization middleware
+---
 
-What’s ~97% complete
-- Embedding, reranking, and agentic capabilities (provider integrations and orchestration)
-- Agent handling is implemented but needs to be tied fully into the pipelines
-- Rich semantic grammar context system to inform AST metadata/context
-- AST-based and semantically-guided chunking
-- Heuristically driven pseudo-semantic backup chunking system.
+## Licensing
 
-What's About 85% Complete
-- Hybrid search with unified ranking across signals
+**Dual License**: MIT OR Apache-2.0
 
-What’s in progress / planned
-- Vector stores: Qdrant implementation (span-aware); in-memory baseline
-- Pipelines and strategies: orchestration via pydantic-graph
-- Query intent analysis via agents
-- Performance, caching, and comprehensive test coverage
+All original Knitli code is licensed under your choice of MIT or Apache-2.0. See `LICENSE`, `LICENSE-MIT`, and `LICENSE-APACHE-2.0` files for details.
 
+**REUSE Compliant**: This project follows the [REUSE specification](https://reuse.software). Every file contains exact license information or has an accompanying `.license` file.
 
+**Vendored Code**: Some vendored code may be Apache-2.0 only or MIT only. Check individual file headers for specifics.
 
-Roadmap
+**Contributing**: Review `CONTRIBUTORS_LICENSE_AGREEMENT.py` before submitting PRs.
 
-[X] Phase 1: Core integration
-- Complete provider registry and statistics integration
-- Finalize FastMCP application state and context handling
-- CLI commands
-- Deliver working find_code over text search with filter integration
-- Basic tests for core workflows
 
+---
 
-Phase 2: Semantic search (~90% complete) [^2]
-- 🟢 Integrate embeddings (VoyageAI, fastembed)
-- 🟢 Robust statistics and usage system
-- :yellow_circle: AST-aware chunking and span-aware indexing
-- 🟢 Background indexing (watchfiles) and incremental updates
-- :yellow_circle: Hybrid search with unified ranking and intent analysis
-- 🔴 Qdrant integration
+## Links
 
-
-Phase 3: Advanced capabilities
-- pydantic-graph pipelines and multi-stage workflows
-- Multi-signal ranking (semantic, syntactic, keyword)
-- Performance optimization and caching
-- Enhanced metadata leverage, comprehensive testing, telemetry/monitoring
-
-
-
-Development
-
-Clone and install (full dev environment)
-- uv pip install "codeweaver-mcp[all-dev]"
-
-Linters and type checking
-- Ruff and Pyright are configured (strict mode for src/codeweaver/**)
-
-Tests
-- Pytest config is included with markers for unit, integration, e2e, and provider-specific tests
-- Coverage thresholds are configured (with cov-fail-under)
-
-Local run
-- codeweaver server
-- codeweaver search "query"
-
-Contribution notes
-- Dual-licensed repository (MIT OR Apache-2.0)
-- A contributors agreement is included; please review CONTRIBUTORS_LICENSE_AGREEMENT.py
-- Issues and PRs welcome—especially for providers, vector stores, pipelines, and indexing (or anything else)
-
-VS Code terminal: auto-activate .venv (first terminal too)
-
-This workspace makes the very first integrated terminal auto-activate the repo `.venv` and lets you run extra commands.
-
-How it works:
-- `.vscode/settings.json` sets `ZDOTDIR` to `.vscode/zsh`, so zsh loads the workspace-local `.zshrc`.
-- `.vscode/zsh/.zshrc` sources `scripts/dev-shell-init.zsh` (idempotent), which activates `.venv` and optionally sources `.vscode/terminal.extra.zsh` if present.
-- Create `.vscode/terminal.extra.zsh` (see `.vscode/terminal.extra.zsh.example`) for your own exports/aliases and startup commands. This file is gitignored.
-
-Notes:
-- If `.venv` is missing, you'll see a hint. Create it with: `uv venv && uv sync`.
-- We disable automatic terminal activation from the Python extension to avoid double activation.
-- To opt out for a single terminal: `unset ZDOTDIR` before launching a new zsh.
-
-Telemetry and auth middleware
-
-Telemetry
-- Default installation includes privacy and proprietary-information-preserving telemetry with Posthog. We take *extreme* care not to collect any information that could reveal your identity or projects. If you're unsure, please look at our implementation for yourself so you can see what we collect.
-- You can also optionally use the `recommended-no-telemetry` install flag for a telemetry-free install (or just disable in settings or an environment variable)
-
-Auth middleware (optional)
-- Permit.io (permit-fastmcp), Eunomia (eunomia-mcp), and AuthKit integrations are scaffolded through FastMCP
-- Enablement is controlled via environment variables when using those middlewares (see comments in pyproject.toml)
-
-Licensing
-
-All original Knitli code licensed under MIT OR Apache-2.0. See LICENSE, LICENSE-MIT, and LICENSE-APACHE-2.0. Some vendored code is Apache-2.0 only or MIT only. 
-
-This project follows the [`REUSE`](https://reuse.software) specification. *Every file contains exact license information or has an accompanying `.license` file*.
-
-
-Links
-
+**Project**:
 - Repository: https://github.com/knitli/codeweaver-mcp
 - Issues: https://github.com/knitli/codeweaver-mcp/issues
-- Documentation (in progress): https://dev.knitli.com/codeweaver
+- Documentation: https://dev.knitli.com/codeweaver (in progress)
 - Changelog: https://github.com/knitli/codeweaver-mcp/blob/main/CHANGELOG.md
 
+**Company**:
 - Knitli: https://knitli.com
-- X: https://x.com/knitli_inc
+- X/Twitter: https://x.com/knitli_inc
 - LinkedIn: https://linkedin.com/company/knitli
-- Github: https://github.com/knitli
+- GitHub: https://github.com/knitli
 
-Notes
-- Python package name: codeweaver-mcp
-- CLI entry point: codeweaver (module: codeweaver.cli.app:main)
-- Requires Python >= 3.12 (classifiers include 3.12–3.14)
+**Package Info**:
+- Python package: `codeweaver-mcp`
+- CLI command: `codeweaver`
+- Python requirement: ≥3.12 (tested on 3.12, 3.13, 3.14)
+- Entry point: `codeweaver.cli.app:main`
 
-[^1]: CodeWeaver **will not index an unknown file extension**. If you want it to index an unsupported extension, then you **must** add it to your config file! If we don't know what it is, we don't want to add noise to your agent's context!
+---
 
-[^2]: Working alone and before CodeWeaver is officially released, I've developed bad habits regarding treating `main` like a development branch. Some of this will be broken from time to time as a result. If anyone is actively wanting to use and get involved: let me know! It'd be great motivation to return to disciplined feature-based PRs! (it's not all bad habits, I also wanted folks to see the project progress and I know most people won't look at other branches).
+**Note**: v0.1 is an early MVP release. Some features are still in development. Contributions welcome!

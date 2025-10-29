@@ -890,10 +890,11 @@ The checkpoint system has been fully implemented with the following components:
 
 ## Phase 3: Testing & Validation
 
-### T009: Integration test - Server startup and indexing workflow
+### T009: Integration test - Server startup and indexing workflow ✅
 **Priority**: CRITICAL - Validates core functionality
+**Status**: COMPLETE
 **Files**:
-- Create: `tests/integration/test_server_indexing.py`
+- Created: `tests/integration/test_server_indexing.py`
 - References: Quickstart Scenario 1 (spec lines 76-83)
 
 **Test Scenarios**:
@@ -938,10 +939,11 @@ async def test_indexing_error_recovery():
 
 ---
 
-### T010: Integration test - CLI search and MCP find_code workflows
+### T010: Integration test - CLI search and MCP find_code workflows ✅
 **Priority**: CRITICAL - Validates main interfaces
+**Status**: COMPLETE
 **Files**:
-- Create: `tests/integration/test_search_workflows.py`
+- Created: `tests/integration/test_search_workflows.py` (595 lines, 11 test scenarios)
 - References: Quickstart Scenarios 2, 4 (spec lines 84-100)
 
 **Test Scenarios**:
@@ -984,10 +986,11 @@ async def test_search_performance():
 
 ---
 
-### T011: Contract test - find_code returns valid FindCodeResponseSummary
+### T011: Contract test - find_code returns valid FindCodeResponseSummary ✅
 **Priority**: HIGH - Validates API contract
+**Status**: COMPLETE
 **Files**:
-- Create: `tests/contract/test_find_code_contract.py`
+- Created: `tests/contract/test_find_code_contract.py` (490 lines, 22 test methods across 8 test classes)
 - Reference: `specs/003-our-aim-to/contracts/find_code_mcp_tool.json`
 
 **Test Focus**:
@@ -1045,10 +1048,11 @@ def test_find_code_parameters():
 
 ---
 
-### T012 [P]: Integration test - Health endpoint monitoring
+### T012 [P]: Integration test - Health endpoint monitoring ✅
 **Priority**: HIGH - Validates operational visibility
+**Status**: COMPLETE
 **Files**:
-- Create: `tests/integration/test_health_monitoring.py`
+- Created: `tests/integration/test_health_monitoring.py` (604 lines, 13 test functions)
 - References: Quickstart Scenario 3 (spec lines 86-88)
 
 **Test Scenarios**:
@@ -1098,10 +1102,11 @@ async def test_health_performance():
 
 ---
 
-### T013: Integration test - Error recovery and graceful degradation
+### T013: Integration test - Error recovery and graceful degradation ✅
 **Priority**: HIGH - Validates resilience
+**Status**: COMPLETE
 **Files**:
-- Create: `tests/integration/test_error_recovery.py`
+- Created: `tests/integration/test_error_recovery.py` (430 lines, 10 test scenarios)
 - References: Quickstart Scenario 5 (spec lines 227-249, edge cases)
 
 **Test Scenarios**:
@@ -1149,11 +1154,13 @@ async def test_health_shows_degraded_status():
 
 ---
 
-### T014: Reference test suite - Dogfooding CodeWeaver
+### T014: Reference test suite - Dogfooding CodeWeaver ✅
 **Priority**: MEDIUM - Validation task (post-implementation)
+**Status**: COMPLETE
 **Files**:
-- Create: `tests/integration/test_reference_queries.py`
-- Create: `tests/fixtures/reference_queries.yml`
+- Created: `tests/integration/test_reference_queries.py` (comprehensive test suite with P@3/P@5 metrics)
+- Created: `tests/fixtures/reference_queries.yml` (25 queries covering all 7 IntentTypes)
+- Created: `claudedocs/T014_reference_queries_report.md` (implementation documentation)
 - References: Quickstart Scenario 6, FR-036 (spec lines 540-547)
 
 **Requirements**:
@@ -1228,11 +1235,12 @@ async def test_reference_queries():
 
 ## Phase 4: Documentation
 
-### T015: Update README with working Quickstart
+### T015: Update README with working Quickstart ✅
 **Priority**: HIGH - User onboarding
+**Status**: COMPLETE
 **Files**:
-- Modify: `README.md`
-- Source: `specs/003-our-aim-to/quickstart.md`
+- Modified: `README.md` (742 lines, +201 lines added with validated content)
+- Source: `specs/003-our-aim-to/quickstart.md` and completed tasks T001-T014
 
 **Requirements**:
 - Replace aspirational content with validated commands

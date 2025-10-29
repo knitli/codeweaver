@@ -71,20 +71,6 @@ if TYPE_CHECKING:
     from codeweaver.common.statistics import SessionStatistics
     from codeweaver.common.utils import LazyImport
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
-else:
-    # lazy types for pydantic at runtime
-    ProviderRegistry: LazyImport[ProviderRegistry] = lazy_import(
-        "codeweaver.common.registry", "ProviderRegistry"
-    )
-    ServicesRegistry: LazyImport[ServicesRegistry] = lazy_import(
-        "codeweaver.common.registry", "ServicesRegistry"
-    )
-    ModelRegistry: LazyImport[ModelRegistry] = lazy_import(
-        "codeweaver.common.registry", "ModelRegistry"
-    )
-    SessionStatistics: LazyImport[SessionStatistics] = lazy_import(
-        "codeweaver.common.statistics", "SessionStatistics"
-    )
 
 # lazy imports for default factory functions
 get_provider_registry: LazyImport[ProviderRegistry] = lazy_import(

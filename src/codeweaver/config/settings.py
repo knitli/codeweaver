@@ -853,23 +853,22 @@ class CodeWeaverSettings(BaseSettings):
 
     # Core settings
     project_path: Annotated[
-        DirectoryPath,
+        DirectoryPath | Unset,
         Field(
-            default_factory=lambda: lazy_import("codeweaver.common.utils").get_project_path(),  # type: ignore
-            description="""Root path of the codebase to analyze. CodeWeaver will try to detect the project root automatically if you don't provide one.""",
+            description="""Root path of the codebase to analyze. CodeWeaver will try to detect the project root automatically if you don't provide one."""
         ),
-    ]
+    ] = UNSET
 
     project_name: Annotated[
-        str | None, Field(description="""Project name (auto-detected from directory if None)""")
-    ] = None
+        str | Unset, Field(description="""Project name (auto-detected from directory if None)""")
+    ] = UNSET
 
     provider: Annotated[
-        ProviderSettings,
+        ProviderSettings | Unset,
         Field(
             description="""Provider and model configurations for agents, data, embedding, reranking, sparse embedding, and vector store providers. Will default to default profile if not provided."""
         ),
-    ] = AllDefaultProviderSettings
+    ] = UNSET
 
     config_file: Annotated[
         FilePath | None,
@@ -878,80 +877,68 @@ class CodeWeaverSettings(BaseSettings):
 
     # Performance settings
     token_limit: Annotated[
-        PositiveInt, Field(le=200_000, description="""Maximum tokens per response""")
-    ] = 30_000
+        PositiveInt | Unset, Field(description="""Maximum tokens per response""")
+    ] = UNSET
     max_file_size: Annotated[
-        PositiveInt, Field(ge=51_200, description="""Maximum file size to process in bytes""")
-    ] = 1_048_576  # 1 MB
+        PositiveInt | Unset, Field(description="""Maximum file size to process in bytes""")
+    ] = UNSET
     max_results: Annotated[
-        PositiveInt,
+        PositiveInt | Unset,
         Field(
-            le=500,
-            description="""Maximum code matches to return. Because CodeWeaver primarily indexes ast-nodes, a page can return multiple matches per file, so this is not the same as the number of files returned. This is the maximum number of code matches returned in a single response.""",
+            description="""Maximum code matches to return. Because CodeWeaver primarily indexes ast-nodes, a page can return multiple matches per file, so this is not the same as the number of files returned. This is the maximum number of code matches returned in a single response."""
         ),
-    ] = 75
+    ] = UNSET
     server: Annotated[
         FastMcpServerSettings,
         Field(description="""Optionally customize FastMCP server settings."""),
     ] = DefaultFastMcpServerSettings
 
-    logging: Annotated[LoggingSettings | None, Field(description="""Logging configuration""")] = (
-        None
+    logging: Annotated[LoggingSettings | Unset, Field(description="""Logging configuration""")] = (
+        UNSET
     )
 
     middleware: Annotated[
-        MiddlewareOptions | None, Field(description="""Middleware settings""")
-    ] = DefaultMiddlewareSettings
+        MiddlewareOptions | Unset, Field(description="""Middleware settings""")
+    ] = UNSET
 
     indexing: Annotated[
-        IndexerSettings,
-        Field(
-            description="""File filtering settings""", init=False, default_factory=IndexerSettings
-        ),
-    ]
+        IndexerSettings | Unset, Field(description="""File filtering settings""")
+    ] = UNSET
 
     chunker: Annotated[
-        ChunkerSettings,
-        Field(
-            description="""Chunker system configuration""",
-            init=False,
-            default_factory=ChunkerSettings,
-        ),
-    ]
+        ChunkerSettings | Unset, Field(description="""Chunker system configuration""")
+    ] = UNSET
 
     # TODO: I don't think we're actually checking for these before initializing the server. We should.
     enable_health_endpoint: Annotated[
-        bool, Field(description="""Enable the health check endpoint""")
-    ] = True
+        bool | Unset, Field(description="""Enable the health check endpoint""")
+    ] = UNSET
     enable_statistics_endpoint: Annotated[
-        bool, Field(description="""Enable the statistics endpoint""")
-    ] = True
+        bool | Unset, Field(description="""Enable the statistics endpoint""")
+    ] = UNSET
     enable_settings_endpoint: Annotated[
-        bool, Field(description="""Enable the settings endpoint""")
-    ] = True
+        bool | Unset, Field(description="""Enable the settings endpoint""")
+    ] = UNSET
     enable_version_endpoint: Annotated[
-        bool, Field(description="""Enable the version endpoint""")
-    ] = True
+        bool | Unset, Field(description="""Enable the version endpoint""")
+    ] = UNSET
     allow_identifying_telemetry: Annotated[
-        bool,
+        bool | Unset,
         Field(
             description="""DISABLED BY DEFAULT. If you want to *really* help us improve CodeWeaver, you can allow us to collect potentially identifying telemetry data. It's not intrusive, it's more like what *most* telemetry collects. If it's enabled, we *won't hash file and repository names. We'll still try our best to screen out potential secrets, as well as names and emails, but we can't guarantee complete anonymity. This helps us by giving us real-world usage patterns and information on queries and results. We can use that to make everyone's results better. Like with the default telemetry, we **will not use it for anything else**."""
         ),
-    ] = False
-    enable_ai_intent_analysis: Annotated[
-        bool, Field(description="""Enable AI-powered intent analysis via FastMCP sampling""")
-    ] = False  # ! Phase 2 feature, switch to True when implemented
+    ] = UNSET
 
     enable_telemetry: Annotated[
-        bool,
+        bool | Unset,
         Field(
-            description="""Enable privacy-friendly usage telemetry. ON by default. We do not collect any identifying information -- we hash all file and directory paths, repository names, and other identifiers to ensure privacy while still gathering useful aggregate data for improving CodeWeaver. We add a second round of filters within Posthog cloud before we get the data just to be sure we caught everything. You can see exactly what we collect, and how we collect it [here](../telemetry). You can disable telemetry if you prefer not to send any data. You can also provide your own PostHog Project Key to collect your own telemetry data. **We will only ever use this data to improve CodeWeaver. We will never sell or share it with anyone else, and we won't use it for targeted marketing (we will use high level aggregate data, like how many people use it, and how many tokens CodeWeaver has saved.)**"""
+            description="""(currently disabled in v.1, planned for v.2). Enable privacy-friendly usage telemetry. ON by default. We do not collect any identifying information -- we hash all file and directory paths, repository names, and other identifiers to ensure privacy while still gathering useful aggregate data for improving CodeWeaver. We add a second round of filters within Posthog cloud before we get the data just to be sure we caught everything. You can see exactly what we collect, and how we collect it [here](../telemetry). You can disable telemetry if you prefer not to send any data. You can also provide your own PostHog Project Key to collect your own telemetry data. **We will only ever use this data to improve CodeWeaver. We will never sell or share it with anyone else, and we won't use it for targeted marketing (we will use high level aggregate data, like how many people use it, and how many tokens CodeWeaver has saved.)**"""
         ),
-    ] = True
+    ] = UNSET
 
     uvicorn: Annotated[
-        UvicornServerSettings | None, Field(description="""Settings for the Uvicorn server""")
-    ] = None
+        UvicornServerSettings | Unset, Field(description="""Settings for the Uvicorn server""")
+    ] = UNSET
 
     __version__: Annotated[
         str,
@@ -963,20 +950,53 @@ class CodeWeaverSettings(BaseSettings):
 
     _map: Annotated[DictView[CodeWeaverSettingsDict] | None, PrivateAttr()] = None
 
-    def __init__(self, **data: Any) -> None:
-        """Initialize CodeWeaverSettings and set global instance."""
-        for key in list(data.keys()):
-            if key in type(self).model_fields:
-                setattr(self, key, data.pop(key))
-        if not self.project_name and self.project_path:
-            self.project_name = self.project_path.name
-        if not self.indexing:
-            self.indexing = IndexerSettings()
-        if not self.chunker:
-            self.chunker = ChunkerSettings()
+    _unset_fields: Annotated[
+        set[str], Field(description="Set of fields that were unset", exclude=True)
+    ] = set()
 
     def model_post_init(self, __context: Any, /) -> None:
         """Post-initialization validation."""
+        self._unset_fields = {
+            field for field in type(self).model_fields if getattr(self, field) is Unset
+        }
+        self.project_path = (
+            self.project_path
+            if not isinstance(self.project_path, Unset)
+            else lazy_import("codeweaver.common.utils").get_project_path()
+        )  # type: ignore
+        self.project_name = (
+            self.project_path.name if isinstance(self.project_name, Unset) else self.project_name
+        )
+        self.provider = (
+            AllDefaultProviderSettings if isinstance(self.provider, Unset) else self.provider
+        )
+        self.token_limit = 30_000 if isinstance(self.token_limit, Unset) else self.token_limit
+        self.max_file_size = (
+            1 * 1024 * 1024 if isinstance(self.max_file_size, Unset) else self.max_file_size
+        )
+        self.max_results = 75 if isinstance(self.max_results, Unset) else self.max_results
+        # middleware gets set in the server initialization if unset
+        self.server = (
+            DefaultFastMcpServerSettings if isinstance(self.server, Unset) else self.server
+        )
+        # logging also gets set in the server initialization if unset
+        self.indexing = IndexerSettings() if isinstance(self.indexing, Unset) else self.indexing
+        self.chunker = ChunkerSettings() if isinstance(self.chunker, Unset) else self.chunker
+        self.uvicorn = UvicornServerSettings() if isinstance(self.uvicorn, Unset) else self.uvicorn
+        for attr in (
+            "enable_health_endpoint",
+            "enable_statistics_endpoint",
+            "enable_settings_endpoint",
+            "enable_version_endpoint",
+            "enable_telemetry",
+        ):
+            if isinstance(getattr(self, attr), Unset):
+                setattr(self, attr, True)
+        # only enabled if explicitly set to True
+        self.allow_identifying_telemetry = bool(
+            not isinstance(self.allow_identifying_telemetry, Unset)
+            and self.allow_identifying_telemetry
+        )
         if not type(self).__pydantic_complete__:
             result = type(self).model_rebuild()
             logger.debug("Rebuilt CodeWeaverSettings during post-init, result: %s", result)
@@ -1014,7 +1034,7 @@ class CodeWeaverSettings(BaseSettings):
     @cached_property
     def project_root(self) -> Path:
         """Get the project root directory. Alias for `project_path`."""
-        if not hasattr(self, "project_path") or not self.project_path:
+        if isinstance(self.project_path, Unset):
             from codeweaver.common.utils.git import get_project_path
 
             self.project_path = get_project_path()
@@ -1100,7 +1120,7 @@ _mapped_settings: DictView[CodeWeaverSettingsDict] | None = None
 """An immutable mapping view of the global settings instance."""
 
 
-def get_settings(path: FilePath | None = None) -> CodeWeaverSettings:
+def get_settings(config_file: FilePath | None = None) -> CodeWeaverSettings:
     """Get the global settings instance.
 
     This should not be your first choice for getting settings. For most needs, you should. Use get_settings_map() to get a read-only mapping view of the settings. This map is a *live view*, meaning it will update if the settings are updated.
@@ -1111,10 +1131,14 @@ def get_settings(path: FilePath | None = None) -> CodeWeaverSettings:
     from codeweaver.common.utils.git import get_project_path
 
     root = get_project_path()
-    if _settings and path and path.exists():
-        _settings = CodeWeaverSettings.from_config(path, **dict(_settings))
-    elif path and path.exists():
-        _settings = CodeWeaverSettings(project_path=root, config_file=path)
+    if isinstance(_settings, CodeWeaverSettings):
+        if isinstance(_settings.project_path, Unset):
+            _settings.project_path = root
+        if isinstance(_settings.project_name, Unset):
+            _settings.project_name = root.name
+        return _settings
+    if config_file and config_file.exists():
+        _settings = CodeWeaverSettings(project_path=root, config_file=config_file)
     if _settings is None:
         _settings = CodeWeaverSettings(project_path=root)  # type: ignore
     if not CodeWeaverSettings.__pydantic_complete__:

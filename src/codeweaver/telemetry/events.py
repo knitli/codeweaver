@@ -11,10 +11,10 @@ All events use only aggregated, anonymized data.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Annotated, Protocol
 
 from pydantic import Field, NonNegativeFloat, NonNegativeInt
+from pydantic.dataclasses import dataclass
 
 
 class TelemetryEvent(Protocol):

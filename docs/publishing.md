@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # Publishing Process
 
 CodeWeaver uses GitHub Actions trusted publishing to automatically publish packages to PyPI and TestPyPI.

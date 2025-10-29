@@ -184,36 +184,40 @@ def _display_table_results(
 
     # If there are matches, display them in a detailed table
     if matches:
-        console.print("\n[bold blue]Match Details:[/bold blue]\n")
-
-        table = Table(show_header=True, header_style="bold blue")
-        table.add_column("File", style="cyan", no_wrap=True, min_width=30)
-        table.add_column("Language", style="green", min_width=10)
-        table.add_column("Score", style="yellow", justify="right", min_width=8)
-        table.add_column("Lines", style="magenta", justify="center", min_width=10)
-        table.add_column("Preview", style="white", min_width=40, max_width=60)
-
-        for match in matches:
-            # Use serialize_for_cli to get structured data
-            match_data = match.serialize_for_cli()
-
-            preview = (
-                match.content[:100].replace("\n", " ") + "..."
-                if len(str(match.content)) > 100
-                else str(match.content).replace("\n", " ")
-            )
-
-            table.add_row(
-                str(match_data.get("file", {}).get("path", "unknown")),
-                str(match_data.get("file", {}).get("ext_kind", {}).get("language", "unknown")),
-                f"{match.relevance_score:.2f}",
-                f"{match.span!s}",
-                preview,
-            )
-
-        console.print(table)
+        _display_match_details(matches)
     else:
         console.print("\n[yellow]No matches found[/yellow]")
+
+
+def _display_match_details(matches: Sequence[CodeMatch]) -> None:
+    console.print("\n[bold blue]Match Details:[/bold blue]\n")
+
+    table = Table(show_header=True, header_style="bold blue")
+    table.add_column("File", style="cyan", no_wrap=True, min_width=30)
+    table.add_column("Language", style="green", min_width=10)
+    table.add_column("Score", style="yellow", justify="right", min_width=8)
+    table.add_column("Lines", style="magenta", justify="center", min_width=10)
+    table.add_column("Preview", style="white", min_width=40, max_width=60)
+
+    for match in matches:
+        # Use serialize_for_cli to get structured data
+        match_data = match.serialize_for_cli()
+
+        preview = (
+            match.content[:100].replace("\n", " ") + "..."
+            if len(str(match.content)) > 100
+            else str(match.content).replace("\n", " ")
+        )
+
+        table.add_row(
+            str(match_data.get("file", {}).get("path", "unknown")),
+            str(match_data.get("file", {}).get("ext_kind", {}).get("language", "unknown")),
+            f"{match.relevance_score:.2f}",
+            f"{match.span!s}",
+            preview,
+        )
+
+    console.print(table)
 
 
 def _display_markdown_results(
@@ -261,7 +265,6 @@ def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
     # Feature flags
     table.add_row("Background Indexing", "✅" if settings["enable_background_indexing"] else "❌")
     table.add_row("Telemetry", "✅" if settings["enable_telemetry"] else "❌")
-    table.add_row("AI Intent Analysis", "✅" if settings["enable_ai_intent_analysis"] else "❌")
 
     console.print(table)
 

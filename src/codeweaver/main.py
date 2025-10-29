@@ -25,16 +25,8 @@ from codeweaver.server import build_app
 if TYPE_CHECKING:
     from fastmcp import FastMCP
 
-    from codeweaver.common.utils import LazyImport
     from codeweaver.config.settings import CodeWeaverSettings
     from codeweaver.server import AppState, ServerSetup
-else:
-    FastMCP: LazyImport[FastMCP] = lazy_import("fastmcp", "FastMCP")
-    CodeWeaverSettings: LazyImport[CodeWeaverSettings] = lazy_import(
-        "codeweaver.config.settings", "CodeWeaverSettings"
-    )
-    AppState: LazyImport[AppState] = lazy_import("codeweaver.server", "AppState")
-    ServerSetup: LazyImport[ServerSetup] = lazy_import("codeweaver.server", "ServerSetup")
 
 
 def is_server_setup(obj: Any) -> TypeGuard[ServerSetup]:

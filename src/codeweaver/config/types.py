@@ -240,7 +240,6 @@ class CodeWeaverSettingsDict(TypedDict, total=False):
     enable_version_endpoint: NotRequired[bool]
     enable_telemetry: NotRequired[bool]
     allow_identifying_telemetry: NotRequired[bool]
-    enable_ai_intent_analysis: NotRequired[bool]
 
 
 # ===========================================================================
