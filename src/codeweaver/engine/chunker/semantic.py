@@ -291,7 +291,7 @@ class SemanticChunker(BaseChunker):
 
         # Set batch ID on all chunks
         for chunk in unique_chunks:
-            chunk.set_batch_id(batch_id)
+            chunk.set_batch_keys(batch_id)
 
         # Store batch
         self._store.set(batch_id, unique_chunks)
@@ -802,19 +802,19 @@ class SemanticChunker(BaseChunker):
 
         for chunk in chunks:
             if not chunk.metadata or "context" not in chunk.metadata:
-                chunk.set_batch_id(batch_id)
+                chunk.set_batch_keys(batch_id)
                 deduplicated.append(chunk)
                 continue
 
             context = chunk.metadata.get("context")
             if not context:
-                chunk.set_batch_id(batch_id)
+                chunk.set_batch_keys(batch_id)
                 deduplicated.append(chunk)
                 continue
 
             content_hash = context.get("content_hash")
             if not content_hash:
-                chunk.set_batch_id(batch_id)
+                chunk.set_batch_keys(batch_id)
                 deduplicated.append(chunk)
                 continue
 
@@ -829,7 +829,7 @@ class SemanticChunker(BaseChunker):
 
             # New unique chunk
             self._hash_store.set(content_hash, batch_id)
-            chunk.set_batch_id(batch_id)
+            chunk.set_batch_keys(batch_id)
             deduplicated.append(chunk)
 
         return deduplicated
