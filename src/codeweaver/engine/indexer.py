@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import signal
 import time
 
 from collections.abc import Callable, Sequence
@@ -42,6 +43,7 @@ from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.stores import BlakeStore
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.models import BasedModel
+from codeweaver.engine.checkpoint import CheckpointManager, IndexingCheckpoint
 from codeweaver.engine.chunking_service import ChunkingService
 from codeweaver.exceptions import ConfigurationError
 
@@ -324,6 +326,10 @@ class Indexer(BasedModel):
 
     _store: BlakeStore[DiscoveredFile] = PrivateAttr()
     _walker: rignore.Walker | None = PrivateAttr(default=None)
+    _checkpoint_manager: CheckpointManager | None = PrivateAttr(default=None)
+    _checkpoint: IndexingCheckpoint | None = PrivateAttr(default=None)
+    _last_checkpoint_time: float = PrivateAttr(default=0.0)
+    _files_since_checkpoint: int = PrivateAttr(default=0)
 
     def __init__(
         self,
@@ -332,6 +338,7 @@ class Indexer(BasedModel):
         chunking_service: Any | None = None,  # ChunkingService type
         *,
         auto_initialize_providers: bool = True,
+        project_path: Path | None = None,
     ) -> None:
         """Initialize the Indexer with optional pipeline components.
 
@@ -340,6 +347,7 @@ class Indexer(BasedModel):
             store: Store for discovered file metadata
             chunking_service: Service for chunking files (optional)
             auto_initialize_providers: Auto-initialize providers from global registry
+            project_path: Project path for checkpoint management
         """
         self._store = store or BlakeStore[DiscoveredFile](_value_type=DiscoveredFile)
         self._walker = walker
@@ -351,8 +359,68 @@ class Indexer(BasedModel):
         self._sparse_provider: Any | None = None
         self._vector_store: Any | None = None
 
+        # Initialize checkpoint manager
+        if project_path:
+            self._checkpoint_manager = CheckpointManager(project_path=project_path)
+        else:
+            from codeweaver.config.settings import get_settings
+            self._checkpoint_manager = CheckpointManager(project_path=get_settings().project_path)
+
+        self._checkpoint = None
+        self._last_checkpoint_time = time.time()
+        self._files_since_checkpoint = 0
+        self._shutdown_requested = False
+        self._original_sigterm_handler = None
+        self._original_sigint_handler = None
+
         if auto_initialize_providers:
             self._initialize_providers()
+
+        # Register signal handlers for graceful shutdown
+        self._register_signal_handlers()
+
+    def _register_signal_handlers(self) -> None:
+        """Register signal handlers for graceful shutdown with checkpoint saving."""
+        def handle_shutdown_signal(signum: int, frame: Any) -> None:
+            """Handle shutdown signal by saving checkpoint and exiting gracefully."""
+            signal_name = signal.Signals(signum).name
+            logger.info("Received %s signal, saving checkpoint and shutting down...", signal_name)
+            self._shutdown_requested = True
+
+            # Save final checkpoint
+            try:
+                self.save_checkpoint()
+                logger.info("Checkpoint saved successfully before shutdown")
+            except Exception:
+                logger.exception("Failed to save checkpoint during shutdown")
+
+            # Call original handler if it existed
+            if signum == signal.SIGTERM and self._original_sigterm_handler:
+                if callable(self._original_sigterm_handler):
+                    self._original_sigterm_handler(signum, frame)
+            elif signum == signal.SIGINT and self._original_sigint_handler:
+                if callable(self._original_sigint_handler):
+                    self._original_sigint_handler(signum, frame)
+
+        # Store original handlers and install new ones
+        try:
+            self._original_sigterm_handler = signal.signal(signal.SIGTERM, handle_shutdown_signal)
+            self._original_sigint_handler = signal.signal(signal.SIGINT, handle_shutdown_signal)
+            logger.debug("Signal handlers registered for graceful shutdown")
+        except (ValueError, OSError) as e:
+            # Signal handling may not be available in all contexts (e.g., threads)
+            logger.debug("Could not register signal handlers: %s", e)
+
+    def _cleanup_signal_handlers(self) -> None:
+        """Restore original signal handlers."""
+        try:
+            if self._original_sigterm_handler is not None:
+                signal.signal(signal.SIGTERM, self._original_sigterm_handler)
+            if self._original_sigint_handler is not None:
+                signal.signal(signal.SIGINT, self._original_sigint_handler)
+            logger.debug("Signal handlers restored")
+        except (ValueError, OSError) as e:
+            logger.debug("Could not restore signal handlers: %s", e)
 
     def _initialize_providers(self) -> None:
         """Initialize pipeline providers from global registry."""
@@ -548,12 +616,19 @@ class Indexer(BasedModel):
         # Try to restore from persistence (unless force_reindex)
         if not force_reindex:
             try:
-                # TODO: Implement persistence methods in next phase
-                # asyncio.run(self.initialize_from_vector_store())
-                # if not self._store.is_empty:
-                #     logger.info("Restored index from vector store")
-                #     return len(self._store)
-                pass
+                # Try loading checkpoint first
+                if self.load_checkpoint():
+                    logger.info("Resuming from checkpoint")
+                    # Note: In v0.1, we still need to reindex discovered files
+                    # In v0.2, we'll implement true resumption with file tracking
+                else:
+                    # Fallback: Try restoring from vector store
+                    # TODO: Implement in future phase
+                    # asyncio.run(self.initialize_from_vector_store())
+                    # if not self._store.is_empty:
+                    #     logger.info("Restored index from vector store")
+                    #     return len(self._store)
+                    pass
             except Exception as e:
                 logger.debug("Could not restore from persistence: %s", e)
 
@@ -591,6 +666,15 @@ class Indexer(BasedModel):
             self._stats.elapsed_time,
             self._stats.processing_rate,
         )
+
+        # Save final checkpoint
+        self.save_checkpoint()
+        logger.info("Final checkpoint saved")
+
+        # Clean up checkpoint file on successful completion
+        if self._checkpoint_manager and len(self._stats.files_with_errors) == 0:
+            self._checkpoint_manager.delete()
+            logger.info("Checkpoint file deleted after successful completion")
 
         return self._stats.files_processed
 
@@ -698,6 +782,11 @@ class Indexer(BasedModel):
         if not files:
             return
 
+        # Check for shutdown request
+        if self._shutdown_requested:
+            logger.info("Shutdown requested, stopping batch indexing")
+            return
+
         if not self._chunking_service:
             logger.warning("No chunking service configured, cannot batch index files")
             return
@@ -727,6 +816,30 @@ class Indexer(BasedModel):
 
         # Update stats with successful file count
         self._stats.files_processed += len(discovered_files)
+        self._files_since_checkpoint += len(discovered_files)
+
+        # Save checkpoint if threshold reached
+        if self._should_checkpoint():
+            self.save_checkpoint()
+            logger.info("Checkpoint saved at %d/%d files processed",
+                       self._stats.files_processed, self._stats.files_discovered)
+
+    def _should_checkpoint(self) -> bool:
+        """Check if checkpoint should be saved based on frequency criteria.
+
+        Returns:
+            True if checkpoint should be saved (every 100 files or every 5 minutes)
+        """
+        # Check file count threshold
+        if self._files_since_checkpoint >= 100:
+            return True
+
+        # Check time threshold (300 seconds = 5 minutes)
+        elapsed_time = time.time() - self._last_checkpoint_time
+        if elapsed_time >= 300:
+            return True
+
+        return False
 
     @property
     def stats(self) -> IndexingStats:
@@ -781,33 +894,106 @@ class Indexer(BasedModel):
     def save_checkpoint(self, checkpoint_path: Path | None = None) -> None:
         """Save indexing state to checkpoint file.
 
-        TODO: Implement in T008
-        - Save to index_settings["checkpoint_file"]
-        - Include files_discovered, files_processed, chunks stats
-        - Include error list and timestamp
+        Saves current indexing progress including:
+        - Files discovered/processed/indexed counts
+        - Chunks created/embedded/indexed counts
+        - Error list with file paths
+        - Settings hash for invalidation detection
 
         Args:
-            checkpoint_path: Optional custom checkpoint file path
+            checkpoint_path: Optional custom checkpoint file path (primarily for testing)
         """
-        logger.debug("Checkpoint save not yet implemented")
+        if not self._checkpoint_manager:
+            logger.warning("No checkpoint manager configured")
+            return
+
+        # Compute settings hash
+        from codeweaver.config.settings import get_settings
+        settings = get_settings()
+        settings_dict = {
+            "project_path": str(settings.project_path),
+            "chunker": settings.chunker.model_dump(),
+            "embedding": settings.embedding.model_dump() if settings.embedding else {},
+        }
+        settings_hash = self._checkpoint_manager.compute_settings_hash(settings_dict)
+
+        # Create or update checkpoint
+        if not self._checkpoint:
+            self._checkpoint = IndexingCheckpoint(
+                project_path=settings.project_path,
+                settings_hash=settings_hash,
+            )
+
+        # Update checkpoint with current stats
+        self._checkpoint.files_discovered = self._stats.files_discovered
+        self._checkpoint.files_embedding_complete = self._stats.files_processed
+        self._checkpoint.files_indexed = self._stats.files_processed
+        self._checkpoint.chunks_created = self._stats.chunks_created
+        self._checkpoint.chunks_embedded = self._stats.chunks_embedded
+        self._checkpoint.chunks_indexed = self._stats.chunks_indexed
+        self._checkpoint.files_with_errors = [str(p) for p in self._stats.files_with_errors]
+        self._checkpoint.settings_hash = settings_hash
+
+        # Save to disk
+        self._checkpoint_manager.save(self._checkpoint)
+        self._last_checkpoint_time = time.time()
+        self._files_since_checkpoint = 0
 
     def load_checkpoint(self, _checkpoint_path: Path | None = None) -> bool:
         """Load indexing state from checkpoint file.
 
-        TODO: Implement in T008
-        - argument primarily for testing, we use the configured path in production
-        - Load from index_settings["checkpoint_file"]
-        - Verify settings hash matches current config
-        - Skip if checkpoint >24 hours old
+        Loads checkpoint if available and valid:
+        - Verifies settings hash matches current config
+        - Skips if checkpoint >24 hours old
+        - Restores stats for progress tracking
 
         Args:
-            _checkpoint_path: Optional custom checkpoint file path
+            _checkpoint_path: Optional custom checkpoint file path (primarily for testing)
 
         Returns:
-            True if checkpoint was loaded successfully
+            True if checkpoint was loaded successfully and is valid for resumption
         """
-        logger.debug("Checkpoint load not yet implemented")
-        return False
+        if not self._checkpoint_manager:
+            logger.warning("No checkpoint manager configured")
+            return False
+
+        # Load checkpoint from disk
+        checkpoint = self._checkpoint_manager.load()
+        if not checkpoint:
+            return False
+
+        # Verify checkpoint is valid for resumption
+        from codeweaver.config.settings import get_settings
+        settings = get_settings()
+        settings_dict = {
+            "project_path": str(settings.project_path),
+            "chunker": settings.chunker.model_dump(),
+            "embedding": settings.embedding.model_dump() if settings.embedding else {},
+        }
+        current_settings_hash = self._checkpoint_manager.compute_settings_hash(settings_dict)
+
+        if not self._checkpoint_manager.should_resume(
+            checkpoint, current_settings_hash, max_age_hours=24
+        ):
+            logger.info("Checkpoint cannot be used for resumption, will reindex from scratch")
+            return False
+
+        # Restore stats from checkpoint
+        self._stats.files_discovered = checkpoint.files_discovered
+        self._stats.files_processed = checkpoint.files_embedding_complete
+        self._stats.chunks_created = checkpoint.chunks_created
+        self._stats.chunks_embedded = checkpoint.chunks_embedded
+        self._stats.chunks_indexed = checkpoint.chunks_indexed
+        self._stats.files_with_errors = [Path(p) for p in checkpoint.files_with_errors]
+
+        self._checkpoint = checkpoint
+        logger.info(
+            "Checkpoint loaded successfully: %d/%d files processed, %d chunks created",
+            checkpoint.files_embedding_complete,
+            checkpoint.files_discovered,
+            checkpoint.chunks_created,
+        )
+        return True
 
     @property
     def is_empty(self) -> bool:
