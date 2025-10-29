@@ -15,14 +15,13 @@ from codeweaver.core.chunks import CodeChunk
 from codeweaver.engine.chunker.base import ChunkGovernor
 from codeweaver.engine.chunker.governance import ResourceGovernor
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-from codeweaver.providers.embedding.registry import EmbeddingBatchInfo  # noqa: F401
+from codeweaver.providers.embedding.types import EmbeddingBatchInfo  # noqa: F401
 
 
 # Rebuild models to resolve forward references
 # This must happen after all imports to ensure all referenced types are available
-# TEMPORARILY DISABLED: Causing circular import hang during test collection
-# ChunkGovernor.model_rebuild()
-# CodeChunk.model_rebuild()
+ChunkGovernor.model_rebuild()
+CodeChunk.model_rebuild()
 
 
 @pytest.fixture

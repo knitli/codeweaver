@@ -54,7 +54,8 @@ from codeweaver.core.utils import truncate_text
 if TYPE_CHECKING:
     from codeweaver.core.discovery import DiscoveredFile
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
-    from codeweaver.providers.embedding.registry import EmbeddingBatchInfo, EmbeddingRegistry
+    from codeweaver.providers.embedding.registry import EmbeddingRegistry
+    from codeweaver.providers.embedding.types import EmbeddingBatchInfo
     from codeweaver.tokenizers.base import Tokenizer
 
 # ---------------------------------------------------------------------------
@@ -253,6 +254,16 @@ class CodeChunk(BasedModel):
         return None
 
     @property
+    def embedding_batch_id(self) -> UUID7 | None:
+        """Get the embedding batch ID, if available.
+
+        Returns the ID from the dense batch key for backward compatibility.
+        """
+        if batch_key := self.dense_batch_key:
+            return batch_key.id
+        return None
+
+    @property
     def dense_embeddings(self) -> EmbeddingBatchInfo | None:
         """Get the dense embeddings info, if available."""
         if not self.dense_batch_key:
@@ -303,26 +314,20 @@ class CodeChunk(BasedModel):
 
     def set_batch_keys(self, batch_keys: BatchKeys) -> Self:
         """Set the batch keys for the code chunk.
-        
+
         Returns a new CodeChunk instance with updated batch keys.
         Explicitly copies metadata dict to prevent shared references between instances.
-        
+
         Args:
             batch_keys: The batch keys to set
-            
+
         Returns:
             New CodeChunk instance with batch keys set
         """
         if self._embedding_batches and batch_keys in self._embedding_batches:
             return self
-        
-        # Create explicit copy of metadata to avoid shared references
-        # Shallow copy the dict but keep nested objects (like SgNode) as references
-        # since they are read-only and cannot be pickled
-        metadata_copy = None
-        if self.metadata:
-            metadata_copy = {k: v for k, v in self.metadata.items()}
-        
+
+        metadata_copy = dict(self.metadata.items()) if self.metadata else None
         return self.model_copy(
             update={
                 "_embedding_batches": (*self._embedding_batches, batch_keys)
@@ -392,7 +397,6 @@ class CodeChunk(BasedModel):
         """Return the token count for the chunk content."""
         return tokenizer_instance.estimate(cast(str, self.serialize_for_embedding()))
 
-    @computed_field
     @property
     def embedding(self) -> EmbeddingBatchInfo | None:
         """Get the embedding info, if available."""
@@ -473,9 +477,9 @@ import contextlib
 
 # Rebuild models to resolve forward references
 # Force rebuild even if it fails - better to have working models than perfect ones
-# TEMPORARILY DISABLED: Causing circular import hang during test collection
-# with contextlib.suppress(Exception):
-#     _ = SearchResult.model_rebuild(force=True)
+# Re-enabled after resolving circular import issues
+with contextlib.suppress(Exception):
+    _ = SearchResult.model_rebuild(force=True)
 
-# with contextlib.suppress(Exception):
-#     _ = CodeChunk.model_rebuild(force=True)
+with contextlib.suppress(Exception):
+    _ = CodeChunk.model_rebuild(force=True)

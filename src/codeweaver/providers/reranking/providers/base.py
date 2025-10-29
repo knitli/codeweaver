@@ -17,7 +17,7 @@ from functools import cache
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, cast, overload, override
 
-from pydantic import ConfigDict, PositiveInt, TypeAdapter
+from pydantic import ConfigDict, PositiveInt, PrivateAttr, TypeAdapter
 from pydantic import ValidationError as PydanticValidationError
 from pydantic.main import IncEx
 from pydantic_core import from_json
@@ -29,7 +29,6 @@ from tenacity import (
     wait_exponential,
 )
 
-from codeweaver.core.chunks import CodeChunk, StructuredDataInput
 from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.models import BasedModel
 from codeweaver.exceptions import RerankingProviderError, ValidationError
@@ -40,6 +39,7 @@ from codeweaver.tokenizers import Tokenizer, get_tokenizer
 
 if TYPE_CHECKING:
     from codeweaver.common.statistics import SessionStatistics
+    from codeweaver.core.chunks import CodeChunk, StructuredDataInput
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +76,8 @@ def _get_statistics() -> SessionStatistics:
 
 def default_reranking_input_transformer(documents: StructuredDataInput) -> Iterator[str]:
     """Default input transformer that converts documents to strings."""
+    from codeweaver.core.chunks import CodeChunk
+
     try:
         yield from CodeChunk.dechunkify(documents, for_embedding=True)
     except (PydanticValidationError, ValueError) as e:
@@ -132,19 +134,19 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
 
     _rerank_kwargs: MappingProxyType[str, Any]
     # transforms the input documents into a format suitable for the provider
-    _input_transformer: Callable[[StructuredDataInput], Any] = staticmethod(
-        default_reranking_input_transformer
+    _input_transformer: Callable[[StructuredDataInput], Any] = PrivateAttr(
+        default=staticmethod(default_reranking_input_transformer)
     )
     """The input transformer is a function that takes the input documents and returns them in a format suitable for the provider.
 
     The `StructuredDataInput` type is a CodeChunk or iterable of CodeChunks, but they can be in string, bytes, bytearray, python dictionary, or CodeChunk format.
     """
     _output_transformer: Callable[[Any, Iterator[CodeChunk]], Sequence[RerankingResult]] = (
-        staticmethod(default_reranking_output_transformer)
+        PrivateAttr(default=staticmethod(default_reranking_output_transformer))
     )
     """The output transformer is a function that takes the raw results from the provider and returns a Sequence of RerankingResult."""
 
-    _chunk_store: tuple[CodeChunk, ...] | None = None
+    _chunk_store: tuple[CodeChunk, ...] | None = PrivateAttr(default=None)
     """Stores the chunks while they are processed. We do this because we don't send the whole chunk to the provider, so we save them for later, like squirrels."""
 
     # Circuit breaker state tracking
@@ -296,6 +298,8 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         self, query: str, documents: StructuredDataInput, **kwargs: Mapping[str, Any] | None
     ) -> Sequence[RerankingResult]:
         """Rerank the given documents based on the query."""
+        from codeweaver.core.chunks import CodeChunk
+
         processed_kwargs = self._set_kwargs(**kwargs)
         transformed_docs = CodeChunk.chunkify(documents)
         self._chunk_store = tuple(transformed_docs)
@@ -419,12 +423,17 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         if self.provider not in [Provider.VOYAGE, Provider.COHERE]:
             loop = asyncio.get_event_loop()
             _ = loop.run_in_executor(None, lambda: self._update_token_stats(from_docs=raw_docs))
+
+        from codeweaver.core.chunks import CodeChunk
+
         chunks = self._chunk_store or CodeChunk.chunkify(raw_docs)
         return self._output_transformer(results, iter(chunks))
 
     @staticmethod
     def to_code_chunk(text: StructuredDataInput) -> Sequence[CodeChunk]:
         """Convenience wrapper around `CodeChunk.chunkify`."""
+        from codeweaver.core.chunks import CodeChunk
+
         return tuple(CodeChunk.chunkify(text))
 
     def _report_token_savings(

@@ -1527,9 +1527,13 @@ def language_from_path(
             lang = ConfigLanguage.from_extension(ext)
     if lang:
         return lang
-    from codeweaver.core.file_extensions import ALL_LANGUAGES, LangPair
+    from codeweaver.core.file_extensions import (
+        CODE_FILES_EXTENSIONS,
+        DATA_FILES_EXTENSIONS,
+        DOC_FILES_EXTENSIONS,
+    )
 
-    all_languages: tuple[LangPair, ...] = ALL_LANGUAGES  # type: ignore
+    all_languages = CODE_FILES_EXTENSIONS + DATA_FILES_EXTENSIONS + DOC_FILES_EXTENSIONS
     # Check if the extension or filename matches any known language extensions
     if (
         (all_exts := tuple(ext_pair.ext for ext_pair in all_languages)) and FileExt(ext) in all_exts  # type: ignore

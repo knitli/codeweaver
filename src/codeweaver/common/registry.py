@@ -1115,9 +1115,11 @@ class ProviderRegistry(BasedModel):
         Returns:
             An initialized provider instance
         """
-        return self._create_provider(
-            provider, self.get_sparse_embedding_provider_class(provider), **kwargs
-        )
+        if (retrieved_cls := self.get_sparse_embedding_provider_class(provider)) and isinstance(
+            retrieved_cls, LazyImport
+        ):
+            return self._create_provider(provider, retrieved_cls, **kwargs)
+        return retrieved_cls(**kwargs)
 
     def create_reranking_provider(
         self, provider: Provider, **kwargs: Any
@@ -1131,9 +1133,11 @@ class ProviderRegistry(BasedModel):
         Returns:
             An initialized provider instance
         """
-        return self._create_provider(
-            provider, self.get_reranking_provider_class(provider), **kwargs
-        )
+        if (retrieved_cls := self.get_reranking_provider_class(provider)) and isinstance(
+            retrieved_cls, LazyImport
+        ):
+            return self._create_provider(provider, retrieved_cls, **kwargs)
+        return retrieved_cls(**kwargs)
 
     def _create_provider(
         self, provider: Provider, importer: LazyImport[type[Any]], **kwargs: Any
@@ -1168,9 +1172,11 @@ class ProviderRegistry(BasedModel):
         Returns:
             An initialized provider instance
         """
-        return self._create_provider(
-            provider, self.get_vector_store_provider_class(provider), **kwargs
-        )
+        if (retrieved_cls := self.get_vector_store_provider_class(provider)) and isinstance(
+            retrieved_cls, LazyImport
+        ):
+            return self._create_provider(provider, retrieved_cls, **kwargs)
+        return retrieved_cls(**kwargs)
 
     def create_agent_provider(self, provider: Provider, **kwargs: Any) -> AgentProvider[Any]:
         """Create an agent provider instance.
@@ -1182,7 +1188,11 @@ class ProviderRegistry(BasedModel):
         Returns:
             An initialized provider instance
         """
-        return self._create_provider(provider, self.get_agent_provider_class(provider), **kwargs)
+        if (retrieved_cls := self.get_agent_provider_class(provider)) and isinstance(
+            retrieved_cls, LazyImport
+        ):
+            return self._create_provider(provider, retrieved_cls, **kwargs)
+        return retrieved_cls(**kwargs)
 
     def create_data_provider(self, provider: Provider, **kwargs: Any) -> Any:
         """Create a data provider instance.
@@ -1194,7 +1204,11 @@ class ProviderRegistry(BasedModel):
         Returns:
             An initialized provider instance
         """
-        return self._create_provider(provider, self.get_data_provider_class(provider), **kwargs)
+        if (retrieved_cls := self.get_data_provider_class(provider)) and isinstance(
+            retrieved_cls, LazyImport
+        ):
+            return self._create_provider(provider, retrieved_cls, **kwargs)
+        return retrieved_cls(**kwargs)
 
     def get_embedding_provider_instance(
         self, provider: Provider, *, singleton: bool = False, **kwargs: Any

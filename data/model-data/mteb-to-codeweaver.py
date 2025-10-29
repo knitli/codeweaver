@@ -1,6 +1,5 @@
 #!/usr/bin/env -S uv run -s
 
-# SPDX-FileCopyrightText: 2025 (c) 2025 Knitli Inc.
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -512,12 +511,14 @@ def to_camel(s: str) -> str:
 
 def generate_capabilities_file(models: list[SimplifiedModelMeta], model_maker: ModelMaker) -> str:
     """Generate a capabilities module from MTEB models."""
+    # REUSE-IgnoreStart
     header = [
         "# THIS FILE IS AUTO-GENERATED - DO NOT EDIT MANUALLY. The `mteb_to_codeweaver.py` script is used to generate this file.",
         f'"""Capabilities for {model_maker} embedding models."""',
         "# SPDX-FileCopyrightText: 2025 (c) 2025 Knitli Inc.",
         "# SPDX-License-Identifier: MIT OR Apache-2.0",
         "# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>",
+    # REUSE-IgnoreEnd
         "from __future__ import annotations",
         "",
         "from typing import Literal",

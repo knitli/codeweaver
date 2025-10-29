@@ -13,27 +13,33 @@ Validates that:
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
 from codeweaver.common.utils import uuid7
 from codeweaver.core.chunks import BatchKeys, CodeChunk
-from codeweaver.core.metadata import ChunkSource, ExtKind
+from codeweaver.core.metadata import ChunkSource, ExtKind, Metadata
 from codeweaver.core.spans import Span
 
 
 @pytest.fixture
 def sample_chunk() -> CodeChunk:
     """Create a sample CodeChunk for testing."""
+    metadata: Metadata = {
+        "chunk_id": uuid7(),
+        "created_at": datetime.now(UTC).timestamp(),
+        "name": "test_function",
+    }
     return CodeChunk(
         content="def hello():\n    print('world')",
         file_path=Path("test.py"),
         line_range=Span(start=1, end=2),
-        ext_kind=ExtKind.PY,
+        ext_kind=ExtKind.from_file("test.py"),
         language="python",
         source=ChunkSource.SEMANTIC,
-        metadata={"test_key": "test_value"},
+        metadata=metadata,
     )
 
 
@@ -57,11 +63,11 @@ def test_set_batch_keys_preserves_metadata(sample_chunk: CodeChunk) -> None:
     """Test that set_batch_keys preserves metadata correctly."""
     batch_keys = BatchKeys(id=uuid7(), idx=0)
     updated_chunk = sample_chunk.set_batch_keys(batch_keys)
-    
+
     # Metadata should be preserved
     assert updated_chunk.metadata is not None
-    assert updated_chunk.metadata["test_key"] == "test_value"
-    
+    assert updated_chunk.metadata["name"] == "test_function"
+
     # Metadata should not be the same dict instance (avoid shared references)
     assert updated_chunk.metadata is not sample_chunk.metadata
 
@@ -96,11 +102,11 @@ def test_metadata_isolation_after_set_batch_keys(sample_chunk: CodeChunk) -> Non
     """Test that modifying metadata after set_batch_keys doesn't affect original."""
     batch_keys = BatchKeys(id=uuid7(), idx=0)
     updated_chunk = sample_chunk.set_batch_keys(batch_keys)
-    
+
     # Modify the updated chunk's metadata
     if updated_chunk.metadata:
-        updated_chunk.metadata["new_key"] = "new_value"
-    
-    # Original chunk's metadata should not have the new key
+        updated_chunk.metadata["kind"] = "modified"
+
+    # Original chunk's metadata should not have the modification
     assert sample_chunk.metadata is not None
-    assert "new_key" not in sample_chunk.metadata
+    assert sample_chunk.metadata.get("kind") is None
