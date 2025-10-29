@@ -311,7 +311,7 @@ class CodeChunk(BasedModel):
                 if self._embedding_batches
                 else (batch_keys,)
             },
-            deep=True,
+            deep=False,  # Shallow copy to avoid pickling issues with SgNode in metadata
         )
 
     def serialize_for_cli(self) -> dict[str, Any]:
