@@ -14,7 +14,9 @@ from threading import Lock as _Lock
 from types import FrameType
 from typing import Self, cast
 
-from pydantic import ConfigDict
+from typing import Any
+
+from pydantic import ConfigDict, GetCoreSchemaHandler
 from pydantic_core import core_schema
 
 from codeweaver.core.types.aliases import LiteralStringT, SentinelName, SentinelNameT
@@ -40,10 +42,22 @@ class Sentinel(BasedModel):
     name: SentinelName
     module_name: str
 
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        """Tell Pydantic how to validate Sentinel instances.
+        
+        Sentinels can only be validated if they're already Sentinel instances.
+        They cannot be constructed from arbitrary data like dicts or strings during validation.
+        """
+        # Use is_instance schema to only accept existing instances
+        return core_schema.is_instance_schema(cls)
+
     def __new__(cls, name: SentinelName | None = None, module_name: str | None = None) -> Self:
         """Create a new ."""
         # sourcery skip: avoid-builtin-shadow
-        name = SentinelName(name or cast(LiteralStringT, type(cls).__name__.upper()).strip())
+        name = SentinelName(name or cast(LiteralStringT, cls.__name__.upper()).strip())
         module_name = module_name or (
             cls.module_name if hasattr(cls, "module_name") else cls._get_module_name_generator()()
         )
@@ -61,6 +75,16 @@ class Sentinel(BasedModel):
         type(newcls).module_name = module_name or __name__
         with _lock:
             return cast(Self, _registry.setdefault(registry_key, newcls))
+
+    def __init__(self, name: SentinelName | None = None, module_name: str | None = None) -> None:
+        """Initialize a Sentinel instance.
+        
+        Note: This bypasses Pydantic validation because Sentinels are constructed
+        via __new__ with special singleton behavior.
+        """
+        # Don't call super().__init__() to avoid Pydantic validation
+        # The attributes are already set in __new__
+        pass
 
     def __str__(self) -> str:
         """Return a string representation of the sentinel."""
@@ -110,12 +134,7 @@ class Unset(Sentinel):
     A sentinel value to indicate that a value is unset.
     """
 
-    def __init__(self, name: SentinelName | None = None, module_name: str | None = None) -> None:
-        """Initialize the UNSET sentinel."""
-        super().__init__(
-            name=name or SentinelName("UNSET"),
-            module_name=module_name or Sentinel._get_module_name_generator()(),
-        )
+    pass
 
 
 UNSET: Unset = Unset()
