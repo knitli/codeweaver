@@ -92,6 +92,10 @@ mise --silent reshim &&
 eval "$(mise --silent activate zsh)" &&
 eval "$(mise --silent env -s zsh)" &&
 print -P "%F{209}[codeweaver]%f Initializing %F{209}CodeWeaver%f..."
+if ! git config --local --get-all include.path | grep -qxF ".gitconfig" &>/dev/null; then
+  print -P "%F{209}[codeweaver]%f Linking repo .gitconfig -> .git/config"
+  git config --local --add include.path ".gitconfig" || true
+fi
 hk init --mise &>/dev/null || true &&
 mise run venv || true &&
 source .venv/bin/activate &
@@ -252,11 +256,11 @@ print -P "%F{209}[codeweaver]%f ✅ All CI checks passed!"
 pre-commit = """
 #!/usr/bin/env bash
 print -P "%F{209}[codeweaver]%f Running %F{209}CodeWeaver%f pre-commit checks 🪝... %F{38} Thanks for your contributions! You're pretty cool.%f 🚀" &&
-hk fix || print -P "%F{209}[codeweaver]%f ⚠️  %F{red}You need to fix some issues before committing. Do not pass go, do not collect $200.%f 💸 😦" && exit 1
+hk fix || print -P "%F{209}[codeweaver]%f ⚠️  %F{red}You need to fix some issues%f before committing. %F{209}Do not pass go, do not collect $200.%f 💸 😦" && exit 1
 git add . &&
 hk check || print -P "%F{209}[codeweaver]%f ⚠️  %F{red}You need to fix some issues before committing. Almost there!%f" && exit 1
 git add . &&
-print -P "%F{209}[codeweaver]%f ✅ All pre-commit checks passed! You're awesome! 🎉 ... and they said the Kobiyashi Maru was unwinnable! 🖖"
+print -P "%F{209}[codeweaver]%f ✅ %F{green}All pre-commit checks passed! You're awesome!%f 🎉 ... and they said the Kobiyashi Maru was unwinnable! 🖖"
 """
 
 #!SECTION Aliases/Shortcuts for Scripts in scripts/ directory
@@ -335,7 +339,7 @@ uv run -s scripts/language-support/generate-delimiters.py
 generate-supported-languages = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Generating supported languages..."
-uv run -s scripts/language-support/generate-supported-languages.py
+uv run -s scripts/build/generate-supported-languages.py
 """
 
 mteb-to-codeweaver = """

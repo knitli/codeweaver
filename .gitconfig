@@ -1,0 +1,14 @@
+
+# repo-level .gitconfig to setup git drivers for codeweaver
+[core]
+    attributesfile = .gitattributes
+    excludesfile = .gitignore
+    autocrlf = false
+
+[merge "ours"]
+    name = "Keep ours merge"
+    driver = true
+
+[merge "latest_version"]
+    name = "Ensures the later version of the version file (_version.py) is kept."
+    driver = ./scripts/build/git-merge-latest-version.py %O %A %B

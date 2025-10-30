@@ -51,6 +51,8 @@ if TYPE_CHECKING:
     from codeweaver.core.types import AnonymityConversion, DictView, FilteredKeyT, Unset
     from codeweaver.providers.provider import Provider
 
+# TODO: Replace most defaults with Unset, to better track user-set vs default values. We just need to ensure we don't pass Unset to places that don't accept it. I'm not sure what the best way to do that is yet. My thought is that we could possibly modify pydantic serialization to convert Unset to None or missing values, but *not* do that for telemetry serialization.
+
 # ===========================================================================
 # *          Rignore and File Filter Settings
 # ===========================================================================
@@ -125,7 +127,9 @@ class BaseProviderSettings(TypedDict, total=False):
     api_key: NotRequired[str | None]
     connection: NotRequired[ConnectionConfiguration | None]
     client_options: NotRequired[dict[str, Any] | None]
+    """Options to pass to the provider's client (like `qdrant_client` for qdrant) as keyword arguments. You should refer to the provider's documentation for what options are available."""
     other: NotRequired[dict[str, Any] | None]
+    """Other provider-specific settings. This is primarily for user-defined providers to pass custom options."""
 
 
 # ===========================================================================
@@ -276,7 +280,9 @@ class UvicornServerSettings(BasedModel):
     access_log: bool = True
     use_colors: bool | None = None
     interface: InterfaceType = "auto"
-    reload: bool = False  # TODO: We should add it, but we need to manage handling it mid-request.
+    reload: bool = (
+        False  # TODO: We should add hot reload, but we need to manage handling it mid-request.
+    )
     reload_dirs: list[str] | str | None = None
     reload_delay: PositiveFloat = 0.25
     reload_includes: list[str] | str | None = None
