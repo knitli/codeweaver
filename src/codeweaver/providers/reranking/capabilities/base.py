@@ -60,7 +60,7 @@ class RerankingModelCapabilities(BasedModel):
 
     name: Annotated[str, Field(description="""The name of the model.""")] = ""
     provider: Annotated[Provider, Field(description="""The provider of the model.""")] = (
-        Provider.UNSET  # pyright: ignore[reportPrivateUsage]
+        Provider.NOT_SET
     )
     max_query: Annotated[
         PositiveInt | None,

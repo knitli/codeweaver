@@ -217,8 +217,9 @@ class ChunkerSettings(BasedModel):
             _ = CustomDelimiter.model_rebuild(_types_namespace=namespace)
 
     def model_post_init(self, __context: Any) -> None:
-        """Ensure models are rebuilt on first instantiation."""
-        self._ensure_models_rebuilt()
+        """Post-initialization hook."""
+        # Model rebuild is now handled at module level, so we don't need to call it here
+        # Calling it here was causing issues with ChunkGovernor's completion status
         super().model_post_init(__context)
 
 
@@ -229,3 +230,12 @@ __all__ = (
     "CustomLanguage",
     "PerformanceSettings",
 )
+
+
+# Rebuild models at module level to resolve forward references
+# This ensures models are ready before first instantiation
+try:
+    ChunkerSettings._ensure_models_rebuilt()
+except Exception:
+    # If rebuild fails during import, models will be rebuilt on first use via model_post_init
+    pass

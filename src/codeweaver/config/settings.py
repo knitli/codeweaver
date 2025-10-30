@@ -16,13 +16,14 @@ from __future__ import annotations
 import contextlib
 import inspect
 import logging
+import os
 import re
 
 from collections.abc import Callable
 from functools import cached_property, partial
 from importlib import util
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, Literal, NamedTuple, Self, Unpack, cast
+from typing import Annotated, Any, Literal, NamedTuple, Self, Unpack, cast
 
 from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.server.server import DuplicateBehavior
@@ -37,20 +38,28 @@ from pydantic import (
     ValidationError,
     computed_field,
     field_validator,
+    model_validator,
 )
 from pydantic.fields import ComputedFieldInfo, FieldInfo
 from pydantic_ai.settings import merge_model_settings
 from pydantic_core import from_json
 from pydantic_settings import (
+    AWSSecretsManagerSettingsSource,
+    AzureKeyVaultSettingsSource,
     BaseSettings,
+    DotEnvSettingsSource,
+    EnvSettingsSource,
+    GoogleSecretManagerSettingsSource,
     JsonConfigSettingsSource,
     PydanticBaseSettingsSource,
+    SecretsSettingsSource,
     SettingsConfigDict,
     TomlConfigSettingsSource,
     YamlConfigSettingsSource,
 )
 
 from codeweaver.common.utils.lazy_importer import lazy_import
+from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.chunker import ChunkerSettings
 from codeweaver.config.logging import LoggingSettings
 from codeweaver.config.middleware import (
@@ -67,28 +76,28 @@ from codeweaver.config.providers import (
     DataProviderSettings,
     EmbeddingModelSettings,
     EmbeddingProviderSettings,
+    ProviderSettingsDict,
     RerankingModelSettings,
     RerankingProviderSettings,
     SparseEmbeddingModelSettings,
     VectorStoreSettings,
 )
 from codeweaver.config.types import (
+    ChunkerSettingsDict,
     CodeWeaverSettingsDict,
+    FastMcpServerSettingsDict,
+    IndexerSettingsDict,
     RignoreSettings,
     UvicornServerSettings,
-    default_config_file_locations,
+    UvicornServerSettingsDict,
 )
 from codeweaver.core.file_extensions import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_EXTENSIONS
+from codeweaver.core.types.aliases import FilteredKey, FilteredKeyT
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.sentinel import UNSET, Unset
 from codeweaver.providers.provider import Provider
-
-
-if TYPE_CHECKING:
-    from codeweaver.core.types.aliases import FilteredKeyT
-    from codeweaver.core.types.enum import AnonymityConversion
 
 
 logger = logging.getLogger(__name__)
@@ -103,7 +112,7 @@ DefaultDataProviderSettings = (
 )
 
 
-# TODO: move defaault computation to provider module.
+# TODO: move default computation to provider module.
 class DeterminedDefaults(NamedTuple):
     """Tuple for determined default embedding settings."""
 
@@ -153,7 +162,7 @@ def _get_default_embedding_settings() -> DeterminedDefaults:
     logger.warning(
         "No default embedding provider libraries found. Embedding functionality will be disabled unless explicitly set in your config or environment variables."
     )
-    return DeterminedDefaults(provider=Provider.UNSET, model="NONE", enabled=False)
+    return DeterminedDefaults(provider=Provider.NOT_SET, model="NONE", enabled=False)
 
 
 _embedding_defaults = _get_default_embedding_settings()
@@ -185,7 +194,7 @@ def _get_default_sparse_embedding_settings() -> DeterminedDefaults:
     logger.warning(
         "No sparse embedding provider libraries found. Sparse embedding functionality disabled."
     )
-    return DeterminedDefaults(provider=Provider.UNSET, model="NONE", enabled=False)
+    return DeterminedDefaults(provider=Provider.NOT_SET, model="NONE", enabled=False)
 
 
 _sparse_embedding_defaults = _get_default_sparse_embedding_settings()
@@ -223,7 +232,7 @@ def _get_default_reranking_settings() -> DeterminedDefaults:
     logger.warning(
         "No default reranking provider libraries found. Reranking functionality will be disabled unless explicitly set in your config or environment variables."
     )
-    return DeterminedDefaults(provider=Provider.UNSET, model="NONE", enabled=False)
+    return DeterminedDefaults(provider=Provider.NOT_SET, model="NONE", enabled=False)
 
 
 _reranking_defaults = _get_default_reranking_settings()
@@ -491,8 +500,6 @@ class IndexerSettings(BasedModel):
         return self.cache_dir / "indexing_checkpoint.json"
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types import AnonymityConversion, FilteredKey
-
         return {
             FilteredKey("_index_storage_path"): AnonymityConversion.HASH,
             FilteredKey("additional_ignores"): AnonymityConversion.COUNT,
@@ -686,7 +693,7 @@ class ProviderSettings(BasedModel):
         return None
 
 
-AllDefaultProviderSettings = ProviderSettings.model_construct(
+AllDefaultProviderSettings = ProviderSettingsDict(
     data=DefaultDataProviderSettings,
     embedding=DefaultEmbeddingProviderSettings,
     reranking=DefaultRerankingProviderSettings,
@@ -804,7 +811,7 @@ class FastMcpServerSettings(BasedModel):
     @field_validator("additional_middleware", mode="before")
     def _validate_additional_middleware(cls, value: Any) -> list[str] | None:
         """Validate and normalize additional middleware inputs."""
-        if value is None or value is UNSET:
+        if value is None or isinstance(value, Unset):
             return None
         if isinstance(value, str | bytes | bytearray):
             try:
@@ -817,7 +824,7 @@ class FastMcpServerSettings(BasedModel):
     @field_validator("additional_tools", mode="before")
     def _validate_additional_tools(cls, value: Any) -> list[str] | None:
         """Validate and normalize additional tool inputs."""
-        if value is None or value is UNSET:
+        if value is None or isinstance(value, Unset):
             return None
         if isinstance(value, str | bytes | bytearray):
             try:
@@ -827,16 +834,19 @@ class FastMcpServerSettings(BasedModel):
         return [s for s in (cls._callable_to_path(v, "tools") for v in value) if s]
 
 
-DefaultFastMcpServerSettings = FastMcpServerSettings.model_validate({
-    "transport": "http",
-    "auth": None,
-    "on_duplicate_tools": "warn",
-    "on_duplicate_resources": "warn",
-    "on_duplicate_prompts": "warn",
-    "resource_prefix_format": "path",
-    "middleware": [],
-    "tools": [],
-})
+DefaultFastMcpServerSettings = FastMcpServerSettingsDict(
+    transport="http",
+    auth=None,
+    on_duplicate_tools="warn",
+    on_duplicate_resources="warn",
+    on_duplicate_prompts="warn",
+    resource_prefix_format="path",
+    middleware=[],
+    tools=[],
+)
+DefaultIndexerSettings = IndexerSettingsDict()
+DefaultChunkerSettings = ChunkerSettingsDict()
+DefaultUvicornSettings = UvicornServerSettingsDict()
 
 
 _ = ProviderSettings.model_rebuild()
@@ -855,27 +865,30 @@ class CodeWeaverSettings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
+        allow_arbitrary_types=True,
         case_sensitive=False,
         cli_kebab_case=True,
-        env_file=(".codeweaver.local.env", ".env", ".codeweaver.env"),
-        env_ignore_empty=True,
-        env_nested_delimiter="__",
-        env_parse_enums=True,
-        env_prefix="CODEWEAVER_",
         extra="allow",  # Allow extra fields in the configuration for plugins/extensions
         field_title_generator=cast(
             Callable[[str, FieldInfo | ComputedFieldInfo], str],
             BasedModel.model_config["field_title_generator"],  # type: ignore
         ),
-        json_file=default_config_file_locations(as_json=True),
         nested_model_default_partial_update=True,
+        from_attributes=True,
+        env_ignore_empty=True,
+        env_nested_delimiter="__",
+        env_nested_max_split=-1,
+        env_prefix="CODEWEAVER_",  # environment variables will be prefixed with CODEWE
+        # keep secrets in user config dir
         str_strip_whitespace=True,
         title="CodeWeaver Settings",
-        toml_file=default_config_file_locations(),
         use_attribute_docstrings=True,
         use_enum_values=True,
         validate_assignment=True,
-        yaml_file=default_config_file_locations(as_yaml=True),
+        populate_by_name=True,
+        # spellchecker:off
+        # NOTE: Sources are set in `settings_customise_sources` method below
+        # spellchecker:on
     )
 
     # Core settings
@@ -916,9 +929,9 @@ class CodeWeaverSettings(BaseSettings):
         ),
     ] = UNSET
     server: Annotated[
-        FastMcpServerSettings,
+        FastMcpServerSettings | Unset,
         Field(description="""Optionally customize FastMCP server settings."""),
-    ] = DefaultFastMcpServerSettings
+    ] = UNSET
 
     logging: Annotated[LoggingSettings | Unset, Field(description="""Logging configuration""")] = (
         UNSET
@@ -997,7 +1010,9 @@ class CodeWeaverSettings(BaseSettings):
             else self.project_name  # type: ignore
         )
         self.provider = (
-            AllDefaultProviderSettings if isinstance(self.provider, Unset) else self.provider
+            ProviderSettings.model_validate(AllDefaultProviderSettings)
+            if isinstance(self.provider, Unset)
+            else self.provider
         )
         self.token_limit = 30_000 if isinstance(self.token_limit, Unset) else self.token_limit
         self.max_file_size = (
@@ -1006,12 +1021,26 @@ class CodeWeaverSettings(BaseSettings):
         self.max_results = 75 if isinstance(self.max_results, Unset) else self.max_results
         # middleware gets set in the server initialization if unset
         self.server = (
-            DefaultFastMcpServerSettings if isinstance(self.server, Unset) else self.server
+            FastMcpServerSettings.model_validate(DefaultFastMcpServerSettings)
+            if isinstance(self.server, Unset)
+            else self.server
         )
         # logging also gets set in the server initialization if unset
-        self.indexing = IndexerSettings() if isinstance(self.indexing, Unset) else self.indexing
-        self.chunker = ChunkerSettings() if isinstance(self.chunker, Unset) else self.chunker
-        self.uvicorn = UvicornServerSettings() if isinstance(self.uvicorn, Unset) else self.uvicorn
+        self.indexing = (
+            IndexerSettings.model_validate(DefaultIndexerSettings)
+            if isinstance(self.indexing, Unset)
+            else self.indexing
+        )
+        self.chunker = (
+            ChunkerSettings.model_validate(DefaultChunkerSettings)
+            if isinstance(self.chunker, Unset)
+            else self.chunker
+        )
+        self.uvicorn = (
+            UvicornServerSettings.model_validate(DefaultUvicornSettings)
+            if isinstance(self.uvicorn, Unset)
+            else self.uvicorn
+        )
         for attr in (
             "enable_health_endpoint",
             "enable_statistics_endpoint",
@@ -1043,8 +1072,36 @@ class CodeWeaverSettings(BaseSettings):
         }
 
     @classmethod
+    def _defaults(cls) -> CodeWeaverSettingsDict:
+        """Get a default settings dictionary."""
+        from codeweaver.common.utils import get_project_path
+
+        path = get_project_path()
+        return CodeWeaverSettingsDict(
+            project_path=path or Path.cwd(),
+            project_name=path.name,
+            provider=AllDefaultProviderSettings,
+            token_limit=30_000,
+            max_file_size=1 * 1024 * 1024,
+            max_results=75,
+            server=DefaultFastMcpServerSettings,
+            indexing=DefaultIndexerSettings,
+            chunker=DefaultChunkerSettings,
+            uvicorn=DefaultUvicornSettings,
+            enable_health_endpoint=True,
+            enable_settings_endpoint=True,
+            enable_statistics_endpoint=True,
+            enable_version_endpoint=True,
+            enable_telemetry=True,
+            allow_identifying_telemetry=False,
+        )
+
+    @classmethod
     def from_config(cls, path: FilePath, **kwargs: Unpack[CodeWeaverSettingsDict]) -> Self:
-        """Create a CodeWeaverSettings instance from a configuration file."""
+        """Create a CodeWeaverSettings instance from a configuration file.
+
+        This is a convenience method for creating a settings instance from a specific config file. By default, CodeWeaverSettings will look for configuration files in standard locations (like .codeweaver.toml in the project root). This method allows you to specify a particular config file to load settings from, primarily for testing or special use cases.
+        """
         extension = path.suffix.lower()
         match extension:
             case ".json":
@@ -1070,7 +1127,7 @@ class CodeWeaverSettings(BaseSettings):
         return self.project_path.resolve()
 
     @classmethod  # spellchecker:off
-    def settings_customise_sources(
+    def settings_customise_sources(  # noqa: C901
         # spellchecker:on
         cls,
         settings_cls: type[BaseSettings],
@@ -1084,47 +1141,171 @@ class CodeWeaverSettings(BaseSettings):
         Configuration precedence (highest to lowest):
         1. init_settings - Direct initialization arguments
         2. env_settings - Environment variables (CODEWEAVER_*)
-        3. dotenv_settings - .env files
-        4. toml_sources - TOML config files (.codeweaver.local.toml, .codeweaver.toml, etc.)
-        5. yaml_sources - YAML config files (.codeweaver.local.yaml, .codeweaver.yaml, etc.)
-        6. json_sources - JSON config files (.codeweaver.local.json, .codeweaver.json, etc.)
-        7. file_secret_settings - Secret files (lowest priority)
+        3. dotenv_settings - .env files:
+            - .local.env,
+            - .env
+            - .codeweaver.local.env
+            - .codeweaver.env
+            - .codeweaver/.local.env
+            - .codeweaver/.env
+        4. In order of .toml, .yaml/.yml, .json files:
+            - .codeweaver.local.{toml,yaml,yml,json}
+            - .codeweaver.{toml,yaml,yml,json}
+            - .codeweaver/codeweaver.local.{toml,yaml,yml,json}
+            - .codeweaver/codeweaver.{toml,yaml,yml,json}
+            - SYSTEM_USER_CONFIG_DIR/codeweaver/codeweaver.{toml,yaml,yml,json}
+        5. file_secret_settings - Secret files SYSTEM_USER_CONFIG_DIR/codeweaver/secrets/
+           (see https://docs.pydantic.dev/latest/concepts/pydantic_settings/#secrets for more info)
+        6. If available and configured:
+            - AWS Secrets Manager
+            - Azure Key Vault
+            - Google Secret Manager
         """
-        sources: list[PydanticBaseSettingsSource] = [init_settings, env_settings, dotenv_settings]
+        config_files: list[PydanticBaseSettingsSource] = []
+        user_config_dir = get_user_config_dir()
+        secrets_dir = user_config_dir / "secrets"
+        if not user_config_dir.exists():
+            user_config_dir.mkdir(parents=True, exist_ok=True)
+            user_config_dir.chmod(0o700)
+        if not secrets_dir.exists():
+            secrets_dir.mkdir(parents=True, exist_ok=True)
+            secrets_dir.chmod(0o700)
+        locations: list[str] = [
+            "codeweaver.local",
+            "codeweaver",
+            ".codeweaver.local",
+            ".codeweaver",
+            ".codeweaver/codeweaver.local",
+            ".codeweaver/codeweaver",
+            f"{user_config_dir!s}/codeweaver",
+        ]
+        for _class in (
+            TomlConfigSettingsSource,
+            YamlConfigSettingsSource,
+            JsonConfigSettingsSource,
+        ):
+            for loc in locations:
+                ext = _class.__name__.split("ConfigSettingsSource")[0].lower()
+                config_files.append(_class(settings_cls, Path(f"{loc}.{ext}")))
+                if ext == "yaml":
+                    config_files.append(_class(settings_cls, Path(f"{loc}.yml")))
+        other_sources: list[PydanticBaseSettingsSource] = []
+        if any(env for env in os.environ if env.startswith("AWS_SECRETS_MANAGER")):
+            other_sources.append(
+                AWSSecretsManagerSettingsSource(
+                    settings_cls,
+                    os.environ.get("AWS_SECRETS_MANAGER_SECRET_ID", ""),
+                    os.environ.get("AWS_SECRETS_MANAGER_REGION", ""),
+                    os.environ.get("AWS_SECRETS_MANAGER_ENDPOINT_URL", ""),
+                )
+            )
+        if any(env for env in os.environ if env.startswith("AZURE_KEY_VAULT")) and util.find_spec(
+            "azure.identity"
+        ):
+            try:
+                from azure.identity import DefaultAzureCredential  # type: ignore
 
-        # Add TOML config source if configured
-        if toml_file := settings_cls.model_config.get("toml_file"):
-            sources.append(TomlConfigSettingsSource(settings_cls, toml_file=toml_file))
+            except ImportError:
+                logger.warning("Azure SDK not installed, skipping Azure Key Vault settings.")
+            else:
+                other_sources.append(
+                    AzureKeyVaultSettingsSource(
+                        settings_cls,
+                        os.environ.get("AZURE_KEY_VAULT_URL", ""),
+                        DefaultAzureCredential(),  # type: ignore
+                    )
+                )
+        if any(
+            env for env in os.environ if env.startswith("GOOGLE_SECRET_MANAGER")
+        ) and util.find_spec("google.auth"):
+            try:
+                from google.auth import default  # type: ignore
 
-        # Add YAML config source if configured
-        if yaml_file := settings_cls.model_config.get("yaml_file"):
-            sources.append(YamlConfigSettingsSource(settings_cls, yaml_file=yaml_file))
+            except ImportError:
+                logger.warning(
+                    "Google Cloud SDK not installed, skipping Google Secret Manager settings."
+                )
+            else:
+                other_sources.append(
+                    GoogleSecretManagerSettingsSource(
+                        settings_cls,
+                        default()[0],  # type: ignore
+                        os.environ.get("GOOGLE_SECRET_MANAGER_PROJECT_ID", ""),
+                    )
+                )
+        return (
+            init_settings,
+            EnvSettingsSource(
+                settings_cls,
+                env_prefix="CODEWEAVER_",
+                case_sensitive=False,
+                env_nested_delimiter="__",
+                env_parse_enums=True,
+                env_ignore_empty=True,
+            ),
+            DotEnvSettingsSource(
+                settings_cls,
+                env_file=(
+                    ".local.env",
+                    ".env",
+                    ".codeweaver.local.env",
+                    ".codeweaver.env",
+                    ".codeweaver/.local.env",
+                    ".codeweaver/.env",
+                ),
+                env_ignore_empty=True,
+            ),
+            *config_files,
+            SecretsSettingsSource(
+                settings_cls=settings_cls,
+                secrets_dir=f"{user_config_dir}/secrets",
+                env_ignore_empty=True,
+            ),
+            *other_sources,
+        )
 
-        # Add JSON config source if configured
-        if json_file := settings_cls.model_config.get("json_file"):
-            sources.append(JsonConfigSettingsSource(settings_cls, json_file=json_file))
-
-        # Add file secret settings last (lowest priority)
-        sources.append(file_secret_settings)
-
-        return tuple(sources)
-
-    def _update_settings(self, **kwargs: CodeWeaverSettingsDict) -> Self:
+    def _update_settings(self, **kwargs: Unpack[CodeWeaverSettingsDict]) -> Self:
         """Update settings, validating a new CodeWeaverSettings instance and updating the global instance."""
-        new_settings = self.model_copy().model_dump() | kwargs
         try:
-            new_self = self.model_validate(new_settings)
+            self.__init__(**kwargs)  # type: ignore # Unpack doesn't extend to nested dicts
         except ValidationError:
             logger.exception(
                 "`CodeWeaverSettings` received invalid settings for an update. The settings failed to validate. We did not update the settings."
             )
             return self
-        globals()["_settings"] = new_self
-        globals()["_mapped_settings"] = (
-            None  # reset the mapping, it will be regenerated on next access
-        )
-        self._map = None  # reset the instance mapping, it will be regenerated on next access
-        return new_self.model_copy()
+        # The global _settings doesn't need updated because its reference didn't change
+        # But we do need to update the global _mapped_settings because it's a copy
+        # And other modules are using references to that copy
+        globals()["_mapped_settings"] = self.view  # this recreates self._map as well
+        return self
+
+    @classmethod
+    def reload(cls) -> Self:
+        """Reloads settings from configuration sources.
+
+        You can use this method to refresh the settings instance, re-reading configuration files and environment variables. This is useful if you expect configuration to change at runtime and want to apply those changes without restarting the application.
+        """
+        instance = globals().get("_settings")
+        if instance is None:
+            return cls()
+        instance.__init__()
+        return instance
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_model(cls, data: Any) -> None:
+        """Validate the model before instantiation."""
+        defaults = cls._defaults()
+        _unset: set[str] = set()
+        for field, value in defaults.items():
+            if field not in data or isinstance(data.get(field), Unset):
+                data[field] = value
+            if isinstance(data.get(field), Unset):
+                _unset.add(field)
+        data["_unset_fields"] = _unset
+        return data
+
+        # Add any additional validation logic here
 
     @property
     def view(self) -> DictView[CodeWeaverSettingsDict]:
@@ -1146,7 +1327,7 @@ _settings: CodeWeaverSettings | None = None
 """The global settings instance. Use `get_settings()` to access it."""
 
 _mapped_settings: DictView[CodeWeaverSettingsDict] | None = None
-"""An immutable mapping view of the global settings instance."""
+"""An immutable mapping view of the global settings instance. Use `get_settings_map()` to access it."""
 
 
 def get_settings(config_file: FilePath | None = None) -> CodeWeaverSettings:
@@ -1163,23 +1344,22 @@ def get_settings(config_file: FilePath | None = None) -> CodeWeaverSettings:
     if not ChunkerSettings.__pydantic_complete__:
         ChunkerSettings._ensure_models_rebuilt()  # type: ignore
 
-    root = get_project_path()
-    if isinstance(_settings, CodeWeaverSettings):
-        if isinstance(_settings.project_path, Unset):
-            _settings.project_path = root
-        if isinstance(_settings.project_name, Unset):
-            _settings.project_name = root.name
-        return _settings
-
     # Rebuild CodeWeaverSettings if needed before instantiation
     if not CodeWeaverSettings.__pydantic_complete__:
         _ = CodeWeaverSettings.model_rebuild()
-
+    root = get_project_path() or Path.cwd()
     if config_file and config_file.exists():
-        _settings = CodeWeaverSettings(project_path=root, config_file=config_file)
-    if _settings is None:
+        _settings = CodeWeaverSettings(config_file=config_file)
+    if _settings is None or isinstance(_settings, Unset):
+        print(globals())
+        print(_settings)
+        print(dir())
         _settings = CodeWeaverSettings(project_path=root)  # type: ignore
 
+    if isinstance(_settings.project_path, Unset):
+        _settings.project_path = root
+    if isinstance(_settings.project_name, Unset):
+        _settings.project_name = root.name
     return _settings
 
 

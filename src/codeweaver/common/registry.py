@@ -79,7 +79,7 @@ if TYPE_CHECKING:
 type AgenticProfile = Any
 type AgenticProfileSpec = Callable[[str], Any] | Any | None
 
-_provider_settings: DictView[ProviderSettingsDict] | None
+_provider_settings: DictView[ProviderSettingsDict] | None = None
 
 logger = logging.getLogger(__name__)
 console = Console(markup=True)
@@ -91,7 +91,7 @@ def get_provider_settings() -> DictView[ProviderSettingsDict]:
     if not _provider_settings:
         from codeweaver.config.settings import get_settings_map
 
-        _provider_settings = DictView(get_settings_map()["providers"])
+        _provider_settings = DictView(get_settings_map()["provider"])
     if not _provider_settings:
         raise ValueError("Provider settings are not available.")
     return _provider_settings

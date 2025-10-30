@@ -512,7 +512,8 @@ all-gpu = [
 vcs = "git"
 style = "semver"
 bump = true
-tag-branch = "main"
+dirty = true  # Add .dirty suffix when working directory has uncommitted changes
+# tag-branch = "main"  # Commented out to allow building on feature branches
 commit-prefix = "g"
 
 [tool.hatch.build.hooks.version]

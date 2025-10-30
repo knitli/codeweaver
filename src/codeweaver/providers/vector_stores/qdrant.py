@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import UUID4
+from typing_extensions import TypeIs
 
 from codeweaver.common.utils.utils import uuid7
 from codeweaver.config.providers import QdrantConfig
@@ -45,6 +46,18 @@ class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
     config: QdrantConfig
     _metadata: dict[str, Any] | None = None
     _provider: Provider = Provider.QDRANT
+
+    @staticmethod
+    def _ensure_client(client: Any) -> TypeIs[AsyncQdrantClient]:
+        """Ensure the Qdrant client is initialized and ready.
+
+        Args:
+            client: The client instance to check.
+
+        Returns:
+            True if the client is initialized and ready.
+        """
+        return client is not None and isinstance(client, AsyncQdrantClient)
 
     @property
     def base_url(self) -> str | None:
@@ -116,13 +129,17 @@ class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         return [col.name for col in collections.collections]
 
     async def search(
-        self, vector: list[float] | dict[str, list[float] | Any], query_filter: Filter | None = None
+        self,
+        vector: list[float] | dict[str, list[float] | Any],
+        query_filter: Filter | None = None,
+        limit: int = 100,
     ) -> list[SearchResult]:
         """Search for similar vectors using dense, sparse, or hybrid search.
 
         Args:
             vector: Query vector (list for dense-only or dict for hybrid).
             query_filter: Optional filter for search results.
+            limit: Maximum number of results to return (default 100).
 
         Returns:
             List of search results sorted by relevance score.
@@ -161,7 +178,7 @@ class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
                 collection_name=collection_name,
                 query=query_value,
                 using=query_vector,
-                limit=100,
+                limit=limit,
                 with_payload=True,
                 with_vectors=False,
                 query_filter=qdrant_filter,

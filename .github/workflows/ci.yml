@@ -21,6 +21,9 @@ jobs:
   test:
     name: Test Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
+    env:
+      QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
+      VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
     strategy:
       matrix:
         python-version:

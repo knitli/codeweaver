@@ -339,6 +339,7 @@ class Indexer(BasedModel):
         *,
         auto_initialize_providers: bool = True,
         project_path: Path | None = None,
+        project_root: Path | None = None,
     ) -> None:
         """Initialize the Indexer with optional pipeline components.
 
@@ -347,8 +348,17 @@ class Indexer(BasedModel):
             store: Store for discovered file metadata
             chunking_service: Service for chunking files (optional)
             auto_initialize_providers: Auto-initialize providers from global registry
-            project_path: Project path for checkpoint management
+            project_path: Project path for checkpoint management (preferred)
+            project_root: Alias for project_path (deprecated, use project_path)
         """
+        # Support both project_path and project_root for backward compatibility
+        if project_root is not None and project_path is None:
+            project_path = project_root
+        elif project_root is not None and project_path is not None:
+            logger.warning(
+                "Both project_path and project_root specified, using project_path: %s",
+                project_path,
+            )
         self._store = store or BlakeStore[DiscoveredFile](_value_type=DiscoveredFile)
         self._walker = walker
         self._chunking_service = chunking_service or _get_chunking_service()

@@ -83,6 +83,29 @@ class ChunkerSelector:
         """
         self.governor = governor
 
+    def select_for_file_path(self, file_path: Any) -> BaseChunker:
+        """Select best chunker for given file path (convenience method).
+
+        Creates a DiscoveredFile from the path and delegates to select_for_file.
+        This is a convenience method for when you only have a Path object.
+
+        Args:
+            file_path: Path to the file (Path object or path-like)
+
+        Returns:
+            Fresh BaseChunker instance appropriate for file's language.
+
+        Examples:
+            >>> from pathlib import Path
+            >>> file_path = Path("example.py")
+            >>> chunker = selector.select_for_file_path(file_path)
+        """
+        from pathlib import Path
+
+        file_path = Path(file_path) if not isinstance(file_path, Path) else file_path
+        discovered_file = DiscoveredFile.from_path(file_path)
+        return self.select_for_file(discovered_file)
+
     def select_for_file(self, file: DiscoveredFile) -> BaseChunker:
         """Select best chunker for given file (creates fresh instance).
 

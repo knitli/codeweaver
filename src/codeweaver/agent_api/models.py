@@ -16,6 +16,7 @@ from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.spans import Span
+from codeweaver.core.types import LanguageName
 from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
 
@@ -23,7 +24,7 @@ from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
 if TYPE_CHECKING:
     from rich.table import Table
 
-    from codeweaver.core.types import AnonymityConversion, FilteredKeyT, LanguageName
+    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
 
 class SearchStrategy(BaseEnum):
@@ -150,7 +151,6 @@ class FindCodeResponseSummary(BasedModel):
         NonNegativeInt,
         Field(
             description="""Total results returned in this response""",
-            default_factory=lambda data: len(data["matches"]),
         ),
     ]
 
@@ -167,13 +167,27 @@ class FindCodeResponseSummary(BasedModel):
         tuple[SemanticSearchLanguage | LanguageName, ...],
         Field(
             description="""Programming languages in the results. If the language is supported for semantic search, it will be a `SemanticSearchLanguage`, otherwise a `LanguageName` NewType (str) from languages in `codeweaver.core.file_extensions.py`""",
-            default_factory=lambda data: tuple(
-                match.file.ext_kind.language
-                for match in data["matches"]
-                if match and match.file and match.file.ext_kind and match.file.ext_kind.language
-            ),
+            default_factory=tuple,
         ),
     ]
+
+    @model_validator(mode="after")
+    def populate_computed_fields(self) -> FindCodeResponseSummary:
+        """Populate computed fields from other data."""
+        # Set total_results from matches count if not already set
+        if self.total_results == 0 and self.matches:
+            object.__setattr__(self, "total_results", len(self.matches))
+
+        # Set languages_found from matches if not already populated
+        if not self.languages_found and self.matches:
+            languages = tuple(
+                match.file.ext_kind.language
+                for match in self.matches
+                if match and match.file and match.file.ext_kind and match.file.ext_kind.language
+            )
+            object.__setattr__(self, "languages_found", languages)
+
+        return self
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
@@ -209,3 +223,8 @@ class FindCodeResponseSummary(BasedModel):
 
 
 __all__ = ("CodeMatch", "CodeMatchType", "FindCodeResponseSummary", "SearchStrategy")
+
+
+# Rebuild models to resolve forward references
+CodeMatch.model_rebuild()
+FindCodeResponseSummary.model_rebuild()

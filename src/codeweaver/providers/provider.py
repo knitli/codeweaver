@@ -99,7 +99,7 @@ class Provider(BaseEnum):
     DUCKDUCKGO = "duckduckgo"
     TAVILY = "tavily"
 
-    UNSET = "unset"
+    NOT_SET = "not_set"
 
     @classmethod
     def validate(cls, value: str) -> BaseEnum:

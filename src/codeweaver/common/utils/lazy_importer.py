@@ -64,7 +64,7 @@ class LazyImport[Import: Any]:
         ...     encoder = _tiktoken.get_encoding("gpt2")  # tiktoken imports NOW
     """
 
-    __slots__ = ("_attrs", "_lock", "_module_name", "_resolved")  # type: ignore
+    __slots__ = ("_attrs", "_lock", "_module_name", "_parent", "_resolved")  # type: ignore
 
     def __init__(self, module_name: str, *attrs: str) -> None:
         """
@@ -83,6 +83,7 @@ class LazyImport[Import: Any]:
         object.__setattr__(self, "_module_name", module_name)
         object.__setattr__(self, "_attrs", attrs)
         object.__setattr__(self, "_resolved", None)
+        object.__setattr__(self, "_parent", None)
         object.__setattr__(self, "_lock", threading.Lock())
 
     def _resolve(self) -> Import:
@@ -141,7 +142,38 @@ class LazyImport[Import: Any]:
                 raise AttributeError(msg) from e
 
         object.__setattr__(self, "_resolved", result)
+
+        # Mark parent as resolved if we have one
+        parent = object.__getattribute__(self, "_parent")
+        if parent is not None:
+            # Recursively mark parent chain as resolved
+            parent._mark_resolved()
+
         return result
+
+    def _mark_resolved(self) -> None:
+        """
+        Mark this LazyImport as resolved without actually resolving it.
+
+        This is used to mark parent LazyImports as resolved when their children
+        are resolved, since accessing any attribute of a module means the module
+        itself has been imported.
+
+        This method is called recursively up the parent chain to ensure all
+        ancestors are marked as resolved.
+        """
+        # Already resolved, nothing to do
+        if object.__getattribute__(self, "_resolved") is not None:
+            return
+
+        # Mark as resolved (we use a sentinel to indicate "resolved but not cached")
+        # We can't store the actual module without resolving it, so we use True as marker
+        object.__setattr__(self, "_resolved", True)
+
+        # Recursively mark parent
+        parent = object.__getattribute__(self, "_parent")
+        if parent is not None:
+            parent._mark_resolved()
 
     def __getattr__(self, name: str) -> LazyImport[Import]:
         """
@@ -159,7 +191,10 @@ class LazyImport[Import: Any]:
         """
         module_name = object.__getattribute__(self, "_module_name")
         attrs = object.__getattribute__(self, "_attrs")
-        return LazyImport(module_name, *attrs, name)
+        child = LazyImport(module_name, *attrs, name)
+        # Set parent reference so child can mark parent as resolved
+        object.__setattr__(child, "_parent", self)
+        return child
 
     def __call__(self, *args: Any, **kwargs: Any) -> Import:
         """

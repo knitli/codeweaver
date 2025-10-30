@@ -10,14 +10,14 @@ enable_telemetry = true
 model_settings = { model = "voyage-code-3" }
 provider = "voyage"
 
-[[provider.sparse_embedding]]
+[[provider.embedding]] # sparse
 provider = "fastembed"
-model_settings = { model = "prithivida/Splade_PP_en_v2" }
+sparse_model_settings = { model = "prithivida/Splade_PP_en_v2" }
 
-[[provider.reranking]]
+[provider.reranking]
 provider = "voyage"
 model_settings = { model = "voyage-rerank-2.5" }
 
-[[provider.vector_store]]
-qdrant = { url = "http://localhost:6333", collection_name = "codeweaver_dev", prefer_grpc = true }
+[provider.vector_store]
+qdrant = { url = "https://f3b7755c-ee6e-4605-8786-c4218f9e148b.us-east-1-1.aws.cloud.qdrant.io", collection_name = "codeweaver-dev", prefer_grpc = true }
 provider = "qdrant"

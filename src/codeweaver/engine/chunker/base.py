@@ -25,6 +25,8 @@ from typing import TYPE_CHECKING, Annotated, Any, cast
 
 from pydantic import ConfigDict, Field, PositiveInt, computed_field
 
+# Import ChunkerSettings at runtime for model rebuild to work
+from codeweaver.config.chunker import ChunkerSettings
 from codeweaver.config.providers import EmbeddingProviderSettings, RerankingProviderSettings
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.models import BasedModel
@@ -34,7 +36,6 @@ from codeweaver.providers.reranking.capabilities.base import RerankingModelCapab
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.chunker import ChunkerSettings
     from codeweaver.core.discovery import DiscoveredFile
 
 
@@ -106,7 +107,7 @@ class ChunkGovernor(BasedModel):
     ) -> Provider:
         from codeweaver.providers.provider import Provider
 
-        return Provider.UNSET if settings is None else settings["provider"]
+        return Provider.NOT_SET if settings is None else settings["provider"]
 
     @staticmethod
     def _get_caps_for_provider(
@@ -158,7 +159,7 @@ class ChunkGovernor(BasedModel):
         embedding_caps = cls._get_caps_for_provider(embedding_settings, embedding_provider)
         if (
             reranking_settings
-            and reranking_provider is not Provider.UNSET
+            and reranking_provider is not Provider.NOT_SET
             and (
                 reranking_caps := cls._get_caps_for_provider(reranking_settings, reranking_provider)
             )
@@ -246,13 +247,32 @@ def _rebuild_models() -> None:
     logger = logging.getLogger(__name__)
     try:
         if not ChunkGovernor.__pydantic_complete__:
-            from codeweaver.config.settings import get_settings
+            # Import ChunkerSettings to ensure it's available for rebuild
+            # The import is safe here because ChunkerSettings imports are already resolved
+            from codeweaver.config.chunker import ChunkerSettings as _ChunkerSettings
 
-            chunk_settings = get_settings().chunker
-            if not type(chunk_settings).__pydantic_complete__:
-                _ = chunk_settings.model_rebuild()
-            _ = ChunkGovernor.model_rebuild()
+            # Build namespace for model rebuild with all required types
+            # ChunkGovernor needs ChunkerSettings, and BaseChunker methods use CodeChunk
+            namespace = {
+                "ChunkerSettings": _ChunkerSettings,
+                "CodeChunk": CodeChunk,
+                "EmbeddingModelCapabilities": EmbeddingModelCapabilities,
+                "RerankingModelCapabilities": RerankingModelCapabilities,
+            }
+            _ = ChunkGovernor.model_rebuild(_types_namespace=namespace)
         _models_rebuilt = True
     except Exception as e:
         # If rebuild fails, model will still work but may have issues with ChunkerSettings
         logger.debug("Failed to rebuild ChunkGovernor model: %s", e, exc_info=True)
+
+
+# Attempt to rebuild models at module level to resolve forward references
+# This ensures models are ready before first instantiation in most cases
+# NOTE: This happens after module-level imports are complete, but ChunkerSettings
+# may rebuild itself during its module initialization, which would invalidate our rebuild.
+# To handle this, we also call rebuild in model_post_init as a fallback.
+try:
+    _rebuild_models()
+except Exception:
+    # If rebuild fails during import (e.g., circular import), models will be rebuilt on first use
+    pass

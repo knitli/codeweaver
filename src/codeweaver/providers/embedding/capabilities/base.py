@@ -31,7 +31,7 @@ class EmbeddingModelCapabilities(BasedModel):
         Field(
             description="""The provider of the model. Since available settings vary across providers, each capabilities instance is tied to a provider."""
         ),
-    ] = Provider.UNSET  # type: ignore
+    ] = Provider.NOT_SET
     version: Annotated[
         str | PositiveInt | PositiveFloat | None,
         Field(
@@ -150,7 +150,7 @@ class SparseEmbeddingModelCapabilities(BasedModel):
     name: Annotated[str, Field(description="""The name of the model.""")]
     multilingual: bool = False
     provider: Annotated[
-        Literal[Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS, Provider.UNSET],  # pyright: ignore[reportPrivateUsage]
+        Literal[Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS, Provider.NOT_SET],  # pyright: ignore[reportPrivateUsage]
         Field(
             description="""The provider of the model. We currently only support local providers for sparse embeddings. Since Sparse embedding tend to be very efficient and low resource, they are well-suited for deployment in resource-constrained environments."""
         ),
@@ -159,7 +159,7 @@ class SparseEmbeddingModelCapabilities(BasedModel):
         if HAS_FASTEMBED
         else Provider.SENTENCE_TRANSFORMERS
         if HAS_ST
-        else Provider.UNSET  # pyright: ignore[reportPrivateUsage]
+        else Provider.NOT_SET  # pyright: ignore[reportPrivateUsage]
     )
     hf_name: Annotated[
         str | None,

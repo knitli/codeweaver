@@ -218,3 +218,9 @@ __pycache__/
 
 # gitattributes tends to get caught in .git-related ignores
 !.gitattributes
+
+
+# Finally, stuff we *really* don't want to let leak
+.local.env
+.codeweaver.local.env
+.codeweaver/local.env

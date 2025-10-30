@@ -27,7 +27,15 @@ from fastmcp.server.server import DuplicateBehavior
 from fastmcp.tools import Tool
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.lowlevel.server import LifespanResultT
-from pydantic import Field, FilePath, NonNegativeFloat, PositiveFloat, PositiveInt, SecretStr
+from pydantic import (
+    DirectoryPath,
+    Field,
+    FilePath,
+    NonNegativeFloat,
+    PositiveFloat,
+    PositiveInt,
+    SecretStr,
+)
 from starlette.middleware import Middleware as ASGIMiddleware
 from uvicorn.config import (
     SSL_PROTOCOL_VERSION,
@@ -225,25 +233,25 @@ class CodeWeaverSettingsDict(TypedDict, total=False):
     Not intended to be used directly; used for internal type checking and validation.
     """
 
-    project_path: NotRequired[Path | None]
-    project_name: NotRequired[str | None]
-    provider: NotRequired[ProviderSettingsDict | None]
-    config_file: NotRequired[FilePath | None]
-    token_limit: NotRequired[PositiveInt]
-    max_file_size: NotRequired[PositiveInt]
-    max_results: NotRequired[PositiveInt]
-    server: NotRequired[FastMcpServerSettingsDict]
-    logging: NotRequired[LoggingSettings]
-    middleware: NotRequired[MiddlewareOptions]
-    chunker: NotRequired[ChunkerSettingsDict]
-    uvicorn: NotRequired[UvicornServerSettingsDict]
-    indexing: NotRequired[IndexerSettingsDict]
-    enable_health_endpoint: NotRequired[bool]
-    enable_statistics_endpoint: NotRequired[bool]
-    enable_settings_endpoint: NotRequired[bool]
-    enable_version_endpoint: NotRequired[bool]
-    enable_telemetry: NotRequired[bool]
-    allow_identifying_telemetry: NotRequired[bool]
+    project_path: NotRequired[DirectoryPath | Unset]
+    project_name: NotRequired[str | Unset]
+    provider: NotRequired[ProviderSettingsDict | Unset]
+    config_file: NotRequired[FilePath | Unset]
+    token_limit: NotRequired[PositiveInt | Unset]
+    max_file_size: NotRequired[PositiveInt | Unset]
+    max_results: NotRequired[PositiveInt | Unset]
+    server: NotRequired[FastMcpServerSettingsDict | Unset]
+    logging: NotRequired[LoggingSettings | Unset]
+    middleware: NotRequired[MiddlewareOptions | Unset]
+    chunker: NotRequired[ChunkerSettingsDict | Unset]
+    uvicorn: NotRequired[UvicornServerSettingsDict | Unset]
+    indexing: NotRequired[IndexerSettingsDict | Unset]
+    enable_health_endpoint: NotRequired[bool | Unset]
+    enable_statistics_endpoint: NotRequired[bool | Unset]
+    enable_settings_endpoint: NotRequired[bool | Unset]
+    enable_version_endpoint: NotRequired[bool | Unset]
+    enable_telemetry: NotRequired[bool | Unset]
+    allow_identifying_telemetry: NotRequired[bool | Unset]
 
 
 # ===========================================================================

@@ -65,7 +65,7 @@ def is_git_dir(directory: Path | None = None) -> bool:
     """
     directory = directory or Path.cwd()
     git_path = directory / ".git"
-    git_worktree = git_path.is_file() and git_path.read_text().startswith("gitdir:")
+    git_worktree = git_path.is_file()
     return git_path.is_dir() or git_worktree if git_path.exists() else False
 
 
@@ -88,6 +88,12 @@ def _root_path_checks_out(root_path: Path) -> bool:
 
 def get_project_path(root_path: Path | None = None) -> Path:
     """Get the root directory of the project."""
+    if (
+        root_path is None
+        and (git_root := try_git_rev_parse())
+        and (_root_path_checks_out(git_root))
+    ):
+        return git_root
     return (
         root_path
         if isinstance(root_path, Path) and _root_path_checks_out(root_path)
