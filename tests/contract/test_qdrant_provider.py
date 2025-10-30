@@ -21,10 +21,11 @@ from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.core.spans import Span
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
 
-
-# Mark all tests in this module as requiring Qdrant
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
+
+
+# Mark all tests in this module as requiring Qdrant
 
 @pytest.fixture
 async def qdrant_config():

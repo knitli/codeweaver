@@ -29,6 +29,12 @@ from codeweaver.engine.chunker.exceptions import (
 )
 
 
+if TYPE_CHECKING:
+    from pytest import MonkeyPatch
+
+pytestmark = [pytest.mark.unit]
+
+
 # Path to test fixtures directory
 FIXTURES_DIR = Path(__file__).parent.parent.parent.parent / "fixtures"
 

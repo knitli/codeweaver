@@ -26,6 +26,10 @@ scripts/
 ├── README.md                          # Main documentation
 ├── ORGANIZATION.md                    # This file - organization design
 │
+├── build/                           # Packaging and background scripts (scripts run by other scripts)
+│   ├── generate-supported-languages.py
+│   ├── git-merge-latest-version.py
+│
 ├── dev-env/                           # Development environment setup
 │   ├── dev-shell-init.zsh
 │   ├── install-mise.sh
@@ -51,7 +55,6 @@ scripts/
 ├── language-support/                  # Tree-sitter and language mappings
 │   ├── download-ts-grammars.py
 │   ├── build-language-mappings.py
-│   ├── generate-supported-languages.py
 │   ├── generate-delimiters.py
 │   ├── compare-delimiters.py
 │   └── analyze-grammar-structure.py
@@ -74,6 +77,11 @@ scripts/
 ```
 
 ## Category Definitions
+
+### build/
+Scripts used in the packaging process or otherwise aren't directly used by devs.
+- Build automation
+- Git drivers/resolution
 
 ### dev-env/
 Scripts for setting up and managing development environments.

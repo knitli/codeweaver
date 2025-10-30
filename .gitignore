@@ -15,6 +15,13 @@ hk.local.pkl.license
 # local terminal zsh config -- can contain sensitive info
 .vscode/terminal.local.zsh
 
+# annoying generated files
+coverage.xml
+.vscode/.history/
+lcov-report/
+htmlcov/
+.coverage
+
 # non-public working files
 .workbench/*
 .workbench/

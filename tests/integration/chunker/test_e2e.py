@@ -14,6 +14,9 @@ import pytest
 
 from codeweaver.engine.chunker.selector import ChunkerSelector
 
+pytestmark = [pytest.mark.integration]
+
+
 
 @pytest.fixture
 def mock_governor():
@@ -254,6 +257,9 @@ def test_e2e_parallel_dict_convenience():
     from codeweaver.engine.chunker.base import ChunkGovernor
     from codeweaver.engine.chunker.parallel import chunk_files_parallel_dict
     from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+
+
+
 
     # Get sample files
     fixture_dir = Path("tests/fixtures")

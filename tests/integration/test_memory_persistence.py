@@ -19,8 +19,11 @@ from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.providers.vector_stores.inmemory import MemoryVectorStore
 
-
 pytestmark = pytest.mark.integration
+
+
+
+
 
 
 async def test_inmemory_persistence():

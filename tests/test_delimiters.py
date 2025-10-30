@@ -36,6 +36,8 @@ from codeweaver.engine.chunker.delimiters.patterns import (
     matches_pattern,
 )
 
+pytestmark = [pytest.mark.unit]
+
 
 class TestDelimiterPattern:
     """Test DelimiterPattern DSL and expansion."""

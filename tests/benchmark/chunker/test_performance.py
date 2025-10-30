@@ -23,6 +23,9 @@ from codeweaver.engine.chunker.base import ChunkGovernor
 from codeweaver.engine.chunker.selector import ChunkerSelector
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
+pytestmark = [pytest.mark.benchmark, pytest.mark.performance, pytest.mark.slow]
+
+
 
 # Test data generators
 def generate_python_file(num_lines: int) -> str:
