@@ -7,15 +7,18 @@ max_results = 75
 enable_telemetry = true
 
 [[provider.embedding]]
-model_settings = { model = "voyage-code-3" }
 provider = "voyage"
+enabled = true
+model_settings = { model = "voyage-code-3" }
 
 [[provider.embedding]] # sparse
 provider = "fastembed"
+enabled = true
 sparse_model_settings = { model = "prithivida/Splade_PP_en_v2" }
 
-[provider.reranking]
+[[provider.reranking]]
 provider = "voyage"
+enabled = true
 model_settings = { model = "voyage-rerank-2.5" }
 
 [provider.vector_store]
