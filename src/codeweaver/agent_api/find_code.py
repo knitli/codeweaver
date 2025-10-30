@@ -35,8 +35,16 @@ from typing import NamedTuple
 from pydantic import NonNegativeInt, PositiveInt
 
 from codeweaver.agent_api.intent import INTENT_TO_AGENT_TASK, IntentType, detect_intent
-from codeweaver.agent_api.models import FindCodeResponseSummary, SearchStrategy
+from codeweaver.agent_api.models import (
+    CodeMatch,
+    CodeMatchType,
+    FindCodeResponseSummary,
+    SearchStrategy,
+)
 from codeweaver.common.registry import get_provider_registry
+from codeweaver.common.utils import uuid7
+from codeweaver.core.chunks import CodeChunk, SearchResult
+from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.spans import Span
 from codeweaver.semantic.classifications import AgentTask
 
@@ -53,6 +61,64 @@ class MatchedSection(NamedTuple):
     filename: str | None = None
     file_path: Path | None = None
     chunk_number: PositiveInt | None = None
+
+
+def _convert_search_result_to_code_match(result: SearchResult) -> CodeMatch:
+    """Convert SearchResult from vector store to CodeMatch for response.
+
+    Args:
+        result: SearchResult from vector store search
+
+    Returns:
+        CodeMatch with all required fields populated
+    """
+    # Extract CodeChunk (SearchResult.content can be str or CodeChunk)
+    if isinstance(result.content, str):
+        # Create minimal CodeChunk from string
+        chunk = CodeChunk(
+            content=result.content,
+            line_range=(1, result.content.count("\n") + 1),
+            file_path=result.file_path,
+            language=None,
+            source="TEXT_BLOCK",
+            chunk_id=uuid7(),
+        )
+    else:
+        chunk = result.content
+
+    # Get file info (prefer from chunk, fallback to result.file_path)
+    if hasattr(chunk, "file_path") and chunk.file_path:
+        file = DiscoveredFile.from_path(chunk.file_path)
+    elif result.file_path:
+        file = DiscoveredFile.from_path(result.file_path)
+    else:
+        # Create minimal DiscoveredFile
+        file = DiscoveredFile.from_path(Path("unknown"))
+
+    # Extract span (line range)
+    if hasattr(chunk, "line_range"):
+        span = chunk.line_range
+    else:
+        span = (1, chunk.content.count("\n") + 1 if hasattr(chunk, "content") else 1)
+
+    # Use relevance_score if set, otherwise use base score
+    relevance = getattr(result, "relevance_score", result.score)
+
+    # Extract related symbols from chunk metadata if available
+    related_symbols = ()
+    if hasattr(chunk, "metadata") and chunk.metadata:
+        meta = chunk.metadata
+        if hasattr(meta, "related_symbols"):
+            related_symbols = tuple(meta.related_symbols)
+
+    return CodeMatch(
+        file=file,
+        content=chunk,
+        span=span,
+        relevance_score=relevance,
+        match_type=CodeMatchType.SEMANTIC,  # Vector search is always semantic
+        related_symbols=related_symbols,
+    )
 
 
 async def find_code(
@@ -221,41 +287,58 @@ async def find_code(
                 candidate.relevance_score = base_score
 
         # Step 7: Sort and limit
-        candidates.sort(key=lambda x: x.relevance_score, reverse=True)
-        results = candidates[:max_results]
+        candidates.sort(key=lambda x: x.relevance_score if hasattr(x, 'relevance_score') and x.relevance_score is not None else x.score, reverse=True)
+        search_results = candidates[:max_results]
+
+        # Convert SearchResult objects to CodeMatch objects for response
+        code_matches = []
+        for result in search_results:
+            try:
+                match = _convert_search_result_to_code_match(result)
+                code_matches.append(match)
+            except Exception as e:
+                logger.warning("Failed to convert search result to code match: %s", e)
+                continue
 
         # Build response
         execution_time_ms = (time.time() - start_time) * 1000
 
-        # Calculate token count
+        # Calculate token count from code matches
         total_tokens = sum(
-            len(result.chunk.content.split()) * 1.3  # Rough token estimate
-            for result in results
-            if result.chunk and result.chunk.content
+            len(match.content.content.split()) * 1.3  # Rough token estimate
+            for match in code_matches
+            if match.content and hasattr(match.content, 'content')
         )
         total_tokens = min(int(total_tokens), token_limit)
 
         # Generate summary
-        if results:
-            top_files = list({r.file.path.name for r in results[:3]})
+        if code_matches:
+            top_files = list({m.file.path.name for m in code_matches[:3] if m.file and m.file.path})
             summary = (
-                f"Found {len(results)} relevant matches "
+                f"Found {len(code_matches)} relevant matches "
                 f"for {intent_type.value} query. "
                 f"Top results in: {', '.join(top_files[:3])}"
             )
         else:
             summary = f"No matches found for query: '{query}'"
 
+        # Extract languages from code matches
+        languages_found = tuple({
+            m.file.ext_kind.language
+            for m in code_matches
+            if m.file and hasattr(m.file, 'ext_kind') and m.file.ext_kind
+        })
+
         return FindCodeResponseSummary(
-            matches=results,
+            matches=code_matches,
             summary=summary[:1000],  # Enforce max_length
             query_intent=intent_type,
             total_matches=len(candidates),
-            total_results=len(results),
+            total_results=len(code_matches),
             token_count=total_tokens,
             execution_time_ms=execution_time_ms,
             search_strategy=tuple(strategies_used),
-            languages_found=tuple({r.file.ext_kind.language for r in results if r.file.ext_kind}),
+            languages_found=languages_found,
         )
 
     except Exception as e:

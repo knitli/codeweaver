@@ -109,6 +109,20 @@ class CodeMatch(BasedModel):
             raise ValueError("Line numbers must start from 1")
         return self
 
+    def serialize_for_cli(self) -> dict:
+        """Serialize code match for CLI display.
+
+        Returns a dict suitable for rendering in CLI output formats.
+        """
+        return {
+            "file_path": str(self.file.path),
+            "span": self.span,
+            "relevance_score": self.relevance_score,
+            "match_type": self.match_type.value,
+            "content_preview": self.content.content[:200] + "..." if len(self.content.content) > 200 else self.content.content,
+            "related_symbols": list(self.related_symbols),
+        }
+
 
 class FindCodeResponseSummary(BasedModel):
     """Structured response from find_code tool."""

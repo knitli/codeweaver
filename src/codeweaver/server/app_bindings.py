@@ -21,7 +21,7 @@ from pydantic_core import to_json
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
-# from codeweaver.agent_api import find_code
+from codeweaver.agent_api.find_code import find_code
 from codeweaver.agent_api.intent import IntentType
 from codeweaver.agent_api.models import FindCodeResponseSummary
 from codeweaver.common.statistics import SessionStatistics, get_session_statistics, timed_http
@@ -70,61 +70,62 @@ async def find_code_tool(
     focus_languages: tuple[SemanticSearchLanguage, ...] | None = None,
     context: Context | None = None,
 ) -> FindCodeResponseSummary:
-    """Use CodeWeaver to find_code in the codebase.
+    """Use CodeWeaver to find code in the codebase.
 
-    NOTE: Temporarily disabled pending architectural improvements.
-    Returns a stub response to prevent MCP server errors.
-    Expected to be re-enabled within 1-2 days.
-    """
-    # Return stub response while find_code is being reimplemented
-    return FindCodeResponseSummary(
-        matches=[],
-        summary=f"⚠️  find_code is temporarily disabled during architectural improvements. Your query was: '{query}'",
-        query_intent=intent,
-        total_matches=0,
-        total_results=0,
-        token_count=0,
-        execution_time_ms=0.0,
-        search_strategy=(),
-        languages_found=(),
-    )
+    Args:
+        query: Natural language search query
+        intent: Optional search intent (if None, will be detected)
+        token_limit: Maximum tokens to return (default: 10000)
+        include_tests: Whether to include test files in results
+        focus_languages: Optional language filter
+        context: MCP context for request tracking
 
-    # Original implementation (commented out during refactor)
-    # Will be restored when new architecture is complete
+    Returns:
+        FindCodeResponseSummary with ranked matches and metadata
+
+    Raises:
+        QueryError: If search fails unexpectedly
     """
     try:
+        # Call the real find_code implementation
+        # Convert focus_languages from SemanticSearchLanguage to str tuple
+        focus_langs = (
+            tuple(lang.value if hasattr(lang, "value") else str(lang) for lang in focus_languages)
+            if focus_languages
+            else None
+        )
+
         response = await find_code(
             query=query,
-            settings=settings(),
             intent=intent,
             token_limit=token_limit,
             include_tests=include_tests,
-            focus_languages=focus_languages,
-            statistics=statistics(),
+            focus_languages=focus_langs,
+            max_results=50,  # Default from find_code signature
         )
-        if statistics:
-            request_id = datetime.datetime.now(datetime.UTC).isoformat()
-            with contextlib.suppress(ValueError, AttributeError):
-                if context and context.request_context and context.request_context.request_id:  # type: ignore
-                    request_id = context.request_context.request_id  # type: ignore
-            cast(SessionStatistics, statistics).add_successful_request(request_id)
-    except CodeWeaverError:
-        if statistics:
-            cast(SessionStatistics, statistics).log_request_from_context(context, successful=False)
-        raise
+
+        # Track successful request in statistics
+        if context and context.request_context:
+            request_id = getattr(context.request_context, "request_id", "unknown")
+            statistics().add_successful_request(request_id)
+
+        return response
+
     except Exception as e:
-        if statistics:
-            cast(SessionStatistics, statistics).log_request_from_context(context, successful=False)
+        # Track failed request
+        if context:
+            statistics().log_request_from_context(context, successful=False)
+
+        # Log the error
+        _logger.exception("find_code failed: %s", e)
+
+        # Import here to avoid circular dependency
         from codeweaver.exceptions import QueryError
 
         raise QueryError(
-            f"Unexpected error in `find_code`: {e!s}",
+            f"Unexpected error in find_code: {e!s}",
             suggestions=["Try a simpler query", "Check server logs for details"],
         ) from e
-    else:
-        return response
-    """
-    return None
 
 
 # -------------------------
