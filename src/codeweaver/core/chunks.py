@@ -34,6 +34,7 @@ from typing import (
 from pydantic import (
     UUID7,
     AfterValidator,
+    ConfigDict,
     Field,
     NonNegativeFloat,
     NonNegativeInt,
@@ -97,6 +98,8 @@ class BatchKeys(NamedTuple):
 class SearchResult(BasedModel):
     """Result from vector search operations."""
 
+    model_config = ConfigDict(validate_assignment=False, extra="allow")
+
     content: str | CodeChunk
     file_path: Annotated[
         Path | None,
@@ -108,10 +111,31 @@ class SearchResult(BasedModel):
         Metadata | None, Field(description="""Additional metadata about the result""")
     ] = None
 
+    # Fields for hybrid search and rescoring (set dynamically by find_code)
+    dense_score: NonNegativeFloat | None = None
+    sparse_score: NonNegativeFloat | None = None
+    rerank_score: NonNegativeFloat | None = None
+    relevance_score: NonNegativeFloat | None = None
+
     @property
     def chunk(self) -> CodeChunk | str:
         """Alias for content field for backward compatibility."""
         return self.content
+
+    @property
+    def file(self) -> Any:
+        """Property to access file info from chunk.
+        
+        Returns the file info from the chunk if available, otherwise returns
+        a minimal object with just the path.
+        """
+        if isinstance(self.content, CodeChunk) and hasattr(self.content, 'file'):
+            return self.content.file
+        # Return minimal file-like object with path
+        class _FileInfo:
+            def __init__(self, path):
+                self.path = path
+        return _FileInfo(self.file_path) if self.file_path else None
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
