@@ -1291,22 +1291,6 @@ class CodeWeaverSettings(BaseSettings):
         instance.__init__()
         return instance
 
-    @model_validator(mode="before")
-    @classmethod
-    def validate_model(cls, data: Any) -> None:
-        """Validate the model before instantiation."""
-        defaults = cls._defaults()
-        _unset: set[str] = set()
-        for field, value in defaults.items():
-            if field not in data or isinstance(data.get(field), Unset):
-                data[field] = value
-            if isinstance(data.get(field), Unset):
-                _unset.add(field)
-        data["_unset_fields"] = _unset
-        return data
-
-        # Add any additional validation logic here
-
     @property
     def view(self) -> DictView[CodeWeaverSettingsDict]:
         """Get a read-only mapping view of the settings."""
@@ -1351,9 +1335,6 @@ def get_settings(config_file: FilePath | None = None) -> CodeWeaverSettings:
     if config_file and config_file.exists():
         _settings = CodeWeaverSettings(config_file=config_file)
     if _settings is None or isinstance(_settings, Unset):
-        print(globals())
-        print(_settings)
-        print(dir())
         _settings = CodeWeaverSettings(project_path=root)  # type: ignore
 
     if isinstance(_settings.project_path, Unset):
