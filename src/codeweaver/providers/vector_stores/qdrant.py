@@ -64,12 +64,7 @@ class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         """
         return self.config.get("collection_name")
 
-    def _telemetry_keys(self) -> dict[str, str] | None:
-        """Get telemetry keys for the provider.
-
-        Returns:
-            None (no special telemetry handling needed).
-        """
+    def _telemetry_keys(self) -> None:
         return None
 
     async def _initialize(self) -> None:

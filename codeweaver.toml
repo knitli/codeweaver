@@ -1,0 +1,23 @@
+# CodeWeaver's CodeWeaver configuration file
+
+project_name = "codeweaver"
+token_limit = 30000
+max_file_size = 1048576
+max_results = 75
+enable_telemetry = true
+
+[[provider.embedding]]
+model_settings = { model = "voyage-code-3" }
+provider = "voyage"
+
+[[provider.sparse_embedding]]
+provider = "fastembed"
+model_settings = { model = "prithivida/Splade_PP_en_v2" }
+
+[[provider.reranking]]
+provider = "voyage"
+model_settings = { model = "voyage-rerank-2.5" }
+
+[[provider.vector_store]]
+qdrant = { url = "http://localhost:6333", collection_name = "codeweaver_dev", prefer_grpc = true }
+provider = "qdrant"

@@ -34,7 +34,6 @@ from pydantic import (
     FilePath,
     PositiveInt,
     PrivateAttr,
-    PydanticUserError,
     ValidationError,
     computed_field,
     field_validator,
@@ -274,14 +273,19 @@ def _get_project_name() -> str:
     global _settings
     if _settings is not None:
         with contextlib.suppress(AttributeError, ValueError):
-            if hasattr(_settings, 'project_name') and _settings.project_name:
+            if (
+                hasattr(_settings, "project_name")
+                and _settings.project_name
+                and not isinstance(_settings.project_name, Unset)
+            ):
                 return _settings.project_name
-            if hasattr(_settings, 'project_path'):
+            if hasattr(_settings, "project_path") and not isinstance(_settings.project_path, Unset):
                 return _settings.project_path.name
 
     # Fallback: try to get project path directly
     with contextlib.suppress(Exception):
         from codeweaver.common.utils.git import get_project_path
+
         return get_project_path().name
 
     return "your_project_name"
@@ -553,11 +557,16 @@ class IndexerSettings(BasedModel):
         if project_path is None:
             # Try to get from global settings without triggering recursion
             global _settings
-            if _settings is not None and hasattr(_settings, 'project_path'):
+            if (
+                _settings is not None
+                and hasattr(_settings, "project_path")
+                and not isinstance(_settings.project_path, Unset)
+            ):
                 project_path = _settings.project_path
             else:
                 # Fallback to current working directory during initialization
                 from codeweaver.common.utils.git import get_project_path
+
                 project_path = get_project_path()
         rignore_settings["path"] = project_path
         rignore_settings["ignore_hidden"] = bool(
@@ -978,12 +987,14 @@ class CodeWeaverSettings(BaseSettings):
             field for field in type(self).model_fields if getattr(self, field) is Unset
         }
         self.project_path = (
-            self.project_path
-            if not isinstance(self.project_path, Unset)
-            else lazy_import("codeweaver.common.utils").get_project_path()
+            lazy_import("codeweaver.common.utils", "get_project_path")()
+            if isinstance(self.project_path, Unset)
+            else self.project_path
         )  # type: ignore
         self.project_name = (
-            self.project_path.name if isinstance(self.project_name, Unset) else self.project_name
+            cast(DirectoryPath, self.project_path).name  # type: ignore
+            if isinstance(self.project_name, Unset)
+            else self.project_name  # type: ignore
         )
         self.provider = (
             AllDefaultProviderSettings if isinstance(self.provider, Unset) else self.provider
@@ -1150,7 +1161,7 @@ def get_settings(config_file: FilePath | None = None) -> CodeWeaverSettings:
 
     # Ensure chunker models are rebuilt before creating settings
     if not ChunkerSettings.__pydantic_complete__:
-        ChunkerSettings._ensure_models_rebuilt()
+        ChunkerSettings._ensure_models_rebuilt()  # type: ignore
 
     root = get_project_path()
     if isinstance(_settings, CodeWeaverSettings):

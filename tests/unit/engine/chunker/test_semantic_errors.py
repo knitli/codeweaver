@@ -29,9 +29,6 @@ from codeweaver.engine.chunker.exceptions import (
 )
 
 
-if TYPE_CHECKING:
-    from pytest import MonkeyPatch
-
 pytestmark = [pytest.mark.unit]
 
 
@@ -210,9 +207,7 @@ class TestTimeoutErrors:
         def mock_time():
             call_count[0] += 1
             # First call sets start time, subsequent calls show elapsed time
-            if call_count[0] == 1:
-                return start_time
-            return start_time + elapsed_time
+            return start_time if call_count[0] == 1 else start_time + elapsed_time
 
         monkeypatch.setattr(time, "time", mock_time)
 

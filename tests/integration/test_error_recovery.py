@@ -110,10 +110,10 @@ async def test_circuit_breaker_opens():
     class TestProvider(EmbeddingProvider):
         """Test provider for circuit breaker testing."""
 
-        async def _embed_documents(self, inputs):
+        async def _embed_documents(self, documents, **kwargs):
             raise ConnectionError("Simulated API failure")
 
-        async def _embed_query(self, query_text: str):
+        async def _embed_query(self, query: str, **kwargs):
             raise ConnectionError("Simulated API failure")
 
     provider = TestProvider()
@@ -210,7 +210,7 @@ async def test_indexing_continues_on_file_errors(test_project_path: Path):
     from codeweaver.engine.indexer import Indexer
 
     indexer = Indexer(
-        project_root=test_project_path,
+        project_path=test_project_path,
         auto_initialize_providers=False,  # Skip provider init for this test
     )
 
@@ -314,7 +314,9 @@ async def test_health_shows_degraded_status():
         mock_reg.get_vector_store_provider_instance.return_value = mock_vector
 
         # Create health service
-        health_service = HealthService(provider_registry=mock_reg, startup_time=time.time())
+        health_service = HealthService(
+            provider_registry=mock_reg, startup_time=time.time(), statistics={}
+        )
 
         # Get health response
         response = await health_service.get_health_response()
@@ -446,7 +448,7 @@ async def test_error_logging_structured():
 
         with pytest.raises(Exception):
             indexer = Indexer(
-                project_root=Path("/nonexistent/path"), auto_initialize_providers=False
+                project_path=Path("/nonexistent/path"), auto_initialize_providers=False
             )
             indexer.prime_index(force_reindex=True)
 

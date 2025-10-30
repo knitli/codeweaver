@@ -436,5 +436,8 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
             - Operation is atomic (all-or-nothing for batch).
         """
 
+    def _telemetry_keys(self) -> None:
+        return None
+
 
 __all__ = ("VectorStoreProvider",)

@@ -27,7 +27,7 @@ class Missing(Sentinel):
     """Sentinel for missing values."""
 
 
-MISSING: Missing = Missing(name=SentinelName("Missing"), repr_="<MISSING>", module_name=__name__)
+MISSING: Missing = Missing(name=SentinelName("MISSING"), module_name=__name__)
 
 
 def try_git_rev_parse() -> Path | None:
