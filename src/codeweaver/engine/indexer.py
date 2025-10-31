@@ -122,6 +122,16 @@ class IndexingStats:
             return 0.0
         return self.files_processed / self.elapsed_time
 
+    @property
+    def total_errors(self) -> int:
+        """Total number of files with errors."""
+        return len(self.files_with_errors)
+    
+    @property
+    def total_files_discovered(self) -> int:
+        """Total files discovered (alias for files_discovered)."""
+        return self.files_discovered
+
 
 class DefaultFilter(watchfiles.DefaultFilter):
     """A default filter that ignores common unwanted files and directories."""
