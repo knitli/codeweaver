@@ -158,6 +158,72 @@ class ProviderRegistry(BasedModel):
         self._agent_instances: MutableMapping[Provider, Any] = {}
         self._data_instances: MutableMapping[Provider, Any] = {}
 
+    @property
+    def _registry_map(
+        self,
+    ) -> dict[
+        ProviderKind | str,
+        tuple[
+            MutableMapping[
+                Provider,
+                LazyImport[type[EmbeddingProvider[Any]]]
+                | type[EmbeddingProvider[Any]]
+                | LazyImport[type[RerankingProvider[Any]]]
+                | type[RerankingProvider[Any]]
+                | LazyImport[type[VectorStoreProvider[Any]]]
+                | type[VectorStoreProvider[Any]]
+                | LazyImport[type[Any]]
+                | type[Any],
+            ],
+            str,
+        ],
+    ]:
+        """Get the registry map for provider classes."""
+        return {
+            ProviderKind.EMBEDDING: (self._embedding_providers, "Embedding"),
+            "embedding": (self._embedding_providers, "Embedding"),
+            ProviderKind.SPARSE_EMBEDDING: (self._sparse_embedding_providers, "Sparse embedding"),
+            "sparse_embedding": (self._sparse_embedding_providers, "Sparse embedding"),
+            ProviderKind.RERANKING: (self._reranking_providers, "Reranking"),
+            "reranking": (self._reranking_providers, "Reranking"),
+            ProviderKind.VECTOR_STORE: (self._vector_store_providers, "Vector store"),
+            "vector_store": (self._vector_store_providers, "Vector store"),
+            ProviderKind.AGENT: (self._agent_providers, "Agent"),
+            "agent": (self._agent_providers, "Agent"),
+            ProviderKind.DATA: (self._data_providers, "Data"),
+            "data": (self._data_providers, "Data"),
+        }
+
+    @property
+    def _instances_map(
+        self,
+    ) -> dict[
+        ProviderKind | str,
+        MutableMapping[
+            Provider,
+            EmbeddingProvider[Any]
+            | RerankingProvider[Any]
+            | VectorStoreProvider[Any]
+            | AgentProvider[Any]
+            | Any,
+        ],
+    ]:
+        """Get the instances map for cached provider instances."""
+        return {
+            ProviderKind.EMBEDDING: self._embedding_instances,
+            "embedding": self._embedding_instances,
+            ProviderKind.SPARSE_EMBEDDING: self._sparse_embedding_instances,
+            "sparse_embedding": self._sparse_embedding_instances,
+            ProviderKind.RERANKING: self._reranking_instances,
+            "reranking": self._reranking_instances,
+            ProviderKind.VECTOR_STORE: self._vector_store_instances,
+            "vector_store": self._vector_store_instances,
+            ProviderKind.AGENT: self._agent_instances,
+            "agent": self._agent_instances,
+            ProviderKind.DATA: self._data_instances,
+            "data": self._data_instances,
+        }
+
     def _telemetry_keys(self) -> None:
         return None
 
@@ -439,22 +505,7 @@ class ProviderRegistry(BasedModel):
         Raises:
             ConfigurationError: If provider is not registered
         """
-        registry_map = {
-            ProviderKind.EMBEDDING: (self._embedding_providers, "Embedding"),
-            "embedding": (self._embedding_providers, "Embedding"),
-            ProviderKind.SPARSE_EMBEDDING: (self._sparse_embedding_providers, "Sparse embedding"),
-            "sparse_embedding": (self._sparse_embedding_providers, "Sparse embedding"),
-            ProviderKind.RERANKING: (self._reranking_providers, "Reranking"),
-            "reranking": (self._reranking_providers, "Reranking"),
-            ProviderKind.VECTOR_STORE: (self._vector_store_providers, "Vector store"),
-            "vector_store": (self._vector_store_providers, "Vector store"),
-            ProviderKind.AGENT: (self._agent_providers, "Agent"),
-            "agent": (self._agent_providers, "Agent"),
-            ProviderKind.DATA: (self._data_providers, "Data"),
-            "data": (self._data_providers, "Data"),
-        }
-
-        registry, kind_name = registry_map[provider_kind]
+        registry, kind_name = self._registry_map[provider_kind]
         if provider not in registry:
             raise ConfigurationError(f"{kind_name} provider '{provider}' is not registered")
 
@@ -745,22 +796,7 @@ class ProviderRegistry(BasedModel):
         Returns:
             A provider instance
         """
-        instances_map = {
-            ProviderKind.EMBEDDING: self._embedding_instances,
-            "embedding": self._embedding_instances,
-            ProviderKind.SPARSE_EMBEDDING: self._sparse_embedding_instances,
-            "sparse_embedding": self._sparse_embedding_instances,
-            ProviderKind.RERANKING: self._reranking_instances,
-            "reranking": self._reranking_instances,
-            ProviderKind.VECTOR_STORE: self._vector_store_instances,
-            "vector_store": self._vector_store_instances,
-            ProviderKind.AGENT: self._agent_instances,
-            "agent": self._agent_instances,
-            ProviderKind.DATA: self._data_instances,
-            "data": self._data_instances,
-        }
-
-        instances = instances_map[provider_kind]
+        instances = self._instances_map[provider_kind]
 
         if singleton and provider in instances:
             return instances[provider]
