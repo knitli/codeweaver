@@ -13,7 +13,7 @@ import logging
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, cast, override
+from typing import Any, ClassVar, cast, override
 
 from pydantic import UUID7
 from typing_extensions import TypeIs
@@ -47,8 +47,9 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
     """
 
     config: MemoryConfig
-    _provider: Provider = Provider.MEMORY
     _client: AsyncQdrantClient | None = None
+
+    _provider: ClassVar[Provider] = Provider.MEMORY
 
     @override
     async def _initialize(self) -> None:  # type: ignore

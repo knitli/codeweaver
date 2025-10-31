@@ -199,8 +199,15 @@ async def find_code(
             else None
         )
 
-        # Embed query
-        dense_query_embedding = await dense_provider.embed_query(query)
+        # Embed query (with fallback to sparse-only if dense fails)
+        dense_query_embedding = None
+        try:
+            dense_query_embedding = await dense_provider.embed_query(query)
+        except Exception as e:
+            logger.warning("Dense embedding failed: %s", e)
+            if not sparse_provider:
+                # No fallback available - must fail
+                raise ValueError("Dense embedding failed and no sparse provider available") from e
 
         sparse_query_embedding = None
         if sparse_provider:
@@ -218,14 +225,21 @@ async def find_code(
             vector_store_enum, singleton=True
         )
 
-        # Build query vector (unified search API)
-        if sparse_query_embedding:
+        # Build query vector (unified search API) with graceful degradation
+        if dense_query_embedding and sparse_query_embedding:
             strategies_used.append(SearchStrategy.HYBRID_SEARCH)
             query_vector = {"dense": dense_query_embedding, "sparse": sparse_query_embedding}
-        else:
+        elif dense_query_embedding and not sparse_query_embedding:
             strategies_used.append(SearchStrategy.DENSE_ONLY)
             logger.warning("Using dense-only search (sparse embeddings unavailable)")
             query_vector = dense_query_embedding
+        elif not dense_query_embedding and sparse_query_embedding:
+            strategies_used.append(SearchStrategy.SPARSE_ONLY)
+            logger.warning("Using sparse-only search (dense embeddings unavailable - degraded mode)")
+            query_vector = {"sparse": sparse_query_embedding}
+        else:
+            # Both failed - should not reach here due to earlier validation
+            raise ValueError("No embeddings available (both dense and sparse failed)")
 
         # Execute search (returns max 100 results)
         # Note: Filter support deferred to v0.2 - we over-fetch and filter post-search
@@ -243,13 +257,14 @@ async def find_code(
         logger.info("Vector search returned %d candidates", len(candidates))
 
         # Step 4: Apply static dense/sparse weights (v0.1)
-        if sparse_query_embedding and SearchStrategy.HYBRID_SEARCH in strategies_used:
+        if SearchStrategy.HYBRID_SEARCH in strategies_used:
             for candidate in candidates:
                 # Static weights for v0.1: dense=0.65, sparse=0.35
                 candidate.score = (
                     getattr(candidate, "dense_score", candidate.score) * 0.65
                     + getattr(candidate, "sparse_score", 0.0) * 0.35
                 )
+        # For sparse-only, scores are already set by vector store
 
         # Step 5: Rerank (optional, if provider configured)
         reranking_enum = registry.get_reranking_provider()

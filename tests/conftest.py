@@ -21,8 +21,7 @@ from qdrant_client import AsyncQdrantClient
 def get_test_qdrant_config(collection_suffix: str = "") -> dict:
     """Get test-specific Qdrant configuration.
 
-    Uses production Qdrant Cloud URL from codeweaver.toml with a test-specific collection name.
-    Reads API key from environment variable CODEWEAVER__PROVIDER__VECTOR_STORE__API_KEY.
+    Uses local Qdrant container at localhost:6336 without authentication.
 
     Args:
         collection_suffix: Optional suffix for collection name to ensure uniqueness
@@ -30,23 +29,11 @@ def get_test_qdrant_config(collection_suffix: str = "") -> dict:
     Returns:
         Configuration dict for QdrantVectorStore
     """
-    # Load .codeweaver.local.env file using python-dotenv
-    from dotenv import load_dotenv
-
-    load_dotenv(".codeweaver.local.env")
-
-    # Get API key from environment
-    api_key = os.getenv("CODEWEAVER__PROVIDER__VECTOR_STORE__API_KEY")
-
-    # Use production Qdrant Cloud URL from codeweaver.toml
+    # Use local Qdrant container without auth at port 6336
     config = {
-        "url": "https://f3b7755c-ee6e-4605-8786-c4218f9e148b.us-east-1-1.aws.cloud.qdrant.io",
-        "prefer_grpc": True,
+        "url": "http://localhost:6336",
+        "prefer_grpc": False,  # Use REST API
     }
-
-    # Add API key if available
-    if api_key:
-        config["api_key"] = api_key
 
     # Set test-specific collection name
     base_name = "codeweaver-test"

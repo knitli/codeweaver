@@ -8,7 +8,11 @@
 The agent package is a thin wrapper around Pydantic AI's agent capabilities, aligning its organization and naming conventions with CodeWeaver's architecture.
 """
 
+from collections.abc import Callable
+from typing import Any
+
 from codeweaver.providers.agent.agent_models import (
+    AgentModel,
     AgentModelSettings,
     DownloadedItem,
     KnownAgentModelName,
@@ -35,9 +39,14 @@ from codeweaver.providers.agent.agent_providers import (
 )
 
 
+type AgentProfile = Any
+type AgentProfileSpec = Callable[[str], Any] | Any | None
+
 __all__ = (
     "AbstractToolset",
+    "AgentModel",
     "AgentModelSettings",
+    "AgentProfile",
     "AgentProvider",
     "CombinedToolset",
     "DownloadedItem",

@@ -138,17 +138,24 @@ def test_build_with_clean_flag():
     dummy_file.write_text("test")
     assert dummy_file.exists()
 
-    # Build with --clear (removes existing build artifacts)
+    # Manually clean dist/ and rebuild (uv build doesn't have --clear flag)
+    if dist_dir.exists():
+        # Remove only build artifacts, not the entire dist/
+        for f in dist_dir.glob("*"):
+            if f.is_file() and f.suffix in [".whl", ".gz"]:
+                f.unlink()
+
+    # Rebuild after cleaning
     result = subprocess.run(
-        ["uv", "build", "--clear"], cwd=project_root, capture_output=True, text=True, check=False
+        ["uv", "build"], cwd=project_root, capture_output=True, text=True, check=False
     )
 
-    assert result.returncode == 0, f"Clear build failed: {result.stderr}"
+    assert result.returncode == 0, f"Rebuild after clean failed: {result.stderr}"
 
-    # Dummy file should still exist (build --clear doesn't remove dist/, just rebuilds)
+    # Dummy file should still exist (manual clean only removed build artifacts)
     # Only the actual build artifacts should be refreshed
     artifacts = [f for f in dist_dir.glob("*") if f.is_file() and f.suffix in [".whl", ".gz"]]
-    assert len(artifacts) == 2, "Build --clean didn't create expected artifacts"
+    assert len(artifacts) == 2, "Rebuild after clean didn't create expected artifacts"
 
     # Cleanup
     if dist_dir.exists():

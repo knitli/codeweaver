@@ -90,8 +90,13 @@ class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         url = self.config.get("url", "http://localhost:6333")
         api_key = self.config.get("api_key")
         prefer_grpc = self.config.get("prefer_grpc", False)
+        grpc_port = self.config.get("grpc_port", 6334)
+
         self._client = AsyncQdrantClient(
-            url=url, api_key=str(api_key) if api_key else None, prefer_grpc=prefer_grpc
+            url=url,
+            api_key=str(api_key) if api_key else None,
+            prefer_grpc=prefer_grpc,
+            grpc_port=grpc_port,
         )
         collection_name = self.collection
         if collection_name:

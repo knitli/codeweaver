@@ -1,4 +1,10 @@
 #!/usr/bin/env -S uv run -s
+
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 # ///script
 # python-version: ">=3.12"
 # dependencies: ["packaging>=25.0"]

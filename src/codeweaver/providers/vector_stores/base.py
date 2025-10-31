@@ -6,13 +6,14 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, ClassVar, TypedDict
 
 from pydantic import UUID4, ConfigDict
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
@@ -33,6 +34,9 @@ if TYPE_CHECKING:
     from codeweaver.core.types.dictview import DictView
 
 
+logger = logging.getLogger(__name__)
+
+
 def _get_settings() -> DictView[CodeWeaverSettingsDict]:
     """Get global CodeWeaver settings.
 
@@ -44,61 +48,17 @@ def _get_settings() -> DictView[CodeWeaverSettingsDict]:
     return get_settings_map()
 
 
-def _assemble_caps() -> dict[
-    Literal["dense", "sparse"],
-    list[EmbeddingModelCapabilities] | list[SparseEmbeddingModelCapabilities],
-]:
+class EmbeddingCapsDict(TypedDict):
+    dense: tuple[EmbeddingModelCapabilities]
+    sparse: tuple[SparseEmbeddingModelCapabilities]
+
+
+def _assemble_caps() -> EmbeddingCapsDict | None:
     """Assemble embedding model capabilities from settings.
 
     Returns:
         EmbeddingModelCapabilities instance or None if not configured.
     """
-    from codeweaver.common.registry import get_model_registry
-
-    settings_map: dict[Literal["dense", "sparse"], list[dict[str, Any]]] = {
-        "dense": [],
-        "sparse": [],
-    }
-
-    # Try to get settings, but handle gracefully if not available (e.g., in tests)
-    try:
-        settings = _get_settings()
-        if "provider" in settings and "embedding" in settings["provider"]:
-            settings_map["dense"].extend(
-                model.get("model_settings") for model in settings["provider"]["embedding"]
-            )
-            settings_map["sparse"].extend(
-                model.get("sparse_model_settings") for model in settings["provider"]["embedding"]
-            )
-    except (KeyError, ValueError, RuntimeError):
-        # Settings not available - return empty caps for tests
-        # In production, this will be caught by validation
-        return {"dense": [], "sparse": []}
-
-    embedding_caps: list[EmbeddingModelCapabilities] = (
-        [
-            cap
-            for cap in get_model_registry().list_embedding_models()
-            if cap.name in {config.name for config in settings_map["dense"]}
-        ]
-        if settings_map["dense"]
-        else []
-    )
-    sparse_caps: list[SparseEmbeddingModelCapabilities] = (
-        [
-            cap
-            for cap in get_model_registry().list_sparse_embedding_models()
-            if cap.name in {config.name for config in settings_map["sparse"]}
-        ]
-        if settings_map["sparse"]
-        else []
-    )
-    if embedding_caps or sparse_caps:
-        return {"dense": embedding_caps, "sparse": sparse_caps}
-
-    # Return empty caps rather than raising - allows tests to work
-    # Production usage will be validated through other means
-    return {"dense": [], "sparse": []}
 
 
 # Lock for thread-safe initialization of class-level embedding capabilities
@@ -122,18 +82,26 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
 
     model_config = BasedModel.model_config | ConfigDict(extra="allow")
 
+    config: Any = None  # Provider-specific configuration object
     _client: VectorStoreClient | None
-    _provider: Provider
+    _embedding_caps: EmbeddingCapsDict | None = None
+
+    _provider: ClassVar[Provider] = Provider.NOT_SET
 
     # Circuit breaker state tracking
     _circuit_state: CircuitBreakerState = CircuitBreakerState.CLOSED
     _failure_count: int = 0
     _last_failure_time: float | None = None
-    _circuit_open_duration: float = 30.0  # 30 seconds as per spec FR-008a
+    _circuit_open_duration: float = 30.0  # seconds
 
-    def __init__(self, **data: Any) -> None:
+    def __init__(
+        self, config: Any, client: VectorStoreClient, embedding_caps: EmbeddingCapsDict
+    ) -> None:
         """Initialize the vector store provider with embedding capabilities."""
-        super().__init__(**data)
+        self.config = config
+        self._client = client
+        self._embedding_caps = embedding_caps
+        super().__init__()
         # Initialize embedding caps on first instance creation if not already set at class level
         # Use double-checked locking pattern for thread safety
         if not hasattr(type(self), "_embedding_caps_initialized"):

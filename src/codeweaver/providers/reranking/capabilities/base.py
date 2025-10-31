@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
-from pydantic import Field, NonNegativeInt, PositiveInt
+from pydantic import ConfigDict, Field, NonNegativeInt, PositiveInt
 
 from codeweaver.core.types.models import BasedModel
 from codeweaver.providers.provider import Provider
@@ -57,6 +57,8 @@ def default_output_transformer(results: Any) -> Sequence[Sequence[float]] | Sequ
 
 class RerankingModelCapabilities(BasedModel):
     """Capabilities of a reranking model."""
+
+    model_config = BasedModel.model_config | ConfigDict(frozen=True)
 
     name: Annotated[str, Field(description="""The name of the model.""")] = ""
     provider: Annotated[Provider, Field(description="""The provider of the model.""")] = (

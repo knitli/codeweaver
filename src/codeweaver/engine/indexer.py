@@ -359,6 +359,12 @@ class Indexer(BasedModel):
                 "Both project_path and project_root specified, using project_path: %s",
                 project_path,
             )
+        
+        # Auto-create walker if project_path is provided but walker is not
+        if walker is None and project_path is not None:
+            walker = rignore.Walker(project_path)
+            logger.debug("Auto-created walker for project_path: %s", project_path)
+        
         self._store = store or BlakeStore[DiscoveredFile](_value_type=DiscoveredFile)
         self._walker = walker
         self._chunking_service = chunking_service or _get_chunking_service()
@@ -665,7 +671,17 @@ class Indexer(BasedModel):
 
         # Index files in batch (synchronous wrapper for async pipeline)
         try:
-            asyncio.run(self._index_files_batch(files_to_index))
+            # Check if we're already in an event loop
+            try:
+                asyncio.get_running_loop()
+                # Already in event loop - run in thread to avoid blocking
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(asyncio.run, self._index_files_batch(files_to_index))
+                    future.result()  # Wait for completion and propagate exceptions
+            except RuntimeError:
+                # No event loop running, use asyncio.run()
+                asyncio.run(self._index_files_batch(files_to_index))
         except Exception:
             logger.exception("Failure during batch indexing")
 
@@ -817,14 +833,18 @@ class Indexer(BasedModel):
 
         logger.info("Created %d chunks from %d files", len(all_chunks), len(discovered_files))
 
-        # Phase 3: Embed chunks in batches
-        await self._embed_chunks_in_batches(all_chunks)
+        # Phase 3-5: Only run if providers are initialized
+        if self._embedding_provider or self._sparse_provider or self._vector_store:
+            # Phase 3: Embed chunks in batches
+            await self._embed_chunks_in_batches(all_chunks)
 
-        # Phase 4: Retrieve embedded chunks from registry
-        updated_chunks = self._retrieve_embedded_chunks(all_chunks)
+            # Phase 4: Retrieve embedded chunks from registry
+            updated_chunks = self._retrieve_embedded_chunks(all_chunks)
 
-        # Phase 5: Index to vector store
-        await self._index_chunks_to_store(updated_chunks)
+            # Phase 5: Index to vector store
+            await self._index_chunks_to_store(updated_chunks)
+        else:
+            logger.debug("Skipping embedding and indexing phases (no providers initialized)")
 
         # Update stats with successful file count
         self._stats.files_processed += len(discovered_files)
@@ -926,7 +946,7 @@ class Indexer(BasedModel):
         settings_dict = {
             "project_path": str(settings.project_path),
             "chunker": settings.chunker.model_dump(),
-            "embedding": settings.embedding.model_dump() if settings.embedding else {},
+            "embedding": getattr(settings, "embedding", {}).model_dump() if hasattr(settings, "embedding") and settings.embedding else {},
         }
         settings_hash = self._checkpoint_manager.compute_settings_hash(settings_dict)
 

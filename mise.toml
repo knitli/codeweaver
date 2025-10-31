@@ -50,7 +50,7 @@ fi
 
 leave = """
 print -P "%F{209}[codeweaver]%f Exiting CodeWeaver environment..."
-eval "$(mise deactivate)" &>/dev/null &&
+mise --silent -y deactivate &>/dev/null &&
 print -P "%F{209}[codeweaver]%f Environment deactivated."
 """
 
@@ -86,7 +86,7 @@ if [ "$GITHUB_ACTIONS" == true ]; then
 else
     export CI=false
 fi
-mise --silent -y trust &&
+mise --silent -y trust &>/dev/null &&
 mise --silent -y install &>/dev/null || true &&
 mise --silent reshim &&
 eval "$(mise --silent activate zsh)" &&

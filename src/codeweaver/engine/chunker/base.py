@@ -39,6 +39,8 @@ if TYPE_CHECKING:
     from codeweaver.core.discovery import DiscoveredFile
 
 
+logger = logging.getLogger(__name__)
+
 SAFETY_MARGIN = 0.1
 """A safety margin to apply to chunk sizes to account for metadata and tokenization variability."""
 
@@ -49,7 +51,8 @@ class ChunkGovernor(BasedModel):
     model_config = BasedModel.model_config | ConfigDict(validate_assignment=True, defer_build=True)
 
     capabilities: Annotated[
-        tuple[EmbeddingModelCapabilities]
+        tuple[()]
+        | tuple[EmbeddingModelCapabilities]
         | tuple[EmbeddingModelCapabilities, RerankingModelCapabilities],
         Field(description="""The model capabilities to infer chunking behavior from."""),
     ] = ()  # type: ignore[assignment]
@@ -63,6 +66,9 @@ class ChunkGovernor(BasedModel):
     @cached_property
     def chunk_limit(self) -> PositiveInt:
         """The absolute maximum chunk size in tokens."""
+        # Use default of 512 tokens when capabilities aren't available
+        if not self.capabilities:
+            return 512
         return min(capability.context_window for capability in self.capabilities)
 
     @computed_field
@@ -172,7 +178,12 @@ class ChunkGovernor(BasedModel):
         elif embedding_caps:
             caps = (embedding_caps,)
         else:
-            raise RuntimeError("Could not determine capabilities for embedding model.")
+            # When capabilities can't be determined (e.g., auto_initialize_providers=False),
+            # return a ChunkGovernor with empty capabilities and use default chunk_limit
+            logger.warning(
+                "Could not determine embedding model capabilities, using default chunk limits"
+            )
+            return cls(capabilities=(), settings=settings)
         return cls(
             capabilities=cast(
                 tuple[EmbeddingModelCapabilities, RerankingModelCapabilities]
