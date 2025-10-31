@@ -103,12 +103,13 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
     ) -> None:
         """Initialize the vector store provider with embedding capabilities."""
         # Pass parameters to Pydantic's __init__
-        init_data: dict[str, Any] = {"config": config, **kwargs}
+        init_data: dict[str, Any] = {**kwargs}
+        if config is not None:
+            init_data["config"] = config
         if client is not None:
             init_data["_client"] = client
         if embedding_caps is not None:
             init_data["_embedding_caps"] = embedding_caps
-        
         super().__init__(**init_data)
         # Initialize embedding caps on first instance creation if not already set at class level
         # Use double-checked locking pattern for thread safety
