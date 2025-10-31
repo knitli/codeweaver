@@ -204,6 +204,21 @@ class HealthService:
             logger.warning("Vector store health check failed: %s", e)
             return VectorStoreServiceInfo(status="down", latency_ms=0)
 
+    def _extract_circuit_breaker_state(self, circuit_state_raw: Any) -> str:
+        """Extract circuit breaker state string from raw value.
+        
+        Handles both string values, enum values, and mock objects with .value attribute.
+        
+        Args:
+            circuit_state_raw: Raw circuit breaker state (string, enum, or mock)
+            
+        Returns:
+            Circuit breaker state as string ("closed", "open", or "half_open")
+        """
+        if hasattr(circuit_state_raw, 'value'):
+            return circuit_state_raw.value
+        return str(circuit_state_raw) if circuit_state_raw else "closed"
+
     async def _check_embedding_provider_health(self) -> EmbeddingProviderServiceInfo:
         """Check embedding provider health with circuit breaker state."""
         try:
@@ -213,13 +228,9 @@ class HealthService:
                         provider=embedding_provider, singleton=True
                     )
                 )
-                circuit_state_raw = embedding_provider_instance.circuit_breaker_state
-                # Handle both string and enum values (or mock objects with .value)
-                if hasattr(circuit_state_raw, 'value'):
-                    circuit_state = circuit_state_raw.value
-                else:
-                    circuit_state = str(circuit_state_raw) if circuit_state_raw else "closed"
-                
+                circuit_state = self._extract_circuit_breaker_state(
+                    embedding_provider_instance.circuit_breaker_state
+                )
                 model_name = getattr(embedding_provider_instance, 'model_name', 'unknown')
 
                 # Check if circuit breaker is open -> service is down
@@ -264,13 +275,9 @@ class HealthService:
                 reranking_instance = self._provider_registry.get_reranking_provider_instance(
                     provider=reranking_provider, singleton=True
                 )
-                circuit_state_raw = reranking_instance.circuit_breaker_state
-                # Handle both string and enum values (or mock objects with .value)
-                if hasattr(circuit_state_raw, 'value'):
-                    circuit_state = circuit_state_raw.value
-                else:
-                    circuit_state = str(circuit_state_raw) if circuit_state_raw else "closed"
-                    
+                circuit_state = self._extract_circuit_breaker_state(
+                    reranking_instance.circuit_breaker_state
+                )
                 model_name = getattr(reranking_instance, 'model_name', 'unknown')
                 status = "down" if circuit_state == "open" else "up"
 

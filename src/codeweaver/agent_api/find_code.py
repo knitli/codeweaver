@@ -187,7 +187,8 @@ async def find_code(
         dense_provider_enum = registry.get_embedding_provider(sparse=False)
         sparse_provider_enum = registry.get_embedding_provider(sparse=True)
 
-        # Get provider instances (both optional for graceful degradation)
+        # Get provider instances (both optional individually for graceful degradation,
+        # but at least one must be available - validated below)
         dense_provider = (
             registry.get_embedding_provider_instance(dense_provider_enum, singleton=True)
             if dense_provider_enum
