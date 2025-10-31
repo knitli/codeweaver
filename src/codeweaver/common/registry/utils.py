@@ -178,6 +178,8 @@ def get_model_config(
 
 def get_vector_store_config() -> DictView[VectorStoreProviderSettings] | None:
     """Get the vector store config, if any."""
+    from codeweaver.core.types.dictview import DictView
+
     provider_settings = get_provider_settings()
     return next(
         (

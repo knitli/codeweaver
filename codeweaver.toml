@@ -16,16 +16,17 @@ provider = "voyage"
 enabled = true
 model_settings = { model = "voyage-code-3" }
 
-[[provider.embedding]] # sparse
+[[provider.sparse_embedding]]
 provider = "fastembed"
 enabled = true
-sparse_model_settings = { model = "prithivida/Splade_PP_en_v2" }
+model_settings = { model = "prithivida/Splade_PP_en_v2" }
 
 [[provider.reranking]]
 provider = "voyage"
 enabled = true
 model_settings = { model = "voyage-rerank-2.5" }
 
-[provider.vector_store]
-qdrant = { url = "https://f3b7755c-ee6e-4605-8786-c4218f9e148b.us-east-1-1.aws.cloud.qdrant.io", collection_name = "codeweaver-dev", prefer_grpc = true }
+[[provider.vector_store]]
 provider = "qdrant"
+enabled = true
+provider_settings = { url = "https://f3b7755c-ee6e-4605-8786-c4218f9e148b.us-east-1-1.aws.cloud.qdrant.io", collection_name = "codeweaver-dev", prefer_grpc = true }
