@@ -187,11 +187,11 @@ async def find_code(
         dense_provider_enum = registry.get_embedding_provider(sparse=False)
         sparse_provider_enum = registry.get_embedding_provider(sparse=True)
 
-        if not dense_provider_enum:
-            raise ValueError("No dense embedding provider configured")
-
-        dense_provider = registry.get_embedding_provider_instance(
-            dense_provider_enum, singleton=True
+        # Get provider instances (both optional for graceful degradation)
+        dense_provider = (
+            registry.get_embedding_provider_instance(dense_provider_enum, singleton=True)
+            if dense_provider_enum
+            else None
         )
         sparse_provider = (
             registry.get_embedding_provider_instance(sparse_provider_enum, singleton=True)
@@ -199,15 +199,19 @@ async def find_code(
             else None
         )
 
+        if not dense_provider and not sparse_provider:
+            raise ValueError("No embedding providers configured (neither dense nor sparse)")
+
         # Embed query (with fallback to sparse-only if dense fails)
         dense_query_embedding = None
-        try:
-            dense_query_embedding = await dense_provider.embed_query(query)
-        except Exception as e:
-            logger.warning("Dense embedding failed: %s", e)
-            if not sparse_provider:
-                # No fallback available - must fail
-                raise ValueError("Dense embedding failed and no sparse provider available") from e
+        if dense_provider:
+            try:
+                dense_query_embedding = await dense_provider.embed_query(query)
+            except Exception as e:
+                logger.warning("Dense embedding failed: %s", e)
+                if not sparse_provider:
+                    # No fallback available - must fail
+                    raise ValueError("Dense embedding failed and no sparse provider available") from e
 
         sparse_query_embedding = None
         if sparse_provider:

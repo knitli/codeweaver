@@ -95,13 +95,21 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
     _circuit_open_duration: float = 30.0  # seconds
 
     def __init__(
-        self, config: Any, client: VectorStoreClient, embedding_caps: EmbeddingCapsDict
+        self,
+        config: Any = None,
+        client: VectorStoreClient | None = None,
+        embedding_caps: EmbeddingCapsDict | None = None,
+        **kwargs: Any,
     ) -> None:
         """Initialize the vector store provider with embedding capabilities."""
-        self.config = config
-        self._client = client
-        self._embedding_caps = embedding_caps
-        super().__init__()
+        # Pass parameters to Pydantic's __init__
+        init_data: dict[str, Any] = {"config": config, **kwargs}
+        if client is not None:
+            init_data["_client"] = client
+        if embedding_caps is not None:
+            init_data["_embedding_caps"] = embedding_caps
+        
+        super().__init__(**init_data)
         # Initialize embedding caps on first instance creation if not already set at class level
         # Use double-checked locking pattern for thread safety
         if not hasattr(type(self), "_embedding_caps_initialized"):
