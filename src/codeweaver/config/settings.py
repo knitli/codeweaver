@@ -38,7 +38,6 @@ from pydantic import (
     ValidationError,
     computed_field,
     field_validator,
-    model_validator,
 )
 from pydantic.fields import ComputedFieldInfo, FieldInfo
 from pydantic_ai.settings import merge_model_settings
@@ -77,10 +76,12 @@ from codeweaver.config.providers import (
     EmbeddingModelSettings,
     EmbeddingProviderSettings,
     ProviderSettingsDict,
+    QdrantConfig,
     RerankingModelSettings,
     RerankingProviderSettings,
     SparseEmbeddingModelSettings,
-    VectorStoreSettings,
+    SparseEmbeddingProviderSettings,
+    VectorStoreProviderSettings,
 )
 from codeweaver.config.types import (
     ChunkerSettingsDict,
@@ -200,10 +201,10 @@ def _get_default_sparse_embedding_settings() -> DeterminedDefaults:
 _sparse_embedding_defaults = _get_default_sparse_embedding_settings()
 
 DefaultSparseEmbeddingProviderSettings = (
-    EmbeddingProviderSettings(
+    SparseEmbeddingProviderSettings(
         provider=_sparse_embedding_defaults.provider,
         enabled=_sparse_embedding_defaults.enabled,
-        sparse_model_settings=SparseEmbeddingModelSettings(model=_sparse_embedding_defaults.model),
+        model_settings=SparseEmbeddingModelSettings(model=_sparse_embedding_defaults.model),
     ),
 )
 
@@ -265,6 +266,12 @@ DefaultMiddlewareSettings = MiddlewareOptions(
     logging=LoggingMiddlewareSettings(log_level=20, include_payloads=False),
     rate_limiting=RateLimitingMiddlewareSettings(
         max_requests_per_second=75, get_client_id=None, burst_capacity=150, global_limit=True
+    ),
+)
+
+DefaultVectorStoreProviderSettings = (
+    VectorStoreProviderSettings(
+        provider=Provider.QDRANT, enabled=True, provider_settings=QdrantConfig()
     ),
 )
 
@@ -661,28 +668,39 @@ class ProviderSettings(BasedModel):
     ] = DefaultDataProviderSettings
 
     embedding: Annotated[
-        tuple[EmbeddingProviderSettings, EmbeddingProviderSettings]
-        | tuple[EmbeddingProviderSettings]
-        | Unset,
+        tuple[EmbeddingProviderSettings, ...] | Unset,
         Field(
-            description="""Embedding provider configuration. You can provide up to two embedding providers: one for dense embeddings and one for sparse embeddings."""
+            description="""Embedding provider configuration.
+
+            We will only use the first provider you configure here. We may add support for multiple embedding providers in the future.
+            """
         ),
     ] = DefaultEmbeddingProviderSettings
+
+    sparse_embedding: Annotated[
+        tuple[SparseEmbeddingProviderSettings, ...] | Unset,
+        Field(
+            description="""Sparse embedding provider configuration.
+
+            We will only use the first provider you configure here. We may add support for multiple sparse embedding providers in the future."""
+        ),
+    ] = DefaultSparseEmbeddingProviderSettings
 
     reranking: Annotated[
         tuple[RerankingProviderSettings, ...] | Unset,
         Field(
-            description="""Reranking provider configuration. Note: while this field is a tuple (for consistency across settings), you can only configure one active reranking provider at a time."""
+            description="""Reranking provider configuration.
+
+            We will only use the first provider you configure here. We may add support for multiple reranking providers in the future."""
         ),
     ] = DefaultRerankingProviderSettings
 
     vector_store: Annotated[
-        VectorStoreSettings,
+        tuple[VectorStoreProviderSettings, ...] | Unset,
         Field(
-            default_factory=lambda: VectorStoreSettings(provider="memory"),
-            description="""Vector store provider configuration (Qdrant or in-memory)""",
+            description="""Vector store provider configuration (Qdrant or in-memory), defaults to a local Qdrant instance."""
         ),
-    ]
+    ] = DefaultVectorStoreProviderSettings
 
     agent: Annotated[
         tuple[AgentProviderSettings, ...] | Unset,
@@ -696,6 +714,7 @@ class ProviderSettings(BasedModel):
 AllDefaultProviderSettings = ProviderSettingsDict(
     data=DefaultDataProviderSettings,
     embedding=DefaultEmbeddingProviderSettings,
+    sparse_embedding=DefaultSparseEmbeddingProviderSettings,
     reranking=DefaultRerankingProviderSettings,
     agent=DefaultAgentProviderSettings,
 )
@@ -1322,8 +1341,6 @@ def get_settings(config_file: FilePath | None = None) -> CodeWeaverSettings:
     If you **really** need to get the mutable settings instance, you can use this function. It will create the global instance if it doesn't exist, optionally loading from a configuration file (like, .codeweaver.toml) if you provide a path.
     """
     global _settings
-    from codeweaver.common.utils.git import get_project_path
-
     # Ensure chunker models are rebuilt before creating settings
     if not ChunkerSettings.__pydantic_complete__:
         ChunkerSettings._ensure_models_rebuilt()  # type: ignore
@@ -1331,16 +1348,17 @@ def get_settings(config_file: FilePath | None = None) -> CodeWeaverSettings:
     # Rebuild CodeWeaverSettings if needed before instantiation
     if not CodeWeaverSettings.__pydantic_complete__:
         _ = CodeWeaverSettings.model_rebuild()
-    root = get_project_path() or Path.cwd()
     if config_file and config_file.exists():
         _settings = CodeWeaverSettings(config_file=config_file)
     if _settings is None or isinstance(_settings, Unset):
-        _settings = CodeWeaverSettings(project_path=root)  # type: ignore
+        _settings = CodeWeaverSettings()  # type: ignore
 
     if isinstance(_settings.project_path, Unset):
-        _settings.project_path = root
+        from codeweaver.common.utils import get_project_path
+
+        _settings.project_path = get_project_path()
     if isinstance(_settings.project_name, Unset):
-        _settings.project_name = root.name
+        _settings.project_name = _settings.project_path.name
     return _settings
 
 

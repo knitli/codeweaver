@@ -23,8 +23,8 @@ from codeweaver.engine.chunker.base import ChunkGovernor
 from codeweaver.engine.chunker.selector import ChunkerSelector
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
-pytestmark = [pytest.mark.benchmark, pytest.mark.performance, pytest.mark.slow]
 
+pytestmark = [pytest.mark.benchmark, pytest.mark.performance, pytest.mark.slow]
 
 
 # Test data generators

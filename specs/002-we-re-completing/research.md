@@ -82,7 +82,7 @@ PointStruct(
 ```python
 from qdrant_client import AsyncQdrantClient
 
-class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
+class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
     async def _initialize(self) -> None:
         self._client = AsyncQdrantClient(
             url=self.config.url or "http://localhost:6333",
@@ -111,7 +111,7 @@ class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
 
 **Implementation Pattern**:
 ```python
-class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
+class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
     def __init__(self, persist_path: Path | None = None, **kwargs):
         self._persist_path = persist_path or Path(".codeweaver/vector_store.json")
         super().__init__(**kwargs)

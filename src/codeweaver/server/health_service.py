@@ -206,16 +206,16 @@ class HealthService:
 
     def _extract_circuit_breaker_state(self, circuit_state_raw: Any) -> str:
         """Extract circuit breaker state string from raw value.
-        
+
         Handles both string values, enum values, and mock objects with .value attribute.
-        
+
         Args:
             circuit_state_raw: Raw circuit breaker state (string, enum, or mock)
-            
+
         Returns:
             Circuit breaker state as string ("closed", "open", or "half_open")
         """
-        if hasattr(circuit_state_raw, 'value'):
+        if hasattr(circuit_state_raw, "value"):
             return circuit_state_raw.value
         return str(circuit_state_raw) if circuit_state_raw else "closed"
 
@@ -231,7 +231,7 @@ class HealthService:
                 circuit_state = self._extract_circuit_breaker_state(
                     embedding_provider_instance.circuit_breaker_state
                 )
-                model_name = getattr(embedding_provider_instance, 'model_name', 'unknown')
+                model_name = getattr(embedding_provider_instance, "model_name", "unknown")
 
                 # Check if circuit breaker is open -> service is down
                 status = "down" if circuit_state == "open" else "up"
@@ -278,7 +278,7 @@ class HealthService:
                 circuit_state = self._extract_circuit_breaker_state(
                     reranking_instance.circuit_breaker_state
                 )
-                model_name = getattr(reranking_instance, 'model_name', 'unknown')
+                model_name = getattr(reranking_instance, "model_name", "unknown")
                 status = "down" if circuit_state == "open" else "up"
 
                 # Estimate latency

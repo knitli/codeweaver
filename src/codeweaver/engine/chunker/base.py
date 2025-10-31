@@ -17,6 +17,7 @@ This multi-tiered approach ensures reliable chunking across 170+ languages while
 
 from __future__ import annotations
 
+import contextlib
 import logging
 
 from abc import ABC, abstractmethod
@@ -83,7 +84,7 @@ class ChunkGovernor(BasedModel):
     def _telemetry_keys(self) -> None:
         return None
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, /, __context: Any) -> None:
         """Ensure models are rebuilt on first instantiation."""
         _rebuild_models()
         super().model_post_init(__context)
@@ -282,8 +283,7 @@ def _rebuild_models() -> None:
 # NOTE: This happens after module-level imports are complete, but ChunkerSettings
 # may rebuild itself during its module initialization, which would invalidate our rebuild.
 # To handle this, we also call rebuild in model_post_init as a fallback.
-try:
+with contextlib.suppress(Exception):
     _rebuild_models()
-except Exception:
-    # If rebuild fails during import (e.g., circular import), models will be rebuilt on first use
-    pass
+
+__all__ = ("BaseChunker", "ChunkGovernor")

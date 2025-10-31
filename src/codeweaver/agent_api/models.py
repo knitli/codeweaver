@@ -91,7 +91,7 @@ class CodeMatch(BasedModel):
     ]
 
     related_symbols: Annotated[
-        tuple[str],
+        tuple[str, ...],
         Field(default_factory=tuple, description="""Related functions, classes, or symbols"""),
     ]
 
@@ -110,18 +110,18 @@ class CodeMatch(BasedModel):
             raise ValueError("Line numbers must start from 1")
         return self
 
-    def serialize_for_cli(self) -> dict:
+    def serialize_for_cli(self) -> dict[str, Any]:
         """Serialize code match for CLI display.
 
         Returns a dict suitable for rendering in CLI output formats.
         """
-        return {
-            "file_path": str(self.file.path),
-            "span": self.span,
+        return self.model_dump() | {
+            "file": self.file.serialize_for_cli(),
+            "span": self.span.serialize_for_cli(),
+            "content": self.content.serialize_for_cli(),
             "relevance_score": self.relevance_score,
-            "match_type": self.match_type.value,
-            "content_preview": self.content.content[:200] + "..." if len(self.content.content) > 200 else self.content.content,
-            "related_symbols": list(self.related_symbols),
+            "match_type": self.match_type.as_title,
+            "related_symbols": self.related_symbols,
         }
 
 
@@ -148,10 +148,7 @@ class FindCodeResponseSummary(BasedModel):
     ]
 
     total_results: Annotated[
-        NonNegativeInt,
-        Field(
-            description="""Total results returned in this response""",
-        ),
+        NonNegativeInt, Field(description="""Total results returned in this response""")
     ]
 
     token_count: Annotated[NonNegativeInt, Field(description="""Actual tokens used in response""")]
@@ -226,5 +223,7 @@ __all__ = ("CodeMatch", "CodeMatchType", "FindCodeResponseSummary", "SearchStrat
 
 
 # Rebuild models to resolve forward references
-CodeMatch.model_rebuild()
-FindCodeResponseSummary.model_rebuild()
+if not CodeMatch.__pydantic_complete__:
+    _ = CodeMatch.model_rebuild()
+if not FindCodeResponseSummary.__pydantic_complete__:
+    _ = FindCodeResponseSummary.model_rebuild()

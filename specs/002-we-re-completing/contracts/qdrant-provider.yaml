@@ -3,14 +3,14 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
-# Contract: QdrantVectorStore Provider
+# Contract: QdrantVectorStoreProvider Provider
 # Description: Qdrant-specific implementation contract for vector storage
 # Extends: VectorStoreProvider
 # Version: 1.0
 # Date: 2025-10-25
 
 contract:
-  name: QdrantVectorStore
+  name: QdrantVectorStoreProvider
   type: concrete_implementation
   extends: VectorStoreProvider
   location: src/codeweaver/providers/vector_stores/qdrant.py
@@ -129,7 +129,8 @@ hybrid_search_implementation:
       - name: vector
         type: list[float] | dict[str, list[float] | SparseVector]
       - name: search_mode
-        type: "dense" | "sparse" | "hybrid"
+        type: |
+          "dense" | "sparse" | "hybrid"
         default: "hybrid"
     implementation:
       - If vector is list[float], use as dense vector only

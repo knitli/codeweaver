@@ -9,18 +9,18 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from codeweaver.providers.vector_stores.base import VectorStoreProvider
-from codeweaver.providers.vector_stores.inmemory import MemoryVectorStore
-from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
+from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
+from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.providers import VectorStoreSettings
+    from codeweaver.config.providers import VectorStoreProviderSettings
     from codeweaver.providers.embedding.providers import EmbeddingProvider
     from codeweaver.providers.reranking import RerankingProvider
 
 
 def get_vector_store_provider(
-    settings: VectorStoreSettings,
+    settings: VectorStoreProviderSettings,
     embedder: EmbeddingProvider[Any] | None = None,
     reranking: RerankingProvider[Any] | None = None,
 ) -> VectorStoreProvider[Any]:
@@ -32,27 +32,27 @@ def get_vector_store_provider(
         reranking: Optional reranking provider for search result optimization.
 
     Returns:
-        Configured vector store provider instance (QdrantVectorStore or MemoryVectorStore).
+        Configured vector store provider instance (QdrantVectorStoreProvider or MemoryVectorStoreProvider).
 
     Raises:
         ValueError: If provider type is not recognized or required config is missing.
         ImportError: If required dependencies for selected provider are not installed.
 
     Examples:
-        >>> from codeweaver.config.providers import VectorStoreSettings
-        >>> settings = VectorStoreSettings(provider="memory")
+        >>> from codeweaver.config.providers import VectorStoreProviderSettings
+        >>> settings = VectorStoreProviderSettings(provider="memory")
         >>> provider = get_vector_store_provider(settings)
-        >>> isinstance(provider, MemoryVectorStore)
+        >>> isinstance(provider, MemoryVectorStoreProvider)
         True
 
         >>> from unittest.mock import MagicMock
-        >>> qdrant_settings = VectorStoreSettings(
+        >>> qdrant_settings = VectorStoreProviderSettings(
         ...     provider="qdrant",
         ...     qdrant={"url": "http://localhost:6333", "collection_name": "test"},
         ... )
         >>> mock_embedder = MagicMock()
         >>> provider = get_vector_store_provider(qdrant_settings, embedder=mock_embedder)
-        >>> isinstance(provider, QdrantVectorStore)
+        >>> isinstance(provider, QdrantVectorStoreProvider)
         True
     """
     provider_type = settings.get("provider", "memory")
@@ -63,7 +63,7 @@ def get_vector_store_provider(
         qdrant_config = settings.get("qdrant", {})
         if not qdrant_config:
             raise ValueError("Qdrant provider selected but no qdrant config provided")
-        return QdrantVectorStore.model_construct(
+        return QdrantVectorStoreProvider.model_construct(
             config=qdrant_config,
             _embedder=embedder,
             _reranking=reranking,
@@ -73,7 +73,7 @@ def get_vector_store_provider(
 
     if provider_type == "memory":
         memory_config = settings.get("memory", {})
-        return MemoryVectorStore.model_construct(config=memory_config, _client=None)
+        return MemoryVectorStoreProvider.model_construct(config=memory_config, _client=None)
 
     raise ValueError(
         f"Unknown vector store provider: {provider_type}. Supported providers: 'qdrant', 'memory'"
@@ -81,8 +81,8 @@ def get_vector_store_provider(
 
 
 __all__ = (
-    "MemoryVectorStore",
-    "QdrantVectorStore",
+    "MemoryVectorStoreProvider",
+    "QdrantVectorStoreProvider",
     "VectorStoreProvider",
     "get_vector_store_provider",
 )

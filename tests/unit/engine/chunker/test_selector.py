@@ -14,6 +14,7 @@ from codeweaver.engine.chunker.delimiter import DelimiterChunker
 from codeweaver.engine.chunker.selector import ChunkerSelector
 from codeweaver.engine.chunker.semantic import SemanticChunker
 
+
 pytestmark = [pytest.mark.unit]
 
 

@@ -20,8 +20,8 @@ class EmbeddingSettingsDict(TypedDict, total=False):
     """A dictionary representing the settings for an embedding client, embedding model, and the embedding call itself. If any."""
 
     client_options: dict[str, Any]
-    model_kwargs: dict[str, Any]
-    call_kwargs: dict[str, Any]
+    model_options: dict[str, Any]
+    call_options: dict[str, Any]
 
 
 type PartialCapabilities = dict[

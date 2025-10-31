@@ -56,7 +56,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 2. Chunking:   Path → SemanticChunker → List[CodeChunk] (no batch keys yet)
 3. Embedding:  List[CodeChunk] → EmbeddingProvider._process_input() → chunks with BatchKeys
 4. Registry:   chunks → _register_chunks() → EmbeddingRegistry[chunk_id → ChunkEmbeddings]
-5. Vector DB:  chunks → QdrantVectorStore.upsert() → chunk.dense_embeddings property access
+5. Vector DB:  chunks → QdrantVectorStoreProvider.upsert() → chunk.dense_embeddings property access
 6. Search:     query → vector_store.search() → List[SearchResult]
 ```
 
@@ -297,7 +297,7 @@ assert len(dense_info.embeddings) > 0
 **Interface**:
 ```python
 # Vector store expects
-QdrantVectorStore.upsert(chunks: List[CodeChunk]) → None
+QdrantVectorStoreProvider.upsert(chunks: List[CodeChunk]) → None
 ```
 
 **Implementation** from `providers/vector_stores/qdrant.py:199-243`:
@@ -382,7 +382,7 @@ assert any(r.content.chunk_id == first_chunk.chunk_id for r in results)
 **Interface**:
 ```python
 # Search
-QdrantVectorStore.search(
+QdrantVectorStoreProvider.search(
     vector: list[float] | dict[str, list[float] | Any],
     query_filter: Filter | None = None
 ) → List[SearchResult]
@@ -447,7 +447,7 @@ await vector_store.upsert(updated_chunks)
 
 ### Gap 2: No Validation That Chunks Have Embeddings 🚨
 
-**Issue**: `QdrantVectorStore.upsert()` assumes chunks have embeddings, but doesn't validate.
+**Issue**: `QdrantVectorStoreProvider.upsert()` assumes chunks have embeddings, but doesn't validate.
 
 **Impact**: Runtime errors if chunks passed without embeddings being generated first.
 
@@ -597,7 +597,7 @@ async def test_discovery_to_chunks():
 5. **Validate**: `chunk.dense_embeddings` property returns valid data
 
 #### B3: Embedding → Vector Store (4-5 hours)
-1. Add validation to `QdrantVectorStore.upsert()`
+1. Add validation to `QdrantVectorStoreProvider.upsert()`
 2. Wire embedding output → vector store
 3. Handle hybrid (dense + sparse) indexing
 4. **Test**: Chunks → vector store → searchable

@@ -126,7 +126,7 @@ class IndexingStats:
     def total_errors(self) -> int:
         """Total number of files with errors."""
         return len(self.files_with_errors)
-    
+
     @property
     def total_files_discovered(self) -> int:
         """Total files discovered (alias for files_discovered)."""
@@ -366,15 +366,14 @@ class Indexer(BasedModel):
             project_path = project_root
         elif project_root is not None and project_path is not None:
             logger.warning(
-                "Both project_path and project_root specified, using project_path: %s",
-                project_path,
+                "Both project_path and project_root specified, using project_path: %s", project_path
             )
-        
+
         # Auto-create walker if project_path is provided but walker is not
         if walker is None and project_path is not None:
             walker = rignore.Walker(project_path)
             logger.debug("Auto-created walker for project_path: %s", project_path)
-        
+
         self._store = store or BlakeStore[DiscoveredFile](_value_type=DiscoveredFile)
         self._walker = walker
         self._chunking_service = chunking_service or _get_chunking_service()
@@ -686,6 +685,7 @@ class Indexer(BasedModel):
                 asyncio.get_running_loop()
                 # Already in event loop - run in thread to avoid blocking
                 import concurrent.futures
+
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                     future = executor.submit(asyncio.run, self._index_files_batch(files_to_index))
                     future.result()  # Wait for completion and propagate exceptions
@@ -956,7 +956,9 @@ class Indexer(BasedModel):
         settings_dict = {
             "project_path": str(settings.project_path),
             "chunker": settings.chunker.model_dump(),
-            "embedding": getattr(settings, "embedding", {}).model_dump() if hasattr(settings, "embedding") and settings.embedding else {},
+            "embedding": getattr(settings, "embedding", {}).model_dump()
+            if hasattr(settings, "embedding") and settings.embedding
+            else {},
         }
         settings_hash = self._checkpoint_manager.compute_settings_hash(settings_dict)
 

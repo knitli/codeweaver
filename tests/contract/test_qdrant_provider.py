@@ -2,9 +2,9 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-"""Contract tests for QdrantVectorStore provider.
+"""Contract tests for QdrantVectorStoreProvider provider.
 
-These tests verify that QdrantVectorStore correctly implements the
+These tests verify that QdrantVectorStoreProvider correctly implements the
 VectorStoreProvider interface and provides Qdrant-specific functionality.
 
 Requires: Local Qdrant instance running on localhost:6333 or use docker:
@@ -19,13 +19,14 @@ import pytest
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.core.spans import Span
-from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
+from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+
 
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
 
-
 # Mark all tests in this module as requiring Qdrant
+
 
 @pytest.fixture
 async def qdrant_config():
@@ -41,14 +42,14 @@ async def qdrant_config():
 
 @pytest.fixture
 async def qdrant_provider(qdrant_config):
-    """Create a QdrantVectorStore instance for testing."""
+    """Create a QdrantVectorStoreProvider instance for testing."""
     from unittest.mock import MagicMock
 
     # Create a mock embedder (not used in contract tests, but required by field definition)
     mock_embedder = MagicMock()
 
     # Use model_construct to bypass validation and create instance
-    provider = QdrantVectorStore.model_construct(
+    provider = QdrantVectorStoreProvider.model_construct(
         config=qdrant_config, _embedder=mock_embedder, _reranking=None, _client=None, _metadata=None
     )
     await provider._initialize()
@@ -78,13 +79,13 @@ def sample_chunk():
 
 
 class TestQdrantProviderContract:
-    """Contract tests for QdrantVectorStore implementation."""
+    """Contract tests for QdrantVectorStoreProvider implementation."""
 
     async def test_implements_vector_store_provider(self):
-        """Verify QdrantVectorStore implements VectorStoreProvider interface."""
+        """Verify QdrantVectorStoreProvider implements VectorStoreProvider interface."""
         from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
-        assert issubclass(QdrantVectorStore, VectorStoreProvider)
+        assert issubclass(QdrantVectorStoreProvider, VectorStoreProvider)
 
     async def test_list_collections(self, qdrant_provider):
         """Test list_collections returns list or None."""

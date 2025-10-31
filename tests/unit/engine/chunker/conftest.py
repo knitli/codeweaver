@@ -13,15 +13,15 @@ import pytest
 from codeweaver.config.chunker import ChunkerSettings, PerformanceSettings
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.engine.chunker.base import ChunkGovernor
-from codeweaver.engine.chunker.governance import ResourceGovernor
-from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-from codeweaver.providers.embedding.types import EmbeddingBatchInfo  # noqa: F401
-
 
 # Rebuild models to resolve forward references
 # This must happen after all imports to ensure all referenced types are available
 # Import types needed for forward reference resolution
 from codeweaver.engine.chunker.delimiters import DelimiterPattern, LanguageFamily
+from codeweaver.engine.chunker.governance import ResourceGovernor
+from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+from codeweaver.providers.embedding.types import EmbeddingBatchInfo  # noqa: F401
+
 
 # Build namespace for Pydantic to resolve string annotations
 namespace = {

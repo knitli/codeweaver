@@ -12,15 +12,14 @@ import contextlib
 import importlib
 import logging
 
-from collections.abc import MutableMapping
+from collections.abc import Mapping, MutableMapping
 from functools import partial
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, ClassVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast, overload
 
 from pydantic import ConfigDict
 from textcase import pascal
 
-from codeweaver.common.registry.utils import get_provider_settings
 from codeweaver.common.utils.lazy_importer import LazyImport, lazy_import
 from codeweaver.config.types import CodeWeaverSettingsDict
 from codeweaver.core.types.aliases import LiteralStringT
@@ -40,7 +39,7 @@ if TYPE_CHECKING:
         DataProviderSettings,
         EmbeddingProviderSettings,
         RerankingProviderSettings,
-        VectorStoreSettings,
+        VectorStoreProviderSettings,
     )
 
 
@@ -62,7 +61,7 @@ class ProviderRegistry(BasedModel):
     _provider_map: ClassVar[
         MappingProxyType[
             ProviderKind,
-            dict[
+            Mapping[
                 Provider, partial[LazyImport[Any]]
             ],  # ProviderKind.EMBEDDING -> Provider.AZURE, Literal["EXCEPTION"] but I couldn't find a way to type it correctly
         ]
@@ -816,16 +815,50 @@ class ProviderRegistry(BasedModel):
             return self._check_for_provider_availability(provider, provider_kind)
         return False
 
+    @overload
     def get_configured_provider_settings(
-        self, provider_kind: ProviderKind
+        self, provider_kind: Literal[ProviderKind.DATA, "data"]
+    ) -> tuple[DictView[DataProviderSettings], ...]: ...
+    @overload
+    def get_configured_provider_settings(
+        self, provider_kind: Literal[ProviderKind.EMBEDDING, "embedding"]
+    ) -> DictView[EmbeddingProviderSettings]: ...
+
+    @overload
+    def get_configured_provider_settings(
+        self, provider_kind: Literal[ProviderKind.RERANKING, "reranking"]
+    ) -> DictView[RerankingProviderSettings]: ...
+    @overload
+    def get_configured_provider_settings(
+        self, provider_kind: Literal[ProviderKind.VECTOR_STORE, "vector_store"]
+    ) -> DictView[VectorStoreProviderSettings]: ...
+
+    @overload
+    def get_configured_provider_settings(
+        self, provider_kind: Literal[ProviderKind.AGENT, "agent"]
+    ) -> DictView[AgentProviderSettings]: ...
+
+    def get_configured_provider_settings(
+        self,
+        provider_kind: Literal[
+            ProviderKind.AGENT,
+            "agent",
+            ProviderKind.DATA,
+            "data",
+            ProviderKind.EMBEDDING,
+            "embedding",
+            ProviderKind.RERANKING,
+            "reranking",
+            ProviderKind.VECTOR_STORE,
+            "vector_store",
+        ],
     ) -> (
-        tuple[DictView[DataProviderSettings], ...]
-        | DictView[
-            EmbeddingProviderSettings
-            | RerankingProviderSettings
-            | VectorStoreSettings
-            | AgentProviderSettings
-        ]
+        DictView[DataProviderSettings]
+        | DictView[EmbeddingProviderSettings]
+        | DictView[RerankingProviderSettings]
+        | DictView[VectorStoreProviderSettings]
+        | DictView[AgentProviderSettings]
+        | tuple[DictView[DataProviderSettings], ...]
         | None
     ):
         """Get a list of providers that have been configured in settings for a given provider kind.
@@ -835,106 +868,47 @@ class ProviderRegistry(BasedModel):
         Returns:
             List of configured providers
         """
-        settings = get_provider_settings()
-        match provider_kind:
-            case ProviderKind.EMBEDDING | ProviderKind.SPARSE_EMBEDDING:
-                embedding_settings = settings.get("embedding", {})
-                return (
-                    DictView(
-                        next(
-                            setting
-                            for setting in embedding_settings
-                            if (
-                                setting.get("model_settings")
-                                if ProviderKind.EMBEDDING
-                                else setting.get("sparse_model_settings")
-                            )
-                            and setting.get("enabled")
-                        )
-                    )
-                    if embedding_settings
-                    else None
-                )
-            case ProviderKind.VECTOR_STORE:
-                vector_store_settings = settings.get("vector", {})
-                return (
-                    DictView(
-                        next((store for store in vector_store_settings if store.get("enabled")), {})
-                    )
-                    if vector_store_settings
-                    else None
-                )  # type: ignore
-            case ProviderKind.RERANKING:
-                reranking_settings = settings.get("reranking", {})
-                return (
-                    DictView(
-                        next(
-                            (setting for setting in reranking_settings if setting.get("enabled")),
-                            {},
-                        )
-                    )
-                    if reranking_settings
-                    else None
-                )  # type: ignore
-            case ProviderKind.AGENT:
-                agent_settings = settings.get("agent", {})
-                return (
-                    DictView(
-                        next((setting for setting in agent_settings if setting.get("enabled")), {})
-                    )
-                    if agent_settings
-                    else None
-                )  # type: ignore
-            case ProviderKind.DATA:
-                data_settings = settings.get("data", {})
-                return (
-                    tuple(DictView(setting) for setting in data_settings if setting.get("enabled"))
-                    if data_settings
-                    else None
-                )  # type: ignore
-            case _:
-                return None
+        from codeweaver.common.registry.utils import (
+            get_data_configs,
+            get_model_config,
+            get_vector_store_config,
+        )
 
-    def get_embedding_provider(self, *, sparse: bool = False) -> Provider | None:
-        """Get the default embedding provider from settings.
+        if provider_kind == ProviderKind.DATA:
+            return get_data_configs()
+        if provider_kind == ProviderKind.VECTOR_STORE:
+            return get_vector_store_config()
+        if provider_kind not in (
+            ProviderKind.EMBEDDING,
+            ProviderKind.SPARSE_EMBEDDING,
+            ProviderKind.RERANKING,
+            ProviderKind.AGENT,
+            "agent",
+            "embedding",
+            "reranking",
+            "sparse_embedding",
+        ):
+            raise ValueError("We didn't recognize that provider kind, %s.", provider_kind)
+        return get_model_config(provider_kind)  # type: ignore
+
+    def get_embedding_provider(self) -> Provider | None:
+        """Get the configured embedding provider enum from settings.
 
         Args:
             sparse: Whether to get the sparse embedding provider
 
         Returns:
-            The default embedding provider enum or None
+            The configured embedding provider enum or None
         """
-        embedding_settings: DictView[EmbeddingProviderSettings] = (
-            self.get_configured_provider_settings(
-                ProviderKind.SPARSE_EMBEDDING if sparse else ProviderKind.EMBEDDING
-            )
-        )  # type: ignore
-        if embedding_settings and (provider := embedding_settings.get("provider")):
-            provider: Provider = (
-                Provider.from_string(provider) if isinstance(provider, str) else provider
-            )
-            if self.is_provider_available(
-                provider, ProviderKind.SPARSE_EMBEDDING if sparse else ProviderKind.EMBEDDING
-            ):
-                return provider
-        return None
+        return (self.get_configured_provider_settings(ProviderKind.EMBEDDING) or {}).get("provider")
 
     def get_reranking_provider(self) -> Provider | None:
-        """Get the default reranking provider from settings.
+        """Get the configured reranking provider enum from settings.
 
         Returns:
-            The default reranking provider enum or None
+            The configured reranking provider enum or None
         """
-        reranking_settings: DictView[RerankingProviderSettings] = (
-            self.get_configured_provider_settings(ProviderKind.RERANKING)
-        )  # type: ignore
-        if reranking_settings and (provider := reranking_settings.get("provider")):
-            provider: Provider = (
-                Provider.from_string(provider) if isinstance(provider, str) else provider
-            )
-            if self.is_provider_available(provider, ProviderKind.RERANKING):
-                return provider
-        return None
+        return (self.get_configured_provider_settings(ProviderKind.RERANKING) or {}).get("provider")
 
     def get_vector_store_provider(self) -> Provider | None:
         """Get the default vector store provider from settings.
@@ -942,16 +916,9 @@ class ProviderRegistry(BasedModel):
         Returns:
             The default vector store provider enum or None
         """
-        vector_store_settings: DictView[VectorStoreSettings] = (
-            self.get_configured_provider_settings(ProviderKind.VECTOR_STORE)
-        )  # type: ignore
-        if vector_store_settings and (provider := vector_store_settings.get("provider")):
-            provider: Provider = (
-                Provider.from_string(provider) if isinstance(provider, str) else provider
-            )
-            if self.is_provider_available(provider, ProviderKind.VECTOR_STORE):
-                return provider
-        return None
+        return (self.get_configured_provider_settings(ProviderKind.VECTOR_STORE) or {}).get(
+            "provider"
+        )
 
     def get_agent_provider(self) -> Provider | None:
         """Get the default agent provider from settings.
@@ -959,16 +926,7 @@ class ProviderRegistry(BasedModel):
         Returns:
             The default agent provider enum or None
         """
-        agent_settings: DictView[AgentProviderSettings] = self.get_configured_provider_settings(
-            ProviderKind.AGENT
-        )  # type: ignore
-        if agent_settings and (provider := agent_settings.get("provider")):
-            provider: Provider = (
-                Provider.from_string(provider) if isinstance(provider, str) else provider
-            )
-            if self.is_provider_available(provider, ProviderKind.AGENT):
-                return provider
-        return None
+        return (self.get_configured_provider_settings(ProviderKind.AGENT) or {}).get("provider")
 
     def get_data_providers(self) -> tuple[Provider, ...] | None:
         """Get all data providers from settings.
@@ -976,18 +934,11 @@ class ProviderRegistry(BasedModel):
         Returns:
             A tuple of all data provider enums
         """
-        if data_settings := self.get_configured_provider_settings(ProviderKind.DATA):
-            providers = [
-                setting.get("provider")
-                for setting in data_settings
-                if isinstance(setting, DictView | dict)
-            ]
-            return tuple(
-                Provider.from_string(provider) if isinstance(provider, str) else provider
-                for provider in providers
-                if provider and self.is_provider_available(provider, ProviderKind.DATA)
-            )
-        return None
+        return (
+            tuple(setting.get("provider") for setting in data)
+            if (data := self.get_configured_provider_settings(ProviderKind.DATA))
+            else None
+        )
 
     def clear_instances(self) -> None:
         """Clear all cached provider instances."""
@@ -997,3 +948,21 @@ class ProviderRegistry(BasedModel):
         self._sparse_embedding_instances.clear()
         self._agent_instances.clear()
         self._data_instances.clear()
+
+
+_provider_registry: ProviderRegistry | None = None
+
+
+def get_provider_registry() -> ProviderRegistry:
+    """Get the global provider registry instance.
+
+    Returns:
+        The global ProviderRegistry instance
+    """
+    global _provider_registry
+    if _provider_registry is None:
+        _provider_registry = ProviderRegistry()
+    return _provider_registry
+
+
+__all__ = ("ProviderRegistry", "get_provider_registry")

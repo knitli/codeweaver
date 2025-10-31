@@ -21,6 +21,7 @@ from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.engine.chunker.base import ChunkGovernor
 from codeweaver.engine.chunker.semantic import SemanticChunker
 
+
 pytestmark = [pytest.mark.unit]
 
 

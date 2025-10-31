@@ -15,7 +15,7 @@ from fnmatch import fnmatch
 from typing import cast
 
 from pydantic import ConfigDict
-from rich.console import console
+from rich.console import Console
 
 from codeweaver.core.types.aliases import LiteralStringT, ModelName
 from codeweaver.core.types.models import BasedModel
@@ -26,6 +26,9 @@ from codeweaver.providers.embedding.capabilities.base import (
 )
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+
+
+console = Console(markup=True, emoji=True)
 
 
 class ModelRegistry(BasedModel):

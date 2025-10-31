@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from typing import TYPE_CHECKING, Annotated, Any, Literal, Self
 
 from pydantic import ConfigDict, Field, NonNegativeFloat, PositiveInt, model_validator
@@ -17,9 +19,13 @@ from codeweaver.core.secondary_languages import SecondarySupportedLanguage
 from codeweaver.core.types.aliases import LanguageNameT
 from codeweaver.core.types.models import FROZEN_BASEDMODEL_CONFIG, BasedModel
 
+
 # Lazy imports to avoid circular dependency with engine.chunker
 if TYPE_CHECKING:
     from codeweaver.engine.chunker.delimiters import DelimiterPattern, LanguageFamily
+
+
+logger = logging.getLogger(__name__)
 
 
 class CustomLanguage(BasedModel):
@@ -38,7 +44,7 @@ class CustomLanguage(BasedModel):
         ),
     ]
     language_family: Annotated[
-        "LanguageFamily | None",
+        LanguageFamily | None,
         Field(
             description="The language family this language belongs to. This is used to determine the best chunking strategy for the language. If not provided, CodeWeaver will test it against known language families."
         ),
@@ -54,7 +60,7 @@ class CustomDelimiter(BasedModel):
     model_config = FROZEN_BASEDMODEL_CONFIG
 
     delimiters: Annotated[
-        "list[DelimiterPattern]",
+        list[DelimiterPattern],
         Field(
             default_factory=list,
             min_length=1,
@@ -171,7 +177,7 @@ class ChunkerSettings(BasedModel):
     ] = None
 
     custom_languages: Annotated[
-        "dict[LanguageNameT, LanguageFamily] | None",
+        dict[LanguageNameT, LanguageFamily] | None,
         Field(
             description="""Associate a new language with an existing CodeWeaver language family for chunking purposes. If you want to define custom delimiters for a new language, use `custom_delimiters` instead. Most languages can be reasonably chunked by CodeWeaver's existing delimiter strategies once you tell it what language to use."""
         ),
@@ -205,10 +211,7 @@ class ChunkerSettings(BasedModel):
         """Ensure forward references are resolved before first use."""
         if not cls.__pydantic_complete__:
             # Import the actual types now (after module initialization)
-            from codeweaver.engine.chunker.delimiters import (
-                DelimiterPattern,
-                LanguageFamily,
-            )
+            from codeweaver.engine.chunker.delimiters import DelimiterPattern, LanguageFamily
 
             # Pass the types to model_rebuild so Pydantic can resolve string annotations
             namespace = {"DelimiterPattern": DelimiterPattern, "LanguageFamily": LanguageFamily}
@@ -216,7 +219,7 @@ class ChunkerSettings(BasedModel):
             _ = CustomLanguage.model_rebuild(_types_namespace=namespace)
             _ = CustomDelimiter.model_rebuild(_types_namespace=namespace)
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, /, __context: Any) -> None:
         """Post-initialization hook."""
         # Model rebuild is now handled at module level, so we don't need to call it here
         # Calling it here was causing issues with ChunkGovernor's completion status
@@ -235,7 +238,9 @@ __all__ = (
 # Rebuild models at module level to resolve forward references
 # This ensures models are ready before first instantiation
 try:
-    ChunkerSettings._ensure_models_rebuilt()
+    ChunkerSettings._ensure_models_rebuilt()  # type: ignore
 except Exception:
     # If rebuild fails during import, models will be rebuilt on first use via model_post_init
-    pass
+    logger.warning(
+        "Failed to rebuild ChunkerSettings models at import time. Will retry on first use."
+    )

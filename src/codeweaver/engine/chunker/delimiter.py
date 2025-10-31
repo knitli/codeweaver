@@ -543,7 +543,7 @@ class DelimiterChunker(BaseChunker):
         Returns:
             True if character is a string delimiter
         """
-        return char in ('"', "'", "`")
+        return char in {'"', "'", "`"}
 
     def _update_string_state(
         self, content: str, pos: int, char: str, state: StringParseState

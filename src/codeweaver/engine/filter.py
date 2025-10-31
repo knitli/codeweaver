@@ -320,7 +320,7 @@ def to_qdrant_filter(filter_obj: Filter | None) -> Filter | None:
     # - git_commit: stored as "git_commit" in payload (if present)
     # - embedding_complete: stored as "embedding_complete" in payload
     #
-    # The vector store providers (QdrantVectorStore, MemoryVectorStore) use
+    # The vector store providers (QdrantVectorStoreProvider, MemoryVectorStoreProvider) use
     # these field names when constructing payload, so no translation is needed.
     return filter_obj
 

@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       run_tests:
-        description: 'Run tests before publishing'
+        description: "Run tests before publishing"
         required: false
-        default: 'true'
+        default: true
         type: boolean
 
 concurrency:

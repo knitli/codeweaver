@@ -58,7 +58,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SparseEmbeddingModelSettings": (__spec__.parent, "providers"),
     "UvicornServerSettings": (__spec__.parent, "types"),
     "UvicornServerSettingsDict": (__spec__.parent, "types"),
-    "VectorStoreSettings": (__spec__.parent, "providers"),
+    "VectorStoreProviderSettings": (__spec__.parent, "providers"),
     "default_config_file_locations": (__spec__.parent, "types"),
     "get_settings": (__spec__.parent, "settings"),
     "get_settings_map": (__spec__.parent, "settings"),

@@ -33,14 +33,11 @@ from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.metadata import ChunkKind, ExtKind
 from codeweaver.core.spans import Span
-from codeweaver.providers.vector_stores.inmemory import MemoryVectorStore
-from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
+from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
+from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+
 
 pytestmark = [pytest.mark.async_test, pytest.mark.performance, pytest.mark.slow]
-
-
-
-
 
 
 # Test data generation helpers
@@ -94,12 +91,12 @@ async def qdrant_client() -> AsyncQdrantClient:
 
 
 @pytest.fixture
-async def qdrant_store(qdrant_client: AsyncQdrantClient) -> QdrantVectorStore:
-    """Create a QdrantVectorStore for testing."""
+async def qdrant_store(qdrant_client: AsyncQdrantClient) -> QdrantVectorStoreProvider:
+    """Create a QdrantVectorStoreProvider for testing."""
     config = QdrantConfig(
         url="http://localhost:6333", collection_name=f"perf_test_{uuid4().hex[:8]}", batch_size=64
     )
-    store = QdrantVectorStore(config=config, embedder=None, reranking=None)
+    store = QdrantVectorStoreProvider(config=config, embedder=None, reranking=None)
     await store._initialize()
     yield store
     # Cleanup
@@ -110,15 +107,15 @@ async def qdrant_store(qdrant_client: AsyncQdrantClient) -> QdrantVectorStore:
 
 
 @pytest.fixture
-async def memory_store() -> MemoryVectorStore:
-    """Create a MemoryVectorStore for testing."""
+async def memory_store() -> MemoryVectorStoreProvider:
+    """Create a MemoryVectorStoreProvider for testing."""
     with tempfile.TemporaryDirectory() as tmpdir:
         config = MemoryConfig(
             persist_path=Path(tmpdir) / "test_store.json",
             auto_persist=False,
             collection_name=f"perf_test_{uuid4().hex[:8]}",
         )
-        store = MemoryVectorStore(config=config, embedder=None, reranking=None)
+        store = MemoryVectorStoreProvider(config=config, embedder=None, reranking=None)
         await store._initialize()
         yield store
 
@@ -129,7 +126,9 @@ async def memory_store() -> MemoryVectorStore:
 @pytest.mark.asyncio
 @pytest.mark.performance
 @pytest.mark.parametrize("chunk_count", [1000, 5000, 10000])
-async def test_qdrant_search_latency(qdrant_store: QdrantVectorStore, chunk_count: int) -> None:
+async def test_qdrant_search_latency(
+    qdrant_store: QdrantVectorStoreProvider, chunk_count: int
+) -> None:
     """Test search latency meets <200ms p95 requirement.
 
     Contract requirement: <200ms p95 for local deployments with <100k chunks.
@@ -171,7 +170,7 @@ async def test_qdrant_search_latency(qdrant_store: QdrantVectorStore, chunk_coun
 
 @pytest.mark.asyncio
 @pytest.mark.performance
-async def test_qdrant_upsert_batch_performance(qdrant_store: QdrantVectorStore) -> None:
+async def test_qdrant_upsert_batch_performance(qdrant_store: QdrantVectorStoreProvider) -> None:
     """Test upsert batch performance meets <1s for 100 chunks requirement.
 
     Contract requirement: <1s for 100 chunks.
@@ -197,7 +196,7 @@ async def test_qdrant_upsert_batch_performance(qdrant_store: QdrantVectorStore) 
 @pytest.mark.performance
 @pytest.mark.parametrize("chunks_per_file", [10, 50, 100])
 async def test_qdrant_delete_by_file_performance(
-    qdrant_store: QdrantVectorStore, chunks_per_file: int
+    qdrant_store: QdrantVectorStoreProvider, chunks_per_file: int
 ) -> None:
     """Test delete_by_file performance meets <100ms requirement.
 
@@ -256,7 +255,7 @@ async def test_memory_persistence_performance(chunk_count: int) -> None:
         )
 
         # Create store and populate
-        store = MemoryVectorStore(config=config, embedder=None, reranking=None)
+        store = MemoryVectorStoreProvider(config=config, embedder=None, reranking=None)
         await store._initialize()
 
         chunks = create_test_chunks(count=chunk_count, files=10)
@@ -277,7 +276,7 @@ async def test_memory_persistence_performance(chunk_count: int) -> None:
         print(f"  Throughput: {chunk_count / persist_duration:.0f} chunks/sec")
 
         # Measure restore performance
-        new_store = MemoryVectorStore(config=config, embedder=None, reranking=None)
+        new_store = MemoryVectorStoreProvider(config=config, embedder=None, reranking=None)
 
         start = time.perf_counter()
         await new_store._restore_from_disk()
@@ -298,7 +297,7 @@ async def test_memory_persistence_performance(chunk_count: int) -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.performance
-async def test_qdrant_concurrent_search(qdrant_store: QdrantVectorStore) -> None:
+async def test_qdrant_concurrent_search(qdrant_store: QdrantVectorStoreProvider) -> None:
     """Test concurrent search performance and thread safety.
 
     Contract requirement: Multiple concurrent reads must be supported.
@@ -350,7 +349,7 @@ async def test_qdrant_concurrent_search(qdrant_store: QdrantVectorStore) -> None
 
 @pytest.mark.asyncio
 @pytest.mark.performance
-async def test_hybrid_search_performance(qdrant_store: QdrantVectorStore) -> None:
+async def test_hybrid_search_performance(qdrant_store: QdrantVectorStoreProvider) -> None:
     """Test hybrid search (dense + sparse) performance.
 
     Hybrid search should have comparable performance to dense-only search.
@@ -400,7 +399,7 @@ async def test_hybrid_search_performance(qdrant_store: QdrantVectorStore) -> Non
 # Performance regression test
 @pytest.mark.asyncio
 @pytest.mark.performance
-async def test_performance_regression_check(qdrant_store: QdrantVectorStore) -> None:
+async def test_performance_regression_check(qdrant_store: QdrantVectorStoreProvider) -> None:
     """Record performance baselines for regression detection.
 
     This test records current performance metrics to a JSON file for comparison

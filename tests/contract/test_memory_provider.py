@@ -2,9 +2,9 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-"""Contract tests for MemoryVectorStore provider.
+"""Contract tests for MemoryVectorStoreProvider provider.
 
-These tests verify that MemoryVectorStore correctly implements the
+These tests verify that MemoryVectorStoreProvider correctly implements the
 VectorStoreProvider interface and provides in-memory storage with persistence.
 """
 
@@ -18,10 +18,10 @@ import pytest
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.core.spans import Span
-from codeweaver.providers.vector_stores.inmemory import MemoryVectorStore
+from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
+
 
 pytestmark = pytest.mark.unit
-
 
 
 @pytest.fixture
@@ -44,8 +44,8 @@ async def memory_config(temp_persist_path):
 
 @pytest.fixture
 async def memory_provider(memory_config):
-    """Create a MemoryVectorStore instance for testing."""
-    provider = MemoryVectorStore(config=memory_config)
+    """Create a MemoryVectorStoreProvider instance for testing."""
+    provider = MemoryVectorStoreProvider(config=memory_config)
     await provider._initialize()
     return provider
     # Cleanup handled by temp directory
@@ -68,13 +68,13 @@ def sample_chunk():
 
 
 class TestMemoryProviderContract:
-    """Contract tests for MemoryVectorStore implementation."""
+    """Contract tests for MemoryVectorStoreProvider implementation."""
 
     async def test_implements_vector_store_provider(self):
-        """Verify MemoryVectorStore implements VectorStoreProvider interface."""
+        """Verify MemoryVectorStoreProvider implements VectorStoreProvider interface."""
         from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
-        assert issubclass(MemoryVectorStore, VectorStoreProvider)
+        assert issubclass(MemoryVectorStoreProvider, VectorStoreProvider)
 
     async def test_list_collections(self, memory_provider):
         """Test list_collections returns list or None."""
@@ -142,13 +142,13 @@ class TestMemoryProviderContract:
     async def test_restore_from_disk(self, memory_config, sample_chunk, temp_persist_path):
         """Test _restore_from_disk loads data from JSON."""
         # Create and persist data
-        provider1 = MemoryVectorStore(config=memory_config)
+        provider1 = MemoryVectorStoreProvider(config=memory_config)
         await provider1._initialize()
         await provider1.upsert([sample_chunk])
         await provider1._persist_to_disk()
 
         # Create new provider and restore
-        provider2 = MemoryVectorStore(config=memory_config)
+        provider2 = MemoryVectorStoreProvider(config=memory_config)
         await provider2._initialize()
 
         # Verify data was restored
@@ -179,7 +179,7 @@ class TestMemoryProviderContract:
         config_with_auto = memory_config.copy()
         config_with_auto["auto_persist"] = True
 
-        provider = MemoryVectorStore(config=config_with_auto)
+        provider = MemoryVectorStoreProvider(config=config_with_auto)
         await provider._initialize()
         await provider.upsert([sample_chunk])
 

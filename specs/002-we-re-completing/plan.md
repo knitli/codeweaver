@@ -75,7 +75,7 @@ Complete the vector storage provider system for CodeWeaver, implementing Qdrant 
 **Proven Patterns**: ✅ PASS - Design follows ecosystem patterns:
 - Named vectors pattern from Qdrant best practices (research.md:Decision 1)
 - AsyncQdrantClient aligns with FastMCP async-first patterns (research.md:Decision 2)
-- Pydantic BaseSettings for hierarchical configuration (data-model.md:VectorStoreSettings)
+- Pydantic BaseSettings for hierarchical configuration (data-model.md:VectorStoreProviderSettings)
 - Provider registry pattern matches existing embedding/reranking providers
 - JSON persistence using pydantic serialization (proven pattern for config/state)
 
@@ -95,7 +95,7 @@ Complete the vector storage provider system for CodeWeaver, implementing Qdrant 
 
 **Simplicity**: ✅ PASS - Design maintains simplicity:
 - Single VectorStoreProvider abstract interface (7 methods total)
-- Two concrete providers: QdrantVectorStore, MemoryVectorStore
+- Two concrete providers: QdrantVectorStoreProvider, MemoryVectorStoreProvider
 - Flat structure: no deep inheritance hierarchies
 - Clear separation: Qdrant for production, Memory for dev/testing
 - Configuration follows pydantic-settings patterns (simple hierarchy)
@@ -215,28 +215,28 @@ ios/ or android/
 **Task Generation Strategy**:
 
 1. **Contract Test Tasks** (from contracts/*.yaml):
-   - Task per provider: QdrantVectorStore contract tests [P]
-   - Task per provider: MemoryVectorStore contract tests [P]
+   - Task per provider: QdrantVectorStoreProvider contract tests [P]
+   - Task per provider: MemoryVectorStoreProvider contract tests [P]
    - Task: VectorStoreProvider abstract interface validation
    - Each verifies all methods match contract specifications
 
 2. **Data Model Tasks** (from data-model.md):
    - Task: Create QdrantConfig pydantic model
    - Task: Create MemoryConfig pydantic model
-   - Task: Create VectorStoreSettings for unified configuration
+   - Task: Create VectorStoreProviderSettings for unified configuration
    - Task: Create CollectionMetadata model for validation
    - Task: Extend CodeChunk metadata for embedding completeness tracking
    - Mark [P] for independent model files
 
 3. **Core Implementation Tasks** (TDD order):
-   - Task: Implement QdrantVectorStore._initialize() (connection + collection setup)
-   - Task: Implement QdrantVectorStore.search() with hybrid support
-   - Task: Implement QdrantVectorStore.upsert() with batch processing
-   - Task: Implement QdrantVectorStore.delete_by_file/id/name()
-   - Task: Implement QdrantVectorStore._validate_provider_compatibility()
-   - Task: Implement MemoryVectorStore._persist_to_disk()
-   - Task: Implement MemoryVectorStore._restore_from_disk()
-   - Task: Implement MemoryVectorStore periodic persistence task
+   - Task: Implement QdrantVectorStoreProvider._initialize() (connection + collection setup)
+   - Task: Implement QdrantVectorStoreProvider.search() with hybrid support
+   - Task: Implement QdrantVectorStoreProvider.upsert() with batch processing
+   - Task: Implement QdrantVectorStoreProvider.delete_by_file/id/name()
+   - Task: Implement QdrantVectorStoreProvider._validate_provider_compatibility()
+   - Task: Implement MemoryVectorStoreProvider._persist_to_disk()
+   - Task: Implement MemoryVectorStoreProvider._restore_from_disk()
+   - Task: Implement MemoryVectorStoreProvider periodic persistence task
 
 4. **Integration Test Tasks** (from quickstart.md):
    - Task: Scenario 1 - Hybrid embeddings storage and search
@@ -250,7 +250,7 @@ ios/ or android/
    - Mark [P] for independent test files
 
 5. **Supporting Infrastructure Tasks**:
-   - Task: Integrate VectorStoreSettings into CodeWeaverSettings
+   - Task: Integrate VectorStoreProviderSettings into CodeWeaverSettings
    - Task: Create provider registry integration for vector stores
    - Task: Implement provider factory/builder pattern
    - Task: Add error types (ProviderSwitchError, DimensionMismatchError)

@@ -33,13 +33,13 @@ try:
     from qdrant_client.models import Distance, PointStruct, VectorParams
 except ImportError as e:
     raise ProviderError(
-        "Qdrant client is required for MemoryVectorStore. Install it with: pip install qdrant-client"
+        "Qdrant client is required for MemoryVectorStoreProvider. Install it with: pip install qdrant-client"
     ) from e
 
 logger = logging.getLogger(__name__)
 
 
-class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
+class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
     """In-memory vector store with JSON persistence for development/testing.
 
     Uses Qdrant's in-memory mode (:memory:) with automatic persistence to JSON.
@@ -584,4 +584,4 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
             await self._client.close()
 
 
-__all__ = ("MemoryVectorStore",)
+__all__ = ("MemoryVectorStoreProvider",)

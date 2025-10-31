@@ -5,11 +5,11 @@
 
 """Global pytest configuration and fixtures for CodeWeaver tests."""
 
-import os
 from pathlib import Path
 from uuid import uuid4
 
 import pytest
+
 from qdrant_client import AsyncQdrantClient
 
 
@@ -27,7 +27,7 @@ def get_test_qdrant_config(collection_suffix: str = "") -> dict:
         collection_suffix: Optional suffix for collection name to ensure uniqueness
 
     Returns:
-        Configuration dict for QdrantVectorStore
+        Configuration dict for QdrantVectorStoreProvider
     """
     # Use local Qdrant container without auth at port 6336
     config = {
@@ -58,7 +58,7 @@ def initialize_test_settings():
     with minimal required configuration for tests. It resets settings after
     the test to avoid cross-test contamination.
     """
-    from codeweaver.config.settings import reset_settings, get_settings
+    from codeweaver.config.settings import get_settings, reset_settings
 
     # Reset any existing settings
     reset_settings()
@@ -66,7 +66,7 @@ def initialize_test_settings():
     # Initialize settings by calling get_settings() which will create
     # the global instance with defaults, including the "providers" key
     # This prevents KeyError when tests access provider settings
-    settings = get_settings()
+    get_settings()
 
     yield
 
@@ -145,7 +145,6 @@ def create_test_chunk_with_embeddings(
     Returns:
         CodeChunk with embeddings registered in the global registry
     """
-    from pydantic import UUID7
 
     from codeweaver.common.utils.utils import uuid7
     from codeweaver.core.chunks import BatchKeys, CodeChunk

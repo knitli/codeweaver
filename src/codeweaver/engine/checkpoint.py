@@ -27,7 +27,7 @@ from uuid_extensions import uuid7
 from codeweaver.config.providers import (
     EmbeddingProviderSettings,
     RerankingProviderSettings,
-    VectorStoreSettings,
+    VectorStoreProviderSettings,
 )
 from codeweaver.config.types import IndexerSettingsDict
 from codeweaver.core.stores import get_blake_hash
@@ -46,7 +46,7 @@ class CheckpointSettingsFingerprint(TypedDict):
     embedding_provider: EmbeddingProviderSettings
     reranking_provider: RerankingProviderSettings
     sparse_provider: EmbeddingProviderSettings
-    vector_store: VectorStoreSettings
+    vector_store: VectorStoreProviderSettings
     max_file_size: PositiveInt
     project_path: Path | None
     project_name: str | None

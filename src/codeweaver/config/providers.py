@@ -20,7 +20,7 @@ from codeweaver.core.types import DictView
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.provider import Provider
+    pass
 
 
 # ===========================================================================
@@ -41,9 +41,9 @@ class EmbeddingModelSettings(TypedDict, total=False):
     data_type: NotRequired[str | None]
     custom_prompt: NotRequired[str | None]
     """A custom prompt to use for the embedding model, if supported. Most models do not support custom prompts for embedding."""
-    call_kwargs: NotRequired[dict[str, Any] | None]
-    """Keyword arguments to pass to the client model's `embed` method."""
-    model_kwargs: NotRequired[dict[str, Any] | None]
+    embed_options: NotRequired[dict[str, Any] | None]
+    """Keyword arguments to pass to the *provider* **client's** (like `voyageai.async_client.AsyncClient`) `embed` method. These are different from `model_options`, which are passed to the model constructor itself."""
+    model_options: NotRequired[dict[str, Any] | None]
     """Keyword arguments to pass to the model's constructor."""
 
 
@@ -51,9 +51,9 @@ class SparseEmbeddingModelSettings(TypedDict, total=False):
     """Sparse embedding model settings. Use this class for sparse (e.g. bag-of-words) models."""
 
     model: Required[str]
-    call_kwargs: NotRequired[dict[str, Any] | None]
-    """Keyword arguments to pass to the client model's `embed` method."""
-    model_kwargs: NotRequired[dict[str, Any] | None]
+    embed_options: NotRequired[dict[str, Any] | None]
+    """Keyword arguments to pass to the *provider* **client's** (like `sentence_transformers.SparseEncoder`) `embed` method. These are different from `model_options`, which are passed to the model constructor itself."""
+    model_options: NotRequired[dict[str, Any] | None]
     """Keyword arguments to pass to the model's constructor."""
 
 
@@ -62,10 +62,12 @@ class RerankingModelSettings(TypedDict, total=False):
 
     model: Required[str]
     custom_prompt: NotRequired[str | None]
-    call_kwargs: NotRequired[dict[str, Any] | None]
-    """Keyword arguments to pass to the client model's `rerank` method."""
+    rerank_options: NotRequired[dict[str, Any] | None]
+    """Keyword arguments to pass to the *provider* **client's** (like `voyageai.async_client.AsyncClient`) `rerank` method."""
     client_options: NotRequired[dict[str, Any] | None]
-    """Keyword arguments to pass to the client model's constructor."""
+    """Keyword arguments to pass to the *provider* **client's** (like `voyageai.async_client.AsyncClient`) constructor."""
+    model_options: NotRequired[dict[str, Any] | None]
+    """Keyword arguments to pass to the model's constructor."""
 
 
 class AWSProviderSettings(TypedDict, total=False):
@@ -169,13 +171,13 @@ class QdrantConfig(TypedDict, total=False):
 class MemoryConfig(TypedDict, total=False):
     """Configuration for in-memory vector store provider."""
 
-    persist_path: NotRequired[str | None]
-    """Path for JSON persistence file. Defaults to .codeweaver/vector_store.json."""
+    persist_path: NotRequired[str]
+    """Path for JSON persistence file. Defaults to {system_user_config}/codeweaver/{project_name}_vector_store.json."""
     auto_persist: NotRequired[bool]
     """Automatically save after operations. Defaults to True."""
-    persist_interval: NotRequired[PositiveInt | None]
+    persist_interval: NotRequired[PositiveInt]
     """Periodic persist interval in seconds. Defaults to 300 (5 minutes)."""
-    collection_name: NotRequired[str | None]
+    collection_name: NotRequired[str]
     """Collection name override. Defaults to project name if not specified."""
 
 
@@ -188,17 +190,20 @@ type ProviderSpecificSettings = (
 
 
 class EmbeddingProviderSettings(BaseProviderSettings):
-    """Settings for embedding models, including sparse embedding models. It validates that the model and provider settings are compatible and complete, reconciling environment variables and config file settings as needed.
+    """Settings for (dense) embedding models. It validates that the model and provider settings are compatible and complete, reconciling environment variables and config file settings as needed."""
 
-    You must provide either `model_settings` or `sparse_model_settings`, but not both. To configure both, use two EmbeddingProviderSettings entries in your config.
-    """
-
-    model_settings: NotRequired[EmbeddingModelSettings | None]
+    model_settings: Required[EmbeddingModelSettings]
     """Settings for the embedding model(s)."""
-    sparse_model_settings: NotRequired[SparseEmbeddingModelSettings | None]
-    """Settings for sparse embedding model(s)."""
     provider_settings: NotRequired[ProviderSpecificSettings | None]
     """Settings for specific providers, if any. Some providers have special settings that are required for them to work properly, but you may provide them by environment variables as well as in your config, or both."""
+
+
+class SparseEmbeddingProviderSettings(BaseProviderSettings):
+    """Settings for sparse embedding models."""
+
+    model_settings: Required[SparseEmbeddingModelSettings]
+    """Settings for the sparse embedding model(s)."""
+    provider_settings: NotRequired[ProviderSpecificSettings | None]
 
 
 class RerankingProviderSettings(BaseProviderSettings):
@@ -210,15 +215,11 @@ class RerankingProviderSettings(BaseProviderSettings):
     top_n: NotRequired[PositiveInt | None]
 
 
-class VectorStoreSettings(TypedDict, total=False):
+class VectorStoreProviderSettings(BaseProviderSettings, total=False):
     """Settings for vector store provider selection and configuration."""
 
-    provider: NotRequired[Provider | str]
-    """Vector store provider: 'qdrant' or 'memory'. Defaults to 'qdrant'."""
-    qdrant: NotRequired[QdrantConfig]
-    """Qdrant-specific configuration."""
-    memory: NotRequired[MemoryConfig]
-    """Memory provider-specific configuration."""
+    """Vector store provider: Provider.QDRANT or Provider.MEMORY. Defaults to Provider.QDRANT."""
+    provider_settings: Required[QdrantConfig | MemoryConfig]
 
 
 # Agent model settings are imported/defined from `pydantic_ai`
@@ -248,9 +249,13 @@ class ProviderSettingsDict(TypedDict, total=False):
     """A dictionary representation of provider settings."""
 
     data: NotRequired[tuple[DataProviderSettings, ...] | None]
+    # we currently only support one each of embedding, reranking and vector store providers
+    # but we use tuples to allow for future expansion for some less common use cases
     embedding: NotRequired[tuple[EmbeddingProviderSettings, ...] | None]
+    # rerank is probably the priority for multiple providers in the future, because they're vector agnostic, so you could have fallback providers, or use different ones for different tasks
+    sparse_embedding: NotRequired[tuple[SparseEmbeddingProviderSettings, ...] | None]
     reranking: NotRequired[tuple[RerankingProviderSettings, ...] | None]
-    vector: NotRequired[tuple[VectorStoreSettings, ...] | None]
+    vector: NotRequired[tuple[VectorStoreProviderSettings, ...] | None]
     agent: NotRequired[tuple[AgentProviderSettings, ...] | None]
 
 
@@ -274,5 +279,5 @@ __all__ = (
     "RerankingModelSettings",
     "RerankingProviderSettings",
     "SparseEmbeddingModelSettings",
-    "VectorStoreSettings",
+    "VectorStoreProviderSettings",
 )

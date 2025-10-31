@@ -2,56 +2,23 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+"""Registry package for CodeWeaver common components. This entrypoint exposes the main registry classes and types. The package internals are not for public use."""
+
+from codeweaver.common.registry.models import ModelRegistry, get_model_registry
+from codeweaver.common.registry.provider import ProviderRegistry, get_provider_registry
+from codeweaver.common.registry.services import ServicesRegistry, get_services_registry
+from codeweaver.common.registry.types import Feature, ServiceCard, ServiceCardDict, ServiceName
 
 
-from codeweaver.common.registry.registry import (
-    Feature,
-    ModelRegistry,
-    ProviderRegistry,
-    ServiceCard,
-    ServiceCardDict,
-    ServicesRegistry,
-    get_model_registry,
-    get_provider_registry,
-    get_services_registry,
-    initialize_registries,
-    register_agent_provider,
-    register_agentic_profile,
-    register_data_provider,
-    register_embedding_capabilities,
-    register_embedding_provider,
-    register_reranking_capabilities,
-    register_reranking_provider,
-    register_service,
-    register_sparse_embedding_capabilities,
-    register_sparse_embedding_provider,
-    register_vector_store_provider,
-    resolve_agentic_profile,
-)
-
-
-
-__all__ = (
+__all__ = [
     "Feature",
     "ModelRegistry",
     "ProviderRegistry",
     "ServiceCard",
     "ServiceCardDict",
+    "ServiceName",
     "ServicesRegistry",
     "get_model_registry",
     "get_provider_registry",
     "get_services_registry",
-    "initialize_registries",
-    "register_agent_provider",
-    "register_agentic_profile",
-    "register_data_provider",
-    "register_embedding_capabilities",
-    "register_embedding_provider",
-    "register_reranking_capabilities",
-    "register_reranking_provider",
-    "register_service",
-    "register_sparse_embedding_capabilities",
-    "register_sparse_embedding_provider",
-    "register_vector_store_provider",
-    "resolve_agentic_profile",
-)
+]

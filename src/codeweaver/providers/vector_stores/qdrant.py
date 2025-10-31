@@ -30,11 +30,11 @@ try:
     from qdrant_client import AsyncQdrantClient
 except ImportError as e:
     raise ProviderError(
-        "Qdrant client is required for QdrantVectorStore. Install it with: pip install qdrant-client"
+        "Qdrant client is required for QdrantVectorStoreProvider. Install it with: pip install qdrant-client"
     ) from e
 
 
-class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
+class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
     """Qdrant vector store provider supporting local and remote deployments.
 
     Supports hybrid search with dense and sparse embeddings via named vectors.
@@ -332,4 +332,4 @@ class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         )
 
 
-__all__ = ("QdrantVectorStore",)
+__all__ = ("QdrantVectorStoreProvider",)

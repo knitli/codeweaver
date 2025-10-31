@@ -14,8 +14,9 @@ from uuid import uuid4
 import pytest
 
 from codeweaver.core.language import SemanticSearchLanguage as Language
-from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
+from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
 from tests.conftest import create_test_chunk_with_embeddings, get_test_qdrant_config
+
 
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
@@ -24,7 +25,7 @@ pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 async def qdrant_provider():
     """Create Qdrant provider for testing."""
     config = get_test_qdrant_config("hybrid")
-    provider = QdrantVectorStore(config=config)
+    provider = QdrantVectorStoreProvider(config=config)
     await provider._initialize()
     yield provider
     # Cleanup

@@ -19,7 +19,7 @@ from codeweaver.config.providers import QdrantConfig
 from codeweaver.providers.embedding.capabilities.voyage import get_voyage_embedding_capabilities
 from codeweaver.providers.embedding.providers.voyage import VoyageEmbeddingProvider
 from codeweaver.providers.provider import Provider
-from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
+from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
 
 
 embedding_caps = next(
@@ -59,7 +59,7 @@ async def test_custom_configuration():
         "batch_size": 128,
     })
     client = AsyncQdrantClient(**config)
-    provider = QdrantVectorStore(client=client, config=config, embedder=embedding_provider)
+    provider = QdrantVectorStoreProvider(client=client, config=config, embedder=embedding_provider)
     await provider._initialize()
 
     # Verify custom collection name

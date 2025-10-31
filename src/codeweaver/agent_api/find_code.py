@@ -212,7 +212,9 @@ async def find_code(
                 logger.warning("Dense embedding failed: %s", e)
                 if not sparse_provider:
                     # No fallback available - must fail
-                    raise ValueError("Dense embedding failed and no sparse provider available") from e
+                    raise ValueError(
+                        "Dense embedding failed and no sparse provider available"
+                    ) from e
 
         sparse_query_embedding = None
         if sparse_provider:
@@ -240,7 +242,9 @@ async def find_code(
             query_vector = dense_query_embedding
         elif not dense_query_embedding and sparse_query_embedding:
             strategies_used.append(SearchStrategy.SPARSE_ONLY)
-            logger.warning("Using sparse-only search (dense embeddings unavailable - degraded mode)")
+            logger.warning(
+                "Using sparse-only search (dense embeddings unavailable - degraded mode)"
+            )
             query_vector = {"sparse": sparse_query_embedding}
         else:
             # Both failed - should not reach here due to earlier validation
@@ -307,7 +311,12 @@ async def find_code(
                 candidate.relevance_score = base_score
 
         # Step 7: Sort and limit
-        candidates.sort(key=lambda x: x.relevance_score if hasattr(x, 'relevance_score') and x.relevance_score is not None else x.score, reverse=True)
+        candidates.sort(
+            key=lambda x: x.relevance_score
+            if hasattr(x, "relevance_score") and x.relevance_score is not None
+            else x.score,
+            reverse=True,
+        )
         search_results = candidates[:max_results]
 
         # Convert SearchResult objects to CodeMatch objects for response
@@ -327,7 +336,7 @@ async def find_code(
         total_tokens = sum(
             len(match.content.content.split()) * 1.3  # Rough token estimate
             for match in code_matches
-            if match.content and hasattr(match.content, 'content')
+            if match.content and hasattr(match.content, "content")
         )
         total_tokens = min(int(total_tokens), token_limit)
 
@@ -346,7 +355,7 @@ async def find_code(
         languages_found = tuple({
             m.file.ext_kind.language
             for m in code_matches
-            if m.file and hasattr(m.file, 'ext_kind') and m.file.ext_kind
+            if m.file and hasattr(m.file, "ext_kind") and m.file.ext_kind
         })
 
         return FindCodeResponseSummary(

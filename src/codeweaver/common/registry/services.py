@@ -96,4 +96,26 @@ class ServicesRegistry(BasedModel):
         raise NotImplementedError("Service status tracking is not implemented yet.")
 
 
-__all__ = ("Feature", "ServiceCard", "ServiceCardDict", "ServiceName", "ServicesRegistry")
+_services_registry: ServicesRegistry | None = None
+
+
+def get_services_registry() -> ServicesRegistry:
+    """Get the global services registry instance.
+
+    Returns:
+        The global ServicesRegistry instance
+    """
+    global _services_registry
+    if _services_registry is None:
+        _services_registry = ServicesRegistry.get_instance()
+    return _services_registry
+
+
+__all__ = (
+    "Feature",
+    "ServiceCard",
+    "ServiceCardDict",
+    "ServiceName",
+    "ServicesRegistry",
+    "get_services_registry",
+)

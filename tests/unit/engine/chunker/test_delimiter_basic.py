@@ -25,8 +25,8 @@ from codeweaver.engine.chunker.base import ChunkGovernor
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
 from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
 
-pytestmark = [pytest.mark.unit]
 
+pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture

@@ -24,7 +24,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import (
     CircuitBreakerOpenError,
     CircuitBreakerState,
@@ -434,10 +433,9 @@ async def test_retry_with_exponential_backoff():
 
         for attempt in range(max_attempts):
             try:
-                result = await provider.embed_query("test query")
+                return await provider.embed_query("test query")
                 # Success - return result
-                return result
-            except ConnectionError as e:
+            except ConnectionError:
                 if attempt < max_attempts - 1:
                     # Calculate exponential backoff delay: 1s, 2s, 4s, 8s
                     delay = min(base_delay * (2**attempt), 16)

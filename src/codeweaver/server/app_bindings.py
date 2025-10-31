@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 
 from collections.abc import Container
@@ -13,8 +14,10 @@ from functools import cache
 from typing import TYPE_CHECKING, Any, cast
 
 from fastmcp import Context
-from starlette.middleware import Middleware
+from fastmcp.server.middleware.middleware import Middleware
 from fastmcp.tools import Tool
+from mcp.shared.context import RequestContext
+from mcp.shared.session import BaseSession
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, TypeAdapter
 from pydantic_core import to_json
@@ -104,12 +107,18 @@ async def find_code_tool(
             max_results=50,  # Default from find_code signature
         )
 
-        # Track successful request in statistics
-        if context and context.request_context:
-            request_id = getattr(context.request_context, "request_id", "unknown")
-            statistics().add_successful_request(request_id)
-
-        return response
+        with contextlib.suppress(ValueError):
+            # try to get request id from context for logging and stats.
+            # Context is only available when called via MCP and will raise ValueError otherwise.
+            # Track successful request in statistics
+            if (
+                context
+                and hasattr(context, "request_context")
+                and (request_context := context.request_context)  # type: ignore
+            ):
+                request_context: RequestContext[BaseSession[Any, Any, Any, Any, Any], Any, Any]
+                request_id = request_context.request_id
+                statistics().add_successful_request(request_id)
 
     except Exception as e:
         # Track failed request
@@ -126,6 +135,9 @@ async def find_code_tool(
             f"Unexpected error in find_code: {e!s}",
             suggestions=["Try a simpler query", "Check server logs for details"],
         ) from e
+
+    else:
+        return response
 
 
 # -------------------------

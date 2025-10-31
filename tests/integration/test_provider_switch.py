@@ -16,10 +16,12 @@ import pytest
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.exceptions import ProviderSwitchError
-from codeweaver.providers.vector_stores.inmemory import MemoryVectorStore
-from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
+from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
+from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+
 
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
+
 
 async def test_provider_switch_detection():
     """
@@ -32,7 +34,7 @@ async def test_provider_switch_detection():
 
     # Phase 1: Create collection with Qdrant
     qdrant_config = {"url": "http://localhost:6333", "collection_name": collection_name}
-    qdrant_provider = QdrantVectorStore(config=qdrant_config)
+    qdrant_provider = QdrantVectorStoreProvider(config=qdrant_config)
     await qdrant_provider._initialize()
 
     chunk = CodeChunk(
@@ -49,7 +51,7 @@ async def test_provider_switch_detection():
 
     # Phase 2: Try to use same collection with Memory provider
     memory_config = {"collection_name": collection_name}
-    memory_provider = MemoryVectorStore(config=memory_config)
+    memory_provider = MemoryVectorStoreProvider(config=memory_config)
 
     # Should raise ProviderSwitchError
     with pytest.raises(ProviderSwitchError) as exc_info:

@@ -15,13 +15,10 @@ import pytest
 
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage as Language
-from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
+from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+
 
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
-
-
-
-
 
 
 async def test_persistence_across_restarts():
@@ -36,7 +33,7 @@ async def test_persistence_across_restarts():
     config = {"url": "http://localhost:6333", "collection_name": collection_name}
 
     # Phase 1: Initial indexing
-    provider1 = QdrantVectorStore(config=config)
+    provider1 = QdrantVectorStoreProvider(config=config)
     await provider1._initialize()
 
     chunk = CodeChunk(
@@ -54,7 +51,7 @@ async def test_persistence_across_restarts():
     original_chunk_id = chunk.chunk_id
 
     # Simulate restart: Create new provider instance
-    provider2 = QdrantVectorStore(config=config)
+    provider2 = QdrantVectorStoreProvider(config=config)
     await provider2._initialize()
 
     # Verify: Previously stored chunk is retrievable

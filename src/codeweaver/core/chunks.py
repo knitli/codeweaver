@@ -125,16 +125,18 @@ class SearchResult(BasedModel):
     @property
     def file(self) -> Any:
         """Property to access file info from chunk.
-        
+
         Returns the file info from the chunk if available, otherwise returns
         a minimal object with just the path.
         """
-        if isinstance(self.content, CodeChunk) and hasattr(self.content, 'file'):
+        if isinstance(self.content, CodeChunk) and hasattr(self.content, "file"):
             return self.content.file
+
         # Return minimal file-like object with path
         class _FileInfo:
             def __init__(self, path):
                 self.path = path
+
         return _FileInfo(self.file_path) if self.file_path else None
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:

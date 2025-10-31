@@ -15,13 +15,10 @@ import pytest
 
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage as Language
-from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
+from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+
 
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
-
-
-
-
 
 
 async def test_hybrid_search_ranking():
@@ -33,7 +30,7 @@ async def test_hybrid_search_ranking():
     Then: System returns hybrid search results ranked by relevance
     """
     config = {"url": "http://localhost:6333", "collection_name": f"test_ranking_{uuid4().hex[:8]}"}
-    provider = QdrantVectorStore(config=config)
+    provider = QdrantVectorStoreProvider(config=config)
     await provider._initialize()
 
     # Insert chunks with varying similarity

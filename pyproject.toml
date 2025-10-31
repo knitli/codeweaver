@@ -36,7 +36,7 @@ dependencies = [
   "aenum>=3.1.16",
   "ast-grep-py>=0.39.7",
   "blake3>=1.0.8",
-  "cyclopts>=4.1.0",
+  "cyclopts>=4.2.1",
   "fastmcp>=2.13.0.2",
   "httpx>=0.28.1",
   "mcp>=1.19.0",
@@ -133,8 +133,8 @@ codeweaver = "codeweaver.cli.app:main"
 
 [project.urls]
 Changelog = "https://github.com/knitli/codeweaver-mcp/blob/main/CHANGELOG.md"
-Documentation = "https://dev.knitli.com/codeweaver"
-Homepage = "https://dev.knitli.com"
+# Documentation = "https://dev.knitli.com/codeweaver" not live yet
+Homepage = "https://knitli.com"
 Issues = "https://github.com/knitli/codeweaver-mcp/issues"
 Repository = "https://github.com/knitli/codeweaver-mcp"
 

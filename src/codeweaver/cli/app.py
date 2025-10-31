@@ -203,19 +203,17 @@ def _display_match_details(matches: Sequence[CodeMatch]) -> None:
         # Use serialize_for_cli to get structured data
         match_data = match.serialize_for_cli()
 
-        preview = (
-            match.content[:100].replace("\n", " ") + "..."
-            if len(str(match.content)) > 100
-            else str(match.content).replace("\n", " ")
-        )
-
-        table.add_row(
-            str(match_data.get("file", {}).get("path", "unknown")),
-            str(match_data.get("file", {}).get("ext_kind", {}).get("language", "unknown")),
-            f"{match.relevance_score:.2f}",
-            f"{match.span!s}",
-            preview,
-        )
+        preview = match.content.content  # serialize_for_cli truncates content for preview
+        if not preview.strip():
+            preview = "<no content>"
+        else:
+            table.add_row(
+                str(match_data.get("file", {}).get("path", "unknown")),
+                str(match_data.get("file", {}).get("ext_kind", {}).get("language", "unknown")),
+                f"{match.relevance_score:.2f}",
+                f"{match.span!s}",
+                preview,
+            )
 
     console.print(table)
 
