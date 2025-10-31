@@ -12,8 +12,8 @@ from collections.abc import Container
 from functools import cache
 from typing import TYPE_CHECKING, Any, cast
 
-from fastapi.middleware import Middleware
 from fastmcp import Context
+from starlette.middleware import Middleware
 from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, TypeAdapter
