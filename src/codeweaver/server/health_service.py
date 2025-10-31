@@ -213,8 +213,14 @@ class HealthService:
                         provider=embedding_provider, singleton=True
                     )
                 )
-                circuit_state = embedding_provider_instance.circuit_breaker_state
-                model_name = embedding_provider_instance.model_name
+                circuit_state_raw = embedding_provider_instance.circuit_breaker_state
+                # Handle both string and enum values (or mock objects with .value)
+                if hasattr(circuit_state_raw, 'value'):
+                    circuit_state = circuit_state_raw.value
+                else:
+                    circuit_state = str(circuit_state_raw) if circuit_state_raw else "closed"
+                
+                model_name = getattr(embedding_provider_instance, 'model_name', 'unknown')
 
                 # Check if circuit breaker is open -> service is down
                 status = "down" if circuit_state == "open" else "up"
@@ -258,9 +264,15 @@ class HealthService:
                 reranking_instance = self._provider_registry.get_reranking_provider_instance(
                     provider=reranking_provider, singleton=True
                 )
-                circuit_state = reranking_instance.circuit_breaker_state
-                model_name = reranking_instance.model_name
-                status = "down" if circuit_state and circuit_state == "open" else "up"
+                circuit_state_raw = reranking_instance.circuit_breaker_state
+                # Handle both string and enum values (or mock objects with .value)
+                if hasattr(circuit_state_raw, 'value'):
+                    circuit_state = circuit_state_raw.value
+                else:
+                    circuit_state = str(circuit_state_raw) if circuit_state_raw else "closed"
+                    
+                model_name = getattr(reranking_instance, 'model_name', 'unknown')
+                status = "down" if circuit_state == "open" else "up"
 
                 # Estimate latency
                 latency_ms = 180.0 if status == "up" else 0.0
