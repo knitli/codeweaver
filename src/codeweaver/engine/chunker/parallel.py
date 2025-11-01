@@ -86,10 +86,7 @@ def _chunk_single_file(
         logger.exception(
             "Failed to chunk file %s",
             file.path,
-            extra={
-                "file_path": str(file.path),
-                "ext_kind": file.ext_kind.value if file.ext_kind else None,
-            },
+            extra={"file_path": str(file.path), "ext_kind": file.ext_kind or "unknown"},
         )
         return (file.path, None)
     else:

@@ -12,6 +12,8 @@ import pytest
 
 from qdrant_client import AsyncQdrantClient
 
+from codeweaver.core.metadata import ChunkKind, ExtKind
+
 
 # ===========================================================================
 # *                    Test Configuration
@@ -155,6 +157,7 @@ def create_test_chunk_with_embeddings(
     # Create the base chunk
     chunk = CodeChunk(
         chunk_id=chunk_id,
+        ext_kind=ExtKind.from_language(language, ChunkKind.CODE),
         chunk_name=chunk_name,
         file_path=file_path,
         language=language,

@@ -30,6 +30,7 @@ from pydantic import Field, PrivateAttr
 from pydantic.dataclasses import dataclass
 from watchfiles.main import Change, FileChange
 
+from codeweaver.config.chunker import ChunkerSettings
 from codeweaver.config.types import CodeWeaverSettingsDict, RignoreSettings
 from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.file_extensions import (
@@ -43,6 +44,7 @@ from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.stores import BlakeStore
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.models import BasedModel
+from codeweaver.core.types.sentinel import Unset
 from codeweaver.engine.checkpoint import CheckpointManager, IndexingCheckpoint
 from codeweaver.engine.chunking_service import ChunkingService
 from codeweaver.exceptions import ConfigurationError
@@ -58,26 +60,27 @@ if TYPE_CHECKING:
 
 
 def _get_embedding_instance(*, sparse: bool = False) -> EmbeddingProvider[Any] | None:
-    """Stub function to get embedding provider instance."""
+    """Get embedding provider instance using new registry API."""
     from codeweaver.common.registry import get_provider_registry
 
+    kind = "sparse_embedding" if sparse else "embedding"
     registry = get_provider_registry()
-    if provider := registry.get_embedding_provider(sparse=sparse):
-        if sparse:
-            return registry.get_sparse_embedding_provider_instance(
-                provider=provider, singleton=True
-            )
-        return registry.get_embedding_provider_instance(provider=provider, singleton=True)
+
+    if provider_enum := registry.get_provider_enum_for(kind):
+        return cast(
+            EmbeddingProvider[Any],
+            registry.get_provider_instance(provider_enum, kind, singleton=True),
+        )
     return None
 
 
 def _get_vector_store_instance() -> Any | None:
-    """Stub function to get vector store provider instance."""
+    """Get vector store provider instance using new registry API."""
     from codeweaver.common.registry import get_provider_registry
 
     registry = get_provider_registry()
-    if provider := registry.get_vector_store_provider():
-        return registry.get_vector_store_provider_instance(provider=provider, singleton=True)
+    if provider_enum := registry.get_provider_enum_for("vector_store"):
+        return registry.get_provider_instance(provider_enum, "vector_store", singleton=True)
     return None
 
 
@@ -89,7 +92,9 @@ def _get_chunking_service() -> ChunkingService:
     from codeweaver.engine.chunking_service import ChunkingService
 
     chunk_settings = get_settings().chunker
-    governor = ChunkGovernor.from_settings(chunk_settings)
+    governor = ChunkGovernor.from_settings(
+        ChunkerSettings() if isinstance(chunk_settings, Unset) else chunk_settings
+    )
     return ChunkingService(governor=governor)
 
 
@@ -364,7 +369,7 @@ class Indexer(BasedModel):
         # Support both project_path and project_root for backward compatibility
         if project_root is not None and project_path is None:
             project_path = project_root
-        elif project_root is not None and project_path is not None:
+        elif project_root is not None:
             logger.warning(
                 "Both project_path and project_root specified, using project_path: %s", project_path
             )
@@ -425,9 +430,12 @@ class Indexer(BasedModel):
             if signum == signal.SIGTERM and self._original_sigterm_handler:
                 if callable(self._original_sigterm_handler):
                     self._original_sigterm_handler(signum, frame)
-            elif signum == signal.SIGINT and self._original_sigint_handler:
-                if callable(self._original_sigint_handler):
-                    self._original_sigint_handler(signum, frame)
+            elif (
+                signum == signal.SIGINT
+                and self._original_sigint_handler
+                and callable(self._original_sigint_handler)
+            ):
+                self._original_sigint_handler(signum, frame)
 
         # Store original handlers and install new ones
         try:

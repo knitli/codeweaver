@@ -27,9 +27,9 @@ embedding_caps = next(
 )
 
 embedding_provider = VoyageEmbeddingProvider(
-    _client=AsyncClient(api_key=os.environ["VOYAGE_API_KEY"]),
-    _provider=Provider.VOYAGE,
-    _caps=embedding_caps,
+    client=AsyncClient(api_key=os.environ["VOYAGE_API_KEY"]),
+    caps=embedding_caps,
+    kwargs=None,
 )
 
 

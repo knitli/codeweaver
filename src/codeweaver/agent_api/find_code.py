@@ -43,9 +43,11 @@ from codeweaver.agent_api.models import (
 )
 from codeweaver.common.registry import get_provider_registry
 from codeweaver.common.utils import uuid7
-from codeweaver.core.chunks import CodeChunk, SearchResult
+from codeweaver.core.chunks import ChunkSource, CodeChunk, SearchResult
 from codeweaver.core.discovery import DiscoveredFile
+from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.spans import Span
+from codeweaver.core.types import LanguageName
 from codeweaver.semantic.classifications import AgentTask
 
 
@@ -75,41 +77,82 @@ def _convert_search_result_to_code_match(result: SearchResult) -> CodeMatch:
     # Extract CodeChunk (SearchResult.content can be str or CodeChunk)
     if isinstance(result.content, str):
         # Create minimal CodeChunk from string
+        from codeweaver.core.metadata import ExtKind
+
+        # Determine ext_kind from file_path or use default
+        ext_kind = ExtKind.from_file(result.file_path) if result.file_path else ExtKind.from_language("text", "other")
+
+        # Create Span for line_range with proper UUID7 source_id
+        source_id = uuid7()
+        line_count = result.content.count("\n") + 1
+        line_span = Span(1, line_count, source_id)  # Positional args: start, end, source_id
+
         chunk = CodeChunk(
             content=result.content,
-            line_range=(1, result.content.count("\n") + 1),
+            line_range=line_span,
             file_path=result.file_path,
             language=None,
-            source="TEXT_BLOCK",
+            ext_kind=ext_kind,
+            source=ChunkSource.TEXT_BLOCK,  # Use enum instead of string
             chunk_id=uuid7(),
         )
     else:
         chunk = result.content
 
-    # Get file info (prefer from chunk, fallback to result.file_path)
+    # Get file info (prefer from chunk, fallback to result.file_path, then create fallback)
+    file: DiscoveredFile | None = None
     if hasattr(chunk, "file_path") and chunk.file_path:
         file = DiscoveredFile.from_path(chunk.file_path)
     elif result.file_path:
         file = DiscoveredFile.from_path(result.file_path)
-    else:
-        # Create minimal DiscoveredFile
-        file = DiscoveredFile.from_path(Path("unknown"))
 
-    # Extract span (line range)
+    # Ensure we always have a DiscoveredFile (CodeMatch requires non-None)
+    if file is None:
+        # Create fallback DiscoveredFile with unknown path
+        from codeweaver.core.metadata import ExtKind
+
+        unknown_path = Path("unknown")
+        ext_kind = ExtKind.from_language("text", "other")
+        # DiscoveredFile constructor accepts path and ext_kind directly
+        file = DiscoveredFile(path=unknown_path, ext_kind=ext_kind)
+
+    # Extract span (line range) - ensure it's a Span object
     if hasattr(chunk, "line_range"):
-        span = chunk.line_range
+        line_range = chunk.line_range
+        if isinstance(line_range, Span):
+            span = line_range
+        elif isinstance(line_range, tuple) and len(line_range) >= 2:
+            # Convert tuple to Span - positional args: start, end, source_id
+            span = Span(line_range[0], line_range[1], file.source_id)
+        else:
+            # Fallback span - positional args: start, end, source_id
+            span = Span(
+                1,
+                chunk.content.count("\n") + 1 if hasattr(chunk, "content") else 1,
+                file.source_id,
+            )
     else:
-        span = (1, chunk.content.count("\n") + 1 if hasattr(chunk, "content") else 1)
+        # Fallback span - positional args: start, end, source_id
+        span = Span(
+            1,
+            chunk.content.count("\n") + 1 if hasattr(chunk, "content") else 1,
+            file.source_id,
+        )
 
     # Use relevance_score if set, otherwise use base score
     relevance = getattr(result, "relevance_score", result.score)
 
     # Extract related symbols from chunk metadata if available
+    # Metadata is a TypedDict, check for semantic_meta which may contain symbols
     related_symbols = ()
     if hasattr(chunk, "metadata") and chunk.metadata:
         meta = chunk.metadata
-        if hasattr(meta, "related_symbols"):
-            related_symbols = tuple(meta.related_symbols)
+        # Check if semantic_meta exists and has symbol information
+        semantic_meta = meta.get("semantic_meta")
+        if semantic_meta is not None and hasattr(semantic_meta, "symbol"):
+            symbol = getattr(semantic_meta, "symbol", None)
+            if symbol:
+                related_symbols = (symbol,)
 
     return CodeMatch(
         file=file,
@@ -184,68 +227,83 @@ async def find_code(
         registry = get_provider_registry()
 
         # Step 2: Embed query (dense + sparse)
-        dense_provider_enum = registry.get_embedding_provider(sparse=False)
-        sparse_provider_enum = registry.get_embedding_provider(sparse=True)
+        dense_provider_enum = registry.get_provider_enum_for("embedding")
+        sparse_provider_enum = registry.get_provider_enum_for("sparse_embedding")
 
-        # Get provider instances (both optional individually for graceful degradation,
-        # but at least one must be available - validated below)
-        dense_provider = (
-            registry.get_embedding_provider_instance(dense_provider_enum, singleton=True)
-            if dense_provider_enum
-            else None
-        )
-        sparse_provider = (
-            registry.get_embedding_provider_instance(sparse_provider_enum, singleton=True)
-            if sparse_provider_enum
-            else None
-        )
-
-        if not dense_provider and not sparse_provider:
+        if not dense_provider_enum and not sparse_provider_enum:
             raise ValueError("No embedding providers configured (neither dense nor sparse)")
 
         # Embed query (with fallback to sparse-only if dense fails)
+
         dense_query_embedding = None
-        if dense_provider:
+        if dense_provider_enum:
             try:
-                dense_query_embedding = await dense_provider.embed_query(query)
+                dense_provider = registry.get_provider_instance(
+                    dense_provider_enum, "embedding", singleton=True
+                )
+                result = await dense_provider.embed_query(query)
+                # Check for embedding error
+                if isinstance(result, dict) and "error" in result:
+                    logger.warning("Dense embedding returned error: %s", result.get("error"))
+                    if not sparse_provider_enum:
+                        raise ValueError(
+                            f"Dense embedding failed: {result.get('error')} (no sparse fallback)"
+                        )
+                else:
+                    dense_query_embedding = result
             except Exception as e:
                 logger.warning("Dense embedding failed: %s", e)
-                if not sparse_provider:
+                if not sparse_provider_enum:
                     # No fallback available - must fail
                     raise ValueError(
                         "Dense embedding failed and no sparse provider available"
                     ) from e
 
         sparse_query_embedding = None
-        if sparse_provider:
+        if sparse_provider_enum:
             try:
-                sparse_query_embedding = await sparse_provider.embed_query(query)
+                sparse_provider = registry.get_provider_instance(
+                    sparse_provider_enum, "sparse_embedding", singleton=True
+                )
+                result = await sparse_provider.embed_query(query)
+                # Check for embedding error
+                if isinstance(result, dict) and "error" in result:
+                    logger.warning("Sparse embedding returned error: %s", result.get("error"))
+                else:
+                    sparse_query_embedding = result
             except Exception as e:
                 logger.warning("Sparse embedding failed, continuing with dense only: %s", e)
 
         # Step 3: Hybrid search
-        vector_store_enum = registry.get_vector_store_provider()
+        vector_store_enum = registry.get_provider_enum_for("vector_store")
         if not vector_store_enum:
             raise ValueError("No vector store provider configured")
 
-        vector_store = registry.get_vector_store_provider_instance(
-            vector_store_enum, singleton=True
+        vector_store = registry.get_provider_instance(
+            vector_store_enum, "vector_store", singleton=True
         )
 
         # Build query vector (unified search API) with graceful degradation
+        # Note: embed_query returns list[list[float|int]] (batch results), unwrap to list[float]
         if dense_query_embedding and sparse_query_embedding:
             strategies_used.append(SearchStrategy.HYBRID_SEARCH)
-            query_vector = {"dense": dense_query_embedding, "sparse": sparse_query_embedding}
-        elif dense_query_embedding and not sparse_query_embedding:
+            # Unwrap batch results (take first element) and ensure float type
+            dense_vec: list[float] = [float(x) for x in dense_query_embedding[0]]
+            sparse_vec: list[float] = [float(x) for x in sparse_query_embedding[0]]
+            query_vector = {"dense": dense_vec, "sparse": sparse_vec}
+        elif dense_query_embedding:
             strategies_used.append(SearchStrategy.DENSE_ONLY)
             logger.warning("Using dense-only search (sparse embeddings unavailable)")
-            query_vector = dense_query_embedding
-        elif not dense_query_embedding and sparse_query_embedding:
+            # Unwrap batch results (take first element) and ensure float type
+            query_vector = [float(x) for x in dense_query_embedding[0]]
+        elif sparse_query_embedding:
             strategies_used.append(SearchStrategy.SPARSE_ONLY)
             logger.warning(
                 "Using sparse-only search (dense embeddings unavailable - degraded mode)"
             )
-            query_vector = {"sparse": sparse_query_embedding}
+            # Unwrap batch results (take first element) and ensure float type
+            sparse_vec_unwrapped: list[float] = [float(x) for x in sparse_query_embedding[0]]
+            query_vector = {"sparse": sparse_vec_unwrapped}
         else:
             # Both failed - should not reach here due to earlier validation
             raise ValueError("No embeddings available (both dense and sparse failed)")
@@ -255,12 +313,21 @@ async def find_code(
         candidates = await vector_store.search(vector=query_vector, query_filter=None)
 
         # Post-search filtering (v0.1 simple approach)
+        # Access file info from SearchResult.file_path, not chunk.file (which doesn't exist)
         if not include_tests:
-            candidates = [c for c in candidates if not getattr(c.chunk.file, "is_test", False)]
+            candidates = [
+                c for c in candidates if not (c.file_path and "test" in str(c.file_path).lower())
+            ]
         if focus_languages:
             lang_set = set(focus_languages)
             candidates = [
-                c for c in candidates if getattr(c.chunk.file, "language", None) in lang_set
+                c
+                for c in candidates
+                if (
+                    isinstance(c.content, CodeChunk)
+                    and c.content.language
+                    and str(c.content.language) in lang_set
+                )
             ]
 
         logger.info("Vector search returned %d candidates", len(candidates))
@@ -276,54 +343,106 @@ async def find_code(
         # For sparse-only, scores are already set by vector store
 
         # Step 5: Rerank (optional, if provider configured)
-        reranking_enum = registry.get_reranking_provider()
+        reranking_enum = registry.get_provider_enum_for("reranking")
+        reranked_results = None
         if reranking_enum and len(candidates) > 0:
             try:
-                reranking = registry.get_reranking_provider_instance(reranking_enum, singleton=True)
-                candidates = await reranking.rerank(query, candidates, top_k=max_results * 2)
-                strategies_used.append(SearchStrategy.SEMANTIC_RERANK)
-                logger.info("Reranked to %d candidates", len(candidates))
+                reranking = registry.get_provider_instance(
+                    reranking_enum, "reranking", singleton=True
+                )
+                # Extract chunks for reranking - filter to only CodeChunk objects
+                # SearchResult.content can be str | CodeChunk, but rerank expects CodeChunk
+                chunks_for_reranking = [
+                    c.content for c in candidates if isinstance(c.content, CodeChunk)
+                ]
+                if not chunks_for_reranking:
+                    logger.warning("No CodeChunk objects available for reranking, skipping")
+                else:
+                    reranked_results = await reranking.rerank(query, chunks_for_reranking)
+                    strategies_used.append(SearchStrategy.SEMANTIC_RERANK)
+                    logger.info("Reranked to %d candidates", len(reranked_results))
             except Exception as e:
                 logger.warning("Reranking failed, continuing without: %s", e)
 
         # Step 6: Rescore with semantic weights
-        for candidate in candidates:
-            base_score = getattr(candidate, "rerank_score", candidate.score)
+        # Build final candidate list with relevance scores
+        scored_candidates: list[SearchResult] = []
 
-            # Apply semantic weighting if semantic class available
-            semantic_class = getattr(candidate.chunk, "semantic_class", None)
-            if semantic_class and hasattr(semantic_class, "importance_scores"):
-                importance = semantic_class.importance_scores.for_task(agent_task)
+        if reranked_results:
+            # Map reranked results back to SearchResult objects with rerank_score
+            for rerank_result in reranked_results:
+                # Find original candidate by matching chunk
+                original_candidate = candidates[rerank_result.original_index]
+                base_score = rerank_result.score
 
-                # Use appropriate importance dimension based on intent
-                if intent_type == IntentType.DEBUG:
-                    semantic_boost = importance.debugging
-                elif intent_type == IntentType.IMPLEMENT:
-                    semantic_boost = (importance.discovery + importance.modification) / 2
-                elif intent_type == IntentType.UNDERSTAND:
-                    semantic_boost = importance.comprehension
+                # Apply semantic weighting if semantic class available
+                semantic_class = getattr(rerank_result.chunk, "semantic_class", None)
+                if semantic_class and hasattr(semantic_class, "importance_scores"):
+                    importance = semantic_class.importance_scores.for_task(agent_task)
+
+                    # Use appropriate importance dimension based on intent
+                    if intent_type == IntentType.DEBUG:
+                        semantic_boost = importance.debugging
+                    elif intent_type == IntentType.IMPLEMENT:
+                        semantic_boost = (importance.discovery + importance.modification) / 2
+                    elif intent_type == IntentType.UNDERSTAND:
+                        semantic_boost = importance.comprehension
+                    else:
+                        semantic_boost = importance.discovery
+
+                    # Apply semantic boost (20% adjustment)
+                    final_score = base_score * (1 + semantic_boost * 0.2)
                 else:
-                    semantic_boost = importance.discovery
+                    final_score = base_score
 
-                # Apply semantic boost (20% adjustment)
-                candidate.relevance_score = base_score * (1 + semantic_boost * 0.2)
-            else:
-                candidate.relevance_score = base_score
+                # Create updated SearchResult with new scores
+                scored_candidate = original_candidate.model_copy(
+                    update={"rerank_score": base_score, "relevance_score": final_score}
+                )
+                scored_candidates.append(scored_candidate)
+        else:
+            # No reranking - use original scores with semantic weighting
+            for candidate in candidates:
+                base_score = candidate.score
+
+                # Apply semantic weighting if semantic class available
+                chunk_obj = candidate.content if isinstance(candidate.content, CodeChunk) else None
+                semantic_class = getattr(chunk_obj, "semantic_class", None) if chunk_obj else None
+
+                if semantic_class and hasattr(semantic_class, "importance_scores"):
+                    importance = semantic_class.importance_scores.for_task(agent_task)
+
+                    # Use appropriate importance dimension based on intent
+                    if intent_type == IntentType.DEBUG:
+                        semantic_boost = importance.debugging
+                    elif intent_type == IntentType.IMPLEMENT:
+                        semantic_boost = (importance.discovery + importance.modification) / 2
+                    elif intent_type == IntentType.UNDERSTAND:
+                        semantic_boost = importance.comprehension
+                    else:
+                        semantic_boost = importance.discovery
+
+                    # Apply semantic boost (20% adjustment)
+                    final_score = base_score * (1 + semantic_boost * 0.2)
+                else:
+                    final_score = base_score
+
+                # Create updated SearchResult with relevance score
+                scored_candidate = candidate.model_copy(update={"relevance_score": final_score})
+                scored_candidates.append(scored_candidate)
 
         # Step 7: Sort and limit
-        candidates.sort(
-            key=lambda x: x.relevance_score
-            if hasattr(x, "relevance_score") and x.relevance_score is not None
-            else x.score,
+        scored_candidates.sort(
+            key=lambda x: (x.relevance_score if x.relevance_score is not None else x.score),
             reverse=True,
         )
-        search_results = candidates[:max_results]
+        search_results = scored_candidates[:max_results]
 
         # Convert SearchResult objects to CodeMatch objects for response
-        code_matches = []
+        code_matches: list[CodeMatch] = []
         for result in search_results:
             try:
-                match = _convert_search_result_to_code_match(result)
+                match: CodeMatch = _convert_search_result_to_code_match(result)
                 code_matches.append(match)
             except Exception as e:
                 logger.warning("Failed to convert search result to code match: %s", e)
@@ -333,36 +452,44 @@ async def find_code(
         execution_time_ms = (time.time() - start_time) * 1000
 
         # Calculate token count from code matches
-        total_tokens = sum(
-            len(match.content.content.split()) * 1.3  # Rough token estimate
-            for match in code_matches
-            if match.content and hasattr(match.content, "content")
+        # Extract content string and calculate tokens
+        total_tokens_float: float = sum(
+            len(m.content.content.split()) * 1.3  # Rough token estimate
+            for m in code_matches
+            if hasattr(m.content, "content") and m.content.content
         )
-        total_tokens = min(int(total_tokens), token_limit)
+        total_tokens: int = min(int(total_tokens_float), token_limit)
 
         # Generate summary
         if code_matches:
-            top_files = list({m.file.path.name for m in code_matches[:3] if m.file and m.file.path})
-            summary = (
+            # Extract top file names (file and file.path are non-nullable in CodeMatch)
+            # Build set of filenames, convert to list for slicing
+            top_files_set: set[str] = {m.file.path.name for m in code_matches[:3]}
+            top_files_list: list[str] = list(top_files_set)
+            summary: str = (
                 f"Found {len(code_matches)} relevant matches "
                 f"for {intent_type.value} query. "
-                f"Top results in: {', '.join(top_files[:3])}"
+                f"Top results in: {', '.join(top_files_list[:3])}"
             )
         else:
-            summary = f"No matches found for query: '{query}'"
+            summary: str = f"No matches found for query: '{query}'"
 
         # Extract languages from code matches
-        languages_found = tuple({
-            m.file.ext_kind.language
-            for m in code_matches
-            if m.file and hasattr(m.file, "ext_kind") and m.file.ext_kind
-        })
+        # Build set of languages (including ConfigLanguage), then convert to tuple
+        from codeweaver.core.language import ConfigLanguage
+
+        languages_set: set[SemanticSearchLanguage | LanguageName | ConfigLanguage] = {
+            m.file.ext_kind.language for m in code_matches
+        }
+        languages_found: tuple[SemanticSearchLanguage | LanguageName, ...] = tuple(
+            lang for lang in languages_set if not isinstance(lang, ConfigLanguage)
+        )
 
         return FindCodeResponseSummary(
             matches=code_matches,
             summary=summary[:1000],  # Enforce max_length
             query_intent=intent_type,
-            total_matches=len(candidates),
+            total_matches=len(scored_candidates),
             total_results=len(code_matches),
             token_count=total_tokens,
             execution_time_ms=execution_time_ms,

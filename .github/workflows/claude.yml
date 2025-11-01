@@ -45,12 +45,11 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          trigger_phrase: "@claude"
+          trigger_phrase: '@claude'
           assignee_trigger: claude
           label_trigger: claude
           base_branch: main
           use_commit_signing: true
-
           claude_args: |
             --max-turns 30
             --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking
@@ -72,7 +71,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          trigger_phrase: "@claude"
+          trigger_phrase: '@claude'
           assignee_trigger: claude
           label_trigger: claude
           track_progress: true
@@ -99,7 +98,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          trigger_phrase: "@claude"
+          trigger_phrase: '@claude'
           assignee_trigger: claude
           label_trigger: claude
           use_commit_signing: true
@@ -126,7 +125,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          trigger_phrase: "@claude"
+          trigger_phrase: '@claude'
           assignee_trigger: claude
           label_trigger: claude
           track_progress: true

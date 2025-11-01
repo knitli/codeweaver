@@ -94,7 +94,7 @@ class EmbeddingModelCapabilities(BasedModel):
             description="""The Hugging Face model name, if it applies *and* is different from the model name. Currently only applies to some models from `fastembed` and `ollama`"""
         ),
     ] = None
-    other: Annotated[dict[str, Any], Field(description="""Extra model-specific settings.""")] = {}
+    other: Annotated[dict[str, Any], Field(description="""Extra model-specific settings.""")] = {}  # noqa: RUF012
     _available: Annotated[
         bool,
         Field(

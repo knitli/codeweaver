@@ -11,7 +11,7 @@ import logging
 import time
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from codeweaver.server.health_models import (
     EmbeddingProviderServiceInfo,
@@ -192,9 +192,13 @@ class HealthService:
             )
             if not provider:
                 raise RuntimeError("No vector store provider configured")
-            self._provider_registry.get_vector_store_provider_instance(
-                provider=provider, singleton=True
-            )
+
+            # Get vector store instance using new unified API
+            vector_store_enum = self._provider_registry.get_provider_enum_for("vector_store")
+            if vector_store_enum:
+                _ = self._provider_registry.get_provider_instance(
+                    vector_store_enum, "vector_store", singleton=True
+                )
             start = time.time()
             # TODO: Add ping/health check method to vector store providers
             # For now, assume healthy if we can get the instance
@@ -222,11 +226,12 @@ class HealthService:
     async def _check_embedding_provider_health(self) -> EmbeddingProviderServiceInfo:
         """Check embedding provider health with circuit breaker state."""
         try:
-            if embedding_provider := self._provider_registry.get_embedding_provider():
-                embedding_provider_instance = (
-                    self._provider_registry.get_embedding_provider_instance(
-                        provider=embedding_provider, singleton=True
-                    )
+            # Get embedding provider using new unified API
+            if embedding_provider_enum := self._provider_registry.get_provider_enum_for(
+                "embedding"
+            ):
+                embedding_provider_instance = self._provider_registry.get_provider_instance(
+                    embedding_provider_enum, "embedding", singleton=True
                 )
                 circuit_state = self._extract_circuit_breaker_state(
                     embedding_provider_instance.circuit_breaker_state
@@ -256,12 +261,17 @@ class HealthService:
     async def _check_sparse_embedding_health(self) -> SparseEmbeddingServiceInfo:
         """Check sparse embedding provider health."""
         try:
-            if sparse_provider := self._provider_registry.get_embedding_provider(sparse=True):
-                _ = self._provider_registry.get_sparse_embedding_provider_instance(
-                    provider=sparse_provider, singleton=True
+            # Get sparse embedding provider using new unified API
+            if sparse_provider_enum := self._provider_registry.get_provider_enum_for(
+                "sparse_embedding"
+            ):
+                _ = self._provider_registry.get_provider_instance(
+                    sparse_provider_enum, "sparse_embedding", singleton=True
                 )
                 # Sparse embedding is local, so typically always available
-                return SparseEmbeddingServiceInfo(status="up", provider=sparse_provider.as_title)
+                return SparseEmbeddingServiceInfo(
+                    status="up", provider=sparse_provider_enum.as_title
+                )
             logger.info("No sparse embedding provider configured")
             return SparseEmbeddingServiceInfo(status="down", provider="none")
         except Exception as e:
@@ -271,9 +281,12 @@ class HealthService:
     async def _check_reranking_health(self) -> RerankingServiceInfo:
         """Check reranking service health."""
         try:
-            if reranking_provider := self._provider_registry.get_reranking_provider():
-                reranking_instance = self._provider_registry.get_reranking_provider_instance(
-                    provider=reranking_provider, singleton=True
+            # Get reranking provider using new unified API
+            if reranking_provider_enum := self._provider_registry.get_provider_enum_for(
+                "reranking"
+            ):
+                reranking_instance = self._provider_registry.get_provider_instance(
+                    reranking_provider_enum, "reranking", singleton=True
                 )
                 circuit_state = self._extract_circuit_breaker_state(
                     reranking_instance.circuit_breaker_state
