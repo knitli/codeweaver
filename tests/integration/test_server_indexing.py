@@ -148,7 +148,7 @@ async def test_server_starts_without_errors(indexer: Indexer):
     # Verify providers initialized (if available)
     # Note: May be None if API keys not configured, that's acceptable
     stats = indexer.stats
-    assert stats.total_files_processed == 0  # Not yet indexed
+    assert stats.files_processed == 0  # Not yet indexed
     assert stats.total_errors == 0
 
 
@@ -170,7 +170,7 @@ async def test_auto_indexing_on_startup(indexer: Indexer, test_project_path: Pat
 
     # Verify stats updated
     stats = indexer.stats
-    assert stats.total_files_discovered >= 4
+    assert stats.files_discovered >= 4
 
 
 @pytest.mark.integration
@@ -189,16 +189,16 @@ async def test_indexing_progress_via_health(indexer: Indexer):
     stats = indexer.stats
 
     # Verify stats structure
-    assert hasattr(stats, "total_files_discovered")
-    assert hasattr(stats, "total_files_processed")
-    assert hasattr(stats, "total_chunks_created")
+    assert hasattr(stats, "files_discovered")
+    assert hasattr(stats, "files_processed")
+    assert hasattr(stats, "chunks_created")
     assert hasattr(stats, "total_errors")
     assert hasattr(stats, "start_time")
 
     # Verify values are reasonable
-    assert stats.total_files_discovered >= 0
-    assert stats.total_files_processed <= stats.total_files_discovered
-    assert stats.total_chunks_created >= 0
+    assert stats.files_discovered >= 0
+    assert stats.files_processed <= stats.files_discovered
+    assert stats.chunks_created >= 0
     assert stats.total_errors >= 0
 
 
@@ -222,17 +222,16 @@ async def test_indexing_completes_successfully(indexer: Indexer, test_project_pa
 
     # All discovered files should be processed
     # Note: May have errors if providers not configured, that's acceptable
-    assert stats.total_files_discovered == discovered_count
+    assert stats.files_discovered == discovered_count
 
     # Should have created chunks (unless providers unavailable)
     # This test will show progress even if embeddings fail
-    if stats.total_chunks_created > 0:
-        assert stats.total_chunks_created >= 10, "Expected at least 10 chunks from test files"
+    if stats.chunks_created > 0:
+        assert stats.chunks_created >= 10, "Expected at least 10 chunks from test files"
 
     # Check completion time is reasonable (<30s for small project)
-    if stats.end_time:
-        duration = stats.end_time - stats.start_time
-        assert duration < 30, f"Indexing took {duration}s, expected <30s"
+    duration = stats.elapsed_time
+    assert duration < 30, f"Indexing took {duration}s, expected <30s"
 
 
 @pytest.mark.integration
@@ -261,11 +260,11 @@ async def test_indexing_error_recovery(test_project_path: Path):
     stats = indexer.stats
 
     # Should have discovered corrupted file plus originals
-    assert stats.total_files_discovered >= 5
+    assert stats.files_discovered >= 5
 
     # Should have processed most files despite error
     # (corrupted file may cause chunking failure)
-    assert stats.total_files_processed >= 4
+    assert stats.files_processed >= 4
 
     # Errors should be tracked
     # Note: May be 0 if binary file filtered out before chunking
@@ -287,7 +286,7 @@ async def test_file_change_indexing(indexer: Indexer, test_project_path: Path):
     await asyncio.sleep(1)
 
     initial_stats = indexer.stats
-    initial_chunks = initial_stats.total_chunks_created
+    initial_chunks = initial_stats.chunks_created
 
     # Modify a file
     auth_file = test_project_path / "src" / "auth.py"
@@ -298,7 +297,7 @@ async def test_file_change_indexing(indexer: Indexer, test_project_path: Path):
     auth_file.write_text(modified_content)
 
     # Simulate file change event
-    change = FileChange(path=auth_file, change_type=Change.modified)
+    change = (Change.modified, str(auth_file))
     await indexer.index(change)
 
     # Allow reindexing to complete
@@ -309,8 +308,8 @@ async def test_file_change_indexing(indexer: Indexer, test_project_path: Path):
 
     # Should have created new chunks for modified file
     # Note: May be same if providers not available
-    if updated_stats.total_chunks_created > 0:
-        assert updated_stats.total_chunks_created >= initial_chunks
+    if updated_stats.chunks_created > 0:
+        assert updated_stats.chunks_created >= initial_chunks
 
 
 @pytest.mark.integration
@@ -334,9 +333,8 @@ async def test_indexing_performance(indexer: Indexer):
     assert stats.start_time is not None
 
     # Verify processing rate calculated
-    if stats.end_time:
-        duration = stats.end_time - stats.start_time
-        if duration > 0 and stats.total_files_processed > 0:
-            rate = stats.total_files_processed / (duration / 60)  # files/minute
-            # For small project, just verify rate is reasonable (not negative, not infinite)
-            assert 0 < rate < 10000, f"Unreasonable indexing rate: {rate} files/min"
+    duration = stats.elapsed_time
+    if duration > 0 and stats.files_processed > 0:
+        rate = stats.files_processed / (duration / 60)  # files/minute
+        # For small project, just verify rate is reasonable (not negative, not infinite)
+        assert 0 < rate < 10000, f"Unreasonable indexing rate: {rate} files/min"

@@ -341,6 +341,7 @@ class Indexer(BasedModel):
 
     _store: BlakeStore[DiscoveredFile] = PrivateAttr()
     _walker: rignore.Walker | None = PrivateAttr(default=None)
+    _project_root: Path | None = PrivateAttr(default=None)
     _checkpoint_manager: CheckpointManager | None = PrivateAttr(default=None)
     _checkpoint: IndexingCheckpoint | None = PrivateAttr(default=None)
     _last_checkpoint_time: float = PrivateAttr(default=0.0)
@@ -381,6 +382,7 @@ class Indexer(BasedModel):
 
         self._store = store or BlakeStore[DiscoveredFile](_value_type=DiscoveredFile)
         self._walker = walker
+        self._project_root = project_path
         self._chunking_service = chunking_service or _get_chunking_service()
         self._stats = IndexingStats()
 
@@ -477,8 +479,9 @@ class Indexer(BasedModel):
                 self._sparse_provider = None
 
             if not self._embedding_provider and not self._sparse_provider:
-                logger.warning("No embedding providers configured")
-                raise ConfigurationError("No embedding providers configured")
+                logger.warning(
+                    "No embedding providers configured - indexing will proceed without embeddings"
+                )
 
             try:
                 self._vector_store = _get_vector_store_instance()
