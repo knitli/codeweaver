@@ -11,53 +11,47 @@ queries:
   # ============================================================================
   # UNDERSTAND Intent Queries (7 queries)
   # ============================================================================
-
-  - query: "how does semantic chunking work"
+  - query: how does semantic chunking work
     intent: UNDERSTAND
     precision_target: 3
     expected_files:
       - src/codeweaver/engine/chunker/semantic.py
       - src/codeweaver/engine/chunking_service.py
       - src/codeweaver/semantic/classifications.py
-    description: "Understanding semantic chunking implementation"
-
-  - query: "explain intent detection system"
+    description: Understanding semantic chunking implementation
+  - query: explain intent detection system
     intent: UNDERSTAND
     precision_target: 3
     expected_files:
       - src/codeweaver/agent_api/intent.py
       - src/codeweaver/agent_api/find_code.py
       - src/codeweaver/semantic/classifications.py
-    description: "Understanding query intent classification"
-
-  - query: "what is the semantic classification hierarchy"
+    description: Understanding query intent classification
+  - query: what is the semantic classification hierarchy
     intent: UNDERSTAND
     precision_target: 3
     expected_files:
       - src/codeweaver/semantic/classifications.py
       - src/codeweaver/semantic/types.py
       - src/codeweaver/semantic/classifier.py
-    description: "Understanding semantic class structure"
-
-  - query: "how does the circuit breaker pattern work"
+    description: Understanding semantic class structure
+  - query: how does the circuit breaker pattern work
     intent: UNDERSTAND
     precision_target: 5
     expected_files:
       - src/codeweaver/providers/embedding/providers/base.py
       - src/codeweaver/providers/reranking/providers/base.py
       - src/codeweaver/server/health_service.py
-    description: "Understanding circuit breaker resilience pattern"
-
-  - query: "show me the health endpoint implementation"
+    description: Understanding circuit breaker resilience pattern
+  - query: show me the health endpoint implementation
     intent: UNDERSTAND
     precision_target: 3
     expected_files:
       - src/codeweaver/server/health_service.py
       - src/codeweaver/server/health_models.py
       - src/codeweaver/server/health_endpoint.py
-    description: "Understanding health monitoring system"
-
-  - query: "explain chunker selector strategy"
+    description: Understanding health monitoring system
+  - query: explain chunker selector strategy
     intent: UNDERSTAND
     precision_target: 5
     expected_files:
@@ -65,22 +59,19 @@ queries:
       - src/codeweaver/engine/chunker/base.py
       - src/codeweaver/engine/chunker/governance.py
       - src/codeweaver/engine/chunking_service.py
-    description: "Understanding chunk strategy selection"
-
-  - query: "how are importance scores calculated"
+    description: Understanding chunk strategy selection
+  - query: how are importance scores calculated
     intent: UNDERSTAND
     precision_target: 3
     expected_files:
       - src/codeweaver/semantic/classifications.py
       - src/codeweaver/semantic/scoring.py
       - src/codeweaver/agent_api/find_code.py
-    description: "Understanding semantic importance scoring"
-
+    description: Understanding semantic importance scoring
   # ============================================================================
   # IMPLEMENT Intent Queries (4 queries)
   # ============================================================================
-
-  - query: "add new embedding provider"
+  - query: add new embedding provider
     intent: IMPLEMENT
     precision_target: 5
     expected_files:
@@ -88,67 +79,59 @@ queries:
       - src/codeweaver/providers/embedding/registry.py
       - src/codeweaver/providers/embedding/capabilities/base.py
       - src/codeweaver/providers/provider.py
-    description: "Implementing new embedding provider"
-
-  - query: "create custom delimiter patterns"
+    description: Implementing new embedding provider
+  - query: create custom delimiter patterns
     intent: IMPLEMENT
     precision_target: 3
     expected_files:
       - src/codeweaver/engine/chunker/delimiters/custom.py
       - src/codeweaver/engine/chunker/delimiters/patterns.py
       - src/codeweaver/engine/chunker/delimiter.py
-    description: "Implementing custom delimiters for chunking"
-
-  - query: "implement language-specific semantic category"
+    description: Implementing custom delimiters for chunking
+  - query: implement language-specific semantic category
     intent: IMPLEMENT
     precision_target: 3
     expected_files:
       - src/codeweaver/semantic/classifications.py
       - src/codeweaver/semantic/registry.py
       - src/codeweaver/semantic/types.py
-    description: "Adding language-specific semantic extensions"
-
-  - query: "build telemetry event tracking"
+    description: Adding language-specific semantic extensions
+  - query: build telemetry event tracking
     intent: IMPLEMENT
     precision_target: 3
     expected_files:
       - src/codeweaver/telemetry/events.py
       - src/codeweaver/telemetry/client.py
       - src/codeweaver/telemetry/config.py
-    description: "Implementing telemetry tracking"
-
+    description: Implementing telemetry tracking
   # ============================================================================
   # DEBUG Intent Queries (4 queries)
   # ============================================================================
-
-  - query: "fix embedding batch tracking errors"
+  - query: fix embedding batch tracking errors
     intent: DEBUG
     precision_target: 5
     expected_files:
       - src/codeweaver/providers/embedding/providers/base.py
       - src/codeweaver/providers/embedding/registry.py
       - src/codeweaver/common/statistics.py
-    description: "Debugging batch processing issues"
-
-  - query: "why is parallel chunking failing"
+    description: Debugging batch processing issues
+  - query: why is parallel chunking failing
     intent: DEBUG
     precision_target: 3
     expected_files:
       - src/codeweaver/engine/chunker/parallel.py
       - src/codeweaver/engine/chunking_service.py
       - src/codeweaver/engine/chunker/exceptions.py
-    description: "Debugging parallel processing failures"
-
-  - query: "checkpoint resume not working"
+    description: Debugging parallel processing failures
+  - query: checkpoint resume not working
     intent: DEBUG
     precision_target: 3
     expected_files:
       - src/codeweaver/engine/checkpoint.py
       - src/codeweaver/engine/indexer.py
       - src/codeweaver/core/stores.py
-    description: "Debugging checkpoint restoration"
-
-  - query: "error in AST node classification"
+    description: Debugging checkpoint restoration
+  - query: error in AST node classification
     intent: DEBUG
     precision_target: 5
     expected_files:
@@ -156,110 +139,96 @@ queries:
       - src/codeweaver/semantic/ast_grep.py
       - src/codeweaver/semantic/node_type_parser.py
       - src/codeweaver/semantic/grammar.py
-    description: "Debugging semantic classification errors"
-
+    description: Debugging semantic classification errors
   # ============================================================================
   # OPTIMIZE Intent Queries (3 queries)
   # ============================================================================
-
-  - query: "slow vector search performance"
+  - query: slow vector search performance
     intent: OPTIMIZE
     precision_target: 5
     expected_files:
       - src/codeweaver/providers/vector_stores/qdrant.py
       - src/codeweaver/providers/vector_stores/base.py
       - src/codeweaver/agent_api/find_code.py
-    description: "Optimizing vector search performance"
-
-  - query: "improve tokenization efficiency"
+    description: Optimizing vector search performance
+  - query: improve tokenization efficiency
     intent: OPTIMIZE
     precision_target: 3
     expected_files:
       - src/codeweaver/tokenizers/tiktoken.py
       - src/codeweaver/tokenizers/base.py
       - src/codeweaver/tokenizers/tokenizers.py
-    description: "Optimizing tokenization speed"
-
-  - query: "optimize chunk size governance"
+    description: Optimizing tokenization speed
+  - query: optimize chunk size governance
     intent: OPTIMIZE
     precision_target: 3
     expected_files:
       - src/codeweaver/engine/chunker/governance.py
       - src/codeweaver/engine/chunker/base.py
       - src/codeweaver/config/chunker.py
-    description: "Optimizing chunk size constraints"
-
+    description: Optimizing chunk size constraints
   # ============================================================================
   # TEST Intent Queries (3 queries)
   # ============================================================================
-
-  - query: "test embedding provider integration"
+  - query: test embedding provider integration
     intent: TEST
     precision_target: 5
     expected_files:
       - src/codeweaver/providers/embedding/providers/base.py
       - src/codeweaver/providers/embedding/registry.py
       - tests/integration/test_embedding_providers.py
-    description: "Testing embedding provider implementations"
-
-  - query: "write tests for semantic classifier"
+    description: Testing embedding provider implementations
+  - query: write tests for semantic classifier
     intent: TEST
     precision_target: 3
     expected_files:
       - src/codeweaver/semantic/classifier.py
       - src/codeweaver/semantic/classifications.py
       - tests/unit/test_semantic_classifier.py
-    description: "Writing unit tests for classifier"
-
-  - query: "test health endpoint responses"
+    description: Writing unit tests for classifier
+  - query: test health endpoint responses
     intent: TEST
     precision_target: 3
     expected_files:
       - src/codeweaver/server/health_endpoint.py
       - src/codeweaver/server/health_service.py
       - src/codeweaver/server/health_models.py
-    description: "Testing health check functionality"
-
+    description: Testing health check functionality
   # ============================================================================
   # CONFIGURE Intent Queries (2 queries)
   # ============================================================================
-
-  - query: "configure vector store settings"
+  - query: configure vector store settings
     intent: CONFIGURE
     precision_target: 3
     expected_files:
       - src/codeweaver/config/providers.py
       - src/codeweaver/config/settings.py
       - src/codeweaver/providers/vector_stores/qdrant.py
-    description: "Configuring vector database"
-
-  - query: "setup chunker concurrency options"
+    description: Configuring vector database
+  - query: setup chunker concurrency options
     intent: CONFIGURE
     precision_target: 3
     expected_files:
       - src/codeweaver/config/chunker.py
       - src/codeweaver/engine/chunker/governance.py
       - src/codeweaver/engine/chunking_service.py
-    description: "Configuring parallel chunking settings"
-
+    description: Configuring parallel chunking settings
   # ============================================================================
   # DOCUMENT Intent Queries (2 queries)
   # ============================================================================
-
-  - query: "document find_code API interface"
+  - query: document find_code API interface
     intent: DOCUMENT
     precision_target: 3
     expected_files:
       - src/codeweaver/agent_api/find_code.py
       - src/codeweaver/agent_api/models.py
       - src/codeweaver/agent_api/intent.py
-    description: "Documenting main API surface"
-
-  - query: "document provider registration system"
+    description: Documenting main API surface
+  - query: document provider registration system
     intent: DOCUMENT
     precision_target: 5
     expected_files:
       - src/codeweaver/common/registry.py
       - src/codeweaver/providers/provider.py
       - src/codeweaver/providers/embedding/registry.py
-    description: "Documenting provider architecture"
+    description: Documenting provider architecture

@@ -98,7 +98,7 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
 
     _output_transformer = staticmethod(huggingface_hub_output_transformer)
 
-    def _initialize(self) -> None:
+    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """We don't need to do anything here."""
         self.doc_kwargs |= {
             "model": self._caps.name,

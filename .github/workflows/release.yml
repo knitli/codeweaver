@@ -102,50 +102,7 @@ jobs:
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
       - name: Generate release notes
         id: release_notes
-        run: |
-          # Get the latest release tag (before current)
-          PREVIOUS_TAG="$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | head -2 | tail -1 || echo "")"
-          CURRENT_TAG="${{ steps.version.outputs.tag }}"
-
-          echo "Previous tag: $PREVIOUS_TAG"
-          echo "Current tag: $CURRENT_TAG"
-
-          # Generate changelog
-          cat > release_notes.md << 'EOF'
-          ## What's Changed
-
-          EOF
-
-          if [ -n "$PREVIOUS_TAG" ] && [ "$PREVIOUS_TAG" != "$CURRENT_TAG" ]; then
-            # Get commits since last release
-            git log --pretty=format:"- %s (%h)" --no-merges "$PREVIOUS_TAG..$CURRENT_TAG" >> release_notes.md
-          else
-            echo "- Initial release" >> release_notes.md
-          fi
-
-          cat >> release_notes.md << 'EOF'
-
-          ## Installation
-
-          Install from PyPI:
-          ```bash
-          pip install codeweaver
-          ```
-
-          Or download the wheel/source distribution from the assets below.
-
-          ## Verification
-
-          All release artifacts are built from source and include:
-          - 📦 Wheel distribution (.whl)
-          - 📦 Source distribution (.tar.gz)
-
-          **Full Changelog**: "https://github.com/knitli/code-weaver-mcp/compare/$PREVIOUS_TAG...$CURRENT_TAG"
-          EOF
-
-          if [ -z "$PREVIOUS_TAG" ]; then
-            sed -i 's|**Full Changelog**: .*|**Full Changelog**: https://github.com/knitli/code-weaver-mcp/commits/'$CURRENT_TAG'|' release_notes.md
-          fi
+        run: "# Get the latest release tag (before current)\nPREVIOUS_TAG=\"$(git tag --sort=-version:refname | grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+' | head -2 | tail -1 || echo \"\")\"\nCURRENT_TAG=\"${{ steps.version.outputs.tag }}\"\n\necho \"Previous tag: $PREVIOUS_TAG\"\necho \"Current tag: $CURRENT_TAG\"\n\n# Generate changelog\ncat > release_notes.md << 'EOF'\n## What's Changed\n\nEOF\n\nif [ -n \"$PREVIOUS_TAG\" ] && [ \"$PREVIOUS_TAG\" != \"$CURRENT_TAG\" ]; then\n  # Get commits since last release\n  git log --pretty=format:\"- %s (%h)\" --no-merges \"$PREVIOUS_TAG..$CURRENT_TAG\" >> release_notes.md\nelse\n  echo \"- Initial release\" >> release_notes.md\nfi\n\ncat >> release_notes.md << 'EOF'\n\n## Installation\n\nInstall from PyPI:\n```bash\npip install codeweaver\n```\n\nOr download the wheel/source distribution from the assets below.\n\n## Verification\n\nAll release artifacts are built from source and include:\n- \U0001F4E6 Wheel distribution (.whl)\n- \U0001F4E6 Source distribution (.tar.gz)\n\n**Full Changelog**: \"https://github.com/knitli/code-weaver-mcp/compare/$PREVIOUS_TAG...$CURRENT_TAG\"\nEOF\n\nif [ -z \"$PREVIOUS_TAG\" ]; then\n  sed -i 's|**Full Changelog**: .*|**Full Changelog**: https://github.com/knitli/code-weaver-mcp/commits/'$CURRENT_TAG'|' release_notes.md\nfi\n"
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:

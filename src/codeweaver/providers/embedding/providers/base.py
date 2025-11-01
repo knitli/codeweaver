@@ -174,11 +174,18 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         kwargs: dict[str, Any] | None,
     ) -> None:
         """Initialize the embedding provider."""
+        # Determine provider - check if subclass has it set
+        provider = getattr(type(self), "_provider", None) or caps.provider
+
+        # Initialize pydantic model with all required fields
+        super().__init__(
+            _client=client,
+            _caps=caps,
+            _provider=provider,
+        )
+
         self._model_dump_json = super().model_dump_json
-        self._client = client
-        self._caps = caps
-        if not self._provider:
-            self._provider = caps.provider
+
         self.doc_kwargs = type(self)._doc_kwargs.copy() or {}
         self.query_kwargs = type(self)._query_kwargs.copy() or {}
         self._add_kwargs(kwargs or {})
@@ -190,7 +197,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         self._failure_count = 0
         self._last_failure_time = None
 
-        self._initialize()
+        # Call _initialize with caps since pydantic may not have set _caps yet
+        self._initialize(caps)
 
     def _add_kwargs(self, kwargs: dict[str, Any]) -> None:
         """Add keyword arguments to the embedding provider."""
@@ -200,11 +208,14 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         self.query_kwargs = {**self.query_kwargs, **kwargs}
 
     @abstractmethod
-    def _initialize(self) -> None:
+    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """Initialize the embedding provider.
 
         This method is called at the end of __init__ to allow for any additional setup.
         It should minimally set up `_doc_kwargs` and `_query_kwargs` if they are not already set.
+
+        Args:
+            caps: The embedding model capabilities (passed since pydantic may not have set _caps yet).
         """
 
     @property

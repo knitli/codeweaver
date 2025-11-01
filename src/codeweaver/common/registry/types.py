@@ -23,6 +23,36 @@ type ServiceName = Annotated[
     Field(description="""The name of the service""", max_length=100, pattern=r"^[a-zA-Z0-9_]+$"),
 ]
 
+type LiteralKinds = Literal[
+    ProviderKind.AGENT,
+    "agent",
+    ProviderKind.DATA,
+    "data",
+    ProviderKind.EMBEDDING,
+    "embedding",
+    ProviderKind.SPARSE_EMBEDDING,
+    "sparse_embedding",
+    ProviderKind.RERANKING,
+    "reranking",
+    ProviderKind.VECTOR_STORE,
+    "vector_store",
+]
+
+type LiteralModelKinds = Literal[
+    ProviderKind.AGENT,
+    "agent",
+    ProviderKind.EMBEDDING,
+    "embedding",
+    ProviderKind.SPARSE_EMBEDDING,
+    "sparse_embedding",
+    ProviderKind.RERANKING,
+    "reranking",
+]
+
+type LiteralDataKinds = Literal[ProviderKind.DATA, "data"]
+
+type LiteralVectorStoreKinds = Literal[ProviderKind.VECTOR_STORE, "vector_store"]
+
 
 @override
 class Feature(IntFlag, BaseEnum):  # pyright: ignore[reportIncompatibleVariableOverride, reportIncompatibleMethodOverride]

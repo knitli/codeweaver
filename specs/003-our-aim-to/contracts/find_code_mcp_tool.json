@@ -53,8 +53,13 @@
           "description": "Filter results by programming languages",
           "default": null,
           "examples": [
-            ["python"],
-            ["python", "typescript"]
+            [
+              "python"
+            ],
+            [
+              "python",
+              "typescript"
+            ]
           ]
         },
         "max_results": {
@@ -65,7 +70,9 @@
           "default": 50
         }
       },
-      "required": ["query"]
+      "required": [
+        "query"
+      ]
     },
     "output_schema": {
       "type": "object",
@@ -174,12 +181,17 @@
         "relevance_score": {
           "type": "number",
           "description": "Multi-layered weighted score",
-          "minimum": 0.0,
-          "maximum": 1.0
+          "minimum": 0,
+          "maximum": 1
         },
         "match_type": {
           "type": "string",
-          "enum": ["SEMANTIC", "SYNTACTIC", "KEYWORD", "FILE_PATTERN"]
+          "enum": [
+            "SEMANTIC",
+            "SYNTACTIC",
+            "KEYWORD",
+            "FILE_PATTERN"
+          ]
         },
         "related_symbols": {
           "type": "array",
@@ -210,7 +222,10 @@
           "description": "Programming language identifier"
         }
       },
-      "required": ["path", "language"]
+      "required": [
+        "path",
+        "language"
+      ]
     },
     "CodeChunk": {
       "type": "object",
@@ -235,7 +250,11 @@
           "description": "Programming language"
         }
       },
-      "required": ["content", "line_range", "language"]
+      "required": [
+        "content",
+        "line_range",
+        "language"
+      ]
     }
   },
   "examples": [
@@ -253,13 +272,22 @@
             },
             "content": {
               "content": "class AuthMiddleware:\n    def __init__(self, config: AuthConfig):\n        ...",
-              "line_range": [15, 85],
+              "line_range": [
+                15,
+                85
+              ],
               "language": "python"
             },
-            "span": [15, 85],
+            "span": [
+              15,
+              85
+            ],
             "relevance_score": 0.92,
             "match_type": "SEMANTIC",
-            "related_symbols": ["AuthConfig", "authenticate_request"]
+            "related_symbols": [
+              "AuthConfig",
+              "authenticate_request"
+            ]
           }
         ],
         "summary": "Found authentication middleware implementation in auth module",
@@ -268,8 +296,13 @@
         "total_results": 1,
         "token_count": 450,
         "execution_time_ms": 850,
-        "search_strategy": ["HYBRID_SEARCH", "SEMANTIC_RERANK"],
-        "languages_found": ["python"]
+        "search_strategy": [
+          "HYBRID_SEARCH",
+          "SEMANTIC_RERANK"
+        ],
+        "languages_found": [
+          "python"
+        ]
       }
     },
     {
@@ -278,7 +311,9 @@
         "query": "database connection pooling implementation",
         "intent": "implement",
         "max_results": 3,
-        "focus_languages": ["python"]
+        "focus_languages": [
+          "python"
+        ]
       },
       "response": {
         "matches": [
@@ -289,13 +324,22 @@
             },
             "content": {
               "content": "class ConnectionPool:\n    def __init__(self, config: PoolConfig):\n        ...",
-              "line_range": [12, 45],
+              "line_range": [
+                12,
+                45
+              ],
               "language": "python"
             },
-            "span": [12, 45],
+            "span": [
+              12,
+              45
+            ],
             "relevance_score": 0.94,
             "match_type": "SEMANTIC",
-            "related_symbols": ["PoolConfig", "DatabaseConnection"]
+            "related_symbols": [
+              "PoolConfig",
+              "DatabaseConnection"
+            ]
           }
         ],
         "summary": "Found 1 connection pool implementation in database module",
@@ -304,8 +348,13 @@
         "total_results": 3,
         "token_count": 450,
         "execution_time_ms": 720,
-        "search_strategy": ["HYBRID_SEARCH", "SEMANTIC_RERANK"],
-        "languages_found": ["python"]
+        "search_strategy": [
+          "HYBRID_SEARCH",
+          "SEMANTIC_RERANK"
+        ],
+        "languages_found": [
+          "python"
+        ]
       }
     }
   ]

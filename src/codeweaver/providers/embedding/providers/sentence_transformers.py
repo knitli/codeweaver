@@ -125,7 +125,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
             self._client = client
         super().__init__(caps=capabilities, client=self._client, **kwargs)
 
-    def _initialize(self) -> None:
+    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """Initialize the Sentence Transformers embedding provider."""
         for keyword_args in (self.doc_kwargs, self.query_kwargs):
             keyword_args.setdefault("client_options", {})

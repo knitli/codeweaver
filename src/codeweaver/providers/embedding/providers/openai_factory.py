@@ -173,7 +173,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
     _provider: Provider
     _caps: EmbeddingModelCapabilities
 
-    def _initialize(self) -> None:
+    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """Initialize the OpenAI embedding provider."""
         self._shared_kwargs = {"model": self.model_name, "encoding_format": "float", "timeout": 30}
         self.valid_client_kwargs = (

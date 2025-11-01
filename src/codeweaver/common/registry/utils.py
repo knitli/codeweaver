@@ -135,8 +135,8 @@ def get_model_config(
 ) -> (
     DictView[AgentProviderSettings]
     | DictView[EmbeddingProviderSettings]
-    | DictView[RerankingProviderSettings]
     | DictView[SparseEmbeddingProviderSettings]
+    | DictView[RerankingProviderSettings]
     | None
 ):
     """Get the model settings for a specific provider kind."""

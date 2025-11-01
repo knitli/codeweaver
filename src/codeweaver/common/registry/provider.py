@@ -15,12 +15,14 @@ import logging
 from collections.abc import Mapping, MutableMapping
 from functools import partial
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast, overload
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypeGuard, cast, overload
 
 from pydantic import ConfigDict
 from textcase import pascal
+from typing_extensions import TypeIs
 
 from codeweaver.common.utils.lazy_importer import LazyImport, lazy_import
+from codeweaver.config.providers import SparseEmbeddingProviderSettings
 from codeweaver.config.types import CodeWeaverSettingsDict
 from codeweaver.core.types.aliases import LiteralStringT
 from codeweaver.core.types.dictview import DictView
@@ -34,6 +36,14 @@ from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
 
 if TYPE_CHECKING:
+    from openai import AsyncOpenAI
+
+    from codeweaver.common.registry.types import (
+        LiteralDataKinds,
+        LiteralKinds,
+        LiteralModelKinds,
+        LiteralVectorStoreKinds,
+    )
     from codeweaver.config.providers import (
         AgentProviderSettings,
         DataProviderSettings,
@@ -41,6 +51,7 @@ if TYPE_CHECKING:
         RerankingProviderSettings,
         VectorStoreProviderSettings,
     )
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
 
 logger = logging.getLogger(__name__)
@@ -59,12 +70,7 @@ class ProviderRegistry(BasedModel):
     _agent_prefix: ClassVar[LiteralStringT] = "codeweaver.providers.agent."
     _vector_store_prefix: ClassVar[LiteralStringT] = "codeweaver.providers.vector_stores."
     _provider_map: ClassVar[
-        MappingProxyType[
-            ProviderKind,
-            Mapping[
-                Provider, partial[LazyImport[Any]]
-            ],  # ProviderKind.EMBEDDING -> Provider.AZURE, Literal["EXCEPTION"] but I couldn't find a way to type it correctly
-        ]
+        MappingProxyType[ProviderKind, Mapping[Provider, partial[LazyImport[Any]]]]
     ] = MappingProxyType({
         ProviderKind.AGENT: {
             Provider.ANTHROPIC: partial(lazy_import, f"{_agent_prefix}agent_providers"),
@@ -86,7 +92,7 @@ class ProviderRegistry(BasedModel):
             Provider.TOGETHER: partial(lazy_import, f"{_agent_prefix}agent_providers"),
             Provider.VERCEL: partial(lazy_import, f"{_agent_prefix}agent_providers"),
             Provider.X_AI: partial(lazy_import, f"{_agent_prefix}agent_providers"),
-        },
+        },  # ProviderKind.EMBEDDING -> Provider.AZURE, Literal["EXCEPTION"] but I couldn't find a way to type it correctly
         ProviderKind.EMBEDDING: {
             Provider.AZURE: "EXCEPTION",
             Provider.BEDROCK: partial(lazy_import, f"{_embedding_prefix}bedrock"),
@@ -133,7 +139,10 @@ class ProviderRegistry(BasedModel):
     })
 
     def __init__(self) -> None:
-        """Initialize the provider registry."""
+        """Initialize the provider registry.
+
+        For builtin providers, we register lazy imports to avoid unnecessary imports until the provider is needed. For third-party providers, we expect the class to be provided directly.
+        """
         # Provider implementation registries
         # we store lazy references to the providers and only try to fetch them when called
         self._embedding_providers: MutableMapping[
@@ -158,72 +167,6 @@ class ProviderRegistry(BasedModel):
         self._agent_instances: MutableMapping[Provider, Any] = {}
         self._data_instances: MutableMapping[Provider, Any] = {}
 
-    @property
-    def _registry_map(
-        self,
-    ) -> dict[
-        ProviderKind | str,
-        tuple[
-            MutableMapping[
-                Provider,
-                LazyImport[type[EmbeddingProvider[Any]]]
-                | type[EmbeddingProvider[Any]]
-                | LazyImport[type[RerankingProvider[Any]]]
-                | type[RerankingProvider[Any]]
-                | LazyImport[type[VectorStoreProvider[Any]]]
-                | type[VectorStoreProvider[Any]]
-                | LazyImport[type[Any]]
-                | type[Any],
-            ],
-            str,
-        ],
-    ]:
-        """Get the registry map for provider classes."""
-        return {
-            ProviderKind.EMBEDDING: (self._embedding_providers, "Embedding"),
-            "embedding": (self._embedding_providers, "Embedding"),
-            ProviderKind.SPARSE_EMBEDDING: (self._sparse_embedding_providers, "Sparse embedding"),
-            "sparse_embedding": (self._sparse_embedding_providers, "Sparse embedding"),
-            ProviderKind.RERANKING: (self._reranking_providers, "Reranking"),
-            "reranking": (self._reranking_providers, "Reranking"),
-            ProviderKind.VECTOR_STORE: (self._vector_store_providers, "Vector store"),
-            "vector_store": (self._vector_store_providers, "Vector store"),
-            ProviderKind.AGENT: (self._agent_providers, "Agent"),
-            "agent": (self._agent_providers, "Agent"),
-            ProviderKind.DATA: (self._data_providers, "Data"),
-            "data": (self._data_providers, "Data"),
-        }
-
-    @property
-    def _instances_map(
-        self,
-    ) -> dict[
-        ProviderKind | str,
-        MutableMapping[
-            Provider,
-            EmbeddingProvider[Any]
-            | RerankingProvider[Any]
-            | VectorStoreProvider[Any]
-            | AgentProvider[Any]
-            | Any,
-        ],
-    ]:
-        """Get the instances map for cached provider instances."""
-        return {
-            ProviderKind.EMBEDDING: self._embedding_instances,
-            "embedding": self._embedding_instances,
-            ProviderKind.SPARSE_EMBEDDING: self._sparse_embedding_instances,
-            "sparse_embedding": self._sparse_embedding_instances,
-            ProviderKind.RERANKING: self._reranking_instances,
-            "reranking": self._reranking_instances,
-            ProviderKind.VECTOR_STORE: self._vector_store_instances,
-            "vector_store": self._vector_store_instances,
-            ProviderKind.AGENT: self._agent_instances,
-            "agent": self._agent_instances,
-            ProviderKind.DATA: self._data_instances,
-            "data": self._data_instances,
-        }
-
     def _telemetry_keys(self) -> None:
         return None
 
@@ -234,29 +177,104 @@ class ProviderRegistry(BasedModel):
             cls._instance = cls()
         return cls._instance
 
-    def register(
-        self, provider: Provider, provider_kind: ProviderKind, provider_class: LazyImport[type]
+    def _is_literal_data_kind(self, kind: Any) -> TypeIs[Literal[ProviderKind.DATA, "data"]]:
+        """Check if the kind is a data provider kind."""
+        return kind in (ProviderKind.DATA, "data")
+
+    def _is_literal_vector_store_kind(
+        self, kind: Any
+    ) -> TypeIs[Literal[ProviderKind.VECTOR_STORE, "vector_store"]]:
+        """Check if the kind is a vector store provider kind."""
+        return kind in (ProviderKind.VECTOR_STORE, "vector_store")
+
+    def _is_literal_model_kind(
+        self, kind: Any
+    ) -> TypeIs[
+        Literal[
+            ProviderKind.AGENT,
+            "agent",
+            ProviderKind.EMBEDDING,
+            "embedding",
+            ProviderKind.SPARSE_EMBEDDING,
+            "sparse_embedding",
+            ProviderKind.RERANKING,
+            "reranking",
+        ]
+    ]:
+        """Check if the kind is a model provider kind."""
+        return kind in (
+            ProviderKind.AGENT,
+            "agent",
+            ProviderKind.EMBEDDING,
+            "embedding",
+            ProviderKind.SPARSE_EMBEDDING,
+            "sparse_embedding",
+            ProviderKind.RERANKING,
+            "reranking",
+        )
+
+    def _is_literal_agent_kind(self, kind: Any) -> TypeIs[Literal[ProviderKind.AGENT, "agent"]]:
+        """Check if the kind is an agent provider kind."""
+        return kind in (ProviderKind.AGENT, "agent")
+
+    def _is_literal_embedding_kind(
+        self, kind: Any
+    ) -> TypeIs[Literal[ProviderKind.EMBEDDING, "embedding"]]:
+        """Check if the kind is an embedding provider kind."""
+        return kind in (ProviderKind.EMBEDDING, "embedding")
+
+    def _is_literal_sparse_embedding_kind(
+        self, kind: Any
+    ) -> TypeIs[Literal[ProviderKind.SPARSE_EMBEDDING, "sparse_embedding"]]:
+        """Check if the kind is a sparse embedding provider kind."""
+        return kind in (ProviderKind.SPARSE_EMBEDDING, "sparse_embedding")
+
+    def _is_literal_reranking_kind(
+        self, kind: Any
+    ) -> TypeIs[Literal[ProviderKind.RERANKING, "reranking"]]:
+        """Check if the kind is a reranking provider kind."""
+        return kind in (ProviderKind.RERANKING, "reranking")
+
+    def _is_any_provider_kind(self, kind: Any) -> TypeIs[ProviderKind]:
+        """Check if the kind is any valid ProviderKind."""
+        return kind in ProviderKind
+
+    def register(  # noqa: C901  # how?
+        self,
+        provider: Provider | str,
+        provider_kind: LiteralKinds,
+        provider_class: LazyImport[type] | type,
     ) -> None:
         """Register a provider implementation.
 
         Args:
-            provider: The provider enum identifier
+            provider: The provider enum identifier or string equivalent
             provider_kind: The type of provider (embedding or vector store)
             provider_class: The provider implementation class
         """
+        if not isinstance(provider, Provider):
+            provider = Provider.from_string(provider)
+        if not isinstance(provider_kind, ProviderKind):
+            provider_kind = ProviderKind(provider_kind)  # type: ignore
         match provider_kind:
             case ProviderKind.AGENT:
-                self.register_agent_provider(provider, provider_class)
+                if self._is_literal_agent_kind(provider_kind):
+                    self._agent_providers[provider] = provider_class
             case ProviderKind.DATA:
-                self.register_data_provider(provider, provider_class)
+                if self._is_literal_data_kind(provider_kind):
+                    self._data_providers[provider] = provider_class
             case ProviderKind.EMBEDDING:
-                self.register_embedding_provider(provider, provider_class)
+                if self._is_literal_embedding_kind(provider_kind):
+                    self._embedding_providers[provider] = provider_class
             case ProviderKind.SPARSE_EMBEDDING:
-                self.register_sparse_embedding_provider(provider, provider_class)
+                if self._is_literal_sparse_embedding_kind(provider_kind):
+                    self._sparse_embedding_providers[provider] = provider_class
             case ProviderKind.VECTOR_STORE:
-                self.register_vector_store_provider(provider, provider_class)
+                if self._is_literal_vector_store_kind(provider_kind):
+                    self._vector_store_providers[provider] = provider_class
             case ProviderKind.RERANKING:
-                self.register_reranking_provider(provider, provider_class)
+                if self._is_literal_reranking_kind(provider_kind):
+                    self._reranking_providers[provider] = provider_class
             case _:
                 pass
 
@@ -269,8 +287,8 @@ class ProviderRegistry(BasedModel):
                     p for p in Provider if str(p).lower() in provider_class.__name__.lower()
                 )
                 self.register(provider, ProviderKind.AGENT, provider_class)
-        tool_module = importlib.import_module("codeweaver.agent_api")
-        if tools := getattr(tool_module, "load_default_data_providers", None):
+        data_module = importlib.import_module("codeweaver.providers.data")
+        if tools := getattr(data_module, "load_default_data_providers", None):
             for tool in tools:
                 provider = (
                     Provider.DUCKDUCKGO if "duck" in tool.__name__.lower() else Provider.TAVILY
@@ -318,10 +336,10 @@ class ProviderRegistry(BasedModel):
         provider_name = self._get_embedding_provider_name(provider, module)
         lazy_class_import = module(provider_name)
 
-        if provider_class := getattr(lazy_class_import, provider_name, None):
+        if getattr(lazy_class_import, provider_name, None):
             if destination == ProviderKind.EMBEDDING:
-                self.register_embedding_provider(provider, provider_class)
-            self.register_sparse_embedding_provider(provider, provider_class)
+                self._embedding_providers[provider] = lazy_class_import
+            self._sparse_embedding_providers[provider] = lazy_class_import
 
     def _get_embedding_provider_name(
         self, provider: Provider, module: partial[LazyImport[Any]]
@@ -337,100 +355,159 @@ class ProviderRegistry(BasedModel):
         """Register Azure exception providers."""
         module_name = f"{self._embedding_prefix}openai_factory"
         class_name = f"{pascal(str(provider))}OpenAIEmbeddingBase"
-        self.register_embedding_provider(provider, LazyImport(module_name, class_name))
+        self._embedding_providers[provider] = LazyImport(module_name, class_name)
 
         module_name = f"{self._embedding_prefix}cohere"
-        self.register_embedding_provider(
-            provider, LazyImport(module_name, "CohereEmbeddingProvider")
-        )
+        self._embedding_providers[provider] = LazyImport(module_name, "CohereEmbeddingProvider")
 
     def _register_reranking_provider_from_module(
         self, provider: Provider, module: partial[LazyImport[type[RerankingProvider[Any]]]]
     ) -> None:
         """Register a reranking provider from a module."""
         provider_name = f"{pascal(str(provider))}RerankingProvider"
-        self.register_reranking_provider(provider, module(provider_name))
+        self._reranking_providers[provider] = module(provider_name)
 
     def _register_vector_store_provider_from_module(
         self, provider: Provider, module: partial[LazyImport[type[VectorStoreProvider[Any]]]]
     ) -> None:
         """Register a vector store provider from a module."""
         provider_name = f"{pascal(str(provider))}VectorStoreProvider"
-        self.register_vector_store_provider(provider, module(provider_name))
+        self._vector_store_providers[provider] = module(provider_name)
 
-    def register_agent_provider(
-        self, provider: Provider, provider_class: LazyImport[type[Any]] | type[Any]
-    ) -> None:
-        """Register an agent provider implementation.
-
-        Args:
-            provider: The provider enum identifier
-            provider_class: The provider implementation class
-        """
-        self._agent_providers[provider] = provider_class
-
-    def register_data_provider(
-        self, provider: Provider, provider_class: LazyImport[type[Any]] | type[Any]
-    ) -> None:
-        """Register a data provider implementation.
+    def _is_openai_factory(
+        self, provider_class: LazyImport[type[Any]] | type[Any]
+    ) -> TypeGuard[LazyImport[type[Any]] | type[Any]]:
+        """Check if a provider class is the OpenAI factory.
 
         Args:
-            provider: The provider enum identifier
-            provider_class: The provider implementation class
-        """
-        self._data_providers[provider] = provider_class
+            provider_class: The provider class to check (LazyImport or resolved)
 
-    def register_embedding_provider(
-        self,
-        provider: Provider,
-        provider_class: LazyImport[type[EmbeddingProvider[Any]]] | type[EmbeddingProvider[Any]],
-    ) -> None:
-        """Register an embedding provider implementation.
+        Returns:
+            True if this is the OpenAI factory class
+        """
+        # Check if it's a LazyImport pointing to openai_factory
+        if isinstance(provider_class, LazyImport):
+            return "openai_factory" in provider_class._module_name  # type: ignore
+
+        # Check if it's the resolved OpenAIEmbeddingBase class
+        if hasattr(provider_class, "__name__"):
+            return provider_class.__name__ == "OpenAIEmbeddingBase"
+
+        return False
+
+    def _get_capabilities_for_provider(self, provider: Provider) -> EmbeddingModelCapabilities:
+        """Get capabilities for a provider.
 
         Args:
-            provider: The provider enum identifier
-            provider_class: The provider implementation class
-        """
-        self._embedding_providers[provider] = provider_class
+            provider: The provider to get capabilities for
 
-    def register_sparse_embedding_provider(
-        self,
-        provider: Provider,
-        provider_class: LazyImport[type[EmbeddingProvider[Any]]] | type[EmbeddingProvider[Any]],
-    ) -> None:
-        """Register a sparse embedding provider implementation.
+        Returns:
+            EmbeddingModelCapabilities instance for the provider
+        """
+        from codeweaver.providers.embedding.capabilities.openai import (
+            get_openai_embedding_capabilities,
+        )
+
+        # Get all capabilities for this provider type
+        all_caps = get_openai_embedding_capabilities()
+
+        # Find the first matching capability for this provider
+        for cap in all_caps:
+            if cap.provider == provider:
+                return cap
+
+        # Fallback to first capability if exact match not found
+        return all_caps[0]
+
+    def _get_default_model_for_provider(
+        self, provider: Provider, capabilities: EmbeddingModelCapabilities
+    ) -> str:
+        """Get default model name for a provider.
 
         Args:
-            provider: The provider enum identifier
-            provider_class: The provider implementation class
-        """
-        self._sparse_embedding_providers[provider] = provider_class
+            provider: The provider to get model for
+            capabilities: Capabilities containing default model
 
-    def register_reranking_provider(
-        self,
-        provider: Provider,
-        provider_class: LazyImport[type[RerankingProvider[Any]]] | type[RerankingProvider[Any]],
-    ) -> None:
-        """Register a reranking provider implementation.
+        Returns:
+            Model name string
+        """
+        # Check config first
+        from codeweaver.common.registry.utils import get_model_config
+
+        config = get_model_config("embedding")
+        if config and config.get("model_settings"):
+            model_settings = config["model_settings"]
+            if model_name := model_settings.get("model_name"):
+                return model_name
+
+        # Fallback to capabilities
+        return capabilities.name
+
+    def _get_base_url_for_provider(self, provider: Provider) -> str | None:
+        """Map Provider enum to default base URLs.
 
         Args:
-            provider: The provider enum identifier
-            provider_class: The provider implementation class
-        """
-        self._reranking_providers[provider] = provider_class
+            provider: The provider to get base URL for
 
-    def register_vector_store_provider(
-        self,
-        provider: Provider,
-        provider_class: LazyImport[type[VectorStoreProvider[Any]]] | type[VectorStoreProvider[Any]],
-    ) -> None:
-        """Register a vector store provider implementation.
+        Returns:
+            Base URL string or None
+        """
+        base_url_map = {
+            Provider.FIREWORKS: "https://api.fireworks.ai/inference/v1",
+            Provider.GROQ: "https://api.groq.com/openai/v1",
+            Provider.OPENAI: "https://api.openai.com/v1",
+            Provider.GITHUB: "https://models.inference.ai.azure.com",
+            Provider.OLLAMA: "http://localhost:11434/v1",
+            Provider.VERCEL: None,  # Uses OpenAI's URL
+            Provider.HEROKU: None,  # Configured via env vars
+        }
+        return base_url_map.get(provider)
+
+    def _construct_openai_provider_class(
+        self, provider: Provider, provider_class: LazyImport[type[Any]] | type[Any], **kwargs: Any
+    ) -> type[Any]:
+        """Construct the actual provider class from OpenAI factory.
 
         Args:
-            provider: The provider enum identifier
-            provider_class: The provider implementation class
+            provider: The provider enum
+            provider_class: LazyImport or class reference to OpenAIEmbeddingBase
+            **kwargs: Additional parameters that may contain overrides
+
+        Returns:
+            The constructed provider class type
         """
-        self._vector_store_providers[provider] = provider_class
+        # Resolve LazyImport if needed
+        if isinstance(provider_class, LazyImport):
+            factory_class = provider_class._resolve()  # type: ignore
+        else:
+            factory_class = provider_class
+
+        # Get capabilities for this provider
+        capabilities = self._get_capabilities_for_provider(provider)
+
+        # Get model name (kwargs override config)
+        model_name = kwargs.get("model") or self._get_default_model_for_provider(
+            provider, capabilities
+        )
+
+        # Get base URL (kwargs override defaults)
+        base_url = kwargs.get("base_url") or self._get_base_url_for_provider(provider)
+
+        # Get provider-specific kwargs
+        provider_kwargs = kwargs.get("provider_kwargs")
+
+        # Get client if provided
+        client: AsyncOpenAI | None = kwargs.get("client")
+
+        # Call the factory method to construct the provider class
+        return factory_class.get_provider_class(
+            model_name=model_name,
+            provider=provider,
+            capabilities=capabilities,
+            base_url=base_url,
+            provider_kwargs=provider_kwargs,
+            client=client,
+        )
 
     @overload
     def get_provider_class(
@@ -451,47 +528,38 @@ class ProviderRegistry(BasedModel):
 
     @overload
     def get_provider_class(
-        self, provider: Provider, provider_kind: Literal[ProviderKind.VECTOR_STORE, "vector_store"]
+        self, provider: Provider, provider_kind: LiteralVectorStoreKinds
     ) -> LazyImport[type[VectorStoreProvider[Any]]] | type[VectorStoreProvider[Any]]: ...
 
     @overload
     def get_provider_class(
         self, provider: Provider, provider_kind: Literal[ProviderKind.AGENT, "agent"]
     ) -> LazyImport[type[AgentProvider[Any]]] | type[AgentProvider[Any]]: ...
-
     @overload
+    def _get_provider_class(
+        self, provider: Provider, provider_kind: LiteralDataKinds
+    ) -> tuple[type[Any], ...] | tuple[LazyImport[type[Any]], ...] | None: ...
     def get_provider_class(
-        self, provider: Provider, provider_kind: Literal[ProviderKind.DATA, "data"]
-    ) -> LazyImport[type[Any]] | type[Any]: ...
-
-    def get_provider_class(
-        self,
-        provider: Provider,
-        provider_kind: Literal[
-            ProviderKind.AGENT,
-            "agent",
-            ProviderKind.DATA,
-            "data",
-            ProviderKind.EMBEDDING,
-            "embedding",
-            ProviderKind.SPARSE_EMBEDDING,
-            "sparse_embedding",
-            ProviderKind.RERANKING,
-            "reranking",
-            ProviderKind.VECTOR_STORE,
-            "vector_store",
-        ],
+        self, provider: Provider, provider_kind: LiteralKinds
     ) -> (
-        LazyImport[type[EmbeddingProvider[Any]]]
-        | type[EmbeddingProvider[Any]]
-        | LazyImport[type[RerankingProvider[Any]]]
-        | type[RerankingProvider[Any]]
-        | LazyImport[type[VectorStoreProvider[Any]]]
-        | type[VectorStoreProvider[Any]]
-        | LazyImport[type[AgentProvider[Any]]]
-        | type[AgentProvider[Any]]
-        | LazyImport[type[Any]]
-        | type[Any]
+        type[
+            EmbeddingProvider[Any]
+            | RerankingProvider[Any]
+            | VectorStoreProvider[Any]
+            | AgentProvider[Any]
+            | Any
+        ]
+        | tuple[type[Any], ...]
+        | LazyImport[
+            type[
+                EmbeddingProvider[Any]
+                | RerankingProvider[Any]
+                | VectorStoreProvider[Any]
+                | AgentProvider[Any]
+                | Any
+            ]
+        ]
+        | tuple[LazyImport[type[Any]], ...]
     ):
         """Get a provider class by provider enum and provider kind.
 
@@ -505,46 +573,12 @@ class ProviderRegistry(BasedModel):
         Raises:
             ConfigurationError: If provider is not registered
         """
-        registry, kind_name = self._registry_map[provider_kind]
-        if provider not in registry:
-            raise ConfigurationError(f"{kind_name} provider '{provider}' is not registered")
-
-        return registry[provider]
-
-    # Maintain backward compatibility with individual methods
-    def get_embedding_provider_class(
-        self, provider: Provider
-    ) -> LazyImport[type[EmbeddingProvider[Any]]] | type[EmbeddingProvider[Any]]:
-        """Get an embedding provider class by provider enum."""
-        return self.get_provider_class(provider, ProviderKind.EMBEDDING)
-
-    def get_sparse_embedding_provider_class(
-        self, provider: Provider
-    ) -> LazyImport[type[EmbeddingProvider[Any]]] | type[EmbeddingProvider[Any]]:
-        """Get a sparse embedding provider class by provider enum."""
-        return self.get_provider_class(provider, ProviderKind.SPARSE_EMBEDDING)
-
-    def get_reranking_provider_class(
-        self, provider: Provider
-    ) -> LazyImport[type[RerankingProvider[Any]]] | type[RerankingProvider[Any]]:
-        """Get a reranking provider class by provider enum."""
-        return self.get_provider_class(provider, ProviderKind.RERANKING)
-
-    def get_vector_store_provider_class(
-        self, provider: Provider
-    ) -> LazyImport[type[VectorStoreProvider[Any]]] | type[VectorStoreProvider[Any]]:
-        """Get a vector store provider class by provider enum."""
-        return self.get_provider_class(provider, ProviderKind.VECTOR_STORE)
-
-    def get_agent_provider_class(
-        self, provider: Provider
-    ) -> LazyImport[type[AgentProvider[Any]]] | type[AgentProvider[Any]]:
-        """Get an agent provider class by provider enum."""
-        return self.get_provider_class(provider, ProviderKind.AGENT)
-
-    def get_data_provider_class(self, provider: Provider) -> LazyImport[type[Any]] | type[Any]:
-        """Get a data provider class by provider enum."""
-        return self.get_provider_class(provider, ProviderKind.DATA)
+        if self._is_any_provider_kind(provider_kind):
+            registry, kind_name = self._provider_map[provider_kind]
+            if provider not in registry:
+                raise ConfigurationError(f"{kind_name} provider '{provider}' is not registered")
+            return registry[provider]
+        raise ConfigurationError(f"Invalid provider kind '{provider_kind}' specified")
 
     @overload
     def create_provider(
@@ -553,7 +587,6 @@ class ProviderRegistry(BasedModel):
         provider_kind: Literal[ProviderKind.EMBEDDING, "embedding"],
         **kwargs: Any,
     ) -> EmbeddingProvider[Any]: ...
-
     @overload
     def create_provider(
         self,
@@ -561,7 +594,6 @@ class ProviderRegistry(BasedModel):
         provider_kind: Literal[ProviderKind.SPARSE_EMBEDDING, "sparse_embedding"],
         **kwargs: Any,
     ) -> EmbeddingProvider[Any]: ...
-
     @overload
     def create_provider(
         self,
@@ -569,46 +601,20 @@ class ProviderRegistry(BasedModel):
         provider_kind: Literal[ProviderKind.RERANKING, "reranking"],
         **kwargs: Any,
     ) -> RerankingProvider[Any]: ...
-
     @overload
     def create_provider(
-        self,
-        provider: Provider,
-        provider_kind: Literal[ProviderKind.VECTOR_STORE, "vector_store"],
-        **kwargs: Any,
+        self, provider: Provider, provider_kind: LiteralVectorStoreKinds, **kwargs: Any
     ) -> VectorStoreProvider[Any]: ...
-
     @overload
     def create_provider(
-        self,
-        provider: Provider,
-        provider_kind: Literal[ProviderKind.AGENT, "agent"],
-        **kwargs: Any,
+        self, provider: Provider, provider_kind: Literal[ProviderKind.AGENT, "agent"], **kwargs: Any
     ) -> AgentProvider[Any]: ...
-
     @overload
     def create_provider(
         self, provider: Provider, provider_kind: Literal[ProviderKind.DATA, "data"], **kwargs: Any
     ) -> Any: ...
-
     def create_provider(
-        self,
-        provider: Provider,
-        provider_kind: Literal[
-            ProviderKind.AGENT,
-            "agent",
-            ProviderKind.DATA,
-            "data",
-            ProviderKind.EMBEDDING,
-            "embedding",
-            ProviderKind.SPARSE_EMBEDDING,
-            "sparse_embedding",
-            ProviderKind.RERANKING,
-            "reranking",
-            ProviderKind.VECTOR_STORE,
-            "vector_store",
-        ],
-        **kwargs: Any,
+        self, provider: Provider, provider_kind: LiteralKinds, **kwargs: Any
     ) -> (
         EmbeddingProvider[Any]
         | RerankingProvider[Any]
@@ -626,10 +632,22 @@ class ProviderRegistry(BasedModel):
         Returns:
             An initialized provider instance
         """
-        retrieved_cls = self.get_provider_class(provider, provider_kind)
+        retrieved_cls = None
+        if self._is_literal_model_kind(provider_kind):
+            retrieved_cls = self.get_provider_class(provider, provider_kind)  # type: ignore
+        if self._is_literal_vector_store_kind(provider_kind):
+            retrieved_cls = self.get_provider_class(provider, provider_kind)
+        if self._is_literal_data_kind(provider_kind):
+            retrieved_cls = self.get_provider_class(provider, provider_kind)  # type: ignore
 
         # Special handling for embedding provider (has different logic)
         if provider_kind in (ProviderKind.EMBEDDING, "embedding"):
+            # Check if this is an OpenAI factory that needs construction
+            if self._is_openai_factory(retrieved_cls):
+                retrieved_cls = self._construct_openai_provider_class(
+                    provider, retrieved_cls, **kwargs
+                )
+
             # we need to access a property to execute the import and ensure it exists
             name = None
             with contextlib.suppress(Exception):
@@ -665,39 +683,6 @@ class ProviderRegistry(BasedModel):
             raise ConfigurationError(f"Provider '{provider}' could not be imported.") from e
         return resolved(**kwargs)
 
-    # Maintain backward compatibility with individual methods
-    def create_embedding_provider(
-        self, provider: Provider, **kwargs: Any
-    ) -> EmbeddingProvider[Any]:
-        """Create an embedding provider instance."""
-        return self.create_provider(provider, ProviderKind.EMBEDDING, **kwargs)
-
-    def create_sparse_embedding_provider(
-        self, provider: Provider, **kwargs: Any
-    ) -> EmbeddingProvider[Any]:
-        """Create a sparse embedding provider instance."""
-        return self.create_provider(provider, ProviderKind.SPARSE_EMBEDDING, **kwargs)
-
-    def create_reranking_provider(
-        self, provider: Provider, **kwargs: Any
-    ) -> RerankingProvider[Any]:
-        """Create a reranking provider instance."""
-        return self.create_provider(provider, ProviderKind.RERANKING, **kwargs)
-
-    def create_vector_store_provider(
-        self, provider: Provider, **kwargs: Any
-    ) -> VectorStoreProvider[Any]:
-        """Create a vector store provider instance."""
-        return self.create_provider(provider, ProviderKind.VECTOR_STORE, **kwargs)
-
-    def create_agent_provider(self, provider: Provider, **kwargs: Any) -> AgentProvider[Any]:
-        """Create an agent provider instance."""
-        return self.create_provider(provider, ProviderKind.AGENT, **kwargs)
-
-    def create_data_provider(self, provider: Provider, **kwargs: Any) -> Any:
-        """Create a data provider instance."""
-        return self.create_provider(provider, ProviderKind.DATA, **kwargs)
-
     @overload
     def get_provider_instance(
         self,
@@ -707,7 +692,6 @@ class ProviderRegistry(BasedModel):
         singleton: bool = False,
         **kwargs: Any,
     ) -> EmbeddingProvider[Any]: ...
-
     @overload
     def get_provider_instance(
         self,
@@ -717,7 +701,6 @@ class ProviderRegistry(BasedModel):
         singleton: bool = False,
         **kwargs: Any,
     ) -> EmbeddingProvider[Any]: ...
-
     @overload
     def get_provider_instance(
         self,
@@ -727,17 +710,15 @@ class ProviderRegistry(BasedModel):
         singleton: bool = False,
         **kwargs: Any,
     ) -> RerankingProvider[Any]: ...
-
     @overload
     def get_provider_instance(
         self,
         provider: Provider,
-        provider_kind: Literal[ProviderKind.VECTOR_STORE, "vector_store"],
+        provider_kind: LiteralVectorStoreKinds,
         *,
         singleton: bool = False,
         **kwargs: Any,
     ) -> VectorStoreProvider[Any]: ...
-
     @overload
     def get_provider_instance(
         self,
@@ -752,7 +733,7 @@ class ProviderRegistry(BasedModel):
     def get_provider_instance(
         self,
         provider: Provider,
-        provider_kind: Literal[ProviderKind.DATA, "data"],
+        provider_kind: LiteralDataKinds,
         *,
         singleton: bool = False,
         **kwargs: Any,
@@ -761,20 +742,7 @@ class ProviderRegistry(BasedModel):
     def get_provider_instance(
         self,
         provider: Provider,
-        provider_kind: Literal[
-            ProviderKind.AGENT,
-            "agent",
-            ProviderKind.DATA,
-            "data",
-            ProviderKind.EMBEDDING,
-            "embedding",
-            ProviderKind.SPARSE_EMBEDDING,
-            "sparse_embedding",
-            ProviderKind.RERANKING,
-            "reranking",
-            ProviderKind.VECTOR_STORE,
-            "vector_store",
-        ],
+        provider_kind: LiteralKinds,
         *,
         singleton: bool = False,
         **kwargs: Any,
@@ -791,63 +759,273 @@ class ProviderRegistry(BasedModel):
             provider: The provider enum identifier
             provider_kind: The type of provider
             singleton: Whether to cache and reuse the instance
-            **kwargs: Provider-specific initialization arguments
+            **kwargs: Provider-specific initialization arguments (override config)
 
         Returns:
             A provider instance
         """
-        instances = self._instances_map[provider_kind]
+        # Get instance cache for this provider kind
+        instance_cache = self._get_instance_cache_for_kind(provider_kind)
 
-        if singleton and provider in instances:
-            return instances[provider]
+        # Check singleton cache first
+        if singleton and provider in instance_cache:
+            return instance_cache[provider]
 
-        instance = self.create_provider(provider, provider_kind, **kwargs)
+        # Get configuration for this provider
+        config = self.get_configured_provider_settings(provider_kind)  # type: ignore
+        if not config:
+            logger.warning(
+                "No configuration found for provider '%s' of kind '%s'", provider, provider_kind
+            )
 
+        # Prepare constructor kwargs from config
+        constructor_kwargs = self._prepare_constructor_kwargs(provider_kind, config, **kwargs)
+
+        # Create the instance with proper type narrowing
+        if (
+            self._is_literal_embedding_kind(provider_kind)
+            or self._is_literal_sparse_embedding_kind(provider_kind)
+            or self._is_literal_reranking_kind(provider_kind)
+            or self._is_literal_vector_store_kind(provider_kind)
+            or self._is_literal_agent_kind(provider_kind)
+            or self._is_literal_data_kind(provider_kind)
+        ):
+            instance = self.create_provider(provider, provider_kind, **constructor_kwargs)
+        else:
+            raise ConfigurationError(f"Invalid provider kind '{provider_kind}' specified")
+
+        # Cache if singleton
         if singleton:
-            instances[provider] = instance
+            instance_cache[provider] = instance
 
         return instance
 
-    # Maintain backward compatibility with individual methods
-    def get_embedding_provider_instance(
-        self, provider: Provider, *, singleton: bool = False, **kwargs: Any
-    ) -> EmbeddingProvider[Any]:
-        """Get an embedding provider instance, optionally cached."""
-        return self.get_provider_instance(provider, ProviderKind.EMBEDDING, singleton=singleton, **kwargs)
+    def _get_instance_cache_for_kind(
+        self, provider_kind: LiteralKinds
+    ) -> MutableMapping[Provider, Any]:
+        """Get the instance cache for a specific provider kind.
 
-    def get_sparse_embedding_provider_instance(
-        self, provider: Provider, *, singleton: bool = False, **kwargs: Any
-    ) -> EmbeddingProvider[Any]:
-        """Get a sparse embedding provider instance, optionally cached."""
-        return self.get_provider_instance(
-            provider, ProviderKind.SPARSE_EMBEDDING, singleton=singleton, **kwargs
+        Args:
+            provider_kind: The type of provider
+
+        Returns:
+            The appropriate instance cache dictionary
+        """
+        if self._is_literal_embedding_kind(provider_kind):
+            return self._embedding_instances
+        if self._is_literal_sparse_embedding_kind(provider_kind):
+            return self._sparse_embedding_instances
+        if self._is_literal_reranking_kind(provider_kind):
+            return self._reranking_instances
+        if self._is_literal_vector_store_kind(provider_kind):
+            return self._vector_store_instances
+        if self._is_literal_agent_kind(provider_kind):
+            return self._agent_instances
+        if self._is_literal_data_kind(provider_kind):
+            return self._data_instances
+        # Fallback - create empty dict (should not reach here with type guards)
+        return {}
+
+    def _prepare_constructor_kwargs(
+        self,
+        provider_kind: LiteralKinds,
+        config: (
+            DictView[EmbeddingProviderSettings]
+            | DictView[SparseEmbeddingProviderSettings]
+            | DictView[RerankingProviderSettings]
+            | DictView[VectorStoreProviderSettings]
+            | DictView[AgentProviderSettings]
+            | DictView[DataProviderSettings]
+            | tuple[DictView[DataProviderSettings], ...]
+            | None
+        ),
+        **user_kwargs: Any,
+    ) -> dict[str, Any]:
+        """Prepare constructor kwargs from config and user overrides.
+
+        Args:
+            provider_kind: The type of provider
+            config: Provider configuration
+            **user_kwargs: User-provided kwargs that override config
+
+        Returns:
+            Complete kwargs dictionary for provider constructor
+        """
+        if self._is_literal_model_kind(provider_kind):
+            return self._prepare_model_provider_kwargs(config, **user_kwargs)  # type: ignore
+        if self._is_literal_vector_store_kind(provider_kind):
+            return self._prepare_vector_store_kwargs(config, **user_kwargs)  # type: ignore
+        if self._is_literal_data_kind(provider_kind):
+            return self._prepare_data_provider_kwargs(config, **user_kwargs)  # type: ignore
+        return user_kwargs
+
+    def _prepare_model_provider_kwargs(
+        self,
+        config: (
+            DictView[EmbeddingProviderSettings]
+            | DictView[SparseEmbeddingProviderSettings]
+            | DictView[RerankingProviderSettings]
+            | DictView[AgentProviderSettings]
+            | None
+        ),
+        **user_kwargs: Any,
+    ) -> dict[str, Any]:
+        """Prepare kwargs for model providers (embedding, sparse, reranking, agent).
+
+        Args:
+            config: Model provider configuration
+            **user_kwargs: User-provided kwargs
+
+        Returns:
+            Complete kwargs with caps, model settings, and provider settings
+        """
+        if not config:
+            return user_kwargs
+
+        kwargs: dict[str, Any] = {}
+
+        # Extract model settings
+        self._add_model_settings_to_kwargs(config, kwargs, user_kwargs)
+
+        # Extract provider settings and merge into client_options
+        self._add_provider_settings_to_kwargs(config, kwargs)
+
+        # User kwargs override everything
+        kwargs.update(user_kwargs)
+        return kwargs
+
+    def _add_model_settings_to_kwargs(
+        self, config: DictView[Any], kwargs: dict[str, Any], user_kwargs: dict[str, Any]
+    ) -> None:
+        """Add model settings to kwargs."""
+        model_settings = config.get("model_settings")
+        if not model_settings:
+            return
+
+        model_name = user_kwargs.get("model") or model_settings.get("model")
+
+        # Get capabilities for this model
+        if model_name:
+            caps = self._get_capabilities_for_model(model_name, config["provider"])
+            if caps:
+                kwargs["caps"] = caps
+
+        # Add model-specific settings
+        for key in ("dimension", "data_type", "custom_prompt", "embed_options", "model_options"):
+            if value := model_settings.get(key):
+                kwargs[key] = value
+
+    def _add_provider_settings_to_kwargs(
+        self, config: DictView[Any], kwargs: dict[str, Any]
+    ) -> None:
+        """Add provider-specific settings to client_options in kwargs."""
+        provider_settings = config.get("provider_settings")
+        if not provider_settings:
+            return
+
+        client_options = kwargs.get("client_options", {})
+
+        # AWS settings (Bedrock)
+        for key in (
+            "region_name",
+            "model_arn",
+            "aws_access_key_id",
+            "aws_secret_access_key",
+            "aws_session_token",
+        ):
+            if value := provider_settings.get(key):
+                client_options[key] = value
+
+        # Azure settings
+        for key in ("model_deployment", "api_key", "azure_resource_name"):
+            if value := provider_settings.get(key):
+                client_options[key] = value
+
+        # Fastembed settings
+        for key in ("cache_dir", "threads"):
+            if value := provider_settings.get(key):
+                client_options[key] = value
+
+        if client_options:
+            kwargs["client_options"] = client_options
+
+    def _prepare_vector_store_kwargs(
+        self, config: DictView[VectorStoreProviderSettings] | None, **user_kwargs: Any
+    ) -> dict[str, Any]:
+        """Prepare kwargs for vector store providers.
+
+        Args:
+            config: Vector store provider configuration
+            **user_kwargs: User-provided kwargs
+
+        Returns:
+            Complete kwargs with config parameter
+        """
+        if not config:
+            return user_kwargs
+
+        kwargs: dict[str, Any] = {}
+
+        # Pass entire provider_settings as "config" parameter
+        provider_settings = config.get("provider_settings")
+        if provider_settings:
+            kwargs["config"] = provider_settings
+
+        # User kwargs override
+        kwargs.update(user_kwargs)
+        return kwargs
+
+    def _prepare_data_provider_kwargs(
+        self,
+        config: DictView[DataProviderSettings] | tuple[DictView[DataProviderSettings], ...] | None,
+        **user_kwargs: Any,
+    ) -> dict[str, Any]:
+        """Prepare kwargs for data providers.
+
+        Args:
+            config: Data provider configuration
+            **user_kwargs: User-provided kwargs
+
+        Returns:
+            User kwargs (data providers are simple pass-through)
+        """
+        # Data providers typically don't need complex configuration
+        # Just pass through user kwargs
+        return user_kwargs
+
+    def _get_capabilities_for_model(
+        self, model_name: str, provider: Provider
+    ) -> EmbeddingModelCapabilities | None:
+        """Get capabilities for a specific model.
+
+        Args:
+            model_name: The model name to look up
+            provider: The provider for the model
+
+        Returns:
+            EmbeddingModelCapabilities if found, None otherwise
+        """
+        from codeweaver.providers.embedding.capabilities import load_default_capabilities
+
+        # Load all capabilities and find matching one
+        for cap in load_default_capabilities():
+            if cap.name == model_name and cap.provider == provider:
+                return cap
+
+        # Fallback: return first capability for this provider
+        for cap in load_default_capabilities():
+            if cap.provider == provider:
+                logger.warning(
+                    "Exact model '%s' not found for provider '%s', using default capability",
+                    model_name,
+                    provider,
+                )
+                return cap
+
+        logger.warning(
+            "No capabilities found for model '%s' and provider '%s'", model_name, provider
         )
-
-    def get_reranking_provider_instance(
-        self, provider: Provider, *, singleton: bool = False, **kwargs: Any
-    ) -> RerankingProvider[Any]:
-        """Get a reranking provider instance, optionally cached."""
-        return self.get_provider_instance(provider, ProviderKind.RERANKING, singleton=singleton, **kwargs)
-
-    def get_vector_store_provider_instance(
-        self, provider: Provider, *, singleton: bool = False, **kwargs: Any
-    ) -> VectorStoreProvider[Any]:
-        """Get a vector store provider instance, optionally cached."""
-        return self.get_provider_instance(
-            provider, ProviderKind.VECTOR_STORE, singleton=singleton, **kwargs
-        )
-
-    def get_agent_provider_instance(
-        self, provider: Provider, *, singleton: bool = False, **kwargs: Any
-    ) -> AgentProvider[Any]:
-        """Get an agent provider instance, optionally cached."""
-        return self.get_provider_instance(provider, ProviderKind.AGENT, singleton=singleton, **kwargs)
-
-    def get_data_provider_instance(
-        self, provider: Provider, *, singleton: bool = False, **kwargs: Any
-    ) -> Any:
-        """Get a data provider instance, optionally cached."""
-        return self.get_provider_instance(provider, ProviderKind.DATA, singleton=singleton, **kwargs)
+        return None
 
     def list_providers(self, provider_kind: ProviderKind) -> list[Provider]:
         """List available providers for a given provider kind.
@@ -905,36 +1083,36 @@ class ProviderRegistry(BasedModel):
         Returns:
             True if the provider is available
         """
-        if provider_kind == ProviderKind.EMBEDDING:
-            return self._check_for_provider_availability(provider, provider_kind)
-        if provider_kind == ProviderKind.VECTOR_STORE:
-            return self._check_for_provider_availability(provider, provider_kind)
-        if provider_kind == ProviderKind.RERANKING:
-            return self._check_for_provider_availability(provider, provider_kind)
-        if provider_kind == ProviderKind.SPARSE_EMBEDDING:
-            return self._check_for_provider_availability(provider, provider_kind)
-        if provider_kind == ProviderKind.AGENT:
-            return self._check_for_provider_availability(provider, provider_kind)
-        if provider_kind == ProviderKind.DATA:
-            return self._check_for_provider_availability(provider, provider_kind)
-        return False
+        if provider_kind not in (
+            ProviderKind.EMBEDDING,
+            ProviderKind.SPARSE_EMBEDDING,
+            ProviderKind.RERANKING,
+            ProviderKind.VECTOR_STORE,
+            ProviderKind.AGENT,
+            ProviderKind.DATA,
+        ) or provider not in self.list_providers(provider_kind):
+            return False
+        return self._check_for_provider_availability(provider, provider_kind)
 
     @overload
     def get_configured_provider_settings(
-        self, provider_kind: Literal[ProviderKind.DATA, "data"]
+        self, provider_kind: LiteralDataKinds
     ) -> tuple[DictView[DataProviderSettings], ...]: ...
     @overload
     def get_configured_provider_settings(
         self, provider_kind: Literal[ProviderKind.EMBEDDING, "embedding"]
     ) -> DictView[EmbeddingProviderSettings]: ...
-
+    @overload
+    def get_configured_provider_settings(
+        self, provider_kind: Literal[ProviderKind.SPARSE_EMBEDDING, "sparse_embedding"]
+    ) -> DictView[SparseEmbeddingProviderSettings]: ...
     @overload
     def get_configured_provider_settings(
         self, provider_kind: Literal[ProviderKind.RERANKING, "reranking"]
     ) -> DictView[RerankingProviderSettings]: ...
     @overload
     def get_configured_provider_settings(
-        self, provider_kind: Literal[ProviderKind.VECTOR_STORE, "vector_store"]
+        self, provider_kind: LiteralVectorStoreKinds
     ) -> DictView[VectorStoreProviderSettings]: ...
 
     @overload
@@ -943,22 +1121,11 @@ class ProviderRegistry(BasedModel):
     ) -> DictView[AgentProviderSettings]: ...
 
     def get_configured_provider_settings(
-        self,
-        provider_kind: Literal[
-            ProviderKind.AGENT,
-            "agent",
-            ProviderKind.DATA,
-            "data",
-            ProviderKind.EMBEDDING,
-            "embedding",
-            ProviderKind.RERANKING,
-            "reranking",
-            ProviderKind.VECTOR_STORE,
-            "vector_store",
-        ],
+        self, provider_kind: LiteralKinds
     ) -> (
         DictView[DataProviderSettings]
         | DictView[EmbeddingProviderSettings]
+        | DictView[SparseEmbeddingProviderSettings]
         | DictView[RerankingProviderSettings]
         | DictView[VectorStoreProviderSettings]
         | DictView[AgentProviderSettings]
@@ -978,71 +1145,58 @@ class ProviderRegistry(BasedModel):
             get_vector_store_config,
         )
 
+        provider_kind = (
+            provider_kind
+            if isinstance(provider_kind, ProviderKind)
+            else ProviderKind.from_string(provider_kind)
+        )  # type: ignore
         if provider_kind == ProviderKind.DATA:
-            return get_data_configs()
+            configs = get_data_configs()
+            return tuple(
+                cfg
+                for cfg in configs
+                if self.is_provider_available(cfg["provider"], ProviderKind.DATA)
+            )
         if provider_kind == ProviderKind.VECTOR_STORE:
-            return get_vector_store_config()
+            return (
+                cfg
+                if (cfg := get_vector_store_config())
+                and self.is_provider_available(cfg["provider"], ProviderKind.VECTOR_STORE)
+                else None
+            )
         if provider_kind not in (
             ProviderKind.EMBEDDING,
             ProviderKind.SPARSE_EMBEDDING,
             ProviderKind.RERANKING,
             ProviderKind.AGENT,
-            "agent",
-            "embedding",
-            "reranking",
-            "sparse_embedding",
         ):
             raise ValueError("We didn't recognize that provider kind, %s.", provider_kind)
-        return get_model_config(provider_kind)  # type: ignore
-
-    def get_embedding_provider(self) -> Provider | None:
-        """Get the configured embedding provider enum from settings.
-
-        Args:
-            sparse: Whether to get the sparse embedding provider
-
-        Returns:
-            The configured embedding provider enum or None
-        """
-        return (self.get_configured_provider_settings(ProviderKind.EMBEDDING) or {}).get("provider")
-
-    def get_reranking_provider(self) -> Provider | None:
-        """Get the configured reranking provider enum from settings.
-
-        Returns:
-            The configured reranking provider enum or None
-        """
-        return (self.get_configured_provider_settings(ProviderKind.RERANKING) or {}).get("provider")
-
-    def get_vector_store_provider(self) -> Provider | None:
-        """Get the default vector store provider from settings.
-
-        Returns:
-            The default vector store provider enum or None
-        """
-        return (self.get_configured_provider_settings(ProviderKind.VECTOR_STORE) or {}).get(
-            "provider"
-        )
-
-    def get_agent_provider(self) -> Provider | None:
-        """Get the default agent provider from settings.
-
-        Returns:
-            The default agent provider enum or None
-        """
-        return (self.get_configured_provider_settings(ProviderKind.AGENT) or {}).get("provider")
-
-    def get_data_providers(self) -> tuple[Provider, ...] | None:
-        """Get all data providers from settings.
-
-        Returns:
-            A tuple of all data provider enums
-        """
+        # Type is now narrowed to valid get_model_config kinds
         return (
-            tuple(setting.get("provider") for setting in data)
-            if (data := self.get_configured_provider_settings(ProviderKind.DATA))
+            cfg
+            if (cfg := get_model_config(provider_kind))  # type: ignore
+            and self.is_provider_available(cfg["provider"], provider_kind)  # type: ignore
             else None
-        )
+        )  # type: ignore
+
+    @overload
+    def get_provider_enum_for(self, kind: LiteralDataKinds) -> tuple[Provider, ...] | None: ...
+    @overload
+    def get_provider_enum_for(
+        self, kind: LiteralModelKinds | LiteralVectorStoreKinds
+    ) -> Provider | None: ...
+    def get_provider_enum_for(
+        self, kind: LiteralModelKinds | LiteralVectorStoreKinds | LiteralDataKinds
+    ) -> Provider | tuple[Provider, ...] | None:
+        """Get the provider enum for a given provider kind."""
+        if kind in (ProviderKind.DATA, "data"):
+            configs = self.get_configured_provider_settings(
+                cast(Literal[ProviderKind.DATA, "data"], kind)
+            )
+            return tuple(cfg["provider"] for cfg in configs if cfg["provider"])
+        if config := self.get_configured_provider_settings(kind):  # type: ignore
+            return config["provider"]  # type: ignore
+        return None
 
     def clear_instances(self) -> None:
         """Clear all cached provider instances."""
@@ -1069,4 +1223,48 @@ def get_provider_registry() -> ProviderRegistry:
     return _provider_registry
 
 
-__all__ = ("ProviderRegistry", "get_provider_registry")
+@overload
+def get_provider_config_for(
+    kind: Literal[ProviderKind.EMBEDDING, "embedding"],
+) -> DictView[EmbeddingProviderSettings]: ...
+@overload
+def get_provider_config_for(
+    kind: Literal[ProviderKind.SPARSE_EMBEDDING, "sparse_embedding"],
+) -> DictView[SparseEmbeddingProviderSettings]: ...
+@overload
+def get_provider_config_for(
+    kind: Literal[ProviderKind.RERANKING, "reranking"],
+) -> DictView[RerankingProviderSettings]: ...
+@overload
+def get_provider_config_for(
+    kind: LiteralVectorStoreKinds,
+) -> DictView[VectorStoreProviderSettings]: ...
+@overload
+def get_provider_config_for(
+    kind: Literal[ProviderKind.AGENT, "agent"],
+) -> DictView[AgentProviderSettings]: ...
+@overload
+def get_provider_config_for(
+    kind: LiteralDataKinds,
+) -> tuple[DictView[DataProviderSettings], ...]: ...
+def get_provider_config_for(
+    kind: LiteralKinds,
+) -> (
+    DictView[EmbeddingProviderSettings]
+    | DictView[SparseEmbeddingProviderSettings]
+    | DictView[RerankingProviderSettings]
+    | DictView[VectorStoreProviderSettings]
+    | DictView[AgentProviderSettings]
+    | tuple[DictView[DataProviderSettings], ...]
+    | None
+):
+    """Get the provider configuration for a given provider kind.
+
+    Args:
+        kind: The type of provider to get configuration for
+
+    Returns:
+        The provider configuration dictionary view
+    """
+    registry = get_provider_registry()
+    return registry.get_configured_provider_settings(kind)  # type: ignore

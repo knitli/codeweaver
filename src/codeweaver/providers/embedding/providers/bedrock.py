@@ -448,7 +448,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[bedrock_client]):
     _doc_kwargs: ClassVar[dict[str, Any]] = {}
     _query_kwargs: ClassVar[dict[str, Any]] = {}
 
-    def _initialize(self) -> None:
+    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         self._preprocessor = super()._input_transformer
         self._postprocessor = self._handle_response
 

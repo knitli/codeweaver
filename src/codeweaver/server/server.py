@@ -56,6 +56,7 @@ from codeweaver.config.types import FastMcpServerSettingsDict
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.enum import AnonymityConversion, BaseEnum
 from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
+from codeweaver.core.types.sentinel import Unset
 from codeweaver.exceptions import InitializationError
 from codeweaver.providers.provider import Provider as Provider
 
@@ -322,15 +323,17 @@ async def lifespan(
 
     console = Console(markup=True)
     console.print("[bold red]Entering lifespan context manager...[/bold red]")
+    if settings is None:
+        settings = get_settings()
+    if isinstance(settings.project_path, Unset):
+        settings.project_path = get_project_path()
     if not hasattr(app, "state"):
         state = AppState(  # type: ignore
             initialized=False,
             settings=settings,
             health=get_health_info(),
             statistics=statistics or get_session_statistics(),
-            project_path=settings.project_path
-            if settings
-            else get_settings().project_path or get_project_path(),
+            project_path=settings.project_path,
             config_path=settings.config_file if settings else get_settings().config_file,
             provider_registry=get_provider_registry(),
             services_registry=get_services_registry(),

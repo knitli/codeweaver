@@ -339,7 +339,6 @@ class BasedModel(BaseModel):
                 for key, conversion in telemetry_keys.items()
             }
         data = self.model_dump(
-            mode="python",
             round_trip=True,
             exclude_none=True,
             exclude_defaults=True,
@@ -357,7 +356,7 @@ class BasedModel(BaseModel):
                 ),
             )
             for key, value in data.items()
-            if key not in excludes
+            if FilteredKey(cast(LiteralStringT, key)) not in excludes
         }
 
 

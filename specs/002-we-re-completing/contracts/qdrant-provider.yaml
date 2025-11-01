@@ -14,7 +14,6 @@ contract:
   type: concrete_implementation
   extends: VectorStoreProvider
   location: src/codeweaver/providers/vector_stores/qdrant.py
-
 configuration:
   class_name: QdrantConfig
   location: src/codeweaver/config/providers.py
@@ -27,8 +26,8 @@ configuration:
         - Valid HTTP/HTTPS URL or None
         - If None, defaults to "http://localhost:6333"
       examples:
-        - "http://localhost:6333"  # Local Qdrant
-        - "https://xyz.us-east.aws.cloud.qdrant.io:6333"  # Qdrant Cloud
+        - http://localhost:6333 # Local Qdrant
+        - https://xyz.us-east.aws.cloud.qdrant.io:6333 # Qdrant Cloud
     - name: api_key
       type: str | None
       default: null
@@ -60,19 +59,18 @@ configuration:
         - maximum: 1000
     - name: dense_vector_name
       type: str
-      default: "dense"
+      default: dense
       description: Named vector for dense embeddings
       validation:
         - Non-empty string
         - Alphanumeric and underscores only
     - name: sparse_vector_name
       type: str
-      default: "sparse"
+      default: sparse
       description: Named vector for sparse embeddings
       validation:
         - Non-empty string
         - Alphanumeric and underscores only
-
 initialization:
   - name: _initialize
     description: Initialize Qdrant client and validate connection
@@ -91,7 +89,6 @@ initialization:
       - Collection exists or is created successfully
       - Metadata stored for provider validation
       - Payload indexes created
-
 collection_management:
   - name: get_or_create_collection
     description: Get existing collection or create with hybrid vector config
@@ -111,17 +108,17 @@ collection_management:
       - If not exists, create with named vectors configuration:
           vectors_config:
             dense:
-              size: {dense_dim}
+              size:
+                dense_dim:
               distance: COSINE
           sparse_vectors_config:
             sparse:
-              # Qdrant manages sparse vector configuration
+            # Qdrant manages sparse vector configuration
       - Store metadata: provider, dimensions, project name
       - Create payload indexes: file_path, language, chunk_name
     returns:
       type: CollectionInfo
       description: Collection information and configuration
-
 hybrid_search_implementation:
   - name: _prepare_query_vector
     description: Prepare query vector for hybrid search
@@ -131,7 +128,7 @@ hybrid_search_implementation:
       - name: search_mode
         type: |
           "dense" | "sparse" | "hybrid"
-        default: "hybrid"
+        default: hybrid
     implementation:
       - If vector is list[float], use as dense vector only
       - If vector is dict, extract named vectors (dense, sparse)
@@ -140,7 +137,6 @@ hybrid_search_implementation:
     returns:
       type: dict[str, list[float] | SparseVector]
       description: Qdrant-compatible query vector
-
   - name: _merge_search_results
     description: Merge and score results from hybrid search
     parameters:
@@ -161,7 +157,6 @@ hybrid_search_implementation:
     returns:
       type: list[SearchResult]
       description: Merged and filtered search results
-
 provider_validation:
   - name: _validate_provider_compatibility
     description: Check if current provider matches collection metadata
@@ -176,26 +171,23 @@ provider_validation:
     success_criteria:
       - Metadata matches current provider configuration
       - No action needed if metadata compatible
-
 remote_deployment_support:
   local_connection:
-    url: "http://localhost:6333"
+    url: http://localhost:6333
     api_key: null
     prefer_grpc: false
     notes:
       - No authentication required
       - Qdrant must be running locally (Docker or native)
       - Default port 6333 for HTTP
-
   remote_connection:
-    url: "https://{instance}.cloud.qdrant.io:6333"
-    api_key: "{required}"
+    url: https://{instance}.cloud.qdrant.io:6333
+    api_key: '{required}'
     prefer_grpc: true
     notes:
       - API key required for authentication
       - gRPC recommended for better performance
       - Supports Qdrant Cloud and self-hosted remote instances
-
 error_handling:
   connection_errors:
     - ConnectionError: Retry with exponential backoff (max 3 retries)
@@ -205,14 +197,12 @@ error_handling:
     - DimensionMismatchError: Log error with expected vs actual dimensions
     - CollectionNotFoundError: Attempt to create collection if auto-create enabled
     - UpsertError: Log failed chunk IDs, continue with successful chunks
-
 performance_optimizations:
   - Use gRPC for bulk operations (prefer_grpc=true)
   - Batch upsert with optimal batch_size (64 default)
   - Create payload indexes before bulk indexing
   - Use async operations for all I/O
   - Connection pooling via AsyncQdrantClient
-
 testing_requirements:
   integration_tests:
     - Test with local Qdrant instance (Docker container)

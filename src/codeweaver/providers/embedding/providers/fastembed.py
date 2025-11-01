@@ -98,7 +98,7 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
         fastembed_output_transformer
     )
 
-    def _initialize(self) -> None:
+    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """Initialize the FastEmbed client."""
         if "model_name" not in self._doc_kwargs:
             model = self._caps.name
@@ -151,7 +151,7 @@ class FastEmbedSparseProvider(FastEmbedEmbeddingProvider):
 
     _client: SparseTextEmbedding
 
-    def _initialize(self) -> None:
+    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """Initialize the FastEmbed client."""
         if "model_name" not in self._doc_kwargs:
             model = self._caps.name
