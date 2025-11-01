@@ -70,14 +70,6 @@ class TelemetrySettings(BaseSettings):
         ),
     ]
 
-    strict_privacy_mode: Annotated[
-        bool,
-        Field(
-            default=True,
-            description="Enable extra privacy validation checks on all telemetry events.",
-        ),
-    ]
-
     @property
     def is_configured(self) -> bool:
         """Check if telemetry is properly configured."""

@@ -11,10 +11,17 @@ All events use only aggregated, anonymized data.
 
 from __future__ import annotations
 
-from typing import Annotated, Protocol
+from typing import TYPE_CHECKING, Annotated, Protocol
 
 from pydantic import Field, NonNegativeFloat, NonNegativeInt
 from pydantic.dataclasses import dataclass
+
+from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
+
+
+if TYPE_CHECKING:
+    from codeweaver.core.types.aliases import FilteredKeyT
+    from codeweaver.core.types.enum import AnonymityConversion
 
 
 class TelemetryEvent(Protocol):
@@ -30,8 +37,8 @@ class TelemetryEvent(Protocol):
         ...
 
 
-@dataclass
-class SessionSummaryEvent:
+@dataclass(config=DATACLASS_CONFIG)
+class SessionSummaryEvent(DataclassSerializationMixin):
     """
     Session summary telemetry event.
 
@@ -100,6 +107,10 @@ class SessionSummaryEvent:
         Field(description="Semantic category usage frequencies (percentages)"),
     ]
 
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
+        """All fields in SessionSummaryEvent are already aggregated and safe for telemetry."""
+        return None
+
     def to_posthog_event(self) -> tuple[str, dict]:
         """Convert to PostHog event format."""
         return (
@@ -128,8 +139,8 @@ class SessionSummaryEvent:
         )
 
 
-@dataclass
-class PerformanceBenchmarkEvent:
+@dataclass(config=DATACLASS_CONFIG)
+class PerformanceBenchmarkEvent(DataclassSerializationMixin):
     """
     Performance benchmark telemetry event.
 
@@ -193,6 +204,10 @@ class PerformanceBenchmarkEvent:
         NonNegativeFloat, Field(description="Cost savings percentage", ge=0.0, le=100.0)
     ]
 
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
+        """All fields in PerformanceBenchmarkEvent are already aggregated and safe for telemetry."""
+        return None
+
     def to_posthog_event(self) -> tuple[str, dict]:
         """Convert to PostHog event format."""
         return (
@@ -222,8 +237,8 @@ class PerformanceBenchmarkEvent:
         )
 
 
-@dataclass
-class SemanticValidationEvent:
+@dataclass(config=DATACLASS_CONFIG)
+class SemanticValidationEvent(DataclassSerializationMixin):
     """
     Semantic category validation telemetry event.
 
@@ -251,6 +266,10 @@ class SemanticValidationEvent:
     ]
 
     note: Annotated[str, Field(description="Analysis note or interpretation")]
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
+        """All fields in SemanticValidationEvent are already aggregated and safe for telemetry."""
+        return None
 
     def to_posthog_event(self) -> tuple[str, dict]:
         """Convert to PostHog event format."""
