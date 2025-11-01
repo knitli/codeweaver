@@ -13,9 +13,9 @@ Privacy-preserving telemetry system for collecting anonymized metrics to prove C
 
 The telemetry module provides:
 
-- **PostHog Integration**: Wrapper around PostHog Python client with privacy filtering
-- **Event Schemas**: Structured event types for session summaries, performance benchmarks, and semantic validation
-- **Privacy Filtering**: Strict filtering to ensure no PII or sensitive data is collected
+- **PostHog Integration**: Wrapper around PostHog Python client
+- **Event Schemas**: Structured event types for session summaries, performance benchmarks, and semantic validation  
+- **Privacy Filtering**: Automatic privacy filtering via `serialize_for_telemetry()` on data models
 - **Baseline Comparison**: Calculator for estimating naive search approaches vs CodeWeaver
 - **Configuration**: Easy opt-out mechanism via environment variables or config files
 
@@ -124,40 +124,39 @@ src/codeweaver/telemetry/
 ├── client.py             # PostHog client wrapper
 ├── config.py             # Configuration settings
 ├── events.py             # Event schemas
-├── privacy.py            # Privacy filtering
 └── comparison.py         # Baseline comparison
 ```
 
-## Privacy Filter
+## Privacy Filtering
 
-The privacy filter automatically validates all events before sending:
+Privacy filtering is now handled automatically via the `serialize_for_telemetry()` method on BasedModel and DataclassSerializationMixin objects. Each model defines its sensitive fields via the `_telemetry_keys()` method:
 
 ```python
-from codeweaver.telemetry.privacy import PrivacyFilter
+from codeweaver.core.types import BasedModel, AnonymityConversion, FilteredKey
 
-filter = PrivacyFilter(strict_mode=True)
+class MyModel(BasedModel):
+    public_data: str = "safe"
+    sensitive_path: str = "/home/user/secret.py"
+    
+    def _telemetry_keys(self):
+        return {
+            FilteredKey("sensitive_path"): AnonymityConversion.HASH,
+        }
 
-event = {
-    "event": "test",
-    "properties": {
-        "total_searches": 10,  # ✅ Allowed
-        "query": "test",       # ❌ Blocked
-    }
-}
-
-# Validate before sending
-if filter.validate_event(event):
-    client.capture(event["event"], event["properties"])
+model = MyModel()
+telemetry_data = model.serialize_for_telemetry()
+# sensitive_path is now hashed, not exposed as raw value
 ```
 
-### Disallowed Keys
+### Anonymity Conversion Methods
 
-The following keys are NEVER allowed in telemetry:
-
-- `query`, `search`, `term`, `content`, `code`, `snippet`
-- `path`, `file`, `filename`, `directory`, `folder`
-- `repository`, `repo`, `project`
-- `user`, `username`, `email`, `name`, `id`, `ip`, `host`
+- **FORBIDDEN**: Completely exclude field from telemetry
+- **BOOLEAN**: Convert to boolean presence/absence  
+- **COUNT**: Convert to count (e.g., list length)
+- **HASH**: Hash the value for anonymity
+- **DISTRIBUTION**: Convert to distribution of values
+- **AGGREGATE**: Aggregate values (e.g., sum)
+- **TEXT_COUNT**: Convert text to character count
 
 ## Baseline Comparison
 
@@ -250,13 +249,13 @@ SemanticValidationEvent(
 Run telemetry tests:
 
 ```bash
-pytest tests/telemetry/ -v
+pytest tests/unit/telemetry/ -v
 ```
 
-Privacy filter tests are marked as critical:
+Privacy serialization tests verify filtering works correctly:
 
 ```bash
-pytest tests/telemetry/test_privacy.py -v -m telemetry
+pytest tests/unit/telemetry/test_privacy_serialization.py -v -m telemetry
 ```
 
 ## Development
@@ -280,23 +279,30 @@ CODEWEAVER_POSTHOG_API_KEY="phc_..." python scripts/testing/metrics-poc.py --sen
 1. Create event class in `events.py`:
 
 ```python
-@dataclass
-class MyCustomEvent:
+from codeweaver.core.types import DATACLASS_CONFIG, DataclassSerializationMixin
+from pydantic.dataclasses import dataclass
+
+@dataclass(config=DATACLASS_CONFIG)
+class MyCustomEvent(DataclassSerializationMixin):
     """My custom telemetry event."""
     
-    my_metric: NonNegativeInt
+    my_metric: int
+    
+    def _telemetry_keys(self):
+        return None  # No sensitive fields
     
     def to_posthog_event(self) -> tuple[str, dict]:
         return ("my_custom_event", {"my_metric": self.my_metric})
 ```
 
-2. Validate privacy:
+2. Add test in test file:
 
 ```python
-# Add test in test_privacy.py
-def test_my_custom_event_privacy(privacy_filter):
-    event = {"event": "my_custom_event", "properties": {"my_metric": 10}}
-    assert privacy_filter.validate_event(event)
+def test_my_custom_event_serializes():
+    event = MyCustomEvent(my_metric=10)
+    serialized = event.serialize_for_telemetry()
+    assert "my_metric" in serialized
+    assert serialized["my_metric"] == 10
 ```
 
 3. Use in application:
@@ -317,7 +323,6 @@ All settings use `CODEWEAVER_` prefix:
 | `POSTHOG_HOST` | str | https://app.posthog.com | PostHog host |
 | `BATCH_SIZE` | int | 10 | Events per batch |
 | `BATCH_INTERVAL_SECONDS` | int | 60 | Batch interval |
-| `STRICT_PRIVACY_MODE` | bool | true | Extra privacy validation |
 
 ## Troubleshooting
 
@@ -344,22 +349,25 @@ logging.basicConfig(level=logging.DEBUG)
 1. Ensure `client.shutdown()` is called (flushes pending events)
 2. Check PostHog dashboard for event name
 3. Verify API key is correct
-4. Check for privacy filter rejections in logs
 
-### Privacy Validation Failures
+### Privacy Concerns
 
-If events are rejected:
+All telemetry events use `serialize_for_telemetry()` which:
+- Filters sensitive fields based on `_telemetry_keys()` mappings
+- Applies anonymization methods (HASH, COUNT, BOOLEAN, etc.)
+- Excludes FORBIDDEN fields completely
 
-1. Check logs for specific reason
-2. Ensure no disallowed keys in properties
-3. Verify strings don't look like paths or code
-4. Review `privacy.py` DISALLOWED_KEYS list
+To verify what data is sent:
+```python
+event = MyEvent(...)
+print(event.serialize_for_telemetry())
+```
 
 ## Links
 
 - [Implementation Plan](../../../plans/telemetry-metrics-implementation-plan.md)
 - [POC Script](../../../scripts/testing/metrics-poc.py)
-- [Privacy Tests](../../../tests/telemetry/test_privacy.py)
+- [Privacy Tests](../../../tests/unit/telemetry/test_privacy_serialization.py)
 - [PostHog Documentation](https://posthog.com/docs)
 
 ## License
