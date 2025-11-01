@@ -25,8 +25,8 @@ from codeweaver.core.types import (
 )
 from codeweaver.telemetry.events import (
     PerformanceBenchmarkEvent,
-    SessionSummaryEvent,
     SemanticValidationEvent,
+    SessionSummaryEvent,
 )
 
 
@@ -76,8 +76,10 @@ class TestBasedModelPrivacySerialization:
     def test_basedmodel_counts_items(self) -> None:
         """Test that COUNT conversion returns count of items."""
 
+        from pydantic import Field
+
         class TestModel(BasedModel):
-            items: list[str] = ["a", "b", "c"]
+            items: list[str] = Field(default_factory=lambda: ["a", "b", "c"])
 
             def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
                 return {
@@ -111,8 +113,10 @@ class TestBasedModelPrivacySerialization:
     def test_basedmodel_distribution(self) -> None:
         """Test that DISTRIBUTION conversion returns value distribution."""
 
+        from pydantic import Field
+
         class TestModel(BasedModel):
-            languages: list[str] = ["python", "rust", "python", "go"]
+            languages: list[str] = Field(default_factory=lambda: ["python", "rust", "python", "go"])
 
             def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
                 return {
@@ -127,6 +131,7 @@ class TestBasedModelPrivacySerialization:
         assert serialized["languages"]["python"] == 2
         assert serialized["languages"]["rust"] == 1
         assert serialized["languages"]["go"] == 1
+        assert serialized["languages"]["go"] == 1
 
     def test_basedmodel_no_telemetry_keys(self) -> None:
         """Test that models without telemetry keys serialize normally."""
@@ -135,7 +140,7 @@ class TestBasedModelPrivacySerialization:
             field1: str = "value1"
             field2: int = 42
 
-            def _telemetry_keys(self) -> None:
+            def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
                 return None
 
         model = TestModel()
@@ -173,13 +178,11 @@ class TestDataclassPrivacySerialization:
     def test_dataclass_counts_items(self) -> None:
         """Test that COUNT conversion works for dataclasses."""
 
+        from pydantic import Field
+
         @dataclass(config=DATACLASS_CONFIG)
         class TestDataclass(DataclassSerializationMixin):
-            items: list[str] = None  # type: ignore
-
-            def __post_init__(self) -> None:
-                if self.items is None:
-                    object.__setattr__(self, "items", ["a", "b", "c"])
+            items: list[str] = Field(default_factory=lambda: ["a", "b", "c"])
 
             def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
                 return {
@@ -309,7 +312,7 @@ class TestTelemetryHandlerOverride:
         class TestModel(BasedModel):
             value: int = 42
 
-            def _telemetry_keys(self) -> None:
+            def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
                 return None
 
             def _telemetry_handler(self, _serialized_self: dict) -> dict:

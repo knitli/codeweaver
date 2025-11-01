@@ -203,7 +203,7 @@ class DataclassSerializationMixin:
                 ),
             )
             for key, value in data.items()
-            if FilteredKey(cast(LiteralStringT, key)) not in excludes
+            if key not in excludes
         }
 
 
@@ -357,7 +357,7 @@ class BasedModel(BaseModel):
                 ),
             )
             for key, value in data.items()
-            if FilteredKey(cast(LiteralStringT, key)) not in excludes
+            if key not in excludes
         }
 
 
