@@ -15,11 +15,8 @@ Tests cover:
 Reference: Quickstart Scenarios 2, 4 (spec lines 84-100)
 Contract: specs/003-our-aim-to/contracts/find_code_mcp_tool.json
 
-**NOTE**: Many tests are currently skipped because find_code implementation
-is temporarily disabled during architectural improvements (see app_bindings.py).
-Tests marked with @pytest.mark.skip will be enabled when find_code is restored.
-
-Tests that do run validate the response structure using the stub implementation.
+Tests validate the find_code tool through both CLI and MCP interfaces,
+ensuring response structure compliance and performance requirements.
 """
 
 from __future__ import annotations
@@ -489,7 +486,6 @@ async def test_no_results_scenario():
 @pytest.mark.integration
 @pytest.mark.asyncio
 @pytest.mark.benchmark
-@pytest.mark.skip(reason="Performance test requires real implementation with embeddings")
 async def test_search_performance(test_project_path: Path):
     """T010: Search performance meets <3s requirement for ≤10k files (FR-037).
 
@@ -560,7 +556,6 @@ async def test_search_response_time_tracking():
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Strategy validation requires real implementation")
 async def test_search_strategy_reporting(test_project_path: Path):
     """T010: Search strategy correctly reported in response.
 

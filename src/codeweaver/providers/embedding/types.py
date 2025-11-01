@@ -8,17 +8,14 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, NamedTuple, cast
+from typing import NamedTuple, cast
 
 from pydantic import UUID7, NonNegativeInt
 
+from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.aliases import LiteralStringT, ModelName, ModelNameT
 from codeweaver.core.types.enum import BaseEnum
 from codeweaver.exceptions import ConfigurationError
-
-
-if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
 
 
 class InvalidEmbeddingModelError(ConfigurationError):

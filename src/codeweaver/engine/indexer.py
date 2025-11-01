@@ -47,7 +47,6 @@ from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.sentinel import Unset
 from codeweaver.engine.checkpoint import CheckpointManager, IndexingCheckpoint
 from codeweaver.engine.chunking_service import ChunkingService
-from codeweaver.exceptions import ConfigurationError
 
 
 logger = logging.getLogger(__name__)

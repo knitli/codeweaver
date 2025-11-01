@@ -17,10 +17,9 @@ from __future__ import annotations
 
 import logging
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.types.aliases import FileExt, LiteralStringT
+from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.engine.chunker.base import BaseChunker
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
 from codeweaver.engine.chunker.exceptions import ParseError
@@ -102,9 +101,12 @@ class ChunkerSelector:
         """
         from pathlib import Path
 
-        file_path = Path(file_path) if not isinstance(file_path, Path) else file_path
-        discovered_file = DiscoveredFile.from_path(file_path)
-        return self.select_for_file(discovered_file)
+        from codeweaver.core.discovery import DiscoveredFile
+
+        file_path = file_path if isinstance(file_path, Path) else Path(file_path)
+        if discovered_file := DiscoveredFile.from_path(file_path):
+            return self.select_for_file(discovered_file)
+        return DelimiterChunker(self.governor, language="unknown")
 
     def select_for_file(self, file: DiscoveredFile) -> BaseChunker:
         """Select best chunker for given file (creates fresh instance).
@@ -179,16 +181,22 @@ class ChunkerSelector:
                     extra={"file_path": str(file.path), "language": str(language)},
                 )
         # Delimiter fallback for unsupported languages
-        language_str = language.value if isinstance(language, SemanticSearchLanguage) else language
+        language_repr = (
+            language.variable
+            if isinstance(language, SemanticSearchLanguage | ConfigLanguage)
+            else language
+        )
         logger.info(
             "Using DelimiterChunker for %s (detected language: %s)",
             file.path,
-            language_str,
-            extra={"file_path": str(file.path), "detected_language": language_str},
+            language_repr,
+            extra={"file_path": str(file.path), "detected_language": language_repr},
         )
-        return DelimiterChunker(self.governor, language=language_str)
+        return DelimiterChunker(self.governor, language=language_repr)
 
-    def _detect_language(self, file: DiscoveredFile) -> SemanticSearchLanguage | str:
+    def _detect_language(
+        self, file: DiscoveredFile
+    ) -> SemanticSearchLanguage | ConfigLanguage | str:
         """Detect language from file extension.
 
         Uses the SemanticSearchLanguage.from_extension() method to map file
@@ -216,19 +224,7 @@ class ChunkerSelector:
         ext = file.path.suffix
 
         # SemanticSearchLanguage.from_extension returns None for unknown
-        result = SemanticSearchLanguage.from_extension(FileExt(cast(LiteralStringT, ext)))
-
-        if result is None:
-            # Check custom language mappings from settings
-            ext_str = ext.lstrip(".").lower()
-            if self.governor.settings is not None and self.governor.settings.custom_languages:
-                # Custom languages map language names to families, not extensions to languages
-                # So we just return the extension string for now
-                # TODO: Implement proper extension-to-language mapping when needed
-                return ext_str
-            return ext_str
-
-        return result
+        return file.ext_kind.language if file.ext_kind else ext.lstrip(".").lower()
 
 
 class GracefulChunker(BaseChunker):

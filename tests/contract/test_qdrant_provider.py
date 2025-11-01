@@ -7,12 +7,14 @@
 These tests verify that QdrantVectorStoreProvider correctly implements the
 VectorStoreProvider interface and provides Qdrant-specific functionality.
 
-Requires: Local Qdrant instance running on localhost:6333 or use docker:
-    docker run -p 6333:6333 qdrant/qdrant:latest
+Uses QdrantTestManager for reliable test instance management with:
+- Automatic port detection (won't interfere with existing instances)
+- Unique collections per test
+- Automatic cleanup after tests
+- Optional authentication support
 """
 
 from pathlib import Path
-from uuid import uuid4
 
 import pytest
 
@@ -25,45 +27,45 @@ from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
 
-# Mark all tests in this module as requiring Qdrant
-
-
 @pytest.fixture
-async def qdrant_config():
-    """Provide test Qdrant configuration."""
-    return {
-        "url": "http://localhost:6334",
-        "collection_name": f"test_contract_{uuid4().hex[:8]}",
+async def qdrant_provider(qdrant_test_manager):
+    """Create a QdrantVectorStoreProvider instance using test manager."""
+    from unittest.mock import MagicMock
+
+    # Create test collection with both dense and sparse vectors
+    collection_name = qdrant_test_manager.create_collection_name("contract")
+    await qdrant_test_manager.create_collection(
+        collection_name, dense_vector_size=768, sparse_vector_size=1000
+    )
+
+    # Create mock embedder (not used in contract tests, but required by field definition)
+    mock_embedder = MagicMock()
+
+    # Create config for provider
+    config = {
+        "url": qdrant_test_manager.url,
+        "collection_name": collection_name,
         "batch_size": 64,
         "dense_vector_name": "dense",
         "sparse_vector_name": "sparse",
     }
 
-
-@pytest.fixture
-async def qdrant_provider(qdrant_config):
-    """Create a QdrantVectorStoreProvider instance for testing."""
-    from unittest.mock import MagicMock
-
-    # Create a mock embedder (not used in contract tests, but required by field definition)
-    mock_embedder = MagicMock()
-
     # Use model_construct to bypass validation and create instance
     provider = QdrantVectorStoreProvider.model_construct(
-        config=qdrant_config, _embedder=mock_embedder, _reranking=None, _client=None, _metadata=None
+        config=config, _embedder=mock_embedder, _reranking=None, _client=None, _metadata=None
     )
     await provider._initialize()
-    yield provider
-    # Cleanup: delete test collection
-    try:
-        await provider._client.delete_collection(collection_name=qdrant_config["collection_name"])
-    except Exception:
-        pass
+
+    yield provider  # noqa: PT022  # The fixture is an async context manager, so it cleans up after yield
+
+    # Cleanup handled by test manager
 
 
 @pytest.fixture
 def sample_chunk():
     """Create a sample CodeChunk for testing."""
+    from codeweaver.common.utils.utils import uuid7
+
     # Use model_construct to bypass Pydantic validation and avoid AstThing forward reference issues
     return CodeChunk.model_construct(
         chunk_name="test.py:test_function",
@@ -74,7 +76,7 @@ def sample_chunk():
             "dense": [0.1, 0.2, 0.3] * 256,  # 768-dim vector
             "sparse": {"indices": [1, 5, 10], "values": [0.8, 0.6, 0.4]},
         },
-        line_range=Span(start=1, end=2),
+        line_range=Span(start=1, end=2, _source_id=uuid7()),
     )
 
 
@@ -135,6 +137,10 @@ class TestQdrantProviderContract:
 
     async def test_upsert_batch_of_chunks(self, qdrant_provider):
         """Test upsert with multiple chunks."""
+        from uuid import uuid4
+
+        from codeweaver.common.utils.utils import uuid7
+
         chunks = [
             CodeChunk.model_construct(
                 chunk_id=uuid4(),
@@ -143,7 +149,7 @@ class TestQdrantProviderContract:
                 language=Language.PYTHON,
                 content=f"def func_{i}(): pass",
                 embeddings={"dense": [float(i)] * 768},
-                line_range=Span(start=1, end=1),
+                line_range=Span(start=1, end=1, _source_id=uuid7()),
             )
             for i in range(10)
         ]
@@ -197,10 +203,11 @@ class TestQdrantProviderContract:
             r.chunk.chunk_name != sample_chunk.chunk_name for r in results
         )
 
-    async def test_collection_property(self, qdrant_provider, qdrant_config):
+    async def test_collection_property(self, qdrant_provider):
         """Test collection property returns configured collection name."""
-        assert qdrant_provider.collection == qdrant_config["collection_name"]
+        # Collection name should start with "contract-"
+        assert qdrant_provider.collection.startswith("contract-")
 
-    async def test_base_url_property(self, qdrant_provider, qdrant_config):
+    async def test_base_url_property(self, qdrant_provider, qdrant_test_manager):
         """Test base_url property returns Qdrant URL."""
-        assert qdrant_provider.base_url == qdrant_config["url"]
+        assert qdrant_provider.base_url == qdrant_test_manager.url

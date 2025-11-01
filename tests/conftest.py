@@ -6,7 +6,6 @@
 """Global pytest configuration and fixtures for CodeWeaver tests."""
 
 from pathlib import Path
-from uuid import uuid4
 
 import pytest
 
@@ -18,33 +17,8 @@ from codeweaver.core.metadata import ChunkKind, ExtKind
 # ===========================================================================
 # *                    Test Configuration
 # ===========================================================================
-
-
-def get_test_qdrant_config(collection_suffix: str = "") -> dict:
-    """Get test-specific Qdrant configuration.
-
-    Uses local Qdrant container at localhost:6336 without authentication.
-
-    Args:
-        collection_suffix: Optional suffix for collection name to ensure uniqueness
-
-    Returns:
-        Configuration dict for QdrantVectorStoreProvider
-    """
-    # Use local Qdrant container without auth at port 6336
-    config = {
-        "url": "http://localhost:6336",
-        "prefer_grpc": False,  # Use REST API
-    }
-
-    # Set test-specific collection name
-    base_name = "codeweaver-test"
-    if collection_suffix:
-        config["collection_name"] = f"{base_name}-{collection_suffix}"
-    else:
-        config["collection_name"] = f"{base_name}-{uuid4().hex[:8]}"
-
-    return config
+# Note: Qdrant configuration now handled by qdrant_test_manager fixture
+# See tests/qdrant_test_manager.py for details
 
 
 # ===========================================================================
@@ -74,12 +48,6 @@ def initialize_test_settings():
 
     # Cleanup: reset settings after test
     reset_settings()
-
-
-@pytest.fixture
-async def qdrant_test_config():
-    """Provide test-specific Qdrant configuration."""
-    return get_test_qdrant_config()
 
 
 @pytest.fixture
@@ -113,6 +81,115 @@ def temp_test_file(tmp_path: Path):
     test_file = tmp_path / "test_code.py"
     test_file.write_text("def test_function():\n    pass\n")
     return test_file
+
+
+# ===========================================================================
+# *                    Qdrant Test Instance Management
+# ===========================================================================
+
+
+@pytest.fixture
+async def qdrant_test_manager(tmp_path: Path):
+    """Provide a QdrantTestManager for integration tests.
+
+    This fixture:
+    - Uses test-specific environment variables (QDRANT_TEST_*) to prevent pollution
+    - Scans ports 6333-6400 for running Qdrant instances
+    - Auto-starts Docker container if no instance found (can be disabled)
+    - Finds first instance accessible without authentication
+    - Creates unique collections per test
+    - Automatically cleans up collections and containers after test
+
+    Environment Variables (all optional):
+        QDRANT_TEST_URL: Direct URL override (e.g., http://localhost:6336)
+        QDRANT_TEST_HOST: Test host (default: localhost)
+        QDRANT_TEST_PORT: Test port override (e.g., 6336)
+        QDRANT_TEST_API_KEY: Test-specific API key
+        QDRANT_TEST_SKIP_DOCKER: Set to '1' or 'true' to disable auto-start
+        QDRANT_TEST_IMAGE: Custom Docker image (default: qdrant/qdrant:latest)
+        QDRANT_TEST_CONTAINER_NAME: Custom container name (default: qdrant-test)
+
+    Usage:
+        async def test_something(qdrant_test_manager):
+            async with qdrant_test_manager.collection_context() as (client, collection):
+                # Use client and collection
+                await client.upsert(collection, points=[...])
+                # Cleanup automatic
+    """
+    from tests.qdrant_test_manager import QdrantTestManager
+
+    # Create manager with unique storage path for this test
+    storage_path = tmp_path / "qdrant_storage"
+    storage_path.mkdir(exist_ok=True)
+
+    # Try to find an accessible Qdrant instance by scanning ports
+    # This ensures we find an unauthenticated instance (e.g., 6336) not an auth-required one (e.g., 6333)
+    import socket
+
+    manager = None
+    for port in range(6333, 6401):  # Scan 6333-6400
+        # Quick check: is port in use?
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(0.1)  # Very quick check
+            if sock.connect_ex(("localhost", port)) != 0:
+                # Nothing listening on this port, skip
+                continue
+
+        # Port has something running, try it as Qdrant
+        try:
+            test_manager = QdrantTestManager(port=port, storage_path=storage_path, auto_start_docker=False)
+            # Verify this instance is accessible without auth
+            if await test_manager.verify_connection():
+                manager = test_manager
+                break
+            # Not accessible, try next port
+            await test_manager.close()
+        except Exception:
+            # Error with this port, try next
+            continue
+
+    # If no accessible instance found, try Docker auto-start
+    if manager is None:
+        try:
+            manager = QdrantTestManager(storage_path=storage_path, auto_start_docker=True)
+            if not await manager.verify_connection():
+                pytest.skip(
+                    "No accessible Qdrant instance found and Docker auto-start failed. "
+                    "Start unauthenticated instance with: docker run -p 6336:6333 qdrant/qdrant:latest"
+                )
+        except RuntimeError as e:
+            pytest.skip(str(e))
+
+    yield manager
+
+    # Cleanup after test (including Docker container if we started it)
+    await manager.close()
+
+
+@pytest.fixture
+async def qdrant_test_client(qdrant_test_manager):
+    """Provide a connected Qdrant client for testing.
+
+    This is a convenience fixture that just returns the client.
+    Use qdrant_test_manager.collection_context() for collection management.
+    """
+    return await qdrant_test_manager.ensure_client()
+
+
+@pytest.fixture
+async def qdrant_test_collection(qdrant_test_manager):
+    """Provide a test collection with automatic cleanup.
+
+    Yields:
+        Tuple of (client, collection_name)
+
+    Usage:
+        async def test_something(qdrant_test_collection):
+            client, collection = qdrant_test_collection
+            await client.upsert(collection, points=[...])
+    """
+    async with qdrant_test_manager.collection_context() as (client, collection):
+        yield client, collection
 
 
 # ===========================================================================

@@ -33,7 +33,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from codeweaver.common.registry import ProviderRegistry
 from codeweaver.common.statistics import SessionStatistics
 from codeweaver.engine.indexer import Indexer, IndexingStats
 from codeweaver.server.health_models import (
@@ -120,13 +119,14 @@ def mock_provider_registry(mocker) -> MagicMock:
     def get_provider_enum_for(provider_type: str):
         if provider_type == "vector_store":
             return vector_store_enum
-        elif provider_type == "embedding":
+        if provider_type == "embedding":
             return embedding_provider_enum
-        elif provider_type == "sparse_embedding":
+        if provider_type == "sparse_embedding":
             return sparse_provider_enum
-        elif provider_type == "reranking":
+        if provider_type == "reranking":
             return reranking_provider_enum
         return None
+
     registry.get_provider_enum_for.side_effect = get_provider_enum_for
 
     # Mock embedding provider with circuit breaker
@@ -160,13 +160,14 @@ def mock_provider_registry(mocker) -> MagicMock:
     def get_provider_instance(enum_value, provider_type: str, singleton: bool = True):
         if provider_type == "vector_store":
             return vector_store
-        elif provider_type == "embedding":
+        if provider_type == "embedding":
             return embedding_instance
-        elif provider_type == "sparse_embedding":
+        if provider_type == "sparse_embedding":
             return sparse_instance
-        elif provider_type == "reranking":
+        if provider_type == "reranking":
             return reranking_instance
         return None
+
     registry.get_provider_instance.side_effect = get_provider_instance
 
     return registry
@@ -358,19 +359,23 @@ async def test_health_status_unhealthy(health_service: HealthService, mocker):
     When: get_health_response() called
     Then: Status is 'unhealthy' (no search functionality available)
     """
+
     # Mock vector store as down using unified API
     def failing_get_provider_instance(enum_value, provider_type: str, singleton: bool = True):
         if provider_type == "vector_store":
             raise RuntimeError("Vector store unavailable")
         # Return other providers normally
-        elif provider_type == "embedding":
+        if provider_type == "embedding":
             return health_service._provider_registry.get_embedding_provider_instance()
-        elif provider_type == "sparse_embedding":
+        if provider_type == "sparse_embedding":
             return health_service._provider_registry.get_sparse_embedding_provider_instance()
-        elif provider_type == "reranking":
+        if provider_type == "reranking":
             return health_service._provider_registry.get_reranking_provider_instance()
         return None
-    health_service._provider_registry.get_provider_instance.side_effect = failing_get_provider_instance
+
+    health_service._provider_registry.get_provider_instance.side_effect = (
+        failing_get_provider_instance
+    )
 
     response = await health_service.get_health_response()
 

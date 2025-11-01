@@ -9,30 +9,32 @@ Validates acceptance criteria spec.md:72
 """
 
 from pathlib import Path
-from uuid import uuid4
 
 import pytest
 
+from codeweaver.common.utils.utils import uuid7
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
-from tests.conftest import create_test_chunk_with_embeddings, get_test_qdrant_config
+from tests.conftest import create_test_chunk_with_embeddings
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
 
 @pytest.fixture
-async def qdrant_provider():
+async def qdrant_provider(qdrant_test_manager):
     """Create Qdrant provider for testing."""
-    config = get_test_qdrant_config("hybrid")
+    # Create unique collection
+    collection_name = qdrant_test_manager.create_collection_name("hybrid")
+    await qdrant_test_manager.create_collection(
+        collection_name, dense_vector_size=768, sparse_vector_size=1000
+    )
+
+    config = {"url": qdrant_test_manager.url, "collection_name": collection_name}
     provider = QdrantVectorStoreProvider(config=config)
     await provider._initialize()
-    yield provider
-    # Cleanup
-    try:
-        await provider._client.delete_collection(collection_name=config["collection_name"])
-    except Exception:
-        pass
+    return provider
+    # Cleanup handled by test manager
 
 
 async def test_store_hybrid_embeddings(qdrant_provider):
@@ -45,7 +47,7 @@ async def test_store_hybrid_embeddings(qdrant_provider):
     """
     # Create chunk with both dense and sparse embeddings
     chunk = create_test_chunk_with_embeddings(
-        chunk_id=uuid4(),
+        chunk_id=uuid7(),
         chunk_name="auth.py:authenticate",
         file_path=Path("src/auth.py"),
         language=Language.PYTHON,

@@ -239,7 +239,11 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
                 sample_item = self.value_type()
         if not sample_item:
             return lambda item: item  # no-op copy
-        if isinstance(sample_item, list | set | tuple):
+        # Tuples (including NamedTuples) are immutable, no copy needed
+        if isinstance(sample_item, tuple):
+            return lambda item: item
+        # Lists and sets have .copy() method
+        if isinstance(sample_item, list | set):
             return lambda item: item.copy()  # pyright: ignore[reportUnknownMemberType, reportUnknownLambdaType, reportAttributeAccessIssue]
         if copy_strategy := self._trial_and_error_copy(sample_item):
             if copy_strategy == "deepcopy":

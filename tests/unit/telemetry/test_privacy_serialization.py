@@ -44,9 +44,7 @@ class TestBasedModelPrivacySerialization:
             sensitive_field: str = "secret_value"
 
             def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-                return {
-                    FilteredKey("sensitive_field"): AnonymityConversion.FORBIDDEN,
-                }
+                return {FilteredKey("sensitive_field"): AnonymityConversion.FORBIDDEN}
 
         model = TestModel()
         serialized = model.serialize_for_telemetry()
@@ -62,9 +60,7 @@ class TestBasedModelPrivacySerialization:
             has_value: str = "some_string"
 
             def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-                return {
-                    FilteredKey("has_value"): AnonymityConversion.BOOLEAN,
-                }
+                return {FilteredKey("has_value"): AnonymityConversion.BOOLEAN}
 
         model = TestModel()
         serialized = model.serialize_for_telemetry()
@@ -82,9 +78,7 @@ class TestBasedModelPrivacySerialization:
             items: list[str] = Field(default_factory=lambda: ["a", "b", "c"])
 
             def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-                return {
-                    FilteredKey("items"): AnonymityConversion.COUNT,
-                }
+                return {FilteredKey("items"): AnonymityConversion.COUNT}
 
         model = TestModel()
         serialized = model.serialize_for_telemetry()
@@ -99,9 +93,7 @@ class TestBasedModelPrivacySerialization:
             path: str = "/home/user/secret.py"
 
             def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-                return {
-                    FilteredKey("path"): AnonymityConversion.HASH,
-                }
+                return {FilteredKey("path"): AnonymityConversion.HASH}
 
         model = TestModel()
         serialized = model.serialize_for_telemetry()
@@ -119,9 +111,7 @@ class TestBasedModelPrivacySerialization:
             languages: list[str] = Field(default_factory=lambda: ["python", "rust", "python", "go"])
 
             def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-                return {
-                    FilteredKey("languages"): AnonymityConversion.DISTRIBUTION,
-                }
+                return {FilteredKey("languages"): AnonymityConversion.DISTRIBUTION}
 
         model = TestModel()
         serialized = model.serialize_for_telemetry()
@@ -164,9 +154,7 @@ class TestDataclassPrivacySerialization:
             sensitive_field: str = "secret_value"
 
             def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-                return {
-                    FilteredKey("sensitive_field"): AnonymityConversion.FORBIDDEN,
-                }
+                return {FilteredKey("sensitive_field"): AnonymityConversion.FORBIDDEN}
 
         instance = TestDataclass()
         serialized = instance.serialize_for_telemetry()
@@ -185,9 +173,7 @@ class TestDataclassPrivacySerialization:
             items: list[str] = Field(default_factory=lambda: ["a", "b", "c"])
 
             def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-                return {
-                    FilteredKey("items"): AnonymityConversion.COUNT,
-                }
+                return {FilteredKey("items"): AnonymityConversion.COUNT}
 
         instance = TestDataclass()
         serialized = instance.serialize_for_telemetry()

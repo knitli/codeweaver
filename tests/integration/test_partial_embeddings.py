@@ -9,40 +9,44 @@ Validates edge case spec.md:94
 """
 
 from pathlib import Path
-from uuid import uuid4
 
 import pytest
 
-from codeweaver.core.chunks import CodeChunk
+from codeweaver.common.utils.utils import uuid7
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+from tests.conftest import create_test_chunk_with_embeddings
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
 
-async def test_partial_embeddings():
+async def test_partial_embeddings(qdrant_test_manager):
     """
     User Story: Handle cases where dense embedding generation fails.
 
     Edge Case: Partial embedding failure
     Then: Store chunk with sparse-only and mark as 'incomplete'
     """
-    config = {"url": "http://localhost:6333", "collection_name": f"test_partial_{uuid4().hex[:8]}"}
+    # Create unique collection
+    collection_name = qdrant_test_manager.create_collection_name("partial")
+    await qdrant_test_manager.create_collection(
+        collection_name, dense_vector_size=768, sparse_vector_size=1000
+    )
+
+    config = {"url": qdrant_test_manager.url, "collection_name": collection_name}
     provider = QdrantVectorStoreProvider(config=config)
     await provider._initialize()
 
     # Create chunk with sparse-only embedding (dense failed)
-    chunk = CodeChunk(
-        chunk_id=uuid4(),
+    chunk = create_test_chunk_with_embeddings(
+        chunk_id=uuid7(),
         chunk_name="partial.py:func",
         file_path=Path("partial.py"),
         language=Language.PYTHON,
         content="function with failed dense embedding",
-        embeddings={
-            "dense": None,  # Dense embedding generation failed
-            "sparse": {"indices": [1, 2, 3], "values": [0.8, 0.7, 0.6]},
-        },
+        dense_embedding=None,  # Dense embedding generation failed
+        sparse_embedding={"indices": [1, 2, 3], "values": [0.8, 0.7, 0.6]},
         line_start=1,
         line_end=5,
     )
@@ -60,10 +64,6 @@ async def test_partial_embeddings():
     # For now, just verify the chunk was stored
     assert results[0].chunk is not None
 
-    # Cleanup
-    try:
-        await provider._client.delete_collection(collection_name=config["collection_name"])
-    except Exception:
-        pass
+    # Cleanup handled by test manager
 
     print("✅ Scenario 9 PASSED: Partial embeddings handled correctly")

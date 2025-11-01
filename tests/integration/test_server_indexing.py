@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from watchfiles.main import Change, FileChange
+from watchfiles.main import Change
 
 from codeweaver.engine.indexer import Indexer
 

@@ -80,7 +80,11 @@ def _convert_search_result_to_code_match(result: SearchResult) -> CodeMatch:
         from codeweaver.core.metadata import ExtKind
 
         # Determine ext_kind from file_path or use default
-        ext_kind = ExtKind.from_file(result.file_path) if result.file_path else ExtKind.from_language("text", "other")
+        ext_kind = (
+            ExtKind.from_file(result.file_path)
+            if result.file_path
+            else ExtKind.from_language("text", "other")
+        )
 
         # Create Span for line_range with proper UUID7 source_id
         source_id = uuid7()
@@ -127,16 +131,12 @@ def _convert_search_result_to_code_match(result: SearchResult) -> CodeMatch:
         else:
             # Fallback span - positional args: start, end, source_id
             span = Span(
-                1,
-                chunk.content.count("\n") + 1 if hasattr(chunk, "content") else 1,
-                file.source_id,
+                1, chunk.content.count("\n") + 1 if hasattr(chunk, "content") else 1, file.source_id
             )
     else:
         # Fallback span - positional args: start, end, source_id
         span = Span(
-            1,
-            chunk.content.count("\n") + 1 if hasattr(chunk, "content") else 1,
-            file.source_id,
+            1, chunk.content.count("\n") + 1 if hasattr(chunk, "content") else 1, file.source_id
         )
 
     # Use relevance_score if set, otherwise use base score

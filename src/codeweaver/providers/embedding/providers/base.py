@@ -178,11 +178,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         provider = getattr(type(self), "_provider", None) or caps.provider
 
         # Initialize pydantic model with all required fields
-        super().__init__(
-            _client=client,
-            _caps=caps,
-            _provider=provider,
-        )
+        super().__init__(_client=client, _caps=caps, _provider=provider)
 
         self._model_dump_json = super().model_dump_json
 

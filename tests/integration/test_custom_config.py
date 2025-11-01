@@ -18,7 +18,6 @@ from voyageai.client_async import AsyncClient
 from codeweaver.config.providers import QdrantConfig
 from codeweaver.providers.embedding.capabilities.voyage import get_voyage_embedding_capabilities
 from codeweaver.providers.embedding.providers.voyage import VoyageEmbeddingProvider
-from codeweaver.providers.provider import Provider
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
 
 
@@ -27,9 +26,7 @@ embedding_caps = next(
 )
 
 embedding_provider = VoyageEmbeddingProvider(
-    client=AsyncClient(api_key=os.environ["VOYAGE_API_KEY"]),
-    caps=embedding_caps,
-    kwargs=None,
+    client=AsyncClient(api_key=os.environ["VOYAGE_API_KEY"]), caps=embedding_caps, kwargs=None
 )
 
 
@@ -58,7 +55,11 @@ async def test_custom_configuration():
         "collection_name": "my_custom_collection",
         "batch_size": 128,
     })
-    client = AsyncQdrantClient(**config)
+    # AsyncQdrantClient doesn't accept collection_name - filter it out
+    client_config = {
+        k: v for k, v in config.items() if k != "collection_name" and k != "batch_size"
+    }
+    client = AsyncQdrantClient(**client_config)
     provider = QdrantVectorStoreProvider(client=client, config=config, embedder=embedding_provider)
     await provider._initialize()
 

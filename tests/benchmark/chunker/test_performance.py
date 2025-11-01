@@ -196,10 +196,6 @@ class TestChunkerPerformance:
 
     # Memory profiling
     @pytest.mark.benchmark
-    @pytest.mark.skipif(
-        not pytest.importorskip("memory_profiler", minversion=None),
-        reason="memory_profiler not installed",
-    )
     def test_memory_usage_typical_file(self, selector):
         """Verify memory usage stays under 100MB for typical files.
 
@@ -215,7 +211,8 @@ class TestChunkerPerformance:
         snapshot_before = tracemalloc.take_snapshot()
 
         # Perform chunking
-        chunker = selector.select_for_file_path(file_path)
+        discovered_file = DiscoveredFile(path=file_path)
+        chunker = selector.select_for_file(discovered_file)
         result = chunker.chunk(content, file_path=file_path)
 
         # Measure memory delta
@@ -231,10 +228,6 @@ class TestChunkerPerformance:
         )
 
     @pytest.mark.benchmark
-    @pytest.mark.skipif(
-        not pytest.importorskip("memory_profiler", minversion=None),
-        reason="memory_profiler not installed",
-    )
     def test_memory_usage_large_file(self, selector):
         """Verify memory usage stays under 100MB even for large files.
 
@@ -248,7 +241,8 @@ class TestChunkerPerformance:
         tracemalloc.start()
         snapshot_before = tracemalloc.take_snapshot()
 
-        chunker = selector.select_for_file_path(file_path)
+        discovered_file = DiscoveredFile(path=file_path)
+        chunker = selector.select_for_file(discovered_file)
         result = chunker.chunk(content, file_path=file_path)
 
         snapshot_after = tracemalloc.take_snapshot()

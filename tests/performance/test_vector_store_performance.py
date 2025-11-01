@@ -83,27 +83,27 @@ def create_test_chunks(count: int, files: int = 1, dense_dim: int = 384) -> list
 
 # Fixtures
 @pytest.fixture
-async def qdrant_client() -> AsyncQdrantClient:
+async def qdrant_client(qdrant_test_manager) -> AsyncQdrantClient:
     """Create a test Qdrant client."""
-    client = AsyncQdrantClient(host="localhost", port=6333)
-    yield client
-    await client.close()
+    client = await qdrant_test_manager.ensure_client()
+    return client
+    # Cleanup handled by test manager
 
 
 @pytest.fixture
-async def qdrant_store(qdrant_client: AsyncQdrantClient) -> QdrantVectorStoreProvider:
+async def qdrant_store(qdrant_test_manager) -> QdrantVectorStoreProvider:
     """Create a QdrantVectorStoreProvider for testing."""
+    # Create unique collection
+    collection_name = qdrant_test_manager.create_collection_name("perf_test")
+    await qdrant_test_manager.create_collection(collection_name, dense_vector_size=384)
+
     config = QdrantConfig(
-        url="http://localhost:6333", collection_name=f"perf_test_{uuid4().hex[:8]}", batch_size=64
+        url=qdrant_test_manager.url, collection_name=collection_name, batch_size=64
     )
     store = QdrantVectorStoreProvider(config=config, embedder=None, reranking=None)
     await store._initialize()
-    yield store
-    # Cleanup
-    try:
-        await qdrant_client.delete_collection(config.collection_name)
-    except Exception:
-        pass
+    return store
+    # Cleanup handled by test manager
 
 
 @pytest.fixture

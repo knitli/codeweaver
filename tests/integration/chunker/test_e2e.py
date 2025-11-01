@@ -101,7 +101,6 @@ def sample_files():
     return files
 
 
-@pytest.mark.skip(reason="Parallel file processing needs debugging - tracked separately")
 def test_e2e_multiple_files_parallel_process(sample_files):
     """Integration test: Process multiple files in parallel with ProcessPoolExecutor.
 
@@ -147,7 +146,6 @@ def test_e2e_multiple_files_parallel_process(sample_files):
         )
 
 
-@pytest.mark.skip(reason="Parallel file processing needs debugging - tracked separately")
 def test_e2e_multiple_files_parallel_thread(sample_files):
     """Integration test: Process multiple files in parallel with ThreadPoolExecutor."""
     from codeweaver.config.chunker import ChunkerSettings, PerformanceSettings

@@ -15,7 +15,6 @@ from codeweaver.core.chunks import CodeChunk
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers import EmbeddingProvider
-from codeweaver.providers.embedding.providers.base import default_output_transformer
 from codeweaver.providers.provider import Provider
 
 
