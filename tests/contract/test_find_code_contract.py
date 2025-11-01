@@ -272,10 +272,11 @@ class TestCodeMatchSchema:
             match_type=CodeMatchType.SEMANTIC,
             related_symbols=(),
         )
-        assert match.span == Span(1, 10)
+        assert match.span.start == 1
+        assert match.span.end == 10
 
-        # Invalid: start > end
-        with pytest.raises(ValidationError, match="Start line must be <= end line"):
+        # Invalid: start > end (Span validation catches this)
+        with pytest.raises(ValidationError, match="Start must be less than or equal to end"):
             CodeMatch(
                 file=test_file,
                 content=test_chunk,
@@ -285,8 +286,8 @@ class TestCodeMatchSchema:
                 related_symbols=(),
             )
 
-        # Invalid: start < 1
-        with pytest.raises(ValidationError, match="Line numbers must start from 1"):
+        # Invalid: start < 1 (Pydantic PositiveInt validation catches this)
+        with pytest.raises(ValidationError):
             CodeMatch(
                 file=test_file,
                 content=test_chunk,

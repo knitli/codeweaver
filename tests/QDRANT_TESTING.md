@@ -13,7 +13,7 @@ This guide explains how to run integration tests for the Qdrant vector store pro
 
 CodeWeaver's Qdrant integration testing uses `QdrantTestManager`, a custom fixture system that provides:
 
-- **Port auto-detection**: Finds available ports (6333-6400) to avoid conflicts with existing instances
+- **Port auto-detection**: Finds available ports (6333-6400) to avoid conflicts with existing instances (note: this won't work on wsl)
 - **Test isolation**: Each test gets a unique collection with automatic cleanup
 - **Flexible deployment**: Supports local containers, remote instances, and authentication
 - **Graceful skipping**: Tests are automatically skipped if Qdrant is unavailable

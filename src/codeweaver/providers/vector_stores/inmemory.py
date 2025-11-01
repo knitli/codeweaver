@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, ClassVar, cast, override
 
-from pydantic import UUID7
+from pydantic import UUID4
 from typing_extensions import TypeIs
 
 from codeweaver.common.utils.utils import get_user_config_dir
@@ -46,7 +46,7 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
     Suitable for small codebases (<10k chunks) and testing scenarios.
     """
 
-    config: MemoryConfig
+    config: Any  # Accepts MemoryConfig dict or any dict[str, Any]
     _client: AsyncQdrantClient | None = None
 
     _provider: ClassVar[Provider] = Provider.MEMORY
@@ -74,9 +74,10 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
         object.__setattr__(self, "_shutdown", False)
 
         # Create in-memory Qdrant client
-        self._client = AsyncQdrantClient(
+        client = AsyncQdrantClient(
             location=":memory:", **(self.config.get("client_options", {}))
         )
+        object.__setattr__(self, "_client", client)
 
         # Restore from disk if persistence file exists
         if persist_path.exists():
@@ -112,10 +113,11 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
         Returns:
             bool: True if the client is initialized and ready.
         """
-        return (
-            isinstance(client, AsyncQdrantClient)
-            and getattr(client, "location", None) == ":memory:"
-        )
+        if not isinstance(client, AsyncQdrantClient):
+            return False
+        # Check inner client's location attribute
+        inner_client = getattr(client, "_client", None)
+        return inner_client is not None and getattr(inner_client, "location", None) == ":memory:"
 
     def _telemetry_keys(self) -> None:
         """Get telemetry keys for the provider.
@@ -288,6 +290,9 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
         if not collection_name:
             raise ProviderError("No collection configured")
 
+        # Ensure collection exists
+        await self._ensure_collection(collection_name)
+
         # Convert chunks to Qdrant points
         points: list[PointStruct] = []
         for chunk in chunks:
@@ -359,12 +364,14 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
         if self._auto_persist:  # type: ignore
             await self._persist_to_disk()
 
-    async def delete_by_id(self, ids: list[UUID7]) -> None:
+    async def delete_by_id(self, ids: list[UUID4]) -> None:
         """Delete chunks by their unique identifiers.
 
         Args:
             ids: List of chunk IDs to delete.
         """
+        if not self._ensure_client(self._client):
+            raise ProviderError("Qdrant client not initialized")
         collection_name = self.collection
         if not collection_name:
             raise ProviderError("No collection configured")

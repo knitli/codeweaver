@@ -177,6 +177,7 @@ def test_validate_publish_output_pypi(package_info: dict):
         )
 
 
+@pytest.mark.slow
 @pytest.mark.integration
 def test_local_installation():
     """Verify package can be installed locally from built artifacts."""

@@ -96,7 +96,7 @@ def test_project_path(tmp_path: Path) -> Path:
     for file_path, content in TEST_PROJECT_FILES.items():
         file_full_path = project_root / file_path
         file_full_path.parent.mkdir(parents=True, exist_ok=True)
-        file_full_path.write_text(content)
+        _ = file_full_path.write_text(content)
 
     return project_root
 
@@ -556,7 +556,7 @@ async def test_search_response_time_tracking():
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_search_strategy_reporting(test_project_path: Path):
+async def test_search_strategy_reporting(test_project_path: Path, configured_providers):
     """T010: Search strategy correctly reported in response.
 
     Given: Search with embeddings available

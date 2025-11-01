@@ -103,10 +103,10 @@ class CodeMatch(BasedModel):
     @model_validator(mode="after")
     def validate_span(self) -> CodeMatch:
         """Validate span consistency."""
-        start, end = self.span
-        if start > end:
+        # Access Span attributes directly instead of unpacking
+        if self.span.start > self.span.end:
             raise ValueError("Start line must be <= end line")
-        if start < 1:
+        if self.span.start < 1:
             raise ValueError("Line numbers must start from 1")
         return self
 

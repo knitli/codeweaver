@@ -21,6 +21,7 @@ node = "24"
 "pipx:mike" = "latest"
 "pipx:mteb" = "latest"
 "pipx:reuse" = "latest"
+"pipx:tombi" = "latest"
 pkl = "latest"
 ripgrep = "latest"
 ruff = "latest"
@@ -30,9 +31,6 @@ taplo = "latest"
 typos = "latest"
 uv = "latest"
 yamlfmt = "latest"
-
-[env]
-GH_REPO = "knitli/codeweaver-mcp"
 
 [hooks]
 enter = """
@@ -47,7 +45,6 @@ else
     export CI=false
 fi
 """
-
 leave = """
 print -P "%F{209}[codeweaver]%f Exiting CodeWeaver environment..."
 mise --silent -y deactivate &>/dev/null &&
@@ -55,26 +52,22 @@ print -P "%F{209}[codeweaver]%f Environment deactivated."
 """
 
 [tasks]
-
 sync = """
 #!/bin/bash
 echo "Syncing dependencies..."
 uv sync --extra all --group all-dev
 """
-
 update-dependencies = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Updating dependencies..."
 uv sync --extra all --group all-dev -U
 """
-
 source = """
 #!/usr/bin/env zsh
 # Source the virtual environment
 print -P "%F{209}[codeweaver]%f Sourcing virtual environment..."
 cdroot || true && source .venv/bin/activate
 """
-
 # Development setup
 setup = """
 #!/usr/bin/env zsh
@@ -104,7 +97,6 @@ git config alias.root 'rev-parse --show-toplevel' &&
 alias cdroot='cd $(git root)'
 print -P "%F{209}[codeweaver]%f ✅ Development environment ready!"
 """
-
 update-tools = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Updating tools..."
@@ -114,9 +106,7 @@ mise --silent reshim &&
 mise --silent -y prune
 print -P "%F{209}[codeweaver]%f ✅ Tools updated! 🧰"
 """
-
 install = "uv sync --all-groups"
-
 # Code quality and formatting
 fix = """
 #!/usr/bin/env zsh
@@ -128,13 +118,11 @@ ruff format . &&
 hk fix &&
 print -P "%F{209}[codeweaver]%f ✅ Code fixes applied!"
 """
-
 check = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Running quality checks..."
 hk check
 """
-
 lint = """
 #!/bin/bash
 echo "Running linting checks..."
@@ -144,13 +132,11 @@ else
     uv run ruff check .
 fi
 """
-
 format = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Running formatting checks..."
 hk check
 """
-
 format-fix = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Applying formatting...hold onto your butts 🚬...🦖 "
@@ -166,7 +152,6 @@ if [ -n "$files" ]; then
     taplo format --in-place $files 2>/dev/null || true
 fi
 """
-
 venv = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Setting up Python virtual environment..."
@@ -176,26 +161,22 @@ source .venv/bin/activate || print -P "%F{209}[codeweaver]%f ⚠️  %F{red}Fail
 print -P "%F{209}[codeweaver]%f Running dependency sync..."
 mise run sync
 """
-
 # Testing
 test = """
 #!/bin/bash
 echo "Running tests..."
 uv run pytest tests/ -v
 """
-
 test-cov = """
 #!/bin/bash
 echo "Running tests with coverage..."
 uv run pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v
 """
-
 test-watch = """
 #!/bin/bash
 echo "Running tests in watch mode..."
 uv run pytest tests/ -f --tb=short
 """
-
 # Building and packaging
 build = """
 #!/bin/bash
@@ -203,7 +184,6 @@ echo "Building package..."
 uv build &&
 echo "✅ Package built successfully!"
 """
-
 clean = """
 #!/bin/bash
 echo "Cleaning build artifacts..."
@@ -212,20 +192,17 @@ find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true &&
 find . -type f -name "*.pyc" -delete &&
 echo "✅ Build artifacts cleaned!"
 """
-
 # Documentation
 docs-serve = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Starting %F{209}CodeWeaver%f documentation server..."
 uv run --group docs mkdocs serve
 """
-
 docs-build = """
 #!/bin/bash
 echo "Building documentation..."
 uv run --group docs mkdocs build
 """
-
 # Release and maintenance
 version = """
 #!/usr/bin/env zsh
@@ -234,13 +211,11 @@ print -P "%F{209}[codeweaver]%f 📦 Package version: $(uv run python -c "import
 print -P "%F{209}[codeweaver]%f 🐍 Python version: $(python --version)"
 print -P "%F{209}[codeweaver]%f 🌞 UV version: $(uv --version)"
 """
-
 changelog = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Generating changelog..."
 npm exec changeset version
 """
-
 # Combined workflows
 ci = """
 #!/usr/bin/env zsh
@@ -252,7 +227,6 @@ mise run test-cov &&
 mise run build &&
 print -P "%F{209}[codeweaver]%f ✅ All CI checks passed!"
 """
-
 pre-commit = """
 #!/usr/bin/env bash
 print -P "%F{209}[codeweaver]%f Running %F{209}CodeWeaver%f pre-commit checks 🪝... %F{38} Thanks for your contributions! You're pretty cool.%f 🚀" &&
@@ -262,9 +236,7 @@ hk check || print -P "%F{209}[codeweaver]%f ⚠️  %F{red}You need to fix some 
 git add . &&
 print -P "%F{209}[codeweaver]%f ✅ %F{green}All pre-commit checks passed! You're awesome!%f 🎉 ... and they said the Kobiyashi Maru was unwinnable! 🖖"
 """
-
-#!SECTION Aliases/Shortcuts for Scripts in scripts/ directory
-
+#! SECTION Aliases/Shortcuts for Scripts in scripts/ directory
 fix-ruff-patterns = """
 #!/bin/bash
 echo "Running ruff pattern fixer..."
@@ -275,109 +247,91 @@ update-licenses = """
 print -P "%F{209}[codeweaver]%f Updating %F{209}CodeWeaver%f license headers :..."
 uv run -s scripts/code-quality/update-licenses.py --interactive "${*}"
 """
-
 dev-shell-init = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Initializing development shell..."
 ./scripts/dev-env/dev-shell-init.zsh
 """
-
 install-mise = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Installing Mise..."
 ./scripts/dev-env/install-mise.sh
 """
-
 vscode-terminal-bootstrap = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Bootstrapping VSCode terminal..."
 ./scripts/dev-env/vscode-terminal-bootstrap.sh
 """
-
 add-plaintext-to-codeblock = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Adding 'plaintext' to unmarked code blocks in markdown files..."
 uv run -s scripts/docs/add-plaintext-to-codeblock.py
 """
-
 gen-ref-pages = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Generating docs reference pages..."
 uv run -s scripts/docs/gen-ref-pages.py
 """
-
 analyze-grammar-structure = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Analyzing grammar structure..."
 uv run -s scripts/language-support/analyze-grammar-structure.py
 """
-
 build-language-mappings = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Building language mappings..."
 uv run -s scripts/language-support/build-language-mappings.py
 """
-
 compare-delimiters = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Comparing delimiters..."
 uv run -s scripts/language-support/compare-delimiters.py
 """
-
 download-ts-grammars = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Downloading tree-sitter grammars..."
 uv run -s scripts/language-support/download-ts-grammars.py "${*}"
 """
-
 generate-delimiters = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Generating delimiters..."
 uv run -s scripts/language-support/generate-delimiters.py
 """
-
 generate-supported-languages = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Generating supported languages..."
 uv run -s scripts/build/generate-supported-languages.py
 """
-
 mteb-to-codeweaver = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Converting MTEB model data to CodeWeaver format..."
 uv run -s scripts/model-data/mteb-to-codeweaver.py "${*}"
 """
-
 apply-test-marks = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Applying test marks to tests..."
 uv run -s scripts/testing/apply-test-marks.py "${*}"
 """
-
 benchmark-detection = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Running benchmark detection..."
 uv run -s scripts/testing/benchmark-detection.py "${*}"
 """
-
 ansi-color-tests = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Checking ANSI color codes..."
 uv run -s scripts/utils/ansi-color-tests.py "${*}"
 """
-
 check-imports = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Checking imports..."
 uv run -s scripts/utils/check-imports.py "${*}"
 """
-
 get-all-exceptions = """
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Getting all exceptions..."
 uv run -s scripts/utils/get-all-exceptions.py "${*}"
 """
-
 
 [tasks.activate]
 run = """eval "$(mise activate)" &>/dev/null"""

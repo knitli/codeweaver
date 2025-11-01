@@ -138,26 +138,45 @@ async def test_sparse_only_fallback(initialize_test_settings):
     """
     from codeweaver.agent_api.find_code import find_code
     from codeweaver.agent_api.models import SearchStrategy
+    from codeweaver.providers.provider import Provider
 
     # Mock embedding provider to fail
-    with patch("codeweaver.common.registry.get_provider_registry") as mock_registry:
+    with patch("codeweaver.agent_api.find_code.get_provider_registry") as mock_registry:
         mock_reg = MagicMock()
         mock_registry.return_value = mock_reg
+
+        # Configure provider enums to indicate both providers exist
+        mock_reg.get_provider_enum_for.side_effect = lambda kind: (
+            Provider.OPENAI if kind == "embedding" else (
+                Provider.FASTEMBED if kind == "sparse_embedding" else (
+                    Provider.QDRANT if kind == "vector_store" else None
+                )
+            )
+        )
 
         # Dense embedding fails
         mock_dense_provider = AsyncMock()
         mock_dense_provider.embed_query.side_effect = ConnectionError("API unavailable")
-        mock_reg.get_embedding_provider_instance.return_value = mock_dense_provider
 
-        # Sparse embedding works
+        # Sparse embedding works - returns batch format list[list[float]]
         mock_sparse_provider = AsyncMock()
-        mock_sparse_provider.embed_query.return_value = {"indices": [1, 2], "values": [0.5, 0.3]}
-        mock_reg.get_sparse_embedding_provider_instance.return_value = mock_sparse_provider
+        mock_sparse_provider.embed_query.return_value = [[0.5, 0.3, 0.2]]
+
+        # get_provider_instance returns appropriate provider based on kind
+        def get_provider_instance_side_effect(provider_enum, kind, singleton=True):
+            if kind == "embedding":
+                return mock_dense_provider
+            elif kind == "sparse_embedding":
+                return mock_sparse_provider
+            elif kind == "vector_store":
+                return mock_vector_store
+            return None
+
+        mock_reg.get_provider_instance.side_effect = get_provider_instance_side_effect
 
         # Vector store works
         mock_vector_store = AsyncMock()
         mock_vector_store.search.return_value = []
-        mock_reg.get_vector_store_provider_instance.return_value = mock_vector_store
 
         # Execute search
         result = await find_code("test query")

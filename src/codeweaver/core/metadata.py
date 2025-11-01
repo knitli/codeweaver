@@ -404,7 +404,7 @@ class ExtLangPair(NamedTuple):
 
 def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
     """Determine the ExtKind based on validated data (`Metadata` extraction)."""
-    if "file_path" in validated_data:
+    if "file_path" in validated_data and validated_data["file_path"] is not None:
         return ExtKind.from_file(validated_data["file_path"])
     source = (
         validated_data.get("source")

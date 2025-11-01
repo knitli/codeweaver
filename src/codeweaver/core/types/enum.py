@@ -483,7 +483,7 @@ class AnonymityConversion(BaseEnum):
             AnonymityConversion.AGGREGATE: lambda v: sum(v) if isinstance(v, list) else v,  # type: ignore
             AnonymityConversion.HASH: lambda v: hash(v),  # type: ignore
             AnonymityConversion.TEXT_COUNT: lambda v: len(v) if isinstance(v, str) else 0,
-            AnonymityConversion.FORBIDDEN: lambda: None,
+            AnonymityConversion.FORBIDDEN: lambda v: None,  # Accept value but return None
         })
         return functions.get(self, lambda v: v)(values)  # type: ignore
 

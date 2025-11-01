@@ -184,26 +184,23 @@ class DataclassSerializationMixin:
             default_group = {
                 key: conversion.filtered(getattr(self, str(key), None))
                 for key, conversion in telemetry_keys.items()
+                if conversion != AnonymityConversion.FORBIDDEN
             }
         data = self.dump_python(
             round_trip=True,
             exclude_none=True,
-            exclude_defaults=True,
-            exclude_unset=True,
             exclude=excludes,
         )
         filtered_group: dict[str, Any] = self._telemetry_handler(data)
         return {
-            # if a key is in the filtered group, use that value
-            key: filtered_group.get(
-                key,
-                (
-                    # otherwise, if it's in the default group, use that value
-                    default_group.get(FilteredKey(cast(LiteralStringT, key)), value)
-                ),
+            key: (
+                # First priority: handler override
+                filtered_group[key]
+                if key in filtered_group
+                # Second priority: filtered conversion from telemetry_keys
+                else default_group.get(FilteredKey(cast(LiteralStringT, key)), value)
             )
             for key, value in data.items()
-            if key not in excludes
         }
 
 
@@ -337,26 +334,23 @@ class BasedModel(BaseModel):
             default_group = {
                 key: conversion.filtered(getattr(self, str(key), None))
                 for key, conversion in telemetry_keys.items()
+                if conversion != AnonymityConversion.FORBIDDEN
             }
         data = self.model_dump(
             round_trip=True,
             exclude_none=True,
-            exclude_defaults=True,
-            exclude_unset=True,
             exclude=excludes,
         )
         filtered_group: dict[str, Any] = self._telemetry_handler(data)
         return {
-            # if a key is in the filtered group, use that value
-            key: filtered_group.get(
-                key,
-                (
-                    # otherwise, if it's in the default group, use that value
-                    default_group.get(FilteredKey(cast(LiteralStringT, key)), value)
-                ),
+            key: (
+                # First priority: handler override
+                filtered_group[key]
+                if key in filtered_group
+                # Second priority: filtered conversion from telemetry_keys
+                else default_group.get(FilteredKey(cast(LiteralStringT, key)), value)
             )
             for key, value in data.items()
-            if FilteredKey(cast(LiteralStringT, key)) not in excludes
         }
 
 

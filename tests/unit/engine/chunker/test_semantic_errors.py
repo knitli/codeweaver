@@ -77,7 +77,7 @@ class TestParseErrors:
 
         discovered_file = DiscoveredFile.from_path(malformed_file)
         with pytest.raises(ParseError) as exc_info:
-            chunker.chunk(content, file=discovered_file)
+            _ = chunker.chunk(content, file=discovered_file)
 
         # Verify error details
         error = exc_info.value
@@ -114,6 +114,7 @@ class TestParseErrors:
 class TestASTDepthErrors:
     """Tests for AST depth limit enforcement."""
 
+    @pytest.mark.slow
     def test_ast_depth_exceeded_error(self, mock_governor: MagicMock) -> None:
         """Verify that deeply nested code raises ASTDepthExceededError.
 
@@ -137,7 +138,7 @@ class TestASTDepthErrors:
 
         discovered_file = DiscoveredFile.from_path(deep_file)
         with pytest.raises(ASTDepthExceededError) as exc_info:
-            chunker.chunk(content, file=discovered_file)
+            _ = chunker.chunk(content, file=discovered_file)
 
         # Verify error details
         error = exc_info.value
@@ -146,6 +147,7 @@ class TestASTDepthErrors:
         assert error.actual_depth > error.max_depth, "Actual depth must exceed limit"
         assert error.file_path == str(deep_file), "Error should track file path"
 
+    @pytest.mark.slow
     def test_ast_depth_error_message_descriptive(self, mock_governor: MagicMock) -> None:
         """Verify that AST depth error messages are clear and actionable.
 
@@ -163,7 +165,7 @@ class TestASTDepthErrors:
 
         discovered_file = DiscoveredFile.from_path(deep_file)
         with pytest.raises(ASTDepthExceededError) as exc_info:
-            chunker.chunk(content, file=discovered_file)
+            _ = chunker.chunk(content, file=discovered_file)
 
         error = exc_info.value
         error_msg = str(error)

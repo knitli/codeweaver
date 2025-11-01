@@ -89,6 +89,8 @@ class TestQdrantProviderContract:
 
         assert issubclass(QdrantVectorStoreProvider, VectorStoreProvider)
 
+    @pytest.mark.qdrant
+    @pytest.mark.asyncio
     async def test_list_collections(self, qdrant_provider):
         """Test list_collections returns list or None."""
         collections = await qdrant_provider.list_collections()
@@ -97,6 +99,9 @@ class TestQdrantProviderContract:
         if isinstance(collections, list):
             assert all(isinstance(name, str) for name in collections)
 
+    @pytest.mark.qdrant
+    @pytest.mark.asyncio
+    @pytest.mark.search
     async def test_search_with_dense_vector(self, qdrant_provider, sample_chunk):
         """Test search with dense vector only."""
         # First upsert a chunk
@@ -110,6 +115,9 @@ class TestQdrantProviderContract:
             assert all(hasattr(r, "chunk") and hasattr(r, "score") for r in results)
             assert all(0.0 <= r.score <= 1.0 for r in results)
 
+    @pytest.mark.qdrant
+    @pytest.mark.asyncio
+    @pytest.mark.search
     async def test_search_with_sparse_vector(self, qdrant_provider, sample_chunk):
         """Test search with sparse vector only."""
         await qdrant_provider.upsert([sample_chunk])
@@ -121,6 +129,9 @@ class TestQdrantProviderContract:
 
         assert isinstance(results, list)
 
+    @pytest.mark.qdrant
+    @pytest.mark.asyncio
+    @pytest.mark.search
     async def test_search_with_hybrid_vectors(self, qdrant_provider, sample_chunk):
         """Test search with both dense and sparse vectors."""
         await qdrant_provider.upsert([sample_chunk])
@@ -135,6 +146,8 @@ class TestQdrantProviderContract:
 
         assert isinstance(results, list)
 
+    @pytest.mark.qdrant
+    @pytest.mark.asyncio
     async def test_upsert_batch_of_chunks(self, qdrant_provider):
         """Test upsert with multiple chunks."""
         from uuid import uuid4
@@ -161,6 +174,8 @@ class TestQdrantProviderContract:
         results = await qdrant_provider.search(vector={"dense": [5.0] * 768})
         assert len(results) > 0
 
+    @pytest.mark.qdrant
+    @pytest.mark.asyncio
     async def test_delete_by_file(self, qdrant_provider, sample_chunk):
         """Test delete_by_file removes chunks for specific file."""
         await qdrant_provider.upsert([sample_chunk])
@@ -174,6 +189,8 @@ class TestQdrantProviderContract:
             r.chunk.file_path != sample_chunk.file_path for r in results
         )
 
+    @pytest.mark.qdrant
+    @pytest.mark.asyncio
     async def test_delete_by_file_idempotent(self, qdrant_provider):
         """Test delete_by_file doesn't error on non-existent file."""
         # Should not raise even if file has no chunks
@@ -190,6 +207,8 @@ class TestQdrantProviderContract:
         results = await qdrant_provider.search(vector={"dense": [0.1, 0.2, 0.3] * 256})
         assert len(results) == 0 or all(r.chunk.chunk_id != sample_chunk.chunk_id for r in results)
 
+    @pytest.mark.qdrant
+    @pytest.mark.asyncio
     async def test_delete_by_name(self, qdrant_provider, sample_chunk):
         """Test delete_by_name removes chunks by name."""
         await qdrant_provider.upsert([sample_chunk])
@@ -203,11 +222,15 @@ class TestQdrantProviderContract:
             r.chunk.chunk_name != sample_chunk.chunk_name for r in results
         )
 
+    @pytest.mark.qdrant
+    @pytest.mark.asyncio
     async def test_collection_property(self, qdrant_provider):
         """Test collection property returns configured collection name."""
         # Collection name should start with "contract-"
         assert qdrant_provider.collection.startswith("contract-")
 
+    @pytest.mark.qdrant
+    @pytest.mark.asyncio
     async def test_base_url_property(self, qdrant_provider, qdrant_test_manager):
         """Test base_url property returns Qdrant URL."""
         assert qdrant_provider.base_url == qdrant_test_manager.url

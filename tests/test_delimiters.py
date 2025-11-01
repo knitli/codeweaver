@@ -280,6 +280,8 @@ class TestLanguageFamilies:
     async def test_python_style_detection(self) -> None:
         """Test Python-style language detection."""
         code = """
+        # Python comment
+        @decorator
         def foo():
             if x > 0:
                 return x
@@ -291,9 +293,13 @@ class TestLanguageFamilies:
     async def test_lisp_style_detection(self) -> None:
         """Test Lisp-style language detection."""
         code = """
-        (defn foo [x]
-            (if (> x 0)
-                x))
+        ;;; Lisp function docstring
+        ;; Another comment
+        (defun foo (x)
+          ;; Local comment
+          (if (> x 0)
+            x
+            nil))
         """
         family = await detect_language_family(code)
         assert family == LanguageFamily.LISP_STYLE
@@ -313,10 +319,11 @@ class TestLanguageFamilies:
     async def test_shell_style_detection(self) -> None:
         """Test Shell-style language detection."""
         code = """
+        #!/bin/bash
         function foo() {
-            if [ $x -gt 0 ]; then
-                echo $x
-            fi
+            for i in 1 2 3; do
+                echo $i
+            done
         }
         """
         family = await detect_language_family(code)

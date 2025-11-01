@@ -214,7 +214,7 @@ queries:
       - src/codeweaver/engine/chunking_service.py
     description: Configuring parallel chunking settings
   # ============================================================================
-  # DOCUMENT Intent Queries (2 queries)
+  # DOCUMENT Intent Queries (4 queries)
   # ============================================================================
   - query: document find_code API interface
     intent: DOCUMENT
@@ -232,3 +232,21 @@ queries:
       - src/codeweaver/providers/provider.py
       - src/codeweaver/providers/embedding/registry.py
     description: Documenting provider architecture
+  - query: document indexing pipeline architecture
+    intent: DOCUMENT
+    precision_target: 5
+    expected_files:
+      - src/codeweaver/engine/indexer.py
+      - src/codeweaver/engine/chunking_service.py
+      - src/codeweaver/engine/chunker/base.py
+      - src/codeweaver/engine/checkpoint.py
+    description: Documenting indexing system flow
+  - query: document MCP server endpoints
+    intent: DOCUMENT
+    precision_target: 5
+    expected_files:
+      - src/codeweaver/server/app_bindings.py
+      - src/codeweaver/server/health_endpoint.py
+      - src/codeweaver/server/server.py
+      - src/codeweaver/agent_api/find_code.py
+    description: Documenting MCP server interface

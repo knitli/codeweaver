@@ -4,42 +4,39 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
 exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".git-rewrite",
-    ".hg",
-    ".ipynb_checkpoints",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pyenv",
-    ".pytest_cache",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    ".vscode",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "site-packages",
-    "venv",
-    "typings",
-    "tests/fixtures/malformed.py",
+  ".bzr",
+  ".direnv",
+  ".eggs",
+  ".git",
+  ".git-rewrite",
+  ".hg",
+  ".ipynb_checkpoints",
+  ".mypy_cache",
+  ".nox",
+  ".pants.d",
+  ".pyenv",
+  ".pytest_cache",
+  ".pytype",
+  ".ruff_cache",
+  ".svn",
+  ".tox",
+  ".venv",
+  ".vscode",
+  "__pypackages__",
+  "_build",
+  "buck-out",
+  "build",
+  "dist",
+  "node_modules",
+  "site-packages",
+  "venv",
+  "typings",
+  "tests/fixtures/malformed.py",
 ]
 extend-include = ["*.ipynb"]
-
-
 fix = true
 line-length = 100
 indent-width = 4
-
 target-version = "py312"
 
 [format]
@@ -47,25 +44,23 @@ docstring-code-format = true
 docstring-code-line-length = 80
 line-ending = "auto"
 indent-style = "space"
-
 skip-magic-trailing-comma = true
-
 exclude = [
-    "**/_vendor",
-    "setuptools/_distutils",
-    "setuptools/config/_validate_pyproject",
-    ".venv",
-    ".git",
-    ".github",
-    ".vscode",
-    ".idea",
-    "dist",
-    "build",
-    "site",
-    "bin",
-    "lib",
-    "include",
-    "docs",
+  "**/_vendor",
+  "setuptools/_distutils",
+  "setuptools/config/_validate_pyproject",
+  ".venv",
+  ".git",
+  ".github",
+  ".vscode",
+  ".idea",
+  "dist",
+  "build",
+  "site",
+  "bin",
+  "lib",
+  "include",
+  "docs",
 ]
 # Enable preview, required for quote-style = "preserve"
 preview = true
@@ -73,90 +68,89 @@ preview = true
 quote-style = "double"
 
 [lint]
-
 fixable = ["ALL"]
 # Almost all rules; but not all https://docs.astral.sh/ruff/rules/
 select = [
-    "A",
-    "ASYNC",
-    "B",
-    "C",
-    "D",
-    "E",
-    "F",
-    "FLY",
-    "FURB",
-    "G",
-    "I",
-    "ICN",
-    "INT",
-    "N",
-    "LOG",
-    "PD",
-    "PERF",
-    "PIE",
-    "PT",
-    "PTH",
-    "PYI",
-    "Q",
-    "RSE",
-    "RET",
-    "S",
-    "SLF",
-    "SLOT",
-    "SIM",
-    "TRY",
-    "RUF",
-    "UP",
-    "YTT",
-    "W",
+  "A",
+  "ASYNC",
+  "B",
+  "C",
+  "D",
+  "E",
+  "F",
+  "FLY",
+  "FURB",
+  "G",
+  "I",
+  "ICN",
+  "INT",
+  "N",
+  "LOG",
+  "PD",
+  "PERF",
+  "PIE",
+  "PT",
+  "PTH",
+  "PYI",
+  "Q",
+  "RSE",
+  "RET",
+  "S",
+  "SLF",
+  "SLOT",
+  "SIM",
+  "TRY",
+  "RUF",
+  "UP",
+  "YTT",
+  "W",
 ]
 extend-select = [
-    "A003",
-    "ANN201",
-    "ANN002",
-    "COM818",
-    "C901",
-    "DTZ005",
-    "DTZ007",
-    "FBT001",
-    "ISC003",
-    "TID252",
-    "TID253",
+  "A003",
+  "ANN201",
+  "ANN002",
+  "COM818",
+  "C901",
+  "DTZ005",
+  "DTZ007",
+  "FBT001",
+  "ISC003",
+  "TID252",
+  "TID253",
 ]
 ignore = [
-    # https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
-    "W191",
-    "E402",
-    "E111",
-    "E114",
-    "E117",
-    "D200",
-    "D205",
-    "D206",
-    "D300",
-    "D417",
-    "E501",
-    "Q000",
-    "Q001",
-    "Q002",
-    "Q003",
-    "PYI051", # redundant annotation with Literal and str -- we like to be explicit here
-    "COM812",
-    "COM819",
-    "ISC001",
-    "ISC002",
-    "D212",
-    "SLF001", # Private member accessed
-    "TRY003",
-    "UP015",  # redundant-open-modes, explicit is preferred
+  # https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
+  "W191",
+  "E402",
+  "E111",
+  "E114",
+  "E117",
+  "D200",
+  "D205",
+  "D206",
+  "D300",
+  "D417",
+  "E501",
+  "Q000",
+  "Q001",
+  "Q002",
+  "Q003",
+  "PYI051",  # redundant annotation with Literal and str -- we like to be explicit here
+  "COM812",
+  "COM819",
+  "ISC001",
+  "ISC002",
+  "D212",
+  "SLF001",  # Private member accessed
+  "TRY003",
+  "UP015",  # redundant-open-modes, explicit is preferred
 ]
 exclude = [
-    ".venv/",
-    "**/_vendor",
-    "setuptools/_distutils",
-    "setuptools/config/_validate_pyproject",
-    "typings",
+  ".venv/",
+  "**/_vendor",
+  "setuptools/_distutils",
+  "setuptools/config/_validate_pyproject",
+  "typings",
 ]
 
 [lint.pydocstyle]
@@ -165,46 +159,45 @@ convention = "google"
 [lint.per-file-ignores]
 # Ignore specific rules for certain files
 "**/validation/**/*.py" = [
-    "S110",   # try-except-pass
-    "TRY301", # abstract raise to an inner function
-    "S101",   # allow assert
-    "SLF001", # Private member accessed
-    "D100",   # missing docstring in public module
-    "D102",   # missing docstring in public class
-    "D103",   # missing docstring in public function
-    "D104",   # missing docstring in public method
-    "D105",   # missing docstring in magic method
-    "D107",   # missing docstring in __init__
-    "G004",   # f-string in logging statement
-    "N806",   # incorrect case for function name
+  "S110",  # try-except-pass
+  "TRY301",  # abstract raise to an inner function
+  "S101",  # allow assert
+  "SLF001",  # Private member accessed
+  "D100",  # missing docstring in public module
+  "D102",  # missing docstring in public class
+  "D103",  # missing docstring in public function
+  "D104",  # missing docstring in public method
+  "D105",  # missing docstring in magic method
+  "D107",  # missing docstring in __init__
+  "G004",  # f-string in logging statement
+  "N806",  # incorrect case for function name
 ]
 "tests/*.py" = [
-    "ANN",
-    "C901",   # too complex
-    "D",
-    "DTZ",
-    "FBT001", # boolean typed positional argument
-    "G004",   # f-string in logging statement
-    "N806",   # incorrect case for function name
-    "PTH",
-    "S",
-    "SIM",
-    "SLF001", # Private member accessed
+  "ANN",
+  "C901",  # too complex
+  "D",
+  "DTZ",
+  "FBT001",  # boolean typed positional argument
+  "G004",  # f-string in logging statement
+  "N806",  # incorrect case for function name
+  "PTH",
+  "S",
+  "SIM",
+  "SLF001",  # Private member accessed
 ]
 "src/codeweaver/testing/**/*.py" = [
-    "ANN",
-    "C901",   # too complex
-    "D",
-    "DTZ",
-    "FBT001", # boolean typed positional argument
-    "G004",   # f-string in logging statement
-    "N806",   # incorrect case for function name
-    "PTH",
-    "S",
-    "SIM",
-    "SLF001", # Private member accessed
+  "ANN",
+  "C901",  # too complex
+  "D",
+  "DTZ",
+  "FBT001",  # boolean typed positional argument
+  "G004",  # f-string in logging statement
+  "N806",  # incorrect case for function name
+  "PTH",
+  "S",
+  "SIM",
+  "SLF001",  # Private member accessed
 ]
-
 
 [lint.isort]
 force-single-line = false

@@ -37,9 +37,35 @@ def mock_discovered_file():
     from codeweaver.common.utils import uuid7
 
     def _make_file(path_str):
+        path = Path(path_str)
+
+        # Create mock stat result
+        mock_stat = Mock()
+        mock_stat.st_size = 1024  # 1KB file size
+
+        # Create mock path with stat() method
+        # Use real Path for integration test since semantic chunker needs to parse the file
+        mock_path = path
+
+        # Override stat() to use mock if needed
+        # For integration tests, we want to use the real file path for parsing
+        # but may need to mock stat for files that don't exist yet
+
+        # Create mock ExtKind
+        from codeweaver.core.language import SemanticSearchLanguage
+
+        mock_ext_kind = Mock()
+        if path.suffix == ".py":
+            mock_ext_kind.language = SemanticSearchLanguage.PYTHON
+        else:
+            mock_ext_kind.language = path.suffix.lstrip(".")
+
+        # Create mock DiscoveredFile
         file = Mock()
-        file.path = Path(path_str)
+        file.path = mock_path
+        file.ext_kind = mock_ext_kind
         file.source_id = uuid7()  # Add source_id for Span validation (UUID7)
+
         return file
 
     return _make_file
@@ -75,7 +101,7 @@ def test_e2e_degradation_chain(mock_governor, mock_discovered_file):
     # (implementation will add fallback logic)
     with pytest.raises(Exception):  # Will fail until fallback implemented
         chunker = selector.select_for_file(file)
-        chunker.chunk(content, file_path=fixture_path)
+        chunker.chunk(content, file=file)
 
 
 # =============================================================================
@@ -101,6 +127,7 @@ def sample_files():
     return files
 
 
+@pytest.mark.slow
 def test_e2e_multiple_files_parallel_process(sample_files):
     """Integration test: Process multiple files in parallel with ProcessPoolExecutor.
 
@@ -146,6 +173,7 @@ def test_e2e_multiple_files_parallel_process(sample_files):
         )
 
 
+@pytest.mark.slow
 def test_e2e_multiple_files_parallel_thread(sample_files):
     """Integration test: Process multiple files in parallel with ThreadPoolExecutor."""
     from codeweaver.config.chunker import ChunkerSettings, PerformanceSettings
@@ -225,7 +253,7 @@ def test_e2e_parallel_error_handling(tmp_path):
     )
 
     # Check if good files are in results (handle both absolute and relative paths)
-    result_paths = {p.resolve() for p in results.keys()}
+    result_paths = {p.resolve() for p in results}
     assert good_file.resolve() in result_paths, f"Good file {good_file} should be processed"
     assert another_good.resolve() in result_paths, (
         f"Another good file {another_good} should be processed"

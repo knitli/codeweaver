@@ -54,7 +54,7 @@ class TestVectorStoreProviderContract:
 
         # Should have no required parameters (only self)
         params = [p for p in sig.parameters.values() if p.name != "self"]
-        assert len(params) == 0, "list_collections should not have parameters"
+        assert not params, "list_collections should not have parameters"
 
         # Should return list[str] | None
         assert "return" in type_hints
@@ -64,7 +64,7 @@ class TestVectorStoreProviderContract:
         """Verify search method signature matches contract."""
         method = VectorStoreProvider.search
         sig = inspect.signature(method)
-        get_type_hints(method)
+        _ = get_type_hints(method)
 
         # Should have vector and query_filter parameters
         params = {p.name: p for p in sig.parameters.values() if p.name != "self"}
