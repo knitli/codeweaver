@@ -7,7 +7,7 @@
 PostHog telemetry client wrapper.
 
 Provides a privacy-aware wrapper around the PostHog Python client with:
-- Automatic privacy filtering
+- Privacy filtering via serialize_for_telemetry() on data models
 - Error handling (telemetry never crashes the application)
 - Easy configuration and opt-out
 - Event batching and throttling
@@ -35,8 +35,9 @@ class PostHogClient:
     """
     Privacy-aware PostHog client wrapper.
 
-    Handles telemetry event sending with automatic privacy filtering,
-    error handling, and configuration management.
+    Handles telemetry event sending with error handling and configuration management.
+    Privacy filtering is handled via serialize_for_telemetry() on BasedModel and
+    DataclassSerializationMixin objects before passing to capture().
 
     Example:
         >>> client = PostHogClient.from_settings()
@@ -55,7 +56,6 @@ class PostHogClient:
         host: str = "https://app.posthog.com",
         *,
         enabled: bool = True,
-        strict_privacy_mode: bool = True,
     ):
         """
         Initialize PostHog client.
@@ -64,7 +64,6 @@ class PostHogClient:
             api_key: PostHog project key (required if enabled)
             host: PostHog host URL
             enabled: Enable telemetry sending
-            strict_privacy_mode: Enable strict privacy validation
         """
         import os
 
@@ -118,43 +117,33 @@ class PostHogClient:
             api_key=settings.posthog_api_key,
             host=settings.posthog_host,
             enabled=settings.telemetry_enabled,
-            strict_privacy_mode=settings.strict_privacy_mode,
         )
 
     def capture(
         self, event: str, properties: dict[str, Any], *, distinct_id: str = "anonymous"
     ) -> None:
         """
-        Send event to PostHog with privacy filtering.
+        Send event to PostHog.
 
         Args:
             event: Event name
-            properties: Event properties dictionary
+            properties: Event properties dictionary (should already be privacy-filtered)
             distinct_id: User identifier (default: "anonymous" for privacy)
 
         Note:
             This method never raises exceptions. All errors are logged
             but do not affect application execution.
+
+            Properties should be privacy-safe. Use serialize_for_telemetry() on
+            objects before passing properties to ensure sensitive data is filtered.
         """
         if not self.enabled or not self._client:
             self.logger.debug("Telemetry disabled, skipping event: %s", event)
             return
 
         try:
-            # Validate event passes privacy requirements
-            event_dict = {"event": event, "properties": properties}
-            if not self.privacy_filter.validate_event(event_dict):
-                self.logger.warning(
-                    "Event '%s' failed privacy validation, not sending. "
-                    "This may indicate a bug in event construction.",  # type: ignore
-                    event,
-                )
-                return
-
             # Send to PostHog
-            _ = self._client.capture(
-                distinct_id=distinct_id, event=event, properties=filtered_properties
-            )
+            _ = self._client.capture(distinct_id=distinct_id, event=event, properties=properties)
 
             self.logger.debug("Telemetry event sent: %s", event)
 
@@ -175,6 +164,34 @@ class PostHogClient:
             self.capture(event_name, properties)
         except Exception:
             self.logger.exception("Failed to capture event from object")
+
+    def capture_with_serialization(
+        self, event: str, data_obj: Any, *, distinct_id: str = "anonymous"
+    ) -> None:
+        """
+        Send event with automatic privacy serialization.
+
+        Args:
+            event: Event name
+            data_obj: Object with serialize_for_telemetry() method (BasedModel or DataclassSerializationMixin)
+            distinct_id: User identifier (default: "anonymous" for privacy)
+
+        Note:
+            This method automatically calls serialize_for_telemetry() on the data object
+            to ensure sensitive fields are filtered according to _telemetry_keys().
+        """
+        try:
+            if hasattr(data_obj, "serialize_for_telemetry"):
+                properties = data_obj.serialize_for_telemetry()
+                self.capture(event, properties, distinct_id=distinct_id)
+            else:
+                self.logger.warning(
+                    "Object %s does not have serialize_for_telemetry method, skipping event '%s'",
+                    type(data_obj).__name__,
+                    event,
+                )
+        except Exception:
+            self.logger.exception("Failed to capture event with serialization for '%s'", event)
 
     def shutdown(self) -> None:
         """
