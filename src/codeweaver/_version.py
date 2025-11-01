@@ -1,10 +1,9 @@
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Version information for CodeWeaver."""
-
 from typing import Final
 
 
-__version__: Final[str] = "0.0.1rc372+g6b469e7.dirty"
+__version__: Final[str] = "0.0.1rc373+gfb53166.dirty"
 
 __all__ = ("__version__",)
