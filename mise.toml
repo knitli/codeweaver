@@ -13,7 +13,6 @@ gh = "latest"
 gitsign = "latest"
 hk = "latest"
 node = "24"
-"npm:@changesets/cli" = "latest"
 "pipx:changesets" = "latest"
 "pipx:claude-monitor" = "latest"
 "pipx:copychat" = "latest"
@@ -44,6 +43,8 @@ if [ "$GITHUB_ACTIONS" = true ]; then
 else
     export CI=false
 fi
+mise --silent set &>/dev/null &&
+mise run source &>/dev/null &&
 """
 leave = """
 print -P "%F{209}[codeweaver]%f Exiting CodeWeaver environment..."

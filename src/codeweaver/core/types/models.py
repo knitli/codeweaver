@@ -186,11 +186,7 @@ class DataclassSerializationMixin:
                 for key, conversion in telemetry_keys.items()
                 if conversion != AnonymityConversion.FORBIDDEN
             }
-        data = self.dump_python(
-            round_trip=True,
-            exclude_none=True,
-            exclude=excludes,
-        )
+        data = self.dump_python(round_trip=True, exclude_none=True, exclude=excludes)
         filtered_group: dict[str, Any] = self._telemetry_handler(data)
         return {
             key: (
@@ -336,11 +332,7 @@ class BasedModel(BaseModel):
                 for key, conversion in telemetry_keys.items()
                 if conversion != AnonymityConversion.FORBIDDEN
             }
-        data = self.model_dump(
-            round_trip=True,
-            exclude_none=True,
-            exclude=excludes,
-        )
+        data = self.model_dump(round_trip=True, exclude_none=True, exclude=excludes)
         filtered_group: dict[str, Any] = self._telemetry_handler(data)
         return {
             key: (

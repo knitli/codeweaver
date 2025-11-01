@@ -126,7 +126,7 @@ async def find_code_tool(
             statistics().log_request_from_context(context, successful=False)
 
         # Log the error
-        _logger.exception("find_code failed: %s", e)
+        _logger.exception("find_code failed")
 
         # Import here to avoid circular dependency
         from codeweaver.exceptions import QueryError

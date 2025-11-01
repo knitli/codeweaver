@@ -122,17 +122,7 @@ def _convert_search_result_to_code_match(result: SearchResult) -> CodeMatch:
 
     # Extract span (line range) - ensure it's a Span object
     if hasattr(chunk, "line_range"):
-        line_range = chunk.line_range
-        if isinstance(line_range, Span):
-            span = line_range
-        elif isinstance(line_range, tuple) and len(line_range) >= 2:
-            # Convert tuple to Span - positional args: start, end, source_id
-            span = Span(line_range[0], line_range[1], file.source_id)
-        else:
-            # Fallback span - positional args: start, end, source_id
-            span = Span(
-                1, chunk.content.count("\n") + 1 if hasattr(chunk, "content") else 1, file.source_id
-            )
+        span = chunk.line_range
     else:
         # Fallback span - positional args: start, end, source_id
         span = Span(
@@ -149,10 +139,12 @@ def _convert_search_result_to_code_match(result: SearchResult) -> CodeMatch:
         meta = chunk.metadata
         # Check if semantic_meta exists and has symbol information
         semantic_meta = meta.get("semantic_meta")
-        if semantic_meta is not None and hasattr(semantic_meta, "symbol"):
-            symbol = getattr(semantic_meta, "symbol", None)
-            if symbol:
-                related_symbols = (symbol,)
+        if (
+            semantic_meta is not None
+            and hasattr(semantic_meta, "symbol")
+            and (symbol := getattr(semantic_meta, "symbol", None))
+        ):
+            related_symbols = (symbol,)
 
     return CodeMatch(
         file=file,
@@ -162,6 +154,11 @@ def _convert_search_result_to_code_match(result: SearchResult) -> CodeMatch:
         match_type=CodeMatchType.SEMANTIC,  # Vector search is always semantic
         related_symbols=related_symbols,
     )
+
+
+def raise_value_error(message: str) -> None:
+    """Helper function to raise ValueError with a message."""
+    raise ValueError(message)
 
 
 async def find_code(
@@ -231,7 +228,7 @@ async def find_code(
         sparse_provider_enum = registry.get_provider_enum_for("sparse_embedding")
 
         if not dense_provider_enum and not sparse_provider_enum:
-            raise ValueError("No embedding providers configured (neither dense nor sparse)")
+            raise_value_error("No embedding providers configured (neither dense nor sparse)")
 
         # Embed query (with fallback to sparse-only if dense fails)
 
@@ -246,7 +243,7 @@ async def find_code(
                 if isinstance(result, dict) and "error" in result:
                     logger.warning("Dense embedding returned error: %s", result.get("error"))
                     if not sparse_provider_enum:
-                        raise ValueError(
+                        raise_value_error(
                             f"Dense embedding failed: {result.get('error')} (no sparse fallback)"
                         )
                 else:
@@ -277,7 +274,7 @@ async def find_code(
         # Step 3: Hybrid search
         vector_store_enum = registry.get_provider_enum_for("vector_store")
         if not vector_store_enum:
-            raise ValueError("No vector store provider configured")
+            raise_value_error("No vector store provider configured")
 
         vector_store = registry.get_provider_instance(
             vector_store_enum, "vector_store", singleton=True
@@ -306,7 +303,7 @@ async def find_code(
             query_vector = {"sparse": sparse_vec_unwrapped}
         else:
             # Both failed - should not reach here due to earlier validation
-            raise ValueError("No embeddings available (both dense and sparse failed)")
+            raise_value_error("Both dense and sparse embeddings failed")
 
         # Execute search (returns max 100 results)
         # Note: Filter support deferred to v0.2 - we over-fetch and filter post-search

@@ -125,6 +125,11 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
             self._client = client
         super().__init__(caps=capabilities, client=self._client, **kwargs)
 
+    @property
+    def base_url(self) -> str | None:
+        """Get the base URL for the provider, if applicable."""
+        return None
+
     def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """Initialize the Sentence Transformers embedding provider."""
         for keyword_args in (self.doc_kwargs, self.query_kwargs):

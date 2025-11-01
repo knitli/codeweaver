@@ -72,11 +72,10 @@ class DiscoveredFile(DataclassSerializationMixin):
     @classmethod
     def _ensure_ext_kind(cls, data: Any) -> Any:
         """Ensure ext_kind is set based on path if not provided."""
-        if isinstance(data, dict):
-            if "ext_kind" not in data or data["ext_kind"] is None:
-                path = data.get("path")
-                if path:
-                    data["ext_kind"] = ExtKind.from_file(path)
+        if isinstance(data, dict) and ("ext_kind" not in data or data["ext_kind"] is None):
+            path = data.get("path")
+            if path:
+                data["ext_kind"] = ExtKind.from_file(path)
         return data
 
     def __init__(
@@ -173,8 +172,7 @@ class DiscoveredFile(DataclassSerializationMixin):
             return content_hash
 
         # For non-existent files, return hash of empty bytes (for test fixtures)
-        empty_hash = get_blake_hash(b"")
-        return empty_hash
+        return get_blake_hash(b"")
 
     def is_same(self, other_path: Path) -> bool:
         """Checks if a file at other_path is the same as this one, by comparing blake3 hashes.

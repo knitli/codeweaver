@@ -116,7 +116,7 @@ async def qdrant_test_manager(tmp_path: Path):
                 await client.upsert(collection, points=[...])
                 # Cleanup automatic
     """
-    from tests.qdrant_test_manager import QdrantTestManager
+    from .qdrant_test_manager import QdrantTestManager
 
     # Create manager with unique storage path for this test
     storage_path = tmp_path / "qdrant_storage"
@@ -137,7 +137,9 @@ async def qdrant_test_manager(tmp_path: Path):
 
         # Port has something running, try it as Qdrant
         try:
-            test_manager = QdrantTestManager(port=port, storage_path=storage_path, auto_start_docker=False)
+            test_manager = QdrantTestManager(
+                port=port, storage_path=storage_path, auto_start_docker=False
+            )
             # Verify this instance is accessible without auth
             if await test_manager.verify_connection():
                 manager = test_manager

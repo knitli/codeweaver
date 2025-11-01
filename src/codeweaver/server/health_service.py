@@ -11,7 +11,7 @@ import logging
 import time
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NoReturn
 
 from codeweaver.server.health_models import (
     EmbeddingProviderServiceInfo,
@@ -179,6 +179,11 @@ class HealthService:
         """Check vector store health with latency measurement."""
         from codeweaver.providers.provider import ProviderKind
 
+        def raise_error() -> NoReturn:
+            """Helper to raise error for missing provider."""
+            logger.error("No vector store provider configured")
+            raise RuntimeError("No vector store provider configured")
+
         try:
             vector_provider = self._provider_registry.get_configured_provider_settings(
                 provider_kind=ProviderKind.VECTOR_STORE
@@ -191,7 +196,7 @@ class HealthService:
                 else None
             )
             if not provider:
-                raise RuntimeError("No vector store provider configured")
+                raise_error()
 
             # Get vector store instance using new unified API
             vector_store_enum = self._provider_registry.get_provider_enum_for("vector_store")
@@ -225,6 +230,12 @@ class HealthService:
 
     async def _check_embedding_provider_health(self) -> EmbeddingProviderServiceInfo:
         """Check embedding provider health with circuit breaker state."""
+
+        def raise_error() -> NoReturn:
+            """Helper to raise error for missing provider."""
+            logger.error("No embedding provider configured")
+            raise RuntimeError("No embedding provider configured")
+
         try:
             # Get embedding provider using new unified API
             if embedding_provider_enum := self._provider_registry.get_provider_enum_for(
@@ -251,7 +262,7 @@ class HealthService:
                     latency_ms=latency_ms,
                     circuit_breaker_state=circuit_state,
                 )
-            raise RuntimeError("No embedding provider configured")
+            raise_error()
         except Exception as e:
             logger.warning("Embedding provider health check failed: %s", e)
             return EmbeddingProviderServiceInfo(

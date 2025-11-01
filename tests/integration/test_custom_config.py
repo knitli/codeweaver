@@ -8,6 +8,7 @@ From quickstart.md:342-373
 Validates acceptance criteria spec.md:88
 """
 
+import contextlib
 import os
 
 import pytest
@@ -26,7 +27,9 @@ embedding_caps = next(
 )
 
 embedding_provider = VoyageEmbeddingProvider(
-    client=AsyncClient(api_key=os.environ["VOYAGE_API_KEY"]), caps=embedding_caps, kwargs=None
+    client=AsyncClient(api_key=os.environ["VOYAGE_API_KEY"]),  # type: ignore
+    caps=embedding_caps,  # type: ignore
+    kwargs=None,  # type: ignore
 )
 
 
@@ -56,10 +59,12 @@ async def test_custom_configuration():
         "batch_size": 128,
     })
     # AsyncQdrantClient doesn't accept collection_name - filter it out
-    client_config = {
-        k: v for k, v in config.items() if k != "collection_name" and k != "batch_size"
-    }
+    client_config = {k: v for k, v in config.items() if k not in ["collection_name", "batch_size"]}
     client = AsyncQdrantClient(**client_config)
+
+    # Cleanup any existing collection first
+    with contextlib.suppress(Exception):
+        _ = await client.delete_collection(collection_name="my_custom_collection")
     provider = QdrantVectorStoreProvider(client=client, config=config, embedder=embedding_provider)
     await provider._initialize()
 
@@ -68,12 +73,9 @@ async def test_custom_configuration():
 
     # Verify collection exists
     collections = await provider.list_collections()
-    assert "my_custom_collection" in collections
+    assert "my_custom_collection" in collections  # type: ignore
 
     # Cleanup
-    try:
-        await provider._client.delete_collection(collection_name="my_custom_collection")
-    except Exception:
-        pass
-
+    with contextlib.suppress(Exception):
+        _ = await provider.client.delete_collection(collection_name="my_custom_collection")
     print("✅ Scenario 6 PASSED: Custom configuration respected")

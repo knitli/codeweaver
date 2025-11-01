@@ -35,7 +35,7 @@ def temp_persist_path():
 async def memory_config(temp_persist_path):
     """Provide test Memory configuration."""
     return {
-        "persist_path": str(temp_persist_path),  # Provider will append /vector_store.json
+        "persist_path": str(temp_persist_path / "vector_store.json"),  # Full file path
         "auto_persist": True,
         "persist_interval": None,  # Disable periodic persistence for tests
         "collection_name": f"test_memory_{uuid4().hex[:8]}",
@@ -164,7 +164,7 @@ class TestMemoryProviderContract:
         await memory_provider.upsert([sample_chunk])
         await memory_provider._persist_to_disk()
 
-        persist_path = Path(memory_config["persist_path"]) / "vector_store.json"
+        persist_path = Path(memory_config["persist_path"])
         assert persist_path.exists(), "Persistence file should be created"
         assert persist_path.stat().st_size > 0, "Persistence file should not be empty"
 
@@ -197,7 +197,7 @@ class TestMemoryProviderContract:
         await memory_provider.upsert([sample_chunk])
         await memory_provider._persist_to_disk()
 
-        persist_path = Path(memory_config["persist_path"]) / "vector_store.json"
+        persist_path = Path(memory_config["persist_path"])
         data = json.loads(persist_path.read_text())
         # Verify top-level structure
         assert "version" in data
@@ -214,7 +214,7 @@ class TestMemoryProviderContract:
         await provider.upsert([sample_chunk])
 
         # Auto-persist should have created the file
-        persist_file = temp_persist_path / "vector_store.json"
+        persist_file = Path(memory_config["persist_path"])
         assert persist_file.exists()
 
     async def test_collection_property(self, memory_provider, memory_config):

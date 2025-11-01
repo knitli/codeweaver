@@ -38,6 +38,7 @@ def _create_mock_file(file_path: Path) -> Mock:
 
     # Create mock ExtKind
     from codeweaver.core.language import SemanticSearchLanguage
+
     mock_ext_kind = Mock()
     if file_path.suffix == ".py":
         mock_ext_kind.language = SemanticSearchLanguage.PYTHON

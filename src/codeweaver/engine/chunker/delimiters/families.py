@@ -715,17 +715,21 @@ def _detect_language_family_sync(content: str, min_confidence: int = 3) -> Langu
         if weighted_score > best_weighted_score + 0.001:
             is_better = True
         elif abs(weighted_score - best_weighted_score) <= 0.001:
-            if matches > best_matches:
+            if (
+                matches <= best_matches
+                and matches == best_matches
+                and pattern_count > best_pattern_count
+            ) or matches > best_matches:
                 is_better = True
-            elif matches == best_matches:
-                # Prefer family with more total patterns (more comprehensive)
-                if pattern_count > best_pattern_count:
+            elif matches == best_matches and pattern_count == best_pattern_count:
+                # Only then use confidence as final tiebreaker
+                best_confidence = (
+                    characteristics[best_family].get("confidence", 0.0)
+                    if best_family != LanguageFamily.UNKNOWN
+                    else 0.0
+                )
+                if confidence > best_confidence:
                     is_better = True
-                elif pattern_count == best_pattern_count:
-                    # Only then use confidence as final tiebreaker
-                    best_confidence = characteristics[best_family].get("confidence", 0.0) if best_family != LanguageFamily.UNKNOWN else 0.0
-                    if confidence > best_confidence:
-                        is_better = True
 
         if is_better:
             best_weighted_score = weighted_score
@@ -749,6 +753,110 @@ async def detect_language_family(content: str, min_confidence: int = 3) -> Langu
         )
 
 
+def _get_excluded_kinds() -> set:
+    """Get delimiter kinds to exclude from family detection."""
+    from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
+
+    return {
+        DelimiterKind.PARAGRAPH,
+        DelimiterKind.WHITESPACE,
+        DelimiterKind.GENERIC,
+        DelimiterKind.UNKNOWN,
+    }
+
+
+def _calculate_specificity_weight(pattern_length: int) -> float:
+    """Calculate specificity weight based on pattern length.
+
+    Args:
+        pattern_length: Length of the pattern string
+
+    Returns:
+        Weight between 0.05 and 0.8 based on pattern reliability
+    """
+    # Single chars are very unreliable
+    if pattern_length == 1:
+        return 0.05
+    # 2-char patterns are good ({{, //, etc.)
+    if pattern_length == 2:
+        return 0.5
+    # 3-char patterns are reliable (def, end, etc.)
+    if pattern_length == 3:
+        return 0.7
+    # 4-char patterns are quite reliable
+    if pattern_length == 4:
+        return 0.8
+    # 5+ char patterns can have context issues (e.g., 'class' in HTML attribute)
+    return 0.6
+
+
+def _build_pattern_family_counts(
+    excluded_kinds: set,
+) -> tuple[dict[tuple, int], dict[LanguageFamily, list[DelimiterPattern]]]:
+    """Build pattern distinctiveness counts and family pattern mappings.
+
+    Args:
+        excluded_kinds: Set of DelimiterKind to exclude
+
+    Returns:
+        Tuple of (pattern_family_counts, family_patterns_map)
+    """
+    pattern_family_counts: dict[tuple, int] = {}
+    family_patterns_map: dict[LanguageFamily, list[DelimiterPattern]] = {}
+
+    for family in LanguageFamily:
+        if family == LanguageFamily.UNKNOWN:
+            continue
+        patterns = get_family_patterns(family)
+        family_patterns_map[family] = patterns
+        for pattern in patterns:
+            if pattern.kind in excluded_kinds:
+                continue
+            pattern_key = (pattern.kind, tuple(sorted(pattern.starts)))
+            pattern_family_counts[pattern_key] = pattern_family_counts.get(pattern_key, 0) + 1
+
+    return pattern_family_counts, family_patterns_map
+
+
+def _calculate_family_score(
+    content: str,
+    patterns: list[DelimiterPattern],
+    pattern_family_counts: dict[tuple, int],
+    excluded_kinds: set,
+) -> tuple[int, float]:
+    """Calculate matches and weighted score for a family's patterns.
+
+    Args:
+        content: Code content to analyze
+        patterns: List of delimiter patterns for the family
+        pattern_family_counts: Mapping of pattern keys to family counts
+        excluded_kinds: Set of DelimiterKind to exclude
+
+    Returns:
+        Tuple of (match_count, weighted_score)
+    """
+    matches = 0
+    weighted_score = 0.0
+
+    for pattern in patterns:
+        if pattern.kind in excluded_kinds:
+            continue
+
+        pattern_key = (pattern.kind, tuple(sorted(pattern.starts)))
+        for start in pattern.starts:
+            if start and start in content:
+                matches += 1
+                # Weight by distinctiveness: 1/count (rare patterns worth more)
+                distinctiveness_weight = 1.0 / pattern_family_counts.get(pattern_key, 1)
+                # Weight by specificity based on pattern length
+                specificity_weight = _calculate_specificity_weight(len(start))
+                weight = distinctiveness_weight * specificity_weight
+                weighted_score += weight
+                break
+
+    return matches, weighted_score
+
+
 def detect_family_characteristics(content: str) -> dict[LanguageFamily, dict[str, int | float]]:
     """Analyze family characteristics in code sample.
 
@@ -769,32 +877,8 @@ def detect_family_characteristics(content: str) -> dict[LanguageFamily, dict[str
         >>> chars[LanguageFamily.C_STYLE]["pattern_matches"]
         4
     """
-    # First, calculate pattern distinctiveness (how many families have each pattern)
-    from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
-
-    pattern_family_counts: dict[tuple, int] = {}
-    family_patterns_map: dict[LanguageFamily, list] = {}
-
-    # Exclude universal/generic patterns that don't help discrimination
-    excluded_kinds = {
-        DelimiterKind.PARAGRAPH,
-        DelimiterKind.WHITESPACE,
-        DelimiterKind.GENERIC,
-        DelimiterKind.UNKNOWN,
-    }
-
-    for family in LanguageFamily:
-        if family == LanguageFamily.UNKNOWN:
-            continue
-        patterns = get_family_patterns(family)
-        family_patterns_map[family] = patterns
-        for pattern in patterns:
-            # Skip universal patterns that don't help distinguish families
-            if pattern.kind in excluded_kinds:
-                continue
-            # Use pattern kind + starts as key for uniqueness
-            pattern_key = (pattern.kind, tuple(sorted(pattern.starts)))
-            pattern_family_counts[pattern_key] = pattern_family_counts.get(pattern_key, 0) + 1
+    excluded_kinds = _get_excluded_kinds()
+    pattern_family_counts, family_patterns_map = _build_pattern_family_counts(excluded_kinds)
 
     results: dict[LanguageFamily, dict[str, int | float]] = {}
 
@@ -803,35 +887,9 @@ def detect_family_characteristics(content: str) -> dict[LanguageFamily, dict[str
             continue
 
         patterns = family_patterns_map[family]
-        matches = 0
-        weighted_score = 0.0
-
-        for pattern in patterns:
-            # Skip universal patterns in matching too
-            if pattern.kind in excluded_kinds:
-                continue
-
-            pattern_key = (pattern.kind, tuple(sorted(pattern.starts)))
-            for start in pattern.starts:
-                if start and start in content:
-                    matches += 1
-                    # Weight by distinctiveness: 1/count (rare patterns worth more)
-                    distinctiveness_weight = 1.0 / pattern_family_counts.get(pattern_key, 1)
-                    # Weight by specificity: penalize single chars, favor 2-4 char patterns
-                    # Longer patterns can have false matches (e.g., 'class' in HTML attribute)
-                    if len(start) == 1:
-                        specificity_weight = 0.05  # Single chars are very unreliable
-                    elif len(start) == 2:
-                        specificity_weight = 0.5  # 2-char patterns are good ({{, //, etc.)
-                    elif len(start) == 3:
-                        specificity_weight = 0.7  # 3-char patterns are reliable (def, end, etc.)
-                    elif len(start) == 4:
-                        specificity_weight = 0.8  # 4-char patterns are quite reliable
-                    else:
-                        specificity_weight = 0.6  # 5+ char patterns can have context issues
-                    weight = distinctiveness_weight * specificity_weight
-                    weighted_score += weight
-                    break
+        matches, weighted_score = _calculate_family_score(
+            content, patterns, pattern_family_counts, excluded_kinds
+        )
 
         # Calculate confidence as percentage of patterns matched
         total_patterns = len(patterns)

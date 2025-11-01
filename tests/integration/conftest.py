@@ -13,9 +13,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+
 if TYPE_CHECKING:
     from codeweaver.core.chunks import CodeChunk
-
+    from codeweaver.providers.embedding.providers.sentence_transformers import (
+        SentenceTransformersEmbeddingProvider,
+        SentenceTransformersRerankingProvider,
+    )
 
 # ===========================================================================
 # Mock Provider Fixtures
@@ -40,6 +44,29 @@ def mock_embedding_provider():
 
 
 @pytest.fixture
+def actual_dense_embedding_provider() -> SentenceTransformersEmbeddingProvider:
+    """Provide an actual dense embedding provider using SentenceTransformers."""
+    from sentence_transformers import SentenceTransformer
+
+    from codeweaver.providers.embedding.capabilities.ibm_granite import (
+        get_ibm_granite_embedding_capabilities,
+    )
+    from codeweaver.providers.embedding.providers.sentence_transformers import (
+        SentenceTransformersEmbeddingProvider,
+    )
+
+    # nice lightweight model
+    caps = next(
+        cap
+        for cap in get_ibm_granite_embedding_capabilities()
+        if cap.name == "ibm-granite/granite-embedding-english-r2"
+    )
+    return SentenceTransformersEmbeddingProvider(
+        capabilities=caps, client=SentenceTransformer(caps.name)
+    )
+
+
+@pytest.fixture
 def mock_sparse_provider():
     """Provide a mock sparse embedding provider."""
     mock_provider = AsyncMock()
@@ -54,6 +81,21 @@ def mock_sparse_provider():
         ]
     )
     return mock_provider
+
+
+@pytest.fixture
+def actual_sparse_embedding_provider() -> SentenceTransformersEmbeddingProvider:
+    """Provide an actual sparse embedding provider using SentenceTransformers."""
+    from sentence_transformers import SparseEncoder
+
+    from codeweaver.providers.embedding.capabilities.base import get_sparse_caps
+
+    cap = next(
+        cap
+        for cap in get_sparse_caps()
+        if cap.name == "opensearch-project/opensearch-neural-sparse-encoding-doc-v2-mini"
+    )
+    return SentenceTransformersEmbeddingProvider(capabilities=cap, client=SparseEncoder(cap.name))
 
 
 @pytest.fixture
@@ -84,9 +126,7 @@ def mock_vector_store():
     # Create mock search results
     test_chunks = [
         create_test_chunk(
-            "test_function",
-            "def test_function():\n    pass",
-            Path("tests/test_file.py"),
+            "test_function", "def test_function():\n    pass", Path("tests/test_file.py")
         ),
         create_test_chunk(
             "authenticate",
@@ -128,16 +168,30 @@ def mock_reranking_provider():
         # Create rerank results that maintain order but adjust scores
         # Note: async function to match the rerank signature
         return [
-            RerankResult(
-                chunk=chunk,
-                score=0.95 - i * 0.05,
-                original_index=i,
-            )
+            RerankResult(chunk=chunk, score=0.95 - i * 0.05, original_index=i)
             for i, chunk in enumerate(chunks)
         ]
 
     mock_provider.rerank = AsyncMock(side_effect=create_rerank_results)
     return mock_provider
+
+
+@pytest.fixture
+def actual_reranking_provider() -> SentenceTransformersRerankingProvider:
+    """Provide an actual reranking provider using SentenceTransformers."""
+    from fastembed import TextEmbedding
+
+    from codeweaver.providers.reranking.capabilities.ms_marco import (
+        get_marco_reranking_capabilities,
+    )
+
+    # nice lightweight model
+    caps = next(
+        cap
+        for cap in get_marco_reranking_capabilities()
+        if cap.name == "Xenova/ms-marco-MiniLM-L6-v2"
+    )
+    return SentenceTransformersRerankingProvider(capabilities=caps, client=TextEmbedding(caps.name))
 
 
 # ===========================================================================
@@ -147,10 +201,7 @@ def mock_reranking_provider():
 
 @pytest.fixture
 def mock_provider_registry(
-    mock_embedding_provider,
-    mock_sparse_provider,
-    mock_vector_store,
-    mock_reranking_provider,
+    mock_embedding_provider, mock_sparse_provider, mock_vector_store, mock_reranking_provider
 ):
     """Configure mock provider registry with all providers."""
     from enum import Enum
@@ -167,11 +218,11 @@ def mock_provider_registry(
     def get_provider_enum_for(kind: str):
         if kind == "embedding":
             return MockProviderEnum.VOYAGE
-        elif kind == "sparse_embedding":
+        if kind == "sparse_embedding":
             return MockProviderEnum.FASTEMBED
-        elif kind == "vector_store":
+        if kind == "vector_store":
             return MockProviderEnum.QDRANT
-        elif kind == "reranking":
+        if kind == "reranking":
             return MockProviderEnum.VOYAGE
         return None
 
@@ -181,11 +232,11 @@ def mock_provider_registry(
     def get_provider_instance(enum_value, kind: str, singleton: bool = True):
         if kind == "embedding":
             return mock_embedding_provider
-        elif kind == "sparse_embedding":
+        if kind == "sparse_embedding":
             return mock_sparse_provider
-        elif kind == "vector_store":
+        if kind == "vector_store":
             return mock_vector_store
-        elif kind == "reranking":
+        if kind == "reranking":
             return mock_reranking_provider
         return None
 
@@ -208,9 +259,7 @@ def configured_providers(mock_provider_registry):
             response = await find_code("test query")
     """
     # Patch both the provider registry and time.time to ensure monotonic timing
-    import time
 
-    original_time = time.time
     call_count = [0]  # Use list for mutable counter
 
     def mock_time():
@@ -218,10 +267,13 @@ def configured_providers(mock_provider_registry):
         # Return monotonically increasing time values (start from a baseline)
         return 1000000.0 + call_count[0] * 0.001
 
-    with patch(
-        "codeweaver.agent_api.find_code.get_provider_registry",
-        return_value=mock_provider_registry,
-    ), patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time):
+    with (
+        patch(
+            "codeweaver.agent_api.find_code.get_provider_registry",
+            return_value=mock_provider_registry,
+        ),
+        patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
+    ):
         yield mock_provider_registry
 
 
@@ -233,25 +285,13 @@ def configured_providers(mock_provider_registry):
 @pytest.fixture
 def mock_settings_with_providers():
     """Provide mock settings with provider configuration."""
-    from codeweaver.config.settings import Settings
+    from codeweaver.config.settings import CodeWeaverSettings as Settings
 
     mock_settings = MagicMock(spec=Settings)
     mock_settings.providers = {
-        "embedding": {
-            "provider": "voyage",
-            "model": "voyage-code-2",
-        },
-        "sparse_embedding": {
-            "provider": "fastembed",
-            "model": "prithivida/Splade_PP_en_v1",
-        },
-        "vector_store": {
-            "provider": "qdrant",
-            "collection": "test_collection",
-        },
-        "reranking": {
-            "provider": "voyage",
-            "model": "rerank-2",
-        },
+        "embedding": {"provider": "voyage", "model": "voyage-code-2"},
+        "sparse_embedding": {"provider": "fastembed", "model": "prithivida/Splade_PP_en_v1"},
+        "vector_store": {"provider": "qdrant", "collection": "test_collection"},
+        "reranking": {"provider": "voyage", "model": "voyage-rerank-2"},
     }
     return mock_settings

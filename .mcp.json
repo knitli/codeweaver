@@ -20,19 +20,13 @@
       },
       "type": "stdio"
     },
-    "sequential-thinking": {
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-sequential-thinking"
-      ],
-      "command": "npx",
-      "type": "stdio"
-    },
     "serena": {
       "args": [
         "run",
         "serena",
-        "start-mcp-server"
+        "start-mcp-server",
+        "--context",
+        "agent"
       ],
       "command": "uv",
       "type": "stdio"

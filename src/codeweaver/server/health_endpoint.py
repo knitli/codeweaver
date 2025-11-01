@@ -58,8 +58,8 @@ async def get_health() -> HealthResponse | Any:
             health_response.uptime_seconds,
         )
 
-    except Exception as e:
-        logger.error("Health check failed with error: %s", e, exc_info=True)
+    except Exception:
+        logger.exception("Health check failed with error")
         # Return unhealthy status on error
 
         from codeweaver.server.health_models import (

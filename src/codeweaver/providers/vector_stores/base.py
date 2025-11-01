@@ -273,11 +273,11 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                 self._failure_count,
             )
             raise
-        except Exception as e:
+        except Exception:
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.exception("Non-retryable error in vector store search: %s", str(e))
+            logger.exception("Non-retryable error in vector store search")
             raise
         else:
             return result
@@ -338,11 +338,11 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                 self._failure_count,
             )
             raise
-        except Exception as e:
+        except Exception:
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.exception("Non-retryable error in vector store upsert: %s", str(e))
+            logger.exception("Non-retryable error in vector store upsert")
             raise
 
     @abstractmethod

@@ -147,10 +147,12 @@ async def test_sparse_only_fallback(initialize_test_settings):
 
         # Configure provider enums to indicate both providers exist
         mock_reg.get_provider_enum_for.side_effect = lambda kind: (
-            Provider.OPENAI if kind == "embedding" else (
-                Provider.FASTEMBED if kind == "sparse_embedding" else (
-                    Provider.QDRANT if kind == "vector_store" else None
-                )
+            Provider.OPENAI
+            if kind == "embedding"
+            else (
+                Provider.FASTEMBED
+                if kind == "sparse_embedding"
+                else (Provider.QDRANT if kind == "vector_store" else None)
             )
         )
 
@@ -166,9 +168,9 @@ async def test_sparse_only_fallback(initialize_test_settings):
         def get_provider_instance_side_effect(provider_enum, kind, singleton=True):
             if kind == "embedding":
                 return mock_dense_provider
-            elif kind == "sparse_embedding":
+            if kind == "sparse_embedding":
                 return mock_sparse_provider
-            elif kind == "vector_store":
+            if kind == "vector_store":
                 return mock_vector_store
             return None
 

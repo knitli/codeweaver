@@ -9,20 +9,22 @@ Validates acceptance criteria spec.md:72
 """
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from codeweaver.common.utils.utils import uuid7
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
-from tests.conftest import create_test_chunk_with_embeddings
+
+from .conftest import actual_dense_embedding_provider
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
 
 @pytest.fixture
-async def qdrant_provider(qdrant_test_manager):
+async def qdrant_provider(qdrant_test_manager: Any):
     """Create Qdrant provider for testing."""
     # Create unique collection
     collection_name = qdrant_test_manager.create_collection_name("hybrid")
@@ -31,13 +33,13 @@ async def qdrant_provider(qdrant_test_manager):
     )
 
     config = {"url": qdrant_test_manager.url, "collection_name": collection_name}
-    provider = QdrantVectorStoreProvider(config=config)
+    provider = QdrantVectorStoreProvider(config=config, _embedder=actual_dense_embedding_provider())
     await provider._initialize()
     return provider
     # Cleanup handled by test manager
 
 
-async def test_store_hybrid_embeddings(qdrant_provider):
+async def test_store_hybrid_embeddings(qdrant_provider: QdrantVectorStoreProvider):
     """
     User Story: Store both dense and sparse embeddings with default settings.
 

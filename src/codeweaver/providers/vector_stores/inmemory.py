@@ -19,7 +19,6 @@ from pydantic import UUID4
 from typing_extensions import TypeIs
 
 from codeweaver.common.utils.utils import get_user_config_dir
-from codeweaver.config.providers import MemoryConfig
 from codeweaver.core.chunks import CodeChunk, SearchResult
 from codeweaver.core.spans import Span
 from codeweaver.engine.filter import Filter
@@ -60,8 +59,12 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
             ValidationError: Persistence file format invalid.
         """
         # Initialize persistence settings
+        # If persist_path is provided, use it as-is (it should be a full file path)
+        # Otherwise, use default location
         persist_path = (
-            Path(self.config.get("persist_path") or get_user_config_dir()) / "vector_store.json"
+            Path(self.config.get("persist_path"))
+            if self.config.get("persist_path")
+            else Path(get_user_config_dir()) / "vector_store.json"
         )
         auto_persist = self.config.get("auto_persist", True)
         persist_interval = self.config.get("persist_interval", 300)
@@ -74,9 +77,7 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
         object.__setattr__(self, "_shutdown", False)
 
         # Create in-memory Qdrant client
-        client = AsyncQdrantClient(
-            location=":memory:", **(self.config.get("client_options", {}))
-        )
+        client = AsyncQdrantClient(location=":memory:", **(self.config.get("client_options", {})))
         object.__setattr__(self, "_client", client)
 
         # Restore from disk if persistence file exists
@@ -519,6 +520,11 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
 
             # Restore each collection
             for collection_name, collection_data in data.get("collections", {}).items():
+                # Check if collection already exists
+                with contextlib.suppress(Exception):
+                    _ = await self._client.get_collection(collection_name=collection_name)
+                    # Collection exists, delete it first to ensure clean restore
+                    _ = await self._client.delete_collection(collection_name=collection_name)
                 # Create collection with vector configuration
                 vectors_config = collection_data["vectors_config"]
                 dense_config = vectors_config.get("dense", {})

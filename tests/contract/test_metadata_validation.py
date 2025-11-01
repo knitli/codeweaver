@@ -52,21 +52,20 @@ def test_validate_twine_check(build_artifacts: Path):
     """
     dist_dir = build_artifacts
 
-    # Verify artifacts exist
-    artifacts = list(dist_dir.glob("*"))
+    # Verify artifacts exist (filter out .gitignore and other non-distribution files)
+    artifacts = [a for a in dist_dir.glob("*") if a.suffix in (".whl", ".gz")]
     if len(artifacts) < 2:
         pytest.fail(f"Expected 2 artifacts, found {len(artifacts)}")
 
     # Install twine if not available
     subprocess.run(["uv", "pip", "install", "twine"], capture_output=True, check=False)
 
-    # Run twine check
+    # Run twine check with expanded artifact paths
     result = subprocess.run(
-        ["twine", "check", str(dist_dir / "*")],
+        ["twine", "check", *[str(a) for a in artifacts]],
         capture_output=True,
         text=True,
         check=False,
-        shell=True,
     )
 
     # Check should succeed
