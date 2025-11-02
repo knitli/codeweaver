@@ -486,7 +486,7 @@ async def find_code(
         languages_set: set[SemanticSearchLanguage | LanguageName | ConfigLanguage] = {
             m.file.ext_kind.language
             for m in code_matches
-            if m.file.ext_kind is not None
+            if m.file.ext_kind is not None and m.file.ext_kind.language is not None
         }
         languages_found: tuple[SemanticSearchLanguage | LanguageName, ...] = tuple(
             lang for lang in languages_set if not isinstance(lang, ConfigLanguage)
