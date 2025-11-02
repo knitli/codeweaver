@@ -50,6 +50,7 @@ from codeweaver.core.spans import Span
 from codeweaver.core.types import LanguageName
 from codeweaver.semantic.classifications import AgentTask
 
+
 if TYPE_CHECKING:
     from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
@@ -79,30 +80,7 @@ def _convert_search_result_to_code_match(result: SearchResult) -> CodeMatch:
     """
     # Extract CodeChunk (SearchResult.content can be str or CodeChunk)
     if isinstance(result.content, str):
-        # Create minimal CodeChunk from string
-        from codeweaver.core.metadata import ExtKind
-
-        # Determine ext_kind from file_path or use default
-        ext_kind = (
-            ExtKind.from_file(result.file_path)
-            if result.file_path
-            else ExtKind.from_language("text", "other")
-        )
-
-        # Create Span for line_range with proper UUID7 source_id
-        source_id = uuid7()
-        line_count = result.content.count("\n") + 1
-        line_span = Span(1, line_count, source_id)  # Positional args: start, end, source_id
-
-        chunk = CodeChunk(
-            content=result.content,
-            line_range=line_span,
-            file_path=result.file_path,
-            language=None,
-            ext_kind=ext_kind,
-            source=ChunkSource.TEXT_BLOCK,  # Use enum instead of string
-            chunk_id=uuid7(),
-        )
+        chunk = _create_code_chunk_from_result(result)
     else:
         chunk = result.content
 
@@ -156,6 +134,36 @@ def _convert_search_result_to_code_match(result: SearchResult) -> CodeMatch:
         relevance_score=relevance,
         match_type=CodeMatchType.SEMANTIC,  # Vector search is always semantic
         related_symbols=related_symbols,
+    )
+
+
+def _create_code_chunk_from_result(result: SearchResult) -> CodeChunk:
+    # Create minimal CodeChunk from string
+    from codeweaver.core.metadata import ExtKind
+
+    if isinstance(result.content, CodeChunk):
+        return result.content
+
+    # Determine ext_kind from file_path or use default
+    ext_kind = (
+        ExtKind.from_file(result.file_path)
+        if result.file_path
+        else ExtKind.from_language("text", "other")
+    )
+
+    # Create Span for line_range with proper UUID7 source_id
+    source_id = uuid7()
+    line_count = (result.content.count("\n") + 1) if result.content else 1
+    line_span = Span(1, line_count, source_id)  # Positional args: start, end, source_id
+
+    return CodeChunk(
+        content=result.content,
+        line_range=line_span,
+        file_path=result.file_path,
+        language=None,
+        ext_kind=ext_kind,
+        source=ChunkSource.TEXT_BLOCK,
+        chunk_id=uuid7(),
     )
 
 
@@ -218,8 +226,8 @@ async def find_code(
             intent_type = query_intent_obj.intent_type
             confidence = query_intent_obj.confidence
 
-        agent_task_str = INTENT_TO_AGENT_TASK.get(intent_type, "DEFAULT")
-        agent_task = AgentTask[agent_task_str]
+        raw_agent_task = INTENT_TO_AGENT_TASK.get(intent_type, "DEFAULT")
+        agent_task = AgentTask[raw_agent_task]
 
         logger.info("Query intent detected: %s (confidence: %.2f)", intent_type, confidence)
 
@@ -278,10 +286,10 @@ async def find_code(
         vector_store_enum = registry.get_provider_enum_for("vector_store")
         if not vector_store_enum:
             raise_value_error("No vector store provider configured")
-
+        assert isinstance(vector_store_enum, type)  # noqa: S101
         vector_store: VectorStoreProvider[Any] = registry.get_provider_instance(
             vector_store_enum, "vector_store", singleton=True
-        )
+        )  # type: ignore
 
         # Build query vector (unified search API) with graceful degradation
         # Note: embed_query returns list[list[float|int]] (batch results), unwrap to list[float]
@@ -307,6 +315,7 @@ async def find_code(
             query_vector = {"sparse": sparse_vec_unwrapped}
         else:
             # Both failed - should not reach here due to earlier validation
+            query_vector = {"dense": [], "sparse": []}
             raise_value_error("Both dense and sparse embeddings failed")
 
         # Execute search (returns max 100 results)
@@ -317,19 +326,21 @@ async def find_code(
 
         # Post-search filtering (v0.1 simple approach)
         # Access file info from SearchResult.file_path, not chunk.file (which doesn't exist)
+        # TODO: This is a basic implementation of test filtering.
+        # Going forward, we'll use our repo metadata collection to tag files as test or non-test among other attributes.
         if not include_tests:
             candidates = [
                 c for c in candidates if not (c.file_path and "test" in str(c.file_path).lower())
             ]
         if focus_languages:
-            lang_set = set(focus_languages)
+            langs = set(focus_languages)
             candidates = [
                 c
                 for c in candidates
                 if (
                     isinstance(c.content, CodeChunk)
                     and c.content.language
-                    and str(c.content.language) in lang_set
+                    and str(c.content.language) in langs
                 )
             ]
 
@@ -348,22 +359,19 @@ async def find_code(
         # Step 5: Rerank (optional, if provider configured)
         reranking_enum = registry.get_provider_enum_for("reranking")
         reranked_results = None
-        if reranking_enum and len(candidates) > 0:
+        if reranking_enum and candidates:
             try:
                 reranking = registry.get_provider_instance(
                     reranking_enum, "reranking", singleton=True
                 )
-                # Extract chunks for reranking - filter to only CodeChunk objects
-                # SearchResult.content can be str | CodeChunk, but rerank expects CodeChunk
-                chunks_for_reranking = [
+                if chunks_for_reranking := [
                     c.content for c in candidates if isinstance(c.content, CodeChunk)
-                ]
-                if not chunks_for_reranking:
-                    logger.warning("No CodeChunk objects available for reranking, skipping")
-                else:
+                ]:
                     reranked_results = await reranking.rerank(query, chunks_for_reranking)
                     strategies_used.append(SearchStrategy.SEMANTIC_RERANK)
                     logger.info("Reranked to %d candidates", len(reranked_results))
+                else:
+                    logger.warning("No CodeChunk objects available for reranking, skipping")
             except Exception as e:
                 logger.warning("Reranking failed, continuing without: %s", e)
 
@@ -456,23 +464,23 @@ async def find_code(
 
         # Calculate token count from code matches
         # Extract content string and calculate tokens
-        total_tokens_float: float = sum(
+        total_tokens_raw = sum(
             len(m.content.content.split()) * 1.3  # Rough token estimate
             for m in code_matches
             if hasattr(m.content, "content") and m.content.content
         )
-        total_tokens: int = min(int(total_tokens_float), token_limit)
+        total_tokens: int = min(int(total_tokens_raw), token_limit)
 
         # Generate summary
         if code_matches:
             # Extract top file names (file and file.path are non-nullable in CodeMatch)
             # Build set of filenames, convert to list for slicing
-            top_files_set: set[str] = {m.file.path.name for m in code_matches[:3]}
-            top_files_list: list[str] = list(top_files_set)
+            top_unique_files: set[str] = {m.file.path.name for m in code_matches[:3]}
+            top_files: list[str] = list(top_unique_files)
             summary: str = (
                 f"Found {len(code_matches)} relevant matches "
                 f"for {intent_type.value} query. "
-                f"Top results in: {', '.join(top_files_list[:3])}"
+                f"Top results in: {', '.join(top_files[:3])}"
             )
         else:
             summary: str = f"No matches found for query: '{query}'"
@@ -481,13 +489,11 @@ async def find_code(
         # Build set of languages (including ConfigLanguage), then convert to tuple
         from codeweaver.core.language import ConfigLanguage
 
-        languages_set: set[SemanticSearchLanguage | LanguageName | ConfigLanguage] = {
-            m.file.ext_kind.language
-            for m in code_matches
-            if m.file.ext_kind is not None and m.file.ext_kind.language is not None
+        languages: set[SemanticSearchLanguage | LanguageName | ConfigLanguage] = {
+            m.file.ext_kind.language for m in code_matches if m.file.ext_kind is not None
         }
         languages_found: tuple[SemanticSearchLanguage | LanguageName, ...] = tuple(
-            lang for lang in languages_set if not isinstance(lang, ConfigLanguage)
+            lang for lang in languages if not isinstance(lang, ConfigLanguage)
         )
 
         return FindCodeResponseSummary(
