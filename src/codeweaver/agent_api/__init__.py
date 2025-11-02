@@ -8,7 +8,7 @@
 
 from functools import cache
 
-from codeweaver.agent_api.find_code import MatchedSection, find_code
+from codeweaver.agent_api.find_code import MatchedSection, find_code  # find_code is now a subpackage
 from codeweaver.agent_api.intent import IntentResult, QueryIntent
 from codeweaver.agent_api.models import CodeMatch, FindCodeResponseSummary, IntentType
 
