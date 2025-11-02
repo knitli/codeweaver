@@ -43,9 +43,9 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
     _client: AsyncQdrantClient | None = None
     _embedder: EmbeddingProvider[Any]
     _reranking: RerankingProvider[Any] | None = None
-    config: QdrantConfig
+    config: QdrantConfig = QdrantConfig()
     _metadata: dict[str, Any] | None = None
-    _provider: Provider = Provider.QDRANT
+    _provider: Provider = Provider.QDRANT  # type: ignore
 
     @staticmethod
     def _ensure_client(client: Any) -> TypeIs[AsyncQdrantClient]:
@@ -98,8 +98,7 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
             prefer_grpc=prefer_grpc,
             grpc_port=grpc_port,
         )
-        collection_name = self.collection
-        if collection_name:
+        if collection_name := self.collection:
             await self._ensure_collection(collection_name)
 
     async def _ensure_collection(self, collection_name: str, dense_dim: int = 768) -> None:
@@ -111,10 +110,12 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
         """
         from qdrant_client.models import Distance, VectorParams
 
+        if not self._client:
+            raise ProviderError("Qdrant client is not initialized")
         collections = await self._client.get_collections()
         collection_names = [col.name for col in collections.collections]
         if collection_name not in collection_names:
-            await self._client.create_collection(
+            _ = await self._client.create_collection(
                 collection_name=collection_name,
                 vectors_config={"dense": VectorParams(size=dense_dim, distance=Distance.COSINE)},
                 sparse_vectors_config={"sparse": {}},
@@ -130,12 +131,14 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
             ConnectionError: Failed to connect to Qdrant server.
             ProviderError: Qdrant operation failed.
         """
+        if not self._client:
+            raise ProviderError("Qdrant client is not initialized")
         collections = await self._client.get_collections()
         return [col.name for col in collections.collections]
 
     async def search(
         self,
-        vector: list[float] | dict[str, list[float] | Any],
+        vector: list[float] | list[int] | dict[str, list[float] | Any] | dict[str, list[int] | Any],
         query_filter: Filter | None = None,
         limit: int = 100,
     ) -> list[SearchResult]:
@@ -154,6 +157,8 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
             DimensionMismatchError: Vector dimension doesn't match collection.
             SearchError: Search operation failed.
         """
+        if not self._client:
+            raise ProviderError("Qdrant client is not initialized")
         collection_name = self.collection
         if not collection_name:
             raise ProviderError("No collection configured")
@@ -176,12 +181,14 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
             if query_vector == "sparse" and isinstance(query_value, dict):
                 from qdrant_client.models import SparseVector
 
+                sparse_vals: dict[str, list[float]] = query_value  # type: ignore
                 query_value = SparseVector(
-                    indices=query_value.get("indices", []), values=query_value.get("values", [])
+                    indices=sparse_vals.get("indices", []),
+                    values=sparse_vals.get("values", []),  # type: ignore
                 )
             results = await self._client.query_points(
                 collection_name=collection_name,
-                query=query_value,
+                query=query_value,  # type: ignore
                 using=query_vector,
                 limit=limit,
                 with_payload=True,
@@ -209,7 +216,7 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
                 search_result = SearchResult.model_construct(
                     content=chunk,
                     file_path=Path(payload["file_path"]) if payload.get("file_path") else None,
-                    score=point.score if point.score is not None else 0.0,
+                    score=point.score or 0.0,
                     metadata=None,
                 )
                 search_results.append(search_result)
@@ -229,6 +236,8 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
             DimensionMismatchError: Embedding dimension mismatch.
             UpsertError: Upsert operation failed.
         """
+        if not self._client:
+            raise ProviderError("Qdrant client is not initialized")
         if not chunks:
             return
         collection_name = self.collection
@@ -274,6 +283,8 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
             CollectionNotFoundError: Collection doesn't exist.
             DeleteError: Delete operation failed.
         """
+        if not self._client:
+            raise ProviderError("Qdrant client is not initialized")
         collection_name = self.collection
         if not collection_name:
             raise ProviderError("No collection configured")
@@ -281,7 +292,7 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
         from qdrant_client.models import FieldCondition, MatchValue
         from qdrant_client.models import Filter as QdrantFilter
 
-        await self._client.delete(
+        _ = await self._client.delete(
             collection_name=collection_name,
             points_selector=QdrantFilter(
                 must=[FieldCondition(key="file_path", match=MatchValue(value=str(file_path)))]
@@ -298,6 +309,8 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
             CollectionNotFoundError: Collection doesn't exist.
             DeleteError: Delete operation failed.
         """
+        if not self._client:
+            raise ProviderError("Qdrant client is not initialized")
         collection_name = self.collection
         if not collection_name:
             raise ProviderError("No collection configured")
@@ -305,7 +318,7 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
         point_ids = [str(id_) for id_ in ids]
         for i in range(0, len(point_ids), 1000):
             batch = point_ids[i : i + 1000]
-            await self._client.delete(collection_name=collection_name, points_selector=batch)
+            _ = await self._client.delete(collection_name=collection_name, points_selector=batch)
 
     async def delete_by_name(self, names: list[str]) -> None:
         """Delete chunks by their unique names.
@@ -317,6 +330,8 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
             CollectionNotFoundError: Collection doesn't exist.
             DeleteError: Delete operation failed.
         """
+        if not self._client:
+            raise ProviderError("Qdrant client is not initialized")
         collection_name = self.collection
         if not collection_name:
             raise ProviderError("No collection configured")
@@ -324,7 +339,7 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
         from qdrant_client.models import FieldCondition, MatchAny
         from qdrant_client.models import Filter as QdrantFilter
 
-        await self._client.delete(
+        _ = await self._client.delete(
             collection_name=collection_name,
             points_selector=QdrantFilter(
                 must=[FieldCondition(key="chunk_name", match=MatchAny(any=names))]

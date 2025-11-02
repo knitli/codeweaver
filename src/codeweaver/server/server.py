@@ -57,8 +57,11 @@ from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.enum import AnonymityConversion, BaseEnum
 from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
 from codeweaver.core.types.sentinel import Unset
+from codeweaver.engine.indexer import Indexer
 from codeweaver.exceptions import InitializationError
 from codeweaver.providers.provider import Provider as Provider
+from codeweaver.server.health_service import HealthService
+from codeweaver.server.telemetry.client import PostHogClient
 
 
 if TYPE_CHECKING:
@@ -256,8 +259,10 @@ class AppState(DataclassSerializationMixin):
         tuple[Middleware, ...],
         Field(description="Tuple of FastMCP middleware instances applied to the server"),
     ] = ()
-    indexer: None = None
-    health_service: None = None
+    indexer: Indexer | None = None
+    health_service: HealthService | None = None
+
+    telemetry: PostHogClient | None = None
 
     def __post_init__(self) -> None:
         """Post-initialization to set the global state reference."""
@@ -340,6 +345,8 @@ async def lifespan(
             model_registry=get_model_registry(),
             middleware_stack=tuple(getattr(app, "middleware", ())),
             health_service=_get_health_service(),
+            telemetry=PostHogClient.from_settings(),
+            indexer=Indexer.from_settings(),
         )
         object.__setattr__(app, "state", state)
     state: AppState = app.state  # type: ignore

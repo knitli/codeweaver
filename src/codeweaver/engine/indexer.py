@@ -31,6 +31,7 @@ from pydantic.dataclasses import dataclass
 from watchfiles.main import Change, FileChange
 
 from codeweaver.config.chunker import ChunkerSettings
+from codeweaver.config.indexing import RignoreSettings
 from codeweaver.config.types import CodeWeaverSettingsDict
 from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.file_extensions import (
@@ -42,6 +43,7 @@ from codeweaver.core.file_extensions import (
 )
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.stores import BlakeStore
+from codeweaver.core.types.aliases import DirectoryPath
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.sentinel import Unset
@@ -66,10 +68,7 @@ def _get_embedding_instance(*, sparse: bool = False) -> EmbeddingProvider[Any] |
     registry = get_provider_registry()
 
     if provider_enum := registry.get_provider_enum_for(kind):
-        return cast(
-            EmbeddingProvider[Any],
-            registry.get_provider_instance(provider_enum, kind, singleton=True),
-        )
+        return registry.get_provider_instance(provider_enum, kind, singleton=True)
     return None
 
 
@@ -318,15 +317,29 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
     ) -> IgnoreFilter[rignore.Walker]:
         """Create an IgnoreFilter instance from settings."""
         # we actually need the full object here
-        from codeweaver.config.settings import get_settings, get_settings_map
+        from codeweaver.common.utils.git import get_project_path
+        from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
+        from codeweaver.config.settings import get_settings_map
 
         settings_map = settings or get_settings_map()
-        index_settings = get_settings().indexing
+        index_settings = (
+            IndexerSettings.model_validate(DefaultIndexerSettings)
+            if isinstance(settings_map["indexer"], Unset)
+            else settings_map["indexer"]
+        )
         if not index_settings.inc_exc_set:
-            _ = asyncio.run(index_settings.set_inc_exc(get_settings().project_path))
+            _ = asyncio.run(
+                index_settings.set_inc_exc(
+                    get_project_path()
+                    if isinstance(settings_map["project_path"], Unset)
+                    else settings_map["project_path"]
+                )
+            )
         indexing = index_settings.to_settings()
         return cls(
-            base_path=settings_map["project_path"], settings=None, walker=rignore.walk(**indexing)
+            base_path=settings_map["project_path"],
+            settings=None,
+            walker=rignore.walk(**indexing),  # type: ignore
         )
 
     @property
@@ -366,6 +379,8 @@ class Indexer(BasedModel):
             project_path: Project path for checkpoint management (preferred)
             project_root: Alias for project_path (deprecated, use project_path)
         """
+        from codeweaver.common.utils.git import get_project_path
+
         # Support both project_path and project_root for backward compatibility
         if project_root is not None and project_path is None:
             project_path = project_root
@@ -396,7 +411,14 @@ class Indexer(BasedModel):
         else:
             from codeweaver.config.settings import get_settings
 
-            self._checkpoint_manager = CheckpointManager(project_path=get_settings().project_path)
+            self._checkpoint_manager = CheckpointManager(
+                project_path=cast(
+                    Path,
+                    get_project_path()
+                    if isinstance(get_settings().project_path, Unset)
+                    else get_settings().project_path,
+                )
+            )
 
         self._checkpoint = None
         self._last_checkpoint_time = time.time()
@@ -451,9 +473,9 @@ class Indexer(BasedModel):
         """Restore original signal handlers."""
         try:
             if self._original_sigterm_handler is not None:
-                signal.signal(signal.SIGTERM, self._original_sigterm_handler)
+                _ = signal.signal(signal.SIGTERM, self._original_sigterm_handler)
             if self._original_sigint_handler is not None:
-                signal.signal(signal.SIGINT, self._original_sigint_handler)
+                _ = signal.signal(signal.SIGINT, self._original_sigint_handler)
             logger.debug("Signal handlers restored")
         except (ValueError, OSError) as e:
             logger.debug("Could not restore signal handlers: %s", e)
@@ -665,7 +687,7 @@ class Indexer(BasedModel):
                     # if not self._store.is_empty:
                     #     logger.info("Restored index from vector store")
                     #     return len(self._store)
-                    pass
+                    pass  # type: ignore
             except Exception as e:
                 logger.debug("Could not restore from persistence: %s", e)
 
@@ -725,6 +747,39 @@ class Indexer(BasedModel):
             logger.info("Checkpoint file deleted after successful completion")
 
         return self._stats.files_processed
+
+    @classmethod
+    def from_settings(cls, settings: DictView[CodeWeaverSettingsDict] | None = None) -> Indexer:
+        """Create an Indexer instance from settings.
+
+        Args:
+            settings: Optional settings dictionary view
+
+        Returns:
+            Configured Indexer instance
+        """
+        from codeweaver.common.utils.git import get_project_path
+        from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
+        from codeweaver.config.settings import get_settings_map
+
+        settings_map = settings or get_settings_map()
+        index_settings = (
+            IndexerSettings.model_validate(DefaultIndexerSettings)
+            if isinstance(settings_map["indexer"], Unset)
+            else settings_map["indexer"]
+        )
+        if not index_settings.inc_exc_set:
+            _ = asyncio.run(
+                index_settings.set_inc_exc(
+                    get_project_path()
+                    if isinstance(settings_map["project_path"], Unset)
+                    else settings_map["project_path"]
+                )
+            )
+        walker = rignore.Walker(
+            **(index_settings.to_settings())  # type: ignore
+        )
+        return cls(walker=walker, project_path=settings_map["project_path"])
 
     def _discover_files_for_batch(self, files: list[Path]) -> list[DiscoveredFile]:
         """Convert file paths to DiscoveredFile objects.
@@ -943,7 +998,7 @@ class Indexer(BasedModel):
     def save_state(self, state_path: Path) -> None:
         """Save current indexer state to a file."""
 
-    def save_checkpoint(self, checkpoint_path: Path | None = None) -> None:
+    def save_checkpoint(self, checkpoint_path: DirectoryPath | None = None) -> None:
         """Save indexing state to checkpoint file.
 
         Saves current indexing progress including:
@@ -960,22 +1015,16 @@ class Indexer(BasedModel):
             return
 
         # Compute settings hash
-        from codeweaver.config.settings import get_settings
 
-        settings = get_settings()
-        settings_dict = {
-            "project_path": str(settings.project_path),
-            "chunker": settings.chunker.model_dump(),
-            "embedding": getattr(settings, "embedding", {}).model_dump()
-            if hasattr(settings, "embedding") and settings.embedding
-            else {},
-        }
-        settings_hash = self._checkpoint_manager.compute_settings_hash(settings_dict)
+        settings_hash = self._checkpoint_manager.compute_settings_hash(
+            self._checkpoint_manager.get_relevant_settings()
+        )
 
         # Create or update checkpoint
         if not self._checkpoint:
             self._checkpoint = IndexingCheckpoint(
-                project_path=settings.project_path, settings_hash=settings_hash
+                project_path=self._checkpoint_manager.get_relevant_settings()["project_path"],
+                settings_hash=settings_hash,
             )
 
         # Update checkpoint with current stats
@@ -992,6 +1041,14 @@ class Indexer(BasedModel):
         self._checkpoint_manager.save(self._checkpoint)
         self._last_checkpoint_time = time.time()
         self._files_since_checkpoint = 0
+
+    def _construct_checkpoint_fingerprint(self) -> str:
+        """Construct a fingerprint hash of current settings for checkpoint validation."""
+        if not self._checkpoint_manager:
+            raise RuntimeError("No checkpoint manager configured")
+        return self._checkpoint_manager.compute_settings_hash(
+            self._checkpoint_manager.get_relevant_settings()
+        )
 
     def load_checkpoint(self, _checkpoint_path: Path | None = None) -> bool:
         """Load indexing state from checkpoint file.
@@ -1016,16 +1073,7 @@ class Indexer(BasedModel):
         if not checkpoint:
             return False
 
-        # Verify checkpoint is valid for resumption
-        from codeweaver.config.settings import get_settings
-
-        settings = get_settings()
-        settings_dict = {
-            "project_path": str(settings.project_path),
-            "chunker": settings.chunker.model_dump(),
-            "embedding": settings.embedding.model_dump() if settings.embedding else {},
-        }
-        current_settings_hash = self._checkpoint_manager.compute_settings_hash(settings_dict)
+        current_settings_hash = self._construct_checkpoint_fingerprint()
 
         if not self._checkpoint_manager.should_resume(
             checkpoint, current_settings_hash, max_age_hours=24
@@ -1039,7 +1087,7 @@ class Indexer(BasedModel):
         self._stats.chunks_created = checkpoint.chunks_created
         self._stats.chunks_embedded = checkpoint.chunks_embedded
         self._stats.chunks_indexed = checkpoint.chunks_indexed
-        self._stats.files_with_errors = [Path(p) for p in checkpoint.files_with_errors]
+        type(self._stats).files_with_errors = [Path(p) for p in checkpoint.files_with_errors]
 
         self._checkpoint = checkpoint
         logger.info(

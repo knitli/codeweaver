@@ -38,7 +38,10 @@ from uvicorn.config import (
 )
 
 from codeweaver.common.utils.utils import get_user_config_dir
+from codeweaver.config.chunker import ChunkerSettingsDict
+from codeweaver.config.indexing import IndexerSettingsDict
 from codeweaver.config.logging import LoggingConfigDict
+from codeweaver.config.telemetry import TelemetrySettingsDict
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
 
@@ -100,8 +103,9 @@ class FastMcpServerSettingsDict(TypedDict, total=False):
 class EndpointSettingsDict(TypedDict, total=False):
     """Defines enable/disable settings for various CodeWeaver HTTP endpoints."""
 
+    enable_state: NotRequired[bool | Unset]
     enable_health: NotRequired[bool | Unset]
-    enable_statistics: NotRequired[bool | Unset]
+    enable_stats: NotRequired[bool | Unset]
     enable_settings: NotRequired[bool | Unset]
     enable_version: NotRequired[bool | Unset]
 

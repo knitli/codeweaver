@@ -72,11 +72,14 @@ class DiscoveredFile(DataclassSerializationMixin):
     @classmethod
     def _ensure_ext_kind(cls, data: Any) -> Any:
         """Ensure ext_kind is set based on path if not provided."""
-        if isinstance(data, dict) and ("ext_kind" not in data or data["ext_kind"] is None):
-            path = data.get("path")
-            if path:
-                data["ext_kind"] = ExtKind.from_file(path)
-        return data
+        if (
+            isinstance(data, dict)
+            and ("ext_kind" not in data or data["ext_kind"] is None)
+            and (path := data["path"])  # type: ignore
+            and isinstance(path, (Path, str))
+        ):
+            data["ext_kind"] = ExtKind.from_file(path if isinstance(path, Path) else Path(path))
+        return data  # type: ignore
 
     def __init__(
         self,
@@ -94,19 +97,17 @@ class DiscoveredFile(DataclassSerializationMixin):
             object.__setattr__(self, "ext_kind", ExtKind.from_file(path))
         if file_hash:
             object.__setattr__(self, "_file_hash", file_hash)
-        elif path.exists() and path.is_file():
+        elif path.is_file():
             object.__setattr__(self, "_file_hash", get_blake_hash(path.read_bytes()))
         else:
             # For non-existent files (e.g., test fixtures), use None
             object.__setattr__(self, "_file_hash", None)
         if git_branch and git_branch is not Missing:
             object.__setattr__(self, "_git_branch", git_branch)
+        elif path.exists():
+            object.__setattr__(self, "_git_branch", get_git_branch(path) or Missing)
         else:
-            # Only try to get git branch if path exists
-            if path.exists():
-                object.__setattr__(self, "_git_branch", get_git_branch(path) or Missing)
-            else:
-                object.__setattr__(self, "_git_branch", Missing)
+            object.__setattr__(self, "_git_branch", Missing)
         object.__setattr__(self, "source_id", kwargs.get("source_id", uuid7()))
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
@@ -241,6 +242,7 @@ class DiscoveredFile(DataclassSerializationMixin):
 
         if (
             self.is_text
+            and self.ext_kind is not None
             and self.ext_kind.language in SemanticSearchLanguage
             and isinstance(self.ext_kind.language, SemanticSearchLanguage)
         ):

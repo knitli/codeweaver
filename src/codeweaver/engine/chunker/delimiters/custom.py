@@ -21,6 +21,7 @@ from types import MappingProxyType
 
 import textcase
 
+from codeweaver.core.types.sentinel import Unset
 from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
 from codeweaver.engine.chunker.delimiters.patterns import (
     EMPTY_PATTERN,
@@ -683,7 +684,12 @@ def get_custom_patterns(language: str) -> list[DelimiterPattern]:
 
     language = textcase.snake(language)
     delimiters: list[DelimiterPattern] = []
-    if custom_delimiters := get_settings().chunker.custom_delimiters:
+    if (
+        (settings := get_settings())
+        and (chunker := settings.chunker)
+        and not isinstance(chunker, Unset)
+        and (custom_delimiters := chunker.custom_delimiters)
+    ):
         for delim in custom_delimiters:
             if (lang := delim.language) and language == textcase.snake(lang):
                 delimiters.extend(delim.delimiters)

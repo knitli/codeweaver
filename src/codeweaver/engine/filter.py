@@ -305,24 +305,7 @@ def to_qdrant_filter(filter_obj: Filter | None) -> Filter | None:
         >>> # No filter
         >>> assert to_qdrant_filter(None) is None
     """
-    if filter_obj is None:
-        return None
-
-    # CodeWeaver's Filter model (from engine.match_models) is already compatible
-    # with Qdrant's filter format. The Filter object uses FieldCondition with
-    # MatchValue, MatchAny, MatchExcept, and Range - all of which map directly
-    # to Qdrant's filter syntax.
-    #
-    # Field mappings for common vector store operations:
-    # - file_path: stored as "file_path" in payload
-    # - language: stored as "language" in payload
-    # - line_start/line_end: stored as "line_start"/"line_end" in payload
-    # - git_commit: stored as "git_commit" in payload (if present)
-    # - embedding_complete: stored as "embedding_complete" in payload
-    #
-    # The vector store providers (QdrantVectorStoreProvider, MemoryVectorStoreProvider) use
-    # these field names when constructing payload, so no translation is needed.
-    return filter_obj
+    return None if filter_obj is None else filter_obj
 
 
 __all__ = (

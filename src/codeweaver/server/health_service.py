@@ -11,7 +11,7 @@ import logging
 import time
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, NoReturn
+from typing import TYPE_CHECKING, Any, Literal, NoReturn, cast
 
 from codeweaver.server.health_models import (
     EmbeddingProviderServiceInfo,
@@ -95,7 +95,7 @@ class HealthService:
         uptime_seconds = int(time.time() - self._startup_time)
 
         return HealthResponse.create_with_current_timestamp(
-            status=status,
+            status=cast(Literal["healthy", "degraded", "unhealthy"], status),
             uptime_seconds=uptime_seconds,
             indexing=indexing_info,
             services=services_info,
@@ -191,7 +191,7 @@ class HealthService:
             provider = (
                 vector_provider["provider"]
                 if isinstance(vector_provider, dict)
-                else vector_provider[0]["provider"]
+                else vector_provider["provider"]
                 if vector_provider
                 else None
             )
@@ -260,7 +260,7 @@ class HealthService:
                     status=status,
                     model=model_name,
                     latency_ms=latency_ms,
-                    circuit_breaker_state=circuit_state,
+                    circuit_breaker_state=circuit_state,  # type: ignore
                 )
             raise_error()
         except Exception as e:

@@ -724,10 +724,14 @@ class SemanticChunker(BaseChunker):
         delimiter_chunks = delimiter_chunker.chunk(node.text, file=temp_file)
 
         # Enhance each chunk with semantic fallback metadata
-        semantic_metadata = self._build_metadata(node)
-        if semantic_metadata and "semantic_meta" in semantic_metadata:
+        metadata = self._build_metadata(node)
+        if (
+            metadata
+            and "semantic_meta" in metadata
+            and isinstance(metadata["semantic_meta"], SemanticMetadata)
+        ):
             # Mark as partial node
-            semantic_metadata["semantic_meta"] = semantic_metadata["semantic_meta"].model_copy(
+            metadata["semantic_meta"] = metadata["semantic_meta"].model_copy(
                 update={"is_partial_node": True}
             )
 
@@ -739,11 +743,8 @@ class SemanticChunker(BaseChunker):
                 chunk_metadata["context"] = {}
 
             # Add semantic fallback indicators (both top-level and in context)
-            chunk_metadata["fallback"] = "delimiter"  # Top-level for test compatibility
-            chunk_metadata["parent_semantic_node"] = node.name  # Top-level for test compatibility
             chunk_metadata["context"]["fallback"] = "delimiter"  # type: ignore[index]
             chunk_metadata["context"]["parent_semantic_node"] = node.name  # type: ignore[index]
-            chunk_metadata["parent_semantic_meta"] = semantic_metadata.get("semantic_meta")
 
             # Create enhanced chunk preserving delimiter chunk properties
             enhanced_chunk = CodeChunk(
@@ -752,27 +753,23 @@ class SemanticChunker(BaseChunker):
                 ext_kind=delimiter_chunk.ext_kind,
                 file_path=delimiter_chunk.file_path,
                 language=delimiter_chunk.language,
-                source=ChunkSource.SEMANTIC,  # Mark as semantic even though it used delimiter
-                metadata=chunk_metadata,
+                source=ChunkSource.TEXT_BLOCK,  # Not truly semantic
+                metadata=Metadata(**chunk_metadata),  # type: ignore
             )
             enhanced_chunks.append(enhanced_chunk)
 
-        return (
-            enhanced_chunks
-            if enhanced_chunks
-            else [
-                # Last resort: single chunk with fallback metadata
-                CodeChunk(
-                    content=node.text,
-                    line_range=Span(node.range.start.line, node.range.end.line, source_id),  # type: ignore[call-arg]
-                    ext_kind=ExtKind.from_file(file_path) if file_path else None,
-                    file_path=file_path,
-                    language=self.language,
-                    source=ChunkSource.SEMANTIC,
-                    metadata=semantic_metadata,
-                )
-            ]
-        )
+        return enhanced_chunks or [
+            # Last resort: single chunk with fallback metadata
+            CodeChunk(
+                content=node.text,
+                line_range=Span(node.range.start.line, node.range.end.line, source_id),  # type: ignore[call-arg]
+                ext_kind=ExtKind.from_file(file_path) if file_path else None,
+                file_path=file_path,
+                language=self.language,
+                source=ChunkSource.SEMANTIC,
+                metadata=metadata,
+            )
+        ]
 
     def _compute_content_hash(self, content: str) -> BlakeHashKey:
         """Compute Blake3 hash for content deduplication.

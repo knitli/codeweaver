@@ -130,11 +130,11 @@ class SearchResult(BasedModel):
         a minimal object with just the path.
         """
         if isinstance(self.content, CodeChunk) and hasattr(self.content, "file"):
-            return self.content.file
+            return DiscoveredFile.from_chunk(self.content)
 
         # Return minimal file-like object with path
         class _FileInfo:
-            def __init__(self, path):
+            def __init__(self, path: Path) -> None:
                 self.path = path
 
         return _FileInfo(self.file_path) if self.file_path else None

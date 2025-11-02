@@ -130,14 +130,13 @@ class DelimiterChunker(BaseChunker):
                 if context is None:
                     context = {}
 
-                matches = self._get_matches_with_fallback(content, governor, context)
+                if matches := self._get_matches_with_fallback(content, governor, context):
+                    chunks = self._process_matches_to_chunks(
+                        matches, content, file_path, source_id, context, governor
+                    )
 
-                if not matches:
+                else:
                     return []
-
-                chunks = self._process_matches_to_chunks(
-                    matches, content, file_path, source_id, context, governor
-                )
 
             except ChunkingError:
                 raise
@@ -413,7 +412,10 @@ class DelimiterChunker(BaseChunker):
 
                 # Find the matching closing delimiter for the structural character
                 struct_end = self._find_matching_close(
-                    content, struct_start, struct_char, structural_pairs.get(struct_char, "")
+                    content,
+                    struct_start,
+                    struct_char or "",
+                    structural_pairs.get(struct_char, ""),  # type: ignore
                 )
 
                 if struct_end is not None:
@@ -584,17 +586,11 @@ class DelimiterChunker(BaseChunker):
         # Line comments
         if two_chars in ("//", "#"):
             newline_pos = content.find("\n", pos)
-            if newline_pos == -1:
-                return -1  # Comment goes to end of file
-            return newline_pos + 1
-
+            return -1 if newline_pos == -1 else newline_pos + 1
         # Block comments
         if two_chars == "/*":
             end_comment = content.find("*/", pos + 2)
-            if end_comment == -1:
-                return -1  # Unclosed comment
-            return end_comment + 2
-
+            return -1 if end_comment == -1 else end_comment + 2
         return None
 
     def _update_paren_depth(self, char: str, paren_depth: int) -> int:
@@ -609,9 +605,7 @@ class DelimiterChunker(BaseChunker):
         """
         if char == "(":
             return paren_depth + 1
-        if char == ")":
-            return paren_depth - 1
-        return paren_depth
+        return paren_depth - 1 if char == ")" else paren_depth
 
     def _check_structural_delimiter(
         self, content: str, pos: int, allowed: set[str]
@@ -739,7 +733,7 @@ class DelimiterChunker(BaseChunker):
         Returns:
             Updated StringParseState
         """
-        if char in ('"', "'", "`"):
+        if char in {'"', "'", "`"}:
             if not state.in_string:
                 return StringParseState(in_string=True, delimiter=char)
             if char == state.delimiter and pos > 0 and content[pos - 1] != "\\":
@@ -764,16 +758,10 @@ class DelimiterChunker(BaseChunker):
 
         if two_chars in ("//", "#"):
             newline = content.find("\n", pos)
-            if newline == -1:
-                return -1
-            return newline
-
+            return -1 if newline == -1 else newline
         if two_chars == "/*":
             end_comment = content.find("*/", pos + 2)
-            if end_comment == -1:
-                return -1
-            return end_comment + 2
-
+            return -1 if end_comment == -1 else end_comment + 2
         return None
 
     def _check_delimiter_nesting(
@@ -892,7 +880,7 @@ class DelimiterChunker(BaseChunker):
         backticks = prefix.count("`")
 
         # Odd number of quotes means we're inside a string
-        return bool(single_quotes % 2 == 1 or double_quotes % 2 == 1 or backticks % 2 == 1)
+        return single_quotes % 2 == 1 or double_quotes % 2 == 1 or backticks % 2 == 1
 
     def _fallback_paragraph_chunking(self, content: str) -> list[DelimiterMatch]:
         r"""Fallback to paragraph-based chunking when no delimiters match.
@@ -1129,9 +1117,6 @@ class DelimiterChunker(BaseChunker):
         lines = content.splitlines(keepends=True)
 
         for boundary in boundaries:
-            # Get delimiter with explicit type
-            delimiter: Delimiter = boundary.delimiter  # type: ignore[assignment]
-
             # Extract chunk text
             chunk_text = content[boundary.start : boundary.end]
 
@@ -1139,24 +1124,10 @@ class DelimiterChunker(BaseChunker):
             # For proper line range metadata, always expand to full lines
             start_line, end_line = self._expand_to_lines(boundary.start, boundary.end, lines)
 
-            # Determine final chunk content based on delimiter settings
-            if delimiter.take_whole_lines:  # type: ignore[union-attr]
-                # Extract the full lines
-                line_start_pos = sum(len(line) for line in lines[: start_line - 1])
-                line_end_pos = sum(len(line) for line in lines[:end_line])
-                chunk_text = content[line_start_pos:line_end_pos]
-            else:
-                # For non-take_whole_lines delimiters, still ensure content matches line range
-                # by extracting full lines, then optionally stripping delimiters
-                line_start_pos = sum(len(line) for line in lines[: start_line - 1])
-                line_end_pos = sum(len(line) for line in lines[:end_line])
-                chunk_text = content[line_start_pos:line_end_pos]
-
-                # Strip delimiters if not inclusive - but this may create mismatch with line range
-                # The test expects content to match line range, so we keep full lines
-                # if not delimiter.inclusive:  # type: ignore[union-attr]
-                #     chunk_text = self._strip_delimiters(chunk_text, delimiter)  # type: ignore[arg-type]
-
+            # Extract the full lines
+            line_start_pos = sum(len(line) for line in lines[: start_line - 1])
+            line_end_pos = sum(len(line) for line in lines[:end_line])
+            chunk_text = content[line_start_pos:line_end_pos]
             # Build metadata
             metadata = self._build_metadata(boundary, chunk_text, start_line, end_line, context)
 

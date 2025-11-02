@@ -11,16 +11,10 @@ It only stores the last `max_size` bytes, and moves old batches to a weakref sto
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from codeweaver.core.stores import UUIDStore
 from codeweaver.core.types.aliases import ModelNameT
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.embedding.types import ChunkEmbeddings, EmbeddingKind
-
-
-if TYPE_CHECKING:
-    pass
 
 
 class InvalidEmbeddingModelError(ConfigurationError):
@@ -115,9 +109,9 @@ def get_embedding_registry() -> EmbeddingRegistry:
     # Rebuild model on first access to resolve forward references
     if not _model_rebuilt:
         # Import CodeChunk here to make it available for model rebuild without circular import
-        from codeweaver.core.chunks import CodeChunk  # noqa: F401
+        from codeweaver.core.chunks import CodeChunk as CodeChunk
 
-        EmbeddingRegistry.model_rebuild()
+        _ = EmbeddingRegistry.model_rebuild()
         _model_rebuilt = True
 
     if _embedding_registry is None:

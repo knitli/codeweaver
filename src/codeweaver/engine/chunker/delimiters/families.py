@@ -25,10 +25,13 @@ from typing import TYPE_CHECKING
 
 import textcase
 
+from pydantic import NonNegativeFloat, NonNegativeInt
+
 from codeweaver.core.types.enum import BaseEnum
 
 
 if TYPE_CHECKING:
+    from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
     from codeweaver.engine.chunker.delimiters.patterns import DelimiterPattern
 
 
@@ -753,7 +756,7 @@ async def detect_language_family(content: str, min_confidence: int = 3) -> Langu
         )
 
 
-def _get_excluded_kinds() -> set:
+def _get_excluded_kinds() -> set[DelimiterKind]:
     """Get delimiter kinds to exclude from family detection."""
     from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
 
@@ -784,15 +787,15 @@ def _calculate_specificity_weight(pattern_length: int) -> float:
     if pattern_length == 3:
         return 0.7
     # 4-char patterns are quite reliable
-    if pattern_length == 4:
-        return 0.8
-    # 5+ char patterns can have context issues (e.g., 'class' in HTML attribute)
-    return 0.6
+    return 0.8 if pattern_length == 4 else 0.6
+
+
+type PatternKey = tuple[DelimiterKind, tuple[str, ...]]
 
 
 def _build_pattern_family_counts(
-    excluded_kinds: set,
-) -> tuple[dict[tuple, int], dict[LanguageFamily, list[DelimiterPattern]]]:
+    excluded_kinds: set[DelimiterKind],
+) -> tuple[dict[PatternKey, NonNegativeInt], dict[LanguageFamily, list[DelimiterPattern]]]:
     """Build pattern distinctiveness counts and family pattern mappings.
 
     Args:
@@ -801,7 +804,7 @@ def _build_pattern_family_counts(
     Returns:
         Tuple of (pattern_family_counts, family_patterns_map)
     """
-    pattern_family_counts: dict[tuple, int] = {}
+    pattern_family_counts: dict[PatternKey, NonNegativeInt] = {}
     family_patterns_map: dict[LanguageFamily, list[DelimiterPattern]] = {}
 
     for family in LanguageFamily:
@@ -821,9 +824,9 @@ def _build_pattern_family_counts(
 def _calculate_family_score(
     content: str,
     patterns: list[DelimiterPattern],
-    pattern_family_counts: dict[tuple, int],
-    excluded_kinds: set,
-) -> tuple[int, float]:
+    pattern_family_counts: dict[PatternKey, NonNegativeInt],
+    excluded_kinds: set[DelimiterKind],
+) -> tuple[NonNegativeInt, NonNegativeFloat]:
     """Calculate matches and weighted score for a family's patterns.
 
     Args:

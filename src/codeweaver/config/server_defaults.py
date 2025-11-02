@@ -32,7 +32,11 @@ DefaultFastMcpServerSettings = FastMcpServerSettingsDict(
     tools=[],
 )
 DefaultEndpointSettings = EndpointSettingsDict(
-    enable_health=True, enable_metrics=True, enable_settings=True, enable_version=True
+    enable_health=True,
+    enable_stats=True,
+    enable_settings=True,
+    enable_version=True,
+    enable_state=True,
 )  # type: ignore
 
 DefaultUvicornSettings = UvicornServerSettingsDict(

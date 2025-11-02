@@ -19,6 +19,7 @@ from pydantic import UUID4
 from typing_extensions import TypeIs
 
 from codeweaver.common.utils.utils import get_user_config_dir
+from codeweaver.config.providers import MemoryConfig
 from codeweaver.core.chunks import CodeChunk, SearchResult
 from codeweaver.core.spans import Span
 from codeweaver.engine.filter import Filter
@@ -38,6 +39,22 @@ except ImportError as e:
 logger = logging.getLogger(__name__)
 
 
+def _get_project_name() -> str:
+    """Get the project name for the persistence store.
+
+    Returns:
+        The project name as a string.
+    """
+    from codeweaver.config.settings import get_settings_map
+
+    settings = get_settings_map()
+    return settings.get("project_name") or (
+        settings.get("project_path").name
+        if isinstance(settings.get("project_path"), Path)
+        else "default_project"
+    )
+
+
 class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
     """In-memory vector store with JSON persistence for development/testing.
 
@@ -45,7 +62,7 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
     Suitable for small codebases (<10k chunks) and testing scenarios.
     """
 
-    config: Any  # Accepts MemoryConfig dict or any dict[str, Any]
+    config: MemoryConfig = MemoryConfig()
     _client: AsyncQdrantClient | None = None
 
     _provider: ClassVar[Provider] = Provider.MEMORY
@@ -58,13 +75,17 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
             PersistenceError: Failed to restore from persistence file.
             ValidationError: Persistence file format invalid.
         """
-        # Initialize persistence settings
-        # If persist_path is provided, use it as-is (it should be a full file path)
-        # Otherwise, use default location
+        if not self.config:
+            from codeweaver.common.registry.provider import get_provider_config_for
+            from codeweaver.providers.provider import ProviderKind
+
+            config = get_provider_config_for(ProviderKind.VECTOR_STORE)
+            if not isinstance(config, dict) or config.get("provider") != Provider.MEMORY:
+                raise ProviderError("No valid configuration found for MemoryVectorStoreProvider")
+            self.config = MemoryConfig(**config)
         persist_path = (
-            Path(self.config.get("persist_path"))
-            if self.config.get("persist_path")
-            else Path(get_user_config_dir()) / "vector_store.json"
+            Path(self.config.get("persist_path", get_user_config_dir()))
+            / f"{_get_project_name()}_vector_store.json"
         )
         auto_persist = self.config.get("auto_persist", True)
         persist_interval = self.config.get("persist_interval", 300)
@@ -85,7 +106,7 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
             await self._restore_from_disk()
 
         # Set up periodic persistence if configured
-        if auto_persist and persist_interval is not None:
+        if auto_persist:
             periodic_task = asyncio.create_task(self._periodic_persist_task())
             object.__setattr__(self, "_periodic_task", periodic_task)
 

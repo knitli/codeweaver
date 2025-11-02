@@ -15,42 +15,49 @@ Checkpoints are saved:
 from __future__ import annotations
 
 import logging
+import re
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, TypedDict
 
-from pydantic import UUID7, Field, PositiveInt
+from pydantic import UUID7, DirectoryPath, Field, NonNegativeInt
 from pydantic_core import from_json, to_json
 from uuid_extensions import uuid7
 
 from codeweaver.common.utils.utils import get_user_config_dir
-from codeweaver.config.indexing import IndexerSettingsDict
+from codeweaver.config.indexing import IndexerSettings
 from codeweaver.config.providers import (
     EmbeddingProviderSettings,
     RerankingProviderSettings,
+    SparseEmbeddingProviderSettings,
     VectorStoreProviderSettings,
 )
 from codeweaver.core.stores import BlakeHashKey, get_blake_hash
 from codeweaver.core.types.models import BasedModel
+from codeweaver.core.types.sentinel import Unset
 
 
 if TYPE_CHECKING:
     from codeweaver.core.types import DictView
+    from codeweaver.core.types.aliases import FilteredKeyT
+    from codeweaver.core.types.enum import AnonymityConversion
 
 logger = logging.getLogger(__name__)
+
+
+EXCEPTION_PATTERN = re.compile(r"\b\w+(Exception|Error|Failure|Fault|Abort|Abortive)\b")
 
 
 class CheckpointSettingsFingerprint(TypedDict):
     """Subset of settings relevant for checkpoint hashing."""
 
-    indexer: IndexerSettingsDict
-    embedding_provider: EmbeddingProviderSettings
-    reranking_provider: RerankingProviderSettings
-    sparse_provider: EmbeddingProviderSettings
-    vector_store: VectorStoreProviderSettings
-    max_file_size: PositiveInt
-    project_path: Path | None
+    indexer: IndexerSettings
+    embedding_provider: tuple[EmbeddingProviderSettings, ...] | None
+    reranking_provider: tuple[RerankingProviderSettings, ...] | None
+    sparse_provider: tuple[SparseEmbeddingProviderSettings, ...] | None
+    vector_store: tuple[VectorStoreProviderSettings, ...] | None
+    project_path: DirectoryPath | None
     project_name: str | None
 
 
@@ -62,19 +69,71 @@ def _get_settings_map() -> DictView[CheckpointSettingsFingerprint]:
 
     We don't want to cache this -- we want the latest settings each time. DictView always reflects changes, but we're creating a new instance here.
     """
-    from codeweaver.config.settings import get_settings_map
+    from codeweaver.common.utils.git import get_project_path
+    from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
+    from codeweaver.config.providers import (
+        DefaultEmbeddingProviderSettings,
+        DefaultRerankingProviderSettings,
+        DefaultSparseEmbeddingProviderSettings,
+        DefaultVectorStoreProviderSettings,
+    )
+    from codeweaver.config.settings import get_settings
 
-    settings = get_settings_map()
+    settings = get_settings()
+    if isinstance(settings.provider, Unset):
+        from codeweaver.config.providers import AllDefaultProviderSettings, ProviderSettings
+
+        settings.provider = ProviderSettings.model_validate(AllDefaultProviderSettings)
+    settings.indexing = (
+        IndexerSettings.model_validate(DefaultIndexerSettings)
+        if isinstance(settings.indexing, Unset)
+        else settings.indexing
+    )
+    settings.provider.embedding = (
+        DefaultEmbeddingProviderSettings
+        if isinstance(settings.provider.embedding, Unset)
+        else settings.provider.embedding
+    )
+    settings.provider.sparse_embedding = (
+        DefaultSparseEmbeddingProviderSettings
+        if isinstance(settings.provider.sparse_embedding, Unset)
+        else settings.provider.sparse_embedding
+    )
+    settings.provider.vector_store = (
+        DefaultVectorStoreProviderSettings
+        if isinstance(settings.provider.vector_store, Unset)
+        else settings.provider.vector_store
+    )
+    settings.provider.reranking = (
+        DefaultRerankingProviderSettings
+        if isinstance(settings.provider.reranking, Unset)
+        else settings.provider.reranking
+    )
+    settings.project_path = (
+        get_project_path() if isinstance(settings.project_path, Unset) else settings.project_path
+    )
+    settings.project_name = (
+        settings.project_path.name
+        if isinstance(settings.project_name, Unset)
+        else settings.project_name
+    )
     return DictView(
         CheckpointSettingsFingerprint(
-            indexer=settings["indexer"],
-            embedding_provider=settings["provider"].get("embeddings"),
-            reranking_provider=settings["provider"].get("reranking"),
-            sparse_provider=settings["provider"].get("sparse"),
-            vector_store=settings["provider"].get("vector_store"),
-            max_file_size=settings["max_file_size"],
-            project_path=settings["project_path"],
-            project_name=settings["project_name"],
+            indexer=settings.indexing,
+            embedding_provider=tuple(settings.provider.embedding)
+            if settings.provider.embedding
+            else None,
+            reranking_provider=tuple(settings.provider.reranking)
+            if settings.provider.reranking
+            else None,
+            sparse_provider=tuple(settings.provider.sparse_embedding)
+            if settings.provider.sparse_embedding
+            else None,
+            vector_store=tuple(settings.provider.vector_store)
+            if settings.provider.vector_store
+            else None,
+            project_path=settings.project_path,
+            project_name=settings.project_name,
         )
     )
 
@@ -101,23 +160,29 @@ class IndexingCheckpoint(BasedModel):
     )
 
     # File progress tracking
-    files_discovered: int = Field(default=0, ge=0, description="Total files found")
-    files_embedding_complete: int = Field(default=0, ge=0, description="Files with embeddings")
-    files_indexed: int = Field(default=0, ge=0, description="Files in vector store")
+    files_discovered: Annotated[NonNegativeInt, Field(ge=0, description="Total files found")] = 0
+    files_embedding_complete: Annotated[
+        NonNegativeInt, Field(ge=0, description="Files with embeddings")
+    ] = 0
+    files_indexed: Annotated[NonNegativeInt, Field(ge=0, description="Files in vector store")] = 0
     files_with_errors: list[str] = Field(
         default_factory=list, description="File paths that failed processing"
     )
 
     # Chunk progress tracking
-    chunks_created: int = Field(default=0, ge=0, description="Total chunks created")
-    chunks_embedded: int = Field(default=0, ge=0, description="Chunks with embeddings")
-    chunks_indexed: int = Field(default=0, ge=0, description="Chunks in vector store")
+    chunks_created: Annotated[NonNegativeInt, Field(ge=0, description="Total chunks created")] = 0
+    chunks_embedded: Annotated[
+        NonNegativeInt, Field(ge=0, description="Chunks with embeddings")
+    ] = 0
+    chunks_indexed: Annotated[NonNegativeInt, Field(ge=0, description="Chunks in vector store")] = 0
 
     # Batch tracking
     batch_ids_completed: list[str] = Field(
-        default_factory=list, description="Completed batch IDs (UUIDs)"
+        default_factory=list, description="Completed batch IDs (hex UUIDs)"
     )
-    current_batch_id: str | None = Field(default=None, description="Active batch ID (UUID, if any)")
+    current_batch_id: Annotated[
+        UUID7 | None, Field(description="Active batch ID (UUID, if any)")
+    ] = None
 
     # Error tracking
     errors: list[dict[str, str]] = Field(
@@ -125,9 +190,32 @@ class IndexingCheckpoint(BasedModel):
     )
 
     # Settings hash for invalidation
-    settings_hash: str = Field(
-        description="Blake3 hash of indexing settings (detect config changes)"
-    )
+    settings_hash: Annotated[
+        BlakeHashKey | None,
+        Field(description="Blake3 hash of indexing settings (detect config changes)"),
+    ] = None
+
+    def _telemetry_handler(self, _serialized_self: dict[str, Any]) -> dict[str, Any]:
+        if errors := self.errors:
+            from codeweaver.core.types.enum import AnonymityConversion
+
+            converted = AnonymityConversion.DISTRIBUTION.filtered([
+                EXCEPTION_PATTERN.findall(val)
+                for e in errors
+                for val in e.values()
+                if val and EXCEPTION_PATTERN.search(val)
+            ])
+            _serialized_self["errors"] = converted
+        return _serialized_self
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        from codeweaver.core.types.aliases import FilteredKey
+        from codeweaver.core.types.enum import AnonymityConversion
+
+        return {
+            FilteredKey("project_path"): AnonymityConversion.HASH,
+            FilteredKey("files_with_errors"): AnonymityConversion.COUNT,
+        }
 
     def is_stale(self, max_age_hours: int = 24) -> bool:
         """Check if checkpoint is too old to resume safely.
@@ -272,6 +360,14 @@ class CheckpointManager:
 
         logger.info("Checkpoint is valid, will resume from previous session")
         return True
+
+    def get_relevant_settings(self) -> CheckpointSettingsFingerprint:
+        """Get relevant settings for checkpoint hashing.
+
+        Returns:
+            Dictionary of settings affecting indexing
+        """
+        return CheckpointSettingsFingerprint(**_get_settings_map())
 
 
 __all__ = ("CheckpointManager", "CheckpointSettingsFingerprint", "IndexingCheckpoint")

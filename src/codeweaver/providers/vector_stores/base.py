@@ -13,7 +13,7 @@ import time
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, TypedDict
+from typing import Any, ClassVar, TypedDict
 
 from pydantic import UUID4, ConfigDict
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
@@ -29,23 +29,7 @@ from codeweaver.providers.embedding.capabilities.base import (
 from codeweaver.providers.provider import Provider
 
 
-if TYPE_CHECKING:
-    from codeweaver.config.types import CodeWeaverSettingsDict
-    from codeweaver.core.types.dictview import DictView
-
-
 logger = logging.getLogger(__name__)
-
-
-def _get_settings() -> DictView[CodeWeaverSettingsDict]:
-    """Get global CodeWeaver settings.
-
-    Returns:
-        Global settings as a dictionary view.
-    """
-    from codeweaver.config.settings import get_settings_map
-
-    return get_settings_map()
 
 
 class EmbeddingCapsDict(TypedDict):

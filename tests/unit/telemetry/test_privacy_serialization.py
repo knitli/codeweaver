@@ -23,7 +23,7 @@ from codeweaver.core.types import (
     FilteredKey,
     FilteredKeyT,
 )
-from codeweaver.telemetry.events import (
+from codeweaver.server.telemetry.events import (
     PerformanceBenchmarkEvent,
     SemanticValidationEvent,
     SessionSummaryEvent,

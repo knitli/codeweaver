@@ -29,8 +29,6 @@ from codeweaver.core.types.sentinel import Unset
 if TYPE_CHECKING:
     from posthog import Posthog
 
-from codeweaver.config.telemetry import get_telemetry_settings
-
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +55,7 @@ class PostHogClient:
     def __init__(
         self,
         api_key: str | None = None,
-        host: str = "https://app.posthog.com",
+        host: str = "https://us.i.posthog.com",
         *,
         enabled: bool = True,
     ):
@@ -115,7 +113,14 @@ class PostHogClient:
         Returns:
             Configured PostHog client instance
         """
-        settings = get_telemetry_settings()
+        from codeweaver.config.settings import get_settings
+        from codeweaver.config.telemetry import TelemetrySettings
+
+        settings = get_settings().telemetry
+        if not isinstance(settings, TelemetrySettings):
+            from codeweaver.config.telemetry import DefaultTelemetrySettings
+
+            settings = TelemetrySettings.model_validate(DefaultTelemetrySettings)
         if (
             not settings.enabled
             or not settings.posthog_project_key

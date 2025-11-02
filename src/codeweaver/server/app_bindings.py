@@ -222,12 +222,12 @@ async def health(_request: Request) -> PlainTextResponse:
             # Fallback to basic health if service not initialized
             info = health_info()
             return PlainTextResponse(content=info.report(), media_type="application/json")
-
-        # Get health response from health service
-        health_response = await state.health_service.get_health_response()
-        return PlainTextResponse(
-            content=health_response.model_dump_json(), media_type="application/json"
-        )
+        # Get health response from health Service
+        if state.health_service:
+            health_response = state.health_service.get_health_response()
+            return PlainTextResponse(
+                content=health_response.model_dump_json(), media_type="application/json"
+            )
     except Exception:
         _logger.exception("Failed to get health status")
         # Return unhealthy status on error
@@ -280,6 +280,7 @@ async def health(_request: Request) -> PlainTextResponse:
         return PlainTextResponse(
             content=error_response.model_dump_json(), status_code=503, media_type="application/json"
         )
+    raise RuntimeError("Unreachable code in health endpoint")
 
 
 def setup_middleware(
@@ -339,16 +340,37 @@ async def register_app_bindings(
     app: FastMCP[AppState], middleware: set[Middleware], middleware_settings: MiddlewareOptions
 ) -> tuple[FastMCP[AppState], set[Middleware]]:
     """Register application bindings for tools and routes."""
+    from codeweaver.config.server_defaults import DefaultEndpointSettings
+    from codeweaver.config.settings import get_settings_map
+    from codeweaver.core.types.sentinel import Unset
+
+    if (endpoint_settings := get_settings_map().get("endpoints")) and isinstance(
+        endpoint_settings, Unset
+    ):
+        endpoint_settings = DefaultEndpointSettings
+    elif endpoint_settings:
+        endpoint_settings = DefaultEndpointSettings | endpoint_settings
+    else:
+        endpoint_settings = DefaultEndpointSettings
     # Routes
-    app.custom_route("/state", methods=["GET"], name="state", include_in_schema=True)(state_info)  # type: ignore[arg-type]
-    app.custom_route("/stats", methods=["GET"], name="stats", include_in_schema=True)(stats_info)  # type: ignore[arg-type]
-    app.custom_route("/settings", methods=["GET"], name="settings", include_in_schema=True)(  # pyright: ignore[reportUnknownMemberType]
-        settings_info
-    )  # type: ignore[arg-type]
-    app.custom_route("/version", methods=["GET"], name="version", include_in_schema=True)(  # pyright: ignore[reportUnknownMemberType]
-        version_info
-    )  # type: ignore[arg-type]
-    app.custom_route("/health", methods=["GET"], name="health", include_in_schema=True)(health)  # type: ignore[arg-type]
+    if endpoint_settings.get("enable_state", True):
+        app.custom_route("/state", methods=["GET"], name="state", include_in_schema=True)(
+            state_info
+        )  # type: ignore[arg-type]
+    if endpoint_settings.get("enable_stats", True):
+        app.custom_route("/stats", methods=["GET"], name="stats", include_in_schema=True)(
+            stats_info
+        )  # type: ignore[arg-type]
+    if endpoint_settings.get("enable_settings", True):
+        app.custom_route("/settings", methods=["GET"], name="settings", include_in_schema=True)(  # pyright: ignore[reportUnknownMemberType]
+            settings_info
+        )  # type: ignore[arg-type]
+    if endpoint_settings.get("enable_version", True):
+        app.custom_route("/version", methods=["GET"], name="version", include_in_schema=True)(  # pyright: ignore[reportUnknownMemberType]
+            version_info
+        )  # type: ignore[arg-type]
+    if endpoint_settings.get("enable_health", True):
+        app.custom_route("/health", methods=["GET"], name="health", include_in_schema=True)(health)  # type: ignore[arg-type]
     # todo: add status endpoint (more what I'm doing right now/progress than health)
 
     middleware = setup_middleware(
