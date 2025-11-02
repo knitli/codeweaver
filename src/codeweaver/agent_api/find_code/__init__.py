@@ -57,6 +57,7 @@ from codeweaver.agent_api.find_code.pipeline import (
     execute_vector_search,
     rerank_results,
 )
+from codeweaver.agent_api.find_code.response import build_error_response, build_success_response
 from codeweaver.agent_api.find_code.scoring import (
     apply_hybrid_weights,
     process_reranked_results,
@@ -68,9 +69,7 @@ from codeweaver.agent_api.models import (
     FindCodeResponseSummary,
     SearchStrategy,
 )
-from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.spans import Span
-from codeweaver.core.types import LanguageName
 from codeweaver.semantic.classifications import AgentTask
 
 
@@ -200,63 +199,22 @@ async def find_code(
 
         # Step 11: Build response
         execution_time_ms = (time.time() - start_time) * 1000
-
-        # Calculate token count from code matches
-        total_tokens_raw = sum(
-            len(m.content.content.split()) * 1.3  # Rough token estimate
-            for m in code_matches
-            if hasattr(m.content, "content") and m.content.content
-        )
-        total_tokens: int = min(int(total_tokens_raw), token_limit)
-
-        # Generate summary
-        if code_matches:
-            # Extract top file names
-            top_unique_files: set[str] = {m.file.path.name for m in code_matches[:3]}
-            top_files: list[str] = list(top_unique_files)
-            summary: str = (
-                f"Found {len(code_matches)} relevant matches "
-                f"for {intent_type.value} query. "
-                f"Top results in: {', '.join(top_files[:3])}"
-            )
-        else:
-            summary: str = f"No matches found for query: '{query}'"
-
-        # Extract languages from code matches
-        languages: set[SemanticSearchLanguage | LanguageName | ConfigLanguage] = {
-            m.file.ext_kind.language for m in code_matches if m.file.ext_kind is not None
-        }
-        languages_found: tuple[SemanticSearchLanguage | LanguageName, ...] = tuple(
-            lang for lang in languages if not isinstance(lang, ConfigLanguage)
-        )
-
-        return FindCodeResponseSummary(
-            matches=code_matches,
-            summary=summary[:1000],  # Enforce max_length
-            query_intent=intent_type,
-            total_matches=len(scored_candidates),
-            total_results=len(code_matches),
-            token_count=total_tokens,
+        
+        return build_success_response(
+            code_matches=code_matches,
+            query=query,
+            intent_type=intent_type,
+            total_candidates=len(scored_candidates),
+            token_limit=token_limit,
             execution_time_ms=execution_time_ms,
-            search_strategy=tuple(strategies_used),
-            languages_found=languages_found,
+            strategies_used=strategies_used,
         )
 
     except Exception as e:
         logger.exception("find_code failed")
         # Return empty response on failure (graceful degradation)
         execution_time_ms = (time.time() - start_time) * 1000
-        return FindCodeResponseSummary(
-            matches=[],
-            summary=f"Search failed: {str(e)[:500]}",
-            query_intent=intent,
-            total_matches=0,
-            total_results=0,
-            token_count=0,
-            execution_time_ms=execution_time_ms,
-            search_strategy=(SearchStrategy.KEYWORD_FALLBACK,),
-            languages_found=(),
-        )
+        return build_error_response(e, intent, execution_time_ms)
 
 
 __all__ = ("MatchedSection", "find_code")

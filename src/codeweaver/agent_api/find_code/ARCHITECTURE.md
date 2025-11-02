@@ -12,6 +12,7 @@ codeweaver/agent_api/find_code/
 ├── conversion.py     # Result format conversions
 ├── filters.py        # Post-search filtering logic
 ├── pipeline.py       # Search pipeline orchestration
+├── response.py       # Response building and metadata
 └── scoring.py        # Scoring and reranking logic
 ```
 
@@ -60,6 +61,18 @@ Orchestrates the search pipeline components.
 
 **Purpose:** Separates provider interactions from business logic, making it easier to swap or extend providers.
 
+### `response.py` - Response Building
+Constructs FindCodeResponseSummary objects and calculates metadata.
+
+**Key Functions:**
+- `calculate_token_count()` - Estimates token count from matches
+- `generate_summary()` - Creates human-readable summary
+- `extract_languages()` - Extracts unique languages from results
+- `build_success_response()` - Builds successful response
+- `build_error_response()` - Builds error response with graceful degradation
+
+**Purpose:** Centralizes response building logic, making it easier to customize output formatting.
+
 ### `scoring.py` - Scoring and Reranking
 Handles all score calculations and adjustments.
 
@@ -103,6 +116,17 @@ All existing imports continue to work:
 from codeweaver.agent_api.find_code import find_code, MatchedSection
 from codeweaver.agent_api import find_code
 ```
+
+### 6. Improved Code Size
+The original 529-line monolithic module has been broken down into 6 focused modules:
+- `__init__.py`: 220 lines (main orchestration)
+- `pipeline.py`: 215 lines (search pipeline)
+- `response.py`: 151 lines (response building)
+- `scoring.py`: 167 lines (scoring logic)
+- `conversion.py`: 131 lines (format conversions)
+- `filters.py`: 87 lines (filtering logic)
+
+Each module is now under 250 lines and has a single, clear responsibility.
 
 ## Future Extensions
 
