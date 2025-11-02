@@ -1,0 +1,151 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+"""Response building utilities for find_code.
+
+This module handles the construction of FindCodeResponseSummary objects
+from search results, including summary generation and metadata calculation.
+"""
+
+from __future__ import annotations
+
+from codeweaver.agent_api.intent import IntentType
+from codeweaver.agent_api.models import CodeMatch, FindCodeResponseSummary, SearchStrategy
+from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
+from codeweaver.core.types import LanguageName
+
+
+def calculate_token_count(code_matches: list[CodeMatch], token_limit: int) -> int:
+    """Calculate approximate token count from code matches.
+
+    Args:
+        code_matches: List of code matches to count tokens for
+        token_limit: Maximum token limit to enforce
+
+    Returns:
+        Estimated token count, capped at token_limit
+    """
+    total_tokens_raw = sum(
+        len(m.content.content.split()) * 1.3  # Rough token estimate
+        for m in code_matches
+        if hasattr(m.content, "content") and m.content.content
+    )
+    return min(int(total_tokens_raw), token_limit)
+
+
+def generate_summary(
+    code_matches: list[CodeMatch], intent_type: IntentType, query: str
+) -> str:
+    """Generate a human-readable summary of search results.
+
+    Args:
+        code_matches: List of code matches
+        intent_type: Detected query intent
+        query: Original search query
+
+    Returns:
+        Summary string (max 1000 characters)
+    """
+    if code_matches:
+        # Extract top file names
+        top_unique_files: set[str] = {m.file.path.name for m in code_matches[:3]}
+        top_files: list[str] = list(top_unique_files)
+        summary = (
+            f"Found {len(code_matches)} relevant matches "
+            f"for {intent_type.value} query. "
+            f"Top results in: {', '.join(top_files[:3])}"
+        )
+    else:
+        summary = f"No matches found for query: '{query}'"
+
+    return summary[:1000]  # Enforce max_length
+
+
+def extract_languages(code_matches: list[CodeMatch]) -> tuple[SemanticSearchLanguage | LanguageName, ...]:
+    """Extract unique programming languages from code matches.
+
+    Args:
+        code_matches: List of code matches
+
+    Returns:
+        Tuple of unique languages found (excludes ConfigLanguage)
+    """
+    languages: set[SemanticSearchLanguage | LanguageName | ConfigLanguage] = {
+        m.file.ext_kind.language for m in code_matches if m.file.ext_kind is not None
+    }
+    return tuple(lang for lang in languages if not isinstance(lang, ConfigLanguage))
+
+
+def build_success_response(
+    code_matches: list[CodeMatch],
+    query: str,
+    intent_type: IntentType,
+    total_candidates: int,
+    token_limit: int,
+    execution_time_ms: float,
+    strategies_used: list[SearchStrategy],
+) -> FindCodeResponseSummary:
+    """Build a successful FindCodeResponseSummary.
+
+    Args:
+        code_matches: List of code matches to include
+        query: Original search query
+        intent_type: Detected query intent
+        total_candidates: Total number of candidates before limiting
+        token_limit: Maximum token limit
+        execution_time_ms: Execution time in milliseconds
+        strategies_used: List of search strategies used
+
+    Returns:
+        FindCodeResponseSummary with all fields populated
+    """
+    return FindCodeResponseSummary(
+        matches=code_matches,
+        summary=generate_summary(code_matches, intent_type, query),
+        query_intent=intent_type,
+        total_matches=total_candidates,
+        total_results=len(code_matches),
+        token_count=calculate_token_count(code_matches, token_limit),
+        execution_time_ms=execution_time_ms,
+        search_strategy=tuple(strategies_used),
+        languages_found=extract_languages(code_matches),
+    )
+
+
+def build_error_response(
+    error: Exception,
+    query_intent: IntentType | None,
+    execution_time_ms: float,
+) -> FindCodeResponseSummary:
+    """Build an error response with graceful degradation.
+
+    Args:
+        error: Exception that occurred
+        query_intent: Optional detected query intent
+        execution_time_ms: Execution time in milliseconds
+
+    Returns:
+        FindCodeResponseSummary indicating failure
+    """
+    return FindCodeResponseSummary(
+        matches=[],
+        summary=f"Search failed: {str(error)[:500]}",
+        query_intent=query_intent,
+        total_matches=0,
+        total_results=0,
+        token_count=0,
+        execution_time_ms=execution_time_ms,
+        search_strategy=(SearchStrategy.KEYWORD_FALLBACK,),
+        languages_found=(),
+    )
+
+
+__all__ = (
+    "calculate_token_count",
+    "generate_summary",
+    "extract_languages",
+    "build_success_response",
+    "build_error_response",
+)
