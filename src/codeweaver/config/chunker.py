@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 
-from typing import TYPE_CHECKING, Annotated, Any, Literal, Self
+from typing import TYPE_CHECKING, Annotated, Any, Literal, NotRequired, Self, TypedDict
 
 from pydantic import ConfigDict, Field, NonNegativeFloat, PositiveInt, model_validator
 
@@ -26,6 +26,48 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+
+# ===========================================================================
+# *       TypedDict Representations of Chunker and Related Settings
+# ===========================================================================
+
+
+class PerformanceSettingsDict(TypedDict, total=False):
+    """TypedDict for performance settings.
+
+    Not intended to be used directly; used for internal type checking and validation.
+    """
+
+    max_file_size_mb: NotRequired[PositiveInt | None]
+    chunk_timeout_seconds: NotRequired[PositiveInt | None]
+    parse_timeout_seconds: NotRequired[PositiveInt | None]
+    max_chunks_per_file: NotRequired[PositiveInt | None]
+    max_memory_mb_per_operation: NotRequired[PositiveInt | None]
+    max_ast_depth: NotRequired[PositiveInt | None]
+
+
+class ConcurrencySettingsDict(TypedDict, total=False):
+    """TypedDict for concurrency settings.
+
+    Not intended to be used directly; used for internal type checking and validation.
+    """
+
+    max_parallel_files: NotRequired[PositiveInt | None]
+    use_process_pool: NotRequired[bool | None]
+
+
+class ChunkerSettingsDict(TypedDict, total=False):
+    """TypedDict for Chunker settings.
+
+    Not intended to be used directly; used for internal type checking and validation.
+    """
+
+    custom_delimiters: NotRequired[list[CustomDelimiter]] | None
+    custom_languages: NotRequired[list[CustomLanguage]] | None
+    semantic_importance_threshold: NotRequired[NonNegativeFloat | None]
+    performance: NotRequired[PerformanceSettingsDict | None]
+    concurrency: NotRequired[ConcurrencySettingsDict | None]
 
 
 class CustomLanguage(BasedModel):
@@ -226,15 +268,6 @@ class ChunkerSettings(BasedModel):
         super().model_post_init(__context)
 
 
-__all__ = (
-    "ChunkerSettings",
-    "ConcurrencySettings",
-    "CustomDelimiter",
-    "CustomLanguage",
-    "PerformanceSettings",
-)
-
-
 # Rebuild models at module level to resolve forward references
 # This ensures models are ready before first instantiation
 try:
@@ -244,3 +277,20 @@ except Exception:
     logger.warning(
         "Failed to rebuild ChunkerSettings models at import time. Will retry on first use."
     )
+
+
+DefaultChunkerSettings = ChunkerSettingsDict(
+    ChunkerSettings().model_dump(exclude_none=True, exclude_computed_fields=True)  # type: ignore
+)
+
+__all__ = (
+    "ChunkerSettings",
+    "ChunkerSettingsDict",
+    "ConcurrencySettings",
+    "ConcurrencySettingsDict",
+    "CustomDelimiter",
+    "CustomLanguage",
+    "DefaultChunkerSettings",
+    "PerformanceSettings",
+    "PerformanceSettingsDict",
+)

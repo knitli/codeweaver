@@ -25,12 +25,12 @@ from pydantic_core import from_json, to_json
 from uuid_extensions import uuid7
 
 from codeweaver.common.utils.utils import get_user_config_dir
+from codeweaver.config.indexing import IndexerSettingsDict
 from codeweaver.config.providers import (
     EmbeddingProviderSettings,
     RerankingProviderSettings,
     VectorStoreProviderSettings,
 )
-from codeweaver.config.types import IndexerSettingsDict
 from codeweaver.core.stores import BlakeHashKey, get_blake_hash
 from codeweaver.core.types.models import BasedModel
 

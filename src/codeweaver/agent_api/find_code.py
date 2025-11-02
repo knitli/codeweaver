@@ -319,9 +319,7 @@ async def find_code(
         # Access file info from SearchResult.file_path, not chunk.file (which doesn't exist)
         if not include_tests:
             candidates = [
-                c
-                for c in candidates
-                if not (c.file_path and "test" in str(c.file_path).lower())
+                c for c in candidates if not (c.file_path and "test" in str(c.file_path).lower())
             ]
         if focus_languages:
             lang_set = set(focus_languages)

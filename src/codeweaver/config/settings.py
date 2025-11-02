@@ -39,7 +39,6 @@ from pydantic import (
     field_validator,
 )
 from pydantic.fields import ComputedFieldInfo, FieldInfo
-from pydantic_ai.settings import merge_model_settings
 from pydantic_core import from_json
 from pydantic_settings import (
     AWSSecretsManagerSettingsSource,
@@ -58,35 +57,17 @@ from pydantic_settings import (
 
 from codeweaver.common.utils.lazy_importer import lazy_import
 from codeweaver.common.utils.utils import get_user_config_dir
-from codeweaver.config.chunker import ChunkerSettings
-from codeweaver.config.defaults import (
-    DefaultAgentProviderSettings,
-    DefaultChunkerSettings,
-    DefaultDataProviderSettings,
-    DefaultEmbeddingProviderSettings,
-    DefaultEndpointSettings,
-    DefaultFastMcpServerSettings,
-    DefaultIndexerSettings,
-    DefaultRerankingProviderSettings,
-    DefaultSparseEmbeddingProviderSettings,
-    DefaultTelemetrySettings,
-    DefaultUvicornSettings,
-    DefaultVectorStoreProviderSettings,
-)
-from codeweaver.config.indexing import IndexerSettings
+from codeweaver.config.chunker import ChunkerSettings, DefaultChunkerSettings
+from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
 from codeweaver.config.logging import LoggingSettings
 from codeweaver.config.middleware import AVAILABLE_MIDDLEWARE, MiddlewareOptions
-from codeweaver.config.providers import (
-    AgentModelSettings,
-    AgentProviderSettings,
-    DataProviderSettings,
-    EmbeddingProviderSettings,
-    ProviderSettingsDict,
-    RerankingProviderSettings,
-    SparseEmbeddingProviderSettings,
-    VectorStoreProviderSettings,
+from codeweaver.config.providers import AllDefaultProviderSettings, ProviderSettings
+from codeweaver.config.server_defaults import (
+    DefaultEndpointSettings,
+    DefaultFastMcpServerSettings,
+    DefaultUvicornSettings,
 )
-from codeweaver.config.telemetry import TelemetrySettings
+from codeweaver.config.telemetry import DefaultTelemetrySettings, TelemetrySettings
 from codeweaver.config.types import (
     CodeWeaverSettingsDict,
     EndpointSettingsDict,
@@ -100,74 +81,6 @@ from codeweaver.core.types.sentinel import UNSET, Unset
 
 
 logger = logging.getLogger(__name__)
-
-
-def merge_agent_model_settings(
-    base: AgentModelSettings | None, override: AgentModelSettings | None
-) -> AgentModelSettings | None:
-    """A convenience re-export of `merge_model_settings` for agent model settings."""
-    return merge_model_settings(base, override)
-
-
-class ProviderSettings(BasedModel):
-    """Settings for provider configuration."""
-
-    data: Annotated[
-        tuple[DataProviderSettings, ...] | Unset,
-        Field(description="""Data provider configuration"""),
-    ] = DefaultDataProviderSettings
-
-    embedding: Annotated[
-        tuple[EmbeddingProviderSettings, ...] | Unset,
-        Field(
-            description="""Embedding provider configuration.
-
-            We will only use the first provider you configure here. We may add support for multiple embedding providers in the future.
-            """
-        ),
-    ] = DefaultEmbeddingProviderSettings
-
-    sparse_embedding: Annotated[
-        tuple[SparseEmbeddingProviderSettings, ...] | Unset,
-        Field(
-            description="""Sparse embedding provider configuration.
-
-            We will only use the first provider you configure here. We may add support for multiple sparse embedding providers in the future."""
-        ),
-    ] = DefaultSparseEmbeddingProviderSettings
-
-    reranking: Annotated[
-        tuple[RerankingProviderSettings, ...] | Unset,
-        Field(
-            description="""Reranking provider configuration.
-
-            We will only use the first provider you configure here. We may add support for multiple reranking providers in the future."""
-        ),
-    ] = DefaultRerankingProviderSettings
-
-    vector_store: Annotated[
-        tuple[VectorStoreProviderSettings, ...] | Unset,
-        Field(
-            description="""Vector store provider configuration (Qdrant or in-memory), defaults to a local Qdrant instance."""
-        ),
-    ] = DefaultVectorStoreProviderSettings
-
-    agent: Annotated[
-        tuple[AgentProviderSettings, ...] | Unset,
-        Field(description="""Agent provider configuration"""),
-    ] = DefaultAgentProviderSettings
-
-    def _telemetry_keys(self) -> None:
-        return None
-
-
-AllDefaultProviderSettings = ProviderSettingsDict(
-    data=DefaultDataProviderSettings,
-    embedding=DefaultEmbeddingProviderSettings,
-    sparse_embedding=DefaultSparseEmbeddingProviderSettings,
-    reranking=DefaultRerankingProviderSettings,
-    agent=DefaultAgentProviderSettings,
-)
 
 
 class FastMcpServerSettings(BasedModel):
@@ -317,7 +230,7 @@ class CodeWeaverSettings(BaseSettings):
     5. Global config (/etc/codeweaver.toml (or .yaml, .yml, .json))
     6. Defaults
 
-    # TODO: flatten the config structure. It's a bit too much when using env vars for nested models.
+    # TODO: flatten the config structure. It's a bit too much when using env vars for nested models, particularly for provider settings.
     """
 
     model_config = SettingsConfigDict(
@@ -334,7 +247,7 @@ class CodeWeaverSettings(BaseSettings):
         env_ignore_empty=True,
         env_nested_delimiter="__",
         env_nested_max_split=-1,
-        env_prefix="CODEWEAVER_",  # environment variables will be prefixed with CODEWE
+        env_prefix="CODEWEAVER_",  # environment variables will be prefixed with CODEWEAVER_
         # keep secrets in user config dir
         str_strip_whitespace=True,
         title="CodeWeaver Settings",
@@ -343,7 +256,7 @@ class CodeWeaverSettings(BaseSettings):
         validate_assignment=True,
         populate_by_name=True,
         # spellchecker:off
-        # NOTE: Sources are set in `settings_customise_sources` method below
+        # NOTE: Config sources are set in `settings_customise_sources` method below
         # spellchecker:on
     )
 
@@ -808,16 +721,9 @@ def reset_settings() -> None:
 
 __all__ = (
     "CodeWeaverSettings",
-    "DefaultAgentProviderSettings",
-    "DefaultDataProviderSettings",
-    "DefaultEmbeddingProviderSettings",
-    "DefaultFastMcpServerSettings",
-    "DefaultRerankingProviderSettings",
     "FastMcpServerSettings",
-    "IndexerSettings",
     "get_settings",
     "get_settings_map",
-    "merge_agent_model_settings",
     "reset_settings",
     "update_settings",
 )

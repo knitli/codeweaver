@@ -27,11 +27,12 @@ Environment Variables:
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated, Any, NotRequired, TypedDict
 
 from pydantic import Field, HttpUrl, PositiveInt, PrivateAttr, SecretStr
 
 from codeweaver.config._project import CODEWEAVER_POSTHOG_PROJECT_KEY
+from codeweaver.core.types.aliases import LiteralStringT
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.sentinel import UNSET, Unset
 
@@ -156,6 +157,25 @@ class TelemetrySettings(BasedModel):
 _telemetry_settings: TelemetrySettings | None = None
 
 
+class TelemetrySettingsDict(TypedDict, total=False):
+    """TypedDict for Telemetry settings.
+
+    Not intended to be used directly; used for internal type checking and validation.
+    """
+
+    disable_telemetry: NotRequired[bool | Unset]
+    tools_before_privacy: NotRequired[bool | Unset]
+    posthog_project_key: NotRequired[LiteralStringT | Unset]
+    posthog_host: NotRequired[HttpUrl | None]
+    batch_size: NotRequired[PositiveInt | Unset]
+    batch_interval_seconds: NotRequired[PositiveInt | Unset]
+
+
+DefaultTelemetrySettings = TelemetrySettingsDict(
+    TelemetrySettings().model_dump(exclude_none=True, exclude_computed_fields=True)  # type: ignore
+)  # type: ignore
+
+
 def get_telemetry_settings() -> TelemetrySettings:
     """Get cached telemetry settings instance."""
     global _telemetry_settings
@@ -164,5 +184,4 @@ def get_telemetry_settings() -> TelemetrySettings:
     return _telemetry_settings
 
 
-__all__ = ("TelemetrySettings", "get_telemetry_settings")
-
+__all__ = ("TelemetrySettings", "TelemetrySettingsDict", "get_telemetry_settings")

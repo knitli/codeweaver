@@ -212,9 +212,7 @@ class TestChunkerPerformance:
         assert len(result) > 0
         mean_time = statistics.mean(timings)
         # Regression threshold: < 2s per file (very slow current performance)
-        assert mean_time < 2.0, (
-            f"Mean time {mean_time:.4f}s exceeds regression threshold of 2.0s"
-        )
+        assert mean_time < 2.0, f"Mean time {mean_time:.4f}s exceeds regression threshold of 2.0s"
 
     # Very large files: 5000+ lines
     @pytest.mark.dev_only
@@ -251,9 +249,7 @@ class TestChunkerPerformance:
         assert len(result) > 0
         mean_time = statistics.mean(timings)
         # Regression threshold: < 4s per file (very slow current performance for 2000 lines)
-        assert mean_time < 4.0, (
-            f"Mean time {mean_time:.4f}s exceeds regression threshold of 4.0s"
-        )
+        assert mean_time < 4.0, f"Mean time {mean_time:.4f}s exceeds regression threshold of 4.0s"
 
     # Memory profiling
     @pytest.mark.dev_only

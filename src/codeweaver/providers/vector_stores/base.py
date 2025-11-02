@@ -94,6 +94,8 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
     _last_failure_time: float | None = None
     _circuit_open_duration: float = 30.0  # seconds
 
+    _embedding_caps_initialized: ClassVar[bool] = False
+
     def __init__(
         self,
         config: Any = None,

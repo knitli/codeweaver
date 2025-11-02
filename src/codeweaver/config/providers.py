@@ -10,17 +10,57 @@ Provides configuration settings for all supported providers, including embedding
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, Any, NotRequired, Required, TypedDict
+import importlib.util as util
+import logging
 
-from pydantic import Field, PositiveInt, SecretStr
+from typing import Annotated, Any, NamedTuple, NotRequired, Required, TypedDict
+
+from pydantic import Field, PositiveFloat, PositiveInt, SecretStr
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
+from pydantic_ai.settings import merge_model_settings
 
-from codeweaver.config.types import BaseProviderSettings
 from codeweaver.core.types import DictView
+from codeweaver.core.types.models import BasedModel
+from codeweaver.core.types.sentinel import Unset
+from codeweaver.providers.provider import Provider
 
 
-if TYPE_CHECKING:
-    pass
+logger = logging.getLogger(__name__)
+
+# ===========================================================================
+# *            Provider Connection and Rate Limit Settings
+# ===========================================================================
+
+
+class ConnectionRateLimitConfig(TypedDict, total=False):
+    """Settings for connection rate limiting."""
+
+    max_requests_per_second: PositiveInt | None
+    burst_capacity: PositiveInt | None
+    backoff_multiplier: PositiveFloat | None
+    max_retries: PositiveInt | None
+
+
+class ConnectionConfiguration(TypedDict, total=False):
+    """Settings for connection configuration. Only required for non-default transports."""
+
+    host: str | None
+    port: PositiveInt | None
+    headers: NotRequired[dict[str, str] | None]
+    rate_limits: NotRequired[ConnectionRateLimitConfig | None]
+
+
+class BaseProviderSettings(TypedDict, total=False):
+    """Base settings for all providers."""
+
+    provider: Required[Provider]
+    enabled: Required[bool]
+    api_key: NotRequired[str | None]
+    connection: NotRequired[ConnectionConfiguration | None]
+    client_options: NotRequired[dict[str, Any] | None]
+    """Options to pass to the provider's client (like to `qdrant_client` for qdrant) as keyword arguments. You should refer to the provider's documentation for what options are available."""
+    other: NotRequired[dict[str, Any] | None]
+    """Other provider-specific settings. This is primarily for user-defined providers to pass custom options."""
 
 
 # ===========================================================================
@@ -32,7 +72,6 @@ class DataProviderSettings(BaseProviderSettings):
     """Settings for data providers."""
 
 
-# TODO: Standardize field names
 class EmbeddingModelSettings(TypedDict, total=False):
     """Embedding model settings. Use this class for dense (vector) models."""
 
@@ -261,17 +300,248 @@ class ProviderSettingsDict(TypedDict, total=False):
 
 type ProviderSettingsView = DictView[ProviderSettingsDict]
 
+
+def merge_agent_model_settings(
+    base: AgentModelSettings | None, override: AgentModelSettings | None
+) -> AgentModelSettings | None:
+    """A convenience re-export of `merge_model_settings` for agent model settings."""
+    return merge_model_settings(base, override)
+
+
+DefaultDataProviderSettings = (
+    DataProviderSettings(provider=Provider.TAVILY, enabled=False, api_key=None, other=None),
+    # DuckDuckGo
+    DataProviderSettings(provider=Provider.DUCKDUCKGO, enabled=True, api_key=None, other=None),
+)
+
+
+class DeterminedDefaults(NamedTuple):
+    """Tuple for determined default embedding settings."""
+
+    provider: Provider
+    model: str
+    enabled: bool
+
+
+def _get_default_embedding_settings() -> DeterminedDefaults:
+    """Determine the default embedding provider, model, and enabled status based on available libraries."""
+    for lib in (
+        "voyageai",
+        "mistral",
+        "google",
+        "fastembed_gpu",
+        "fastembed",
+        "sentence_transformers",
+    ):
+        if util.find_spec(lib) is not None:
+            # all three of the top defaults are extremely capable
+            if lib == "voyageai":
+                return DeterminedDefaults(
+                    provider=Provider.VOYAGE, model="voyage:voyage-code-3", enabled=True
+                )
+            if lib == "mistral":
+                return DeterminedDefaults(
+                    provider=Provider.MISTRAL, model="mistral:codestral-embed", enabled=True
+                )
+            if lib == "google":
+                return DeterminedDefaults(
+                    provider=Provider.GOOGLE, model="google/gemini-embedding-001", enabled=True
+                )
+            if lib in {"fastembed_gpu", "fastembed"}:
+                return DeterminedDefaults(
+                    # showing its age but it's still a solid lightweight option
+                    provider=Provider.FASTEMBED,
+                    model="fastembed:BAAI/bge-small-en-v1.5",
+                    enabled=True,
+                )
+            if lib == "sentence_transformers":
+                return DeterminedDefaults(
+                    provider=Provider.SENTENCE_TRANSFORMERS,
+                    # embedding-small-english-r2 is *very lightweight* and quite capable with a good context window (8192 tokens)
+                    model="sentence-transformers:ibm-granite/granite-embedding-small-english-r2",
+                    enabled=True,
+                )
+    logger.warning(
+        "No default embedding provider libraries found. Embedding functionality will be disabled unless explicitly set in your config or environment variables."
+    )
+    return DeterminedDefaults(provider=Provider.NOT_SET, model="NONE", enabled=False)
+
+
+_embedding_defaults = _get_default_embedding_settings()
+
+DefaultEmbeddingProviderSettings = (
+    EmbeddingProviderSettings(
+        provider=_embedding_defaults.provider,
+        enabled=_embedding_defaults.enabled,
+        model_settings=EmbeddingModelSettings(model=_embedding_defaults.model),
+    ),
+)
+
+
+def _get_default_sparse_embedding_settings() -> DeterminedDefaults:
+    """Determine the default sparse embedding provider, model, and enabled status based on available libraries."""
+    for lib in ("sentence_transformers", "fastembed_gpu", "fastembed"):
+        if util.find_spec(lib) is not None:
+            if lib == "sentence_transformers":
+                return DeterminedDefaults(
+                    provider=Provider.SENTENCE_TRANSFORMERS,
+                    model="opensearch:opensearch-neural-sparse-encoding-doc-v3-gte",
+                    enabled=True,
+                )
+            if lib in {"fastembed_gpu", "fastembed"}:
+                return DeterminedDefaults(
+                    provider=Provider.FASTEMBED, model="prithivida/Splade_PP_en_v2", enabled=True
+                )
+    # Sentence-Transformers and Fastembed are the *only* sparse embedding options we support
+    logger.warning(
+        "No sparse embedding provider libraries found. Sparse embedding functionality disabled."
+    )
+    return DeterminedDefaults(provider=Provider.NOT_SET, model="NONE", enabled=False)
+
+
+_sparse_embedding_defaults = _get_default_sparse_embedding_settings()
+
+DefaultSparseEmbeddingProviderSettings = (
+    SparseEmbeddingProviderSettings(
+        provider=_sparse_embedding_defaults.provider,
+        enabled=_sparse_embedding_defaults.enabled,
+        model_settings=SparseEmbeddingModelSettings(model=_sparse_embedding_defaults.model),
+    ),
+)
+
+
+def _get_default_reranking_settings() -> DeterminedDefaults:
+    """Determine the default reranking provider, model, and enabled status based on available libraries."""
+    for lib in ("voyageai", "fastembed_gpu", "fastembed", "sentence_transformers"):
+        if util.find_spec(lib) is not None:
+            if lib == "voyageai":
+                return DeterminedDefaults(
+                    provider=Provider.VOYAGE, model="voyage:rerank-2.5", enabled=True
+                )
+            if lib in {"fastembed_gpu", "fastembed"}:
+                return DeterminedDefaults(
+                    provider=Provider.FASTEMBED,
+                    model="fastembed:jinaai/jina-reranking-v2-base-multilingual",
+                    enabled=True,
+                )
+            if lib == "sentence_transformers":
+                return DeterminedDefaults(
+                    provider=Provider.SENTENCE_TRANSFORMERS,
+                    # on the heavier side for what we aim for as a default but very capable
+                    model="sentence-transformers:BAAI/bge-reranking-v2-m3",
+                    enabled=True,
+                )
+    logger.warning(
+        "No default reranking provider libraries found. Reranking functionality will be disabled unless explicitly set in your config or environment variables."
+    )
+    return DeterminedDefaults(provider=Provider.NOT_SET, model="NONE", enabled=False)
+
+
+_reranking_defaults = _get_default_reranking_settings()
+
+DefaultRerankingProviderSettings = (
+    RerankingProviderSettings(
+        provider=_reranking_defaults.provider,
+        enabled=_reranking_defaults.enabled,
+        model_settings=RerankingModelSettings(model=_reranking_defaults.model),
+    ),
+)
+
+HAS_ANTHROPIC = util.find_spec("anthropic") is not None
+DefaultAgentProviderSettings = (
+    AgentProviderSettings(
+        provider=Provider.ANTHROPIC,
+        enabled=HAS_ANTHROPIC,
+        model="claude-sonnet-4-latest",
+        model_settings=AgentModelSettings(),
+    ),
+)
+
+
+DefaultVectorStoreProviderSettings = (
+    VectorStoreProviderSettings(
+        provider=Provider.QDRANT, enabled=True, provider_settings=QdrantConfig()
+    ),
+)
+
+
+class ProviderSettings(BasedModel):
+    """Settings for provider configuration."""
+
+    data: Annotated[
+        tuple[DataProviderSettings, ...] | Unset,
+        Field(description="""Data provider configuration"""),
+    ] = DefaultDataProviderSettings
+
+    embedding: Annotated[
+        tuple[EmbeddingProviderSettings, ...] | Unset,
+        Field(
+            description="""Embedding provider configuration.
+
+            We will only use the first provider you configure here. We may add support for multiple embedding providers in the future.
+            """
+        ),
+    ] = DefaultEmbeddingProviderSettings
+
+    sparse_embedding: Annotated[
+        tuple[SparseEmbeddingProviderSettings, ...] | Unset,
+        Field(
+            description="""Sparse embedding provider configuration.
+
+            We will only use the first provider you configure here. We may add support for multiple sparse embedding providers in the future."""
+        ),
+    ] = DefaultSparseEmbeddingProviderSettings
+
+    reranking: Annotated[
+        tuple[RerankingProviderSettings, ...] | Unset,
+        Field(
+            description="""Reranking provider configuration.
+
+            We will only use the first provider you configure here. We may add support for multiple reranking providers in the future."""
+        ),
+    ] = DefaultRerankingProviderSettings
+
+    vector_store: Annotated[
+        tuple[VectorStoreProviderSettings, ...] | Unset,
+        Field(
+            description="""Vector store provider configuration (Qdrant or in-memory), defaults to a local Qdrant instance."""
+        ),
+    ] = DefaultVectorStoreProviderSettings
+
+    agent: Annotated[
+        tuple[AgentProviderSettings, ...] | Unset,
+        Field(description="""Agent provider configuration"""),
+    ] = DefaultAgentProviderSettings
+
+    def _telemetry_keys(self) -> None:
+        return None
+
+
+AllDefaultProviderSettings = ProviderSettingsDict(
+    data=DefaultDataProviderSettings,
+    embedding=DefaultEmbeddingProviderSettings,
+    sparse_embedding=DefaultSparseEmbeddingProviderSettings,
+    reranking=DefaultRerankingProviderSettings,
+    agent=DefaultAgentProviderSettings,
+)
+
+
 __all__ = (
     "AWSProviderSettings",
     "AgentProviderSettings",
+    "AllDefaultProviderSettings",
     "AzureCohereProviderSettings",
     "AzureOpenAIProviderSettings",
+    "ConnectionConfiguration",
+    "ConnectionRateLimitConfig",
     "DataProviderSettings",
     "EmbeddingModelSettings",
     "EmbeddingProviderSettings",
     "FastembedGPUProviderSettings",
     "MemoryConfig",
     "ModelString",
+    "ProviderSettings",
+    "ProviderSettingsDict",
     "ProviderSettingsDict",
     "ProviderSettingsView",
     "ProviderSpecificSettings",

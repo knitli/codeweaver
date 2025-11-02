@@ -31,7 +31,7 @@ from pydantic.dataclasses import dataclass
 from watchfiles.main import Change, FileChange
 
 from codeweaver.config.chunker import ChunkerSettings
-from codeweaver.config.types import CodeWeaverSettingsDict, RignoreSettings
+from codeweaver.config.types import CodeWeaverSettingsDict
 from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.file_extensions import (
     CODE_FILES_EXTENSIONS,

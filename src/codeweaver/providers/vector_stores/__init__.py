@@ -8,15 +8,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from codeweaver.providers.vector_stores.base import VectorStoreProvider
-from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
-from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
-
 
 if TYPE_CHECKING:
     from codeweaver.config.providers import VectorStoreProviderSettings
     from codeweaver.providers.embedding.providers import EmbeddingProvider
     from codeweaver.providers.reranking import RerankingProvider
+    from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
 
 def get_vector_store_provider(
@@ -40,7 +37,7 @@ def get_vector_store_provider(
 
     Examples:
         >>> from codeweaver.config.providers import VectorStoreProviderSettings
-        >>> settings = VectorStoreProviderSettings(provider="memory")
+        >>> settings = VectorStoreProviderSettings(provider=Provider.MEMORY)
         >>> provider = get_vector_store_provider(settings)
         >>> isinstance(provider, MemoryVectorStoreProvider)
         True
@@ -55,23 +52,26 @@ def get_vector_store_provider(
         >>> isinstance(provider, QdrantVectorStoreProvider)
         True
     """
-    provider_type = settings.get("provider", "memory")
+    from codeweaver.providers.provider import Provider
+    from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
+    from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
 
-    if provider_type == "qdrant":
+    provider_type = settings.get("provider", Provider.MEMORY)
+
+    if provider_type == Provider.QDRANT:
         if embedder is None:
             raise ValueError("Qdrant provider requires an embedder for dimension validation")
-        qdrant_config = settings.get("qdrant", {})
-        if not qdrant_config:
-            raise ValueError("Qdrant provider selected but no qdrant config provided")
-        return QdrantVectorStoreProvider.model_construct(
-            config=qdrant_config,
-            _embedder=embedder,
-            _reranking=reranking,
-            _client=None,
-            _metadata=None,
-        )
+        if qdrant_config := settings.get("qdrant", {}):
+            return QdrantVectorStoreProvider.model_construct(
+                config=qdrant_config,
+                _embedder=embedder,
+                _reranking=reranking,
+                _client=None,
+                _metadata=None,
+            )
 
-    if provider_type == "memory":
+        raise ValueError("Qdrant provider selected but no qdrant config provided")
+    if provider_type == Provider.MEMORY:
         memory_config = settings.get("memory", {})
         return MemoryVectorStoreProvider.model_construct(config=memory_config, _client=None)
 
@@ -80,9 +80,4 @@ def get_vector_store_provider(
     )
 
 
-__all__ = (
-    "MemoryVectorStoreProvider",
-    "QdrantVectorStoreProvider",
-    "VectorStoreProvider",
-    "get_vector_store_provider",
-)
+__all__ = ("VectorStoreProvider", "get_vector_store_provider")

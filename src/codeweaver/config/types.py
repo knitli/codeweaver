@@ -20,23 +20,14 @@ import ssl
 
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, Literal, NotRequired, Required, TypedDict
+from typing import TYPE_CHECKING, Annotated, Literal, NotRequired, TypedDict
 
 from fastmcp.server.middleware import Middleware
 from fastmcp.server.server import DuplicateBehavior
 from fastmcp.tools import Tool
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.lowlevel.server import LifespanResultT
-from pydantic import (
-    DirectoryPath,
-    Field,
-    FilePath,
-    HttpUrl,
-    NonNegativeFloat,
-    PositiveFloat,
-    PositiveInt,
-    SecretStr,
-)
+from pydantic import DirectoryPath, Field, FilePath, PositiveFloat, PositiveInt, SecretStr
 from starlette.middleware import Middleware as ASGIMiddleware
 from uvicorn.config import (
     SSL_PROTOCOL_VERSION,
@@ -48,139 +39,17 @@ from uvicorn.config import (
 
 from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.logging import LoggingConfigDict
-from codeweaver.core.types.aliases import LiteralStringT
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.chunker import CustomDelimiter, CustomLanguage
     from codeweaver.config.logging import LoggingSettings
     from codeweaver.config.middleware import MiddlewareOptions
     from codeweaver.config.providers import ProviderSettingsDict
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT, Unset
-    from codeweaver.providers.provider import Provider
 
 # TODO: Replace most defaults with Unset, to better track user-set vs default values. We just need to ensure we don't pass Unset to places that don't accept it. I'm not sure what the best way to do that is yet. My thought is that we could possibly modify pydantic serialization to convert Unset to None or missing values, but *not* do that for telemetry serialization.
-
-# ===========================================================================
-# *          Rignore and File Filter Settings
-# ===========================================================================
-
-
-class RignoreSettings(TypedDict, total=False):
-    """Settings for the rignore library."""
-
-    path: NotRequired[Path]
-    ignore_hidden: NotRequired[bool]
-    read_ignore_files: NotRequired[bool]
-    read_parents_ignores: NotRequired[bool]
-    read_git_ignore: NotRequired[bool]
-    read_global_git_ignore: NotRequired[bool]
-    read_git_exclude: NotRequired[bool]
-    require_git: NotRequired[bool]
-    additional_ignores: NotRequired[list[str]]
-    additional_ignore_paths: NotRequired[list[str]]
-    max_depth: NotRequired[int]
-    max_filesize: NotRequired[int]
-    follow_links: NotRequired[bool]
-    case_insensitive: NotRequired[bool]
-    same_file_system: NotRequired[bool]
-    should_exclude_entry: NotRequired[Callable[[Path], bool]]
-
-
-class IndexerSettingsDict(TypedDict, total=False):
-    """A serialized `IndexerSettings` object."""
-
-    forced_includes: NotRequired[frozenset[str | Path]]
-    excludes: NotRequired[frozenset[str | Path]]
-    excluded_extensions: NotRequired[frozenset[str]]
-    use_gitignore: NotRequired[bool]
-    use_other_ignore_files: NotRequired[bool]
-    ignore_hidden: NotRequired[bool]
-    index_storage_path: NotRequired[Path | None]
-    include_github_dir: NotRequired[bool]
-    include_tooling_dirs: NotRequired[bool]
-    rignore_options: NotRequired[RignoreSettings | Unset]
-    only_index_on_command: NotRequired[bool]
-
-
-# ===========================================================================
-# *            Provider Connection and Rate Limit Settings
-# ===========================================================================
-
-
-class ConnectionRateLimitConfig(TypedDict, total=False):
-    """Settings for connection rate limiting."""
-
-    max_requests_per_second: PositiveInt | None
-    burst_capacity: PositiveInt | None
-    backoff_multiplier: PositiveFloat | None
-    max_retries: PositiveInt | None
-
-
-class ConnectionConfiguration(TypedDict, total=False):
-    """Settings for connection configuration. Only required for non-default transports."""
-
-    host: str | None
-    port: PositiveInt | None
-    headers: NotRequired[dict[str, str] | None]
-    rate_limits: NotRequired[ConnectionRateLimitConfig | None]
-
-
-class BaseProviderSettings(TypedDict, total=False):
-    """Base settings for all providers."""
-
-    provider: Required[Provider]
-    enabled: Required[bool]
-    api_key: NotRequired[str | None]
-    connection: NotRequired[ConnectionConfiguration | None]
-    client_options: NotRequired[dict[str, Any] | None]
-    """Options to pass to the provider's client (like `qdrant_client` for qdrant) as keyword arguments. You should refer to the provider's documentation for what options are available."""
-    other: NotRequired[dict[str, Any] | None]
-    """Other provider-specific settings. This is primarily for user-defined providers to pass custom options."""
-
-
-# ===========================================================================
-# *       TypedDict Representations of Chunker and Related Settings
-# ===========================================================================
-
-
-class PerformanceSettingsDict(TypedDict, total=False):
-    """TypedDict for performance settings.
-
-    Not intended to be used directly; used for internal type checking and validation.
-    """
-
-    max_file_size_mb: NotRequired[PositiveInt | None]
-    chunk_timeout_seconds: NotRequired[PositiveInt | None]
-    parse_timeout_seconds: NotRequired[PositiveInt | None]
-    max_chunks_per_file: NotRequired[PositiveInt | None]
-    max_memory_mb_per_operation: NotRequired[PositiveInt | None]
-    max_ast_depth: NotRequired[PositiveInt | None]
-
-
-class ConcurrencySettingsDict(TypedDict, total=False):
-    """TypedDict for concurrency settings.
-
-    Not intended to be used directly; used for internal type checking and validation.
-    """
-
-    max_parallel_files: NotRequired[PositiveInt | None]
-    use_process_pool: NotRequired[bool | None]
-
-
-class ChunkerSettingsDict(TypedDict, total=False):
-    """TypedDict for Chunker settings.
-
-    Not intended to be used directly; used for internal type checking and validation.
-    """
-
-    custom_delimiters: NotRequired[list[CustomDelimiter]] | None
-    custom_languages: NotRequired[list[CustomLanguage]] | None
-    semantic_importance_threshold: NotRequired[NonNegativeFloat | None]
-    performance: NotRequired[PerformanceSettingsDict | None]
-    concurrency: NotRequired[ConcurrencySettingsDict | None]
 
 
 # ===========================================================================
@@ -226,20 +95,6 @@ class FastMcpServerSettingsDict(TypedDict, total=False):
     resource_prefix_format: NotRequired[Literal["protocol", "path"] | None]
     middleware: NotRequired[list[str | Middleware] | None]
     tools: NotRequired[list[str | Tool] | None]
-
-
-class TelemetrySettingsDict(TypedDict, total=False):
-    """TypedDict for Telemetry settings.
-
-    Not intended to be used directly; used for internal type checking and validation.
-    """
-
-    disable_telemetry: NotRequired[bool | Unset]
-    tools_before_privacy: NotRequired[bool | Unset]
-    posthog_project_key: NotRequired[LiteralStringT | Unset]
-    posthog_host: NotRequired[HttpUrl | None]
-    batch_size: NotRequired[PositiveInt | Unset]
-    batch_interval_seconds: NotRequired[PositiveInt | Unset]
 
 
 class EndpointSettingsDict(TypedDict, total=False):
@@ -447,16 +302,9 @@ def default_config_file_locations(
 
 
 __all__ = (
-    "ChunkerSettingsDict",
     "CodeWeaverSettingsDict",
-    "ConcurrencySettingsDict",
-    "ConnectionConfiguration",
-    "ConnectionRateLimitConfig",
     "FastMcpHttpRunArgs",
     "FastMcpServerSettingsDict",
-    "IndexerSettingsDict",
-    "PerformanceSettingsDict",
-    "RignoreSettings",
     "UvicornServerSettings",
     "UvicornServerSettingsDict",
     "default_config_file_locations",

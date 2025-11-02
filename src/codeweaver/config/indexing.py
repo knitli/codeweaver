@@ -18,12 +18,11 @@ import re
 from collections.abc import Callable
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, NamedTuple
+from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, NotRequired, TypedDict
 
 from fastmcp.server.middleware import MiddlewareContext
 from pydantic import DirectoryPath, Field, FilePath, PrivateAttr, computed_field
 
-from codeweaver.config.types import RignoreSettings
 from codeweaver.core.file_extensions import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_EXTENSIONS
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.sentinel import UNSET, Unset
@@ -38,6 +37,49 @@ logger = logging.getLogger(__name__)
 
 BRACKET_PATTERN: re.Pattern[str] = re.compile("\\[.+\\]")
 
+_init: bool = True
+
+# ===========================================================================
+# *          Rignore and File Filter Settings
+# ===========================================================================
+
+
+class RignoreSettings(TypedDict, total=False):
+    """Settings for the rignore library."""
+
+    path: NotRequired[Path]
+    ignore_hidden: NotRequired[bool]
+    read_ignore_files: NotRequired[bool]
+    read_parents_ignores: NotRequired[bool]
+    read_git_ignore: NotRequired[bool]
+    read_global_git_ignore: NotRequired[bool]
+    read_git_exclude: NotRequired[bool]
+    require_git: NotRequired[bool]
+    additional_ignores: NotRequired[list[str]]
+    additional_ignore_paths: NotRequired[list[str]]
+    max_depth: NotRequired[int]
+    max_filesize: NotRequired[int]
+    follow_links: NotRequired[bool]
+    case_insensitive: NotRequired[bool]
+    same_file_system: NotRequired[bool]
+    should_exclude_entry: NotRequired[Callable[[Path], bool]]
+
+
+class IndexerSettingsDict(TypedDict, total=False):
+    """A serialized `IndexerSettings` object."""
+
+    forced_includes: NotRequired[frozenset[str | Path]]
+    excludes: NotRequired[frozenset[str | Path]]
+    excluded_extensions: NotRequired[frozenset[str]]
+    use_gitignore: NotRequired[bool]
+    use_other_ignore_files: NotRequired[bool]
+    ignore_hidden: NotRequired[bool]
+    index_storage_path: NotRequired[Path | None]
+    include_github_dir: NotRequired[bool]
+    include_tooling_dirs: NotRequired[bool]
+    rignore_options: NotRequired[RignoreSettings | Unset]
+    only_index_on_command: NotRequired[bool]
+
 
 def _get_settings() -> CodeWeaverSettings | None:
     """Get the current CodeWeaver settings."""
@@ -49,26 +91,30 @@ def _get_settings() -> CodeWeaverSettings | None:
 def _get_project_name() -> str:
     """Get the current project name from settings."""
     # Avoid circular dependency: check if settings exist without triggering initialization
-    settings = _get_settings()
-    if settings is not None:
-        with contextlib.suppress(AttributeError, ValueError):
-            if (
-                hasattr(settings, "project_name")
-                and settings.project_name
-                and not isinstance(settings.project_name, Unset)
-            ):
-                return settings.project_name
-            if hasattr(settings, "project_path") and not isinstance(settings.project_path, Unset):
-                return settings.project_path.name
-            if hasattr(settings, "project_name") and not isinstance(settings.project_name, Unset):
-                return settings.project_name
-
-    # Fallback: try to get project path directly
+    if globals().get("_init", False) is False:
+        settings = _get_settings()
+        if settings is not None:
+            with contextlib.suppress(AttributeError, ValueError):
+                if (
+                    hasattr(settings, "project_name")
+                    and settings.project_name
+                    and not isinstance(settings.project_name, Unset)
+                ):
+                    return settings.project_name
+                if hasattr(settings, "project_path") and not isinstance(
+                    settings.project_path, Unset
+                ):
+                    return settings.project_path.name
+                if hasattr(settings, "project_name") and not isinstance(
+                    settings.project_name, Unset
+                ):
+                    return settings.project_name
     with contextlib.suppress(Exception):
         from codeweaver.common.utils.git import get_project_path
 
-        return get_project_path().name
-
+        project_name = get_project_path().name
+        globals()["_init"] = False
+        return project_name
     return "your_project_name"
 
 
@@ -419,4 +465,8 @@ class IndexerSettings(BasedModel):
         return self._as_settings()
 
 
-__all__ = ("IndexerSettings",)
+DefaultIndexerSettings = IndexerSettingsDict(
+    IndexerSettings().model_dump(exclude_none=True, exclude_computed_fields=True)  # type: ignore
+)
+
+__all__ = ("DefaultIndexerSettings", "IndexerSettings")

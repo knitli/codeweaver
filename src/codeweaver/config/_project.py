@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """We keep CodeWeaver's PostHog project key here.
 
 This **is _NOT_ a secret**. It's a write-only key used to send telemetry events. No one can use it to read any data. In other words, it's safe to have this key in our public code.
