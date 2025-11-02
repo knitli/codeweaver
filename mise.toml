@@ -38,7 +38,7 @@ enter = """
 alias jj='jj --no-pager' &&
 alias git='git --no-pager' &&
 alias cdroot='cd $(git root)' &&
-if [ "$GITHUB_ACTIONS" = true ]; then
+if [ "$GITHUB_ACTIONS" = "true" ]; then
     export CI=true
 else
     export CI=false
