@@ -30,7 +30,7 @@ import logging
 import time
 
 from pathlib import Path
-from typing import NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from pydantic import NonNegativeInt, PositiveInt
 
@@ -49,6 +49,9 @@ from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.spans import Span
 from codeweaver.core.types import LanguageName
 from codeweaver.semantic.classifications import AgentTask
+
+if TYPE_CHECKING:
+    from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
 
 logger = logging.getLogger(__name__)
@@ -276,12 +279,13 @@ async def find_code(
         if not vector_store_enum:
             raise_value_error("No vector store provider configured")
 
-        vector_store = registry.get_provider_instance(
+        vector_store: VectorStoreProvider[Any] = registry.get_provider_instance(
             vector_store_enum, "vector_store", singleton=True
         )
 
         # Build query vector (unified search API) with graceful degradation
         # Note: embed_query returns list[list[float|int]] (batch results), unwrap to list[float]
+        query_vector: list[float] | dict[str, list[float] | Any]
         if dense_query_embedding and sparse_query_embedding:
             strategies_used.append(SearchStrategy.HYBRID_SEARCH)
             # Unwrap batch results (take first element) and ensure float type
@@ -307,13 +311,17 @@ async def find_code(
 
         # Execute search (returns max 100 results)
         # Note: Filter support deferred to v0.2 - we over-fetch and filter post-search
-        candidates = await vector_store.search(vector=query_vector, query_filter=None)
+        candidates: list[SearchResult] = await vector_store.search(
+            vector=query_vector, query_filter=None
+        )
 
         # Post-search filtering (v0.1 simple approach)
         # Access file info from SearchResult.file_path, not chunk.file (which doesn't exist)
         if not include_tests:
             candidates = [
-                c for c in candidates if not (c.file_path and "test" in str(c.file_path).lower())
+                c
+                for c in candidates
+                if not (c.file_path and "test" in str(c.file_path).lower())
             ]
         if focus_languages:
             lang_set = set(focus_languages)
@@ -476,7 +484,9 @@ async def find_code(
         from codeweaver.core.language import ConfigLanguage
 
         languages_set: set[SemanticSearchLanguage | LanguageName | ConfigLanguage] = {
-            m.file.ext_kind.language for m in code_matches
+            m.file.ext_kind.language
+            for m in code_matches
+            if m.file.ext_kind is not None and m.file.ext_kind.language is not None
         }
         languages_found: tuple[SemanticSearchLanguage | LanguageName, ...] = tuple(
             lang for lang in languages_set if not isinstance(lang, ConfigLanguage)
