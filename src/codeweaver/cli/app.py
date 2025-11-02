@@ -1,4 +1,4 @@
-# sourcery skip: avoid-global-variables
+# sourcery skip: avoid-global-variables, no-complex-if-expressions
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -247,6 +247,8 @@ def _display_markdown_results(
 
 def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
     """Display current configuration."""
+    from codeweaver.core.types.sentinel import Unset
+
     console.print("[bold blue]CodeWeaver Configuration[/bold blue]\n")
 
     table = Table(show_header=True, header_style="bold blue")
@@ -261,7 +263,13 @@ def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
     table.add_row("Max Results", str(settings["max_results"]))
 
     # Feature flags
-    table.add_row("Background Indexing", "✅" if settings["enable_background_indexing"] else "❌")
+    table.add_row(
+        "Background Indexing",
+        "❌"
+        if settings["indexing"].get("only_index_on_command")
+        and not isinstance(settings["indexing"].get("only_index_on_command"), Unset)
+        else "✅",
+    )
     table.add_row("Telemetry", "✅" if settings["enable_telemetry"] else "❌")
 
     console.print(table)

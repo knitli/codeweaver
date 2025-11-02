@@ -31,6 +31,7 @@ from pydantic import (
     DirectoryPath,
     Field,
     FilePath,
+    HttpUrl,
     NonNegativeFloat,
     PositiveFloat,
     PositiveInt,
@@ -47,6 +48,7 @@ from uvicorn.config import (
 
 from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.logging import LoggingConfigDict
+from codeweaver.core.types.aliases import LiteralStringT
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
 
@@ -56,7 +58,7 @@ if TYPE_CHECKING:
     from codeweaver.config.logging import LoggingSettings
     from codeweaver.config.middleware import MiddlewareOptions
     from codeweaver.config.providers import ProviderSettingsDict
-    from codeweaver.core.types import AnonymityConversion, DictView, FilteredKeyT, Unset
+    from codeweaver.core.types import AnonymityConversion, FilteredKeyT, Unset
     from codeweaver.providers.provider import Provider
 
 # TODO: Replace most defaults with Unset, to better track user-set vs default values. We just need to ensure we don't pass Unset to places that don't accept it. I'm not sure what the best way to do that is yet. My thought is that we could possibly modify pydantic serialization to convert Unset to None or missing values, but *not* do that for telemetry serialization.
@@ -99,8 +101,7 @@ class IndexerSettingsDict(TypedDict, total=False):
     index_storage_path: NotRequired[Path | None]
     include_github_dir: NotRequired[bool]
     include_tooling_dirs: NotRequired[bool]
-    other_ignore_kwargs: NotRequired[RignoreSettings | Unset]
-    default_rignore_settings: NotRequired[DictView[RignoreSettings]]
+    rignore_options: NotRequired[RignoreSettings | Unset]
     only_index_on_command: NotRequired[bool]
 
 
@@ -227,6 +228,29 @@ class FastMcpServerSettingsDict(TypedDict, total=False):
     tools: NotRequired[list[str | Tool] | None]
 
 
+class TelemetrySettingsDict(TypedDict, total=False):
+    """TypedDict for Telemetry settings.
+
+    Not intended to be used directly; used for internal type checking and validation.
+    """
+
+    disable_telemetry: NotRequired[bool | Unset]
+    tools_before_privacy: NotRequired[bool | Unset]
+    posthog_project_key: NotRequired[LiteralStringT | Unset]
+    posthog_host: NotRequired[HttpUrl | None]
+    batch_size: NotRequired[PositiveInt | Unset]
+    batch_interval_seconds: NotRequired[PositiveInt | Unset]
+
+
+class EndpointSettingsDict(TypedDict, total=False):
+    """Defines enable/disable settings for various CodeWeaver HTTP endpoints."""
+
+    enable_health: NotRequired[bool | Unset]
+    enable_statistics: NotRequired[bool | Unset]
+    enable_settings: NotRequired[bool | Unset]
+    enable_version: NotRequired[bool | Unset]
+
+
 class CodeWeaverSettingsDict(TypedDict, total=False):
     """TypedDict for CodeWeaver settings.
 
@@ -246,12 +270,8 @@ class CodeWeaverSettingsDict(TypedDict, total=False):
     chunker: NotRequired[ChunkerSettingsDict | Unset]
     uvicorn: NotRequired[UvicornServerSettingsDict | Unset]
     indexing: NotRequired[IndexerSettingsDict | Unset]
-    enable_health_endpoint: NotRequired[bool | Unset]
-    enable_statistics_endpoint: NotRequired[bool | Unset]
-    enable_settings_endpoint: NotRequired[bool | Unset]
-    enable_version_endpoint: NotRequired[bool | Unset]
-    enable_telemetry: NotRequired[bool | Unset]
-    allow_identifying_telemetry: NotRequired[bool | Unset]
+    telemetry: NotRequired[TelemetrySettingsDict | Unset]
+    endpoints: NotRequired[EndpointSettingsDict | Unset]
 
 
 # ===========================================================================

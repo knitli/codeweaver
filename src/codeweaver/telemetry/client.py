@@ -21,11 +21,15 @@ from functools import cache
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Self
 
+from pydantic import HttpUrl
+
+from codeweaver.core.types.sentinel import Unset
+
 
 if TYPE_CHECKING:
     from posthog import Posthog
 
-from codeweaver.telemetry.config import get_telemetry_settings
+from codeweaver.config.telemetry import get_telemetry_settings
 
 
 logger = logging.getLogger(__name__)
@@ -112,11 +116,23 @@ class PostHogClient:
             Configured PostHog client instance
         """
         settings = get_telemetry_settings()
+        if (
+            not settings.enabled
+            or not settings.posthog_project_key
+            or not settings.posthog_host
+            or settings.disable_telemetry
+        ):
+            return cls(enabled=False)
+        posthog_host = (
+            HttpUrl("https://us.i.posthog.com")
+            if isinstance(settings.posthog_host, Unset)
+            else settings.posthog_host
+        )
 
         return cls(
-            api_key=settings.posthog_api_key,
-            host=settings.posthog_host,
-            enabled=settings.telemetry_enabled,
+            api_key=settings.posthog_project_key.get_secret_value(),
+            host=posthog_host.encoded_string(),
+            enabled=not settings.disable_telemetry,
         )
 
     def capture(

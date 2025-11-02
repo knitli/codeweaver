@@ -236,7 +236,6 @@ class CodeChunk(BasedModel):
             FilteredKey("content"): AnonymityConversion.TEXT_COUNT,
             FilteredKey("file_path"): AnonymityConversion.BOOLEAN,
             FilteredKey("metadata"): AnonymityConversion.AGGREGATE,
-            FilteredKey("embeddings"): AnonymityConversion.BOOLEAN,
             FilteredKey("_embedding_batches"): AnonymityConversion.BOOLEAN,
         }
 

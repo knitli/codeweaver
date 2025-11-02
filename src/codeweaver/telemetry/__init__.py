@@ -24,8 +24,8 @@ Example:
 
 from __future__ import annotations
 
+from codeweaver.config.telemetry import TelemetrySettings, get_telemetry_settings
 from codeweaver.telemetry.client import PostHogClient, get_telemetry_client
-from codeweaver.telemetry.config import TelemetrySettings, get_telemetry_settings
 from codeweaver.telemetry.events import (
     PerformanceBenchmarkEvent,
     SessionSummaryEvent,

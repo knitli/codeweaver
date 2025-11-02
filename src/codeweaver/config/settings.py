@@ -17,15 +17,14 @@ import contextlib
 import inspect
 import logging
 import os
-import re
 
 from collections.abc import Callable
-from functools import cached_property, partial
+from functools import cached_property
 from importlib import util
 from pathlib import Path
-from typing import Annotated, Any, Literal, NamedTuple, Self, Unpack, cast
+from typing import Annotated, Any, Literal, Self, Unpack, cast
 
-from fastmcp.server.middleware import Middleware, MiddlewareContext
+from fastmcp.server.middleware import Middleware
 from fastmcp.server.server import DuplicateBehavior
 from fastmcp.tools.tool import Tool
 from mcp.server.auth.settings import AuthSettings
@@ -60,220 +59,47 @@ from pydantic_settings import (
 from codeweaver.common.utils.lazy_importer import lazy_import
 from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.chunker import ChunkerSettings
-from codeweaver.config.logging import LoggingSettings
-from codeweaver.config.middleware import (
-    AVAILABLE_MIDDLEWARE,
-    ErrorHandlingMiddlewareSettings,
-    LoggingMiddlewareSettings,
-    MiddlewareOptions,
-    RateLimitingMiddlewareSettings,
-    RetryMiddlewareSettings,
+from codeweaver.config.defaults import (
+    DefaultAgentProviderSettings,
+    DefaultChunkerSettings,
+    DefaultDataProviderSettings,
+    DefaultEmbeddingProviderSettings,
+    DefaultEndpointSettings,
+    DefaultFastMcpServerSettings,
+    DefaultIndexerSettings,
+    DefaultRerankingProviderSettings,
+    DefaultSparseEmbeddingProviderSettings,
+    DefaultTelemetrySettings,
+    DefaultUvicornSettings,
+    DefaultVectorStoreProviderSettings,
 )
+from codeweaver.config.indexing import IndexerSettings
+from codeweaver.config.logging import LoggingSettings
+from codeweaver.config.middleware import AVAILABLE_MIDDLEWARE, MiddlewareOptions
 from codeweaver.config.providers import (
     AgentModelSettings,
     AgentProviderSettings,
     DataProviderSettings,
-    EmbeddingModelSettings,
     EmbeddingProviderSettings,
     ProviderSettingsDict,
-    QdrantConfig,
-    RerankingModelSettings,
     RerankingProviderSettings,
-    SparseEmbeddingModelSettings,
     SparseEmbeddingProviderSettings,
     VectorStoreProviderSettings,
 )
+from codeweaver.config.telemetry import TelemetrySettings
 from codeweaver.config.types import (
-    ChunkerSettingsDict,
     CodeWeaverSettingsDict,
-    FastMcpServerSettingsDict,
-    IndexerSettingsDict,
-    RignoreSettings,
+    EndpointSettingsDict,
     UvicornServerSettings,
-    UvicornServerSettingsDict,
 )
-from codeweaver.core.file_extensions import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_EXTENSIONS
-from codeweaver.core.types.aliases import FilteredKey, FilteredKeyT
+from codeweaver.core.types.aliases import FilteredKeyT
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.sentinel import UNSET, Unset
-from codeweaver.providers.provider import Provider
 
 
 logger = logging.getLogger(__name__)
-
-BRACKET_PATTERN: re.Pattern[str] = re.compile("\\[.+\\]")
-
-
-DefaultDataProviderSettings = (
-    DataProviderSettings(provider=Provider.TAVILY, enabled=False, api_key=None, other=None),
-    # DuckDuckGo
-    DataProviderSettings(provider=Provider.DUCKDUCKGO, enabled=True, api_key=None, other=None),
-)
-
-
-# TODO: move default computation to provider module.
-class DeterminedDefaults(NamedTuple):
-    """Tuple for determined default embedding settings."""
-
-    provider: Provider
-    model: str
-    enabled: bool
-
-
-def _get_default_embedding_settings() -> DeterminedDefaults:
-    """Determine the default embedding provider, model, and enabled status based on available libraries."""
-    for lib in (
-        "voyageai",
-        "mistral",
-        "google",
-        "fastembed_gpu",
-        "fastembed",
-        "sentence_transformers",
-    ):
-        if util.find_spec(lib) is not None:
-            # all three of the top defaults are extremely capable
-            if lib == "voyageai":
-                return DeterminedDefaults(
-                    provider=Provider.VOYAGE, model="voyage:voyage-code-3", enabled=True
-                )
-            if lib == "mistral":
-                return DeterminedDefaults(
-                    provider=Provider.MISTRAL, model="mistral:codestral-embed", enabled=True
-                )
-            if lib == "google":
-                return DeterminedDefaults(
-                    provider=Provider.GOOGLE, model="google/gemini-embedding-001", enabled=True
-                )
-            if lib in {"fastembed_gpu", "fastembed"}:
-                return DeterminedDefaults(
-                    # showing its age but it's still a solid lightweight option
-                    provider=Provider.FASTEMBED,
-                    model="fastembed:BAAI/bge-small-en-v1.5",
-                    enabled=True,
-                )
-            if lib == "sentence_transformers":
-                return DeterminedDefaults(
-                    provider=Provider.SENTENCE_TRANSFORMERS,
-                    # embedding-small-english-r2 is *very lightweight* and quite capable with a good context window (8192 tokens)
-                    model="sentence-transformers:ibm-granite/granite-embedding-small-english-r2",
-                    enabled=True,
-                )
-    logger.warning(
-        "No default embedding provider libraries found. Embedding functionality will be disabled unless explicitly set in your config or environment variables."
-    )
-    return DeterminedDefaults(provider=Provider.NOT_SET, model="NONE", enabled=False)
-
-
-_embedding_defaults = _get_default_embedding_settings()
-
-DefaultEmbeddingProviderSettings = (
-    EmbeddingProviderSettings(
-        provider=_embedding_defaults.provider,
-        enabled=_embedding_defaults.enabled,
-        model_settings=EmbeddingModelSettings(model=_embedding_defaults.model),
-    ),
-)
-
-
-def _get_default_sparse_embedding_settings() -> DeterminedDefaults:
-    """Determine the default sparse embedding provider, model, and enabled status based on available libraries."""
-    for lib in ("sentence_transformers", "fastembed_gpu", "fastembed"):
-        if util.find_spec(lib) is not None:
-            if lib == "sentence_transformers":
-                return DeterminedDefaults(
-                    provider=Provider.SENTENCE_TRANSFORMERS,
-                    model="opensearch:opensearch-neural-sparse-encoding-doc-v3-gte",
-                    enabled=True,
-                )
-            if lib in {"fastembed_gpu", "fastembed"}:
-                return DeterminedDefaults(
-                    provider=Provider.FASTEMBED, model="prithivida/Splade_PP_en_v2", enabled=True
-                )
-    # Sentence-Transformers and Fastembed are the *only* sparse embedding options we support
-    logger.warning(
-        "No sparse embedding provider libraries found. Sparse embedding functionality disabled."
-    )
-    return DeterminedDefaults(provider=Provider.NOT_SET, model="NONE", enabled=False)
-
-
-_sparse_embedding_defaults = _get_default_sparse_embedding_settings()
-
-DefaultSparseEmbeddingProviderSettings = (
-    SparseEmbeddingProviderSettings(
-        provider=_sparse_embedding_defaults.provider,
-        enabled=_sparse_embedding_defaults.enabled,
-        model_settings=SparseEmbeddingModelSettings(model=_sparse_embedding_defaults.model),
-    ),
-)
-
-
-def _get_default_reranking_settings() -> DeterminedDefaults:
-    """Determine the default reranking provider, model, and enabled status based on available libraries."""
-    for lib in ("voyageai", "fastembed_gpu", "fastembed", "sentence_transformers"):
-        if util.find_spec(lib) is not None:
-            if lib == "voyageai":
-                return DeterminedDefaults(
-                    provider=Provider.VOYAGE, model="voyage:rerank-2.5", enabled=True
-                )
-            if lib in {"fastembed_gpu", "fastembed"}:
-                return DeterminedDefaults(
-                    provider=Provider.FASTEMBED,
-                    model="fastembed:jinaai/jina-reranking-v2-base-multilingual",
-                    enabled=True,
-                )
-            if lib == "sentence_transformers":
-                return DeterminedDefaults(
-                    provider=Provider.SENTENCE_TRANSFORMERS,
-                    # on the heavier side for what we aim for as a default but very capable
-                    model="sentence-transformers:BAAI/bge-reranking-v2-m3",
-                    enabled=True,
-                )
-    logger.warning(
-        "No default reranking provider libraries found. Reranking functionality will be disabled unless explicitly set in your config or environment variables."
-    )
-    return DeterminedDefaults(provider=Provider.NOT_SET, model="NONE", enabled=False)
-
-
-_reranking_defaults = _get_default_reranking_settings()
-
-DefaultRerankingProviderSettings = (
-    RerankingProviderSettings(
-        provider=_reranking_defaults.provider,
-        enabled=_reranking_defaults.enabled,
-        model_settings=RerankingModelSettings(model=_reranking_defaults.model),
-    ),
-)
-
-HAS_ANTHROPIC = util.find_spec("anthropic") is not None
-DefaultAgentProviderSettings = (
-    AgentProviderSettings(
-        provider=Provider.ANTHROPIC,
-        enabled=HAS_ANTHROPIC,
-        model="claude-sonnet-4-latest",
-        model_settings=AgentModelSettings(),
-    ),
-)
-
-DefaultMiddlewareSettings = MiddlewareOptions(
-    error_handling=ErrorHandlingMiddlewareSettings(
-        include_traceback=True, error_callback=None, transform_errors=False
-    ),
-    retry=RetryMiddlewareSettings(
-        max_retries=5, base_delay=1.0, max_delay=60.0, backoff_multiplier=2.0
-    ),
-    logging=LoggingMiddlewareSettings(log_level=20, include_payloads=False),
-    rate_limiting=RateLimitingMiddlewareSettings(
-        max_requests_per_second=75, get_client_id=None, burst_capacity=150, global_limit=True
-    ),
-)
-
-DefaultVectorStoreProviderSettings = (
-    VectorStoreProviderSettings(
-        provider=Provider.QDRANT, enabled=True, provider_settings=QdrantConfig()
-    ),
-)
 
 
 def merge_agent_model_settings(
@@ -281,382 +107,6 @@ def merge_agent_model_settings(
 ) -> AgentModelSettings | None:
     """A convenience re-export of `merge_model_settings` for agent model settings."""
     return merge_model_settings(base, override)
-
-
-def _get_project_name() -> str:
-    """Get the current project name from settings."""
-    # Avoid circular dependency: check if settings exist without triggering initialization
-    global _settings
-    if _settings is not None:
-        with contextlib.suppress(AttributeError, ValueError):
-            if (
-                hasattr(_settings, "project_name")
-                and _settings.project_name
-                and not isinstance(_settings.project_name, Unset)
-            ):
-                return _settings.project_name
-            if hasattr(_settings, "project_path") and not isinstance(_settings.project_path, Unset):
-                return _settings.project_path.name
-
-    # Fallback: try to get project path directly
-    with contextlib.suppress(Exception):
-        from codeweaver.common.utils.git import get_project_path
-
-        return get_project_path().name
-
-    return "your_project_name"
-
-
-def get_storage_path() -> Path:
-    """Get the default storage path for index data."""
-    from codeweaver.common.utils import get_user_config_dir
-
-    return Path(get_user_config_dir()) / f"{_get_project_name()}_index.json"
-
-
-def _resolve_globs(path_string: str, repo_root: Path) -> set[Path]:
-    """Resolve glob patterns in a path string."""
-    if "*" in path_string or "?" in path_string or BRACKET_PATTERN.search(path_string):
-        return set(repo_root.glob(path_string))
-    if (path := (repo_root / path_string)) and path.exists():
-        return {path} if path.is_file() else set(path.glob("**/*"))
-    return set()
-
-
-class FilteredPaths(NamedTuple):
-    """Tuple of included and excluded file paths."""
-
-    includes: frozenset[Path]
-    excludes: frozenset[Path]
-
-    @classmethod
-    async def from_settings(cls, indexing: IndexerSettings, repo_root: Path) -> FilteredPaths:
-        """Resolve included and excluded files based on filter settings.
-
-        Resolves glob patterns for include and exclude paths, filtering includes for excluded extensions.
-
-        If a file is specifically included in the `forced_includes`, it will not be excluded even if it matches an excluded extension or excludes.
-
-        "Specifically included" means that it was defined directly in the `forced_includes`, and **not** as a glob pattern.
-
-        This constructor is async so that it can resolve quietly in the background without slowing initialization.
-        """
-        settings = indexing.model_dump(mode="python")
-        other_files: set[Path] = set()
-        specifically_included_files = {
-            Path(file)
-            for file in settings.get("forced_includes", set())
-            if file
-            and "*" not in file
-            and ("?" not in file)
-            and Path(file).exists()
-            and Path(file).is_file()
-        }
-        for include in settings.get("forced_includes", set()):
-            other_files |= _resolve_globs(include, repo_root)
-        for ext in settings.get("excluded_extensions", set()):
-            if not ext:
-                continue
-            ext = ext.lstrip("*?[]")
-            ext = ext if ext.startswith(".") else f".{ext}"
-            other_files -= {
-                file
-                for file in other_files
-                if file.suffix == ext and file not in specifically_included_files
-            }
-        excludes: set[Path] = set()
-        excluded_files = settings.get("excluded_files", set())
-        for exclude in excluded_files:
-            if exclude:
-                excludes |= _resolve_globs(exclude, repo_root)
-        excludes |= specifically_included_files
-        other_files -= {
-            exclude for exclude in excludes if exclude not in specifically_included_files
-        }
-        other_files -= {None, Path(), Path("./"), Path("./.")}
-        excludes -= {None, Path(), Path("./"), Path("./.")}
-        return FilteredPaths(frozenset(other_files), frozenset(excludes))
-
-
-class IndexerSettings(BasedModel):
-    """Settings for indexing and file filtering.
-
-    ## Path Resolution and Deconfliction
-
-    Any configured paths or path patterns should be relative to the project root directory.
-
-    CodeWeaver deconflicts paths in the following ways:
-    - If a file is specifically defined in `forced_includes`, it will always be included, even if it matches an exclude pattern.
-      - This doesn't apply if it is defined in `forced_includes` with a glob pattern that matches an excluded file (by extension or glob/path).
-      - This also doesn't apply to directories.
-    - Other filters like `use_gitignore`, `use_other_ignore_files`, and `ignore_hidden` will apply to all files **not in `forced_includes`**.
-      - Files in `forced_includes`, including files defined from glob patterns, will *not* be filtered by these settings.
-    - if `include_github_dir` is True (default), the glob `**/.github/**` will be added to `forced_includes`.
-    - if `include_tooling_dirs` is True (default and recommended), common hidden tooling directories will be included *if they aren't .gitignored* (assuming `use_gitignore` is enabled, which is default). Any gitignored files will be excluded. This includes directories like `.vscode`, `.idea`, but also more specialized ones like `.moon`, `.husky`, and LLM-specific ones like `.codeweaver`, `.claude`, `.codex`, `.roo`, and more.
-    """
-
-    forced_includes: Annotated[
-        frozenset[str | Path],
-        Field(
-            description="""Directories, files, or [glob patterns](https://docs.python.org/3/library/pathlib.html#pathlib-pattern-language) to include in search and indexing. This is a set of strings, so you can use glob patterns like `**/src/**` or `**/*.py` to include directories or files."""
-        ),
-    ] = frozenset()
-    excludes: Annotated[
-        frozenset[str | Path],
-        Field(
-            description="""Directories, files, or [glob patterns](https://docs.python.org/3/library/pathlib.html#pathlib-pattern-language) to exclude from search and indexing. This is a set of strings, so you can use glob patterns like `**/node_modules/**` or `**/*.log` to exclude directories or files. You don't need to provide gitignored paths here if `use_gitignore` is enabled (default)."""
-        ),
-    ] = DEFAULT_EXCLUDED_DIRS
-    excluded_extensions: Annotated[
-        frozenset[str], Field(description="""File extensions to exclude from search and indexing""")
-    ] = DEFAULT_EXCLUDED_EXTENSIONS
-    use_gitignore: Annotated[
-        bool, Field(description="""Whether to use .gitignore for filtering. Enabled by default.""")
-    ] = True
-    use_other_ignore_files: Annotated[
-        bool,
-        Field(
-            description="""Whether to read *other* ignore files (besides .gitignore) for filtering"""
-        ),
-    ] = False
-    ignore_hidden: Annotated[
-        bool,
-        Field(description="""Whether to ignore hidden files (starting with .) for filtering"""),
-    ] = True
-    include_github_dir: Annotated[
-        bool,
-        Field(
-            description="""Whether to include the .github directory in search and indexing. Because the .github directory is hidden, it wouldn't be included in default settings. Most people want to include it for work on GitHub Actions, workflows, and other GitHub-related files. Note: this setting will also include `.circleci` if present. Any subdirectories or files within `.github` or `.circleci` that are gitignored will still be excluded."""
-        ),
-    ] = True
-    include_tooling_dirs: Annotated[
-        bool,
-        Field(
-            description="""Whether to include common hidden tooling directories in search and indexing. This is enabled by default and recommended for most users. Still respects .gitignore rules, so any gitignored files will be excluded."""
-        ),
-    ] = True
-    other_ignore_kwargs: Annotated[
-        RignoreSettings | Unset,
-        Field(
-            description="""Other kwargs to pass to `rignore`. See <https://pypi.org/project/rignore/>. By default we set max_filesize to 5MB and same_file_system to True."""
-        ),
-    ] = UNSET
-
-    default_rignore_settings: Annotated[
-        RignoreSettings,
-        Field(
-            description="""Default settings for rignore. These are used if not overridden by user settings in `other_ignore_kwargs`."""
-        ),
-    ] = RignoreSettings({
-        "max_filesize": 5 * 1024 * 1024,
-        "same_file_system": True,
-        "follow_links": False,
-    })
-    only_index_on_command: Annotated[
-        bool,
-        Field(
-            description="""Disabled by default and usually **not recommended**. This setting disables background indexing, requiring you to manually trigger indexing by command or program call. CodeWeaver uses background indexing to ensure it always has an accurate view of the codebase, so disabling this can severely impact the quality of results. We expose this setting for troubleshooting, debugging, and some isolated use cases where codeweaver may be orchestrated externally or supplied with data from other sources."""
-        ),
-    ] = False
-    _index_storage_path: Annotated[
-        Path | None,
-        Field(
-            description=rf"""\
-            Path to store index data locally. The default is in your user configuration directory (like ~/.config/codeweaver/{_get_project_name()}_index.json or c:\Users\your_username\AppData\Roaming\codeweaver\your_project_name_index.json).  If not set, CodeWeaver will use the default path.
-
-            Developer Note: We set the default lazily after initialization to avoid circular import issues. Internally, we use the `cache_dir` property to get the effective storage path. We recommend you do too if you need to programmatically access this value. We only keep this field public for user configuration.
-            """,
-            serialization_alias="index_storage_path",
-            validation_alias="index_storage_path",
-        ),
-    ] = None
-
-    _inc_exc_set: Annotated[bool, PrivateAttr()] = False
-
-    @computed_field
-    @property
-    def cache_dir(self) -> DirectoryPath:
-        """Effective storage directory for index data."""
-        path = self._index_storage_path or get_storage_path()
-        # Get the parent directory (cache_dir should be a directory, not a file)
-        dir_path = path.parent
-        if not dir_path.exists():
-            dir_path.mkdir(parents=True, exist_ok=True)
-        return dir_path
-
-    @computed_field
-    @property
-    def storage_file(self) -> FilePath:
-        """Effective storage file path for index data."""
-        if self._index_storage_path:
-            return self._index_storage_path
-        project_name = _get_project_name()
-        self._index_storage_path = self.cache_dir / f"{project_name}_index.json"
-        return self._index_storage_path
-
-    @computed_field
-    @property
-    def inc_exc_set(self) -> bool:
-        """Whether includes and excludes have been set."""
-        return self._inc_exc_set
-
-    @computed_field
-    @property
-    def checkpoint_file(self) -> FilePath:
-        """Path to the checkpoint file for indexing progress."""
-        return self.cache_dir / "indexing_checkpoint.json"
-
-    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        return {
-            FilteredKey("_index_storage_path"): AnonymityConversion.HASH,
-            FilteredKey("additional_ignores"): AnonymityConversion.COUNT,
-            FilteredKey("cache_dir"): AnonymityConversion.HASH,
-            FilteredKey("checkpoint_file"): AnonymityConversion.HASH,
-            FilteredKey("excluded_extensions"): AnonymityConversion.COUNT,
-            FilteredKey("excludes"): AnonymityConversion.COUNT,
-            FilteredKey("forced_includes"): AnonymityConversion.COUNT,
-            FilteredKey("storage_file"): AnonymityConversion.HASH,
-        }
-
-    def model_post_init(self, _context: MiddlewareContext[Any] | None = None, /) -> None:
-        """Post-initialization processing."""
-        if self.include_github_dir:
-            self.forced_includes |= {"**/.github/**"}
-        if self.include_tooling_dirs:
-            from codeweaver.core.file_extensions import (
-                COMMON_LLM_TOOLING_PATHS,
-                COMMON_TOOLING_PATHS,
-            )
-
-            file_endings = {
-                ".json",
-                ".yaml",
-                ".yml",
-                ".toml",
-                ".lock",
-                ".sbt",
-                ".properties",
-                ".js",
-                ".ts",
-                ".cmd",
-                ".xml",
-            }
-
-            tooling_dirs = {
-                path
-                for tool in COMMON_TOOLING_PATHS
-                for path in tool[1]
-                if path.name.startswith(".")
-                or (str(path).startswith(".") and path.suffix not in file_endings)
-            } | {
-                path
-                for tool in COMMON_LLM_TOOLING_PATHS
-                for path in tool[1]
-                if path.name.startswith(".")
-                or (str(path).startswith(".") and path.suffix not in file_endings)
-            }
-            self.forced_includes |= {f"**/{directory}/**" for directory in tooling_dirs}
-
-    async def set_inc_exc(self, project_path: Path) -> None:
-        """Set that includes and excludes have been configured."""
-        self.forced_includes, self.excludes = await FilteredPaths.from_settings(self, project_path)
-        self._inc_exc_set = True
-
-    def _as_settings(self, project_path: Path | None = None) -> RignoreSettings:
-        """Convert self, either as an instance or as a serialized python dictionary, to kwargs for rignore."""
-        rignore_settings = self.default_rignore_settings | (
-            {} if isinstance(self.other_ignore_kwargs, Unset) else self.other_ignore_kwargs
-        )
-        # Avoid circular dependency: use provided path or try to get it safely
-        if project_path is None:
-            # Try to get from global settings without triggering recursion
-            global _settings
-            if (
-                _settings is not None
-                and hasattr(_settings, "project_path")
-                and not isinstance(_settings.project_path, Unset)
-            ):
-                project_path = _settings.project_path
-            else:
-                # Fallback to current working directory during initialization
-                from codeweaver.common.utils.git import get_project_path
-
-                project_path = get_project_path()
-        rignore_settings["path"] = project_path
-        rignore_settings["ignore_hidden"] = bool(
-            self.ignore_hidden and not self.include_github_dir and not self.include_tooling_dirs
-        )
-        rignore_settings["read_ignore_files"] = self.use_other_ignore_files
-        rignore_settings["read_git_ignore"] = self.use_gitignore
-        rignore_settings["additional_ignore_paths"] = [
-            str(p) for p in self.excludes if not any(char for char in ("*?[]") if char in str(p))
-        ]
-        rignore_settings["additional_ignores"] = [
-            str(p)
-            for p in self.excludes
-            if str(p) not in rignore_settings["additional_ignore_paths"]
-        ]
-        rignore_settings["should_exclude_entry"] = self.filter
-        return RignoreSettings(rignore_settings)
-
-    def construct_filter(self) -> Callable[[Path], bool]:
-        """Constructs the filter function for rignore's `should_exclude_entry` parameter.
-
-        Returns *True* for paths that should **not** be included (i.e., excluded paths).
-        """
-
-        def filter_func(settings: IndexerSettings, path: Path | str) -> bool:
-            """Default filter function that respects forced includes and other settings."""
-            path_obj = Path(path) if isinstance(path, str) else path
-            if settings.ignore_hidden and (
-                settings.include_github_dir or settings.include_tooling_dirs
-            ):
-                # We need to check for .github/ and tooling dirs first
-                if settings.include_github_dir and (
-                    path_obj.match("**/.github/**") or path_obj.match("**/.circleci/**")
-                ):
-                    return False
-                if settings.include_tooling_dirs:
-                    from codeweaver.core.file_extensions import (
-                        COMMON_LLM_TOOLING_PATHS,
-                        COMMON_TOOLING_PATHS,
-                    )
-
-                    # filter for tooling dirs that are hidden (i.e., start with .)
-                    if {
-                        p
-                        for p in {
-                            path
-                            for tool in COMMON_TOOLING_PATHS
-                            for path in tool[1]
-                            if path_obj.match(f"**/{path}/**")
-                        }
-                        | {
-                            path
-                            for tool in COMMON_LLM_TOOLING_PATHS
-                            for path in tool[1]
-                            if path_obj.match(f"**/{path}/**")
-                        }
-                        if p
-                        and (
-                            (str(p).startswith(".") or p.name.startswith("."))
-                            and ("." not in p.name[1:] or "." not in p.parts[0][1:])
-                        )
-                    }:
-                        return False
-                return True
-            return False
-
-        return partial(filter_func, self)
-
-    @property
-    def filter(self) -> Callable[[Path], bool]:
-        """Cached property for the filter function."""
-        return self.construct_filter()
-
-    def to_settings(self) -> RignoreSettings:
-        """Serialize to `RignoreSettings`."""
-        return self._as_settings()
 
 
 class ProviderSettings(BasedModel):
@@ -853,21 +303,6 @@ class FastMcpServerSettings(BasedModel):
         return [s for s in (cls._callable_to_path(v, "tools") for v in value) if s]
 
 
-DefaultFastMcpServerSettings = FastMcpServerSettingsDict(
-    transport="http",
-    auth=None,
-    on_duplicate_tools="warn",
-    on_duplicate_resources="warn",
-    on_duplicate_prompts="warn",
-    resource_prefix_format="path",
-    middleware=[],
-    tools=[],
-)
-DefaultIndexerSettings = IndexerSettingsDict()
-DefaultChunkerSettings = ChunkerSettingsDict()
-DefaultUvicornSettings = UvicornServerSettingsDict()
-
-
 _ = ProviderSettings.model_rebuild()
 
 
@@ -881,6 +316,8 @@ class CodeWeaverSettings(BaseSettings):
     4. User config (~/.codeweaver.toml (or .yaml, .yml, .json))
     5. Global config (/etc/codeweaver.toml (or .yaml, .yml, .json))
     6. Defaults
+
+    # TODO: flatten the config structure. It's a bit too much when using env vars for nested models.
     """
 
     model_config = SettingsConfigDict(
@@ -968,35 +405,16 @@ class CodeWeaverSettings(BaseSettings):
         ChunkerSettings | Unset, Field(description="""Chunker system configuration""")
     ] = UNSET
 
-    # TODO: I don't think we're actually checking for these before initializing the server. We should.
-    enable_health_endpoint: Annotated[
-        bool | Unset, Field(description="""Enable the health check endpoint""")
-    ] = UNSET
-    enable_statistics_endpoint: Annotated[
-        bool | Unset, Field(description="""Enable the statistics endpoint""")
-    ] = UNSET
-    enable_settings_endpoint: Annotated[
-        bool | Unset, Field(description="""Enable the settings endpoint""")
-    ] = UNSET
-    enable_version_endpoint: Annotated[
-        bool | Unset, Field(description="""Enable the version endpoint""")
-    ] = UNSET
-    allow_identifying_telemetry: Annotated[
-        bool | Unset,
-        Field(
-            description="""DISABLED BY DEFAULT. If you want to *really* help us improve CodeWeaver, you can allow us to collect potentially identifying telemetry data. It's not intrusive, it's more like what *most* telemetry collects. If it's enabled, we *won't hash file and repository names. We'll still try our best to screen out potential secrets, as well as names and emails, but we can't guarantee complete anonymity. This helps us by giving us real-world usage patterns and information on queries and results. We can use that to make everyone's results better. Like with the default telemetry, we **will not use it for anything else**."""
-        ),
-    ] = UNSET
-
-    enable_telemetry: Annotated[
-        bool | Unset,
-        Field(
-            description="""(currently disabled in v.1, planned for v.2). Enable privacy-friendly usage telemetry. ON by default. We do not collect any identifying information -- we hash all file and directory paths, repository names, and other identifiers to ensure privacy while still gathering useful aggregate data for improving CodeWeaver. We add a second round of filters within Posthog cloud before we get the data just to be sure we caught everything. You can see exactly what we collect, and how we collect it [here](../telemetry). You can disable telemetry if you prefer not to send any data. You can also provide your own PostHog Project Key to collect your own telemetry data. **We will only ever use this data to improve CodeWeaver. We will never sell or share it with anyone else, and we won't use it for targeted marketing (we will use high level aggregate data, like how many people use it, and how many tokens CodeWeaver has saved.)**"""
-        ),
+    endpoints: Annotated[
+        EndpointSettingsDict | Unset, Field(description="""Endpoint settings""")
     ] = UNSET
 
     uvicorn: Annotated[
         UvicornServerSettings | Unset, Field(description="""Settings for the Uvicorn server""")
+    ] = UNSET
+
+    telemetry: Annotated[
+        TelemetrySettings | Unset, Field(description="""Telemetry configuration""")
     ] = UNSET
 
     __version__: Annotated[
@@ -1045,34 +463,20 @@ class CodeWeaverSettings(BaseSettings):
             else self.server
         )
         # logging also gets set in the server initialization if unset
-        self.indexing = (
-            IndexerSettings.model_validate(DefaultIndexerSettings)
-            if isinstance(self.indexing, Unset)
-            else self.indexing
-        )
-        self.chunker = (
-            ChunkerSettings.model_validate(DefaultChunkerSettings)
-            if isinstance(self.chunker, Unset)
-            else self.chunker
+        self.indexing = IndexerSettings() if isinstance(self.indexing, Unset) else self.indexing
+        self.chunker = ChunkerSettings() if isinstance(self.chunker, Unset) else self.chunker
+        self.telemetry = (
+            TelemetrySettings() if isinstance(self.telemetry, Unset) else self.telemetry
         )
         self.uvicorn = (
             UvicornServerSettings.model_validate(DefaultUvicornSettings)
             if isinstance(self.uvicorn, Unset)
             else self.uvicorn
         )
-        for attr in (
-            "enable_health_endpoint",
-            "enable_statistics_endpoint",
-            "enable_settings_endpoint",
-            "enable_version_endpoint",
-            "enable_telemetry",
-        ):
-            if isinstance(getattr(self, attr), Unset):
-                setattr(self, attr, True)
-        # only enabled if explicitly set to True
-        self.allow_identifying_telemetry = bool(
-            not isinstance(self.allow_identifying_telemetry, Unset)
-            and self.allow_identifying_telemetry
+        self.endpoints = (
+            DefaultEndpointSettings
+            if isinstance(self.endpoints, Unset)
+            else DefaultEndpointSettings | self.endpoints
         )
         if not type(self).__pydantic_complete__:
             result = type(self).model_rebuild()
@@ -1106,13 +510,9 @@ class CodeWeaverSettings(BaseSettings):
             server=DefaultFastMcpServerSettings,
             indexing=DefaultIndexerSettings,
             chunker=DefaultChunkerSettings,
+            telemetry=DefaultTelemetrySettings,
             uvicorn=DefaultUvicornSettings,
-            enable_health_endpoint=True,
-            enable_settings_endpoint=True,
-            enable_statistics_endpoint=True,
-            enable_version_endpoint=True,
-            enable_telemetry=True,
-            allow_identifying_telemetry=False,
+            endpoints=DefaultEndpointSettings,
         )
 
     @classmethod

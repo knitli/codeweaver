@@ -20,17 +20,19 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, TypedDict
 
-from pydantic import UUID7, BaseModel, Field, PositiveInt
+from pydantic import UUID7, Field, PositiveInt
 from pydantic_core import from_json, to_json
 from uuid_extensions import uuid7
 
+from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.providers import (
     EmbeddingProviderSettings,
     RerankingProviderSettings,
     VectorStoreProviderSettings,
 )
 from codeweaver.config.types import IndexerSettingsDict
-from codeweaver.core.stores import get_blake_hash
+from codeweaver.core.stores import BlakeHashKey, get_blake_hash
+from codeweaver.core.types.models import BasedModel
 
 
 if TYPE_CHECKING:
@@ -77,7 +79,7 @@ def _get_settings_map() -> DictView[CheckpointSettingsFingerprint]:
     )
 
 
-class IndexingCheckpoint(BaseModel):
+class IndexingCheckpoint(BasedModel):
     """Persistent checkpoint for indexing pipeline state.
 
     Enables resumption after interruption by tracking processed files,
@@ -124,7 +126,7 @@ class IndexingCheckpoint(BaseModel):
 
     # Settings hash for invalidation
     settings_hash: str = Field(
-        description="SHA256 hash of indexing settings (detect config changes)"
+        description="Blake3 hash of indexing settings (detect config changes)"
     )
 
     def is_stale(self, max_age_hours: int = 24) -> bool:
@@ -143,7 +145,7 @@ class IndexingCheckpoint(BaseModel):
         """Check if checkpoint settings match current configuration.
 
         Args:
-            current_settings_hash: SHA256 hash of current settings
+            current_settings_hash: Blake3 hash of current settings
 
         Returns:
             True if settings match (safe to resume)
@@ -154,19 +156,24 @@ class IndexingCheckpoint(BaseModel):
 class CheckpointManager:
     """Manages checkpoint save/load operations for indexing pipeline."""
 
-    def __init__(self, project_path: Path, checkpoint_dir: Path | None = None):
+    def __init__(self, project_path: Path | None = None, checkpoint_dir: Path | None = None):
         """Initialize checkpoint manager.
 
         Args:
             project_path: Path to indexed codebase
             checkpoint_dir: Directory for checkpoint files (default: .codeweaver/)
         """
-        self.project_path = project_path.resolve()
-        self.checkpoint_dir = (checkpoint_dir or self.project_path / ".codeweaver").resolve()
-        self.checkpoint_file = self.checkpoint_dir / "index_checkpoint.json"
+        settings = _get_settings_map()
 
-    def compute_settings_hash(self, settings_dict: CheckpointSettingsFingerprint) -> str:
-        """Compute SHA256 hash of settings for change detection.
+        self.project_path = (project_path or settings.get("project_path", Path.cwd())).resolve()
+
+        self.checkpoint_dir = (checkpoint_dir or get_user_config_dir()).resolve()
+        self.checkpoint_file = (
+            self.checkpoint_dir / f"index_checkpoint_{self.project_path.name}.json"
+        )
+
+    def compute_settings_hash(self, settings_dict: CheckpointSettingsFingerprint) -> BlakeHashKey:
+        """Compute Blake3 hash of settings for change detection.
 
         Args:
             settings_dict: Dictionary of relevant settings
@@ -265,3 +272,6 @@ class CheckpointManager:
 
         logger.info("Checkpoint is valid, will resume from previous session")
         return True
+
+
+__all__ = ("CheckpointManager", "CheckpointSettingsFingerprint", "IndexingCheckpoint")
