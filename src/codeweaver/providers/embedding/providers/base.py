@@ -283,7 +283,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     )
     async def _embed_documents_with_retry(
         self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any] | None
-    ) -> list[list[float]] | list[list[int]]:
+    ) -> list[list[float]] | list[list[int]] | list[dict[str, list[int] | list[float]]]:
         """Wrapper around _embed_documents with retry logic and circuit breaker.
 
         Applies exponential backoff (1s, 2s, 4s, 8s, 16s) and circuit breaker pattern.
@@ -312,7 +312,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     @abstractmethod
     async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any] | None
-    ) -> list[list[float]] | list[list[int]]:
+    ) -> list[list[float]] | list[list[int]] | list[dict[str, list[int] | list[float]]]:
         """Abstract method to implement document embedding logic."""
 
     def _handle_embedding_error(
@@ -338,7 +338,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         *,
         batch_id: UUID7 | None = None,
         **kwargs: Mapping[str, Any] | None,
-    ) -> list[list[float]] | list[list[int]] | EmbeddingErrorInfo:
+    ) -> list[list[float]] | list[list[int]] | list[dict[str, list[int] | list[float]]] | EmbeddingErrorInfo:
         """Embed a list of documents into vectors.
 
         Optionally takes a `batch_id` parameter to reprocess a specific batch of documents.
@@ -346,12 +346,12 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         is_old_batch = False
         if batch_id and self._store and batch_id in self._store:  # pyright: ignore[reportUnknownMemberType]
             documents: Sequence[CodeChunk] = self._store[batch_id]  # type: ignore
-            is_old_batch = True
+        is_old_batch = True
         chunks, cache_key = self._process_input(documents, is_old_batch=is_old_batch)  # type: ignore
         try:
             # Use retry wrapper instead of calling _embed_documents directly
             results: (
-                Sequence[Sequence[float]] | Sequence[Sequence[int]]
+                Sequence[Sequence[float]] | Sequence[Sequence[int]] | Sequence[dict[str, list[int] | list[float]]]
             ) = await self._embed_documents_with_retry(tuple(chunks), **kwargs)
         except CircuitBreakerOpenError as e:
             # Circuit breaker open - return error immediately
@@ -380,7 +380,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     )
     async def _embed_query_with_retry(
         self, query: Sequence[str], **kwargs: Mapping[str, Any] | None
-    ) -> list[list[float]] | list[list[int]]:
+    ) -> list[list[float]] | list[list[int]] | list[dict[str, list[int] | list[float]]]:
         """Wrapper around _embed_query with retry logic and circuit breaker."""
         self._check_circuit_breaker()
 
@@ -405,19 +405,19 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     @abstractmethod
     async def _embed_query(
         self, query: Sequence[str], **kwargs: Mapping[str, Any] | None
-    ) -> list[list[float]] | list[list[int]]:
+    ) -> list[list[float]] | list[list[int]] | list[dict[str, list[int] | list[float]]]:
         """Abstract method to implement query embedding logic."""
 
     async def embed_query(
         self, query: str | Sequence[str], **kwargs: Mapping[str, Any] | None
-    ) -> list[list[float]] | list[list[int]] | EmbeddingErrorInfo:
+    ) -> list[list[float]] | list[list[int]] | list[dict[str, list[int] | list[float]]] | EmbeddingErrorInfo:
         """Embed a query into a vector."""
         processed_kwargs: Mapping[str, Any] = self._set_kwargs(self.query_kwargs, kwargs or {})
         queries: Sequence[str] = query if isinstance(query, list | tuple | set) else [query]  # pyright: ignore[reportAssignmentType]
         try:
             # Use retry wrapper instead of calling _embed_query directly
             results: (
-                Sequence[Sequence[float]] | Sequence[Sequence[int]]
+                Sequence[Sequence[float]] | Sequence[Sequence[int]] | Sequence[dict[str, list[int] | list[float]]]
             ) = await self._embed_query_with_retry(queries, **processed_kwargs)  # pyright: ignore[reportUnknownVariableType, reportGeneralTypeIssues]
         except CircuitBreakerOpenError as e:
             logger.warning("Circuit breaker open for query embedding")
@@ -538,24 +538,42 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         self,
         chunks: Sequence[CodeChunk],
         batch_id: UUID7,
-        embeddings: Sequence[Sequence[float]] | Sequence[Sequence[int]],
+        embeddings: Sequence[Sequence[float]] | Sequence[Sequence[int]] | Sequence[dict[str, list[int] | list[float]]],
     ) -> None:
         """Register chunks in the embedding registry."""
         from codeweaver.core.types.aliases import LiteralStringT, ModelName
-        from codeweaver.providers.embedding.types import ChunkEmbeddings, EmbeddingBatchInfo
+        from codeweaver.providers.embedding.types import ChunkEmbeddings, EmbeddingBatchInfo, SparseEmbedding
 
         registry = _get_registry()
-        attr = "sparse" if type(self).__name__.lower().startswith("sparse") else "dense"
-        chunk_infos = [
-            getattr(EmbeddingBatchInfo, f"create_{attr}")(
-                batch_id=batch_id,
-                batch_index=i,
-                chunk_id=chunk.chunk_id,
-                model=ModelName(cast(LiteralStringT, self.model_name)),
-                embeddings=embedding,
-            )
-            for i, (chunk, embedding) in enumerate(zip(chunks, embeddings, strict=True))
-        ]
+        is_sparse = type(self).__name__.lower().startswith("sparse") or "sparse" in type(self).__name__.lower()
+        attr = "sparse" if is_sparse else "dense"
+        
+        chunk_infos = []
+        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings, strict=True)):
+            if attr == "sparse" and isinstance(embedding, dict):
+                # For sparse embeddings, convert dict to SparseEmbedding
+                sparse_emb = SparseEmbedding(
+                    indices=embedding["indices"],
+                    values=embedding["values"]
+                )
+                chunk_info = EmbeddingBatchInfo.create_sparse(
+                    batch_id=batch_id,
+                    batch_index=i,
+                    chunk_id=chunk.chunk_id,
+                    model=ModelName(cast(LiteralStringT, self.model_name)),
+                    embeddings=sparse_emb,
+                )
+            else:
+                # For dense embeddings or old format
+                chunk_info = getattr(EmbeddingBatchInfo, f"create_{attr}")(
+                    batch_id=batch_id,
+                    batch_index=i,
+                    chunk_id=chunk.chunk_id,
+                    model=ModelName(cast(LiteralStringT, self.model_name)),
+                    embeddings=embedding,
+                )
+            chunk_infos.append(chunk_info)
+            
         for i, info in enumerate(chunk_infos):
             if (registered := registry.get(info.chunk_id)) is not None:
                 registry[info.chunk_id] = registered.add(info)
