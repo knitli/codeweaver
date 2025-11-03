@@ -266,14 +266,14 @@ def configured_providers(mock_provider_registry):
 
     call_count = [0]  # Use list for mutable counter
 
-    def mock_time():
+    def mock_time() -> float:
         call_count[0] += 1
         # Return monotonically increasing time values (start from a baseline)
         return 1000000.0 + call_count[0] * 0.001
 
     with (
         patch(
-            "codeweaver.agent_api.find_code.get_provider_registry",
+            "codeweaver.common.registry.provider.get_provider_registry",
             return_value=mock_provider_registry,
         ),
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),

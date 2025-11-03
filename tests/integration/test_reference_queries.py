@@ -30,7 +30,7 @@ import pytest
 import yaml
 
 from codeweaver.agent_api.find_code import find_code
-from codeweaver.agent_api.intent import IntentType
+from codeweaver.agent_api.find_code.intent import IntentType
 
 
 logger = logging.getLogger(__name__)

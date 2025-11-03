@@ -109,11 +109,13 @@ async def qdrant_store(qdrant_test_manager) -> QdrantVectorStoreProvider:
 @pytest.fixture
 async def memory_store() -> MemoryVectorStoreProvider:
     """Create a MemoryVectorStoreProvider for testing."""
+    from codeweaver.common.utils.utils import uuid7
+
     with tempfile.TemporaryDirectory() as tmpdir:
         config = MemoryConfig(
             persist_path=Path(tmpdir) / "test_store.json",
             auto_persist=False,
-            collection_name=f"perf_test_{uuid4().hex[:8]}",
+            collection_name=f"perf_test_{uuid7().hex[:8]}",
         )
         store = MemoryVectorStoreProvider(config=config)
         await store._initialize()

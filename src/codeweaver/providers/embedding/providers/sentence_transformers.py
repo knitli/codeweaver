@@ -21,12 +21,13 @@ from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
 )
-from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+from codeweaver.providers.embedding.providers.base import EmbeddingProvider, SparseEmbeddingProvider
 from codeweaver.providers.provider import Provider
 
 
 if TYPE_CHECKING:
     from codeweaver.core.chunks import CodeChunk
+    from codeweaver.providers.embedding.types import SparseEmbedding
 
 
 try:
@@ -229,9 +230,9 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
             )
 
 
-class SentenceTransformersSparseProvider(EmbeddingProvider[SparseEncoder]):
+class SentenceTransformersSparseProvider(SparseEmbeddingProvider[SparseEncoder]):
     """Sentence Transformers sparse embedding provider.
-    
+
     This provider handles sparse embeddings from SparseEncoder models,
     returning properly formatted sparse embeddings with indices and values.
     """
@@ -250,7 +251,7 @@ class SentenceTransformersSparseProvider(EmbeddingProvider[SparseEncoder]):
         **kwargs: Any,
     ) -> None:
         """Initialize the Sentence Transformers sparse embedding provider."""
-        self._caps = capabilities
+        self._caps = capabilities  # type: ignore
         self.doc_kwargs = {**self._doc_kwargs, **(kwargs or {})}
         self.query_kwargs = {**self._query_kwargs, **(kwargs or {})}
         if client is None:
@@ -259,7 +260,7 @@ class SentenceTransformersSparseProvider(EmbeddingProvider[SparseEncoder]):
             )
         else:
             self._client = client
-        super().__init__(caps=capabilities, client=self._client, **kwargs)
+        super().__init__(caps=capabilities, client=self._client, **kwargs)  # type: ignore
 
     @property
     def base_url(self) -> str | None:
@@ -281,9 +282,19 @@ class SentenceTransformersSparseProvider(EmbeddingProvider[SparseEncoder]):
         self.query_kwargs.pop("model_name", self.query_kwargs.pop("model_name_or_path", None))
         self._client = SparseEncoder(name, **(self.doc_kwargs or {}))
 
+    def _to_sparse_format(self, embedding: Any) -> SparseEmbedding:
+        """Convert embedding to sparse format with indices and values."""
+        from codeweaver.providers.embedding.types import SparseEmbedding
+
+        if hasattr(embedding, "indices") and hasattr(embedding, "values"):
+            return SparseEmbedding(indices=list(embedding.indices), values=list(embedding.values))
+        return SparseEmbedding(
+            indices=list(embedding.get("indices", [])), values=list(embedding.get("values", []))
+        )
+
     async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Any
-    ) -> list[dict[str, list[int] | list[float]]]:
+    ) -> list[SparseEmbedding]:
         """Embed a sequence of documents into sparse vectors."""
         preprocessed = cast(list[str], self.chunks_to_strings(documents))
         embed_partial = rpartial(  # type: ignore
@@ -297,20 +308,12 @@ class SentenceTransformersSparseProvider(EmbeddingProvider[SparseEncoder]):
         loop = asyncio.get_running_loop()
         results = await loop.run_in_executor(None, embed_partial, preprocessed)  # type: ignore
         _ = self._fire_and_forget(lambda: self._update_token_stats(from_docs=preprocessed))
-        
-        # SparseEncoder.encode returns dicts with 'indices' and 'values' keys
-        # Convert to our expected format
-        return [
-            {
-                "indices": list(emb.get("indices", [])) if isinstance(emb, dict) else list(emb.indices),
-                "values": list(emb.get("values", [])) if isinstance(emb, dict) else list(emb.values),
-            }
-            for emb in results
-        ]
 
-    async def _embed_query(
-        self, query: Sequence[str], **kwargs: Any
-    ) -> list[dict[str, list[int] | list[float]]]:
+        formatted_results = [self._to_sparse_format(emb) for emb in results]
+        self._update_token_stats(token_count=sum(len(emb.indices) for emb in formatted_results))
+        return formatted_results
+
+    async def _embed_query(self, query: Sequence[str], **kwargs: Any) -> list[SparseEmbedding]:
         """Embed a sequence of queries into sparse vectors."""
         preprocessed = cast(list[str], query)
         embed_partial = rpartial(  # type: ignore
@@ -323,24 +326,11 @@ class SentenceTransformersSparseProvider(EmbeddingProvider[SparseEncoder]):
         )
         loop = asyncio.get_running_loop()
         results = await loop.run_in_executor(None, embed_partial, preprocessed)  # type: ignore
-        _ = self._fire_and_forget(
-            lambda: self._update_token_stats(from_docs=cast(list[str], preprocessed))
-        )
-        
-        # SparseEncoder.encode returns dicts with 'indices' and 'values' keys
-        return [
-            {
-                "indices": list(emb.get("indices", [])) if isinstance(emb, dict) else list(emb.indices),
-                "values": list(emb.get("values", [])) if isinstance(emb, dict) else list(emb.values),
-            }
-            for emb in results
-        ]
+        _ = self._fire_and_forget(lambda: self._update_token_stats(from_docs=preprocessed))
 
-    def _decode_sparse_vectors(
-        self, vectors: Sequence[Sequence[float]]
-    ) -> list[list[tuple[str, float]]]:
-        """Decode sparse vectors from the model output."""
-        return cast(list[list[tuple[str, float]]], self._client.decode(vectors))  # type: ignore
+        formatted_results = [self._to_sparse_format(emb) for emb in results]
+        self._update_token_stats(token_count=sum(len(emb.indices) for emb in formatted_results))
+        return formatted_results
 
 
 __all__ = ("SentenceTransformersEmbeddingProvider", "SentenceTransformersSparseProvider")

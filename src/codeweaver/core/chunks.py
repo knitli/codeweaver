@@ -34,9 +34,7 @@ from typing import (
 from pydantic import (
     UUID7,
     AfterValidator,
-    ConfigDict,
     Field,
-    NonNegativeFloat,
     NonNegativeInt,
     PositiveFloat,
     PositiveInt,
@@ -44,7 +42,6 @@ from pydantic import (
 )
 from pydantic_core import to_json
 
-from codeweaver.agent_api.find_code.types import StrategizedQuery
 from codeweaver.common.utils import ensure_iterable, set_relative_path, uuid7
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.metadata import ChunkSource, ExtKind, Metadata, determine_ext_kind
@@ -95,63 +92,6 @@ class BatchKeys(NamedTuple):
     sparse: Annotated[bool, Field(description="""Whether the batch's embeddings are sparse.""")] = (
         False
     )
-
-
-class SearchResult(BasedModel):
-    """Result from vector search operations."""
-
-    model_config = ConfigDict(validate_assignment=False, extra="allow")
-
-    content: str | CodeChunk
-    file_path: Annotated[
-        Path | None,
-        Field(description="""Path to the source file"""),
-        AfterValidator(set_relative_path),
-    ]
-    score: Annotated[NonNegativeFloat, Field(description="""Similarity score""")]
-    metadata: Annotated[
-        Metadata | None, Field(description="""Additional metadata about the result""")
-    ] = None
-    strategized_query: Annotated[
-        StrategizedQuery | None, Field(description="""The query used for the search""")
-    ] = None
-
-    # Fields for hybrid search and rescoring (set dynamically by find_code)
-    dense_score: NonNegativeFloat | None = None
-    sparse_score: NonNegativeFloat | None = None
-    rerank_score: NonNegativeFloat | None = None
-    relevance_score: NonNegativeFloat | None = None
-
-    @property
-    def chunk(self) -> CodeChunk | str:
-        """Alias for content field for backward compatibility."""
-        return self.content
-
-    @property
-    def file(self) -> Any:
-        """Property to access file info from chunk.
-
-        Returns the file info from the chunk if available, otherwise returns
-        a minimal object with just the path.
-        """
-        if isinstance(self.content, CodeChunk) and hasattr(self.content, "file"):
-            return DiscoveredFile.from_chunk(self.content)
-
-        # Return minimal file-like object with path
-        class _FileInfo:
-            def __init__(self, path: Path) -> None:
-                self.path = path
-
-        return _FileInfo(self.file_path) if self.file_path else None
-
-    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types import AnonymityConversion, FilteredKey
-
-        base = {FilteredKey("content"): AnonymityConversion.TEXT_COUNT}
-        return {
-            FilteredKey("file_path"): AnonymityConversion.BOOLEAN,
-            FilteredKey("metadata"): AnonymityConversion.BOOLEAN,
-        } | (base if isinstance(self.content, str) else {})
 
 
 class CodeChunkDict(TypedDict, total=False):
@@ -544,7 +484,6 @@ __all__ = (
     "ChunkSequence",
     "CodeChunk",
     "CodeChunkDict",
-    "SearchResult",
     "SerializedCodeChunk",
     "StructuredDataInput",
 )
@@ -555,8 +494,6 @@ import contextlib
 # Rebuild models to resolve forward references
 # Force rebuild even if it fails - better to have working models than perfect ones
 # Re-enabled after resolving circular import issues
-with contextlib.suppress(Exception):
-    _ = SearchResult.model_rebuild(force=True)
 
 with contextlib.suppress(Exception):
     _ = CodeChunk.model_rebuild(force=True)

@@ -17,14 +17,13 @@ import logging
 
 from typing import TYPE_CHECKING, Any, NoReturn
 
-from codeweaver.agent_api.find_code.types import StrategizedQuery
-from codeweaver.agent_api.models import SearchStrategy
+from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
 from codeweaver.common.registry import get_provider_registry
-from codeweaver.core.chunks import CodeChunk, SearchResult
 from codeweaver.providers.embedding.types import QueryResult
 
 
 if TYPE_CHECKING:
+    from codeweaver.agent_api.find_code.results import SearchResult
     from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
 
@@ -105,7 +104,7 @@ async def embed_query(query: str) -> QueryResult:
     # So we unwrap the first element from the list for both dense and sparse embeddings
     return QueryResult(
         dense=dense_query_embedding[0] if dense_query_embedding else None,
-        sparse=sparse_query_embedding[0] if sparse_query_embedding else None,
+        sparse=sparse_query_embedding,
     )
 
 
@@ -186,6 +185,8 @@ async def rerank_results(
         - reranked_results is None if reranking unavailable or fails
         - strategy is SEMANTIC_RERANK if successful, None otherwise
     """
+    from codeweaver.core.chunks import CodeChunk
+
     registry = get_provider_registry()
     reranking_enum = registry.get_provider_enum_for("reranking")
 

@@ -666,6 +666,8 @@ class TokenCategory(BaseEnum):
 
     EMBEDDING = "embedding"
     """Tokens generated for storing/using in embedding operations. Includes query tokens."""
+    SPARSE_EMBEDDING = "sparse_embedding"
+    """Tokens generated for storing/using in sparse embedding operations."""
     RERANKING = "reranking"
     """Embeddings generated for reranking search results."""
 
@@ -730,6 +732,7 @@ class TokenCounter(Counter[TokenCategory]):
         self.update({
             TokenCategory.EMBEDDING: 0,
             TokenCategory.RERANKING: 0,
+            TokenCategory.SPARSE_EMBEDDING: 0,
             TokenCategory.CONTEXT_AGENT: 0,
             TokenCategory.USER_AGENT: 0,
             TokenCategory.SEARCH_RESULTS: 0,
@@ -739,7 +742,11 @@ class TokenCounter(Counter[TokenCategory]):
     @property
     def total_generated(self) -> NonNegativeInt:
         """Get the total number of tokens generated across all operations."""
-        return sum((self[TokenCategory.EMBEDDING], self[TokenCategory.RERANKING]))
+        return sum((
+            self[TokenCategory.EMBEDDING],
+            self[TokenCategory.RERANKING],
+            self[TokenCategory.SPARSE_EMBEDDING],
+        ))
 
     @computed_field
     @property
@@ -790,7 +797,7 @@ class TokenCounter(Counter[TokenCategory]):
         """
         embedding_cost_per_1k = 0.00018
         reranking_cost_per_1k = 0.00005
-        _sparse_cost_per_1k = 0.0  # we don't track sparse token use because it's effectively free but it's here for clarity
+        _sparse_cost_per_1k = 0.0  # we don't track sparse token use because costs are negligible compared to everything else
         context_agent_cost_per_1k = 0.00025
         user_agent_cost_per_1k = (0.8 * 0.003) + (0.2 * 0.015)
 
@@ -1065,6 +1072,7 @@ class SessionStatistics(DataclassSerializationMixin):
         self,
         *,
         embedding_generated: NonNegativeInt = 0,
+        sparse_embedding_generated: NonNegativeInt = 0,
         reranking_generated: NonNegativeInt = 0,
         context_agent_used: NonNegativeInt = 0,
         user_agent_received: NonNegativeInt = 0,
@@ -1077,6 +1085,7 @@ class SessionStatistics(DataclassSerializationMixin):
 
         self.token_statistics[TokenCategory.EMBEDDING] += embedding_generated
         self.token_statistics[TokenCategory.RERANKING] += reranking_generated
+        self.token_statistics[TokenCategory.SPARSE_EMBEDDING] += sparse_embedding_generated
         self.token_statistics[TokenCategory.CONTEXT_AGENT] += context_agent_used
         self.token_statistics[TokenCategory.USER_AGENT] += user_agent_received
         self.token_statistics[TokenCategory.SEARCH_RESULTS] += search_results

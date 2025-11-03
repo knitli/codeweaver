@@ -131,7 +131,7 @@ async def test_cli_search_returns_results(test_project_path: Path):
     )
 
     # Validate response structure (works even with stub)
-    from codeweaver.agent_api import FindCodeResponseSummary
+    from codeweaver.agent_api.find_code.types import FindCodeResponseSummary
 
     assert isinstance(response, FindCodeResponseSummary)
     assert hasattr(response, "matches")
@@ -214,8 +214,8 @@ async def test_mcp_find_code_tool(test_project_path: Path):
 
     Reference: specs/003-our-aim-to/contracts/find_code_mcp_tool.json
     """
-    from codeweaver.agent_api.intent import IntentType
-    from codeweaver.agent_api.models import CodeMatchType
+    from codeweaver.agent_api.find_code.intent import IntentType
+    from codeweaver.agent_api.find_code.types import CodeMatchType
     from codeweaver.server.app_bindings import find_code_tool
 
     # Invoke MCP tool
@@ -287,7 +287,7 @@ async def test_mcp_find_code_required_parameters(test_project_path: Path):
     )
 
     # Should handle gracefully (stub always returns valid response)
-    from codeweaver.agent_api import FindCodeResponseSummary
+    from codeweaver.agent_api.find_code.types import FindCodeResponseSummary
 
     assert isinstance(response, FindCodeResponseSummary)
 
@@ -318,7 +318,7 @@ async def test_search_with_intent_parameter():
     When: find_code called with different intents
     Then: Intent reflected in response
     """
-    from codeweaver.agent_api.intent import IntentType
+    from codeweaver.agent_api.find_code.intent import IntentType
     from codeweaver.server.app_bindings import find_code_tool
 
     intents_to_test = [
@@ -347,7 +347,7 @@ async def test_search_with_intent_parameter():
         )
 
         # Validate response structure
-        from codeweaver.agent_api import FindCodeResponseSummary
+        from codeweaver.agent_api.find_code.types import FindCodeResponseSummary
 
         assert isinstance(response, FindCodeResponseSummary)
         assert response.execution_time_ms >= 0
@@ -389,7 +389,7 @@ async def test_search_filters_work():
     )
 
     # Both should return valid responses
-    from codeweaver.agent_api import FindCodeResponseSummary
+    from codeweaver.agent_api.find_code.types import FindCodeResponseSummary
 
     assert isinstance(response_with_tests, FindCodeResponseSummary)
     assert isinstance(response_without_tests, FindCodeResponseSummary)
@@ -445,7 +445,7 @@ async def test_empty_query_handling():
         context=None,
     )
 
-    from codeweaver.agent_api import FindCodeResponseSummary
+    from codeweaver.agent_api.find_code.types import FindCodeResponseSummary
 
     assert isinstance(response, FindCodeResponseSummary)
     assert response.total_results == 0
@@ -471,7 +471,7 @@ async def test_no_results_scenario():
         context=None,
     )
 
-    from codeweaver.agent_api import FindCodeResponseSummary
+    from codeweaver.agent_api.find_code.types import FindCodeResponseSummary
 
     assert isinstance(response, FindCodeResponseSummary)
     assert response.total_results == 0
@@ -496,7 +496,7 @@ async def test_search_performance(test_project_path: Path):
     Note: Requires real find_code implementation and embeddings to be restored.
     """
     from codeweaver.agent_api.find_code import find_code
-    from codeweaver.agent_api.intent import IntentType
+    from codeweaver.agent_api.find_code.intent import IntentType
 
     start_time = time.time()
 
@@ -564,8 +564,8 @@ async def test_search_strategy_reporting(test_project_path: Path, configured_pro
     Then: search_strategy reports HYBRID_SEARCH and SEMANTIC_RERANK
     """
     from codeweaver.agent_api.find_code import find_code
-    from codeweaver.agent_api.intent import IntentType
-    from codeweaver.agent_api.models import SearchStrategy
+    from codeweaver.agent_api.find_code.intent import IntentType
+    from codeweaver.agent_api.find_code.types import SearchStrategy
 
     response = await find_code(
         query="how does authentication work",

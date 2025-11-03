@@ -8,9 +8,9 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import NamedTuple, cast
+from typing import Annotated, NamedTuple, cast
 
-from pydantic import UUID7, NonNegativeInt
+from pydantic import UUID7, Field, NonNegativeInt
 
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.aliases import LiteralStringT, ModelName, ModelNameT
@@ -28,20 +28,22 @@ type StoredEmbeddingVectors = tuple[float, ...] | tuple[int, ...]
 
 class SparseEmbedding(NamedTuple):
     """NamedTuple representing sparse embedding with indices and values.
-    
+
     Sparse embeddings are represented as two parallel arrays:
     - indices: positions in the vocabulary that have non-zero values
     - values: weights/importance scores for those positions
-    
+
     This format is used by SPLADE, SparseEncoder and similar models.
     """
 
-    indices: Sequence[int]
-    values: Sequence[float]
+    indices: Annotated[Sequence[int], Field(description="Indices of non-zero embedding values")]
+    values: Annotated[
+        Sequence[float], Field(description="Values (weights) of non-zero embedding indices")
+    ]
 
-    def to_tuple(self) -> tuple[tuple[int, ...], tuple[float, ...]]:
-        """Convert to a tuple of tuples for storage."""
-        return (tuple(self.indices), tuple(self.values))
+    def to_tuple(self) -> SparseEmbedding:
+        """Convert to a SparseEmbedding with tuples for indices and values."""
+        return self._replace(indices=tuple(self.indices), values=tuple(self.values))
 
 
 class EmbeddingKind(BaseEnum):
@@ -66,7 +68,7 @@ class EmbeddingBatchInfo(NamedTuple):
     kind: EmbeddingKind
     chunk_id: UUID7
     model: ModelNameT
-    embeddings: StoredEmbeddingVectors | tuple[tuple[int, ...], tuple[float, ...]]
+    embeddings: StoredEmbeddingVectors | SparseEmbedding
 
     @classmethod
     def create_dense(
@@ -97,7 +99,7 @@ class EmbeddingBatchInfo(NamedTuple):
         embeddings: SparseEmbedding,
     ) -> EmbeddingBatchInfo:
         """Create EmbeddingBatchInfo for sparse embeddings.
-        
+
         Args:
             batch_id: Unique identifier for the batch
             batch_index: Index within the batch
@@ -113,6 +115,14 @@ class EmbeddingBatchInfo(NamedTuple):
             model=ModelName(model),
             embeddings=embeddings.to_tuple(),
         )
+
+    def is_dense(self) -> bool:
+        """Check if the embedding kind is dense."""
+        return self.kind == EmbeddingKind.DENSE
+
+    def is_sparse(self) -> bool:
+        """Check if the embedding kind is sparse."""
+        return self.kind == EmbeddingKind.SPARSE
 
 
 class ChunkEmbeddings(NamedTuple):

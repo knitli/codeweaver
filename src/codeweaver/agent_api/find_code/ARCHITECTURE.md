@@ -18,9 +18,13 @@ codeweaver/agent_api/find_code/
 ├── __init__.py       # Main entry point and orchestration
 ├── conversion.py     # Result format conversions
 ├── filters.py        # Post-search filtering logic
+├── intent.py         # Intent types and resolution
 ├── pipeline.py       # Search pipeline orchestration
 ├── response.py       # Response building and metadata
+├── types.py          # Shared types
+├── results.py        # result object (isolated to avoid circular imports)
 └── scoring.py        # Scoring and reranking logic
+
 ```
 
 ## Module Responsibilities

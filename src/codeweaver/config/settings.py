@@ -32,6 +32,7 @@ from pydantic import (
     DirectoryPath,
     Field,
     FilePath,
+    ImportString,
     PositiveInt,
     PrivateAttr,
     ValidationError,
@@ -112,7 +113,7 @@ class FastMcpServerSettings(BasedModel):
     resource_prefix_format: Literal["protocol", "path"] | None = None
     # these are each "middleware", "tools", and "dependencies" for FastMCP. But we prefix them with "additional_" to make it clear these are *in addition to* the ones we provide by default.
     additional_middleware: Annotated[
-        list[str] | None,
+        list[ImportString[Middleware]] | None,
         Field(
             description="""Additional middleware to add to the FastMCP server. Values should be full path import strings, like `codeweaver.middleware.statistics.StatisticsMiddleware`.""",
             validation_alias="middleware",
@@ -120,7 +121,7 @@ class FastMcpServerSettings(BasedModel):
         ),
     ] = None
     additional_tools: Annotated[
-        list[str] | None,
+        list[ImportString[Any]] | None,
         Field(
             description="""Additional tools to add to the FastMCP server. Values can be either full path import strings, like `codeweaver.agent_api.git.GitTool`, or just the tool name, like `GitTool`.""",
             validation_alias="tools",

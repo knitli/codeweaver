@@ -13,12 +13,17 @@ CodeMatch objects for API responses.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from codeweaver.agent_api.models import CodeMatch, CodeMatchType
+from codeweaver.agent_api.find_code.types import CodeMatch, CodeMatchType
 from codeweaver.common.utils import uuid7
-from codeweaver.core.chunks import ChunkSource, CodeChunk, SearchResult
+from codeweaver.core.chunks import ChunkSource, CodeChunk
 from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.spans import Span
+
+
+if TYPE_CHECKING:
+    from codeweaver.agent_api.find_code.results import SearchResult
 
 
 def convert_search_result_to_code_match(result: SearchResult) -> CodeMatch:

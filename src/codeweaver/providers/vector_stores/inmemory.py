@@ -202,8 +202,9 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
             CollectionNotFoundError: Collection doesn't exist.
             SearchError: Search operation failed.
         """
-        from codeweaver.agent_api.find_code.types import StrategizedQuery
-        from codeweaver.agent_api.models import SearchStrategy
+        from codeweaver.agent_api.find_code.results import SearchResult
+        from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
+        from codeweaver.providers.embedding.types import SparseEmbedding
 
         if not self._ensure_client(self._client):
             raise ProviderError("Qdrant client not initialized")
@@ -213,19 +214,21 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
 
         # Ensure collection exists
         await self._ensure_collection(collection_name)
-        dense, sparse = None, None
-        if isinstance(vector, list):
-            if not vector:
-                raise ProviderError("Empty vector provided for search")
-            dense = vector if len(vector) < 8193 else None
-            sparse = vector if len(vector) >= 8193 else None
-        elif isinstance(vector, dict):
-            dense = vector.get("dense")
-            sparse = vector.get("sparse")
-        if dense or sparse:
+        sparse, dense = None, None
+        if not hasattr(vector, "sparse") or not hasattr(vector, "dense"):
+            if isinstance(vector, dict) and "indices" in vector and "values" in vector:  # type: ignore
+                sparse = SparseEmbedding(indices=vector["indices"], values=vector["values"])  # type: ignore
+            elif isinstance(vector, dict) and "sparse" in vector:
+                sparse = SparseEmbedding(
+                    indices=vector["sparse"].get("indices", []),  # type: ignore
+                    values=vector["sparse"].get("values", []),  # type: ignore
+                )  # type: ignore
+            elif isinstance(vector, (list, tuple)):
+                sparse = None
+                dense = vector
             vector = StrategizedQuery(
                 query="unavailable",
-                dense=dense,
+                dense=dense,  # type: ignore
                 sparse=sparse,
                 strategy=SearchStrategy.HYBRID_SEARCH
                 if dense and sparse
@@ -323,10 +326,8 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
                     # New format: tuple of (indices, values)
                     indices, values = sparse.embeddings
                     from qdrant_client.http.models import SparseVector
-                    vectors["sparse"] = SparseVector(
-                        indices=list(indices),
-                        values=list(values)
-                    )
+
+                    vectors["sparse"] = SparseVector(indices=list(indices), values=list(values))
                 else:
                     # Old format: flat list (for backward compatibility during migration)
                     vectors["sparse"] = list(sparse.embeddings)

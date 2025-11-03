@@ -11,7 +11,12 @@ various criteria such as test file inclusion and language focus.
 
 from __future__ import annotations
 
-from codeweaver.core.chunks import CodeChunk, SearchResult
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from codeweaver.agent_api.find_code.results import SearchResult
+    from codeweaver.core.chunks import CodeChunk
 
 
 def filter_test_files(candidates: list[SearchResult], *, include_tests: bool) -> list[SearchResult]:

@@ -76,7 +76,7 @@ enabled = false
 ### Basic Usage
 
 ```python
-from codeweaver.server.telemetry import get_telemetry_client
+from codeweaver.common.telemetry import get_telemetry_client
 
 # Get singleton client (configured from settings)
 client = get_telemetry_client()
@@ -99,7 +99,7 @@ client.shutdown()
 ### Using Event Schemas
 
 ```python
-from codeweaver.server.telemetry.events import SessionSummaryEvent
+from codeweaver.common.telemetry.events import SessionSummaryEvent
 
 # Create structured event
 event = SessionSummaryEvent(
@@ -163,7 +163,7 @@ telemetry_data = model.serialize_for_telemetry()
 Calculate efficiency improvements vs naive approaches:
 
 ```python
-from codeweaver.server.telemetry.comparison import (
+from codeweaver.common.telemetry.comparison import (
     BaselineComparator,
     CodeWeaverMetrics,
 )
@@ -330,7 +330,7 @@ All settings use `CODEWEAVER_` prefix:
 
 1. Check if enabled:
 ```bash
-python -c "from codeweaver.server.telemetry import get_telemetry_client; print(get_telemetry_client().enabled)"
+python -c "from codeweaver.common.telemetry import get_telemetry_client; print(get_telemetry_client().enabled)"
 ```
 
 2. Verify API key:

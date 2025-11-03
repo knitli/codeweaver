@@ -228,7 +228,6 @@ def generate_field_title(name: str, info: FieldInfo | ComputedFieldInfo) -> str:
 DATACLASS_CONFIG = ConfigDict(
     arbitrary_types_allowed=True,
     cache_strings="keys",
-    # defer_build=True,
     field_title_generator=generate_field_title,
     model_title_generator=generate_title,
     serialize_by_alias=True,

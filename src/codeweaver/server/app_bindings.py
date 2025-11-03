@@ -25,8 +25,8 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
 from codeweaver.agent_api.find_code import find_code
-from codeweaver.agent_api.intent import IntentType
-from codeweaver.agent_api.models import FindCodeResponseSummary
+from codeweaver.agent_api.find_code.intent import IntentType
+from codeweaver.agent_api.find_code.types import FindCodeResponseSummary
 from codeweaver.common.statistics import SessionStatistics, get_session_statistics, timed_http
 from codeweaver.config.middleware import MiddlewareOptions
 from codeweaver.config.settings import CodeWeaverSettingsDict, get_settings_map

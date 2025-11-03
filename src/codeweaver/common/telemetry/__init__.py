@@ -16,7 +16,7 @@ Key Principles:
 - Fail-safe (errors don't affect application)
 
 Example:
-    >>> from codeweaver.server.telemetry import get_telemetry_client
+    >>> from codeweaver.common.telemetry import get_telemetry_client
     >>> client = get_telemetry_client()
     >>> if client.enabled:
     ...     client.capture("session_summary", {"searches": 10})
@@ -24,13 +24,13 @@ Example:
 
 from __future__ import annotations
 
-from codeweaver.config.telemetry import TelemetrySettings, get_telemetry_settings
-from codeweaver.server.telemetry.client import PostHogClient, get_telemetry_client
-from codeweaver.server.telemetry.events import (
+from codeweaver.common.telemetry.client import PostHogClient, get_telemetry_client
+from codeweaver.common.telemetry.events import (
     PerformanceBenchmarkEvent,
     SessionSummaryEvent,
     TelemetryEvent,
 )
+from codeweaver.config.telemetry import TelemetrySettings, get_telemetry_settings
 
 
 __all__ = (

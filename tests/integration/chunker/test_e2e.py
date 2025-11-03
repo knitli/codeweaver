@@ -286,10 +286,9 @@ def test_e2e_parallel_dict_convenience():
 
     # Get sample files
     fixture_dir = Path("tests/fixtures")
-    files = []
-    for fixture_path in fixture_dir.glob("sample*.py"):
-        if discovered := DiscoveredFile.from_path(fixture_path):
-            files.append(discovered)
+    files = [
+        DiscoveredFile.from_path(fixture_path) for fixture_path in fixture_dir.glob("sample*.py")
+    ]
 
     if not files:
         pytest.skip("No sample files available")

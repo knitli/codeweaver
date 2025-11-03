@@ -35,9 +35,10 @@ yamlfmt = "latest"
 enter = """
 #!/usr/bin/env zsh
 # Set up git aliases
+git config alias.root 'rev-parse --show-toplevel'
 alias jj='jj --no-pager'
 alias git='git --no-pager'
-alias cdroot='cd $(git root)'
+alias cdroot="cd "$(git root)" || true"
 
 if [[ "$GITHUB_ACTIONS" == "true" ]]; then
     export CI=true
@@ -97,7 +98,7 @@ mise run venv || true &&
 source .venv/bin/activate &
 mise --silent -y run sync &
 git config alias.root 'rev-parse --show-toplevel' &&
-alias cdroot='cd $(git root)'
+alias cdroot="cd "$(git root)" || true"
 print -P "%F{209}[codeweaver]%f ✅ Development environment ready!"
 """
 update-tools = """

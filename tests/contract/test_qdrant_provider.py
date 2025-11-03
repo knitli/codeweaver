@@ -39,7 +39,7 @@ async def qdrant_provider(qdrant_test_manager):
     )
 
     # Create mock embedder (not used in contract tests, but required by field definition)
-    mock_embedder = MagicMock()
+    MagicMock()
 
     # Create config for provider
     config = {

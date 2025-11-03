@@ -11,8 +11,8 @@ from search results, including summary generation and metadata calculation.
 
 from __future__ import annotations
 
+from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary, SearchStrategy
 from codeweaver.agent_api.intent import IntentType
-from codeweaver.agent_api.models import CodeMatch, FindCodeResponseSummary, SearchStrategy
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.types import LanguageName
 
@@ -35,9 +35,7 @@ def calculate_token_count(code_matches: list[CodeMatch], token_limit: int) -> in
     return min(int(total_tokens_raw), token_limit)
 
 
-def generate_summary(
-    code_matches: list[CodeMatch], intent_type: IntentType, query: str
-) -> str:
+def generate_summary(code_matches: list[CodeMatch], intent_type: IntentType, query: str) -> str:
     """Generate a human-readable summary of search results.
 
     Args:
@@ -63,7 +61,9 @@ def generate_summary(
     return summary[:1000]  # Enforce max_length
 
 
-def extract_languages(code_matches: list[CodeMatch]) -> tuple[SemanticSearchLanguage | LanguageName, ...]:
+def extract_languages(
+    code_matches: list[CodeMatch],
+) -> tuple[SemanticSearchLanguage | LanguageName, ...]:
     """Extract unique programming languages from code matches.
 
     Args:
@@ -115,9 +115,7 @@ def build_success_response(
 
 
 def build_error_response(
-    error: Exception,
-    query_intent: IntentType | None,
-    execution_time_ms: float,
+    error: Exception, query_intent: IntentType | None, execution_time_ms: float
 ) -> FindCodeResponseSummary:
     """Build an error response with graceful degradation.
 
@@ -143,9 +141,9 @@ def build_error_response(
 
 
 __all__ = (
-    "calculate_token_count",
-    "generate_summary",
-    "extract_languages",
-    "build_success_response",
     "build_error_response",
+    "build_success_response",
+    "calculate_token_count",
+    "extract_languages",
+    "generate_summary",
 )

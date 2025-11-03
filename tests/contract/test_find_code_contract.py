@@ -26,13 +26,15 @@ import pytest
 from pydantic import ValidationError
 
 from codeweaver.agent_api.find_code import find_code
-from codeweaver.agent_api.intent import IntentType
-from codeweaver.agent_api.models import (
+from codeweaver.agent_api.find_code.intent import IntentType
+from codeweaver.agent_api.find_code.types import (
     CodeMatch,
     CodeMatchType,
     FindCodeResponseSummary,
     SearchStrategy,
 )
+from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.core.metadata import ChunkKind
 
 
 class TestFindCodeSignature:
@@ -255,19 +257,25 @@ class TestCodeMatchSchema:
         """Verify span tuple validation (2 elements, start <= end, >= 1)."""
         from pathlib import Path
 
+        from codeweaver.common.utils.utils import uuid7
         from codeweaver.core.chunks import CodeChunk
         from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core.metadata import ExtKind
         from codeweaver.core.spans import Span
 
         # Create minimal test data
         test_file = DiscoveredFile(path=Path("test.py"))
-        test_chunk = CodeChunk(content="def test(): pass", line_range=Span(1, 1))
+        test_chunk = CodeChunk(
+            content="def test(): pass",
+            ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+            line_range=Span(1, 1, uuid7()),
+        )
 
         # Valid span
         match = CodeMatch(
             file=test_file,
             content=test_chunk,
-            span=Span(1, 10),
+            span=Span(1, 10, uuid7()),
             relevance_score=0.8,
             match_type=CodeMatchType.SEMANTIC,
             related_symbols=(),
@@ -280,7 +288,7 @@ class TestCodeMatchSchema:
             CodeMatch(
                 file=test_file,
                 content=test_chunk,
-                span=Span(10, 1),  # Invalid: start > end
+                span=Span(10, 1, uuid7()),  # Invalid: start > end
                 relevance_score=0.8,
                 match_type=CodeMatchType.SEMANTIC,
                 related_symbols=(),
@@ -291,7 +299,7 @@ class TestCodeMatchSchema:
             CodeMatch(
                 file=test_file,
                 content=test_chunk,
-                span=Span(0, 10),  # Invalid: 0-indexed
+                span=Span(0, 10, uuid7()),  # Invalid: 0-indexed
                 relevance_score=0.8,
                 match_type=CodeMatchType.SEMANTIC,
                 related_symbols=(),
@@ -382,20 +390,23 @@ class TestContractExamples:
         """Verify response can represent the simple search example from contract."""
         from pathlib import Path
 
+        from codeweaver.common.utils.utils import uuid7
         from codeweaver.core.chunks import CodeChunk
         from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core.metadata import ExtKind
         from codeweaver.core.spans import Span
 
         # Recreate example from contract
         example_file = DiscoveredFile(path=Path("src/auth/middleware.py"))
         example_chunk = CodeChunk(
             content="class AuthMiddleware:\n    def __init__(self, config: AuthConfig):\n        ...",
-            line_range=Span(15, 85),
+            line_range=Span(15, 85, uuid7()),
+            ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
         )
         example_match = CodeMatch(
             file=example_file,
             content=example_chunk,
-            span=Span(15, 85),
+            span=Span(15, 85, uuid7()),
             relevance_score=0.92,
             match_type=CodeMatchType.SEMANTIC,
             related_symbols=("AuthConfig", "authenticate_request"),
@@ -410,7 +421,7 @@ class TestContractExamples:
             token_count=450,
             execution_time_ms=850,
             search_strategy=(SearchStrategy.HYBRID_SEARCH, SearchStrategy.SEMANTIC_RERANK),
-            languages_found=("python",),
+            languages_found=(SemanticSearchLanguage.PYTHON,),
         )
 
         # Verify all fields are accessible and have expected types
@@ -426,7 +437,7 @@ class TestContractExamples:
         assert len(response.search_strategy) == 2
         assert SearchStrategy.HYBRID_SEARCH in response.search_strategy
         assert SearchStrategy.SEMANTIC_RERANK in response.search_strategy
-        assert "python" in response.languages_found
+        assert SemanticSearchLanguage.PYTHON in response.languages_found
 
 
 class TestTypesSafety:

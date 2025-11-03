@@ -15,6 +15,11 @@ import pytest
 
 from pydantic.dataclasses import dataclass
 
+from codeweaver.common.telemetry.events import (
+    PerformanceBenchmarkEvent,
+    SemanticValidationEvent,
+    SessionSummaryEvent,
+)
 from codeweaver.core.types import (
     DATACLASS_CONFIG,
     AnonymityConversion,
@@ -22,11 +27,6 @@ from codeweaver.core.types import (
     DataclassSerializationMixin,
     FilteredKey,
     FilteredKeyT,
-)
-from codeweaver.server.telemetry.events import (
-    PerformanceBenchmarkEvent,
-    SemanticValidationEvent,
-    SessionSummaryEvent,
 )
 
 

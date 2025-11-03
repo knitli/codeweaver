@@ -137,11 +137,11 @@ async def test_sparse_only_fallback(initialize_test_settings):
     Then: Falls back to sparse-only search, warns user
     """
     from codeweaver.agent_api.find_code import find_code
-    from codeweaver.agent_api.models import SearchStrategy
+    from codeweaver.agent_api.find_code.types import SearchStrategy
     from codeweaver.providers.provider import Provider
 
     # Mock embedding provider to fail
-    with patch("codeweaver.agent_api.find_code.get_provider_registry") as mock_registry:
+    with patch("codeweaver.common.registry.provider.get_provider_registry") as mock_registry:
         mock_reg = MagicMock()
         mock_registry.return_value = mock_reg
 
@@ -162,7 +162,9 @@ async def test_sparse_only_fallback(initialize_test_settings):
 
         # Sparse embedding works - returns batch format with indices and values
         mock_sparse_provider = AsyncMock()
-        mock_sparse_provider.embed_query.return_value = [{"indices": [0, 1, 2], "values": [0.5, 0.3, 0.2]}]
+        mock_sparse_provider.embed_query.return_value = [
+            {"indices": [0, 1, 2], "values": [0.5, 0.3, 0.2]}
+        ]
 
         # get_provider_instance returns appropriate provider based on kind
         def get_provider_instance_side_effect(provider_enum, kind, singleton=True):

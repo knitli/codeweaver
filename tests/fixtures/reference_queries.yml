@@ -23,8 +23,8 @@ queries:
     intent: UNDERSTAND
     precision_target: 3
     expected_files:
-      - src/codeweaver/agent_api/intent.py
-      - src/codeweaver/agent_api/find_code.py
+      - src/codeweaver/agent_api/find_code/intent.py
+      - src/codeweaver/agent_api/find_code/__init__.py
       - src/codeweaver/semantic/classifications.py
     description: Understanding query intent classification
   - query: what is the semantic classification hierarchy
@@ -66,7 +66,7 @@ queries:
     expected_files:
       - src/codeweaver/semantic/classifications.py
       - src/codeweaver/semantic/scoring.py
-      - src/codeweaver/agent_api/find_code.py
+      - src/codeweaver/agent_api/find_code/__init__.py
     description: Understanding semantic importance scoring
   # ============================================================================
   # IMPLEMENT Intent Queries (4 queries)
@@ -149,7 +149,7 @@ queries:
     expected_files:
       - src/codeweaver/providers/vector_stores/qdrant.py
       - src/codeweaver/providers/vector_stores/base.py
-      - src/codeweaver/agent_api/find_code.py
+      - src/codeweaver/agent_api/find_code/__init__.py
     description: Optimizing vector search performance
   - query: improve tokenization efficiency
     intent: OPTIMIZE
@@ -220,9 +220,9 @@ queries:
     intent: DOCUMENT
     precision_target: 3
     expected_files:
-      - src/codeweaver/agent_api/find_code.py
-      - src/codeweaver/agent_api/models.py
-      - src/codeweaver/agent_api/intent.py
+      - src/codeweaver/agent_api/find_code/__init__.py
+      - src/codeweaver/agent_api/find_code/types.py
+      - src/codeweaver/agent_api/find_code/intent.py
     description: Documenting main API surface
   - query: document provider registration system
     intent: DOCUMENT
@@ -248,5 +248,5 @@ queries:
       - src/codeweaver/server/app_bindings.py
       - src/codeweaver/server/health_endpoint.py
       - src/codeweaver/server/server.py
-      - src/codeweaver/agent_api/find_code.py
+      - src/codeweaver/agent_api/find_code/__init__.py
     description: Documenting MCP server interface

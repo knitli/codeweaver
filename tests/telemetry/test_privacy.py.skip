@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from codeweaver.server.telemetry.privacy import PrivacyFilter
+from codeweaver.common.telemetry.privacy import PrivacyFilter
 
 
 class TestPrivacyFilter:

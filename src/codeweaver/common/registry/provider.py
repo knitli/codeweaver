@@ -29,7 +29,8 @@ from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.models import BasedModel
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.agent.agent_providers import AgentProvider
-from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+from codeweaver.providers.embedding.capabilities.base import SparseEmbeddingModelCapabilities
+from codeweaver.providers.embedding.providers.base import EmbeddingProvider, SparseEmbeddingProvider
 from codeweaver.providers.provider import Provider, ProviderKind
 from codeweaver.providers.reranking.providers.base import RerankingProvider
 from codeweaver.providers.vector_stores.base import VectorStoreProvider
@@ -149,7 +150,8 @@ class ProviderRegistry(BasedModel):
             Provider, LazyImport[type[EmbeddingProvider[Any]]] | type[EmbeddingProvider[Any]]
         ] = {}
         self._sparse_embedding_providers: MutableMapping[
-            Provider, LazyImport[type[EmbeddingProvider[Any]]] | type[EmbeddingProvider[Any]]
+            Provider,
+            LazyImport[type[SparseEmbeddingProvider[Any]]] | type[SparseEmbeddingProvider[Any]],
         ] = {}
         self._vector_store_providers: MutableMapping[
             Provider, LazyImport[type[VectorStoreProvider[Any]]] | type[VectorStoreProvider[Any]]
@@ -161,7 +163,9 @@ class ProviderRegistry(BasedModel):
         self._data_providers: MutableMapping[Provider, LazyImport[type[Any]] | type[Any]] = {}
 
         self._embedding_instances: MutableMapping[Provider, EmbeddingProvider[Any]] = {}
-        self._sparse_embedding_instances: MutableMapping[Provider, EmbeddingProvider[Any]] = {}
+        self._sparse_embedding_instances: MutableMapping[
+            Provider, SparseEmbeddingProvider[Any]
+        ] = {}
         self._vector_store_instances: MutableMapping[Provider, VectorStoreProvider[Any]] = {}
         self._reranking_instances: MutableMapping[Provider, RerankingProvider[Any]] = {}
         self._agent_instances: MutableMapping[Provider, Any] = {}
@@ -518,7 +522,7 @@ class ProviderRegistry(BasedModel):
         self,
         provider: Provider,
         provider_kind: Literal[ProviderKind.SPARSE_EMBEDDING, "sparse_embedding"],
-    ) -> LazyImport[type[EmbeddingProvider[Any]]] | type[EmbeddingProvider[Any]]: ...
+    ) -> LazyImport[type[SparseEmbeddingProvider[Any]]] | type[SparseEmbeddingProvider[Any]]: ...
     @overload
     def get_provider_class(
         self, provider: Provider, provider_kind: Literal[ProviderKind.RERANKING, "reranking"]
@@ -540,6 +544,7 @@ class ProviderRegistry(BasedModel):
     ) -> (
         type[
             EmbeddingProvider[Any]
+            | SparseEmbeddingProvider[Any]
             | RerankingProvider[Any]
             | VectorStoreProvider[Any]
             | AgentProvider[Any]
@@ -549,6 +554,7 @@ class ProviderRegistry(BasedModel):
         | LazyImport[
             type[
                 EmbeddingProvider[Any]
+                | SparseEmbeddingProvider[Any]
                 | RerankingProvider[Any]
                 | VectorStoreProvider[Any]
                 | AgentProvider[Any]
@@ -589,7 +595,7 @@ class ProviderRegistry(BasedModel):
         provider: Provider,
         provider_kind: Literal[ProviderKind.SPARSE_EMBEDDING, "sparse_embedding"],
         **kwargs: Any,
-    ) -> EmbeddingProvider[Any]: ...
+    ) -> SparseEmbeddingProvider[Any]: ...
     @overload
     def create_provider(
         self,
@@ -696,7 +702,7 @@ class ProviderRegistry(BasedModel):
         *,
         singleton: bool = False,
         **kwargs: Any,
-    ) -> EmbeddingProvider[Any]: ...
+    ) -> SparseEmbeddingProvider[Any]: ...
     @overload
     def get_provider_instance(
         self,
@@ -986,7 +992,7 @@ class ProviderRegistry(BasedModel):
 
     def _get_capabilities_for_model(
         self, model_name: str, provider: Provider
-    ) -> EmbeddingModelCapabilities | None:
+    ) -> SparseEmbeddingModelCapabilities | EmbeddingModelCapabilities | None:
         """Get capabilities for a specific model.
 
         Args:
@@ -1002,6 +1008,13 @@ class ProviderRegistry(BasedModel):
         for cap in load_default_capabilities():
             if cap.name == model_name and cap.provider == provider:
                 return cap
+        if provider.name in ("SENTENCE_TRANSFORMERS", "FASTEMBED"):
+            from codeweaver.providers.embedding.capabilities.base import get_sparse_caps
+
+            sparse_caps = get_sparse_caps()
+            for cap in sparse_caps:
+                if model_name == cap.name and cap.provider == provider:
+                    return cap
 
         # Fallback: return first capability for this provider
         for cap in load_default_capabilities():

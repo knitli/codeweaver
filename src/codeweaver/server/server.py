@@ -37,6 +37,7 @@ from pydantic_core import to_json
 
 from codeweaver import __version__ as version
 from codeweaver.common.logging import setup_logger
+from codeweaver.common.telemetry.client import PostHogClient
 from codeweaver.common.utils import get_project_path, lazy_import, rpartial
 from codeweaver.config.logging import LoggingSettings
 from codeweaver.config.middleware import (
@@ -61,7 +62,6 @@ from codeweaver.engine.indexer import Indexer
 from codeweaver.exceptions import InitializationError
 from codeweaver.providers.provider import Provider as Provider
 from codeweaver.server.health_service import HealthService
-from codeweaver.server.telemetry.client import PostHogClient
 
 
 if TYPE_CHECKING:

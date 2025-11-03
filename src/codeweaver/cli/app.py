@@ -20,7 +20,8 @@ from rich import print as rich_print
 from rich.console import Console
 from rich.table import Table
 
-from codeweaver.agent_api import CodeMatch, FindCodeResponseSummary, IntentType  #  find_code
+from codeweaver.agent_api.find_code.intent import IntentType
+from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary  #  find_code
 from codeweaver.common import CODEWEAVER_PREFIX
 from codeweaver.common.utils import LazyImport, lazy_import
 from codeweaver.config.settings import CodeWeaverSettingsDict

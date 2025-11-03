@@ -75,9 +75,10 @@ def _is_docker_available() -> bool:
     docker_cmd = _get_docker_command()
     try:
         result = subprocess.run([docker_cmd, "info"], capture_output=True, timeout=5, check=False)
-        return result.returncode == 0
     except Exception:
         return False
+    else:
+        return result.returncode == 0
 
 
 def _find_qdrant_container(container_name: str) -> str | None:
@@ -169,9 +170,10 @@ def _stop_qdrant_container(container_name: str) -> bool:
         subprocess.run(
             [docker_cmd, "stop", container_name], capture_output=True, timeout=10, check=False
         )
-        return True
     except Exception:
         return False
+    else:
+        return True
 
 
 def _remove_qdrant_container(container_name: str) -> bool:

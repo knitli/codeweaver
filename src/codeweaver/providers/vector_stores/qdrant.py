@@ -14,7 +14,7 @@ from pydantic import UUID4
 from typing_extensions import TypeIs
 
 from codeweaver.config.providers import QdrantConfig
-from codeweaver.core.chunks import CodeChunk, SearchResult
+from codeweaver.core.chunks import CodeChunk
 from codeweaver.engine.filter import Filter
 from codeweaver.exceptions import ProviderError
 from codeweaver.providers.provider import Provider
@@ -22,6 +22,7 @@ from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
 
 if TYPE_CHECKING:
+    from codeweaver.agent_api.find_code.results import SearchResult
     from codeweaver.agent_api.find_code.types import StrategizedQuery
     from codeweaver.providers.vector_stores.base import MixedQueryInput
 
@@ -152,8 +153,9 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
             CollectionNotFoundError: Collection doesn't exist.
             SearchError: Search operation failed.
         """
-        from codeweaver.agent_api.find_code.types import StrategizedQuery
-        from codeweaver.agent_api.models import SearchStrategy
+        from codeweaver.agent_api.find_code.results import SearchResult
+        from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
+        from codeweaver.providers.embedding.types import SparseEmbedding
 
         if not self._ensure_client(self._client):
             raise ProviderError("Qdrant client not initialized")
@@ -163,16 +165,18 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
 
         # Ensure collection exists
         await self._ensure_collection(collection_name)
-        dense, sparse = None, None
-        if isinstance(vector, list):
-            if not vector:
-                raise ProviderError("Empty vector provided for search")
-            dense = vector if len(vector) < 8193 else None
-            sparse = vector if len(vector) >= 8193 else None
-        elif isinstance(vector, dict):
-            dense = vector.get("dense")
-            sparse = vector.get("sparse")
-        if dense or sparse:
+        sparse, dense = None, None
+        if not hasattr(vector, "sparse") or not hasattr(vector, "dense"):
+            if isinstance(vector, dict) and "indices" in vector and "values" in vector:
+                sparse = SparseEmbedding(indices=vector["indices"], values=vector["values"])
+            elif isinstance(vector, dict) and "sparse" in vector:
+                sparse = SparseEmbedding(
+                    indices=vector["sparse"].get("indices", []),
+                    values=vector["sparse"].get("values", []),
+                )  # type: ignore
+            elif isinstance(vector, (list, tuple)):
+                sparse = None
+                dense = vector
             vector = StrategizedQuery(
                 query="unavailable",
                 dense=dense,
@@ -247,6 +251,7 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
 
         from qdrant_client.http.models import PointStruct
 
+        from codeweaver.providers.embedding.types import SparseEmbedding
         from codeweaver.providers.vector_stores.metadata import HybridVectorPayload
 
         if not chunks:
@@ -270,14 +275,12 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
                 # Qdrant sparse vector format requires indices and values
                 # sparse_embeddings.embeddings is a tuple of (indices, values) for sparse
                 sparse = chunk.sparse_embeddings
-                if isinstance(sparse.embeddings, tuple) and len(sparse.embeddings) == 2:
+                if isinstance(sparse.embeddings, SparseEmbedding):
                     # New format: tuple of (indices, values)
                     indices, values = sparse.embeddings
                     from qdrant_client.http.models import SparseVector
-                    vectors["sparse"] = SparseVector(
-                        indices=list(indices),
-                        values=list(values)
-                    )
+
+                    vectors["sparse"] = SparseVector(indices=list(indices), values=list(values))
                 else:
                     # Old format: flat list (for backward compatibility during migration)
                     vectors["sparse"] = list(sparse.embeddings)

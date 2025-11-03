@@ -11,8 +11,6 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from codeweaver.config.providers import VectorStoreProviderSettings
-    from codeweaver.providers.embedding.providers import EmbeddingProvider
-    from codeweaver.providers.reranking import RerankingProvider
     from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
 

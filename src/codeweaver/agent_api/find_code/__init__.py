@@ -65,8 +65,8 @@ from codeweaver.agent_api.find_code.scoring import (
     process_reranked_results,
     process_unranked_results,
 )
+from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary, SearchStrategy
 from codeweaver.agent_api.intent import INTENT_TO_AGENT_TASK, IntentType, detect_intent
-from codeweaver.agent_api.models import CodeMatch, FindCodeResponseSummary, SearchStrategy
 from codeweaver.core.spans import Span
 from codeweaver.semantic.classifications import AgentTask
 

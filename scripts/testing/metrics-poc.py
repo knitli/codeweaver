@@ -181,7 +181,7 @@ def main() -> None:
     print("\n📊 Step 3: Calculating baseline comparison...")
 
     try:
-        from codeweaver.server.telemetry.comparison import BaselineComparator, CodeWeaverMetrics
+        from codeweaver.common.telemetry.comparison import BaselineComparator, CodeWeaverMetrics
 
         comparator = BaselineComparator()
 
@@ -263,7 +263,7 @@ def main() -> None:
     print_separator("Telemetry Event Generation")
 
     try:
-        from codeweaver.server.telemetry.events import (
+        from codeweaver.common.telemetry.events import (
             PerformanceBenchmarkEvent,
             SessionSummaryEvent,
         )
@@ -342,7 +342,7 @@ def main() -> None:
 
     try:
         # Test that events serialize correctly with privacy filtering
-        from codeweaver.server.telemetry.events import SessionSummaryEvent
+        from codeweaver.common.telemetry.events import SessionSummaryEvent
 
         test_event = SessionSummaryEvent(
             session_duration_minutes=session_stats["duration_minutes"],
@@ -375,7 +375,7 @@ def main() -> None:
         print_separator("Sending Telemetry to PostHog")
 
         try:
-            from codeweaver.server.telemetry import get_telemetry_client
+            from codeweaver.common.telemetry import get_telemetry_client
 
             client = get_telemetry_client()
 
