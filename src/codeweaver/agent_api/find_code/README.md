@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # find_code Package
 
 The `find_code` package provides CodeWeaver's semantic code search functionality. It has been designed as a modular, extensible package with clear separation of concerns.

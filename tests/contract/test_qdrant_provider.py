@@ -52,7 +52,7 @@ async def qdrant_provider(qdrant_test_manager):
 
     # Use model_construct to bypass validation and create instance
     provider = QdrantVectorStoreProvider.model_construct(
-        config=config, _embedder=mock_embedder, _reranking=None, _client=None, _metadata=None
+        config=config, _client=None, _metadata=None
     )
     await provider._initialize()
 

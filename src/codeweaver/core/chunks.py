@@ -44,10 +44,12 @@ from pydantic import (
 )
 from pydantic_core import to_json
 
+from codeweaver.agent_api.find_code.types import StrategizedQuery
 from codeweaver.common.utils import ensure_iterable, set_relative_path, uuid7
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.metadata import ChunkSource, ExtKind, Metadata, determine_ext_kind
 from codeweaver.core.spans import Span, SpanTuple
+from codeweaver.core.stores import BlakeHashKey
 from codeweaver.core.types import BasedModel, LanguageNameT
 from codeweaver.core.utils import truncate_text
 
@@ -110,6 +112,9 @@ class SearchResult(BasedModel):
     metadata: Annotated[
         Metadata | None, Field(description="""Additional metadata about the result""")
     ] = None
+    strategized_query: Annotated[
+        StrategizedQuery | None, Field(description="""The query used for the search""")
+    ] = None
 
     # Fields for hybrid search and rescoring (set dynamically by find_code)
     dense_score: NonNegativeFloat | None = None
@@ -158,14 +163,23 @@ class CodeChunkDict(TypedDict, total=False):
     content: Required[str]
     line_range: Required[SpanTuple | Span]
     file_path: NotRequired[Path | None]
-    language: NotRequired[SemanticSearchLanguage | str | None]
+    language: NotRequired[SemanticSearchLanguage | LanguageNameT | None]
     source: NotRequired[ChunkSource | None]
     timestamp: NotRequired[PositiveFloat]
     chunk_id: NotRequired[UUID7]
     parent_id: NotRequired[UUID7 | None]
     metadata: NotRequired[Metadata | None]
     chunk_name: NotRequired[str | None]
-    _embedding_batches: NotRequired[tuple[BatchKeys, ...]]
+    _embedding_batches: NotRequired[tuple[BatchKeys] | tuple[BatchKeys, BatchKeys] | None]
+    blake_hash: NotRequired[BlakeHashKey]
+    name: NotRequired[str]
+    title: NotRequired[str]
+    dense_batch_key: NotRequired[BatchKeys | None]
+    sparse_batch_key: NotRequired[BatchKeys | None]
+    length: NotRequired[PositiveInt]
+    token_estimate: NotRequired[PositiveInt]
+    line_start: NotRequired[PositiveInt]
+    line_end: NotRequired[PositiveInt]
 
 
 class CodeChunk(BasedModel):
@@ -176,7 +190,7 @@ class CodeChunk(BasedModel):
     file_path: Annotated[
         Path | None,
         Field(
-            description="""Path to the source file. Not all chunks are from files, so this can be None."""
+            description="""Relative path to the source file from project root. Not all chunks are from files, so this can be None."""
         ),
         AfterValidator(set_relative_path),
     ] = None
@@ -223,8 +237,8 @@ class CodeChunk(BasedModel):
     _embedding_batches: Annotated[
         tuple[BatchKeys] | tuple[BatchKeys, BatchKeys] | None,
         Field(
-            repr=False,
-            description="""Batch ID for the embedding batch the chunk was processed in.""",
+            repr=True,
+            description="""Batch keys for embedding operations associated with this chunk""",
             max_length=2,
         ),
     ] = None
@@ -237,17 +251,52 @@ class CodeChunk(BasedModel):
             FilteredKey("file_path"): AnonymityConversion.BOOLEAN,
             FilteredKey("metadata"): AnonymityConversion.AGGREGATE,
             FilteredKey("_embedding_batches"): AnonymityConversion.BOOLEAN,
+            FilteredKey("chunk_name"): AnonymityConversion.BOOLEAN,
+            FilteredKey("name"): AnonymityConversion.HASH,
         }
+
+    @computed_field
+    @property
+    def blake_hash(self) -> BlakeHashKey:
+        """Compute a Blake3 hash of the chunk content for deduplication."""
+        from codeweaver.core.stores import get_blake_hash
+
+        return get_blake_hash(self.content)
 
     def serialize(self) -> SerializedCodeChunk[CodeChunk]:
         """Serialize the CodeChunk to a dictionary."""
         return self.model_dump_json(round_trip=True, exclude_none=True)
+
+    def _construct_name(self) -> str:
+        """Construct a name for the code chunk based on file path and line range."""
+        parts: list[str] = []
+        if self.file_path:
+            parts.append(str(self.file_path))
+        if self.line_range:
+            parts.append(f"lines {self.line_range.start}-{self.line_range.end}")
+        name = self.metadata.get("name") if self.metadata and self.metadata.get("name") else None
+        semantic_meta = self.metadata.get("semantic_meta") if self.metadata else None
+        semantic = (
+            semantic_meta.symbol if semantic_meta and hasattr(semantic_meta, "symbol") else None
+        )
+        if semantic:
+            parts.append(semantic)
+        elif name:
+            parts.append(name)
+        return " | ".join(parts) if parts else "unnamed_chunk"
+
+    @computed_field
+    @property
+    def name(self) -> str:
+        """Get or construct the name of the code chunk."""
+        return self.chunk_name or self._construct_name()
 
     @property
     def _serialization_order(self) -> tuple[str, ...]:
         """Define the order of fields during serialization."""
         return (
             "title",
+            "name",
             "content",
             "metadata",
             "file_path",
@@ -316,7 +365,7 @@ class CodeChunk(BasedModel):
         """Serialize the CodeChunk for embedding."""
         self_map = self.model_dump(
             round_trip=True,
-            exclude_unset=True,
+            exclude_none=True,
             exclude=self._base_excludes,
             exclude_computed_fields=True,  # Exclude all computed fields
             warnings=False,  # Suppress serialization warnings
@@ -432,14 +481,6 @@ class CodeChunk(BasedModel):
     def token_count(self, tokenizer_instance: Tokenizer[Any]) -> PositiveInt:
         """Return the token count for the chunk content."""
         return tokenizer_instance.estimate(cast(str, self.serialize_for_embedding()))
-
-    @property
-    def embedding(self) -> EmbeddingBatchInfo | None:
-        """Get the embedding info, if available."""
-        if not self._embedding_batches:
-            return None
-        registry = _get_registry()
-        return registry[self.chunk_id].dense if self.chunk_id in registry else None
 
     @computed_field
     @cached_property

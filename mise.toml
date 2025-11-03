@@ -35,16 +35,18 @@ yamlfmt = "latest"
 enter = """
 #!/usr/bin/env zsh
 # Set up git aliases
-alias jj='jj --no-pager' &&
-alias git='git --no-pager' &&
-alias cdroot='cd $(git root)' &&
-if [ "$GITHUB_ACTIONS" = "true" ]; then
+alias jj='jj --no-pager'
+alias git='git --no-pager'
+alias cdroot='cd $(git root)'
+
+if [[ "$GITHUB_ACTIONS" == "true" ]]; then
     export CI=true
 else
     export CI=false
 fi
-mise --silent set &>/dev/null &&
-mise run source &>/dev/null &&
+
+mise --silent set &>/dev/null
+mise run source &>/dev/null
 """
 leave = """
 print -P "%F{209}[codeweaver]%f Exiting CodeWeaver environment..."

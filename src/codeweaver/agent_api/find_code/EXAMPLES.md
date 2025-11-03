@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # find_code Refactoring Examples
 
 This document provides practical examples of how the new modular structure makes it easier to extend and maintain the find_code functionality.

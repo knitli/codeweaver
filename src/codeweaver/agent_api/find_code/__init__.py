@@ -37,9 +37,11 @@ This modular structure makes it easy to:
 - Extend scoring mechanisms
 - Integrate new search providers
 - Test individual components in isolation
-"""
 
-from __future__ import annotations
+## Philosophy: Agent UX
+
+The design of `find_code` is heavily influenced by the concept of *Agent User Experience (Agent UX)*. Just as traditional UX focuses on making software intuitive and efficient for human users, Agent UX aims to optimize how AI agents interact with tools and systems. When we ask agents to use a tool with a human API, we need to consider how the agent will perceive and utilize that tool. `find_code` is designed to be as straightforward and effective as possible for AI agents, minimizing the complexity they have to deal with.
+"""
 
 import logging
 import time
@@ -64,11 +66,7 @@ from codeweaver.agent_api.find_code.scoring import (
     process_unranked_results,
 )
 from codeweaver.agent_api.intent import INTENT_TO_AGENT_TASK, IntentType, detect_intent
-from codeweaver.agent_api.models import (
-    CodeMatch,
-    FindCodeResponseSummary,
-    SearchStrategy,
-)
+from codeweaver.agent_api.models import CodeMatch, FindCodeResponseSummary, SearchStrategy
 from codeweaver.core.spans import Span
 from codeweaver.semantic.classifications import AgentTask
 
@@ -147,14 +145,14 @@ async def find_code(
         logger.info("Query intent detected: %s (confidence: %.2f)", intent_type, confidence)
 
         # Step 2: Embed query (dense + sparse)
-        dense_embedding, sparse_embedding = await embed_query(query)
+        embeddings = await embed_query(query)
 
         # Step 3: Build query vector and determine strategy
-        query_vector, search_strategy = build_query_vector(dense_embedding, sparse_embedding)
-        strategies_used.append(search_strategy)
+        query_intent_obj = build_query_vector(embeddings)
+        strategies_used.append(query_intent_obj.strategy)
 
         # Step 4: Execute vector search
-        candidates = await execute_vector_search(query_vector)
+        candidates = await execute_vector_search(query_intent_obj)
 
         # Step 5: Post-search filtering (v0.1 simple approach)
         candidates = apply_filters(
@@ -199,7 +197,7 @@ async def find_code(
 
         # Step 11: Build response
         execution_time_ms = (time.time() - start_time) * 1000
-        
+
         return build_success_response(
             code_matches=code_matches,
             query=query,

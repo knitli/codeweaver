@@ -13,12 +13,13 @@ import time
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import Any, ClassVar, TypedDict
+from typing import Any, ClassVar, Literal, TypedDict
 
-from pydantic import UUID4, ConfigDict
+from pydantic import UUID7, ConfigDict
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 from typing_extensions import TypeIs
 
+from codeweaver.agent_api.find_code.types import StrategizedQuery
 from codeweaver.core.chunks import CodeChunk, SearchResult
 from codeweaver.core.types.models import BasedModel
 from codeweaver.engine.filter import Filter
@@ -31,18 +32,14 @@ from codeweaver.providers.provider import Provider
 
 logger = logging.getLogger(__name__)
 
+type MixedQueryInput = (
+    list[float] | list[int] | dict[Literal["dense", "sparse"], list[float] | list[int] | Any]
+)
+
 
 class EmbeddingCapsDict(TypedDict):
-    dense: tuple[EmbeddingModelCapabilities]
-    sparse: tuple[SparseEmbeddingModelCapabilities]
-
-
-def _assemble_caps() -> EmbeddingCapsDict | None:
-    """Assemble embedding model capabilities from settings.
-
-    Returns:
-        EmbeddingModelCapabilities instance or None if not configured.
-    """
+    dense: EmbeddingModelCapabilities | None
+    sparse: SparseEmbeddingModelCapabilities | None
 
 
 # Lock for thread-safe initialization of class-level embedding capabilities
@@ -61,6 +58,27 @@ class CircuitBreakerOpenError(Exception):
     """Raised when circuit breaker is open and rejecting requests."""
 
 
+def _get_caps(
+    *, sparse: bool = False
+) -> EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities | None:
+    """Get embedding capabilities for in-memory provider.
+
+    Args:
+        sparse: Whether to get sparse embedding capabilities.
+
+    Returns:
+        Embedding capabilities or None.
+    """
+    from codeweaver.common.registry import get_model_registry
+
+    registry = get_model_registry()
+    if sparse and (sparse_settings := registry.configured_models_for_kind(kind="sparse_embedding")):
+        return sparse_settings[0] if isinstance(sparse_settings, tuple) else sparse_settings  # type: ignore
+    if not sparse and (dense_settings := registry.configured_models_for_kind(kind="embedding")):
+        return dense_settings[0] if isinstance(dense_settings, tuple) else dense_settings  # type: ignore
+    return None
+
+
 class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
     """Abstract interface for vector storage providers."""
 
@@ -68,7 +86,9 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
 
     config: Any = None  # Provider-specific configuration object
     _client: VectorStoreClient | None
-    _embedding_caps: EmbeddingCapsDict | None = None
+    _embedding_caps: EmbeddingCapsDict = EmbeddingCapsDict(
+        dense=_get_caps(), sparse=_get_caps(sparse=True)
+    )
 
     _provider: ClassVar[Provider] = Provider.NOT_SET
 
@@ -77,8 +97,6 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
     _failure_count: int = 0
     _last_failure_time: float | None = None
     _circuit_open_duration: float = 30.0  # seconds
-
-    _embedding_caps_initialized: ClassVar[bool] = False
 
     def __init__(
         self,
@@ -97,14 +115,6 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         if embedding_caps is not None:
             init_data["_embedding_caps"] = embedding_caps
         super().__init__(**init_data)
-        # Initialize embedding caps on first instance creation if not already set at class level
-        # Use double-checked locking pattern for thread safety
-        if not hasattr(type(self), "_embedding_caps_initialized"):
-            with _embedding_caps_lock:
-                # Double-check after acquiring lock to avoid race condition
-                if not hasattr(type(self), "_embedding_caps_initialized"):
-                    type(self)._embedding_caps = _assemble_caps()
-                    type(self)._embedding_caps_initialized = True
 
         # Initialize circuit breaker state
         self._circuit_state = CircuitBreakerState.CLOSED
@@ -270,21 +280,25 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
 
     @abstractmethod
     async def search(
-        self, vector: list[float] | dict[str, list[float] | Any], query_filter: Filter | None = None
+        self, vector: StrategizedQuery | MixedQueryInput, query_filter: Filter | None = None
     ) -> list[SearchResult]:
         """Search for similar vectors using query vector(s).
 
-        Supports both dense-only and hybrid search:
-        - Dense only: Pass a list[float] for the query vector
-        - Hybrid: Pass a dict with named vectors like {"dense": [...], "sparse": {...}}
+        Supports both dense-only and hybrid search.
 
         Args:
-            vector: Query vector (single dense vector or dict of named vectors for hybrid search).
-                For hybrid search, the dict can contain:
-                - "dense": list[float] - Dense embedding vector
-                - "sparse": dict with "indices" and "values" keys - Sparse embedding
+            vector: Preferred input is a StrategizedQuery object containing:
+                - query: Original query string (for logging/metadata/tracking)
+                - dense: Dense embedding vector (list of floats or ints) or None
+                - sparse: Sparse embedding vector (list of floats/ints) or None
+                - strategy: Search strategy to use (DENSE_ONLY, SPARSE_ONLY, HYBRID_SEARCH)
+
+                Alternatively, a MixedQueryInput can be provided (will be deprecated), which is any of:
+                - For dense-only: list of floats or ints
+                - For sparse-only: list of floats or ints
+                - For hybrid: dict with keys "dense" and "sparse" mapping to respective vectors
+
             query_filter: Optional filter to apply to search results.
-                Filter fields must exist in payload schema.
 
         Returns:
             List of search results sorted by relevance score (descending).
@@ -373,12 +387,12 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         """
 
     @abstractmethod
-    async def delete_by_id(self, ids: list[UUID4]) -> None:
+    async def delete_by_id(self, ids: list[UUID7]) -> None:
         """Delete specific code chunks by their unique identifiers.
 
         Args:
             ids: List of chunk IDs to delete.
-                - Each ID must be valid UUID4.
+                - Each ID must be valid UUID7.
                 - Maximum 1000 IDs per batch.
 
         Raises:

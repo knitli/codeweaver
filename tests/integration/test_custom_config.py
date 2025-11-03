@@ -65,7 +65,7 @@ async def test_custom_configuration():
     # Cleanup any existing collection first
     with contextlib.suppress(Exception):
         _ = await client.delete_collection(collection_name="my_custom_collection")
-    provider = QdrantVectorStoreProvider(client=client, config=config, embedder=embedding_provider)
+    provider = QdrantVectorStoreProvider(client=client, config=config)
     await provider._initialize()
 
     # Verify custom collection name

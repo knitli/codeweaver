@@ -16,11 +16,7 @@ if TYPE_CHECKING:
     from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
 
-def get_vector_store_provider(
-    settings: VectorStoreProviderSettings,
-    embedder: EmbeddingProvider[Any] | None = None,
-    reranking: RerankingProvider[Any] | None = None,
-) -> VectorStoreProvider[Any]:
+def get_vector_store_provider(settings: VectorStoreProviderSettings) -> VectorStoreProvider[Any]:
     """Create vector store provider from settings.
 
     Args:
@@ -48,7 +44,7 @@ def get_vector_store_provider(
         ...     qdrant={"url": "http://localhost:6333", "collection_name": "test"},
         ... )
         >>> mock_embedder = MagicMock()
-        >>> provider = get_vector_store_provider(qdrant_settings, embedder=mock_embedder)
+        >>> provider = get_vector_store_provider(qdrant_settings)
         >>> isinstance(provider, QdrantVectorStoreProvider)
         True
     """
@@ -59,15 +55,9 @@ def get_vector_store_provider(
     provider_type = settings.get("provider", Provider.MEMORY)
 
     if provider_type == Provider.QDRANT:
-        if embedder is None:
-            raise ValueError("Qdrant provider requires an embedder for dimension validation")
         if qdrant_config := settings.get("qdrant", {}):
             return QdrantVectorStoreProvider.model_construct(
-                config=qdrant_config,
-                _embedder=embedder,
-                _reranking=reranking,
-                _client=None,
-                _metadata=None,
+                config=qdrant_config, _client=None, _metadata=None
             )
 
         raise ValueError("Qdrant provider selected but no qdrant config provided")

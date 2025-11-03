@@ -23,7 +23,7 @@ from codeweaver.semantic.classifications import AgentTask
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.reranking import RerankResult
+    from codeweaver.providers.reranking.providers.base import RerankingResult
 
 
 logger = logging.getLogger(__name__)
@@ -93,7 +93,7 @@ def apply_semantic_weighting(
 
 
 def process_reranked_results(
-    reranked_results: list[RerankResult],
+    reranked_results: list[RerankingResult],
     original_candidates: list[SearchResult],
     intent_type: IntentType,
     agent_task: AgentTask,

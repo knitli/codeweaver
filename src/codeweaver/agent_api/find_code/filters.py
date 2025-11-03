@@ -14,7 +14,7 @@ from __future__ import annotations
 from codeweaver.core.chunks import CodeChunk, SearchResult
 
 
-def filter_test_files(candidates: list[SearchResult], include_tests: bool) -> list[SearchResult]:
+def filter_test_files(candidates: list[SearchResult], *, include_tests: bool) -> list[SearchResult]:
     """Filter out test files if include_tests is False.
 
     Args:
@@ -31,9 +31,7 @@ def filter_test_files(candidates: list[SearchResult], include_tests: bool) -> li
     if include_tests:
         return candidates
 
-    return [
-        c for c in candidates if not (c.file_path and "test" in str(c.file_path).lower())
-    ]
+    return [c for c in candidates if not (c.file_path and "test" in str(c.file_path).lower())]
 
 
 def filter_by_languages(
@@ -79,9 +77,9 @@ def apply_filters(
     Returns:
         Filtered list of search results
     """
-    filtered = filter_test_files(candidates, include_tests)
-    filtered = filter_by_languages(filtered, focus_languages)
-    return filtered
+    return filter_by_languages(
+        filter_test_files(candidates, include_tests=include_tests), focus_languages=focus_languages
+    )
 
 
-__all__ = ("filter_test_files", "filter_by_languages", "apply_filters")
+__all__ = ("apply_filters", "filter_by_languages", "filter_test_files")

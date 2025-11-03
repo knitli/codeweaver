@@ -15,17 +15,18 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, ClassVar, cast, override
 
-from pydantic import UUID4
+from pydantic import UUID7
 from typing_extensions import TypeIs
 
+from codeweaver.agent_api.find_code.types import StrategizedQuery
 from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.providers import MemoryConfig
 from codeweaver.core.chunks import CodeChunk, SearchResult
-from codeweaver.core.spans import Span
 from codeweaver.engine.filter import Filter
 from codeweaver.exceptions import PersistenceError, ProviderError
 from codeweaver.providers.provider import Provider
-from codeweaver.providers.vector_stores.base import VectorStoreProvider
+from codeweaver.providers.vector_stores.base import MixedQueryInput, VectorStoreProvider
+from codeweaver.providers.vector_stores.metadata import HybridVectorPayload
 
 
 try:
@@ -185,12 +186,13 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
         return [col.name for col in collections.collections]
 
     async def search(
-        self, vector: list[float] | dict[str, list[float] | Any], query_filter: Filter | None = None
+        self, vector: StrategizedQuery | MixedQueryInput, query_filter: Filter | None = None
     ) -> list[SearchResult]:
         """Search for similar vectors using dense, sparse, or hybrid search.
 
         Args:
-            vector: Query vector (list for dense-only or dict for hybrid).
+            vector: Query vector (StrategizedQuery or list of floats/ints or dict for hybrid
+            other inputs will be deprecated in favor of StrategizedQuery in the future).
             query_filter: Optional filter for search results.
 
         Returns:
@@ -200,6 +202,9 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
             CollectionNotFoundError: Collection doesn't exist.
             SearchError: Search operation failed.
         """
+        from codeweaver.agent_api.find_code.types import StrategizedQuery
+        from codeweaver.agent_api.models import SearchStrategy
+
         if not self._ensure_client(self._client):
             raise ProviderError("Qdrant client not initialized")
         collection_name = self.collection
@@ -208,82 +213,70 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
 
         # Ensure collection exists
         await self._ensure_collection(collection_name)
-
-        # Prepare query vector(s) for Qdrant
-        # Handle both dense-only (list[float]) and hybrid (dict) queries
+        dense, sparse = None, None
         if isinstance(vector, list):
-            # Dense-only search
-            query_vector = "dense"
-            query_value = vector
-        elif vector.get("dense"):
-            query_vector = "dense"
-            query_value = vector["dense"]
-        elif vector.get("sparse"):
-            query_vector = "sparse"
-            query_value = vector["sparse"]
-        else:
-            raise ProviderError(
-                "No valid vector provided (expected 'dense' or 'sparse' key in dict)"
+            if not vector:
+                raise ProviderError("Empty vector provided for search")
+            dense = vector if len(vector) < 8193 else None
+            sparse = vector if len(vector) >= 8193 else None
+        elif isinstance(vector, dict):
+            dense = vector.get("dense")
+            sparse = vector.get("sparse")
+        if dense or sparse:
+            vector = StrategizedQuery(
+                query="unavailable",
+                dense=dense,
+                sparse=sparse,
+                strategy=SearchStrategy.HYBRID_SEARCH
+                if dense and sparse
+                else SearchStrategy.DENSE_ONLY
+                if dense
+                else SearchStrategy.SPARSE_ONLY,
             )
+        if not isinstance(vector, StrategizedQuery):
+            raise ProviderError("Invalid vector input for search")
 
         try:
             # Perform search using Qdrant's query_points for hybrid support
 
             # Build Qdrant filter from our Filter if provided
             qdrant_filter = None
-            # For sparse vectors, need to convert dict to SparseVector model
-            if query_vector == "sparse" and isinstance(query_value, dict):
-                from qdrant_client.models import SparseVector
-
-                query_value = SparseVector(
-                    indices=query_value.get("indices", []),  # type: ignore
-                    values=query_value.get("values", []),  # type: ignore
+            if vector.is_hybrid():
+                results = await self._client.query_points(
+                    **vector.to_hybrid_query(
+                        query_kwargs={
+                            "limit": 100,
+                            "with_payload": True,
+                            "with_vectors": False,
+                            "query_filter": qdrant_filter or None,
+                        },
+                        kwargs={"collection_name": collection_name},
+                    )  # type: ignore
+                )  # type: ignore
+            else:
+                results = await self._client.search(
+                    **vector.to_query(
+                        kwargs={
+                            "collection_name": collection_name,
+                            "limit": 100,
+                            "with_payload": True,
+                            "with_vectors": False,
+                            "query_filter": qdrant_filter or None,
+                        }
+                    )  # type: ignore
                 )
-
-            # Search with vector
-            results = await self._client.query_points(
-                collection_name=collection_name,
-                query=query_value,
-                using=query_vector,
-                limit=100,  # Maximum results per query
-                with_payload=True,
-                with_vectors=False,  # Don't return vectors in results
-                query_filter=qdrant_filter,
-            )
-
             # Convert Qdrant results to SearchResult objects
             search_results: list[SearchResult] = []
             for point in results.points:
                 # Extract payload data
-                payload = point.payload or {}
-
-                # Reconstruct CodeChunk from payload using model_construct
-                from uuid import UUID
-
-                from codeweaver.common.utils import uuid7
-
-                chunk_id = UUID(payload.get("chunk_id")) if payload.get("chunk_id") else uuid7()
-                chunk = CodeChunk.model_construct(
-                    chunk_id=chunk_id,
-                    chunk_name=payload.get("chunk_name"),
-                    file_path=Path(payload["file_path"]) if payload.get("file_path") else None,
-                    language=payload.get("language"),
-                    content=payload.get("content", ""),
-                    line_range=Span(
-                        start=payload.get("line_start", 1),
-                        end=payload.get("line_end", 1),
-                        _source_id=UUID(payload.get("source_id"))
-                        if payload.get("source_id")
-                        else chunk_id,
-                    ),
-                )
+                payload = HybridVectorPayload.model_validate(point.payload or {})  # type: ignore
 
                 # Create SearchResult from point payload using model_construct to avoid AstThing issues
                 search_result = SearchResult.model_construct(
-                    content=chunk,
-                    file_path=Path(payload["file_path"]) if payload.get("file_path") else None,
+                    content=payload.chunk,
+                    file_path=Path(payload.file_path) if payload.file_path else None,
                     score=point.score,
-                    metadata=None,  # TODO: Extract metadata from payload if needed
+                    metadata={"query": vector.query, "strategy": vector.strategy},
                 )
                 search_results.append(search_result)
 
@@ -327,25 +320,25 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
                 sparse = chunk.sparse_embeddings
                 vectors["sparse"] = list(sparse.embeddings)
 
-            # Prepare payload with chunk metadata
-            payload = {
-                "chunk_id": str(chunk.chunk_id),
-                "chunk_name": chunk.chunk_name,
-                "file_path": str(chunk.file_path),
-                "language": chunk.language,
-                "content": chunk.content,
-                "line_start": chunk.line_start,
-                "line_end": chunk.line_end,
-                "indexed_at": datetime.now(UTC).isoformat(),
-                "provider_name": "memory",
-                "embedding_complete": bool(chunk.dense_embeddings and chunk.sparse_embeddings),
-            }
+            payload = HybridVectorPayload(
+                chunk=chunk,
+                chunk_id=chunk.chunk_id.hex,
+                chunked_on=datetime.fromtimestamp(chunk.timestamp).astimezone(UTC).isoformat(),
+                file_path=str(chunk.file_path) if chunk.file_path else "",
+                line_start=chunk.line_range.start,
+                line_end=chunk.line_range.end,
+                indexed_at=datetime.now(UTC).isoformat(),
+                hash=str(chunk.blake_hash),
+                provider="memory",
+                embedding_complete=bool(chunk.dense_batch_key and chunk.sparse_batch_key),
+            )
+            serialized_payload = payload.model_dump(exclude_none=True, round_trip=True)
 
             points.append(
                 PointStruct(
-                    id=str(chunk.chunk_id),
+                    id=chunk.chunk_id.hex,
                     vector=vectors,  # type: ignore
-                    payload=payload,
+                    payload=serialized_payload,
                 )
             )
 
@@ -386,7 +379,7 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
         if self._auto_persist:  # type: ignore
             await self._persist_to_disk()
 
-    async def delete_by_id(self, ids: list[UUID4]) -> None:
+    async def delete_by_id(self, ids: list[UUID7]) -> None:
         """Delete chunks by their unique identifiers.
 
         Args:
@@ -401,8 +394,8 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
         # Ensure collection exists
         await self._ensure_collection(collection_name)
 
-        # Convert UUID4 to strings
-        point_ids = [str(id_) for id_ in ids]
+        # Convert UUID7 to strings
+        point_ids = [id_.hex for id_ in ids]
 
         # Batch delete (Qdrant supports up to 1000 per batch)
         for i in range(0, len(point_ids), 1000):
@@ -477,15 +470,16 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
                     offset = result[1]  # Next offset
                     if offset is None:  # Reached end
                         break
+                from codeweaver.providers.vector_stores.utils import resolve_dimensions
 
                 # Serialize collection data
                 # Extract dense vector config (vectors is a dict[str, VectorParams])
                 vectors_data = col_info.config.params.vectors  # type: ignore
-                dense_size = 768  # default
+                dense_size = resolve_dimensions()
                 if isinstance(vectors_data, dict) and "dense" in vectors_data:
                     dense_params = vectors_data["dense"]
-                    dense_size = dense_params.size if hasattr(dense_params, "size") else 768
-
+                    dense_size = dense_params.size if hasattr(dense_params, "size") else dense_size
+                # TODO: this should be a CollectionMetadata instance
                 collections_data[col.name] = {
                     "metadata": {"provider": "memory", "created_at": datetime.now(UTC).isoformat()},
                     "vectors_config": {"dense": {"size": dense_size, "distance": "Cosine"}},

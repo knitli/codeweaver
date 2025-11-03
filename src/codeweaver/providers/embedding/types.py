@@ -33,6 +33,13 @@ class EmbeddingKind(BaseEnum):
     SPARSE = "sparse"
 
 
+class QueryResult(NamedTuple):
+    """NamedTuple representing the result of an embedding query."""
+
+    dense: RawEmbeddingVectors | None
+    sparse: RawEmbeddingVectors | None
+
+
 class EmbeddingBatchInfo(NamedTuple):
     """NamedTuple representing metadata about a CodeChunk's embedding within a batch."""
 

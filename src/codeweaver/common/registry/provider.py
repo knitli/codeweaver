@@ -513,30 +513,26 @@ class ProviderRegistry(BasedModel):
     def get_provider_class(
         self, provider: Provider, provider_kind: Literal[ProviderKind.EMBEDDING, "embedding"]
     ) -> LazyImport[type[EmbeddingProvider[Any]]] | type[EmbeddingProvider[Any]]: ...
-
     @overload
     def get_provider_class(
         self,
         provider: Provider,
         provider_kind: Literal[ProviderKind.SPARSE_EMBEDDING, "sparse_embedding"],
     ) -> LazyImport[type[EmbeddingProvider[Any]]] | type[EmbeddingProvider[Any]]: ...
-
     @overload
     def get_provider_class(
         self, provider: Provider, provider_kind: Literal[ProviderKind.RERANKING, "reranking"]
     ) -> LazyImport[type[RerankingProvider[Any]]] | type[RerankingProvider[Any]]: ...
-
     @overload
     def get_provider_class(
         self, provider: Provider, provider_kind: LiteralVectorStoreKinds
     ) -> LazyImport[type[VectorStoreProvider[Any]]] | type[VectorStoreProvider[Any]]: ...
-
     @overload
     def get_provider_class(
         self, provider: Provider, provider_kind: Literal[ProviderKind.AGENT, "agent"]
     ) -> LazyImport[type[AgentProvider[Any]]] | type[AgentProvider[Any]]: ...
     @overload
-    def _get_provider_class(
+    def get_provider_class(
         self, provider: Provider, provider_kind: LiteralDataKinds
     ) -> tuple[type[Any], ...] | tuple[LazyImport[type[Any]], ...] | None: ...
     def get_provider_class(
@@ -891,7 +887,7 @@ class ProviderRegistry(BasedModel):
         self._add_provider_settings_to_kwargs(config, kwargs)
 
         # User kwargs override everything
-        kwargs.update(user_kwargs)
+        kwargs |= user_kwargs
         return kwargs
 
     def _add_model_settings_to_kwargs(
@@ -902,13 +898,10 @@ class ProviderRegistry(BasedModel):
         if not model_settings:
             return
 
-        model_name = user_kwargs.get("model") or model_settings.get("model")
-
-        # Get capabilities for this model
-        if model_name:
-            caps = self._get_capabilities_for_model(model_name, config["provider"])
-            if caps:
-                kwargs["caps"] = caps
+        if (model_name := user_kwargs.get("model") or model_settings.get("model")) and (
+            caps := self._get_capabilities_for_model(model_name, config["provider"])
+        ):
+            kwargs["caps"] = caps
 
         # Add model-specific settings
         for key in ("dimension", "data_type", "custom_prompt", "embed_options", "model_options"):
@@ -966,13 +959,11 @@ class ProviderRegistry(BasedModel):
 
         kwargs: dict[str, Any] = {}
 
-        # Pass entire provider_settings as "config" parameter
-        provider_settings = config.get("provider_settings")
-        if provider_settings:
+        if provider_settings := config.get("provider_settings"):
             kwargs["config"] = provider_settings
 
         # User kwargs override
-        kwargs.update(user_kwargs)
+        kwargs |= user_kwargs
         return kwargs
 
     def _prepare_data_provider_kwargs(

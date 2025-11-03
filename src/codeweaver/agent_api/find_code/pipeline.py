@@ -15,11 +15,13 @@ from __future__ import annotations
 
 import logging
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NoReturn
 
+from codeweaver.agent_api.find_code.types import StrategizedQuery
 from codeweaver.agent_api.models import SearchStrategy
 from codeweaver.common.registry import get_provider_registry
 from codeweaver.core.chunks import CodeChunk, SearchResult
+from codeweaver.providers.embedding.types import QueryResult
 
 
 if TYPE_CHECKING:
@@ -28,13 +30,17 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
-def raise_value_error(message: str) -> None:
-    """Helper function to raise ValueError with a message."""
-    raise ValueError(message)
+_query_: str | None = None
 
 
-async def embed_query(query: str) -> tuple[list[float] | None, list[float] | None]:
+def raise_value_error(message: str) -> NoReturn:
+    """Raise ValueError with message including current query."""
+    global _query_
+    q = _query_ if _query_ is not None else ""
+    raise ValueError(f"{message} (query: '{q}')")
+
+
+async def embed_query(query: str) -> QueryResult:
     """Embed query using configured embedding providers.
 
     Args:
@@ -46,13 +52,16 @@ async def embed_query(query: str) -> tuple[list[float] | None, list[float] | Non
     Raises:
         ValueError: If no embedding providers configured or both fail
     """
-    registry = get_provider_registry()
+    from codeweaver.providers.embedding.types import QueryResult
 
+    registry = get_provider_registry()
+    global _query_
+    _query_ = query.strip()
     dense_provider_enum = registry.get_provider_enum_for("embedding")
     sparse_provider_enum = registry.get_provider_enum_for("sparse_embedding")
 
     if not dense_provider_enum and not sparse_provider_enum:
-        raise_value_error("No embedding providers configured (neither dense nor sparse)")
+        raise ValueError("No embedding providers configured (neither dense nor sparse)")
 
     # Dense embedding
     dense_query_embedding = None
@@ -66,8 +75,8 @@ async def embed_query(query: str) -> tuple[list[float] | None, list[float] | Non
             if isinstance(result, dict) and "error" in result:
                 logger.warning("Dense embedding returned error: %s", result.get("error"))
                 if not sparse_provider_enum:
-                    raise_value_error(
-                        f"Dense embedding failed: {result.get('error')} (no sparse fallback)"
+                    return raise_value_error(
+                        "Dense embedding returned error and no sparse provider available"
                     )
             else:
                 dense_query_embedding = result
@@ -92,13 +101,15 @@ async def embed_query(query: str) -> tuple[list[float] | None, list[float] | Non
                 sparse_query_embedding = result
         except Exception as e:
             logger.warning("Sparse embedding failed, continuing with dense only: %s", e)
+    # EmbeddingProvider returns batch results - we haven't implemented batch queries yet
+    # So we unwrap the first element from the list for both dense and sparse embeddings
+    return QueryResult(
+        dense=dense_query_embedding[0] if dense_query_embedding else None,
+        sparse=sparse_query_embedding[0] if sparse_query_embedding else None,
+    )
 
-    return dense_query_embedding, sparse_query_embedding
 
-
-def build_query_vector(
-    dense_embedding: list[float] | None, sparse_embedding: list[float] | None
-) -> tuple[list[float] | dict[str, list[float] | Any], SearchStrategy]:
+def build_query_vector(query_result: QueryResult, query: str) -> StrategizedQuery:
     """Build query vector for search from embeddings.
 
     Args:
@@ -106,41 +117,35 @@ def build_query_vector(
         sparse_embedding: Sparse embedding vector (batch result from provider)
 
     Returns:
-        Tuple of (query_vector, strategy) where query_vector can be:
-        - list[float] for dense-only search
-        - dict with 'dense' and 'sparse' keys for hybrid search
-        - dict with 'sparse' key only for sparse-only search
+        A StrategizedQuery containing sparse and/or dense vectors and the chosen strategy
 
     Raises:
         ValueError: If both embeddings are None
     """
-    # Build query vector (unified search API) with graceful degradation
-    # Note: embed_query returns list[list[float|int]] (batch results), unwrap to list[float]
-    if dense_embedding and sparse_embedding:
-        # Unwrap batch results (take first element) and ensure float type
-        dense_vec: list[float] = [float(x) for x in dense_embedding[0]]
-        sparse_vec: list[float] = [float(x) for x in sparse_embedding[0]]
-        return {"dense": dense_vec, "sparse": sparse_vec}, SearchStrategy.HYBRID_SEARCH
-    elif dense_embedding:
+    if query_result.dense:
+        if query_result.sparse:
+            return StrategizedQuery(
+                query=query,
+                dense=query_result.dense,
+                sparse=query_result.sparse,
+                strategy=SearchStrategy.HYBRID_SEARCH,
+            )
         logger.warning("Using dense-only search (sparse embeddings unavailable)")
         # Unwrap batch results (take first element) and ensure float type
-        query_vector: list[float] = [float(x) for x in dense_embedding[0]]
-        return query_vector, SearchStrategy.DENSE_ONLY
-    elif sparse_embedding:
-        logger.warning(
-            "Using sparse-only search (dense embeddings unavailable - degraded mode)"
+        return StrategizedQuery(
+            query=query, dense=query_result.dense, sparse=None, strategy=SearchStrategy.DENSE_ONLY
         )
+    if query_result.sparse:
+        logger.warning("Using sparse-only search (dense embeddings unavailable - degraded mode)")
         # Unwrap batch results (take first element) and ensure float type
-        sparse_vec_unwrapped: list[float] = [float(x) for x in sparse_embedding[0]]
-        return {"sparse": sparse_vec_unwrapped}, SearchStrategy.SPARSE_ONLY
-    else:
-        # Both failed - should not reach here due to earlier validation
-        raise_value_error("Both dense and sparse embeddings failed")
+        return StrategizedQuery(
+            query=query, dense=None, sparse=query_result.sparse, strategy=SearchStrategy.SPARSE_ONLY
+        )
+    # Both failed - should not reach here due to earlier validation
+    raise ValueError("Both dense and sparse embeddings are None")
 
 
-async def execute_vector_search(
-    query_vector: list[float] | dict[str, list[float] | Any],
-) -> list[SearchResult]:
+async def execute_vector_search(query_vector: StrategizedQuery) -> list[SearchResult]:
     """Execute vector search using configured vector store.
 
     Args:
@@ -189,9 +194,7 @@ async def rerank_results(
 
     try:
         reranking = registry.get_provider_instance(reranking_enum, "reranking", singleton=True)
-        chunks_for_reranking = [
-            c.content for c in candidates if isinstance(c.content, CodeChunk)
-        ]
+        chunks_for_reranking = [c.content for c in candidates if isinstance(c.content, CodeChunk)]
 
         if not chunks_for_reranking:
             logger.warning("No CodeChunk objects available for reranking, skipping")
@@ -199,17 +202,18 @@ async def rerank_results(
 
         reranked_results = await reranking.rerank(query, chunks_for_reranking)
         logger.info("Reranked to %d candidates", len(reranked_results))
-        return reranked_results, SearchStrategy.SEMANTIC_RERANK
 
     except Exception as e:
         logger.warning("Reranking failed, continuing without: %s", e)
         return None, None
+    else:
+        return reranked_results, SearchStrategy.SEMANTIC_RERANK
 
 
 __all__ = (
-    "embed_query",
     "build_query_vector",
+    "embed_query",
     "execute_vector_search",
-    "rerank_results",
     "raise_value_error",
+    "rerank_results",
 )

@@ -100,7 +100,7 @@ async def qdrant_store(qdrant_test_manager) -> QdrantVectorStoreProvider:
     config = QdrantConfig(
         url=qdrant_test_manager.url, collection_name=collection_name, batch_size=64
     )
-    store = QdrantVectorStoreProvider(config=config, embedder=None, reranking=None)
+    store = QdrantVectorStoreProvider(config=config)
     await store._initialize()
     return store
     # Cleanup handled by test manager
@@ -115,7 +115,7 @@ async def memory_store() -> MemoryVectorStoreProvider:
             auto_persist=False,
             collection_name=f"perf_test_{uuid4().hex[:8]}",
         )
-        store = MemoryVectorStoreProvider(config=config, embedder=None, reranking=None)
+        store = MemoryVectorStoreProvider(config=config)
         await store._initialize()
         yield store
 
@@ -256,7 +256,7 @@ async def test_memory_persistence_performance(chunk_count: int) -> None:
         )
 
         # Create store and populate
-        store = MemoryVectorStoreProvider(config=config, embedder=None, reranking=None)
+        store = MemoryVectorStoreProvider(config=config)
         await store._initialize()
 
         chunks = create_test_chunks(count=chunk_count, files=10)
@@ -278,7 +278,7 @@ async def test_memory_persistence_performance(chunk_count: int) -> None:
 
         # Measure restore performance
         # Create a new store - _initialize will automatically restore from disk
-        new_store = MemoryVectorStoreProvider(config=config, embedder=None, reranking=None)
+        new_store = MemoryVectorStoreProvider(config=config)
 
         start = time.perf_counter()
         await new_store._initialize()

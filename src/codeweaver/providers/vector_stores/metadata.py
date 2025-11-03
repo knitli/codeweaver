@@ -7,12 +7,48 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 from pydantic import Field, PositiveInt
 
+from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.models import BasedModel
 from codeweaver.exceptions import DimensionMismatchError, ProviderSwitchError
+
+
+if TYPE_CHECKING:
+    from codeweaver.core.types.aliases import FilteredKeyT
+    from codeweaver.core.types.enum import AnonymityConversion
+
+
+class HybridVectorPayload(BasedModel):
+    """Metadata payload for stored vectors."""
+
+    chunk: Annotated[CodeChunk, Field(description="Code chunk metadata")]
+    chunk_id: Annotated[str, Field(description="UUID7 hex string index identifier for the chunk")]
+    file_path: Annotated[str, Field(description="File path of the code chunk")]
+    line_start: Annotated[int, Field(description="Start line number of the code chunk")]
+    line_end: Annotated[int, Field(description="End line number of the code chunk")]
+    indexed_at: Annotated[
+        str, Field(description="ISO 8601 datetime string when the chunk was indexed")
+    ]
+    chunked_on: Annotated[
+        str, Field(description="ISO 8601 datetime string when the chunk was created")
+    ]
+    hash: Annotated[str, Field(description="blake 3 hash of the code chunk")]
+    provider: Annotated[str, Field(description="Provider name for the vector store")]
+    embedding_complete: Annotated[
+        bool,
+        Field(
+            description="Whether the chunk has been fully embedded with both sparse and dense embeddings"
+        ),
+    ]
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        from codeweaver.core.types.aliases import FilteredKey
+        from codeweaver.core.types.enum import AnonymityConversion
+
+        return {FilteredKey("file_path"): AnonymityConversion.HASH}
 
 
 class CollectionMetadata(BasedModel):
@@ -26,6 +62,10 @@ class CollectionMetadata(BasedModel):
     ]
     embedding_dim_sparse: Annotated[
         int | None, Field(default=None, description="Max sparse embedding dimension")
+    ]
+    embedding_model: Annotated[str, Field(description="Embedding model name used")]
+    sparse_embedding_model: Annotated[
+        str | None, Field(default=None, description="Sparse embedding model name used")
     ]
     project_name: Annotated[str, Field(description="Project/repository name")]
     vector_config: Annotated[dict[str, Any], Field(description="Vector configuration snapshot")]
@@ -93,4 +133,4 @@ class CollectionMetadata(BasedModel):
             )
 
 
-__all__ = ("CollectionMetadata",)
+__all__ = ("CollectionMetadata", "HybridVectorPayload")

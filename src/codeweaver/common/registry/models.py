@@ -17,6 +17,7 @@ from typing import cast
 from pydantic import ConfigDict
 from rich.console import Console
 
+from codeweaver.common.registry.types import LiteralModelKinds
 from codeweaver.core.types.aliases import LiteralStringT, ModelName
 from codeweaver.core.types.models import BasedModel
 from codeweaver.providers.agent import AgentModel, AgentProfile, AgentProfileSpec
@@ -300,6 +301,36 @@ class ModelRegistry(BasedModel):
         return not any(self._embedding_capabilities.values()) and not any(
             self._agent_profiles.values()
         )
+
+    def configured_models_for_kind(
+        self, kind: LiteralModelKinds
+    ) -> (
+        tuple[EmbeddingModelCapabilities, ...]
+        | tuple[RerankingModelCapabilities, ...]
+        | tuple[SparseEmbeddingModelCapabilities, ...]
+        | EmbeddingModelCapabilities
+        | RerankingModelCapabilities
+        | SparseEmbeddingModelCapabilities
+        | AgentProfile
+        | None
+    ):
+        """Get all configured models for a specific kind."""
+        from codeweaver.common.registry.provider import get_provider_config_for
+        from codeweaver.providers.provider import ProviderKind
+
+        kind = kind if isinstance(kind, ProviderKind) else ProviderKind.from_string(kind)
+        if settings := get_provider_config_for(kind):
+            provider = settings["provider"]
+            model_name = settings["model"]
+            if kind == "embedding":
+                return self.get_embedding_capabilities(provider, model_name)  # type: ignore
+            if kind == "sparse_embedding":
+                return self.get_sparse_embedding_capabilities(provider, model_name)  # type: ignore
+            if kind == "reranking":
+                return self.get_reranking_capabilities(provider, model_name)  # type: ignore
+            if kind == "agent" and (profile := self.resolve_agent_profile(provider, model_name)):
+                return profile
+        return None
 
     def _telemetry_keys(self) -> None:
         return None

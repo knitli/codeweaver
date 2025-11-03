@@ -14,8 +14,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import PositiveInt
-
 from codeweaver.agent_api.models import CodeMatch, CodeMatchType
 from codeweaver.common.utils import uuid7
 from codeweaver.core.chunks import ChunkSource, CodeChunk, SearchResult

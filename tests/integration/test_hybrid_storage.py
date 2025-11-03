@@ -17,8 +17,6 @@ from codeweaver.common.utils.utils import uuid7
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
 
-from .conftest import actual_dense_embedding_provider
-
 
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
@@ -33,7 +31,7 @@ async def qdrant_provider(qdrant_test_manager: Any):
     )
 
     config = {"url": qdrant_test_manager.url, "collection_name": collection_name}
-    provider = QdrantVectorStoreProvider(config=config, _embedder=actual_dense_embedding_provider())
+    provider = QdrantVectorStoreProvider(config=config)
     await provider._initialize()
     return provider
     # Cleanup handled by test manager
