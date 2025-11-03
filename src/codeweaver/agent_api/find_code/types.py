@@ -235,8 +235,8 @@ class StrategizedQuery(NamedTuple):
 
     query: str
     dense: Sequence[float] | Sequence[int] | None
-    sparse: SparseEmbedding | None
-    strategy: SearchStrategy
+    sparse: Annotated[SparseEmbedding | None, Field(description="Sparse embedding data")]
+    strategy: Annotated[SearchStrategy, Field(description="Search strategy to use")]
 
     def is_empty(self) -> bool:
         """Check if both dense and sparse embeddings are None or empty."""
@@ -272,7 +272,7 @@ class StrategizedQuery(NamedTuple):
         # Convert sparse dict to SparseVector with indices and values
         assert self.sparse is not None  # noqa: S101
         sparse_vector = SparseVector(
-            indices=list(self.sparse["indices"]), values=list(self.sparse["values"])
+            indices=list(self.sparse.indices), values=list(self.sparse.values)
         )
 
         return {

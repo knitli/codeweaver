@@ -373,9 +373,10 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
                 results = [
                     SparseEmbedding(
-                        indices=results["indices"],  # type: ignore
-                        values=results["values"],  # type: ignore
+                        indices=result["indices"],  # type: ignore
+                        values=result["values"],  # type: ignore
                     )
+                    for result in results
                 ]
             if not is_old_batch:
                 self._register_chunks(
