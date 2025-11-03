@@ -81,6 +81,24 @@ def fastembed_output_transformer(output: list[np.ndarray]) -> list[list[float]] 
     return [emb.tolist() for emb in output]
 
 
+def fastembed_sparse_output_transformer(output: list[Any]) -> list[dict[str, list[int] | list[float]]]:
+    """Transform the sparse output of FastEmbed into indices and values format.
+    
+    FastEmbed's SparseTextEmbedding returns SparseEmbedding objects with
+    indices and values attributes. We transform them into dicts for easier handling.
+    """
+    from codeweaver.providers.embedding.types import SparseEmbedding
+
+    result = []
+    for emb in output:
+        # FastEmbed SparseEmbedding has .indices and .values as numpy arrays
+        result.append({
+            "indices": emb.indices.tolist() if hasattr(emb.indices, "tolist") else list(emb.indices),
+            "values": emb.values.tolist() if hasattr(emb.values, "tolist") else list(emb.values),
+        })
+    return result
+
+
 class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
     """
     FastEmbed implementation of the embedding provider.
@@ -150,6 +168,9 @@ class FastEmbedSparseProvider(FastEmbedEmbeddingProvider):
     """
 
     _client: SparseTextEmbedding
+    _output_transformer: ClassVar[Callable[[Any], list[dict[str, list[int] | list[float]]]]] = (
+        fastembed_sparse_output_transformer
+    )
 
     def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """Initialize the FastEmbed client."""
@@ -161,8 +182,8 @@ class FastEmbedSparseProvider(FastEmbedEmbeddingProvider):
 
     async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any] | None
-    ) -> list[list[float]] | list[list[int]]:
-        """Embed a list of documents into vectors."""
+    ) -> list[dict[str, list[int] | list[float]]]:
+        """Embed a list of documents into sparse vectors."""
         ready_documents = self.chunks_to_strings(documents)
         loop = asyncio.get_event_loop()
         embeddings = await loop.run_in_executor(
@@ -173,8 +194,8 @@ class FastEmbedSparseProvider(FastEmbedEmbeddingProvider):
 
     async def _embed_query(
         self, query: Sequence[str], **kwargs: Mapping[str, Any] | None
-    ) -> list[list[float]] | list[list[int]]:
-        """Embed a query into a vector."""
+    ) -> list[dict[str, list[int] | list[float]]]:
+        """Embed a query into a sparse vector."""
         loop = asyncio.get_event_loop()
         embeddings = await loop.run_in_executor(
             None, lambda: list(self._client.query_embed(query, **kwargs))
