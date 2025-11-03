@@ -26,6 +26,24 @@ type RawEmbeddingVectors = Sequence[float] | Sequence[int]
 type StoredEmbeddingVectors = tuple[float, ...] | tuple[int, ...]
 
 
+class SparseEmbedding(NamedTuple):
+    """NamedTuple representing sparse embedding with indices and values.
+    
+    Sparse embeddings are represented as two parallel arrays:
+    - indices: positions in the vocabulary that have non-zero values
+    - values: weights/importance scores for those positions
+    
+    This format is used by SPLADE, SparseEncoder and similar models.
+    """
+
+    indices: Sequence[int]
+    values: Sequence[float]
+
+    def to_tuple(self) -> tuple[tuple[int, ...], tuple[float, ...]]:
+        """Convert to a tuple of tuples for storage."""
+        return (tuple(self.indices), tuple(self.values))
+
+
 class EmbeddingKind(BaseEnum):
     """Enum representing the kind of embedding."""
 
@@ -37,7 +55,7 @@ class QueryResult(NamedTuple):
     """NamedTuple representing the result of an embedding query."""
 
     dense: RawEmbeddingVectors | None
-    sparse: RawEmbeddingVectors | None
+    sparse: SparseEmbedding | None
 
 
 class EmbeddingBatchInfo(NamedTuple):
@@ -48,7 +66,7 @@ class EmbeddingBatchInfo(NamedTuple):
     kind: EmbeddingKind
     chunk_id: UUID7
     model: ModelNameT
-    embeddings: StoredEmbeddingVectors
+    embeddings: StoredEmbeddingVectors | tuple[tuple[int, ...], tuple[float, ...]]
 
     @classmethod
     def create_dense(
@@ -76,16 +94,24 @@ class EmbeddingBatchInfo(NamedTuple):
         batch_index: NonNegativeInt,
         chunk_id: UUID7,
         model: LiteralStringT | ModelNameT,
-        embeddings: RawEmbeddingVectors,
+        embeddings: SparseEmbedding,
     ) -> EmbeddingBatchInfo:
-        """Create EmbeddingBatchInfo for sparse embeddings."""
+        """Create EmbeddingBatchInfo for sparse embeddings.
+        
+        Args:
+            batch_id: Unique identifier for the batch
+            batch_index: Index within the batch
+            chunk_id: Unique identifier for the chunk
+            model: Model name
+            embeddings: SparseEmbedding with indices and values
+        """
         return cls(
             batch_id=batch_id,
             batch_index=batch_index,
             kind=EmbeddingKind.SPARSE,
             chunk_id=chunk_id,
             model=ModelName(model),
-            embeddings=tuple(embeddings),
+            embeddings=embeddings.to_tuple(),
         )
 
 
@@ -159,4 +185,13 @@ class ChunkEmbeddings(NamedTuple):
         return self.sparse.model if self.sparse is not None else None
 
 
-__all__ = ("ChunkEmbeddings", "EmbeddingBatchInfo", "EmbeddingKind", "InvalidEmbeddingModelError")
+__all__ = (
+    "ChunkEmbeddings",
+    "EmbeddingBatchInfo",
+    "EmbeddingKind",
+    "InvalidEmbeddingModelError",
+    "QueryResult",
+    "RawEmbeddingVectors",
+    "SparseEmbedding",
+    "StoredEmbeddingVectors",
+)

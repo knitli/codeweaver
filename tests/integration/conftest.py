@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from codeweaver.providers.embedding.providers.sentence_transformers import (
         SentenceTransformersEmbeddingProvider,
         SentenceTransformersRerankingProvider,
+        SentenceTransformersSparseProvider,
     )
 
 # ===========================================================================
@@ -70,32 +71,35 @@ def actual_dense_embedding_provider() -> SentenceTransformersEmbeddingProvider:
 def mock_sparse_provider():
     """Provide a mock sparse embedding provider."""
     mock_provider = AsyncMock()
-    # Sparse embeddings in batch format
+    # Sparse embeddings in new format with indices and values
     mock_provider.embed_query = AsyncMock(
-        return_value=[[0.1, 0.0, 0.3, 0.0, 0.5]]  # Sparse query embedding
+        return_value=[{"indices": [0, 2, 4], "values": [0.1, 0.3, 0.5]}]  # Sparse query embedding
     )
     mock_provider.embed_batch = AsyncMock(
         return_value=[
-            [0.1, 0.0, 0.3, 0.0, 0.5],  # First sparse embedding
-            [0.0, 0.2, 0.0, 0.4, 0.0],  # Second sparse embedding
+            {"indices": [0, 2, 4], "values": [0.1, 0.3, 0.5]},  # First sparse embedding
+            {"indices": [1, 3], "values": [0.2, 0.4]},  # Second sparse embedding
         ]
     )
     return mock_provider
 
 
 @pytest.fixture
-def actual_sparse_embedding_provider() -> SentenceTransformersEmbeddingProvider:
+def actual_sparse_embedding_provider() -> SentenceTransformersSparseProvider:
     """Provide an actual sparse embedding provider using SentenceTransformers."""
     from sentence_transformers import SparseEncoder
 
     from codeweaver.providers.embedding.capabilities.base import get_sparse_caps
+    from codeweaver.providers.embedding.providers.sentence_transformers import (
+        SentenceTransformersSparseProvider,
+    )
 
     cap = next(
         cap
         for cap in get_sparse_caps()
         if cap.name == "opensearch-project/opensearch-neural-sparse-encoding-doc-v2-mini"
     )
-    return SentenceTransformersEmbeddingProvider(capabilities=cap, client=SparseEncoder(cap.name))
+    return SentenceTransformersSparseProvider(capabilities=cap, client=SparseEncoder(cap.name))
 
 
 @pytest.fixture

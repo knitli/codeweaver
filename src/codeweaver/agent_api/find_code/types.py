@@ -21,13 +21,17 @@ class StrategizedQuery(NamedTuple):
 
     query: str
     dense: Sequence[float] | Sequence[int] | None
-    sparse: Sequence[float] | Sequence[int] | None
+    sparse: dict[str, Sequence[int] | Sequence[float]] | None  # {indices: [...], values: [...]}
     strategy: SearchStrategy
 
     def is_empty(self) -> bool:
         """Check if both dense and sparse embeddings are None or empty."""
         dense_empty = self.dense is None or len(self.dense) == 0
-        sparse_empty = self.sparse is None or len(self.sparse) == 0
+        sparse_empty = (
+            self.sparse is None
+            or len(self.sparse.get("indices", [])) == 0
+            or len(self.sparse.get("values", [])) == 0
+        )
         return dense_empty and sparse_empty
 
     def has_dense(self) -> bool:
@@ -36,7 +40,11 @@ class StrategizedQuery(NamedTuple):
 
     def has_sparse(self) -> bool:
         """Check if sparse embedding is present and non-empty."""
-        return self.sparse is not None and len(self.sparse) > 0
+        return (
+            self.sparse is not None
+            and len(self.sparse.get("indices", [])) > 0
+            and len(self.sparse.get("values", [])) > 0
+        )
 
     def is_hybrid(self) -> bool:
         """Check if both dense and sparse embeddings are present and non-empty."""
@@ -50,11 +58,19 @@ class StrategizedQuery(NamedTuple):
 
         if not self.is_hybrid():
             raise ValueError("Both dense and sparse embeddings must be present for hybrid query.")
+        
+        # Convert sparse dict to SparseVector with indices and values
+        assert self.sparse is not None  # noqa: S101
+        sparse_vector = SparseVector(
+            indices=list(self.sparse["indices"]),
+            values=list(self.sparse["values"])
+        )
+        
         return {
             "query": FusionQuery(fusion=Fusion.RRF),
             "prefetch": [
                 Prefetch(query=self.dense, using="dense", **query_kwargs),
-                Prefetch(query=SparseVector(self.sparse), using="sparse", **query_kwargs),
+                Prefetch(query=sparse_vector, using="sparse", **query_kwargs),
             ],
             **kwargs,
         }
@@ -69,4 +85,13 @@ class StrategizedQuery(NamedTuple):
             return self.to_hybrid_query({}, kwargs)
         from qdrant_client.http.models import SparseVector
 
-        return {"query": self.dense if self.has_dense() else SparseVector(self.sparse), **kwargs}
+        if self.has_dense():
+            return {"query": self.dense, **kwargs}
+        
+        # Convert sparse dict to SparseVector
+        assert self.sparse is not None  # noqa: S101
+        sparse_vector = SparseVector(
+            indices=list(self.sparse["indices"]),
+            values=list(self.sparse["values"])
+        )
+        return {"query": sparse_vector, **kwargs}

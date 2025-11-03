@@ -92,12 +92,12 @@ def process_for_instruction_model(queries: Sequence[str], instruction: str) -> l
     return [format_doc(query) for query in queries]
 
 
-class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransformer | SparseEncoder]):
-    """Sentence Transformers embedding provider."""
+class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransformer]):
+    """Sentence Transformers embedding provider for dense embeddings."""
 
-    _client: SentenceTransformer | SparseEncoder
+    _client: SentenceTransformer
     _provider: Provider = Provider.SENTENCE_TRANSFORMERS
-    _caps: EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities  # pyright: ignore[reportIncompatibleVariableOverride]
+    _caps: EmbeddingModelCapabilities
 
     _doc_kwargs: ClassVar[dict[str, Any]] = {"client_options": {"trust_remote_code": True}}
     _query_kwargs: ClassVar[dict[str, Any]] = {"client_options": {"trust_remote_code": True}}
@@ -105,20 +105,15 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
     def __init__(
         self,
         capabilities: EmbeddingModelCapabilities,
-        client: SentenceTransformer | SparseEncoder | None = None,
+        client: SentenceTransformer | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the Sentence Transformers embedding provider."""
-        self._caps = capabilities  # pyright: ignore[reportIncompatibleVariableOverride]
+        self._caps = capabilities
         self.doc_kwargs = {**self._doc_kwargs, **(kwargs or {})}
         self.query_kwargs = {**self._query_kwargs, **(kwargs or {})}
         if client is None:
-            _client = (
-                SentenceTransformer
-                if isinstance(self._caps, EmbeddingModelCapabilities)  # pyright: ignore[reportUnnecessaryIsInstance]
-                else SparseEncoder
-            )
-            self._client = _client(
+            self._client = SentenceTransformer(
                 model_name_or_path=capabilities.name, **self.doc_kwargs["client_options"]
             )
         else:
@@ -233,13 +228,119 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
                 "flash_attention_2"
             )
 
+
+class SentenceTransformersSparseProvider(EmbeddingProvider[SparseEncoder]):
+    """Sentence Transformers sparse embedding provider.
+    
+    This provider handles sparse embeddings from SparseEncoder models,
+    returning properly formatted sparse embeddings with indices and values.
+    """
+
+    _client: SparseEncoder
+    _provider: Provider = Provider.SENTENCE_TRANSFORMERS
+    _caps: SparseEmbeddingModelCapabilities
+
+    _doc_kwargs: ClassVar[dict[str, Any]] = {"client_options": {"trust_remote_code": True}}
+    _query_kwargs: ClassVar[dict[str, Any]] = {"client_options": {"trust_remote_code": True}}
+
+    def __init__(
+        self,
+        capabilities: SparseEmbeddingModelCapabilities,
+        client: SparseEncoder | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize the Sentence Transformers sparse embedding provider."""
+        self._caps = capabilities
+        self.doc_kwargs = {**self._doc_kwargs, **(kwargs or {})}
+        self.query_kwargs = {**self._query_kwargs, **(kwargs or {})}
+        if client is None:
+            self._client = SparseEncoder(
+                model_name_or_path=capabilities.name, **self.doc_kwargs["client_options"]
+            )
+        else:
+            self._client = client
+        super().__init__(caps=capabilities, client=self._client, **kwargs)
+
+    @property
+    def base_url(self) -> str | None:
+        """Get the base URL for the provider, if applicable."""
+        return None
+
+    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
+        """Initialize the Sentence Transformers sparse embedding provider."""
+        for keyword_args in (self.doc_kwargs, self.query_kwargs):
+            keyword_args.setdefault("client_options", {})
+            if "trust_remote_code" not in keyword_args["client_options"]:
+                keyword_args["client_options"]["trust_remote_code"] = True
+            if (
+                "model_name" not in keyword_args["client_options"]
+                and "model_name_or_path" not in keyword_args["client_options"]
+            ):
+                keyword_args["client_options"]["model_name_or_path"] = self._caps.name
+        name = self.doc_kwargs.pop("model_name", self.doc_kwargs.pop("model_name_or_path"))
+        self.query_kwargs.pop("model_name", self.query_kwargs.pop("model_name_or_path", None))
+        self._client = SparseEncoder(name, **(self.doc_kwargs or {}))
+
+    async def _embed_documents(
+        self, documents: Sequence[CodeChunk], **kwargs: Any
+    ) -> list[dict[str, list[int] | list[float]]]:
+        """Embed a sequence of documents into sparse vectors."""
+        preprocessed = cast(list[str], self.chunks_to_strings(documents))
+        embed_partial = rpartial(  # type: ignore
+            self._client.encode,  # type: ignore
+            **(
+                self.doc_kwargs.get("client_options", {})
+                | {"model_kwargs": self.doc_kwargs.get("model_kwargs", {})}
+                | kwargs
+            ),
+        )
+        loop = asyncio.get_running_loop()
+        results = await loop.run_in_executor(None, embed_partial, preprocessed)  # type: ignore
+        _ = self._fire_and_forget(lambda: self._update_token_stats(from_docs=preprocessed))
+        
+        # SparseEncoder.encode returns dicts with 'indices' and 'values' keys
+        # Convert to our expected format
+        return [
+            {
+                "indices": list(emb.get("indices", [])) if isinstance(emb, dict) else list(emb.indices),
+                "values": list(emb.get("values", [])) if isinstance(emb, dict) else list(emb.values),
+            }
+            for emb in results
+        ]
+
+    async def _embed_query(
+        self, query: Sequence[str], **kwargs: Any
+    ) -> list[dict[str, list[int] | list[float]]]:
+        """Embed a sequence of queries into sparse vectors."""
+        preprocessed = cast(list[str], query)
+        embed_partial = rpartial(  # type: ignore
+            self._client.encode,  # type: ignore
+            **(
+                self.query_kwargs.get("client_options", {})
+                | {"model_kwargs": self.query_kwargs.get("model_kwargs", {})}
+                | kwargs
+            ),
+        )
+        loop = asyncio.get_running_loop()
+        results = await loop.run_in_executor(None, embed_partial, preprocessed)  # type: ignore
+        _ = self._fire_and_forget(
+            lambda: self._update_token_stats(from_docs=cast(list[str], preprocessed))
+        )
+        
+        # SparseEncoder.encode returns dicts with 'indices' and 'values' keys
+        return [
+            {
+                "indices": list(emb.get("indices", [])) if isinstance(emb, dict) else list(emb.indices),
+                "values": list(emb.get("values", [])) if isinstance(emb, dict) else list(emb.values),
+            }
+            for emb in results
+        ]
+
     def _decode_sparse_vectors(
         self, vectors: Sequence[Sequence[float]]
     ) -> list[list[tuple[str, float]]]:
         """Decode sparse vectors from the model output."""
-        if not isinstance(self._client, SparseEncoder):
-            raise TypeError("The model is not a SparseEncoder.")
         return cast(list[list[tuple[str, float]]], self._client.decode(vectors))  # type: ignore
 
 
-__all__ = ("SentenceTransformersEmbeddingProvider",)
+__all__ = ("SentenceTransformersEmbeddingProvider", "SentenceTransformersSparseProvider")

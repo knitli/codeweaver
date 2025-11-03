@@ -312,13 +312,24 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
         points: list[PointStruct] = []
         for chunk in chunks:
             # Prepare vectors dict for named vectors
-            vectors: dict[str, list[float]] = {}
+            vectors: dict[str, Any] = {}
             if chunk.dense_embeddings:
                 vectors["dense"] = list(chunk.dense_embeddings.embeddings)
             if chunk.sparse_embeddings:
-                # Qdrant sparse vector format
+                # Qdrant sparse vector format requires indices and values
+                # sparse_embeddings.embeddings is a tuple of (indices, values) for sparse
                 sparse = chunk.sparse_embeddings
-                vectors["sparse"] = list(sparse.embeddings)
+                if isinstance(sparse.embeddings, tuple) and len(sparse.embeddings) == 2:
+                    # New format: tuple of (indices, values)
+                    indices, values = sparse.embeddings
+                    from qdrant_client.http.models import SparseVector
+                    vectors["sparse"] = SparseVector(
+                        indices=list(indices),
+                        values=list(values)
+                    )
+                else:
+                    # Old format: flat list (for backward compatibility during migration)
+                    vectors["sparse"] = list(sparse.embeddings)
 
             payload = HybridVectorPayload(
                 chunk=chunk,
