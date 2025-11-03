@@ -53,6 +53,7 @@ from pydantic import NonNegativeInt, PositiveInt
 
 from codeweaver.agent_api.find_code.conversion import convert_search_result_to_code_match
 from codeweaver.agent_api.find_code.filters import apply_filters
+from codeweaver.agent_api.find_code.intent import INTENT_TO_AGENT_TASK, IntentType, detect_intent
 from codeweaver.agent_api.find_code.pipeline import (
     build_query_vector,
     embed_query,
@@ -66,7 +67,6 @@ from codeweaver.agent_api.find_code.scoring import (
     process_unranked_results,
 )
 from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary, SearchStrategy
-from codeweaver.agent_api.intent import INTENT_TO_AGENT_TASK, IntentType, detect_intent
 from codeweaver.core.spans import Span
 from codeweaver.semantic.classifications import AgentTask
 

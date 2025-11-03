@@ -11,8 +11,8 @@ from search results, including summary generation and metadata calculation.
 
 from __future__ import annotations
 
+from codeweaver.agent_api.find_code.intent import IntentType
 from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary, SearchStrategy
-from codeweaver.agent_api.intent import IntentType
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.types import LanguageName
 
