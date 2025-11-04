@@ -5,7 +5,11 @@ local linters = new Mapping<String, Step> {
     // uses builtin prettier linter config
     ["actionlint"] = Builtins.actionlint
 
-    ["taplo"] = Builtins.taplo
+    ["tombi"] = new Step {
+        glob = List("*.toml", "*.toml.*", ".*.toml")
+        check = "tombi format --check {{ files }}"
+        fix = "tombi format {{ files }}"
+    }
         // yaml
     ["yq"] = new Step {
       glob = List( "*.{.yaml,yml,yaml,.yml,json,jsonc,.json,.jsonc}")
@@ -46,10 +50,7 @@ local linters = new Mapping<String, Step> {
     ["shfmt"] = Builtins.shfmt
 
     // define a custom linter
-    ["pkl"] = new Step{
-        glob = "*.pkl"
-        check = "pkl eval {{files}} >/dev/null"
-    }
+    ["pkl"] = Builtins.pkl
 
     ["add-marks"] = new Step {
         glob = "tests/**/*.py"

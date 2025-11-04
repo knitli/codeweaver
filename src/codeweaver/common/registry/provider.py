@@ -12,7 +12,7 @@ import contextlib
 import importlib
 import logging
 
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Callable, Mapping, MutableMapping
 from functools import partial
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypeGuard, cast, overload
@@ -53,6 +53,7 @@ if TYPE_CHECKING:
         VectorStoreProviderSettings,
     )
     from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    from codeweaver.providers.types import LiteralProvider, LiteralProviderKind
 
 
 logger = logging.getLogger(__name__)
@@ -71,73 +72,80 @@ class ProviderRegistry(BasedModel):
     _agent_prefix: ClassVar[LiteralStringT] = "codeweaver.providers.agent."
     _vector_store_prefix: ClassVar[LiteralStringT] = "codeweaver.providers.vector_stores."
     _provider_map: ClassVar[
-        MappingProxyType[ProviderKind, Mapping[Provider, partial[LazyImport[Any]]]]
-    ] = MappingProxyType({
-        ProviderKind.AGENT: {
-            Provider.ANTHROPIC: partial(lazy_import, f"{_agent_prefix}agent_providers"),
-            Provider.AZURE: partial(lazy_import, f"{_agent_prefix}agent_providers"),
-            Provider.BEDROCK: partial(lazy_import, f"{_agent_prefix}agent_providers"),
-            Provider.CEREBRAS: partial(lazy_import, f"{_agent_prefix}agent_providers"),
-            Provider.COHERE: partial(lazy_import, f"{_agent_prefix}agent_providers"),
-            Provider.DEEPSEEK: partial(lazy_import, f"{_agent_prefix}agent_providers"),
-            Provider.FIREWORKS: partial(lazy_import, f"{_agent_prefix}agent_providers"),
-            Provider.HEROKU: partial(lazy_import, f"{_agent_prefix}agent_providers"),
-            Provider.HUGGINGFACE_INFERENCE: partial(lazy_import, f"{_agent_prefix}agent_providers"),
-            Provider.GITHUB: partial(lazy_import, f"{_agent_prefix}agent_providers"),
-            Provider.GOOGLE: partial(lazy_import, f"{_agent_prefix}agent_providers"),
-            Provider.LITELLM: partial(lazy_import, f"{_agent_prefix}agent_providers"),
-            Provider.MISTRAL: partial(lazy_import, f"{_agent_prefix}agent_providers"),
-            Provider.MOONSHOT: partial(lazy_import, f"{_agent_prefix}agent_providers"),
-            Provider.OPENAI: partial(lazy_import, f"{_agent_prefix}agent_providers"),
-            Provider.OPENROUTER: partial(lazy_import, f"{_agent_prefix}agent_providers"),
-            Provider.TOGETHER: partial(lazy_import, f"{_agent_prefix}agent_providers"),
-            Provider.VERCEL: partial(lazy_import, f"{_agent_prefix}agent_providers"),
-            Provider.X_AI: partial(lazy_import, f"{_agent_prefix}agent_providers"),
-        },  # ProviderKind.EMBEDDING -> Provider.AZURE, Literal["EXCEPTION"] but I couldn't find a way to type it correctly
-        ProviderKind.EMBEDDING: {
-            Provider.AZURE: "EXCEPTION",
-            Provider.BEDROCK: partial(lazy_import, f"{_embedding_prefix}bedrock"),
-            Provider.COHERE: partial(lazy_import, f"{_embedding_prefix}cohere"),
-            Provider.FASTEMBED: partial(lazy_import, f"{_embedding_prefix}fastembed"),
-            Provider.FIREWORKS: partial(lazy_import, f"{_embedding_prefix}openai_factory"),
-            Provider.GITHUB: partial(lazy_import, f"{_embedding_prefix}openai_factory"),
-            Provider.GOOGLE: partial(lazy_import, f"{_embedding_prefix}google"),
-            Provider.GROQ: partial(lazy_import, f"{_embedding_prefix}openai_factory"),
-            Provider.HEROKU: partial(lazy_import, f"{_embedding_prefix}openai_factory"),
-            Provider.HUGGINGFACE_INFERENCE: partial(lazy_import, f"{_embedding_prefix}huggingface"),
-            Provider.MISTRAL: partial(lazy_import, f"{_embedding_prefix}mistral"),
-            Provider.OPENAI: partial(lazy_import, f"{_embedding_prefix}openai_factory"),
-            Provider.OLLAMA: partial(lazy_import, f"{_embedding_prefix}openai_factory"),
-            Provider.SENTENCE_TRANSFORMERS: partial(
-                lazy_import, f"{_embedding_prefix}sentence_transformers"
-            ),
-            Provider.VERCEL: partial(lazy_import, f"{_embedding_prefix}openai_factory"),
-            Provider.VOYAGE: partial(lazy_import, f"{_embedding_prefix}voyage"),
-        },
-        ProviderKind.SPARSE_EMBEDDING: {
-            Provider.FASTEMBED: partial(lazy_import, f"{_sparse_prefix}fastembed"),
-            Provider.SENTENCE_TRANSFORMERS: partial(
-                lazy_import, f"{_sparse_prefix}sentence_transformers"
-            ),
-        },
-        ProviderKind.RERANKING: {
-            Provider.BEDROCK: partial(lazy_import, f"{_rerank_prefix}bedrock"),
-            Provider.COHERE: partial(lazy_import, f"{_rerank_prefix}cohere"),
-            Provider.FASTEMBED: partial(lazy_import, f"{_rerank_prefix}fastembed"),
-            Provider.SENTENCE_TRANSFORMERS: partial(
-                lazy_import, f"{_rerank_prefix}sentence_transformers"
-            ),
-            Provider.VOYAGE: partial(lazy_import, f"{_rerank_prefix}voyage"),
-        },
-        ProviderKind.VECTOR_STORE: {
-            Provider.QDRANT: partial(lazy_import, f"{_vector_store_prefix}qdrant"),
-            Provider.MEMORY: partial(lazy_import, f"{_vector_store_prefix}inmemory"),
-        },
-        ProviderKind.DATA: {
-            Provider.DUCKDUCKGO: partial(lazy_import, "codeweaver.providers.tools"),
-            Provider.TAVILY: partial(lazy_import, "codeweaver.providers.tools"),
-        },
-    })
+        MappingProxyType[LiteralProviderKind, Mapping[LiteralProvider, partial[LazyImport[Any]]]]
+    ] = cast(
+        "MappingProxyType[LiteralProviderKind, Mapping[LiteralProvider, partial[LazyImport[Any]]]]",
+        MappingProxyType({
+            ProviderKind.AGENT: {
+                Provider.ANTHROPIC: partial(lazy_import, f"{_agent_prefix}agent_providers"),
+                Provider.AZURE: partial(lazy_import, f"{_agent_prefix}agent_providers"),
+                Provider.BEDROCK: partial(lazy_import, f"{_agent_prefix}agent_providers"),
+                Provider.CEREBRAS: partial(lazy_import, f"{_agent_prefix}agent_providers"),
+                Provider.COHERE: partial(lazy_import, f"{_agent_prefix}agent_providers"),
+                Provider.DEEPSEEK: partial(lazy_import, f"{_agent_prefix}agent_providers"),
+                Provider.FIREWORKS: partial(lazy_import, f"{_agent_prefix}agent_providers"),
+                Provider.HEROKU: partial(lazy_import, f"{_agent_prefix}agent_providers"),
+                Provider.HUGGINGFACE_INFERENCE: partial(
+                    lazy_import, f"{_agent_prefix}agent_providers"
+                ),
+                Provider.GITHUB: partial(lazy_import, f"{_agent_prefix}agent_providers"),
+                Provider.GOOGLE: partial(lazy_import, f"{_agent_prefix}agent_providers"),
+                Provider.LITELLM: partial(lazy_import, f"{_agent_prefix}agent_providers"),
+                Provider.MISTRAL: partial(lazy_import, f"{_agent_prefix}agent_providers"),
+                Provider.MOONSHOT: partial(lazy_import, f"{_agent_prefix}agent_providers"),
+                Provider.OPENAI: partial(lazy_import, f"{_agent_prefix}agent_providers"),
+                Provider.OPENROUTER: partial(lazy_import, f"{_agent_prefix}agent_providers"),
+                Provider.TOGETHER: partial(lazy_import, f"{_agent_prefix}agent_providers"),
+                Provider.VERCEL: partial(lazy_import, f"{_agent_prefix}agent_providers"),
+                Provider.X_AI: partial(lazy_import, f"{_agent_prefix}agent_providers"),
+            },  # ProviderKind.EMBEDDING -> Provider.AZURE, Literal["EXCEPTION"] but I couldn't find a way to type it correctly
+            ProviderKind.EMBEDDING: {
+                Provider.AZURE: "EXCEPTION",
+                Provider.BEDROCK: partial(lazy_import, f"{_embedding_prefix}bedrock"),
+                Provider.COHERE: partial(lazy_import, f"{_embedding_prefix}cohere"),
+                Provider.FASTEMBED: partial(lazy_import, f"{_embedding_prefix}fastembed"),
+                Provider.FIREWORKS: partial(lazy_import, f"{_embedding_prefix}openai_factory"),
+                Provider.GITHUB: partial(lazy_import, f"{_embedding_prefix}openai_factory"),
+                Provider.GOOGLE: partial(lazy_import, f"{_embedding_prefix}google"),
+                Provider.GROQ: partial(lazy_import, f"{_embedding_prefix}openai_factory"),
+                Provider.HEROKU: partial(lazy_import, f"{_embedding_prefix}openai_factory"),
+                Provider.HUGGINGFACE_INFERENCE: partial(
+                    lazy_import, f"{_embedding_prefix}huggingface"
+                ),
+                Provider.MISTRAL: partial(lazy_import, f"{_embedding_prefix}mistral"),
+                Provider.OPENAI: partial(lazy_import, f"{_embedding_prefix}openai_factory"),
+                Provider.OLLAMA: partial(lazy_import, f"{_embedding_prefix}openai_factory"),
+                Provider.SENTENCE_TRANSFORMERS: partial(
+                    lazy_import, f"{_embedding_prefix}sentence_transformers"
+                ),
+                Provider.VERCEL: partial(lazy_import, f"{_embedding_prefix}openai_factory"),
+                Provider.VOYAGE: partial(lazy_import, f"{_embedding_prefix}voyage"),
+            },
+            ProviderKind.SPARSE_EMBEDDING: {
+                Provider.FASTEMBED: partial(lazy_import, f"{_sparse_prefix}fastembed"),
+                Provider.SENTENCE_TRANSFORMERS: partial(
+                    lazy_import, f"{_sparse_prefix}sentence_transformers"
+                ),
+            },
+            ProviderKind.RERANKING: {
+                Provider.BEDROCK: partial(lazy_import, f"{_rerank_prefix}bedrock"),
+                Provider.COHERE: partial(lazy_import, f"{_rerank_prefix}cohere"),
+                Provider.FASTEMBED: partial(lazy_import, f"{_rerank_prefix}fastembed"),
+                Provider.SENTENCE_TRANSFORMERS: partial(
+                    lazy_import, f"{_rerank_prefix}sentence_transformers"
+                ),
+                Provider.VOYAGE: partial(lazy_import, f"{_rerank_prefix}voyage"),
+            },
+            ProviderKind.VECTOR_STORE: {
+                Provider.QDRANT: partial(lazy_import, f"{_vector_store_prefix}qdrant"),
+                Provider.MEMORY: partial(lazy_import, f"{_vector_store_prefix}inmemory"),
+            },
+            ProviderKind.DATA: {
+                Provider.DUCKDUCKGO: partial(lazy_import, "codeweaver.providers.tools"),
+                Provider.TAVILY: partial(lazy_import, "codeweaver.providers.tools"),
+            },
+        }),
+    )
 
     def __init__(self) -> None:
         """Initialize the provider registry.
@@ -447,7 +455,9 @@ class ProviderRegistry(BasedModel):
         # Fallback to capabilities
         return capabilities.name
 
-    def _get_base_url_for_provider(self, provider: Provider) -> str | None:
+    def _get_base_url_for_provider(
+        self, provider: Provider, **kwargs: Any
+    ) -> str | LazyImport[Callable[[Mapping[str, Any]], str]] | None:
         """Map Provider enum to default base URLs.
 
         Args:
@@ -456,35 +466,309 @@ class ProviderRegistry(BasedModel):
         Returns:
             Base URL string or None
         """
-        base_url_map = {
+        url_map: dict[Provider, LazyImport[Callable[[Mapping[str, Any]], str]] | str] = {
+            Provider.AZURE: lazy_import(
+                "codeweaver.providers.embedding.providers.openai_factory", "try_for_azure_endpoint"
+            ),
+            Provider.CEREBRAS: "https://api.cerebras.ai/v1",
             Provider.FIREWORKS: "https://api.fireworks.ai/inference/v1",
-            Provider.GROQ: "https://api.groq.com/openai/v1",
-            Provider.OPENAI: "https://api.openai.com/v1",
             Provider.GITHUB: "https://models.inference.ai.azure.com",
+            Provider.GROQ: "https://api.groq.com/openai/v1",
+            Provider.HEROKU: lazy_import(
+                "codeweaver.providers.embedding.providers.openai_factory", "try_for_heroku_endpoint"
+            ),
             Provider.OLLAMA: "http://localhost:11434/v1",
-            Provider.VERCEL: None,  # Uses OpenAI's URL
-            Provider.HEROKU: None,  # Configured via env vars
+            Provider.OPENAI: "https://api.openai.com/v1",
+            Provider.VERCEL: "https://ai-gateway.vercel.sh/v1",
         }
-        return base_url_map.get(provider)
+        if (value := url_map.get(provider)) and isinstance(value, str):
+            return value
+        return value._resolve()(**kwargs) if value else None  # type: ignore
+
+    # 🔧 NEW: Client Factory Methods
+
+    def collect_env_vars(self, provider: Provider) -> dict[str, str]:
+        """Collect relevant environment variables for a provider.
+
+        Args:
+            provider: The provider to collect env vars for
+
+        Returns:
+            Dictionary mapping environment variable names to their values
+        """
+        import os
+
+        from codeweaver.providers.provider import ProviderEnvVarInfo, ProviderEnvVars
+
+        env_vars: tuple[ProviderEnvVars, ...] | None = provider.other_env_vars
+        if env_vars is None:
+            return {}
+        assembled_vars: dict[str, str] = {}
+        for provider_vars in env_vars:
+            for role, var_info in provider_vars.items():
+                if role == "note":
+                    continue
+                if role == "other":
+                    var_info: dict[str, ProviderEnvVarInfo]
+                    values: list[ProviderEnvVarInfo] = list(var_info.values())
+                    for info in values:
+                        if (var_present := os.getenv(info.env)) and info.env not in (
+                            "HTTPS_PROXY",
+                            "SSL_CERT_FILE",
+                        ):
+                            assembled_vars[info.variable_name or role] = var_present
+                if isinstance(var_info, ProviderEnvVarInfo) and (
+                    var_present := os.getenv(var_info.env)
+                ):
+                    assembled_vars[var_info.variable_name or role] = var_present
+
+        return assembled_vars
+
+    def _create_client_from_map(
+        self,
+        provider: Provider,
+        provider_kind: ProviderKind | str,
+        provider_settings: dict[str, Any] | None,
+        client_options: dict[str, Any] | None,
+    ) -> Any:
+        """Create client instance using CLIENT_MAP from capabilities.
+
+        Args:
+            provider: Provider enum (VOYAGE, OPENAI, QDRANT, etc.)
+            provider_kind: Provider kind (embedding, reranking, vector_store, etc.)
+            provider_settings: Provider-specific auth/config (API keys, endpoints, paths)
+            client_options: User-specified client options (timeout, retries, etc.)
+
+        Returns:
+            Configured client instance ready for use, or None if:
+            - Provider doesn't require a client
+            - Provider is pydantic-ai origin (handled elsewhere)
+            - Client creation should be delegated to provider
+
+        Raises:
+            ConfigurationError: If client creation fails due to missing dependencies
+                or invalid configuration.
+        """
+        from codeweaver.exceptions import ConfigurationError
+        from codeweaver.providers.capabilities import CLIENT_MAP, get_client_map
+
+        # Normalize provider_kind to ProviderKind enum if string
+        if isinstance(provider_kind, str):
+            provider_kind = ProviderKind(provider_kind)
+        if provider not in CLIENT_MAP:
+            logger.debug("No CLIENT_MAP entry for provider '%s'", provider)
+            return None
+        # Get client entries for this provider
+        client_entries = get_client_map(cast(LiteralProvider, provider))
+        if not client_entries:
+            logger.debug("No CLIENT_MAP entry for provider '%s'", provider)
+            return None
+
+        matching_client = next(
+            (client_entry for client_entry in client_entries if client_entry.kind == provider_kind),
+            None,
+        )
+        if not matching_client:
+            logger.debug(
+                "No CLIENT_MAP entry for provider '%s' with kind '%s'", provider, provider_kind
+            )
+            return None
+
+        # Skip pydantic-ai providers - not yet integrated
+        if matching_client.origin == "pydantic-ai":
+            logger.debug(
+                "Provider '%s' (%s) is pydantic-ai origin, skipping client creation",
+                provider,
+                provider_kind,
+            )
+            return None
+
+        # Skip if no client class defined
+        if not matching_client.client:
+            logger.debug("Provider '%s' (%s) has no client class defined", provider, provider_kind)
+            return None
+
+        # Resolve the lazy import to get actual client class
+        try:
+            client_class = matching_client.client._resolve()  # type: ignore
+        except Exception as e:
+            logger.exception(
+                "Failed to resolve client import for provider '%s' (%s)", provider, provider_kind
+            )
+            raise ConfigurationError(
+                f"Provider '{provider}' client import failed. Ensure the required package is installed."
+            ) from e
+
+        # Prepare client options
+        provider_settings = provider_settings or {}
+        opts = self.get_configured_provider_settings(provider_kind)  # type: ignore
+        env_vars = self.collect_env_vars(provider)
+        base_url = self._get_base_url_for_provider(
+            provider, **(provider_settings | env_vars | opts)
+        )
+        if base_url and (
+            "base_url" not in provider_settings or not provider_settings.get("base_url")
+        ):
+            provider_settings |= {"base_url": base_url} | env_vars
+
+        # Create client based on provider type
+        try:
+            return self._instantiate_client(
+                provider, provider_kind, client_class, provider_settings, opts
+            )
+        except Exception as e:
+            logger.exception(
+                "Failed to create client for provider '%s' (%s)", provider, provider_kind
+            )
+            raise ConfigurationError(f"Provider '{provider}' client creation failed: {e}") from e
+
+    def _instantiate_client(
+        self,
+        provider: Provider,
+        provider_kind: ProviderKind,
+        client_class: type[Any],
+        provider_settings: dict[str, Any],
+        client_options: dict[str, Any],
+    ) -> Any:
+        """Instantiate a client with provider-specific configuration.
+
+        Args:
+            provider: Provider enum
+            provider_kind: Provider kind enum
+            client_class: Resolved client class
+            provider_settings: Provider-specific settings
+            client_options: Client options
+
+        Returns:
+            Configured client instance
+        """
+        import os
+
+        # Handle special cases first
+
+        # 1. Boto3 clients (Bedrock)
+        if provider == Provider.BEDROCK:
+            return client_class("bedrock-runtime", **(provider_settings | client_options))
+
+        # 2. Google Gemini
+        if provider == Provider.GOOGLE:
+            api_key = None
+            if provider_settings:
+                api_key = provider_settings.get("api_key")
+            if not api_key:
+                api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+            return client_class(api_key=api_key, **client_options)
+
+        # 3. Qdrant (supports URL, path, or memory)
+        if provider in (Provider.QDRANT, Provider.MEMORY):
+            if provider == Provider.QDRANT:
+                try:
+                    client = client_class(**provider_settings, **client_options)
+                except Exception as e:
+                    logger.warning("Failed to create Qdrant client: %s", e)
+                    logger.info("Falling back to in-memory mode")
+                    return client_class(location=":memory:", **client_options)
+                else:
+                    return client
+            return client_class(location=":memory:", **client_options)
+
+        # 4. Local model libraries (no authentication needed)
+        if provider in (Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS):
+            # These take model name/path in provider_settings, not client_options
+            model_name_or_path = provider_settings.get("model") if provider_settings else None
+            if model_name_or_path:
+                return client_class(model_name=model_name_or_path, **client_options)
+            if (capabilities := self.get_configured_provider_settings(provider_kind)) and (
+                model_settings := capabilities.get("model_settings")
+            ):  # type: ignore
+                model: str = model_settings["model_name"]
+                return client_class(model_name=model, **client_options)
+            # Let provider handle default model selection
+            return client_class(**client_options)
+
+        # 5. Standard API clients with API key authentication
+        # Extract API key from provider_settings or environment
+        api_key = None
+        if provider_settings:
+            api_key = provider_settings.get("api_key")
+
+        # Construct client based on what parameters it accepts
+        import inspect
+
+        sig = inspect.signature(client_class.__init__)
+        all_settings = provider_settings | client_options
+        args, kwargs = (), {}
+        if arg_names := [param.name for param in sig.parameters.values() if param.kind in (0, 2)]:
+            args = (all_settings.get(arg) for arg in arg_names if arg in all_settings)
+        if kwarg_names := [
+            param.name for param in sig.parameters.values() if param.name not in arg_names
+        ]:
+            kwargs = {k: v for k, v in all_settings.items() if k in kwarg_names}
+        return client_class(*args, **kwargs)
+
+    def _create_model_provider_client(
+        self,
+        provider: Provider,
+        provider_settings: dict[str, Any] | None,
+        client_options: dict[str, Any] | None,
+    ) -> Any:
+        """Create client instance for model providers (embedding, sparse, reranking).
+
+        This method is now a thin wrapper around _create_client_from_map.
+
+        Args:
+            provider: Provider enum
+            provider_settings: Provider-specific auth/config
+            client_options: User-specified client options
+
+        Returns:
+            Configured client instance or None
+        """
+        # This will be called from create_provider with the correct provider_kind
+        # We can't determine the kind here, so we return None and let the caller
+        # pass the kind to _create_client_from_map
+        logger.debug(
+            "_create_model_provider_client called but client creation should use _create_client_from_map with explicit provider_kind"
+        )
+        return None
+
+    def _create_vector_store_client(
+        self,
+        provider: Provider,
+        provider_settings: dict[str, Any] | None,
+        client_options: dict[str, Any] | None,
+    ) -> Any:
+        """Create client instance for vector store providers.
+
+        This method is now a thin wrapper around _create_client_from_map.
+
+        Args:
+            provider: Provider enum
+            provider_settings: Provider-specific connection config
+            client_options: User-specified client options
+
+        Returns:
+            Configured client instance or None
+        """
+        return self._create_client_from_map(
+            provider, ProviderKind.VECTOR_STORE, provider_settings, client_options
+        )
 
     def _construct_openai_provider_class(
-        self, provider: Provider, provider_class: LazyImport[type[Any]] | type[Any], **kwargs: Any
-    ) -> type[Any]:
+        self, provider: Provider, factory: Any, **kwargs: Any
+    ) -> Any:
         """Construct the actual provider class from OpenAI factory.
 
         Args:
             provider: The provider enum
-            provider_class: LazyImport or class reference to OpenAIEmbeddingBase
+            factory: LazyImport or class reference to OpenAIEmbeddingBase
             **kwargs: Additional parameters that may contain overrides
 
         Returns:
             The constructed provider class type
         """
         # Resolve LazyImport if needed
-        if isinstance(provider_class, LazyImport):
-            factory_class = provider_class._resolve()  # type: ignore
-        else:
-            factory_class = provider_class
+        factory_class = factory._resolve() if isinstance(factory, LazyImport) else factory  # type: ignore
 
         # Get capabilities for this provider
         capabilities = self._get_capabilities_for_provider(provider)
@@ -502,9 +786,10 @@ class ProviderRegistry(BasedModel):
 
         # Get client if provided
         client: AsyncOpenAI | None = kwargs.get("client")
+        from codeweaver.providers.embedding.providers.openai_factory import OpenAIEmbeddingBase
 
         # Call the factory method to construct the provider class
-        return factory_class.get_provider_class(
+        return cast(OpenAIEmbeddingBase, factory_class).get_provider_class(
             model_name=model_name,
             provider=provider,
             capabilities=capabilities,
@@ -641,6 +926,30 @@ class ProviderRegistry(BasedModel):
             retrieved_cls = self.get_provider_class(provider, provider_kind)
         if self._is_literal_data_kind(provider_kind):
             retrieved_cls = self.get_provider_class(provider, provider_kind)  # type: ignore
+
+        # 🔧 NEW: Create client instance if not provided
+        if "client" not in kwargs:
+            # Extract settings for client creation
+            provider_settings = kwargs.get("provider_settings")
+            client_options = kwargs.get("client_options")
+
+            # Create appropriate client using CLIENT_MAP
+            try:
+                client = self._create_client_from_map(
+                    provider, provider_kind, provider_settings, client_options
+                )
+                if client is not None:
+                    kwargs["client"] = client
+                    logger.debug(
+                        "Created client for %s provider (kind: %s)", provider, provider_kind
+                    )
+            except Exception as e:
+                logger.warning(
+                    "Client creation failed for %s provider (kind: %s): %s. Provider may handle client internally.",
+                    provider,
+                    provider_kind,
+                    e,
+                )
 
         # Special handling for embedding provider (has different logic)
         if provider_kind in (ProviderKind.EMBEDDING, "embedding"):
@@ -1008,6 +1317,7 @@ class ProviderRegistry(BasedModel):
         for cap in load_default_capabilities():
             if cap.name == model_name and cap.provider == provider:
                 return cap
+
         if provider.name in ("SENTENCE_TRANSFORMERS", "FASTEMBED"):
             from codeweaver.providers.embedding.capabilities.base import get_sparse_caps
 
@@ -1114,6 +1424,7 @@ class ProviderRegistry(BasedModel):
     def get_configured_provider_settings(
         self, provider_kind: Literal[ProviderKind.RERANKING, "reranking"]
     ) -> DictView[RerankingProviderSettings]: ...
+
     @overload
     def get_configured_provider_settings(
         self, provider_kind: LiteralVectorStoreKinds

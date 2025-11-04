@@ -18,7 +18,6 @@ import logging
 from typing import TYPE_CHECKING, Any, NoReturn
 
 from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
-from codeweaver.common.registry import get_provider_registry
 from codeweaver.providers.embedding.types import QueryResult
 
 
@@ -42,16 +41,20 @@ def raise_value_error(message: str) -> NoReturn:
 async def embed_query(query: str) -> QueryResult:
     """Embed query using configured embedding providers.
 
+    Tries dense embedding first, then sparse. Returns result with whichever
+    succeeded. If both fail, raises ValueError.
+
     Args:
-        query: Natural language query string
+        query: Natural language query to embed
 
     Returns:
-        Tuple of (dense_embedding, sparse_embedding), either can be None
+        QueryResult with dense and/or sparse embeddings
 
     Raises:
         ValueError: If no embedding providers configured or both fail
     """
     from codeweaver.providers.embedding.types import QueryResult
+    from codeweaver.common.registry import get_provider_registry  # Lazy import
 
     registry = get_provider_registry()
     global _query_
@@ -82,8 +85,7 @@ async def embed_query(query: str) -> QueryResult:
         except Exception as e:
             logger.warning("Dense embedding failed: %s", e)
             if not sparse_provider_enum:
-                # No fallback available - must fail
-                raise ValueError("Dense embedding failed and no sparse provider available") from e
+                return raise_value_error(f"Dense embedding failed: {e}")
 
     # Sparse embedding
     sparse_query_embedding = None
@@ -96,15 +98,24 @@ async def embed_query(query: str) -> QueryResult:
             # Check for embedding error
             if isinstance(result, dict) and "error" in result:
                 logger.warning("Sparse embedding returned error: %s", result.get("error"))
+                if not dense_query_embedding:
+                    return raise_value_error(
+                        "Sparse embedding returned error and dense embedding unavailable"
+                    )
             else:
                 sparse_query_embedding = result
         except Exception as e:
-            logger.warning("Sparse embedding failed, continuing with dense only: %s", e)
-    # EmbeddingProvider returns batch results - we haven't implemented batch queries yet
-    # So we unwrap the first element from the list for both dense and sparse embeddings
+            logger.warning("Sparse embedding failed: %s", e)
+            if not dense_query_embedding:
+                return raise_value_error(f"Sparse embedding failed: {e}")
+
+    # Return whatever we got (at least one must have succeeded)
+    if dense_query_embedding is None and sparse_query_embedding is None:
+        return raise_value_error("Both dense and sparse embedding failed")
+
     return QueryResult(
-        dense=dense_query_embedding[0] if dense_query_embedding else None,
-        sparse=sparse_query_embedding,
+        dense_query_embedding=dense_query_embedding,
+        sparse_query_embedding=sparse_query_embedding,
     )
 
 
@@ -145,7 +156,7 @@ def build_query_vector(query_result: QueryResult, query: str) -> StrategizedQuer
 
 
 async def execute_vector_search(query_vector: StrategizedQuery) -> list[SearchResult]:
-    """Execute vector search using configured vector store.
+    """Execute vector search against configured vector store.
 
     Args:
         query_vector: Query vector (dense, sparse, or hybrid)
@@ -156,6 +167,8 @@ async def execute_vector_search(query_vector: StrategizedQuery) -> list[SearchRe
     Raises:
         ValueError: If no vector store provider configured
     """
+    from codeweaver.common.registry import get_provider_registry  # Lazy import
+
     registry = get_provider_registry()
     vector_store_enum = registry.get_provider_enum_for("vector_store")
     if not vector_store_enum:
@@ -177,8 +190,8 @@ async def rerank_results(
     """Rerank search results using configured reranking provider.
 
     Args:
-        query: Original query string
-        candidates: Search results to rerank
+        query: Original search query
+        candidates: Initial search results to rerank
 
     Returns:
         Tuple of (reranked_results, strategy) where:
@@ -186,6 +199,7 @@ async def rerank_results(
         - strategy is SEMANTIC_RERANK if successful, None otherwise
     """
     from codeweaver.core.chunks import CodeChunk
+    from codeweaver.common.registry import get_provider_registry  # Lazy import
 
     registry = get_provider_registry()
     reranking_enum = registry.get_provider_enum_for("reranking")
@@ -202,13 +216,12 @@ async def rerank_results(
             return None, None
 
         reranked_results = await reranking.rerank(query, chunks_for_reranking)
-        logger.info("Reranked to %d candidates", len(reranked_results))
+        logger.info("Reranked %d results", len(reranked_results) if reranked_results else 0)
+        return reranked_results, SearchStrategy.SEMANTIC_RERANK
 
     except Exception as e:
-        logger.warning("Reranking failed, continuing without: %s", e)
+        logger.warning("Reranking failed: %s, using unranked results", e)
         return None, None
-    else:
-        return reranked_results, SearchStrategy.SEMANTIC_RERANK
 
 
 __all__ = (

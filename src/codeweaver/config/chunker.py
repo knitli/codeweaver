@@ -20,7 +20,6 @@ from codeweaver.core.types.aliases import LanguageNameT
 from codeweaver.core.types.models import FROZEN_BASEDMODEL_CONFIG, BasedModel
 
 
-# Lazy imports to avoid circular dependency with engine.chunker
 if TYPE_CHECKING:
     from codeweaver.engine.chunker.delimiters import DelimiterPattern, LanguageFamily
 
@@ -251,15 +250,15 @@ class ChunkerSettings(BasedModel):
     @classmethod
     def _ensure_models_rebuilt(cls) -> None:
         """Ensure forward references are resolved before first use."""
-        if not cls.__pydantic_complete__:
-            # Import the actual types now (after module initialization)
-            from codeweaver.engine.chunker.delimiters import DelimiterPattern, LanguageFamily
+        # Import the actual types now (after module initialization)
+        from codeweaver.engine.chunker.delimiters import DelimiterPattern, LanguageFamily
 
-            # Pass the types to model_rebuild so Pydantic can resolve string annotations
-            namespace = {"DelimiterPattern": DelimiterPattern, "LanguageFamily": LanguageFamily}
-            _ = cls.model_rebuild(_types_namespace=namespace)
-            _ = CustomLanguage.model_rebuild(_types_namespace=namespace)
-            _ = CustomDelimiter.model_rebuild(_types_namespace=namespace)
+        # Pass the types to model_rebuild so Pydantic can resolve string annotations
+        namespace = {"DelimiterPattern": DelimiterPattern, "LanguageFamily": LanguageFamily}
+        _ = cls.model_rebuild(_types_namespace=namespace)
+        _ = CustomLanguage.model_rebuild(_types_namespace=namespace)
+        _ = CustomDelimiter.model_rebuild(_types_namespace=namespace)
+        _ = cls.model_rebuild()
 
     def model_post_init(self, /, __context: Any) -> None:
         """Post-initialization hook."""
@@ -268,19 +267,12 @@ class ChunkerSettings(BasedModel):
         super().model_post_init(__context)
 
 
-# Rebuild models at module level to resolve forward references
-# This ensures models are ready before first instantiation
-try:
-    ChunkerSettings._ensure_models_rebuilt()  # type: ignore
-except Exception:
-    # If rebuild fails during import, models will be rebuilt on first use via model_post_init
-    logger.warning(
-        "Failed to rebuild ChunkerSettings models at import time. Will retry on first use."
-    )
-
-
 DefaultChunkerSettings = ChunkerSettingsDict(
-    ChunkerSettings().model_dump(exclude_none=True, exclude_computed_fields=True)  # type: ignore
+    custom_delimiters=None,
+    custom_languages=None,
+    semantic_importance_threshold=0.3,
+    performance={},
+    concurrency={},
 )
 
 __all__ = (

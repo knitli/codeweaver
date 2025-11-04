@@ -18,10 +18,11 @@ from typing import Any, ClassVar, cast, override
 from pydantic import UUID7
 from typing_extensions import TypeIs
 
+from codeweaver.agent_api.find_code.results import SearchResult
 from codeweaver.agent_api.find_code.types import StrategizedQuery
 from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.providers import MemoryConfig
-from codeweaver.core.chunks import CodeChunk, SearchResult
+from codeweaver.core.chunks import CodeChunk
 from codeweaver.engine.filter import Filter
 from codeweaver.exceptions import PersistenceError, ProviderError
 from codeweaver.providers.provider import Provider
@@ -322,15 +323,10 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
                 # Qdrant sparse vector format requires indices and values
                 # sparse_embeddings.embeddings is a tuple of (indices, values) for sparse
                 sparse = chunk.sparse_embeddings
-                if isinstance(sparse.embeddings, tuple) and len(sparse.embeddings) == 2:
-                    # New format: tuple of (indices, values)
-                    indices, values = sparse.embeddings
-                    from qdrant_client.http.models import SparseVector
+                indices, values = sparse.embeddings
+                from qdrant_client.http.models import SparseVector
 
-                    vectors["sparse"] = SparseVector(indices=list(indices), values=list(values))
-                else:
-                    # Old format: flat list (for backward compatibility during migration)
-                    vectors["sparse"] = list(sparse.embeddings)
+                vectors["sparse"] = SparseVector(indices=list(indices), values=list(values))
 
             payload = HybridVectorPayload(
                 chunk=chunk,

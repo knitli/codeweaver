@@ -52,7 +52,7 @@ def create_test_chunk(
 
     chunk_id = uuid7()
     [0.1] * dense_dim
-    models.SparseVector(indices=list(range(sparse_indices)), values=[0.5] * sparse_indices)
+    _ = models.SparseVector(indices=list(range(sparse_indices)), values=[0.5] * sparse_indices)
 
     return CodeChunk(
         chunk_id=chunk_id,

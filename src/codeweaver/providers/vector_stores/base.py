@@ -13,14 +13,14 @@ import time
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import Any, ClassVar, Literal, TypedDict
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypedDict
 
-from pydantic import UUID7, ConfigDict
+from pydantic import UUID7, ConfigDict, PrivateAttr
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 from typing_extensions import TypeIs
 
 from codeweaver.agent_api.find_code.types import StrategizedQuery
-from codeweaver.core.chunks import CodeChunk, SearchResult
+from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.models import BasedModel
 from codeweaver.engine.filter import Filter
 from codeweaver.providers.embedding.capabilities.base import (
@@ -28,6 +28,10 @@ from codeweaver.providers.embedding.capabilities.base import (
     SparseEmbeddingModelCapabilities,
 )
 from codeweaver.providers.provider import Provider
+
+
+if TYPE_CHECKING:
+    from codeweaver.agent_api.find_code.results import SearchResult
 
 
 logger = logging.getLogger(__name__)
@@ -79,6 +83,13 @@ def _get_caps(
     return None
 
 
+def _default_embedding_caps() -> EmbeddingCapsDict:
+    """Default factory for embedding capabilities. Evaluated lazily at instance creation."""
+    return EmbeddingCapsDict(
+        dense=_get_caps(), sparse=_get_caps(sparse=True)
+    )
+
+
 class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
     """Abstract interface for vector storage providers."""
 
@@ -86,9 +97,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
 
     config: Any = None  # Provider-specific configuration object
     _client: VectorStoreClient | None
-    _embedding_caps: EmbeddingCapsDict = EmbeddingCapsDict(
-        dense=_get_caps(), sparse=_get_caps(sparse=True)
-    )
+    _embedding_caps: EmbeddingCapsDict = PrivateAttr(default_factory=_default_embedding_caps)
 
     _provider: ClassVar[Provider] = Provider.NOT_SET
 

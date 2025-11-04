@@ -89,7 +89,7 @@ try:
     from openai.types.create_embedding_response import CreateEmbeddingResponse
 except ImportError as _import_error:
     raise ConfigurationError(
-        'Please install the `openai` package to use the OpenAI provider, \nyou can use the `openai` optional group — `pip install "codeweaver[openai]"`'
+        'Please install the `openai` package to use the OpenAI provider, \nyou can use the `openai` optional group — `pip install "codeweaver[provider-openai]"`'
     ) from _import_error
 
 

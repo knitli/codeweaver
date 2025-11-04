@@ -45,6 +45,7 @@ from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BasedModel
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.registry import EmbeddingRegistry
+from codeweaver.providers.embedding.types import SparseEmbedding
 from codeweaver.providers.provider import Provider
 from codeweaver.tokenizers import Tokenizer, get_tokenizer
 
@@ -55,7 +56,6 @@ if TYPE_CHECKING:
     from codeweaver.common.statistics import SessionStatistics
     from codeweaver.core.chunks import CodeChunk, SerializedCodeChunk, StructuredDataInput
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
-    from codeweaver.providers.embedding.types import SparseEmbedding
 
 
 _get_statistics: LazyImport[SessionStatistics] = lazy_import(
@@ -714,9 +714,6 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
 class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC):
     """Abstract class for sparse embedding providers."""
-
-    from codeweaver.core.chunks import StructuredDataInput
-    from codeweaver.providers.embedding.types import SparseEmbedding
 
     @abstractmethod
     @override
