@@ -133,6 +133,14 @@ class ProviderError(CodeWeaverError):
     """
 
 
+class ModelSwitchError(ProviderError):
+    """Model switching detection error.
+
+    Raised when the system detects that the embedding model has changed
+    from what was used to create the existing vector store collection.
+    """
+
+
 class RerankingProviderError(ProviderError):
     """Reranking provider errors.
 

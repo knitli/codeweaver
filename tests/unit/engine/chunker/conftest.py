@@ -31,7 +31,7 @@ namespace = {
     "CodeChunk": CodeChunk,
 }
 # Ensure ChunkerSettings models are rebuilt first
-ChunkerSettings._ensure_models_rebuilt()
+ChunkerSettings.model_rebuild()
 # Then rebuild ChunkGovernor and CodeChunk with full namespace
 ChunkGovernor.model_rebuild(_types_namespace=namespace)
 CodeChunk.model_rebuild(_types_namespace=namespace)

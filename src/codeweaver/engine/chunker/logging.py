@@ -12,6 +12,8 @@ architecture spec §9.3:
 - Edge case events: chunking_edge_case
 """
 
+from __future__ import annotations
+
 import logging
 
 from pathlib import Path

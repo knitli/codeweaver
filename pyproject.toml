@@ -584,6 +584,7 @@ markers = [
   "slow: Tests that take a significant amount of time to run",
   "performance: Performance-related tests",
   # External dependencies
+  "real_providers: Tests that require real provider configurations",
   "network: Tests that require network access",
   "external_api: Tests that interact with external APIs",
   "voyageai: Tests that require VoyageAI API access",
@@ -599,6 +600,7 @@ markers = [
   "telemetry: Tests related to telemetry and metrics",
   "mcp: Tests related to MCP protocol functionality",
   "services: Tests related to services layer",
+  "server: Tests related to server functionality",
   # Test types
   "parametrize: Parametrized tests with multiple test cases",
   "fixtures: Tests that heavily rely on pytest fixtures",

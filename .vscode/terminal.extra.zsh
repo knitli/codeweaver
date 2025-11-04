@@ -11,7 +11,6 @@
 
 setup_env() {
   zsh -c "mise -q -y run update-tools &> /dev/null &" &
-  mise -q -y en --shell zsh .
   print -P "%F{209}[codeweaver]%f %F{148}All done on our end!%f We're going to re-init your local environment, so it may take a moment depending on your setup. You're good to go once you get your terminal back. Happy coding!"
 }
 
@@ -19,7 +18,7 @@ full_setup() {
   mise -q -y trust || {
     print -P "%F{209}[codeweaver]%f %F{red}Failed to trust the Mise environment!%f"
   }
-  setup_env
+  mise run setup
   # Skip 'mise run setup' to avoid circular activation
 }
 
@@ -45,5 +44,3 @@ else
     }
     full_setup
 fi
-# Mise activation already handled above, no need to repeat
-# This prevents double-activation which could cause loops

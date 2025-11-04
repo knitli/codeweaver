@@ -248,8 +248,13 @@ class ChunkerSettings(BasedModel):
         return None
 
     @classmethod
-    def _ensure_models_rebuilt(cls) -> None:
-        """Ensure forward references are resolved before first use."""
+    def ensure_models_rebuilt(cls) -> None:
+        """Ensure forward references are resolved before first use.
+
+        This method must be called at module level after all class definitions
+        to resolve forward references to LanguageFamily and DelimiterPattern types
+        used in CustomLanguage and CustomDelimiter models.
+        """
         # Import the actual types now (after module initialization)
         from codeweaver.engine.chunker.delimiters import DelimiterPattern, LanguageFamily
 
@@ -274,6 +279,11 @@ DefaultChunkerSettings = ChunkerSettingsDict(
     performance={},
     concurrency={},
 )
+
+# Resolve forward references after all model definitions are complete
+# This ensures LanguageFamily and DelimiterPattern types are properly resolved
+# See: https://docs.pydantic.dev/2.12/api/base_model/#pydantic.main.BaseModel.model_rebuild
+ChunkerSettings.ensure_models_rebuilt()
 
 __all__ = (
     "ChunkerSettings",

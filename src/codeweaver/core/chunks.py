@@ -47,13 +47,13 @@ from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.metadata import ChunkSource, ExtKind, Metadata, determine_ext_kind
 from codeweaver.core.spans import Span, SpanTuple
 from codeweaver.core.stores import BlakeHashKey
-from codeweaver.core.types import BasedModel, LanguageNameT
+from codeweaver.core.types import BasedModel, FilteredKeyT, LanguageNameT
 from codeweaver.core.utils import truncate_text
 
 
 if TYPE_CHECKING:
     from codeweaver.core.discovery import DiscoveredFile
-    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
+    from codeweaver.core.types import AnonymityConversion
     from codeweaver.providers.embedding.registry import EmbeddingRegistry
     from codeweaver.providers.embedding.types import EmbeddingBatchInfo
     from codeweaver.tokenizers.base import Tokenizer

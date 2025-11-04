@@ -568,7 +568,7 @@ class FileStatistics(DataclassSerializationMixin):
         set()
     )
 
-    def _telemetry_keys(self):
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {FilteredKey("_other_files"): AnonymityConversion.COUNT}

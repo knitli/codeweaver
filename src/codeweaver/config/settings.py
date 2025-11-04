@@ -396,7 +396,12 @@ class CodeWeaverSettings(BaseSettings):
             result = type(self).model_rebuild()
             logger.debug("Rebuilt CodeWeaverSettings during post-init, result: %s", result)
         if type(self).__pydantic_complete__:
-            self._map = cast(DictView[CodeWeaverSettingsDict], DictView(self.model_dump()))
+            # Exclude computed fields to prevent circular dependency during initialization
+            # Computed fields like IndexingSettings.cache_dir may call get_settings()
+            self._map = cast(
+                DictView[CodeWeaverSettingsDict],
+                DictView(self.model_dump(mode="python", exclude_computed_fields=True)),
+            )
             globals()["_mapped_settings"] = self._map
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:

@@ -14,6 +14,7 @@ from typing import get_type_hints
 
 import pytest
 
+from codeweaver.agent_api.find_code.results import SearchResult
 from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
 
@@ -64,7 +65,10 @@ class TestVectorStoreProviderContract:
         """Verify search method signature matches contract."""
         method = VectorStoreProvider.search
         sig = inspect.signature(method)
-        _ = get_type_hints(method)
+
+        # Get type hints with SearchResult in localns to resolve forward reference
+        localns = {"SearchResult": SearchResult}
+        _ = get_type_hints(method, localns=localns)
 
         # Should have vector and query_filter parameters
         params = {p.name: p for p in sig.parameters.values() if p.name != "self"}
@@ -94,8 +98,7 @@ class TestVectorStoreProviderContract:
         assert inspect.iscoroutinefunction(method), "upsert must be async"
 
         # Should return None
-        type_hints.get("return")
-        # Type checking for None is tricky, just verify it exists
+        assert type_hints.get("return") is type(None), "upsert should return None"
 
     def test_delete_by_file_signature(self):
         """Verify delete_by_file method signature matches contract."""

@@ -214,8 +214,8 @@ class MemoryConfig(TypedDict, total=False):
     """Path for JSON persistence file. Defaults to {system_user_config}/codeweaver/{project_name}_vector_store.json."""
     auto_persist: NotRequired[bool]
     """Automatically save after operations. Defaults to True."""
-    persist_interval: NotRequired[PositiveInt]
-    """Periodic persist interval in seconds. Defaults to 300 (5 minutes)."""
+    persist_interval: NotRequired[PositiveInt | None]
+    """Periodic persist interval in seconds. Defaults to 300 (5 minutes). Set to None to disable periodic persistence."""
     collection_name: NotRequired[str]
     """Collection name override. Defaults to project name if not specified."""
 

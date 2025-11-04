@@ -8,6 +8,8 @@
 The agent package is a thin wrapper around Pydantic AI's agent capabilities, aligning its organization and naming conventions with CodeWeaver's architecture.
 """
 
+from __future__ import annotations
+
 from collections.abc import Callable
 from typing import Any
 

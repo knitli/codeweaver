@@ -13,7 +13,7 @@ from pydantic import Field, PositiveInt
 
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.models import BasedModel
-from codeweaver.exceptions import DimensionMismatchError, ProviderSwitchError
+from codeweaver.exceptions import DimensionMismatchError, ModelSwitchError
 
 
 if TYPE_CHECKING:
@@ -55,53 +55,59 @@ class CollectionMetadata(BasedModel):
     """Metadata stored with collections for validation and compatibility checks."""
 
     provider: Annotated[str, Field(description="Provider name that created collection")]
-    version: Annotated[str, Field(description="Metadata schema version")]
     created_at: Annotated[datetime, Field(default_factory=lambda: datetime.now(UTC))]
-    embedding_dim_dense: Annotated[
-        PositiveInt, Field(description="Expected dense embedding dimension")
-    ]
-    embedding_dim_sparse: Annotated[
-        int | None, Field(default=None, description="Max sparse embedding dimension")
-    ]
-    embedding_model: Annotated[str, Field(description="Embedding model name used")]
-    sparse_embedding_model: Annotated[
-        str | None, Field(default=None, description="Sparse embedding model name used")
-    ]
     project_name: Annotated[str, Field(description="Project/repository name")]
     vector_config: Annotated[dict[str, Any], Field(description="Vector configuration snapshot")]
+    embedding_dtype_dense: Annotated[
+        str, Field(description="Data type of dense embeddings, e.g., 'float32'")
+    ] = "float32"
+    embedding_dim_dense: Annotated[
+        PositiveInt | None, Field(description="Expected dense embedding dimension")
+    ] = None
 
-    def validate_compatibility(
-        self, current_provider: str, expected_dense_dim: int, expected_sparse_dim: int | None = None
-    ) -> None:
+    embedding_model: Annotated[str | None, Field(description="Embedding model name used")] = None
+    sparse_embedding_model: Annotated[
+        str | None, Field(description="Sparse embedding model name used")
+    ] = None
+    collection_name: Annotated[str, Field(description="Name of the collection")] = ""
+
+    version: Annotated[str, Field(description="Metadata schema version")] = "1.0.0"
+
+    def validate_compatibility(self, other: CollectionMetadata) -> None:
         """Validate collection metadata against current provider configuration.
 
         Args:
-            current_provider: Current provider name
-            expected_dense_dim: Expected dense embedding dimension
-            expected_sparse_dim: Expected sparse embedding dimension (optional)
+            other: Other collection metadata to compare against
 
         Raises:
             ProviderSwitchError: If provider doesn't match collection metadata
             DimensionMismatchError: If embedding dimensions don't match
         """
-        if self.provider != current_provider:
-            raise ProviderSwitchError(
-                f"Collection was created with '{self.provider}' provider, but current configuration uses '{current_provider}'",
+        if self.embedding_model and self.embedding_model != other.embedding_model:
+            raise ModelSwitchError(
+                f"Your existing embedding collection was created with model '{other.embedding_model}', but the current model is '{self.embedding_model}'. You can't use different embedding models for the same collection.",
                 suggestions=[
-                    "Option 1: Re-index your codebase with the current provider",
+                    "Option 1: Re-index your codebase with the new provider",
                     "Option 2: Revert provider setting to match the collection",
                     "Option 3: Delete the existing collection and re-index",
+                    "Option 4: Create a new collection with a different name",
                 ],
                 details={
                     "collection_provider": self.provider,
-                    "current_provider": current_provider,
+                    "current_provider": other.provider,
+                    "collection_model": other.embedding_model,
+                    "current_model": self.embedding_model,
                     "collection": self.project_name,
                 },
             )
 
-        if self.embedding_dim_dense != expected_dense_dim:
+        if (
+            self.embedding_dim_dense
+            and other.embedding_dim_dense
+            and self.embedding_dim_dense != other.embedding_dim_dense
+        ):
             raise DimensionMismatchError(
-                f"Embedding dimension mismatch: collection expects {self.embedding_dim_dense}, but current embedder produces {expected_dense_dim}",
+                f"Embedding dimension mismatch: collection expects {other.embedding_dim_dense}, but current embedder produces {self.embedding_dim_dense}.",
                 suggestions=[
                     "Option 1: Use an embedding model with matching dimensions",
                     "Option 2: Re-index with the current embedding model",
@@ -114,23 +120,11 @@ class CollectionMetadata(BasedModel):
                 },
             )
 
-        if (
-            expected_sparse_dim
-            and self.embedding_dim_sparse
-            and self.embedding_dim_sparse != expected_sparse_dim
-        ):
-            raise DimensionMismatchError(
-                f"Sparse embedding dimension mismatch: collection expects {self.embedding_dim_sparse}, but current embedder produces {expected_sparse_dim}",
-                suggestions=[
-                    "Option 1: Use a sparse embedding model with matching dimensions",
-                    "Option 2: Re-index with the current sparse embedding model",
-                ],
-                details={
-                    "expected_sparse_dimension": self.embedding_dim_sparse,
-                    "actual_sparse_dimension": expected_sparse_dim,
-                    "collection": self.project_name,
-                },
-            )
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        from codeweaver.core.types.aliases import FilteredKey
+        from codeweaver.core.types.enum import AnonymityConversion
+
+        return {FilteredKey("project_name"): AnonymityConversion.HASH}
 
 
 __all__ = ("CollectionMetadata", "HybridVectorPayload")

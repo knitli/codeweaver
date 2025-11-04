@@ -79,6 +79,7 @@ echo "Environment deactivated."
 [tasks]
 [tasks.sync]
 depends = ["source"]
+tools.uv = "latest"
 run = '''
 #!/bin/bash
 echo "Syncing dependencies..."
@@ -95,7 +96,6 @@ uv sync --extra all --group all-dev -U
 '''
 
 [tasks.source]
-tools.git = "latest"
 run = '''
 #!/usr/bin/env zsh
 # Source the virtual environment
@@ -171,6 +171,7 @@ hk check
 '''
 
 [tasks.lint]
+tools.uv = "latest"
 run = '''
 #!/bin/bash
 echo "Running linting checks..."
@@ -189,6 +190,7 @@ hk check
 '''
 
 [tasks.format-fix]
+tools."cargo:rust-parallel" = "latest"
 run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Applying formatting...hold onto your butts 🚬...🦖 "
@@ -201,7 +203,7 @@ if [ -n "$files" ]; then
 fi
 files="$(git ls-files "*.toml" 2>/dev/null)"
 if [ -n "$files" ]; then
-    taplo format --in-place $files 2>/dev/null || true
+    tombi format $files 2>/dev/null || true
 fi
 '''
 
@@ -302,16 +304,14 @@ npm exec changeset version
 
 # Combined workflows
 [tasks.ci]
-run = '''
-#!/usr/bin/env zsh
-print -P "%F{209}[codeweaver]%f Running full CI pipeline locally..."
-mise run check &&
-mise run lint &&
-mise run format &&
-mise run test-cov &&
-mise run build &&
-print -P "%F{209}[codeweaver]%f ✅ All CI checks passed!"
-'''
+run = [
+  "mise run check",
+  "mise run lint",
+  "mise run format",
+  "mise run test-cov",
+  "mise run build"
+]
+description = "Run all CI checks."
 
 [tasks.pre-commit]
 run = '''

@@ -189,6 +189,40 @@ class ProviderRegistry(BasedModel):
             cls._instance = cls()
         return cls._instance
 
+    @property
+    def _registry_map(
+        self,
+    ) -> dict[
+        ProviderKind | str,
+        tuple[
+            MutableMapping[
+                Provider,
+                type[EmbeddingProvider[Any] | SparseEmbeddingProvider[Any] | RerankingProvider[Any] | VectorStoreProvider[Any] | AgentProvider[Any] | Any] | LazyImport[type[EmbeddingProvider[Any]]] | LazyImport[type[SparseEmbeddingProvider[Any]]] | LazyImport[type[RerankingProvider[Any]]] | LazyImport[type[VectorStoreProvider[Any]]] | LazyImport[type[AgentProvider[Any]]] | LazyImport[type[Any]],
+            ],
+            str,
+        ],
+    ]:
+        """Map provider kinds to their runtime registries and human-readable names.
+
+        Returns mapping of provider kind to (registry, kind_name) tuples where:
+        - registry: The mutable mapping storing provider implementations
+        - kind_name: Human-readable name for error messages
+        """
+        return {
+            ProviderKind.EMBEDDING: (self._embedding_providers, "Embedding"),
+            "embedding": (self._embedding_providers, "Embedding"),
+            ProviderKind.SPARSE_EMBEDDING: (self._sparse_embedding_providers, "Sparse embedding"),
+            "sparse_embedding": (self._sparse_embedding_providers, "Sparse embedding"),
+            ProviderKind.RERANKING: (self._reranking_providers, "Reranking"),
+            "reranking": (self._reranking_providers, "Reranking"),
+            ProviderKind.VECTOR_STORE: (self._vector_store_providers, "Vector store"),
+            "vector_store": (self._vector_store_providers, "Vector store"),
+            ProviderKind.AGENT: (self._agent_providers, "Agent"),
+            "agent": (self._agent_providers, "Agent"),
+            ProviderKind.DATA: (self._data_providers, "Data"),
+            "data": (self._data_providers, "Data"),
+        }
+
     def _is_literal_data_kind(self, kind: Any) -> TypeIs[Literal[ProviderKind.DATA, "data"]]:
         """Check if the kind is a data provider kind."""
         return kind in (ProviderKind.DATA, "data")
@@ -811,7 +845,7 @@ class ProviderRegistry(BasedModel):
             ConfigurationError: If provider is not registered
         """
         if self._is_any_provider_kind(provider_kind):
-            registry, kind_name = self._provider_map[provider_kind]
+            registry, kind_name = self._registry_map[provider_kind]
             if provider not in registry:
                 raise ConfigurationError(f"{kind_name} provider '{provider}' is not registered")
             return registry[provider]
@@ -904,7 +938,7 @@ class ProviderRegistry(BasedModel):
         # Special handling for embedding provider (has different logic)
         if provider_kind in (ProviderKind.EMBEDDING, "embedding"):
             # Check if this is an OpenAI factory that needs construction
-            if self._is_openai_factory(provider, providerkind):
+            if self._is_openai_factory(provider, provider_kind):
                 retrieved_cls = self._construct_openai_provider_class(
                     provider, retrieved_cls, **kwargs
                 )

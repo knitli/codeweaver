@@ -18,13 +18,13 @@ from pydantic.dataclasses import dataclass
 
 from codeweaver.core.file_extensions import COMMON_TOOLING_PATHS, TEST_DIR_NAMES
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
-from codeweaver.core.types.aliases import LiteralStringT
+from codeweaver.core.types.aliases import FilteredKeyT, LiteralStringT
 from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
+    from codeweaver.core.types import AnonymityConversion
     from codeweaver.engine.discovery import FileDiscoveryService
 
 _discovery: FileDiscoveryService | None = None
@@ -157,6 +157,7 @@ class RepoDirectory(DataclassSerializationMixin):
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types.aliases import FilteredKey
+        from codeweaver.core.types.enum import AnonymityConversion
 
         return {
             FilteredKey("path"): AnonymityConversion.HASH,
