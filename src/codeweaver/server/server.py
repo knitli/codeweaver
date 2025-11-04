@@ -373,6 +373,13 @@ async def lifespan(
         state.initialized = False
         raise
     finally:
+        # Shutdown telemetry client to flush pending events
+        if state.telemetry:
+            try:
+                state.telemetry.shutdown()
+            except Exception:
+                logger.exception("Error shutting down telemetry client")
+        
         # TODO: Add state caching/saving and cleanup logic here
         console.print(
             f"{CODEWEAVER_PREFIX} [bold red]Exiting CodeWeaver lifespan context manager...[/bold red]"
