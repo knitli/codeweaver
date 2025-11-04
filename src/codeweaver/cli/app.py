@@ -146,7 +146,7 @@ async def search(
 
 
 @app.command
-async def config(
+def config(
     *,
     show: bool = False,
     project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,

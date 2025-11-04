@@ -455,9 +455,7 @@ class ProviderRegistry(BasedModel):
         # Fallback to capabilities
         return capabilities.name
 
-    def _get_base_url_for_provider(
-        self, provider: Provider, **kwargs: Any
-    ) -> str | LazyImport[Callable[[Mapping[str, Any]], str]] | None:
+    def _get_base_url_for_provider(self, provider: Provider, **kwargs: Any) -> str | None:
         """Map Provider enum to default base URLs.
 
         Args:
@@ -642,22 +640,11 @@ class ProviderRegistry(BasedModel):
         Returns:
             Configured client instance
         """
-        import os
-
         # Handle special cases first
 
         # 1. Boto3 clients (Bedrock)
         if provider == Provider.BEDROCK:
             return client_class("bedrock-runtime", **(provider_settings | client_options))
-
-        # 2. Google Gemini
-        if provider == Provider.GOOGLE:
-            api_key = None
-            if provider_settings:
-                api_key = provider_settings.get("api_key")
-            if not api_key:
-                api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-            return client_class(api_key=api_key, **client_options)
 
         # 3. Qdrant (supports URL, path, or memory)
         if provider in (Provider.QDRANT, Provider.MEMORY):
@@ -686,51 +673,13 @@ class ProviderRegistry(BasedModel):
             # Let provider handle default model selection
             return client_class(**client_options)
 
-        # 5. Standard API clients with API key authentication
-        # Extract API key from provider_settings or environment
-        api_key = None
-        if provider_settings:
-            api_key = provider_settings.get("api_key")
-
         # Construct client based on what parameters it accepts
-        import inspect
+        from codeweaver.common.utils.utils import set_args_on_signature
 
-        sig = inspect.signature(client_class.__init__)
-        all_settings = provider_settings | client_options
-        args, kwargs = (), {}
-        if arg_names := [param.name for param in sig.parameters.values() if param.kind in (0, 2)]:
-            args = (all_settings.get(arg) for arg in arg_names if arg in all_settings)
-        if kwarg_names := [
-            param.name for param in sig.parameters.values() if param.name not in arg_names
-        ]:
-            kwargs = {k: v for k, v in all_settings.items() if k in kwarg_names}
-        return client_class(*args, **kwargs)
-
-    def _create_model_provider_client(
-        self,
-        provider: Provider,
-        provider_settings: dict[str, Any] | None,
-        client_options: dict[str, Any] | None,
-    ) -> Any:
-        """Create client instance for model providers (embedding, sparse, reranking).
-
-        This method is now a thin wrapper around _create_client_from_map.
-
-        Args:
-            provider: Provider enum
-            provider_settings: Provider-specific auth/config
-            client_options: User-specified client options
-
-        Returns:
-            Configured client instance or None
-        """
-        # This will be called from create_provider with the correct provider_kind
-        # We can't determine the kind here, so we return None and let the caller
-        # pass the kind to _create_client_from_map
-        logger.debug(
-            "_create_model_provider_client called but client creation should use _create_client_from_map with explicit provider_kind"
+        args, kwargs = set_args_on_signature(
+            client_class, kwargs=provider_settings | client_options
         )
-        return None
+        return client_class(*args, **kwargs)
 
     def _create_vector_store_client(
         self,

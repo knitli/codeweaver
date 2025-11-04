@@ -44,13 +44,14 @@ from codeweaver.config.logging import LoggingConfigDict
 from codeweaver.config.telemetry import TelemetrySettingsDict
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
+from codeweaver.core.types.sentinel import Unset
 
 
 if TYPE_CHECKING:
     from codeweaver.config.logging import LoggingSettings
     from codeweaver.config.middleware import MiddlewareOptions
     from codeweaver.config.providers import ProviderSettingsDict
-    from codeweaver.core.types import AnonymityConversion, FilteredKeyT, Unset
+    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
 # TODO: Replace most defaults with Unset, to better track user-set vs default values. We just need to ensure we don't pass Unset to places that don't accept it. I'm not sure what the best way to do that is yet. My thought is that we could possibly modify pydantic serialization to convert Unset to None or missing values, but *not* do that for telemetry serialization.
 
