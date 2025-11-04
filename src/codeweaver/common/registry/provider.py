@@ -17,7 +17,7 @@ from functools import partial
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypeGuard, cast, overload
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, SecretStr
 from textcase import pascal
 from typing_extensions import TypeIs
 
@@ -387,25 +387,22 @@ class ProviderRegistry(BasedModel):
         self._vector_store_providers[provider] = module(provider_name)
 
     def _is_openai_factory(
-        self, provider_class: LazyImport[type[Any]] | type[Any]
+        self, provider: Provider, provider_kind: LiteralProviderKind
     ) -> TypeGuard[LazyImport[type[Any]] | type[Any]]:
-        """Check if a provider class is the OpenAI factory.
+        """Check if a provider needs a class created in the openai class factory.
 
         Args:
-            provider_class: The provider class to check (LazyImport or resolved)
+            provider: the provider
+            provider_kind: the kind of provider
 
         Returns:
             True if this is the OpenAI factory class
         """
-        # Check if it's a LazyImport pointing to openai_factory
-        if isinstance(provider_class, LazyImport):
-            return "openai_factory" in provider_class._module_name  # type: ignore
-
-        # Check if it's the resolved OpenAIEmbeddingBase class
-        if hasattr(provider_class, "__name__"):
-            return provider_class.__name__ == "OpenAIEmbeddingBase"
-
-        return False
+        return (
+            provider.is_embedding_provider
+            and provider_kind == ProviderKind.EMBEDDING
+            and provider.uses_openai_api
+        )
 
     def _get_capabilities_for_provider(self, provider: Provider) -> EmbeddingModelCapabilities:
         """Get capabilities for a provider.
@@ -679,6 +676,10 @@ class ProviderRegistry(BasedModel):
         args, kwargs = set_args_on_signature(
             client_class, kwargs=provider_settings | client_options
         )
+        args = tuple(arg.get_secret_value() if isinstance(arg, SecretStr) else arg for arg in args)
+        kwargs = {
+            k: v.get_secret_value() if isinstance(v, SecretStr) else v for k, v in kwargs.items()
+        }
         return client_class(*args, **kwargs)
 
     def _create_vector_store_client(
@@ -903,7 +904,7 @@ class ProviderRegistry(BasedModel):
         # Special handling for embedding provider (has different logic)
         if provider_kind in (ProviderKind.EMBEDDING, "embedding"):
             # Check if this is an OpenAI factory that needs construction
-            if self._is_openai_factory(retrieved_cls):
+            if self._is_openai_factory(provider, providerkind):
                 retrieved_cls = self._construct_openai_provider_class(
                     provider, retrieved_cls, **kwargs
                 )

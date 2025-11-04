@@ -10,9 +10,8 @@
 # This file can be customized per workspace for additional setup.
 
 setup_env() {
-  eval "$(mise -q activate zsh)"
-  eval "$(mise -q env -s zsh)"
   zsh -c "mise -q -y run update-tools &> /dev/null &" &
+  mise -q -y en --shell zsh .
   print -P "%F{209}[codeweaver]%f %F{148}All done on our end!%f We're going to re-init your local environment, so it may take a moment depending on your setup. You're good to go once you get your terminal back. Happy coding!"
 }
 

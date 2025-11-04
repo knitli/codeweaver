@@ -358,12 +358,14 @@ class Provider(BaseEnum):
     def is_huggingface_model_provider(self) -> bool:
         """Check if the provider is a Hugging Face model provider."""
         return self in {
-            Provider.HUGGINGFACE_INFERENCE,
+            Provider.CEREBRAS,
             Provider.FASTEMBED,
-            Provider.GROQ,
-            Provider.SENTENCE_TRANSFORMERS,
             Provider.FIREWORKS,
+            Provider.GROQ,
+            Provider.HUGGINGFACE_INFERENCE,
+            Provider.LITELLM,
             Provider.OLLAMA,
+            Provider.SENTENCE_TRANSFORMERS,
             Provider.TOGETHER,
         }
 
@@ -371,21 +373,22 @@ class Provider(BaseEnum):
     def uses_openai_api(self) -> bool:
         """Check if the provider uses the OpenAI API."""
         return self in {
-            Provider.OPENAI,
             Provider.AZURE,
             Provider.CEREBRAS,
             Provider.DEEPSEEK,
             Provider.FIREWORKS,
             Provider.GITHUB,
-            Provider.X_AI,
             Provider.GROQ,
             Provider.HEROKU,
+            Provider.LITELLM,
             Provider.MOONSHOT,
             Provider.OLLAMA,
+            Provider.OPENAI,
             Provider.OPENROUTER,
             Provider.PERPLEXITY,
             Provider.TOGETHER,
             Provider.VERCEL,
+            Provider.X_AI,
         }
 
     @staticmethod
