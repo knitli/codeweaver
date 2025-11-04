@@ -54,7 +54,7 @@ class TestTelemetryIntegration:
         # Capture should be a no-op
         client.capture("test_event", {"key": "value"})
 
-    def test_from_settings_respects_disable_telemetry(self, monkeypatch) -> None:
+    def test_from_settings_respects_disable_telemetry(self) -> None:
         """Test that from_settings respects disable_telemetry setting."""
         # Create a mock settings object with telemetry disabled
         mock_settings = MagicMock(spec=CodeWeaverSettings)
@@ -69,7 +69,7 @@ class TestTelemetryIntegration:
             assert client.enabled is False
             assert client._client is None
 
-    def test_from_settings_with_no_api_key(self, monkeypatch) -> None:
+    def test_from_settings_with_no_api_key(self) -> None:
         """Test that from_settings handles missing API key."""
         mock_settings = MagicMock(spec=CodeWeaverSettings)
         mock_telemetry = MagicMock(spec=TelemetrySettings)
