@@ -15,6 +15,7 @@ Validates:
 from __future__ import annotations
 
 import sys
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -35,21 +36,21 @@ class TestTelemetryIntegration:
         # Temporarily hide posthog module
         with patch.dict(sys.modules, {"posthog": None}):
             client = PostHogClient(enabled=True)
-            
+
             # Client should be disabled and not raise an error
             assert client.enabled is False
             assert client._client is None
-            
+
             # Capture should not fail
             client.capture("test_event", {"key": "value"})
 
     def test_posthog_client_respects_disabled_setting(self) -> None:
         """Test that PostHogClient respects enabled=False setting."""
         client = PostHogClient(enabled=False)
-        
+
         assert client.enabled is False
         assert client._client is None
-        
+
         # Capture should be a no-op
         client.capture("test_event", {"key": "value"})
 
@@ -61,10 +62,10 @@ class TestTelemetryIntegration:
         mock_telemetry.enabled = False
         mock_telemetry.disable_telemetry = True
         mock_settings.telemetry = mock_telemetry
-        
+
         with patch("codeweaver.common.telemetry.client.get_settings", return_value=mock_settings):
             client = PostHogClient.from_settings()
-            
+
             assert client.enabled is False
             assert client._client is None
 
@@ -77,17 +78,17 @@ class TestTelemetryIntegration:
         mock_telemetry.posthog_project_key = None
         mock_telemetry.posthog_host = "https://us.i.posthog.com"
         mock_settings.telemetry = mock_telemetry
-        
+
         with patch("codeweaver.common.telemetry.client.get_settings", return_value=mock_settings):
             client = PostHogClient.from_settings()
-            
+
             assert client.enabled is False
             assert client._client is None
 
     def test_shutdown_with_no_client(self) -> None:
         """Test that shutdown handles case when client is None."""
         client = PostHogClient(enabled=False)
-        
+
         # Should not raise an error
         client.shutdown()
 
@@ -96,7 +97,7 @@ class TestTelemetryIntegration:
         client = PostHogClient(enabled=False)
         client._client = MagicMock()
         client._client.flush.side_effect = Exception("Test error")
-        
+
         # Should not raise an error, just log it
         client.shutdown()
 
@@ -106,30 +107,30 @@ class TestTelemetryIntegration:
         client._client = MagicMock()
         client._client.capture.side_effect = Exception("Test error")
         client.enabled = True  # Force it to try to capture
-        
+
         # Should not raise, just log the error
         client.capture("test_event", {"key": "value"})
 
     def test_capture_with_serialization(self) -> None:
         """Test capture_with_serialization with a serializable object."""
         from codeweaver.core.types.models import BasedModel
-        
+
         class TestModel(BasedModel):
             field1: str = "value1"
-            
+
             def _telemetry_keys(self):
                 return None
-        
+
         client = PostHogClient(enabled=False)
         obj = TestModel()
-        
+
         # Should not raise an error even when disabled
         client.capture_with_serialization("test_event", obj)
 
     def test_capture_from_event(self) -> None:
         """Test capture_from_event with a telemetry event object."""
         from codeweaver.common.telemetry.events import SessionSummaryEvent
-        
+
         event = SessionSummaryEvent(
             session_duration_minutes=5.0,
             total_searches=10,
@@ -145,8 +146,8 @@ class TestTelemetryIntegration:
             context_reduction_pct=70.0,
             estimated_cost_savings_usd=0.05,
         )
-        
+
         client = PostHogClient(enabled=False)
-        
+
         # Should not raise an error even when disabled
         client.capture_from_event(event)
