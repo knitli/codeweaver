@@ -378,7 +378,7 @@ async def lifespan(
             try:
                 state.telemetry.shutdown()
             except Exception:
-                logger.exception("Error shutting down telemetry client")
+                logging.getLogger(__name__).exception("Error shutting down telemetry client")
 
         # TODO: Add state caching/saving and cleanup logic here
         console.print(

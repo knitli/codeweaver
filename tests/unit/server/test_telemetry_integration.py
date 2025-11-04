@@ -131,6 +131,7 @@ class TestTelemetryIntegration:
         """Test capture_from_event with a telemetry event object."""
         from codeweaver.common.telemetry.events import SessionSummaryEvent
 
+        # Test data: 3000 delivered + 7000 saved = 10000 generated (70% reduction)
         event = SessionSummaryEvent(
             session_duration_minutes=5.0,
             total_searches=10,
