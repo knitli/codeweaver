@@ -482,6 +482,8 @@ class CodeWeaverSettings(BaseSettings):
             - .codeweaver/.local.env
             - .codeweaver/.env
         4. In order of .toml, .yaml/.yml, .json files:
+            - codeweaver.local.{toml,yaml,yml,json}
+            - codeweaver.{toml,yaml,yml,json}
             - .codeweaver.local.{toml,yaml,yml,json}
             - .codeweaver.{toml,yaml,yml,json}
             - .codeweaver/codeweaver.local.{toml,yaml,yml,json}

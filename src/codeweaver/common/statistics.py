@@ -359,9 +359,9 @@ class _LanguageStatistics(DataclassSerializationMixin):
     skipped: Annotated[
         NonNegativeInt, Field(description="""Number of files skipped for this language.""")
     ] = 0
-    unique_files: ClassVar[
-        Annotated[set[Path], Field(default_factory=set, init=False, repr=False, exclude=True)]
-    ] = set()
+    unique_files: ClassVar[Annotated[set[Path], Field(init=False, repr=False, exclude=True)]] = (
+        set()
+    )
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
@@ -564,9 +564,9 @@ class FileStatistics(DataclassSerializationMixin):
         }
     )
 
-    _other_files: ClassVar[
-        Annotated[set[Path], Field(default_factory=set, init=False, repr=False, exclude=True)]
-    ] = set()
+    _other_files: ClassVar[Annotated[set[Path], Field(init=False, repr=False, exclude=True)]] = (
+        set()
+    )
 
     def _telemetry_keys(self):
         from codeweaver.core.types import AnonymityConversion, FilteredKey
