@@ -436,13 +436,21 @@ class CodeWeaverSettings(BaseSettings):
             1 * 1024 * 1024 if isinstance(self.max_file_size, Unset) else self.max_file_size
         )
         self.max_results = 75 if isinstance(self.max_results, Unset) else self.max_results
-        # middleware gets set in the server initialization if unset
         self.server = (
             FastMcpServerSettings.model_validate(DefaultFastMcpServerSettings)
             if isinstance(self.server, Unset)
             else self.server
         )
-        # logging also gets set in the server initialization if unset
+        self.middleware = (
+            MiddlewareOptions()
+            if isinstance(self.middleware, Unset)
+            else self.middleware
+        )
+        self.logging = (
+            LoggingSettings()
+            if isinstance(self.logging, Unset)
+            else self.logging
+        )
         self.indexing = IndexerSettings() if isinstance(self.indexing, Unset) else self.indexing
         self.chunker = ChunkerSettings() if isinstance(self.chunker, Unset) else self.chunker
         self.telemetry = (
@@ -462,6 +470,8 @@ class CodeWeaverSettings(BaseSettings):
             result = type(self).model_rebuild()
             logger.debug("Rebuilt CodeWeaverSettings during post-init, result: %s", result)
         if type(self).__pydantic_complete__:
+            # Ensure all nested Unset values are replaced with defaults
+            ensure_set_fields(self)
             # Exclude computed fields to prevent circular dependency during initialization
             # Computed fields like IndexingSettings.cache_dir may call get_settings()
             self._map = cast(
