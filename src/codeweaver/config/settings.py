@@ -442,12 +442,12 @@ class CodeWeaverSettings(BaseSettings):
             else self.server
         )
         self.middleware = (
-            cast(MiddlewareOptions, {})
+            MiddlewareOptions()
             if isinstance(self.middleware, Unset)
             else self.middleware
         )
         self.logging = (
-            cast(LoggingSettings, {})
+            LoggingSettings()
             if isinstance(self.logging, Unset)
             else self.logging
         )
