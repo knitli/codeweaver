@@ -26,6 +26,9 @@ if TYPE_CHECKING:
 
     from codeweaver.config.settings import CodeWeaverSettings
     from codeweaver.server import AppState, ServerSetup
+else:
+    # Import FastMCP at runtime for isinstance checks
+    from fastmcp import FastMCP
 
 logger = logging.getLogger(__name__)
 
@@ -72,8 +75,9 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
             "uvicorn_config": {},
             **kwargs.copy(),
         }  # type: ignore
-    registry = lazy_import("codeweaver.common.registry", "initialize_providers")  # type: ignore
-    _ = registry()  # type: ignore
+    # TODO: Fix or remove this - initialize_providers doesn't exist in registry
+    # registry = lazy_import("codeweaver.common.registry", "initialize_providers")  # type: ignore
+    # _ = registry()  # type: ignore
     await app.run_http_async(**resolved_kwargs)  # type: ignore
 
 
