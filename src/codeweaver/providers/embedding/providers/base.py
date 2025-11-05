@@ -658,10 +658,22 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         return self._output_transformer(output_data)
 
     def _fire_and_forget(self, task: Callable[..., Any]) -> None:
-        """Execute a fire-and-forget task."""
+        """Execute a fire-and-forget task.
+
+        This method should only be called from within async contexts.
+        It schedules the task to run in a thread pool executor to avoid blocking.
+        """
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             _ = loop.run_in_executor(None, task)
+        except RuntimeError:
+            # No running loop - this shouldn't happen in normal usage
+            # since this is only called from async methods
+            logger.warning(
+                "Attempted to fire-and-forget task outside async context. "
+                "Running synchronously (may cause blocking)."
+            )
+            task()
         except Exception:
             logger.exception("Error occurred while executing fire-and-forget task.")
 

@@ -148,7 +148,7 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
     ) -> list[list[float]] | list[list[int]]:
         """Embed a list of documents into vectors."""
         ready_documents = self.chunks_to_strings(documents)
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(
             None,
             lambda: list(
@@ -163,7 +163,7 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
         self, query: Sequence[str], **kwargs: Mapping[str, Any] | None
     ) -> list[list[float]] | list[list[int]]:
         """Embed a query into a vector."""
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(
             None, lambda: list(self._client.query_embed(query, **kwargs))
         )
@@ -209,7 +209,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
     ) -> list[SparseEmbedding]:
         """Embed a list of documents into sparse vectors."""
         ready_documents = self.chunks_to_strings(documents)
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(
             None,
             lambda: list(self._client.embed(cast(Sequence[str], ready_documents), **kwargs)),  # pyright: ignore[reportArgumentType]
@@ -222,7 +222,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         self, query: Sequence[str], **kwargs: Mapping[str, Any] | None
     ) -> list[SparseEmbedding]:
         """Embed a query into a sparse vector."""
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(
             None, lambda: list(self._client.query_embed(query, **kwargs))
         )

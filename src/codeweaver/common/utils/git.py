@@ -32,8 +32,6 @@ MISSING: Missing = Missing(name=SentinelName("MISSING"), module_name=__name__)
 
 def try_git_rev_parse() -> Path | None:
     """Attempt to use git to get the root directory of the current git repository."""
-    if not has_git():
-        return None
     git = shutil.which("git")
     if not git:
         return None
@@ -65,11 +63,10 @@ def is_git_dir(directory: Path | None = None) -> bool:
     """
     directory = directory or Path.cwd()
     git_path = directory / ".git"
-    git_worktree = git_path.is_file()
-    return git_path.is_dir() or git_worktree if git_path.exists() else False
+    return git_path.is_dir() or git_path.is_file() if git_path.exists() else False
 
 
-def _walk_down_to_git_root(path: Path | None = None) -> Path:
+def _walk_up_to_git_root(path: Path | None = None) -> Path:
     """Walk up the directory tree until a .git directory is found."""
     path = path or Path.cwd()
     if path.is_file():
@@ -78,7 +75,8 @@ def _walk_down_to_git_root(path: Path | None = None) -> Path:
         if is_git_dir(path):
             return path
         path = path.parent
-    raise FileNotFoundError("No .git directory found in the path hierarchy.")
+    msg = "No .git directory found in the path hierarchy."
+    raise FileNotFoundError(msg)
 
 
 def _root_path_checks_out(root_path: Path) -> bool:
@@ -97,8 +95,8 @@ def get_project_path(root_path: Path | None = None) -> Path:
     return (
         root_path
         if isinstance(root_path, Path) and _root_path_checks_out(root_path)
-        else _walk_down_to_git_root(root_path)
-    )  # pyright: ignore[reportOptionalMemberAccess, reportUnknownMemberType]
+        else _walk_up_to_git_root(root_path)
+    )
 
 
 def set_relative_path(path: Path | str | None) -> Path | None:
@@ -112,7 +110,12 @@ def set_relative_path(path: Path | str | None) -> Path | None:
     if not path_obj.is_absolute():
         return path_obj
 
-    base_path = get_project_path()
+    try:
+        base_path = get_project_path()
+    except FileNotFoundError:
+        # Not in a git repository, return path as-is
+        return path_obj
+
     try:
         return path_obj.relative_to(base_path)
     except ValueError:
@@ -126,18 +129,19 @@ def has_git() -> bool:
     git = shutil.which("git")
     if not git:
         return False
-    with contextlib.suppress(subprocess.CalledProcessError):
-        output = subprocess.run([git, "--version"], capture_output=True)
-        return output.returncode == 0
-    return False
+    # Verify git command works
+    output = subprocess.run([git, "--version"], capture_output=True, check=False)
+    return output.returncode == 0
 
 
 def _get_git_dir(directory: Path) -> Path | Missing:
     """Get the .git directory of a git repository."""
     if not is_git_dir(directory):
-        with contextlib.suppress(FileNotFoundError):
-            directory = get_project_path() or Path.cwd()
-        if not directory or not is_git_dir(directory):
+        try:
+            directory = get_project_path()
+        except FileNotFoundError:
+            return MISSING
+        if not is_git_dir(directory):
             return MISSING
     return directory
 
@@ -149,7 +153,9 @@ def get_git_revision(directory: Path) -> str | Missing:
         return MISSING
     directory = cast(Path, git_dir)
     if has_git():
-        git = cast(bytes, shutil.which("git"))
+        git = shutil.which("git")
+        if not git:
+            return MISSING
         with contextlib.suppress(subprocess.CalledProcessError):
             output = subprocess.run(
                 [git, "rev-parse", "--short", "HEAD"], cwd=directory, capture_output=True, text=True
@@ -171,35 +177,51 @@ def _get_branch_from_origin(directory: Path) -> str | Missing:
             text=True,
         )
         branch = output.stdout.strip().removeprefix("origin/")
-        if branch and "/" in branch:
-            return branch.split("/", 1)[1]
-        if branch:
-            return branch
+        # Return the full branch name after removing "origin/" prefix
+        # This handles both simple names like "main" and complex ones like "feature/my-feature"
+        return branch or MISSING
     return MISSING
 
 
-def get_git_branch(directory: Path) -> str | Missing:
+def get_git_branch(directory: Path) -> str:
     """Get the current branch name of a git repository."""
     git_dir = _get_git_dir(directory)
-    directory = cast(Path, git_dir)
-    if has_git():
-        git = shutil.which("git")
-        if git_dir is MISSING and (git_dir := get_project_path(directory)):
-            directory = git_dir
-        else:
-            return MISSING
-        with contextlib.suppress(subprocess.CalledProcessError):
-            output = subprocess.run(
-                [cast(bytes, git), "rev-parse", "--abbrev-ref", "HEAD"],
-                cwd=directory,
-                capture_output=True,
-                text=True,
-            )
-            if branch := output.stdout.strip():
-                return branch if branch != "HEAD" else _get_branch_from_origin(directory)
-            if branch is MISSING:
-                return "detached"
-    return MISSING
+
+    if git_dir is MISSING:
+        # Try to get project path
+        try:
+            directory = get_project_path(directory)
+        except FileNotFoundError:
+            return "detached"
+    else:
+        directory = cast(Path, git_dir)
+
+    if not has_git():
+        return "detached"
+
+    git = shutil.which("git")
+    if not git:
+        return "detached"
+
+    with contextlib.suppress(subprocess.CalledProcessError):
+        output = subprocess.run(
+            [git, "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=directory,
+            capture_output=True,
+            text=True,
+        )
+        branch = output.stdout.strip()
+
+        # If we got HEAD, try to get origin branch
+        if not branch or branch == "HEAD":
+            origin_branch = _get_branch_from_origin(directory)
+            if origin_branch is not MISSING and origin_branch != "HEAD":
+                return cast(str, origin_branch)
+            return "detached"
+
+        return branch
+
+    return "detached"
 
 
 def in_codeweaver_clone(path: Path) -> bool:
@@ -208,12 +230,10 @@ def in_codeweaver_clone(path: Path) -> bool:
         "codeweaver" in str(path).lower()
         or "code-weaver" in str(path).lower()
         or bool((rev_dir := try_git_rev_parse()) and "codeweaver" in rev_dir.name.lower())
-    )  # pyright: ignore[reportOptionalMemberAccess, reportUnknownMemberType]
+    )
 
 
 __all__ = (
-    "MISSING",
-    "Missing",
     "get_git_branch",
     "get_git_revision",
     "get_project_path",

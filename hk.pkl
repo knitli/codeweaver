@@ -49,9 +49,6 @@ local linters = new Mapping<String, Step> {
 
     ["shfmt"] = Builtins.shfmt
 
-    // define a custom linter
-    ["pkl"] = Builtins.pkl
-
     ["add-marks"] = new Step {
         glob = "tests/**/*.py"
         fix = "./scripts/testing/apply-test-marks.py {{ files }}"

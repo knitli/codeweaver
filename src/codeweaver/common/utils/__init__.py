@@ -16,8 +16,6 @@ from codeweaver.common.utils.checks import (
     is_typeadapter,
 )
 from codeweaver.common.utils.git import (
-    MISSING,
-    Missing,
     get_git_branch,
     get_git_revision,
     get_project_path,
@@ -39,9 +37,7 @@ from codeweaver.common.utils.utils import (
 
 
 __all__ = (
-    "MISSING",
     "LazyImport",
-    "Missing",
     "ensure_iterable",
     "estimate_tokens",
     "file_is_binary",

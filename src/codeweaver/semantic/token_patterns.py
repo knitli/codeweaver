@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 
 from functools import lru_cache
@@ -15,6 +16,8 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, TypedDict
 
 from codeweaver.core.language import SemanticSearchLanguage
+
+logger = logging.getLogger(__name__)
 
 
 if TYPE_CHECKING:
@@ -674,8 +677,48 @@ async def _get_token_patterns() -> TokenPatternCacheDict:
 
 
 def get_token_patterns_sync() -> TokenPatternCacheDict:
-    """Synchronous wrapper to get token patterns."""
-    return asyncio.run(_get_token_patterns())
+    """Synchronous wrapper to get token patterns.
+
+    Handles both async and sync contexts:
+    - If patterns are cached, returns immediately
+    - If in async context, compiles synchronously (blocking but one-time)
+    - If not in async context, uses optimal async thread pool offloading
+    """
+    global _token_pattern_cache
+
+    # Fast path: return cached patterns
+    if _token_pattern_cache.get("operator") is not None:
+        return _token_pattern_cache
+
+    # Need to compile patterns - check for running event loop
+    try:
+        loop = asyncio.get_running_loop()
+        # We're in an async context - compile synchronously to avoid nested event loop
+        logger.warning(
+            "Compiling token patterns synchronously from async context. "
+            "This is a one-time operation but may cause brief blocking."
+        )
+
+        # Compile each pattern synchronously (no thread pool offloading)
+        operator_pat = _get_operator_pattern()
+        literal_pat = _get_literal_pattern()
+        identifier_pat = _get_identifier_pattern()
+        annotation_pat = _get_annotation_pattern()
+        keyword_pat = _get_keyword_pattern()
+        not_symbol_pat = _get_not_symbol_pattern()
+
+        _token_pattern_cache = TokenPatternCacheDict(
+            operator=operator_pat,
+            literal=literal_pat,
+            identifier=identifier_pat,
+            annotation=annotation_pat,
+            keyword=keyword_pat,
+            not_symbol=not_symbol_pat,
+        )
+        return _token_pattern_cache
+    except RuntimeError:
+        # No running loop - use optimal async version with thread pool offloading
+        return asyncio.run(_get_token_patterns())
 
 
 TypeScriptLangs = frozenset({SemanticSearchLanguage.TYPESCRIPT, SemanticSearchLanguage.TSX})

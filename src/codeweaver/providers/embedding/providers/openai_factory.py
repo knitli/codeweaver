@@ -224,13 +224,25 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         return self.doc_kwargs.get("dimensions") or self._caps.default_dimension or 1024  # type: ignore
 
     def _report(self, response: CreateEmbeddingResponse, texts: Sequence[str]) -> None:
-        loop = asyncio.get_event_loop()
-        if response.usage and (token_count := response.usage.total_tokens):
-            _ = loop.run_in_executor(
-                None, lambda: self._update_token_stats(token_count=token_count)
-            )
-        else:
-            _ = loop.run_in_executor(None, lambda: self._update_token_stats(from_docs=texts))
+        """Report token usage statistics.
+
+        Note: This sync method is only called from async contexts.
+        """
+        try:
+            loop = asyncio.get_running_loop()
+            if response.usage and (token_count := response.usage.total_tokens):
+                _ = loop.run_in_executor(
+                    None, lambda: self._update_token_stats(token_count=token_count)
+                )
+            else:
+                _ = loop.run_in_executor(None, lambda: self._update_token_stats(from_docs=texts))
+        except RuntimeError:
+            # No running loop - shouldn't happen in normal usage since called from async methods
+            # Fall back to synchronous execution
+            if response.usage and (token_count := response.usage.total_tokens):
+                self._update_token_stats(token_count=token_count)
+            else:
+                self._update_token_stats(from_docs=texts)
 
     async def _get_vectors(
         self, texts: Sequence[str], **kwargs: Mapping[str, Any] | None

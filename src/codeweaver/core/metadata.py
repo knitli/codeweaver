@@ -81,6 +81,15 @@ class ChunkSource(BaseEnum):
     EXTERNAL = "external"  # from internet or similar external sources, not from code files
 
 
+def _set_symbol(data: Any) -> str | None:
+    """Helper function to set the symbol field based on the primary_thing."""
+    from codeweaver.semantic.ast_grep import AstThing
+    if thing := data.get("thing"):
+        if isinstance(thing, AstThing) and thing.symbol and (0 < len(thing.symbol.strip()) < 20):
+            return thing.symbol
+    return None
+
+
 class SemanticMetadata(BasedModel):
     """Metadata associated with the semantics of a code chunk."""
 
@@ -97,12 +106,7 @@ class SemanticMetadata(BasedModel):
     # TODO: Logic for symbol extraction from AST nodes
     symbol: Annotated[
         str | None,
-        Field(
-            description="""The symbol represented by the node""",
-            default_factory=lambda data: data["primary_thing"].name
-            if data.get("primary_thing")
-            else None,
-        ),
+        Field(description="""The symbol represented by the node""", default_factory=_set_symbol),
     ]
     thing_id: UUID7 = uuid7()
     parent_thing_id: UUID7 | None = None

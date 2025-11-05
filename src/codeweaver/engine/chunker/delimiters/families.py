@@ -748,7 +748,7 @@ async def detect_language_family(content: str, min_confidence: int = 3) -> Langu
 
     Runs in a thread pool to avoid blocking the event loop.
     """
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     with ThreadPoolExecutor(max_workers=1) as executor:
         # Offload the synchronous detection helper to the thread pool.
         return await loop.run_in_executor(

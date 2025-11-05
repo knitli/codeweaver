@@ -97,12 +97,20 @@ class TelemetrySettings(BasedModel):
 
     batch_interval_seconds: Annotated[
         PositiveInt | Unset,
-        Field(
-            default=60, description="Maximum time in seconds to wait before sending batched events."
-        ),
+        Field(description="Maximum time in seconds to wait before sending batched events."),
     ] = UNSET
 
     _unset_fields: Annotated[set[str] | None, PrivateAttr()] = None
+
+    @classmethod
+    def _default(cls) -> TelemetrySettings:
+        """Set default values for unset fields."""
+        return cls.model_construct(
+            disable_telemetry=False,
+            tools_before_privacy=False,
+            batch_size=10,
+            batch_interval_seconds=60,
+        )
 
     def model_post_init(self, _context: Any) -> None:
         """Post-initialization to track unset fields and set defaults."""

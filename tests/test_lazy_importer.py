@@ -505,3 +505,63 @@ class TestLazyImportPerformance:
             f"Cached access too slow: {cached_time:.4f}s vs direct {direct_time:.4f}s "
             f"(ratio: {cached_time / direct_time:.1f}x)"
         )
+
+
+class TestLazyImportIntrospection:
+    """Test LazyImport compatibility with introspection tools like inspect and pydantic."""
+
+    def test_inspect_signature_compatibility(self):
+        """Test that inspect.signature() works with LazyImport objects."""
+        from inspect import signature
+
+        # Create a lazy import to a function
+        get_settings_lazy = lazy_import("codeweaver.config.settings", "get_settings")
+
+        # This should not raise AttributeError
+        sig = signature(get_settings_lazy)
+
+        # Verify we got a valid signature
+        assert sig is not None
+        assert "config_file" in str(sig)
+
+        # The lazy import should now be resolved
+        assert get_settings_lazy.is_resolved
+
+    def test_pydantic_default_factory_compatibility(self):
+        """Test that LazyImport can be used as a pydantic default_factory."""
+        from pydantic import Field
+        from pydantic.dataclasses import dataclass
+
+        # This is the pattern used in AppState
+        get_settings_lazy = lazy_import("codeweaver.config.settings", "get_settings")
+
+        @dataclass
+        class TestModel:
+            settings: object = Field(default_factory=get_settings_lazy)
+
+        # This should not raise during schema generation
+        model = TestModel()
+        assert model.settings is not None
+
+    def test_introspection_attributes_resolve(self):
+        """Test that accessing introspection attributes resolves the object."""
+        from codeweaver.config.settings import get_settings
+
+        get_settings_lazy = lazy_import("codeweaver.config.settings", "get_settings")
+
+        # Should not be resolved yet
+        assert not get_settings_lazy.is_resolved
+
+        # Accessing __name__ should resolve
+        name = get_settings_lazy.__name__
+        assert name == get_settings.__name__
+        assert get_settings_lazy.is_resolved
+
+    def test_introspection_attributes_missing(self):
+        """Test that missing introspection attributes raise AttributeError."""
+        # Create lazy import to something that doesn't have __text_signature__
+        lazy = lazy_import("os")
+
+        # Should raise AttributeError for missing introspection attributes
+        with pytest.raises(AttributeError):
+            _ = lazy.__text_signature__

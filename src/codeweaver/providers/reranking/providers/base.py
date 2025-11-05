@@ -323,7 +323,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
             # Return empty results on other errors
             return []
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         processed_results = self._process_results(reranked, processed_docs)
         if len(processed_results) > self.top_n:
             # results already sorted in descending order
@@ -418,11 +418,22 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
             statistics.add_token_usage(reranking_generated=token_count)
 
     def _process_results(self, results: Any, raw_docs: Sequence[str]) -> Sequence[RerankingResult]:
-        """Process the results from the reranking."""
+        """Process the results from the reranking.
+
+        Note: This sync method is only called from async contexts (from the rerank method).
+        """
         # voyage and cohere return token count, others do not
         if self.provider not in [Provider.VOYAGE, Provider.COHERE]:
-            loop = asyncio.get_event_loop()
-            _ = loop.run_in_executor(None, lambda: self._update_token_stats(from_docs=raw_docs))
+            try:
+                loop = asyncio.get_running_loop()
+                _ = loop.run_in_executor(None, lambda: self._update_token_stats(from_docs=raw_docs))
+            except RuntimeError:
+                # No running loop - shouldn't happen in normal usage
+                logger.warning(
+                    "Attempted to schedule token stats update outside async context. "
+                    "Running synchronously (may cause blocking)."
+                )
+                self._update_token_stats(from_docs=raw_docs)
 
         from codeweaver.core.chunks import CodeChunk
 

@@ -37,6 +37,14 @@ from pydantic_core import to_json
 
 from codeweaver import __version__ as version
 from codeweaver.common.logging import setup_logger
+from codeweaver.common.registry import (
+    Feature,
+    ModelRegistry,
+    ProviderRegistry,
+    ServiceCard,
+    ServicesRegistry,
+)
+from codeweaver.common.statistics import SessionStatistics
 from codeweaver.common.telemetry.client import PostHogClient
 from codeweaver.common.utils import get_project_path, lazy_import, rpartial
 from codeweaver.config.logging import LoggingSettings
@@ -65,14 +73,6 @@ from codeweaver.server.health_service import HealthService
 
 
 if TYPE_CHECKING:
-    from codeweaver.common.registry import (
-        Feature,
-        ModelRegistry,
-        ProviderRegistry,
-        ServiceCard,
-        ServicesRegistry,
-    )
-    from codeweaver.common.statistics import SessionStatistics
     from codeweaver.common.utils import LazyImport
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
@@ -197,9 +197,7 @@ def get_health_info() -> HealthInfo:
     return _health_info
 
 
-@dataclass(
-    order=True, kw_only=True, config=DATACLASS_CONFIG | ConfigDict(extra="forbid", defer_build=True)
-)
+@dataclass(order=True, kw_only=True, config=DATACLASS_CONFIG | ConfigDict(extra="forbid"))
 class AppState(DataclassSerializationMixin):
     """Application state for CodeWeaver server."""
 
@@ -303,7 +301,7 @@ def get_state() -> AppState:
     return _state
 
 
-def _get_health_service() -> Any:
+def _get_health_service() -> HealthService:
     """Get the health service instance."""
     from codeweaver.server.health_service import HealthService
 
@@ -344,11 +342,13 @@ async def lifespan(
             services_registry=get_services_registry(),
             model_registry=get_model_registry(),
             middleware_stack=tuple(getattr(app, "middleware", ())),
-            health_service=_get_health_service(),
+            health_service=None,  # Initialize as None, will be set after AppState construction
             telemetry=PostHogClient.from_settings(),
             indexer=Indexer.from_settings(),
         )
         object.__setattr__(app, "state", state)
+        # Now that AppState is constructed and _state is set, create the HealthService
+        state.health_service = _get_health_service()
     state: AppState = app.state  # type: ignore
     from codeweaver.common import CODEWEAVER_PREFIX
 
@@ -436,7 +436,7 @@ def __setup_interim_logger() -> tuple[logging.Logger, int]:
     setup_local_logger(level)
     return (
         setup_logger(
-            name="codeweaver", level=level, rich=True, rich_kwargs={}, logging_kwargs=None
+            name="codeweaver", level=level, rich=True, rich_options={}, logging_kwargs=None
         ),
         level,
     )
@@ -463,13 +463,13 @@ def _setup_logger(
     app_logger_settings: LoggingSettings = cast(LoggingSettings, settings.get("logging", {}))
     level = app_logger_settings.get("level", 20)
     rich = app_logger_settings.get("use_rich", True)
-    rich_kwargs = app_logger_settings.get("rich_kwargs", {})
+    rich_options = app_logger_settings.get("rich_options", {})
     logging_kwargs = app_logger_settings.get("dict_config", None)
     app_logger = setup_logger(
         name="codeweaver",
         level=level,
         rich=rich,
-        rich_kwargs=rich_kwargs,
+        rich_options=rich_options,
         logging_kwargs=logging_kwargs,
     )
     fast_mcp_log_level = LEVEL_MAP.get(level, "INFO")

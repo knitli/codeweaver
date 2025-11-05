@@ -41,14 +41,14 @@ def _setup_config_logger(
     *,
     level: int = logging.INFO,
     rich: bool = True,
-    rich_kwargs: dict[str, Any] | None = None,
+    rich_options: dict[str, Any] | None = None,
     logging_kwargs: LoggingConfigDict | None = None,
 ) -> logging.Logger:
     """Set up a logger with optional rich formatting."""
     if logging_kwargs:
         dictConfig({**logging_kwargs})
         if rich:
-            handler = get_rich_handler(**(rich_kwargs or {}))
+            handler = get_rich_handler(**(rich_options or {}))
             logger = logging.getLogger(name)
             logger.setLevel(level)
             logger.addHandler(handler)
@@ -62,7 +62,7 @@ def setup_logger(
     *,
     level: int = logging.INFO,
     rich: bool = True,
-    rich_kwargs: dict[str, Any] | None = None,
+    rich_options: dict[str, Any] | None = None,
     logging_kwargs: LoggingConfigDict | None = None,
 ) -> logging.Logger:
     """Set up a logger with optional rich formatting."""
@@ -71,13 +71,13 @@ def setup_logger(
             name=name,
             level=level,
             rich=rich,
-            rich_kwargs=rich_kwargs,
+            rich_options=rich_options,
             logging_kwargs=logging_kwargs,
         )
     if not rich:
         logging.basicConfig(level=level)
         return logging.getLogger(name)
-    handler = get_rich_handler(**(rich_kwargs or {}))
+    handler = get_rich_handler(**(rich_options or {}))
     logger = logging.getLogger(name)
     logger.setLevel(level)
     logger.addHandler(handler)

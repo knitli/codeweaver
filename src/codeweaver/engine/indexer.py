@@ -325,23 +325,31 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         settings_map = settings or get_settings_map()
         index_settings = (
             IndexerSettings.model_validate(DefaultIndexerSettings)
-            if isinstance(settings_map["indexer"], Unset)
-            else settings_map["indexer"]
+            if isinstance(settings_map["indexing"], Unset)
+            else settings_map["indexing"]
         )
         if not index_settings.inc_exc_set:
-            _ = asyncio.run(
-                index_settings.set_inc_exc(
-                    get_project_path()
-                    if isinstance(settings_map["project_path"], Unset)
-                    else settings_map["project_path"]
+            # Check if there's already a running event loop
+            try:
+                loop = asyncio.get_running_loop()
+                # If we're here, there's a running loop
+                # We can't await here since from_settings is not async, so skip for now
+                logger.warning(
+                    "Cannot set inc_exc in Indexer.from_settings: already in async context. Will be set lazily when indexer is used."
                 )
-            )
-        indexing = index_settings.to_settings()
-        return cls(
-            base_path=settings_map["project_path"],
-            settings=None,
-            walker=rignore.walk(**indexing),  # type: ignore
+            except RuntimeError:
+                # No running loop, safe to use asyncio.run()
+                _ = asyncio.run(
+                    index_settings.set_inc_exc(
+                        get_project_path()
+                        if isinstance(settings_map["project_path"], Unset)
+                        else settings_map["project_path"]
+                    )
+                )
+        walker = rignore.Walker(
+            **(index_settings.to_settings())  # type: ignore
         )
+        return cls(walker=walker, project_path=settings_map["project_path"])
 
     @property
     def walker(self) -> rignore.Walker:
@@ -764,23 +772,87 @@ class Indexer(BasedModel):
         from codeweaver.config.settings import get_settings_map
 
         settings_map = settings or get_settings_map()
-        index_settings = (
-            IndexerSettings.model_validate(DefaultIndexerSettings)
-            if isinstance(settings_map["indexer"], Unset)
-            else settings_map["indexer"]
-        )
-        if not index_settings.inc_exc_set:
-            _ = asyncio.run(
-                index_settings.set_inc_exc(
-                    get_project_path()
-                    if isinstance(settings_map["project_path"], Unset)
-                    else settings_map["project_path"]
-                )
+        indexing_data = settings_map["indexing"]
+
+        # Handle different types of indexing_data
+        if isinstance(indexing_data, Unset):
+            index_settings = IndexerSettings.model_validate(DefaultIndexerSettings)
+        elif isinstance(indexing_data, IndexerSettings):
+            # Use the existing IndexerSettings instance directly
+            index_settings = indexing_data
+        else:
+            # If it's a dict or something else, try to validate it
+            index_settings = IndexerSettings.model_validate(
+                DefaultIndexerSettings | indexing_data
+                if isinstance(indexing_data, dict)
+                else DefaultIndexerSettings
             )
+
+        if not index_settings.inc_exc_set:
+            # Check if there's already a running event loop
+            try:
+                loop = asyncio.get_running_loop()
+                # If we're here, there's a running loop
+                # We can't await here since from_settings is not async, so skip for now
+                logger.warning(
+                    "Cannot set inc_exc in Indexer.from_settings: already in async context. Will be set lazily when indexer is used."
+                )
+            except RuntimeError:
+                # No running loop, safe to use asyncio.run()
+                _ = asyncio.run(
+                    index_settings.set_inc_exc(
+                        get_project_path()
+                        if isinstance(settings_map["project_path"], Unset)
+                        else settings_map["project_path"]
+                    )
+                )
         walker = rignore.Walker(
             **(index_settings.to_settings())  # type: ignore
         )
         return cls(walker=walker, project_path=settings_map["project_path"])
+
+    @classmethod
+    def from_config(
+        cls,
+        project_path: Path | None = None,
+        settings: DictView[CodeWeaverSettingsDict] | None = None,
+    ) -> Indexer:
+        """Create a new `Indexer` from configuration settings."""
+        from codeweaver.common.utils.git import get_project_path
+        from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
+        from codeweaver.config.settings import get_settings_map
+        from codeweaver.core.types.sentinel import Unset
+
+        settings_map = settings or get_settings_map()
+        index_settings = (
+            IndexerSettings.model_validate(DefaultIndexerSettings)
+            if isinstance(settings_map["indexing"], Unset)
+            else settings_map["indexing"]
+        )
+        if not index_settings.inc_exc_set:
+            # Check if there's already a running event loop
+            try:
+                loop = asyncio.get_running_loop()
+                # If we're here, there's a running loop
+                # We can't await here since from_config is not async, so skip for now
+                logger.warning(
+                    "Cannot set inc_exc in Indexer.from_config: already in async context. Will be set lazily when indexer is used."
+                )
+            except RuntimeError:
+                # No running loop, safe to use asyncio.run()
+                _ = asyncio.run(
+                    index_settings.set_inc_exc(
+                        get_project_path()
+                        if isinstance(settings_map["project_path"], Unset)
+                        else settings_map["project_path"]
+                    )
+                )
+        indexing = index_settings.to_settings()
+        return cls(
+            base_path=settings_map["project_path"],
+            settings=None,
+            walker=rignore.walk(**indexing),  # type: ignore
+        )
 
     def _discover_files_for_batch(self, files: list[Path]) -> list[DiscoveredFile]:
         """Convert file paths to DiscoveredFile objects.

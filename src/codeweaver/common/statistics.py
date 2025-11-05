@@ -784,12 +784,12 @@ class TokenCounter(Counter[TokenCategory]):
 
 
         For now we're using simple 'back-of-the-envelope' calculations. We assume:
-        - The average cost per 1,000 tokens for embedding models is $0.00018 (Voyage AI as of September 2025)
-        - The average cost per 1,000 tokens for reranking models is $0.00005 (Voyage AI as of September 2025)
+        - The average cost per 1,000 tokens for embedding models is $0.00018 (Voyage AI as of October 2025)
+        - The average cost per 1,000 tokens for reranking models is $0.00005 (Voyage AI as of October 2025)
         - Sparse models we consider `free` for this calculation, as compared to everything else, the costs to run them are miniscule.
         - CodeWeaver itself doesn't have control over what model is used for the context agent, but CodeWeaver does *recommend* models to the user's client. We choose light-weight, low-cost models because we don't need frontline models for the context agent to do its job well, and we want it to be fast.
-            - Assuming the user's client chooses to listen to our recommendation (a big assumption), we assume the selected model is GPT-5-mini. As of September 2025, GPT-5-mini is priced at $0.25/million tokens, or $0.00025/1,000 tokens for input, and $2/M tokens for output, or $0.002/1,000 tokens.
-        - We assume the user's agent is using a frontline model. As of September 2025, by far the most used model for coding is Anthropic's Claude 4 Sonnet. The costs for Sonnet are complex because they vary heavily based on context length and caching (for example, if the message is over 200,000 tokens, output cost jumps from $15/M to $22.5/M tokens).
+            - Assuming the user's client chooses to listen to our recommendation (a big assumption), we assume the selected model is Claude-Haiku-4.5. As of October 2025, Claude-Haiku-4.5 is priced at $0.25/million tokens, or $0.00025/1,000 tokens for input, and $2/M tokens for output, or $0.002/1,000 tokens.
+        - We assume the user's agent is using a frontline model. As of October 2025, by far the most used model for coding is Anthropic's Claude 4.5 Sonnet. The costs for Sonnet are complex because they vary heavily based on context length and caching (for example, if the message is over 200,000 tokens, output cost jumps from $15/M to $22.5/M tokens).
             - We assume the lower end of the pricing, which is $3/M input and $15/M output. Which is $0.003/1,000 tokens for input and $0.015/1,000 tokens for output.
             - Generally, about 80% of token use is for input, and 20% is for output, so we use that ratio to calculate an average cost per 1,000 tokens.
             - Any "savings" are calculated against this assumed cost.

@@ -8,13 +8,26 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Annotated, Any, Literal, NewType, NotRequired, Required, TypedDict
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Literal,
+    NewType,
+    NotRequired,
+    Required,
+    TypedDict,
+    cast,
+)
 
 from pydantic import BeforeValidator, Field, FieldSerializationInfo, PrivateAttr, field_serializer
 
+from codeweaver.cli.utils import is_tty
+from codeweaver.common.utils.checks import is_debug
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BasedModel
 from codeweaver.exceptions import ConfigurationError
@@ -299,6 +312,7 @@ class LoggingConfigDict(TypedDict, total=False):
 class LoggingSettings(TypedDict, total=False):
     """Global logging settings."""
 
+    name: NotRequired[str]
     level: NotRequired[Literal[0, 10, 20, 30, 40, 50]]  # DEBUG, INFO, WARNING, ERROR, CRITICAL
     use_rich: NotRequired[bool]
     dict_config: NotRequired[
@@ -309,7 +323,7 @@ class LoggingSettings(TypedDict, total=False):
             ),
         ]
     ]
-    rich_kwargs: NotRequired[
+    rich_options: NotRequired[
         Annotated[
             dict[str, Any],
             Field(
@@ -317,6 +331,23 @@ class LoggingSettings(TypedDict, total=False):
             ),
         ]
     ]
+
+
+DefaultLoggingSettings: LoggingSettings = {
+    "name": "codeweaver",
+    "level": cast(
+        Literal[0, 10, 20, 30, 40, 50], os.environ.get("CODEWEAVER_LOG_LEVEL", logging.INFO)
+    ),
+    "use_rich": is_tty(),
+    "rich_options": {
+        "show_time": True,
+        "show_level": True,
+        "show_path": True,
+        "rich_tracebacks": is_debug() and is_tty(),
+    }
+    if is_tty()
+    else {},
+}
 
 
 __all__ = (

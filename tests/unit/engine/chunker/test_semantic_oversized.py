@@ -68,7 +68,7 @@ def test_oversized_file_chunks_via_child_nodes(
         and chunk.metadata["context"]
         and chunk.metadata["context"].get("chunker_type") == "semantic"
     ]
-    assert len(semantic_chunks) > 0, "Should have semantic chunks from child node processing"
+    assert semantic_chunks, "Should have semantic chunks from child node processing"
 
 
 def test_oversized_class_chunks_via_methods(
@@ -108,4 +108,4 @@ def test_oversized_class_chunks_via_methods(
         and chunk.metadata["context"]
         and chunk.metadata["context"].get("chunker_type") == "semantic"
     ]
-    assert len(semantic_chunks) > 0, "Should have semantic chunks from child node processing"
+    assert semantic_chunks, "Should have semantic chunks from child node processing"

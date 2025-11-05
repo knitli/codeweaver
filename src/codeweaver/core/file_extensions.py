@@ -49,6 +49,7 @@ DEFAULT_EXCLUDED_DIRS: frozenset[DirectoryNameT] = frozenset({
     DirectoryName(".git"),
     DirectoryName(".hg"),
     DirectoryName(".history"),
+    DirectoryName(".htmlcov"),
     DirectoryName(".idea"),
     DirectoryName(".jj"),
     DirectoryName(".next"),

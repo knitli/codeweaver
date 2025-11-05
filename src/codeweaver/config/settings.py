@@ -60,8 +60,12 @@ from codeweaver.common.utils.lazy_importer import lazy_import
 from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.chunker import ChunkerSettings, DefaultChunkerSettings
 from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
-from codeweaver.config.logging import LoggingSettings
-from codeweaver.config.middleware import AVAILABLE_MIDDLEWARE, MiddlewareOptions
+from codeweaver.config.logging import DefaultLoggingSettings, LoggingSettings
+from codeweaver.config.middleware import (
+    AVAILABLE_MIDDLEWARE,
+    DefaultMiddlewareSettings,
+    MiddlewareOptions,
+)
 from codeweaver.config.providers import AllDefaultProviderSettings, ProviderSettings
 from codeweaver.config.server_defaults import (
     DefaultEndpointSettings,
@@ -102,6 +106,10 @@ def _determine_setting(
         and (other_sources := tuple(arg for arg in args if arg is not Unset and arg is not None))
         and (other := other_sources[0])
     ):
+        # Don't return class references - return None instead
+        # This prevents TypedDict classes from being returned as values
+        if inspect.isclass(other):
+            return None
         return other
     return None
 
@@ -112,11 +120,20 @@ def ensure_set_fields(obj: BaseSettings | BasedModel) -> BaseSettings | BasedMod
         value = getattr(obj, field_name)
         if isinstance(value, Unset):
             value = _determine_setting(field_name, type(obj).model_fields[field_name], obj)
+            # If we still got None and the field doesn't accept None, skip it (leave as Unset)
+            if value is None:
+                field_type = type(obj).model_fields[field_name].annotation
+                # Check if None is in the union type
+                if field_type and (args := field_type.__args__) and type(None) not in args:
+                    continue
+                # None is allowed, set it
+                setattr(obj, field_name, None)
+                continue
             setattr(
                 obj,
                 field_name,
                 ensure_set_fields(value())
-                if issubclass(value, BaseSettings | BasedModel)
+                if inspect.isclass(value) and issubclass(value, BaseSettings | BasedModel)
                 else value,
             )
         elif isinstance(value, BaseSettings | BasedModel):
@@ -431,6 +448,7 @@ class CodeWeaverSettings(BaseSettings):
             if isinstance(self.provider, Unset) or self.provider is None  # pyright: ignore[reportUnnecessaryComparison]
             else self.provider
         )
+        # Serena uses 17,000 tokens *each turn*, so I feel like 30,000 is a reasonable default limit. We'll strive to keep it well under that.
         self.token_limit = 30_000 if isinstance(self.token_limit, Unset) else self.token_limit
         self.max_file_size = (
             1 * 1024 * 1024 if isinstance(self.max_file_size, Unset) else self.max_file_size
@@ -442,19 +460,16 @@ class CodeWeaverSettings(BaseSettings):
             else self.server
         )
         self.middleware = (
-            MiddlewareOptions()
-            if isinstance(self.middleware, Unset)
-            else self.middleware
+            DefaultMiddlewareSettings if isinstance(self.middleware, Unset) else self.middleware
         )
-        self.logging = (
-            LoggingSettings()
-            if isinstance(self.logging, Unset)
-            else self.logging
-        )
+        self.logging = DefaultLoggingSettings if isinstance(self.logging, Unset) else self.logging
+        # by default, IndexerSettings has `rignore_options` UNSET, but that needs to be deferred until after CodeWeaverSettings is initialized
         self.indexing = IndexerSettings() if isinstance(self.indexing, Unset) else self.indexing
         self.chunker = ChunkerSettings() if isinstance(self.chunker, Unset) else self.chunker
         self.telemetry = (
-            TelemetrySettings() if isinstance(self.telemetry, Unset) else self.telemetry
+            TelemetrySettings._default()  # type: ignore
+            if isinstance(self.telemetry, Unset)
+            else self.telemetry
         )
         self.uvicorn = (
             UvicornServerSettings.model_validate(DefaultUvicornSettings)
@@ -471,7 +486,7 @@ class CodeWeaverSettings(BaseSettings):
             logger.debug("Rebuilt CodeWeaverSettings during post-init, result: %s", result)
         if type(self).__pydantic_complete__:
             # Ensure all nested Unset values are replaced with defaults
-            ensure_set_fields(self)
+            self = cast(CodeWeaverSettings, ensure_set_fields(self))
             # Exclude computed fields to prevent circular dependency during initialization
             # Computed fields like IndexingSettings.cache_dir may call get_settings()
             self._map = cast(
@@ -728,7 +743,24 @@ class CodeWeaverSettings(BaseSettings):
             self._map = DictView(self.model_dump(exclude_computed_fields=True))  # type: ignore
         return self._map  # type: ignore
 
-    def save_to_file(self, path: FilePath | None = None) -> None:
+    @classmethod
+    def generate_default_config(cls, path: Path) -> None:
+        """Generate a default configuration file at the specified path.
+
+        The file format is determined by the file extension (.toml, .yaml/.yml, .json).
+        """
+        default_settings = cls()
+        config = default_settings.model_dump(
+            exclude_unset=True,
+            by_alias=True,
+            exclude_defaults=True,
+            round_trip=True,
+            exclude_computed_fields=True,
+            exclude={"config_file"},
+            mode="python",
+        )
+
+    def save_to_file(self, path: Path | None = None) -> None:
         """Save the current settings to a configuration file.
 
         The file format is determined by the file extension (.toml, .yaml/.yml, .json).
@@ -746,6 +778,7 @@ class CodeWeaverSettings(BaseSettings):
             "exclude_defaults": True,
             "round_trip": True,
             "exclude_computed_fields": True,
+            "mode": "python",
         }
         as_obj = self.model_dump(**kwargs)  # type: ignore
         data: str
@@ -771,8 +804,7 @@ class CodeWeaverSettings(BaseSettings):
                 data = yaml.dump(self.model_dump())
             case _:
                 raise ValueError(f"Unsupported configuration file format: {extension}")
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(data)
+        _ = path.write_text(data, encoding="utf-8")
 
 
 # Global settings instance

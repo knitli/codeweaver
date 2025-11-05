@@ -19,12 +19,10 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "HttpRequestsDict": (__spec__.parent, "types"),
     "Identifier": (__spec__.parent, "statistics"),
     "LazyImport": (__spec__.parent, "utils"),
-    "MISSING": (__spec__.parent, "utils"),
     "McpComponentRequests": (__spec__.parent, "types"),
     "McpComponentTimingDict": (__spec__.parent, "types"),
     "McpOperationRequests": (__spec__.parent, "types"),
     "McpTimingDict": (__spec__.parent, "types"),
-    "Missing": (__spec__.parent, "utils"),
     "ResourceUri": (__spec__.parent, "types"),
     "SessionStatistics": (__spec__.parent, "statistics"),
     "TimingStatistics": (__spec__.parent, "statistics"),
@@ -84,7 +82,6 @@ def __getattr__(name: str) -> object:
 
 __all__ = (
     "CODEWEAVER_PREFIX",
-    "MISSING",
     "CallHookTimingDict",
     "FileStatistics",
     "HttpRequestsDict",
@@ -94,7 +91,6 @@ __all__ = (
     "McpComponentTimingDict",
     "McpOperationRequests",
     "McpTimingDict",
-    "Missing",
     "ResourceUri",
     "SessionStatistics",
     "TimingStatistics",
