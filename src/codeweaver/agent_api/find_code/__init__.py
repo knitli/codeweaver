@@ -150,11 +150,11 @@ async def find_code(
         embeddings = await embed_query(query)
 
         # Step 3: Build query vector and determine strategy
-        query_intent_obj = build_query_vector(embeddings)
-        strategies_used.append(query_intent_obj.strategy)
+        query_vector = build_query_vector(embeddings, query)
+        strategies_used.append(query_vector.strategy)
 
         # Step 4: Execute vector search
-        candidates = await execute_vector_search(query_intent_obj)
+        candidates = await execute_vector_search(query_vector)
 
         # Step 5: Post-search filtering (v0.1 simple approach)
         candidates = apply_filters(

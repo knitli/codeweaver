@@ -84,6 +84,54 @@ from codeweaver.core.types.sentinel import UNSET, Unset
 logger = logging.getLogger(__name__)
 
 
+def _determine_setting(
+    field_name: str, field_info: FieldInfo, obj: BaseSettings | BasedModel
+) -> Any:
+    """Determine the correct value for a setting field that was Unset."""
+    if (
+        isinstance(field_info.default, Unset)
+        and hasattr(obj, "_defaults")
+        and (defaults := obj._defaults() if callable(obj._defaults) else obj._defaults)  # type: ignore
+        and (value := defaults.get(field_name))  # type: ignore
+    ):
+        return value  # type: ignore
+    if (
+        (annotation := field_info.annotation)
+        and hasattr(annotation, "__args__")
+        and (args := annotation.__args__)
+        and (other_sources := tuple(arg for arg in args if arg is not Unset and arg is not None))
+        and (other := other_sources[0])
+    ):
+        return other
+    return None
+
+
+def ensure_set_fields(obj: BaseSettings | BasedModel) -> BaseSettings | BasedModel:
+    """Ensure all fields in a pydantic model are set, replacing Unset with None where applicable."""
+    for field_name in type(obj).model_fields:
+        value = getattr(obj, field_name)
+        if isinstance(value, Unset):
+            value = _determine_setting(field_name, type(obj).model_fields[field_name], obj)
+            setattr(
+                obj,
+                field_name,
+                ensure_set_fields(value())
+                if issubclass(value, BaseSettings | BasedModel)
+                else value,
+            )
+        elif isinstance(value, BaseSettings | BasedModel):
+            setattr(obj, field_name, ensure_set_fields(value))
+        elif isinstance(value, list):
+            for i, item in enumerate(value):  # type: ignore
+                if isinstance(item, BaseSettings | BasedModel):
+                    value[i] = ensure_set_fields(item)
+        elif isinstance(value, dict):
+            for key, item in value.items():  # type: ignore
+                if isinstance(item, BaseSettings | BasedModel):
+                    value[key] = ensure_set_fields(item)
+    return obj
+
+
 class FastMcpServerSettings(BasedModel):
     """Settings for the FastMCP server.
 
@@ -265,18 +313,24 @@ class CodeWeaverSettings(BaseSettings):
     project_path: Annotated[
         DirectoryPath | Unset,
         Field(
-            description="""Root path of the codebase to analyze. CodeWeaver will try to detect the project root automatically if you don't provide one."""
+            description="""Root path of the codebase to analyze. CodeWeaver will try to detect the project root automatically if you don't provide one.""",
+            validate_default=False,
         ),
     ] = UNSET
 
     project_name: Annotated[
-        str | Unset, Field(description="""Project name (auto-detected from directory if None)""")
+        str | Unset,
+        Field(
+            description="""Project name (auto-detected from directory if None)""",
+            validate_default=False,
+        ),
     ] = UNSET
 
     provider: Annotated[
         ProviderSettings | Unset,
         Field(
-            description="""Provider and model configurations for agents, data, embedding, reranking, sparse embedding, and vector store providers. Will default to default profile if not provided."""
+            description="""Provider and model configurations for agents, data, embedding, reranking, sparse embedding, and vector store providers. Will default to default profile if not provided.""",
+            validate_default=False,
         ),
     ] = UNSET
 
@@ -287,48 +341,60 @@ class CodeWeaverSettings(BaseSettings):
 
     # Performance settings
     token_limit: Annotated[
-        PositiveInt | Unset, Field(description="""Maximum tokens per response""")
+        PositiveInt | Unset,
+        Field(description="""Maximum tokens per response""", validate_default=False),
     ] = UNSET
     max_file_size: Annotated[
-        PositiveInt | Unset, Field(description="""Maximum file size to process in bytes""")
+        PositiveInt | Unset,
+        Field(description="""Maximum file size to process in bytes""", validate_default=False),
     ] = UNSET
     max_results: Annotated[
         PositiveInt | Unset,
         Field(
-            description="""Maximum code matches to return. Because CodeWeaver primarily indexes ast-nodes, a page can return multiple matches per file, so this is not the same as the number of files returned. This is the maximum number of code matches returned in a single response."""
+            description="""Maximum code matches to return. Because CodeWeaver primarily indexes ast-nodes, a page can return multiple matches per file, so this is not the same as the number of files returned. This is the maximum number of code matches returned in a single response.""",
+            validate_default=False,
         ),
     ] = UNSET
     server: Annotated[
         FastMcpServerSettings | Unset,
-        Field(description="""Optionally customize FastMCP server settings."""),
+        Field(
+            description="""Optionally customize FastMCP server settings.""", validate_default=False
+        ),
     ] = UNSET
 
-    logging: Annotated[LoggingSettings | Unset, Field(description="""Logging configuration""")] = (
-        UNSET
-    )
+    logging: Annotated[
+        LoggingSettings | Unset,
+        Field(description="""Logging configuration""", validate_default=False),
+    ] = UNSET
 
     middleware: Annotated[
-        MiddlewareOptions | Unset, Field(description="""Middleware settings""")
+        MiddlewareOptions | Unset,
+        Field(description="""Middleware settings""", validate_default=False),
     ] = UNSET
 
     indexing: Annotated[
-        IndexerSettings | Unset, Field(description="""File filtering settings""")
+        IndexerSettings | Unset,
+        Field(description="""File filtering settings""", validate_default=False),
     ] = UNSET
 
     chunker: Annotated[
-        ChunkerSettings | Unset, Field(description="""Chunker system configuration""")
+        ChunkerSettings | Unset,
+        Field(description="""Chunker system configuration""", validate_default=False),
     ] = UNSET
 
     endpoints: Annotated[
-        EndpointSettingsDict | Unset, Field(description="""Endpoint settings""")
+        EndpointSettingsDict | Unset,
+        Field(description="""Endpoint settings""", validate_default=False),
     ] = UNSET
 
     uvicorn: Annotated[
-        UvicornServerSettings | Unset, Field(description="""Settings for the Uvicorn server""")
+        UvicornServerSettings | Unset,
+        Field(description="""Settings for the Uvicorn server""", validate_default=False),
     ] = UNSET
 
     telemetry: Annotated[
-        TelemetrySettings | Unset, Field(description="""Telemetry configuration""")
+        TelemetrySettings | Unset,
+        Field(description="""Telemetry configuration""", validate_default=False),
     ] = UNSET
 
     __version__: Annotated[
@@ -362,7 +428,7 @@ class CodeWeaverSettings(BaseSettings):
         )
         self.provider = (
             ProviderSettings.model_validate(AllDefaultProviderSettings)
-            if isinstance(self.provider, Unset)
+            if isinstance(self.provider, Unset) or self.provider is None  # pyright: ignore[reportUnnecessaryComparison]
             else self.provider
         )
         self.token_limit = 30_000 if isinstance(self.token_limit, Unset) else self.token_limit
@@ -389,7 +455,7 @@ class CodeWeaverSettings(BaseSettings):
         )
         self.endpoints = (
             DefaultEndpointSettings
-            if isinstance(self.endpoints, Unset)
+            if isinstance(self.endpoints, Unset) or self.endpoints is None  # pyright: ignore[reportUnnecessaryComparison]
             else DefaultEndpointSettings | self.endpoints
         )
         if not type(self).__pydantic_complete__:
@@ -636,14 +702,67 @@ class CodeWeaverSettings(BaseSettings):
         """Get a read-only mapping view of the settings."""
         if self._map is None or not self._map:
             try:
-                self._map = DictView(self.model_dump())  # type: ignore
+                self._map = DictView(self.model_dump(exclude_computed_fields=True))  # type: ignore
             except Exception:
                 logger.exception("Failed to create settings map view")
                 _ = type(self).model_rebuild()
                 self._map = DictView(self.model_dump())  # type: ignore
         if not self._map:
             raise TypeError("Settings map view is not a valid DictView[CodeWeaverSettingsDict]")
-        return self._map
+        if unset_fields := tuple(
+            field for field in type(self).model_fields if getattr(self, field) is Unset
+        ):
+            logger.warning("Some fields in CodeWeaverSettings are still unset: %s", unset_fields)
+            self._unset_fields |= set(unset_fields)
+            self = ensure_set_fields(self)
+            self._map = DictView(self.model_dump(exclude_computed_fields=True))  # type: ignore
+        return self._map  # type: ignore
+
+    def save_to_file(self, path: FilePath | None = None) -> None:
+        """Save the current settings to a configuration file.
+
+        The file format is determined by the file extension (.toml, .yaml/.yml, .json).
+        """
+        path = path or self.config_file
+        if path is None and isinstance(self.project_path, Path):
+            path = self.project_path / ".codeweaver.toml"
+        if path is None:
+            raise ValueError("No path provided to save configuration file.")
+        extension = path.suffix.lower()
+        kwargs = {
+            "indent": 4,
+            "exclude_unset": True,
+            "by_alias": True,
+            "exclude_defaults": True,
+            "round_trip": True,
+            "exclude_computed_fields": True,
+        }
+        as_obj = self.model_dump(**kwargs)  # type: ignore
+        data: str
+        match extension:
+            case ".json":
+                from pydantic_core import to_json
+
+                data = to_json(
+                    as_obj,
+                    **{
+                        k: v
+                        for k, v in kwargs.items()
+                        if k not in {"exclude_unset", "exclude_defaults", "exclude_computed_fields"}
+                    },  # type: ignore
+                ).decode("utf-8")
+            case ".toml":
+                import tomli_w
+
+                data = tomli_w.dumps(as_obj)
+            case ".yaml" | ".yml":
+                import yaml
+
+                data = yaml.dump(self.model_dump())
+            case _:
+                raise ValueError(f"Unsupported configuration file format: {extension}")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(data)
 
 
 # Global settings instance
@@ -715,7 +834,11 @@ def get_settings_map() -> DictView[CodeWeaverSettingsDict]:
         _ = CodeWeaverSettings.model_rebuild()
         settings = get_settings()
     if _mapped_settings is None or _mapped_settings != settings.view:
-        _mapped_settings = settings.view
+        _mapped_settings = settings.view or (
+            _mapped_settings or DictView(settings.model_dump(round_trip=True))
+        )  # type: ignore
+    if not _mapped_settings:
+        raise TypeError("Mapped settings is not a valid DictView[CodeWeaverSettingsDict]")
     return _mapped_settings
 
 

@@ -83,6 +83,23 @@ def temp_test_file(tmp_path: Path):
     return test_file
 
 
+@pytest.fixture(autouse=True)
+def clear_semantic_chunker_stores():
+    """Clear SemanticChunker class-level deduplication stores before each test.
+
+    This prevents test interference where chunks from one test are marked as
+    duplicates in subsequent tests. The stores are class-level by design for
+    production use (cross-file deduplication within a session), but need to be
+    reset between test runs for isolation.
+    """
+    from codeweaver.engine.chunker.semantic import SemanticChunker
+
+    SemanticChunker.clear_deduplication_stores()
+    yield
+    # Optional: Clear again after test for extra safety
+    SemanticChunker.clear_deduplication_stores()
+
+
 # ===========================================================================
 # *                    Qdrant Test Instance Management
 # ===========================================================================
@@ -131,7 +148,8 @@ async def qdrant_test_manager(tmp_path: Path):
         # Quick check: is port in use?
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.settimeout(0.1)  # Very quick check
-            if sock.connect_ex(("localhost", port)) != 0:
+            # Use 127.0.0.1 instead of localhost to avoid DNS lookup in WSL
+            if sock.connect_ex(("127.0.0.1", port)) != 0:
                 # Nothing listening on this port, skip
                 continue
 

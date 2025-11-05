@@ -110,16 +110,19 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         **kwargs: Any,
     ) -> None:
         """Initialize the Sentence Transformers embedding provider."""
-        self._caps = capabilities
-        self.doc_kwargs = {**self._doc_kwargs, **(kwargs or {})}
-        self.query_kwargs = {**self._query_kwargs, **(kwargs or {})}
+        # Initialize client if not provided
         if client is None:
-            self._client = SentenceTransformer(
-                model_name_or_path=capabilities.name, **self.doc_kwargs["client_options"]
+            doc_kwargs = {**self._doc_kwargs, **(kwargs or {})}
+            client = SentenceTransformer(
+                model_name_or_path=capabilities.name, **doc_kwargs.get("client_options", {})
             )
-        else:
-            self._client = client
-        super().__init__(caps=capabilities, client=self._client, **kwargs)
+
+        # Store client before calling super() so _initialize() can access it
+        self._client = client
+
+        # Call super().__init__() which handles all initialization
+        # The base class will set doc_kwargs, query_kwargs, and call _initialize()
+        super().__init__(client=client, caps=capabilities, kwargs=kwargs)
 
     @property
     def base_url(self) -> str | None:
@@ -128,6 +131,9 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
 
     def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """Initialize the Sentence Transformers embedding provider."""
+        # Set _caps for later use
+        self._caps = caps
+
         for keyword_args in (self.doc_kwargs, self.query_kwargs):
             keyword_args.setdefault("client_options", {})
             if "normalize_embeddings" not in keyword_args["client_options"]:
@@ -138,12 +144,19 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
                 "model_name" not in keyword_args["client_options"]
                 and "model_name_or_path" not in keyword_args["client_options"]
             ):
-                keyword_args["client_options"]["model_name_or_path"] = self._caps.name
-        name = self.doc_kwargs.pop("model_name", self.doc_kwargs.pop("model_name_or_path"))
-        self.query_kwargs.pop("model_name", self.query_kwargs.pop("model_name_or_path", None))
-        self._client = self._client(name, **(self.doc_kwargs or {}))
+                keyword_args["client_options"]["model_name_or_path"] = caps.name
+
+        # Extract model name for potential use
+        name = self.doc_kwargs.pop("model_name", None) or self.doc_kwargs.pop("model_name_or_path", None) or caps.name
+        self.query_kwargs.pop("model_name", None)
+        self.query_kwargs.pop("model_name_or_path", None)
+
+        # Note: _client is already set by __init__ when client is provided
+        # The old code here (self._client = self._client(name, ...)) was incorrect
+        # as it tried to call an instance as if it were a class
+
         if (
-            (other := self._caps.other)
+            (other := caps.other)
             and (model := other.get("model_kwargs", {}))
             and (instruction := model.get("instruction"))
         ):
@@ -251,16 +264,19 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[SparseEncoder])
         **kwargs: Any,
     ) -> None:
         """Initialize the Sentence Transformers sparse embedding provider."""
-        self._caps = capabilities  # type: ignore
-        self.doc_kwargs = {**self._doc_kwargs, **(kwargs or {})}
-        self.query_kwargs = {**self._query_kwargs, **(kwargs or {})}
+        # Initialize client if not provided
         if client is None:
-            self._client = SparseEncoder(
-                model_name_or_path=capabilities.name, **self.doc_kwargs["client_options"]
+            doc_kwargs = {**self._doc_kwargs, **(kwargs or {})}
+            client = SparseEncoder(
+                model_name_or_path=capabilities.name, **doc_kwargs.get("client_options", {})
             )
-        else:
-            self._client = client
-        super().__init__(caps=capabilities, client=self._client, **kwargs)  # type: ignore
+
+        # Store client before calling super() so _initialize() can access it
+        self._client = client
+
+        # Call super().__init__() which handles all initialization
+        # The base class will set doc_kwargs, query_kwargs, and call _initialize()
+        super().__init__(client=client, caps=capabilities, kwargs=kwargs)  # type: ignore
 
     @property
     def base_url(self) -> str | None:
@@ -269,6 +285,9 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[SparseEncoder])
 
     def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """Initialize the Sentence Transformers sparse embedding provider."""
+        # Set _caps for later use
+        self._caps = caps  # type: ignore
+
         for keyword_args in (self.doc_kwargs, self.query_kwargs):
             keyword_args.setdefault("client_options", {})
             if "trust_remote_code" not in keyword_args["client_options"]:
@@ -277,10 +296,14 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[SparseEncoder])
                 "model_name" not in keyword_args["client_options"]
                 and "model_name_or_path" not in keyword_args["client_options"]
             ):
-                keyword_args["client_options"]["model_name_or_path"] = self._caps.name
-        name = self.doc_kwargs.pop("model_name", self.doc_kwargs.pop("model_name_or_path"))
-        self.query_kwargs.pop("model_name", self.query_kwargs.pop("model_name_or_path", None))
-        self._client = SparseEncoder(name, **(self.doc_kwargs or {}))
+                keyword_args["client_options"]["model_name_or_path"] = caps.name
+        name = self.doc_kwargs.pop("model_name", None) or self.doc_kwargs.pop("model_name_or_path", None)
+        self.query_kwargs.pop("model_name", None)
+        self.query_kwargs.pop("model_name_or_path", None)
+
+        # Note: _client is already set by __init__ when client is provided
+        # The old code here (self._client = SparseEncoder(name, ...)) was incorrect
+        # as it tried to re-initialize an already-initialized client
 
     def _to_sparse_format(self, embedding: Any) -> SparseEmbedding:
         """Convert embedding to sparse format with indices and values."""

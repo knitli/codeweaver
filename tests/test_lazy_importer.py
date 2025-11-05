@@ -445,24 +445,63 @@ class TestDocumentationExamples:
 class TestLazyImportPerformance:
     """Test performance characteristics of LazyImport."""
 
-    def test_resolution_overhead(self, benchmark):
-        """Benchmark the overhead of lazy resolution vs direct import."""
+    def test_resolution_overhead(self):
+        """Test that lazy resolution overhead is reasonable."""
+        import time
 
-        def lazy_import_and_use():
+        # Measure lazy import + resolution
+        iterations = 1000
+        start = time.perf_counter()
+        for _ in range(iterations):
             lazy = lazy_import("os.path", "join")
-            return lazy("a", "b")
+            result = lazy("a", "b")
+            assert result == "a/b"
+        lazy_time = time.perf_counter() - start
 
-        result = benchmark(lazy_import_and_use)
-        assert result == "a/b"
+        # Measure direct import (baseline)
+        start = time.perf_counter()
+        for _ in range(iterations):
+            from os.path import join
 
-    def test_cached_resolution_performance(self, benchmark):
-        """Benchmark cached resolution (should be fast)."""
+            result = join("a", "b")
+            assert result == "a/b"
+        direct_time = time.perf_counter() - start
+
+        # Lazy import should be within reasonable overhead (10x)
+        # This is a sanity check, not a strict performance requirement
+        assert lazy_time < direct_time * 10, (
+            f"Lazy import too slow: {lazy_time:.4f}s vs direct {direct_time:.4f}s "
+            f"(ratio: {lazy_time / direct_time:.1f}x)"
+        )
+
+    def test_cached_resolution_performance(self):
+        """Test that cached resolution is fast (minimal overhead)."""
+        import time
+
         lazy = lazy_import("os.path", "join")
         # Pre-resolve it
         lazy._resolve()
 
-        def use_cached():
-            return lazy("a", "b")
+        # Measure cached access
+        iterations = 10000
+        start = time.perf_counter()
+        for _ in range(iterations):
+            result = lazy("a", "b")
+            assert result == "a/b"
+        cached_time = time.perf_counter() - start
 
-        result = benchmark(use_cached)
-        assert result == "a/b"
+        # Measure direct access (baseline)
+        from os.path import join
+
+        start = time.perf_counter()
+        for _ in range(iterations):
+            result = join("a", "b")
+            assert result == "a/b"
+        direct_time = time.perf_counter() - start
+
+        # Cached access should be reasonably fast (within 3x of direct access)
+        # Note: There is inherent overhead from __call__ forwarding even after resolution
+        assert cached_time < direct_time * 3, (
+            f"Cached access too slow: {cached_time:.4f}s vs direct {direct_time:.4f}s "
+            f"(ratio: {cached_time / direct_time:.1f}x)"
+        )

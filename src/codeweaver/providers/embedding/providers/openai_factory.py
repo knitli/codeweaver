@@ -129,27 +129,33 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
                 """
                 Initialize the embedding provider.
                 """
-                self._provider = provider
-                self._caps = caps
-                if client is not None:
-                    self._client = client
+                # 1. Prepare kwargs before calling parent
                 kwargs.setdefault("model", model_name)
                 if base_url is not None:
                     kwargs.setdefault("base_url", base_url)
                 if provider_kwargs:
                     kwargs.setdefault("provider_kwargs", provider_kwargs)
-                if self._provider == Provider.OLLAMA:
+                if provider == Provider.OLLAMA:
                     kwargs.setdefault("api_key", "ollama")
-                base.__init__(self, *args, **kwargs)
+
+                # 2. Initialize client if not provided (use nonlocal to access outer scope)
+                client_instance = client
+                if client_instance is None:
+                    from openai import AsyncOpenAI
+                    client_kwargs = {"api_key": kwargs.get("api_key", "ollama" if provider == Provider.OLLAMA else None)}
+                    if base_url:
+                        client_kwargs["base_url"] = base_url
+                    client_instance = AsyncOpenAI(**client_kwargs)
+
+                # 3. Call parent __init__ FIRST with proper arguments
+                # Base class expects (client, caps, kwargs) as per line 171-176 of base.py
+                base.__init__(self, client=client_instance, caps=caps, kwargs=kwargs)
+
+                # 4. Set provider-specific attributes AFTER parent initialization
+                self._provider = provider
 
             return __init__
 
-        attrs: dict[str, Any] = {
-            "_default_model_name": model_name,
-            "_default_provider": provider,
-            "_default_base_url": base_url,
-            "_default_provider_kwargs": provider_kwargs or {},
-        }
         parent_cls = cls
         # Because this is a BaseModel, we need to set __init__ on the parent class
         # so that it's there *before* pydantic does its thing so it can account for it.
@@ -157,17 +163,26 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         parent_cls.__init__ = make_init(
             cls, model_name, provider, base_url, provider_kwargs or {}, client=client
         )
-        return create_model(
+
+        # Create the new provider class with proper field definitions
+        new_class = create_model(
             name,
             __doc__=f"An embedding provider class for {str(provider).title()}.\n\nI was proudly made in the `codeweaver.providers.embedding.providers.openai_factory` module by hardworking electrons.",
             __base__=parent_cls,
             __module__="codeweaver.providers.embedding.providers.openai_factory",
             __validators__=None,
-            __cls_kwargs__=attrs,
             _client=(AsyncOpenAI, ...),
             _provider=(Provider, provider),
             _caps=(EmbeddingModelCapabilities, capabilities),
         )
+
+        # Set metadata attributes that aren't Pydantic fields
+        new_class._default_model_name = model_name
+        new_class._default_provider = provider
+        new_class._default_base_url = base_url
+        new_class._default_provider_kwargs = provider_kwargs or {}
+
+        return new_class
 
     _client: AsyncOpenAI
     _provider: Provider

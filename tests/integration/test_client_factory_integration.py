@@ -23,8 +23,9 @@ class TestProviderInstantiationWithClientFactory:
     @pytest.fixture
     def registry(self):
         """Create a ProviderRegistry for testing."""
-        from codeweaver.common.registry.provider import ProviderRegistry
         from unittest.mock import Mock
+
+        from codeweaver.common.registry.provider import ProviderRegistry
 
         # Create mock settings to avoid Unset type annotation issues
         mock_settings = Mock()
@@ -60,7 +61,11 @@ class TestProviderInstantiationWithClientFactory:
         mock_provider_class = Mock()
         mock_provider_instance = Mock()
         mock_provider_lazy = Mock()
+        mock_provider_lazy.__name__ = (
+            "MockVoyageProvider"  # Fix: Add __name__ to lazy mock (not resolved class)
+        )
         mock_provider_lazy._resolve.return_value = mock_provider_class
+        mock_provider_lazy.return_value = mock_provider_instance  # Fix: mock_provider_lazy is called at line 959
         mock_provider_class.return_value = mock_provider_instance
 
         mock_client_map = {
@@ -77,22 +82,18 @@ class TestProviderInstantiationWithClientFactory:
         with patch("codeweaver.providers.capabilities.CLIENT_MAP", mock_client_map):
             with patch.dict("os.environ", {"VOYAGE_API_KEY": "test_key"}):
                 # Register the provider
-                registry.register(
-                    Provider.VOYAGE,
-                    ProviderKind.EMBEDDING,
-                    mock_provider_lazy,
-                )
+                registry.register(Provider.VOYAGE, ProviderKind.EMBEDDING, mock_provider_lazy)
 
                 # Create provider
-                provider = registry.create_provider(
+                registry.create_provider(
                     Provider.VOYAGE,
                     ProviderKind.EMBEDDING,
                     provider_settings={"api_key": "test_key"},
                 )
 
                 # Verify client was created and passed to provider
-                mock_provider_class.assert_called_once()
-                call_kwargs = mock_provider_class.call_args[1]
+                mock_provider_lazy.assert_called_once()
+                call_kwargs = mock_provider_lazy.call_args[1]
                 assert "client" in call_kwargs
                 assert call_kwargs["client"] == mock_client_instance
 
@@ -107,7 +108,11 @@ class TestProviderInstantiationWithClientFactory:
 
         mock_provider_class = Mock()
         mock_provider_lazy = Mock()
+        mock_provider_lazy.__name__ = (
+            "MockVoyageProvider"  # Fix: Add __name__ to lazy mock (not resolved class)
+        )
         mock_provider_lazy._resolve.return_value = mock_provider_class
+        mock_provider_lazy.return_value = Mock()  # Fix: mock_provider_lazy is called at line 959
 
         mock_client_map = {
             Provider.VOYAGE: (
@@ -121,22 +126,18 @@ class TestProviderInstantiationWithClientFactory:
         }
 
         with patch("codeweaver.providers.capabilities.CLIENT_MAP", mock_client_map):
-            registry.register(
-                Provider.VOYAGE,
-                ProviderKind.EMBEDDING,
-                mock_provider_lazy,
-            )
+            registry.register(Provider.VOYAGE, ProviderKind.EMBEDDING, mock_provider_lazy)
 
             # Pass explicit client
-            provider = registry.create_provider(
+            registry.create_provider(
                 Provider.VOYAGE,
                 ProviderKind.EMBEDDING,
                 client=mock_existing_client,  # Explicit client
             )
 
             # Should use existing client, not create new one
-            mock_provider_class.assert_called_once()
-            call_kwargs = mock_provider_class.call_args[1]
+            mock_provider_lazy.assert_called_once()
+            call_kwargs = mock_provider_lazy.call_args[1]
             assert call_kwargs["client"] == mock_existing_client
             # Mock client class should not have been called
             mock_client_class.assert_not_called()
@@ -151,7 +152,11 @@ class TestProviderInstantiationWithClientFactory:
 
         mock_provider_class = Mock(return_value=Mock())
         mock_provider_lazy = Mock()
+        mock_provider_lazy.__name__ = (
+            "MockVoyageProvider"  # Fix: Add __name__ to lazy mock (not resolved class)
+        )
         mock_provider_lazy._resolve.return_value = mock_provider_class
+        mock_provider_lazy.return_value = Mock()  # Fix: mock_provider_lazy is called at line 959
 
         mock_client_map = {
             Provider.VOYAGE: (
@@ -166,21 +171,14 @@ class TestProviderInstantiationWithClientFactory:
 
         with patch("codeweaver.providers.capabilities.CLIENT_MAP", mock_client_map):
             with patch.dict("os.environ", {"VOYAGE_API_KEY": "test_key"}):
-                registry.register(
-                    Provider.VOYAGE,
-                    ProviderKind.EMBEDDING,
-                    mock_provider_lazy,
-                )
+                registry.register(Provider.VOYAGE, ProviderKind.EMBEDDING, mock_provider_lazy)
 
                 # Should not raise, just log warning
-                provider = registry.create_provider(
-                    Provider.VOYAGE,
-                    ProviderKind.EMBEDDING,
-                )
+                registry.create_provider(Provider.VOYAGE, ProviderKind.EMBEDDING)
 
                 # Provider should still be created (without client)
-                mock_provider_class.assert_called_once()
-                call_kwargs = mock_provider_class.call_args[1]
+                mock_provider_lazy.assert_called_once()
+                call_kwargs = mock_provider_lazy.call_args[1]
                 # Client should not be in kwargs since creation failed
                 assert "client" not in call_kwargs
 
@@ -191,8 +189,9 @@ class TestVectorStoreProviderWithClientFactory:
     @pytest.fixture
     def registry(self):
         """Create a ProviderRegistry for testing."""
-        from codeweaver.common.registry.provider import ProviderRegistry
         from unittest.mock import Mock
+
+        from codeweaver.common.registry.provider import ProviderRegistry
 
         # Create mock settings to avoid Unset type annotation issues
         mock_settings = Mock()
@@ -221,13 +220,15 @@ class TestVectorStoreProviderWithClientFactory:
 
         mock_client_instance = Mock()
         mock_client_instance.location = ":memory:"
-        mock_client_class = Mock(return_value=mock_client_instance)
+        # Fix: Mock should fail first (no URL), then succeed with memory mode
+        mock_client_class = Mock(side_effect=[Exception("No URL provided"), mock_client_instance])
         mock_lazy_import = Mock()
         mock_lazy_import._resolve.return_value = mock_client_class
 
         mock_provider_class = Mock(return_value=Mock())
         mock_provider_lazy = Mock()
         mock_provider_lazy._resolve.return_value = mock_provider_class
+        mock_provider_lazy.return_value = Mock()  # Fix: mock_provider_lazy is what gets called
 
         mock_client_map = {
             Provider.QDRANT: (
@@ -241,24 +242,18 @@ class TestVectorStoreProviderWithClientFactory:
         }
 
         with patch("codeweaver.providers.capabilities.CLIENT_MAP", mock_client_map):
-            registry.register(
-                Provider.QDRANT,
-                ProviderKind.VECTOR_STORE,
-                mock_provider_lazy,
-            )
+            registry.register(Provider.QDRANT, ProviderKind.VECTOR_STORE, mock_provider_lazy)
 
             # Create provider without settings (should use memory mode)
-            provider = registry.create_provider(
-                Provider.QDRANT,
-                ProviderKind.VECTOR_STORE,
-            )
+            registry.create_provider(Provider.QDRANT, ProviderKind.VECTOR_STORE)
 
-            # Verify client was created with memory mode
-            mock_client_class.assert_called_once_with(location=":memory:")
+            # Verify client was created with memory mode (second call after exception)
+            assert mock_client_class.call_count == 2
+            mock_client_class.assert_called_with(location=":memory:")
 
             # Verify client was passed to provider
-            mock_provider_class.assert_called_once()
-            call_kwargs = mock_provider_class.call_args[1]
+            mock_provider_lazy.assert_called_once()
+            call_kwargs = mock_provider_lazy.call_args[1]
             assert "client" in call_kwargs
             assert call_kwargs["client"] == mock_client_instance
 
@@ -287,26 +282,18 @@ class TestVectorStoreProviderWithClientFactory:
         }
 
         with patch("codeweaver.providers.capabilities.CLIENT_MAP", mock_client_map):
-            registry.register(
-                Provider.QDRANT,
-                ProviderKind.VECTOR_STORE,
-                mock_provider_lazy,
-            )
+            registry.register(Provider.QDRANT, ProviderKind.VECTOR_STORE, mock_provider_lazy)
 
             # Create provider with URL
-            provider = registry.create_provider(
+            registry.create_provider(
                 Provider.QDRANT,
                 ProviderKind.VECTOR_STORE,
-                provider_settings={
-                    "url": "http://localhost:6333",
-                    "api_key": "test_key",
-                },
+                provider_settings={"url": "http://localhost:6333", "api_key": "test_key"},
             )
 
             # Verify client was created with URL
             mock_client_class.assert_called_once_with(
-                url="http://localhost:6333",
-                api_key="test_key",
+                url="http://localhost:6333", api_key="test_key"
             )
 
 
@@ -316,8 +303,9 @@ class TestProviderKindStringHandling:
     @pytest.fixture
     def registry(self):
         """Create a ProviderRegistry for testing."""
-        from codeweaver.common.registry.provider import ProviderRegistry
         from unittest.mock import Mock
+
+        from codeweaver.common.registry.provider import ProviderRegistry
 
         # Create mock settings to avoid Unset type annotation issues
         mock_settings = Mock()
@@ -351,7 +339,11 @@ class TestProviderKindStringHandling:
 
         mock_provider_class = Mock(return_value=Mock())
         mock_provider_lazy = Mock()
+        mock_provider_lazy.__name__ = (
+            "MockVoyageProvider"  # Fix: Add __name__ to lazy mock (not resolved class)
+        )
         mock_provider_lazy._resolve.return_value = mock_provider_class
+        mock_provider_lazy.return_value = Mock()  # Fix: mock_provider_lazy is called at line 959
 
         mock_client_map = {
             Provider.VOYAGE: (
@@ -366,22 +358,18 @@ class TestProviderKindStringHandling:
 
         with patch("codeweaver.providers.capabilities.CLIENT_MAP", mock_client_map):
             with patch.dict("os.environ", {"VOYAGE_API_KEY": "test_key"}):
-                registry.register(
-                    Provider.VOYAGE,
-                    ProviderKind.EMBEDDING,
-                    mock_provider_lazy,
-                )
+                registry.register(Provider.VOYAGE, ProviderKind.EMBEDDING, mock_provider_lazy)
 
                 # Use string instead of enum
-                provider = registry.create_provider(
+                registry.create_provider(
                     Provider.VOYAGE,
                     "embedding",  # String
                     provider_settings={"api_key": "test_key"},
                 )
 
                 # Should work correctly
-                mock_provider_class.assert_called_once()
-                call_kwargs = mock_provider_class.call_args[1]
+                mock_provider_lazy.assert_called_once()
+                call_kwargs = mock_provider_lazy.call_args[1]
                 assert "client" in call_kwargs
 
 
@@ -390,8 +378,9 @@ class TestGlobalRegistryIntegration:
 
     def test_get_provider_registry_has_client_factory(self):
         """Test that global registry has client factory methods."""
-        from codeweaver.common.registry.provider import ProviderRegistry
         from unittest.mock import Mock
+
+        from codeweaver.common.registry.provider import ProviderRegistry
 
         # Create mock registry instance
         mock_settings = Mock()

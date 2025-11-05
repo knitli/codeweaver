@@ -1,10 +1,10 @@
+"""CodeWeaver CLI - Search Command."""
+
 # sourcery skip: avoid-global-variables, no-complex-if-expressions
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-"""CLI application for CodeWeaver using cyclopts."""
-
 from __future__ import annotations
 
 import sys
@@ -15,76 +15,22 @@ from typing import Annotated, Literal
 
 import cyclopts
 
-from pydantic import FilePath
+from cyclopts import App
 from rich import print as rich_print
 from rich.console import Console
 from rich.table import Table
 
 from codeweaver.agent_api.find_code.intent import IntentType
-from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary  #  find_code
+from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
 from codeweaver.common import CODEWEAVER_PREFIX
-from codeweaver.common.utils import LazyImport, lazy_import
-from codeweaver.config.settings import CodeWeaverSettingsDict
-from codeweaver.core.types.dictview import DictView
+from codeweaver.config.settings import get_settings_map
 from codeweaver.exceptions import CodeWeaverError
 
 
-# Lazy import for performance
-get_settings_map: LazyImport[DictView[CodeWeaverSettingsDict]] = lazy_import(
-    "codeweaver.config", "get_settings_map"
-)
-
-# Initialize console for rich output
 console = Console(markup=True, emoji=True)
-
-# Create the main CLI application
-app = cyclopts.App(
-    name="codeweaver",
-    help="CodeWeaver: A tool that gives AI agents exactly what you need them to have.",
+app = App(
+    "search", default_command="search", help="Search codebase from command line.", console=console
 )
-
-
-async def _run_server(
-    config_file: Annotated[FilePath | None, cyclopts.Parameter(name=["--config", "-c"])] = None,
-    project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
-    host: str = "127.0.0.1",
-    port: int = 9328,
-    *,
-    debug: bool = False,
-) -> None:
-    from codeweaver.main import run
-
-    console.print(f"{CODEWEAVER_PREFIX} [blue]Starting CodeWeaver MCP server...[/blue]")
-    return await run(config_file=config_file, project_path=project_path, host=host, port=port)
-
-
-@app.command
-async def server(
-    *,
-    config_file: Annotated[FilePath | None, cyclopts.Parameter(name=["--config", "-c"])] = None,
-    project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
-    host: str = "127.0.0.1",
-    port: int = 9328,
-    debug: bool = False,
-) -> None:
-    """Start CodeWeaver MCP server."""
-    try:
-        await _run_server(
-            config_file=config_file, project_path=project_path, host=host, port=port, debug=debug
-        )
-
-    except CodeWeaverError as e:
-        console.print_exception(show_locals=True)
-        if e.suggestions:
-            console.print(f"{CODEWEAVER_PREFIX} [yellow]Suggestions:[/yellow]")
-            for suggestion in e.suggestions:
-                console.print(f"  • {suggestion}")
-        sys.exit(1)
-    except KeyboardInterrupt:
-        console.print_exception(show_locals=False, word_wrap=True)
-    except Exception:
-        console.print_exception(show_locals=True, word_wrap=True)
-        sys.exit(1)
 
 
 @app.command
@@ -97,7 +43,7 @@ async def search(
     project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
     output_format: Literal["json", "table", "markdown"] = "table",
 ) -> None:
-    """Search codebase from command line (using stub during refactor)."""
+    """Search your codebase from the command line with plain language."""
     try:
         settings = get_settings_map()
         if project_path:
@@ -134,42 +80,14 @@ async def search(
             _display_markdown_results(query, response, limited_matches)
 
     except CodeWeaverError as e:
-        console.print(f"[red]Error: {e.message}[/red]")
+        console.print(f"{CODEWEAVER_PREFIX} [red]Error: {e.message}[/red]")
         if e.suggestions:
-            console.print("[yellow]Suggestions:[/yellow]")
+            console.print(f"{CODEWEAVER_PREFIX} [yellow]Suggestions:[/yellow]")
             for suggestion in e.suggestions:
                 console.print(f"  • {suggestion}")
         sys.exit(1)
     except Exception as e:
-        console.print(f"[red]Unexpected error: {e}[/red]")
-        sys.exit(1)
-
-
-@app.command
-def config(
-    *,
-    show: bool = False,
-    project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
-) -> None:
-    """Manage CodeWeaver configuration."""
-    try:
-        settings = get_settings_map()
-        if project_path:
-            from codeweaver.config.settings import update_settings
-
-            settings = update_settings(project_path=project_path)  # type: ignore
-
-        if show:
-            _show_config(settings)
-        else:
-            console.print("Use --show to display configuration")
-
-    except CodeWeaverError as e:
-        console.print(f"[red]Configuration Error: {e.message}[/red]")
-        if e.suggestions:
-            console.print("[yellow]Suggestions:[/yellow]")
-            for suggestion in e.suggestions:
-                console.print(f"  • {suggestion}")
+        console.print(f"{CODEWEAVER_PREFIX} [red]Unexpected error: {e}[/red]")
         sys.exit(1)
 
 
@@ -177,7 +95,7 @@ def _display_table_results(
     query: str, response: FindCodeResponseSummary, matches: Sequence[CodeMatch]
 ) -> None:
     """Display search results as a table using serialize_for_cli."""
-    console.print(f"\n[bold green]Search Results for: '{query}'[/bold green]")
+    console.print(f"\n{CODEWEAVER_PREFIX} [bold green]Search Results for: '{query}'[/bold green]")
 
     # Use the built-in CLI summary from FindCodeResponseSummary
     summary_table = response.assemble_cli_summary()
@@ -223,11 +141,13 @@ def _display_markdown_results(
     query: str, response: FindCodeResponseSummary, matches: Sequence[CodeMatch]
 ) -> None:
     """Display search results as markdown using serialize_for_cli."""
-    console.print(f"# Search Results for: '{query}'\n")
-    console.print(f"Found {response.total_matches} matches in {response.execution_time_ms:.1f}ms\n")
+    console.print(f"{CODEWEAVER_PREFIX} # Search Results for: '{query}'\n")
+    console.print(
+        f"{CODEWEAVER_PREFIX} Found {response.total_matches} matches in {response.execution_time_ms:.1f}ms\n"
+    )
 
     if not matches:
-        console.print("*No matches found*")
+        console.print(f"{CODEWEAVER_PREFIX} *No matches found*")
         return
 
     for i, match in enumerate(matches, 1):
@@ -246,50 +166,16 @@ def _display_markdown_results(
         console.print("```\n")
 
 
-def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
-    """Display current configuration."""
-    from codeweaver.core.types.sentinel import Unset
-
-    console.print("[bold blue]CodeWeaver Configuration[/bold blue]\n")
-
-    table = Table(show_header=True, header_style="bold blue")
-    table.add_column("Setting", style="cyan", no_wrap=True)
-    table.add_column("Value", style="white")
-
-    # Core settings
-    table.add_row("Project Path", str(settings["project_path"]))
-    table.add_row("Project Name", settings["project_name"] or "auto-detected")
-    table.add_row("Token Limit", str(settings["token_limit"]))
-    table.add_row("Max File Size", f"{settings['max_file_size']:,} bytes")
-    table.add_row("Max Results", str(settings["max_results"]))
-
-    # Feature flags
-    table.add_row(
-        "Background Indexing",
-        "❌"
-        if settings["indexing"].get("only_index_on_command")
-        and not isinstance(settings["indexing"].get("only_index_on_command"), Unset)
-        else "✅",
-    )
-    table.add_row("Telemetry", "❌" if settings["telemetry"].get("disable_telemetry") else "✅")
-
-    console.print(table)
-
-
 def main() -> None:
-    """Main CLI entry point."""
+    """Entry point for the search CLI command."""
     try:
         app()
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Operation cancelled by user[/yellow]")
-        sys.exit(0)
     except Exception as e:
-        console.print(f"[red]Fatal error: {e}[/red]")
+        console.print(f"{CODEWEAVER_PREFIX} [red]Unexpected error: {e}[/red]")
         sys.exit(1)
 
 
 if __name__ == "__main__":
     main()
 
-
-__all__ = ["app", "main"]
+__all__ = ("app", "search")

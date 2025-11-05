@@ -63,7 +63,7 @@ class TestTelemetryIntegration:
         mock_telemetry.disable_telemetry = True
         mock_settings.telemetry = mock_telemetry
 
-        with patch("codeweaver.common.telemetry.client.get_settings", return_value=mock_settings):
+        with patch("codeweaver.config.settings.get_settings", return_value=mock_settings):
             client = PostHogClient.from_settings()
 
             assert client.enabled is False
@@ -79,7 +79,7 @@ class TestTelemetryIntegration:
         mock_telemetry.posthog_host = "https://us.i.posthog.com"
         mock_settings.telemetry = mock_telemetry
 
-        with patch("codeweaver.common.telemetry.client.get_settings", return_value=mock_settings):
+        with patch("codeweaver.config.settings.get_settings", return_value=mock_settings):
             client = PostHogClient.from_settings()
 
             assert client.enabled is False
@@ -146,6 +146,8 @@ class TestTelemetryIntegration:
             total_tokens_saved=7000,
             context_reduction_pct=70.0,
             estimated_cost_savings_usd=0.05,
+            languages={"python": 50, "typescript": 30, "rust": 20},
+            semantic_frequencies={"function": 0.4, "class": 0.3, "variable": 0.3},
         )
 
         client = PostHogClient(enabled=False)

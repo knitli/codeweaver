@@ -85,10 +85,12 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
             if not isinstance(config, dict) or config.get("provider") != Provider.MEMORY:
                 raise ProviderError("No valid configuration found for MemoryVectorStoreProvider")
             self.config = MemoryConfig(**config)
-        persist_path = (
-            Path(self.config.get("persist_path", get_user_config_dir()))
-            / f"{_get_project_name()}_vector_store.json"
-        )
+        # Handle persist_path - if it's a file path, use it directly; otherwise treat as directory
+        persist_path_config = self.config.get("persist_path", get_user_config_dir())
+        persist_path = Path(persist_path_config)
+        # If path doesn't end with .json, treat it as a directory and append default filename
+        if persist_path.suffix != ".json":
+            persist_path = persist_path / f"{_get_project_name()}_vector_store.json"
         auto_persist = self.config.get("auto_persist", True)
         persist_interval = self.config.get("persist_interval", 300)
 
@@ -224,6 +226,8 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
                     indices=vector["sparse"].get("indices", []),  # type: ignore
                     values=vector["sparse"].get("values", []),  # type: ignore
                 )  # type: ignore
+            elif isinstance(vector, dict) and "dense" in vector:  # type: ignore
+                dense = vector["dense"]  # type: ignore
             elif isinstance(vector, (list, tuple)):
                 sparse = None
                 dense = vector
@@ -271,7 +275,9 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
                 )
             # Convert Qdrant results to SearchResult objects
             search_results: list[SearchResult] = []
-            for point in results.points:
+            # Handle both query_points (returns object with .points) and search (returns list directly)
+            points = results.points if hasattr(results, "points") else results
+            for point in points:
                 # Extract payload data
                 payload = HybridVectorPayload.model_validate(point.payload or {})  # type: ignore
 
@@ -429,14 +435,14 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
         # Ensure collection exists
         await self._ensure_collection(collection_name)
 
-        # Delete using filter on chunk_name
+        # Delete using filter on chunk.chunk_name (nested field in payload)
         from qdrant_client.models import FieldCondition, MatchAny
         from qdrant_client.models import Filter as QdrantFilter
 
         _ = await self._client.delete(
             collection_name=collection_name,
             points_selector=QdrantFilter(
-                must=[FieldCondition(key="chunk_name", match=MatchAny(any=names))]
+                must=[FieldCondition(key="chunk.chunk_name", match=MatchAny(any=names))]
             ),
         )
 
@@ -478,15 +484,24 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
                     offset = result[1]  # Next offset
                     if offset is None:  # Reached end
                         break
-                from codeweaver.providers.vector_stores.utils import resolve_dimensions
-
                 # Serialize collection data
                 # Extract dense vector config (vectors is a dict[str, VectorParams])
                 vectors_data = col_info.config.params.vectors  # type: ignore
-                dense_size = resolve_dimensions()
+                # Try to get dimension from collection first, fall back to model config
+                dense_size = 768  # Default dimension
                 if isinstance(vectors_data, dict) and "dense" in vectors_data:
                     dense_params = vectors_data["dense"]
-                    dense_size = dense_params.size if hasattr(dense_params, "size") else dense_size
+                    if hasattr(dense_params, "size"):
+                        dense_size = dense_params.size
+                    else:
+                        # Only call resolve_dimensions if we can't get size from collection
+                        try:
+                            from codeweaver.providers.vector_stores.utils import resolve_dimensions
+
+                            dense_size = resolve_dimensions()
+                        except ValueError:
+                            # No embedding model configured, use default
+                            pass
                 # TODO: this should be a CollectionMetadata instance
                 collections_data[col.name] = {
                     "metadata": {"provider": "memory", "created_at": datetime.now(UTC).isoformat()},

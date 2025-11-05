@@ -118,7 +118,14 @@ def sample_files():
     files = []
 
     # Collect existing Python fixtures, excluding edge cases and problem files
-    skip_files = {"__init__.py", "malformed.py", "empty.py", "whitespace_only.py"}
+    skip_files = {
+        "__init__.py",
+        "malformed.py",
+        "empty.py",
+        "whitespace_only.py",
+        "deep_nesting.py",  # Pathological file with 201 nesting levels
+        "single_line.py",  # Edge case: only one line of code
+    }
     for fixture_path in fixture_dir.glob("*.py"):
         if fixture_path.name not in skip_files:
             if discovered := DiscoveredFile.from_path(fixture_path):

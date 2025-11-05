@@ -73,29 +73,40 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
         **kwargs: Any,
     ) -> None:
         """Initialize the SentenceTransformersRerankingProvider."""
-        self._caps = capabilities
-        self._rerank_kwargs = MappingProxyType({**type(self)._rerank_kwargs, **kwargs})
-        self._client = client or CrossEncoder(self._caps.name, **self._rerank_kwargs)
-        self._prompt = prompt
-        self._top_n = top_n
+        # Prepare kwargs before calling super().__init__()
+        rerank_kwargs = {**type(self)._rerank_kwargs, **kwargs}
+
+        # Initialize client if not provided
+        if client is None:
+            client = CrossEncoder(capabilities.name, **rerank_kwargs)
+
+        # Store client before calling super().__init__()
+        self._client = client
+
+        # Call super().__init__() which handles Pydantic initialization
         super().__init__(
             capabilities,
             client=self._client,  # pyright: ignore[reportCallIssue]
             prompt=prompt,
             top_n=top_n,
-            **self._rerank_kwargs,  # pyright: ignore[reportCallIssue]  # we're intentionally reassigning here
+            **rerank_kwargs,  # pyright: ignore[reportCallIssue]
         )
 
     def _initialize(self) -> None:
         """
         Initialize the SentenceTransformersRerankingProvider.
         """
-        if "model_name" not in self.kwargs or "model_name_or_path" not in self.kwargs:
+        # Set default model path if not provided
+        if "model_name" not in self.kwargs and "model_name_or_path" not in self.kwargs:
             self.kwargs["model_name_or_path"] = self._caps.name
-        name = self.kwargs.pop("model_name")
+
+        # Extract model name, with fallback to capabilities name
+        name = self.kwargs.pop("model_name", None) or self.kwargs.pop("model_name_or_path", None) or self._caps.name
+
         if not isinstance(name, str):
             raise TypeError(f"Expected model_name to be str, got {type(name).__name__}")
-        self._client = self._client or CrossEncoder(name, **(self.kwargs or {}))  # pyright: ignore[reportArgumentType]
+
+        # Note: _client is already initialized by __init__, no need to reinitialize
         if "Qwen3" in name:
             self._setup_qwen3()
 

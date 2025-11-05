@@ -126,10 +126,16 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
 
     def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """Initialize the FastEmbed client."""
+        # 1. Set _caps from parameter
+        self._caps = caps
+
+        # 2. Configure model name in kwargs if not already set
         if "model_name" not in self._doc_kwargs:
-            model = self._caps.name
+            model = caps.name  # Use caps parameter, not self._caps
             self.doc_kwargs["model_name"] = model
             self.query_kwargs["model_name"] = model
+
+        # 3. Initialize the client
         self._client = _TextEmbedding(**self._doc_kwargs)
 
     @property
@@ -183,12 +189,20 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
     @override
     def _initialize(self, caps: SparseEmbeddingModelCapabilities) -> None:  # type: ignore
         """Initialize the FastEmbed client."""
-        self._caps = self._caps or caps
+        # 1. Set _caps from parameter, not from self
+        self._caps = caps
+
+        # 2. Configure model name in kwargs if not already set
         if "model_name" not in self._doc_kwargs:
-            model = self._caps.name
+            model = caps.name  # Use caps parameter, not self._caps
             self.doc_kwargs["model_name"] = model
             self.query_kwargs["model_name"] = model
-        self._client = self._client(**(self._doc_kwargs.get("client_options") or self._doc_kwargs))  # pyright: ignore[reportCallIssue, reportIncompatibleVariableOverride]
+
+        # 3. Initialize client if it's still a class (not an instance)
+        # The _client class variable is set to the class type, so we need to instantiate it
+        if isinstance(self._client, type):
+            client_options = self._doc_kwargs.get("client_options") or self._doc_kwargs
+            self._client = self._client(**client_options)  # pyright: ignore[reportCallIssue, reportIncompatibleVariableOverride]
 
     async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any] | None

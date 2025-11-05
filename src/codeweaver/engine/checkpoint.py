@@ -34,12 +34,12 @@ from codeweaver.config.providers import (
     VectorStoreProviderSettings,
 )
 from codeweaver.core.stores import BlakeHashKey, get_blake_hash
+from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.sentinel import Unset
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types import DictView
     from codeweaver.core.types.aliases import FilteredKeyT
     from codeweaver.core.types.enum import AnonymityConversion
 
@@ -50,9 +50,13 @@ EXCEPTION_PATTERN = re.compile(r"\b\w+(Exception|Error|Failure|Fault|Abort|Abort
 
 
 class CheckpointSettingsFingerprint(TypedDict):
-    """Subset of settings relevant for checkpoint hashing."""
+    """Subset of settings relevant for checkpoint hashing.
 
-    indexer: IndexerSettings
+    Note: indexer is a dict (from model_dump) to avoid circular reference issues
+    with computed fields like `filter` which contain references to the parent object.
+    """
+
+    indexer: dict[str, Any]  # Serialized IndexerSettings to avoid circular refs
     embedding_provider: tuple[EmbeddingProviderSettings, ...] | None
     reranking_provider: tuple[RerankingProviderSettings, ...] | None
     sparse_provider: tuple[SparseEmbeddingProviderSettings, ...] | None
@@ -70,7 +74,7 @@ def _get_settings_map() -> DictView[CheckpointSettingsFingerprint]:
     We don't want to cache this -- we want the latest settings each time. DictView always reflects changes, but we're creating a new instance here.
     """
     from codeweaver.common.utils.git import get_project_path
-    from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
+    from codeweaver.config.indexing import DefaultIndexerSettings
     from codeweaver.config.providers import (
         DefaultEmbeddingProviderSettings,
         DefaultRerankingProviderSettings,
@@ -80,13 +84,13 @@ def _get_settings_map() -> DictView[CheckpointSettingsFingerprint]:
     from codeweaver.config.settings import get_settings
 
     settings = get_settings()
-    if isinstance(settings.provider, Unset):
+    if isinstance(settings.provider, Unset) or settings.provider is None:  # pyright: ignore[reportUnnecessaryComparison]
         from codeweaver.config.providers import AllDefaultProviderSettings, ProviderSettings
 
         settings.provider = ProviderSettings.model_validate(AllDefaultProviderSettings)
     settings.indexing = (
         IndexerSettings.model_validate(DefaultIndexerSettings)
-        if isinstance(settings.indexing, Unset)
+        if isinstance(settings.indexing, Unset) or settings.indexing is None  # pyright: ignore[reportUnnecessaryComparison]
         else settings.indexing
     )
     settings.provider.embedding = (
@@ -117,9 +121,15 @@ def _get_settings_map() -> DictView[CheckpointSettingsFingerprint]:
         if isinstance(settings.project_name, Unset)
         else settings.project_name
     )
+    # Convert IndexerSettings to dict to avoid circular reference from computed fields
+    # The filter property creates a partial function containing self, causing circular ref
+    indexer_dict = settings.indexing.model_dump(
+        mode="json", exclude_computed_fields=True, exclude_none=True
+    )
+
     return DictView(
         CheckpointSettingsFingerprint(
-            indexer=settings.indexing,
+            indexer=indexer_dict,  # type: ignore[typeddict-item]
             embedding_provider=tuple(settings.provider.embedding)
             if settings.provider.embedding
             else None,
@@ -253,7 +263,7 @@ class CheckpointManager:
         """
         settings = _get_settings_map()
 
-        self.project_path = (project_path or settings.get("project_path", Path.cwd())).resolve()
+        self.project_path = (project_path or settings.get("project_path") or Path.cwd()).resolve()
 
         self.checkpoint_dir = (checkpoint_dir or get_user_config_dir()).resolve()
         self.checkpoint_file = (

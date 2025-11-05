@@ -226,10 +226,15 @@ mise run sync &
 
 [tasks.test]
 # Testing
+usage = '''
+args "[dir]" help="directory to test" default="tests/"
+flag "--marks [markers]" help="pytest markers to filter tests" default=""
+
+'''
 run = '''
 #!/bin/bash
 echo "Running tests..."
-uv run pytest tests/ -v
+uv run pytest
 '''
 
 [tasks.test-cov]

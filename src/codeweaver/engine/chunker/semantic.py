@@ -105,6 +105,24 @@ class SemanticChunker(BaseChunker):
         size_limit=256 * 1024,  # 256KB cache for content hashes
     )
 
+    @classmethod
+    def clear_deduplication_stores(cls) -> None:
+        """Clear class-level deduplication stores.
+
+        This is primarily useful for testing to ensure clean state between test runs.
+        In production, stores persist across chunking operations to detect duplicates
+        across files within a session.
+        """
+        # Recreate stores instead of clearing to avoid weak reference issues with lists
+        cls._store = make_uuid_store(
+            value_type=list,
+            size_limit=3 * 1024 * 1024,  # 3MB cache for chunk batches
+        )
+        cls._hash_store = make_blake_store(
+            value_type=UUID,  # UUID7 but UUID is the type
+            size_limit=256 * 1024,  # 256KB cache for content hashes
+        )
+
     def __init__(self, governor: ChunkGovernor, language: SemanticSearchLanguage) -> None:
         """Initialize semantic chunker with governor and language.
 

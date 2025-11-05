@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import dataclasses
 import logging
 import signal
 import time
@@ -32,7 +33,6 @@ from watchfiles.main import Change, FileChange
 
 from codeweaver.config.chunker import ChunkerSettings
 from codeweaver.config.indexing import RignoreSettings
-from codeweaver.config.types import CodeWeaverSettingsDict
 from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.file_extensions import (
     CODE_FILES_EXTENSIONS,
@@ -56,6 +56,7 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import Any
 
+    from codeweaver.config.types import CodeWeaverSettingsDict
     from codeweaver.core.chunks import CodeChunk
     from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 
@@ -105,7 +106,7 @@ class IndexingStats:
     chunks_created: int = 0
     chunks_embedded: int = 0
     chunks_indexed: int = 0
-    start_time: float = time.time()
+    start_time: float = dataclasses.field(default_factory=time.time)
     files_with_errors: ClassVar[
         Annotated[
             list[Path],

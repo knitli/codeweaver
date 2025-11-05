@@ -169,7 +169,8 @@ def set_args_on_signature(
     """Filter args and kwargs, and return them."""
     import inspect
 
-    sig = inspect.signature(func.__init__)
+    # Use inspect.signature(func) to respect __signature__ attribute for mocks
+    sig = inspect.signature(func)
     all_kwargs = kwargs.copy()
     if "self" in all_kwargs:
         del all_kwargs["self"]

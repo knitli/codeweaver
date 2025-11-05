@@ -56,13 +56,10 @@ def _get_docker_command() -> str:
     Returns:
         Docker command to use ('docker' or 'docker.exe')
     """
-    if _is_wsl():
-        # In WSL, try docker.exe first (Windows Docker), fall back to docker
-        if (
-            subprocess.run(["which", "docker.exe"], capture_output=True, check=False).returncode
-            == 0
-        ):
-            return "docker.exe"
+    if _is_wsl() and (
+        subprocess.run(["which", "docker.exe"], capture_output=True, check=False).returncode == 0
+    ):
+        return "docker.exe"
     return "docker"
 
 
@@ -91,7 +88,7 @@ def _find_qdrant_container(container_name: str) -> str | None:
         Container ID if found and running, None otherwise
     """
     docker_cmd = _get_docker_command()
-    try:
+    with suppress(Exception):
         result = subprocess.run(
             [docker_cmd, "ps", "-q", "-f", f"name={container_name}"],
             capture_output=True,
@@ -101,8 +98,6 @@ def _find_qdrant_container(container_name: str) -> str | None:
         )
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
-    except Exception:
-        pass
     return None
 
 
@@ -122,7 +117,7 @@ def _start_qdrant_container(
     docker_cmd = _get_docker_command()
 
     # Check if container already exists (stopped)
-    try:
+    with suppress(Exception):
         result = subprocess.run(
             [docker_cmd, "ps", "-a", "-q", "-f", f"name={container_name}"],
             capture_output=True,
@@ -132,18 +127,15 @@ def _start_qdrant_container(
         )
         if result.returncode == 0 and result.stdout.strip():
             # Container exists, try to start it
-            subprocess.run(
+            _ = subprocess.run(
                 [docker_cmd, "start", container_name], capture_output=True, timeout=10, check=False
             )
             # Wait for startup
             time.sleep(2)
             return _find_qdrant_container(container_name) is not None
-    except Exception:
-        pass
-
     # Create new container
     try:
-        subprocess.run(
+        _ = subprocess.run(
             [docker_cmd, "run", "-d", "--name", container_name, "-p", f"{port}:6333", image],
             capture_output=True,
             timeout=30,
@@ -167,7 +159,7 @@ def _stop_qdrant_container(container_name: str) -> bool:
     """
     docker_cmd = _get_docker_command()
     try:
-        subprocess.run(
+        _ = subprocess.run(
             [docker_cmd, "stop", container_name], capture_output=True, timeout=10, check=False
         )
     except Exception:
@@ -187,7 +179,7 @@ def _remove_qdrant_container(container_name: str) -> bool:
     """
     docker_cmd = _get_docker_command()
     try:
-        subprocess.run(
+        _ = subprocess.run(
             [docker_cmd, "rm", "-f", container_name], capture_output=True, timeout=10, check=False
         )
     except Exception:
@@ -296,25 +288,16 @@ class QdrantTestManager:
             RuntimeError: If no instance found and Docker auto-start disabled or failed
         """
         # First try to find existing instance
-        try:
+        with suppress(RuntimeError):
             return self._find_qdrant_instance()
-        except RuntimeError:
-            pass
-
         # No instance found, try Docker auto-start if enabled
         if self.auto_start_docker and _is_docker_available():
-            # Try to find a free port starting from 6333
-            test_port = 6333
-            while test_port <= 6400:
-                if not self._check_port_in_use(self.host, test_port):
-                    # Port is free, try to start container
-                    if _start_qdrant_container(
-                        port=test_port, container_name=self.container_name, image=self.docker_image
-                    ):
-                        self._docker_started = True
-                        return test_port
-                test_port += 1
-
+            for test_port in range(6333, 6401):
+                if not self._check_port_in_use(self.host, test_port) and _start_qdrant_container(
+                    port=test_port, container_name=self.container_name, image=self.docker_image
+                ):
+                    self._docker_started = True
+                    return test_port
         # Failed to find or start instance
         platform_info = "WSL" if _is_wsl() else platform.system()
         docker_available = "available" if _is_docker_available() else "NOT available"
@@ -401,8 +384,10 @@ class QdrantTestManager:
         if self.api_key:
             client_kwargs["api_key"] = self.api_key
 
-        if self.storage_path:
-            client_kwargs["path"] = str(self.storage_path)
+        # NOTE: Do NOT pass storage_path to the client as 'path' parameter.
+        # The 'path' parameter is for local file-based Qdrant storage and is
+        # mutually exclusive with 'url'. storage_path is only used internally
+        # by this test manager for generating unique collection names.
 
         return AsyncQdrantClient(**client_kwargs)  # type: ignore
 

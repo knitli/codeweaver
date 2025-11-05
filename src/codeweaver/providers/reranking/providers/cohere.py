@@ -46,25 +46,39 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
         self, caps: RerankingModelCapabilities, _client: CohereClient | None = None, **kwargs: Any
     ) -> None:
         """Initialize the Cohere reranking provider."""
-        self._caps = caps
-        self._provider = caps.provider or self._provider
+        # Prepare client options before calling super().__init__()
         kwargs = kwargs or {}
-        self.client_options = kwargs.get("client_options", {}) or kwargs
-        self.client_options["client_name"] = "codeweaver"
-        if not self.client_options.get("api_key"):
-            if self._provider == Provider.COHERE:
-                self.client_options["api_key"] = kwargs.get("api_key") or os.getenv(
-                    "COHERE_API_KEY"
-                )
+        client_options = kwargs.get("client_options", {}) or kwargs
+        client_options["client_name"] = "codeweaver"
 
-            if not self.client_options.get("api_key"):
+        provider = caps.provider or Provider.COHERE
+
+        if not client_options.get("api_key"):
+            if provider == Provider.COHERE:
+                client_options["api_key"] = kwargs.get("api_key") or os.getenv("COHERE_API_KEY")
+
+            if not client_options.get("api_key"):
                 from codeweaver.exceptions import ConfigurationError
 
                 raise ConfigurationError(
-                    f"API key not found for {self._provider.value} provider. Please set the API key in the client kwargs or as an environment variable."
+                    f"API key not found for {provider.value} provider. Please set the API key in the client kwargs or as an environment variable."
                 )
-        self._client = _client or CohereClient(**self.client_options)
+
+        # Initialize client if not provided
+        if _client is None:
+            _client = CohereClient(**client_options)
+
+        # Store client before calling super().__init__()
+        self._client = _client
+
+        # Call super().__init__() which handles Pydantic initialization
         super().__init__(self._client, caps, **kwargs)
+
+    def _initialize(self) -> None:
+        """Initialize the Cohere reranking provider after Pydantic setup."""
+        # Set _caps and _provider after Pydantic initialization
+        # Note: base class might set these, but we ensure they're correct here
+        pass
 
     @property
     def base_url(self) -> str:

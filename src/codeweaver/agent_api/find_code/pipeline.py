@@ -53,8 +53,8 @@ async def embed_query(query: str) -> QueryResult:
     Raises:
         ValueError: If no embedding providers configured or both fail
     """
-    from codeweaver.providers.embedding.types import QueryResult
     from codeweaver.common.registry import get_provider_registry  # Lazy import
+    from codeweaver.providers.embedding.types import QueryResult
 
     registry = get_provider_registry()
     global _query_
@@ -113,10 +113,7 @@ async def embed_query(query: str) -> QueryResult:
     if dense_query_embedding is None and sparse_query_embedding is None:
         return raise_value_error("Both dense and sparse embedding failed")
 
-    return QueryResult(
-        dense_query_embedding=dense_query_embedding,
-        sparse_query_embedding=sparse_query_embedding,
-    )
+    return QueryResult(dense=dense_query_embedding, sparse=sparse_query_embedding)
 
 
 def build_query_vector(query_result: QueryResult, query: str) -> StrategizedQuery:
@@ -173,7 +170,6 @@ async def execute_vector_search(query_vector: StrategizedQuery) -> list[SearchRe
     vector_store_enum = registry.get_provider_enum_for("vector_store")
     if not vector_store_enum:
         raise_value_error("No vector store provider configured")
-    assert isinstance(vector_store_enum, type)  # noqa: S101
 
     vector_store: VectorStoreProvider[Any] = registry.get_provider_instance(
         vector_store_enum, "vector_store", singleton=True
@@ -198,8 +194,8 @@ async def rerank_results(
         - reranked_results is None if reranking unavailable or fails
         - strategy is SEMANTIC_RERANK if successful, None otherwise
     """
-    from codeweaver.core.chunks import CodeChunk
     from codeweaver.common.registry import get_provider_registry  # Lazy import
+    from codeweaver.core.chunks import CodeChunk
 
     registry = get_provider_registry()
     reranking_enum = registry.get_provider_enum_for("reranking")

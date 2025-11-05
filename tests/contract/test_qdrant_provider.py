@@ -14,12 +14,13 @@ Uses QdrantTestManager for reliable test instance management with:
 - Optional authentication support
 """
 
+import asyncio
+
 from pathlib import Path
 
 import pytest
 
 from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.core.spans import Span
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
 
@@ -61,22 +62,86 @@ async def qdrant_provider(qdrant_test_manager):
     # Cleanup handled by test manager
 
 
+def _register_chunk_embeddings(chunk, dense=None, sparse=None):
+    """Helper to register embeddings for a test chunk in the global registry."""
+    from codeweaver.common.utils.utils import uuid7
+    from codeweaver.providers.embedding.registry import get_embedding_registry
+    from codeweaver.providers.embedding.types import ChunkEmbeddings, EmbeddingBatchInfo
+
+    registry = get_embedding_registry()
+
+    # Create batch IDs for this chunk - separate for dense and sparse
+    dense_batch_id = uuid7() if dense is not None else None
+    sparse_batch_id = uuid7() if sparse is not None else None
+    batch_index = 0
+
+    # Create EmbeddingBatchInfo objects for dense/sparse embeddings
+    dense_info = None
+    if dense is not None:
+        dense_info = EmbeddingBatchInfo.create_dense(
+            batch_id=dense_batch_id,
+            batch_index=batch_index,
+            chunk_id=chunk.chunk_id,
+            model="test-dense-model",
+            embeddings=dense,
+        )
+
+    sparse_info = None
+    if sparse is not None:
+        from codeweaver.providers.embedding.types import SparseEmbedding
+
+        sparse_emb = SparseEmbedding(indices=sparse["indices"], values=sparse["values"])
+        sparse_info = EmbeddingBatchInfo.create_sparse(
+            batch_id=sparse_batch_id,
+            batch_index=batch_index,
+            chunk_id=chunk.chunk_id,
+            model="test-sparse-model",
+            embeddings=sparse_emb,
+        )
+
+    # Register the embeddings - ChunkEmbeddings is a NamedTuple (sparse, dense, chunk)
+    registry[chunk.chunk_id] = ChunkEmbeddings(
+        sparse=sparse_info,
+        dense=dense_info,
+        chunk=chunk,
+    )
+
+    # Update chunk with batch keys - need to add both dense and sparse keys
+    from codeweaver.core.chunks import BatchKeys
+
+    # Start with the chunk
+    result_chunk = chunk
+
+    # Add dense batch key if we have dense embeddings
+    if dense is not None:
+        dense_batch_keys = BatchKeys(id=dense_batch_id, idx=batch_index, sparse=False)
+        result_chunk = result_chunk.set_batch_keys(dense_batch_keys)
+
+    # Add sparse batch key if we have sparse embeddings
+    if sparse is not None:
+        sparse_batch_keys = BatchKeys(id=sparse_batch_id, idx=batch_index, sparse=True)
+        result_chunk = result_chunk.set_batch_keys(sparse_batch_keys)
+
+    return result_chunk
+
+
 @pytest.fixture
 def sample_chunk():
-    """Create a sample CodeChunk for testing."""
+    """Create a sample CodeChunk for testing with proper embedding registration."""
     from codeweaver.common.utils.utils import uuid7
 
-    # Use model_construct to bypass Pydantic validation and avoid AstThing forward reference issues
-    return CodeChunk.model_construct(
+    chunk = CodeChunk.model_construct(
         chunk_name="test.py:test_function",
         file_path=Path("test.py"),
-        language=Language.PYTHON,
         content="def test_function():\n    pass",
-        embeddings={
-            "dense": [0.1, 0.2, 0.3] * 256,  # 768-dim vector
-            "sparse": {"indices": [1, 5, 10], "values": [0.8, 0.6, 0.4]},
-        },
         line_range=Span(start=1, end=2, _source_id=uuid7()),
+    )
+
+    # Register embeddings properly in the registry
+    return _register_chunk_embeddings(
+        chunk,
+        dense=[0.1, 0.2, 0.3] * 256,  # 768-dim vector
+        sparse={"indices": [1, 5, 10], "values": [0.8, 0.6, 0.4]},
     )
 
 
@@ -111,9 +176,9 @@ class TestQdrantProviderContract:
         results = await qdrant_provider.search(vector={"dense": [0.1, 0.2, 0.3] * 256})
 
         assert isinstance(results, list)
-        if results:
-            assert all(hasattr(r, "chunk") and hasattr(r, "score") for r in results)
-            assert all(0.0 <= r.score <= 1.0 for r in results)
+        assert len(results) > 0, "Search returned no results after upserting chunk with dense embeddings"
+        assert all(hasattr(r, "chunk") and hasattr(r, "score") for r in results), "Search results missing chunk or score attributes"
+        assert all(0.0 <= r.score <= 1.0 for r in results), "Search result scores out of valid range [0.0, 1.0]"
 
     @pytest.mark.qdrant
     @pytest.mark.asyncio
@@ -128,6 +193,10 @@ class TestQdrantProviderContract:
         )
 
         assert isinstance(results, list)
+        assert len(results) > 0, "Search returned no results after upserting chunk with sparse embeddings"
+        assert all(hasattr(r, "chunk") and hasattr(r, "score") for r in results), "Search results missing chunk or score attributes"
+        # Sparse vector scores can be unbounded (SPLADE/BM25), so we just check they're valid numbers
+        assert all(isinstance(r.score, (int, float)) and not isinstance(r.score, bool) for r in results), "Search result scores should be numeric"
 
     @pytest.mark.qdrant
     @pytest.mark.asyncio
@@ -145,30 +214,38 @@ class TestQdrantProviderContract:
         )
 
         assert isinstance(results, list)
+        assert len(results) > 0, "Hybrid search returned no results after upserting chunk with both dense and sparse embeddings"
+        assert all(hasattr(r, "chunk") and hasattr(r, "score") for r in results), "Search results missing chunk or score attributes"
+        # Hybrid scores combine dense and sparse, so can be unbounded
+        assert all(isinstance(r.score, (int, float)) and not isinstance(r.score, bool) for r in results), "Search result scores should be numeric"
 
     @pytest.mark.qdrant
     @pytest.mark.asyncio
-    async def test_upsert_batch_of_chunks(self, qdrant_provider):
-        """Test upsert with multiple chunks."""
-        from uuid import uuid4
+    async def test_upsert_batch_of_chunks(self, qdrant_provider: QdrantVectorStoreProvider):
+        """Test upserting a batch of chunks and verify they can be retrieved via search."""
+        from pathlib import Path
 
         from codeweaver.common.utils.utils import uuid7
+        from codeweaver.core.chunks import CodeChunk, Span
 
-        chunks = [
-            CodeChunk.model_construct(
-                chunk_id=uuid4(),
+        chunks = []
+        for i in range(10):
+            chunk = CodeChunk.model_construct(
+                chunk_id=uuid7(),  # Use uuid7 instead of uuid4
                 chunk_name=f"test_{i}.py:func",
                 file_path=Path(f"test_{i}.py"),
-                language=Language.PYTHON,
                 content=f"def func_{i}(): pass",
-                embeddings={"dense": [float(i)] * 768},
                 line_range=Span(start=1, end=1, _source_id=uuid7()),
             )
-            for i in range(10)
-        ]
+            # Register embeddings properly
+            chunk_with_emb = _register_chunk_embeddings(chunk, dense=[float(i)] * 768)
+            chunks.append(chunk_with_emb)
 
         # Should not raise
         await qdrant_provider.upsert(chunks)
+
+        # Wait for indexing
+        await asyncio.sleep(1.0)
 
         # Verify chunks were stored
         results = await qdrant_provider.search(vector={"dense": [5.0] * 768})

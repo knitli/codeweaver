@@ -85,9 +85,7 @@ def _get_caps(
 
 def _default_embedding_caps() -> EmbeddingCapsDict:
     """Default factory for embedding capabilities. Evaluated lazily at instance creation."""
-    return EmbeddingCapsDict(
-        dense=_get_caps(), sparse=_get_caps(sparse=True)
-    )
+    return EmbeddingCapsDict(dense=_get_caps(), sparse=_get_caps(sparse=True))
 
 
 class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):

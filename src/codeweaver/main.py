@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any, TypeGuard, is_typeddict
 from pydantic import FilePath
 
 from codeweaver.common.utils import lazy_import
+from codeweaver.core.types.sentinel import Unset
 from codeweaver.providers.provider import Provider as Provider  # needed for pydantic models
 
 
@@ -49,7 +50,9 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
     if server_setup and is_server_setup(server_setup):
         settings: CodeWeaverSettings = server_setup["settings"]
         new_kwargs = {  # type: ignore
-            "transport": settings.server.transport or "streamable-http",
+            "transport": "streamable-http"
+            if isinstance(settings.server, Unset)
+            else settings.server.transport,
             "host": server_setup.pop("host", "127.0.0.1"),
             "port": server_setup.pop("port", 9328),
             "log_level": server_setup.pop("log_level", "INFO"),

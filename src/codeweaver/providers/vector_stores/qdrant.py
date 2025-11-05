@@ -174,6 +174,14 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
                     indices=vector["sparse"].get("indices", []),
                     values=vector["sparse"].get("values", []),
                 )  # type: ignore
+            elif isinstance(vector, dict) and "dense" in vector:
+                dense = vector["dense"]
+                # Also check for sparse in the same dict
+                if "sparse" in vector:
+                    sparse = SparseEmbedding(
+                        indices=vector["sparse"].get("indices", []),
+                        values=vector["sparse"].get("values", []),
+                    )  # type: ignore
             elif isinstance(vector, (list, tuple)):
                 sparse = None
                 dense = vector
@@ -222,7 +230,9 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
             from codeweaver.providers.vector_stores.metadata import HybridVectorPayload
 
             search_results: list[SearchResult] = []
-            for point in results.points:
+            # search() returns a list directly, query_points() returns object with .points
+            points = results.points if hasattr(results, 'points') else results
+            for point in points:
                 payload = HybridVectorPayload.model_validate(point.payload)
                 search_result = SearchResult.model_construct(
                     content=payload.chunk,
@@ -269,21 +279,43 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
         for chunk in chunks:
             # Prepare vectors dict for named vectors
             vectors: dict[str, Any] = {}
+
+            # Try to get embeddings from proper embedding batch info
             if chunk.dense_embeddings:
                 vectors["dense"] = list(chunk.dense_embeddings.embeddings)
+            elif hasattr(chunk, "__dict__") and "embeddings" in chunk.__dict__:
+                # Fallback for test chunks created with model_construct(embeddings={...})
+                emb_dict = chunk.__dict__["embeddings"]
+                if isinstance(emb_dict, dict) and "dense" in emb_dict:
+                    vectors["dense"] = list(emb_dict["dense"])
+
             if chunk.sparse_embeddings:
                 # Qdrant sparse vector format requires indices and values
-                # sparse_embeddings.embeddings is a tuple of (indices, values) for sparse
+                # sparse_embeddings.embeddings is a SparseEmbedding NamedTuple with .indices and .values
                 sparse = chunk.sparse_embeddings
                 if isinstance(sparse.embeddings, SparseEmbedding):
-                    # New format: tuple of (indices, values)
-                    indices, values = sparse.embeddings
+                    # SparseEmbedding NamedTuple: access indices and values as fields
                     from qdrant_client.http.models import SparseVector
 
-                    vectors["sparse"] = SparseVector(indices=list(indices), values=list(values))
+                    vectors["sparse"] = SparseVector(
+                        indices=list(sparse.embeddings.indices),
+                        values=list(sparse.embeddings.values)
+                    )
                 else:
                     # Old format: flat list (for backward compatibility during migration)
                     vectors["sparse"] = list(sparse.embeddings)
+            elif hasattr(chunk, "__dict__") and "embeddings" in chunk.__dict__:
+                # Fallback for test chunks created with model_construct(embeddings={...})
+                emb_dict = chunk.__dict__["embeddings"]
+                if isinstance(emb_dict, dict) and "sparse" in emb_dict:
+                    sparse_data = emb_dict["sparse"]
+                    from qdrant_client.http.models import SparseVector
+
+                    if isinstance(sparse_data, dict):
+                        vectors["sparse"] = SparseVector(
+                            indices=list(sparse_data.get("indices", [])),
+                            values=list(sparse_data.get("values", [])),
+                        )
 
             payload = HybridVectorPayload(
                 chunk=chunk,

@@ -197,7 +197,20 @@ class ProviderRegistry(BasedModel):
         tuple[
             MutableMapping[
                 Provider,
-                type[EmbeddingProvider[Any] | SparseEmbeddingProvider[Any] | RerankingProvider[Any] | VectorStoreProvider[Any] | AgentProvider[Any] | Any] | LazyImport[type[EmbeddingProvider[Any]]] | LazyImport[type[SparseEmbeddingProvider[Any]]] | LazyImport[type[RerankingProvider[Any]]] | LazyImport[type[VectorStoreProvider[Any]]] | LazyImport[type[AgentProvider[Any]]] | LazyImport[type[Any]],
+                type[
+                    EmbeddingProvider[Any]
+                    | SparseEmbeddingProvider[Any]
+                    | RerankingProvider[Any]
+                    | VectorStoreProvider[Any]
+                    | AgentProvider[Any]
+                    | Any
+                ]
+                | LazyImport[type[EmbeddingProvider[Any]]]
+                | LazyImport[type[SparseEmbeddingProvider[Any]]]
+                | LazyImport[type[RerankingProvider[Any]]]
+                | LazyImport[type[VectorStoreProvider[Any]]]
+                | LazyImport[type[AgentProvider[Any]]]
+                | LazyImport[type[Any]],
             ],
             str,
         ],
@@ -588,7 +601,7 @@ class ProviderRegistry(BasedModel):
             logger.debug("No CLIENT_MAP entry for provider '%s'", provider)
             return None
         # Get client entries for this provider
-        client_entries = get_client_map(cast(LiteralProvider, provider))
+        client_entries = get_client_map(cast("LiteralProvider", provider))
         if not client_entries:
             logger.debug("No CLIENT_MAP entry for provider '%s'", provider)
             return None
@@ -630,7 +643,7 @@ class ProviderRegistry(BasedModel):
 
         # Prepare client options
         provider_settings = provider_settings or {}
-        opts = self.get_configured_provider_settings(provider_kind)  # type: ignore
+        opts = self.get_configured_provider_settings(provider_kind) or {}  # type: ignore
         env_vars = self.collect_env_vars(provider)
         base_url = self._get_base_url_for_provider(
             provider, **(provider_settings | env_vars | opts)
@@ -675,6 +688,7 @@ class ProviderRegistry(BasedModel):
 
         # 1. Boto3 clients (Bedrock)
         if provider == Provider.BEDROCK:
+            provider_settings = provider_settings or {}
             return client_class("bedrock-runtime", **(provider_settings | client_options))
 
         # 3. Qdrant (supports URL, path, or memory)
@@ -707,9 +721,8 @@ class ProviderRegistry(BasedModel):
         # Construct client based on what parameters it accepts
         from codeweaver.common.utils.utils import set_args_on_signature
 
-        args, kwargs = set_args_on_signature(
-            client_class, kwargs=provider_settings | client_options
-        )
+        provider_settings = provider_settings or {}
+        args, kwargs = set_args_on_signature(client_class, **(provider_settings | client_options))
         args = tuple(arg.get_secret_value() if isinstance(arg, SecretStr) else arg for arg in args)
         kwargs = {
             k: v.get_secret_value() if isinstance(v, SecretStr) else v for k, v in kwargs.items()
@@ -942,6 +955,10 @@ class ProviderRegistry(BasedModel):
                 retrieved_cls = self._construct_openai_provider_class(
                     provider, retrieved_cls, **kwargs
                 )
+
+            # Resolve LazyImport if needed before accessing __name__
+            if isinstance(retrieved_cls, LazyImport):
+                return self._create_provider(provider, retrieved_cls, **kwargs)
 
             # we need to access a property to execute the import and ensure it exists
             name = None

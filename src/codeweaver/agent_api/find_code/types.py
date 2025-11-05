@@ -292,17 +292,21 @@ class StrategizedQuery(NamedTuple):
             )
         if self.is_hybrid():
             return self.to_hybrid_query({}, kwargs)
-        from qdrant_client.http.models import SparseVector
+        from qdrant_client.http.models import NamedSparseVector, NamedVector, SparseVector
 
         if self.has_dense():
-            return {"query": self.dense, **kwargs}
+            # Use NamedVector for named vector collections
+            dense_vector = NamedVector(name="dense", vector=self.dense)
+            return {"query_vector": dense_vector, **kwargs}
 
-        # Convert sparse dict to SparseVector
+        # Convert sparse dict to SparseVector and wrap in NamedSparseVector
         assert self.sparse is not None  # noqa: S101
         sparse_vector = SparseVector(
             indices=list(self.sparse.indices), values=list(self.sparse.values)
         )
-        return {"query": sparse_vector, **kwargs}
+        # Use NamedSparseVector for sparse vectors
+        named_sparse = NamedSparseVector(name="sparse", vector=sparse_vector)
+        return {"query_vector": named_sparse, **kwargs}
 
 
 __all__ = (

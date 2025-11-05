@@ -106,14 +106,15 @@ dependencies = [
   "httpx>=0.28.1",
   "mcp>=1.19.0",
   "numpy>=2.3.4",
-  "posthog>=6.7.11",
+  "posthog>=6.8.0",
   "pydantic>=2.12.3",
-  "pydantic-ai>=1.7.0",
-  "pydantic-graph>=1.7.0",
-  "pydantic-settings>=2.11.0",
+  "pydantic-ai>=1.10.0",
+  "pydantic-graph>=1.10.0",
+  "pydantic-settings[json,yaml]>=2.11.0",
+  "pyyaml>=6.0.3",
   "qdrant-client>=1.15.1",
   "rich>=14.2.0",
-  "rignore>=0.7.1",
+  "rignore>=0.7.4",
   "tenacity>=9.1.2",
   "textcase>=0.4.5",
   "tiktoken>=0.12.0",
@@ -134,7 +135,7 @@ Issues = "https://github.com/knitli/codeweaver-mcp/issues"
 Repository = "https://github.com/knitli/codeweaver-mcp"
 
 [project.scripts]
-codeweaver = "codeweaver.cli.app:main"
+codeweaver = "codeweaver.cli.__main__:main"
 
 [project.optional-dependencies]
 # workos AuthKit middleware - see https://gofastmcp.com/integrations/authkit
@@ -163,7 +164,7 @@ all = [
   "permit-fastmcp",
   "pydantic-ai",
   "pydantic-graph",
-  "pydantic-settings",
+  "pydantic-settings[json,yaml]",
   "pydantic",
   "qdrant-client",
   "rich",
@@ -174,7 +175,7 @@ all = [
   "tokenizers",
   "pydantic-ai",
   "pydantic-graph",
-  "pydantic-settings",
+  "pydantic-settings[json,yaml]",
   "pydantic",
   "qdrant-client",
   "rich",
@@ -204,7 +205,7 @@ all-gpu = [
   "posthog",
   "pydantic-ai",
   "pydantic-graph",
-  "pydantic-settings",
+  "pydantic-settings[json,yaml]",
   "pydantic",
   "qdrant-client",
   "rich",
@@ -228,7 +229,12 @@ auth-eunomia = ["eunomia-mcp"]
 # TODO: Implement authentication and authorization middleware -- should be simple to add
 # permit.io middleware - see https://gofastmcp.com/integrations/permit
 auth-permitio = ["permit-fastmcp"]
+# ==== Authentication and Authorization Middleware/Addons ====
+# Settings/Config Secrets
+aws-secrets-manager = ["pydantic-settings[yaml,toml,aws-secrets-manager]"]
+azure-key-vault = ["pydantic-settings[yaml,toml,azure-key-vault]"]
 cli = ["cyclopts", "rich", "tomli-w"]
+gcp-secret-manager = ["pydantic-settings[yaml,toml,gcp-secret-manager]"]
 # also requires one agent-capable provider, one embedding-capable provider, and a vector store
 pre-context = [
   "cyclopts",
@@ -284,7 +290,7 @@ recommended = [
   "posthog",
   "pydantic-ai",
   "pydantic-graph",
-  "pydantic-settings",
+  "pydantic-settings[toml,yaml]",
   "pydantic",
   "qdrant-client",
   "rich",
@@ -310,7 +316,7 @@ recommended-local-only = [
   "numpy",
   "posthog",
   "pydantic-graph",
-  "pydantic-settings",
+  "pydantic-settings[json,yaml]",
   "pydantic",
   "qdrant-client",
   "rich",
@@ -335,7 +341,7 @@ recommended-no-telemetry = [
   "posthog",
   "pydantic-ai",
   "pydantic-graph",
-  "pydantic-settings",
+  "pydantic-settings[json,yaml]",
   "pydantic",
   "qdrant-client",
   "rich",
@@ -372,7 +378,7 @@ required-core = [
   "mcp",
   "numpy",
   "pydantic-graph",
-  "pydantic-settings",
+  "pydantic-settings[json,yaml]",
   "pydantic",
   "rignore",
   "textcase",
@@ -380,10 +386,10 @@ required-core = [
   "typing-extensions",
   "uuid7; python_version < '3.14'",
   "uvicorn[standard]",
+  "watchfiles",
 ]
-source-duckduckgo = ["pydantic-ai-slim[duckduckgo]"]
 # ==== Data Sources ====
-source-filesystem = ["watchfiles"]
+source-duckduckgo = ["pydantic-ai-slim[duckduckgo]"]
 source-tavily = ["pydantic-ai-slim[tavily]"]
 
 [dependency-groups]
@@ -440,11 +446,12 @@ all-dev = [
   "pytest-timeout",
   "ruff",
   "superclaude",
+  "twine",
   "types-boto3-custom",
   "uv",
   "uv-dynamic-versioning",
 ]
-build = ["hatchling>=1.27.0", "uv-dynamic-versioning>=0.11.2"]
+build = ["hatchling>=1.27.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.11.2"]
 docs = [
   "mkdocs>=1.6.1",
   "mkdocs-awesome-nav>=3.2.0",

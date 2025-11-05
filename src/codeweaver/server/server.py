@@ -621,15 +621,36 @@ def build_app() -> ServerSetup:
     local_logger: logging.Logger = globals()["logger"]
     local_logger.info("Initializing CodeWeaver server. Logging set up.")
     settings_view = get_settings_map()
+    if not settings_view:
+        try:
+            from codeweaver.config.settings import get_settings
+            from codeweaver.core.types.dictview import DictView
+
+            if settings := get_settings():
+                settings_view = DictView(
+                    CodeWeaverSettingsDict(**settings.model_dump(round_trip=True))
+                )
+                settings_module = settings.__class__.__module__
+                settings_module._mapped_settings = settings_view  # type: ignore[attr-defined]
+        except Exception as e:
+            raise InitializationError("Failed to load CodeWeaver settings.") from e
     middleware_settings, logging_middleware = _configure_middleware(
         settings_view, app_logger, level
     )
-    filtered_server_settings = _filter_server_settings(settings_view.get("server", {}))
+    filtered_server_settings = _filter_server_settings(
+        lazy_import("codeweaver.config.settings", "FastMcpServerSettings")().model_dump(  # type: ignore
+            round_trip=True
+        )
+        if isinstance((server_settings := settings_view.get("server")), Unset)
+        else server_settings
+    )
     middleware = {logging_middleware, *get_default_middleware()}
     base_fast_mcp_settings = _create_base_fastmcp_settings()
     base_fast_mcp_settings = _integrate_user_settings(
         settings_view.get("server", {}), filtered_server_settings
     )
+    from codeweaver.config.settings import get_settings
+
     local_logger.info("Base FastMCP settings created and merged with user settings.")
     local_logger.debug("Base FastMCP settings dump \n", extra=base_fast_mcp_settings)
     lifespan_fn = _setup_file_filters_and_lifespan(get_settings(), session_statistics)

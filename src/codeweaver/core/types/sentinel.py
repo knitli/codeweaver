@@ -44,13 +44,32 @@ class Sentinel(BasedModel):
     def __get_pydantic_core_schema__(
         cls, source_type: Any, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
-        """Tell Pydantic how to validate Sentinel instances.
+        """Tell Pydantic how to validate and serialize Sentinel instances.
 
         Sentinels can only be validated if they're already Sentinel instances.
         They cannot be constructed from arbitrary data like dicts or strings during validation.
+
+        For serialization, we convert to a simple string to avoid circular references.
         """
-        # Use is_instance schema to only accept existing instances
-        return core_schema.is_instance_schema(cls)
+        from pydantic_core import core_schema as cs
+
+        # Define serialization function
+        def serialize_sentinel(value: Sentinel) -> str:
+            """Serialize Sentinel to string."""
+            return str(value.name)
+
+        assert source_type is cls, "Sentinel can only validate its own instances."
+        # Use is_instance schema with custom serialization
+        # Sentinels are only set internally,
+        # spellchecker:off
+        return cs.is_instance_schema(
+            cls,
+            cls_repr=repr(cls),
+            serialization=cs.plain_serializer_function_ser_schema(
+                serialize_sentinel, return_schema=cs.str_schema(), when_used="json"
+            ),
+        )
+        # spellchecker:on
 
     def __new__(cls, name: SentinelName | None = None, module_name: str | None = None) -> Self:
         """Create a new ."""
