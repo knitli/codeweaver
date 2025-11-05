@@ -470,6 +470,8 @@ class CodeWeaverSettings(BaseSettings):
             result = type(self).model_rebuild()
             logger.debug("Rebuilt CodeWeaverSettings during post-init, result: %s", result)
         if type(self).__pydantic_complete__:
+            # Ensure all nested Unset values are replaced with defaults
+            ensure_set_fields(self)
             # Exclude computed fields to prevent circular dependency during initialization
             # Computed fields like IndexingSettings.cache_dir may call get_settings()
             self._map = cast(
