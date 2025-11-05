@@ -256,31 +256,59 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         reraise=True,
     )
     async def _search_with_retry(
-        self, vector: list[float] | dict[str, list[float] | Any], query_filter: Filter | None = None
+        self, vector: list[float] | dict[str, list[float] | Any], query_filter: Filter | None = None, context: Any = None
     ) -> list[SearchResult]:
         """Wrapper around search with retry logic and circuit breaker."""
+        from codeweaver.common.logging import log_to_client_or_fallback
+
         self._check_circuit_breaker()
 
         try:
             result = await self.search(vector, query_filter)
             self._record_success()
+
+            await log_to_client_or_fallback(
+                context,
+                "debug",
+                {
+                    "msg": "Vector store search successful",
+                    "extra": {
+                        "provider": self._provider.value,
+                        "results_count": len(result),
+                    }
+                }
+            )
         except (ConnectionError, TimeoutError, OSError) as e:
             self._record_failure()
-            import logging
 
-            logger = logging.getLogger(__name__)
-            logger.warning(
-                "Vector store search failed for %s: %s (attempt %d/5)",
-                self._provider,
-                str(e),
-                self._failure_count,
+            await log_to_client_or_fallback(
+                context,
+                "warning",
+                {
+                    "msg": "Vector store search failed",
+                    "extra": {
+                        "provider": self._provider.value,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "attempt": self._failure_count,
+                        "max_attempts": 5,
+                    }
+                }
             )
             raise
-        except Exception:
-            import logging
-
-            logger = logging.getLogger(__name__)
-            logger.exception("Non-retryable error in vector store search")
+        except Exception as e:
+            await log_to_client_or_fallback(
+                context,
+                "error",
+                {
+                    "msg": "Non-retryable error in vector store search",
+                    "extra": {
+                        "provider": self._provider.value,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                    }
+                }
+            )
             raise
         else:
             return result
@@ -326,30 +354,72 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         retry=retry_if_exception_type((ConnectionError, TimeoutError, OSError)),
         reraise=True,
     )
-    async def _upsert_with_retry(self, chunks: list[CodeChunk]) -> None:
+    async def _upsert_with_retry(self, chunks: list[CodeChunk], context: Any = None) -> None:
         """Wrapper around upsert with retry logic and circuit breaker."""
+        from codeweaver.common.logging import log_to_client_or_fallback
+
         self._check_circuit_breaker()
+
+        await log_to_client_or_fallback(
+            context,
+            "debug",
+            {
+                "msg": "Starting vector store upsert",
+                "extra": {
+                    "provider": self._provider.value,
+                    "chunks_count": len(chunks),
+                }
+            }
+        )
 
         try:
             await self.upsert(chunks)
             self._record_success()
+
+            await log_to_client_or_fallback(
+                context,
+                "debug",
+                {
+                    "msg": "Vector store upsert successful",
+                    "extra": {
+                        "provider": self._provider.value,
+                        "chunks_count": len(chunks),
+                    }
+                }
+            )
         except (ConnectionError, TimeoutError, OSError) as e:
             self._record_failure()
-            import logging
 
-            logger = logging.getLogger(__name__)
-            logger.warning(
-                "Vector store upsert failed for %s: %s (attempt %d/5)",
-                self._provider,
-                str(e),
-                self._failure_count,
+            await log_to_client_or_fallback(
+                context,
+                "warning",
+                {
+                    "msg": "Vector store upsert failed",
+                    "extra": {
+                        "provider": self._provider.value,
+                        "chunks_count": len(chunks),
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "attempt": self._failure_count,
+                        "max_attempts": 5,
+                    }
+                }
             )
             raise
-        except Exception:
-            import logging
-
-            logger = logging.getLogger(__name__)
-            logger.exception("Non-retryable error in vector store upsert")
+        except Exception as e:
+            await log_to_client_or_fallback(
+                context,
+                "error",
+                {
+                    "msg": "Non-retryable error in vector store upsert",
+                    "extra": {
+                        "provider": self._provider.value,
+                        "chunks_count": len(chunks),
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                    }
+                }
+            )
             raise
 
     @abstractmethod

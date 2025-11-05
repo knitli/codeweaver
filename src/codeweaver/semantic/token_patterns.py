@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, TypedDict
 
 from codeweaver.core.language import SemanticSearchLanguage
 
+
 logger = logging.getLogger(__name__)
 
 

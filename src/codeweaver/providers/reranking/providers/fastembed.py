@@ -13,6 +13,7 @@ import multiprocessing
 from collections.abc import Mapping, Sequence
 from typing import Any, ClassVar
 
+from codeweaver.exceptions import ProviderError
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider
@@ -96,7 +97,23 @@ class FastEmbedRerankingProvider(RerankingProvider[TextCrossEncoder]):
                 query=query, documents=documents, batch_size=len(documents), **(kwargs or {})
             )
         except Exception as e:
-            raise RuntimeError(f"Error during reranking with FastEmbed: {e}") from e
+            raise ProviderError(
+                f"FastEmbed reranking execution failed: {e}",
+                details={
+                    "provider": "fastembed",
+                    "model": self._caps.name,
+                    "query_length": len(query),
+                    "document_count": len(documents),
+                    "batch_size": len(documents),
+                    "error_type": type(e).__name__,
+                },
+                suggestions=[
+                    "Verify FastEmbed model is properly initialized",
+                    "Check if GPU/CUDA is available if using GPU acceleration",
+                    "Reduce batch size if encountering memory issues",
+                    "Ensure documents are valid text strings",
+                ],
+            ) from e
         else:
             return response
 

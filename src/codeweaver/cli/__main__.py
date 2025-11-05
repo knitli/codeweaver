@@ -29,11 +29,13 @@ app = App(
 app.command("codeweaver.cli.commands.config:main", name="config")
 app.command("codeweaver.cli.commands.server:main", name="server")
 app.command("codeweaver.cli.commands.search:main", name="search")
+app.command("codeweaver.cli.commands.index:main", name="index")
+app.command("codeweaver.cli.commands.doctor:app", name="doctor")
+app.command("codeweaver.cli.commands.list:app", name="list", alias="ls")
 
 # these are scaffolded for future implementation
 # app.command("codeweaver.cli.commands.context:app", name="context", alias="prep")
 # app.command("codeweaver.cli.commands.init:app", name="init", alias="initialize")
-# app.command("codeweaver.cli.commands.list:app", name="list", alias="ls")
 
 
 def main() -> None:

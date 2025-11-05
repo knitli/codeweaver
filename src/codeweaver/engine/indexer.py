@@ -525,12 +525,15 @@ class Indexer(BasedModel):
         except ImportError:
             logger.warning("Provider registry not available, providers not initialized")
 
-    async def _index_file(self, path: Path) -> None:
+    async def _index_file(self, path: Path, context: Any = None) -> None:
         """Execute full pipeline for a single file: discover → chunk → embed → index.
 
         Args:
             path: Path to the file to index
+            context: Optional FastMCP context for structured logging
         """
+        from codeweaver.common.logging import log_to_client_or_fallback
+
         try:
             # 1. Discover and store file metadata
             discovered_file = DiscoveredFile.from_path(path)
@@ -540,7 +543,21 @@ class Indexer(BasedModel):
 
             self._store.set(discovered_file.file_hash, discovered_file)
             self._stats.files_discovered += 1
-            logger.debug("Discovered file: %s (%s bytes)", path, discovered_file.size)
+
+            await log_to_client_or_fallback(
+                context,
+                "debug",
+                {
+                    "msg": "File discovered",
+                    "extra": {
+                        "phase": "discovery",
+                        "file_path": str(path),
+                        "file_size": discovered_file.size,
+                        "file_language": discovered_file.language.value if discovered_file.language else None,
+                        "total_discovered": self._stats.files_discovered,
+                    }
+                }
+            )
 
             # 2. Chunk via ChunkingService (if available)
             if not self._chunking_service:
@@ -549,15 +566,53 @@ class Indexer(BasedModel):
 
             chunks = self._chunking_service.chunk_file(discovered_file)
             self._stats.chunks_created += len(chunks)
-            logger.debug("Created %d chunks from %s", len(chunks), path)
+
+            await log_to_client_or_fallback(
+                context,
+                "debug",
+                {
+                    "msg": "File chunked",
+                    "extra": {
+                        "phase": "chunking",
+                        "file_path": str(path),
+                        "chunks_created": len(chunks),
+                        "total_chunks": self._stats.chunks_created,
+                    }
+                }
+            )
 
             # 3. Embed chunks (if embedding providers available)
             if self._embedding_provider or self._sparse_provider:
                 await self._embed_chunks(chunks)
                 self._stats.chunks_embedded += len(chunks)
+
+                await log_to_client_or_fallback(
+                    context,
+                    "debug",
+                    {
+                        "msg": "Chunks embedded",
+                        "extra": {
+                            "phase": "embedding",
+                            "file_path": str(path),
+                            "chunks_embedded": len(chunks),
+                            "total_embedded": self._stats.chunks_embedded,
+                            "dense_provider": type(self._embedding_provider).__name__ if self._embedding_provider else None,
+                            "sparse_provider": type(self._sparse_provider).__name__ if self._sparse_provider else None,
+                        }
+                    }
+                )
             else:
-                logger.warning(
-                    "No embedding providers configured, skipping embedding for: %s", path
+                await log_to_client_or_fallback(
+                    context,
+                    "warning",
+                    {
+                        "msg": "No embedding providers configured",
+                        "extra": {
+                            "phase": "embedding",
+                            "file_path": str(path),
+                            "action": "skipped",
+                        }
+                    }
                 )
 
             # 4. Retrieve updated chunks from registry (single source of truth!)
@@ -577,16 +632,69 @@ class Indexer(BasedModel):
             if self._vector_store:
                 await self._vector_store.upsert(updated_chunks)
                 self._stats.chunks_indexed += len(updated_chunks)
-                logger.debug("Indexed %d chunks to vector store from %s", len(updated_chunks), path)
+
+                await log_to_client_or_fallback(
+                    context,
+                    "debug",
+                    {
+                        "msg": "Chunks indexed to vector store",
+                        "extra": {
+                            "phase": "storage",
+                            "file_path": str(path),
+                            "chunks_indexed": len(updated_chunks),
+                            "total_indexed": self._stats.chunks_indexed,
+                            "vector_store": type(self._vector_store).__name__,
+                        }
+                    }
+                )
             else:
-                logger.warning("No vector store configured, skipping indexing for: %s", path)
+                await log_to_client_or_fallback(
+                    context,
+                    "warning",
+                    {
+                        "msg": "No vector store configured",
+                        "extra": {
+                            "phase": "storage",
+                            "file_path": str(path),
+                            "action": "skipped",
+                        }
+                    }
+                )
 
             self._stats.files_processed += 1
-            logger.info("Successfully processed file: %s (%d chunks)", path, len(chunks))
 
-        except Exception:
+            await log_to_client_or_fallback(
+                context,
+                "info",
+                {
+                    "msg": "File processing complete",
+                    "extra": {
+                        "file_path": str(path),
+                        "chunks_created": len(chunks),
+                        "files_processed": self._stats.files_processed,
+                        "total_files": self._stats.files_discovered,
+                        "progress_pct": round((self._stats.files_processed / self._stats.files_discovered * 100), 1) if self._stats.files_discovered > 0 else 0,
+                    }
+                }
+            )
+
+        except Exception as e:
             logger.exception("Failed to index file %s", path)
             self._stats.files_with_errors.append(path)
+
+            await log_to_client_or_fallback(
+                context,
+                "error",
+                {
+                    "msg": "File indexing failed",
+                    "extra": {
+                        "file_path": str(path),
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "total_errors": len(self._stats.files_with_errors),
+                    }
+                }
+            )
 
     def _telemetry_keys(self) -> None:
         return None
@@ -666,13 +774,19 @@ class Indexer(BasedModel):
                 logger.debug("Unhandled change type %s for %s", change_type, path)
 
     # ---- public helpers ----
-    def prime_index(self, *, force_reindex: bool = False) -> int:
+    def prime_index(
+        self,
+        *,
+        force_reindex: bool = False,
+        progress_callback: Callable[[IndexingStats, str | None], None] | None = None,
+    ) -> int:
         """Perform an initial indexing pass using the configured rignore walker.
 
         Enhanced version with persistence support and batch processing.
 
         Args:
             force_reindex: If True, skip persistence checks and reindex everything
+            progress_callback: Optional callback to report progress (receives stats and phase)
 
         Returns:
             Number of files indexed
@@ -719,6 +833,10 @@ class Indexer(BasedModel):
         logger.info("Discovered %d files to index", len(files_to_index))
         self._stats.files_discovered = len(files_to_index)
 
+        # Report discovery phase complete
+        if progress_callback:
+            progress_callback(self._stats, "discovery")
+
         # Index files in batch (synchronous wrapper for async pipeline)
         try:
             # Check if we're already in an event loop
@@ -728,11 +846,13 @@ class Indexer(BasedModel):
                 import concurrent.futures
 
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                    future = executor.submit(asyncio.run, self._index_files_batch(files_to_index))
+                    future = executor.submit(
+                        asyncio.run, self._index_files_batch(files_to_index, progress_callback)
+                    )
                     future.result()  # Wait for completion and propagate exceptions
             except RuntimeError:
                 # No event loop running, use asyncio.run()
-                asyncio.run(self._index_files_batch(files_to_index))
+                asyncio.run(self._index_files_batch(files_to_index, progress_callback))
         except Exception:
             logger.exception("Failure during batch indexing")
 
@@ -949,50 +1069,213 @@ class Indexer(BasedModel):
         except Exception:
             logger.exception("Failed to index to vector store")
 
-    async def _index_files_batch(self, files: list[Path]) -> None:
+    async def _index_files_batch(
+        self,
+        files: list[Path],
+        progress_callback: Callable[[IndexingStats, str | None], None] | None = None,
+        context: Any = None,
+    ) -> None:
         """Index multiple files in batch using the chunking service.
 
         Args:
             files: List of file paths to index
+            progress_callback: Optional callback to report progress (receives stats and phase)
+            context: Optional FastMCP context for structured logging
         """
+        from codeweaver.common.logging import log_to_client_or_fallback
+
         if not files:
             return
 
         # Check for shutdown request
         if self._shutdown_requested:
-            logger.info("Shutdown requested, stopping batch indexing")
+            await log_to_client_or_fallback(
+                context,
+                "info",
+                {
+                    "msg": "Shutdown requested",
+                    "extra": {
+                        "action": "stopping_batch_indexing",
+                        "files_remaining": len(files),
+                    }
+                }
+            )
             return
 
         if not self._chunking_service:
-            logger.warning("No chunking service configured, cannot batch index files")
+            await log_to_client_or_fallback(
+                context,
+                "warning",
+                {
+                    "msg": "No chunking service configured",
+                    "extra": {
+                        "action": "cannot_batch_index",
+                        "files_count": len(files),
+                    }
+                }
+            )
             return
 
         # Phase 1: Discover files
+        await log_to_client_or_fallback(
+            context,
+            "info",
+            {
+                "msg": "Starting batch indexing",
+                "extra": {
+                    "phase": "discovery",
+                    "batch_size": len(files),
+                    "total_discovered": self._stats.files_discovered,
+                }
+            }
+        )
+
         discovered_files = self._discover_files_for_batch(files)
         if not discovered_files:
-            logger.info("No valid files to index in batch")
+            await log_to_client_or_fallback(
+                context,
+                "info",
+                {
+                    "msg": "No valid files to index",
+                    "extra": {
+                        "phase": "discovery",
+                        "files_attempted": len(files),
+                    }
+                }
+            )
             return
+
+        # Report progress after discovery
+        if progress_callback:
+            progress_callback(self._stats, "discovery")
 
         # Phase 2: Chunk files
+        await log_to_client_or_fallback(
+            context,
+            "info",
+            {
+                "msg": "Discovery complete, starting chunking",
+                "extra": {
+                    "phase": "chunking",
+                    "files_discovered": len(discovered_files),
+                    "languages": list(set(f.language.value for f in discovered_files if f.language)),
+                }
+            }
+        )
+
         all_chunks = self._chunk_discovered_files(discovered_files)
         if not all_chunks:
-            logger.info("No chunks created from files")
+            await log_to_client_or_fallback(
+                context,
+                "info",
+                {
+                    "msg": "No chunks created",
+                    "extra": {
+                        "phase": "chunking",
+                        "files_processed": len(discovered_files),
+                    }
+                }
+            )
             return
 
-        logger.info("Created %d chunks from %d files", len(all_chunks), len(discovered_files))
+        await log_to_client_or_fallback(
+            context,
+            "info",
+            {
+                "msg": "Chunking complete",
+                "extra": {
+                    "phase": "chunking",
+                    "chunks_created": len(all_chunks),
+                    "files_chunked": len(discovered_files),
+                    "avg_chunks_per_file": round(len(all_chunks) / len(discovered_files), 1),
+                }
+            }
+        )
+
+        # Report progress after chunking
+        if progress_callback:
+            progress_callback(self._stats, "chunking")
 
         # Phase 3-5: Only run if providers are initialized
         if self._embedding_provider or self._sparse_provider or self._vector_store:
             # Phase 3: Embed chunks in batches
+            await log_to_client_or_fallback(
+                context,
+                "info",
+                {
+                    "msg": "Starting embedding phase",
+                    "extra": {
+                        "phase": "embedding",
+                        "chunks_to_embed": len(all_chunks),
+                        "dense_provider": type(self._embedding_provider).__name__ if self._embedding_provider else None,
+                        "sparse_provider": type(self._sparse_provider).__name__ if self._sparse_provider else None,
+                    }
+                }
+            )
+
             await self._embed_chunks_in_batches(all_chunks)
+
+            await log_to_client_or_fallback(
+                context,
+                "info",
+                {
+                    "msg": "Embedding complete",
+                    "extra": {
+                        "phase": "embedding",
+                        "chunks_embedded": self._stats.chunks_embedded,
+                    }
+                }
+            )
+
+            # Report progress after embedding
+            if progress_callback:
+                progress_callback(self._stats, "embedding")
 
             # Phase 4: Retrieve embedded chunks from registry
             updated_chunks = self._retrieve_embedded_chunks(all_chunks)
 
             # Phase 5: Index to vector store
+            await log_to_client_or_fallback(
+                context,
+                "info",
+                {
+                    "msg": "Starting vector store indexing",
+                    "extra": {
+                        "phase": "storage",
+                        "chunks_to_index": len(updated_chunks),
+                        "vector_store": type(self._vector_store).__name__ if self._vector_store else None,
+                    }
+                }
+            )
+
             await self._index_chunks_to_store(updated_chunks)
+
+            await log_to_client_or_fallback(
+                context,
+                "info",
+                {
+                    "msg": "Vector store indexing complete",
+                    "extra": {
+                        "phase": "storage",
+                        "chunks_indexed": self._stats.chunks_indexed,
+                    }
+                }
+            )
+
+            # Report progress after indexing
+            if progress_callback:
+                progress_callback(self._stats, "indexing")
         else:
-            logger.debug("Skipping embedding and indexing phases (no providers initialized)")
+            await log_to_client_or_fallback(
+                context,
+                "debug",
+                {
+                    "msg": "Skipping embedding and indexing phases",
+                    "extra": {
+                        "reason": "no_providers_initialized",
+                    }
+                }
+            )
 
         # Update stats with successful file count
         self._stats.files_processed += len(discovered_files)

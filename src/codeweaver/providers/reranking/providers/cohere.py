@@ -78,7 +78,6 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
         """Initialize the Cohere reranking provider after Pydantic setup."""
         # Set _caps and _provider after Pydantic initialization
         # Note: base class might set these, but we ensure they're correct here
-        pass
 
     @property
     def base_url(self) -> str:

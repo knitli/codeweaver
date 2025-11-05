@@ -43,6 +43,7 @@ from codeweaver.common.utils import LazyImport, lazy_import, uuid7
 from codeweaver.core.stores import BlakeStore, UUIDStore, make_blake_store, make_uuid_store
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BasedModel
+from codeweaver.exceptions import ProviderError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.registry import EmbeddingRegistry
 from codeweaver.providers.embedding.types import SparseEmbedding
@@ -114,7 +115,18 @@ def default_output_transformer(output: Any) -> list[list[float]] | list[list[int
         ("Received unexpected output format from embedding provider."),
         extra={"output_data": output},  # pyright: ignore[reportUnknownArgumentType]
     )
-    raise ValueError("Unexpected output format from embedding provider.")
+    raise ProviderError(
+        "Embedding provider returned unexpected output format",
+        details={
+            "output_type": type(output).__name__,
+            "output_preview": str(output)[:200] if output else None,
+        },
+        suggestions=[
+            "Check that the provider's response format matches expectations",
+            "Verify the provider's API has not changed",
+            "Review provider documentation for output format",
+        ],
+    )
 
 
 class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
@@ -338,17 +350,35 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         documents: Sequence[CodeChunk],  # type: ignore # intentionally obscurred
         *,
         batch_id: UUID7 | None = None,
+        context: Any = None,
         **kwargs: Mapping[str, Any] | None,
     ) -> list[list[float]] | list[list[int]] | list[SparseEmbedding] | EmbeddingErrorInfo:
         """Embed a list of documents into vectors.
 
         Optionally takes a `batch_id` parameter to reprocess a specific batch of documents.
         """
+        from codeweaver.common.logging import log_to_client_or_fallback
+
         is_old_batch = False
         if batch_id and self._store and batch_id in self._store:  # pyright: ignore[reportUnknownMemberType]
             documents: Sequence[CodeChunk] = self._store[batch_id]  # type: ignore
         is_old_batch = True
         chunks, cache_key = self._process_input(documents, is_old_batch=is_old_batch)  # type: ignore
+
+        await log_to_client_or_fallback(
+            context,
+            "debug",
+            {
+                "msg": "Starting document embedding",
+                "extra": {
+                    "provider": self._provider.value,
+                    "document_count": len(documents),
+                    "is_reprocessing": is_old_batch,
+                    "batch_id": str(batch_id or cache_key) if batch_id or cache_key else None,
+                }
+            }
+        )
+
         try:
             # Use retry wrapper instead of calling _embed_documents directly
             results: (
@@ -358,13 +388,48 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             ) = await self._embed_documents_with_retry(tuple(chunks), **kwargs)
         except CircuitBreakerOpenError as e:
             # Circuit breaker open - return error immediately
-            logger.warning("Circuit breaker open for %s", self._provider)
+            await log_to_client_or_fallback(
+                context,
+                "error",
+                {
+                    "msg": "Circuit breaker open",
+                    "extra": {
+                        "provider": self._provider.value,
+                        "document_count": len(documents),
+                        "circuit_state": self._circuit_state.value,
+                    }
+                }
+            )
             return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)  # type: ignore
         except RetryError as e:
             # All retry attempts exhausted
-            logger.exception("All retry attempts exhausted for %s", self._provider)
+            await log_to_client_or_fallback(
+                context,
+                "error",
+                {
+                    "msg": "All retry attempts exhausted",
+                    "extra": {
+                        "provider": self._provider.value,
+                        "document_count": len(documents),
+                        "failure_count": self._failure_count,
+                    }
+                }
+            )
             return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)  # type: ignore
         except Exception as e:
+            await log_to_client_or_fallback(
+                context,
+                "error",
+                {
+                    "msg": "Document embedding failed",
+                    "extra": {
+                        "provider": self._provider.value,
+                        "document_count": len(documents),
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                    }
+                }
+            )
             return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)  # type: ignore
         else:
             if isinstance(results, dict):
@@ -384,6 +449,20 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                     batch_id=cast(UUID7, batch_id or cache_key),
                     embeddings=results,
                 )
+
+            await log_to_client_or_fallback(
+                context,
+                "debug",
+                {
+                    "msg": "Document embedding complete",
+                    "extra": {
+                        "provider": self._provider.value,
+                        "document_count": len(documents),
+                        "embeddings_generated": len(results) if results else 0,
+                    }
+                }
+            )
+
             return results
 
     @retry(
@@ -521,9 +600,18 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 else sum(self.tokenizer.estimate_batch(item) for item in from_docs)  # type: ignore
             )
             statistics.add_token_usage(embedding_generated=token_count)
-        raise ValueError(
-            "Either `token_count` or `from_docs` must be provided to update token statistics."
-        )
+        else:
+            raise CodeWeaverValidationError(
+                "Token statistics update requires either token_count or from_docs",
+                details={
+                    "token_count_provided": token_count is not None,
+                    "from_docs_provided": from_docs is not None,
+                },
+                suggestions=[
+                    "Provide token_count directly from provider response",
+                    "Provide from_docs list to estimate token count",
+                ],
+            )
 
     @staticmethod
     def normalize(embedding: Sequence[float] | Sequence[int]) -> list[float]:
@@ -538,7 +626,19 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         if arr.size == 0:
             return arr.tolist()
         if not np.all(np.isfinite(arr)):
-            raise ValueError("Embedding contains non-finite values.")
+            raise CodeWeaverValidationError(
+                "Embedding vector contains non-finite values (NaN or Inf)",
+                details={
+                    "embedding_size": int(arr.size),
+                    "has_nan": bool(np.isnan(arr).any()),
+                    "has_inf": bool(np.isinf(arr).any()),
+                },
+                suggestions=[
+                    "Check the embedding model output for numerical stability issues",
+                    "Verify input text does not contain unusual characters",
+                    "Try re-generating the embedding",
+                ],
+            )
         denom = float(np.linalg.norm(arr))
         return arr.tolist() if denom == 0.0 else (arr / denom).tolist()
 

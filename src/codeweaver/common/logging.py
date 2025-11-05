@@ -84,18 +84,30 @@ def setup_logger(
     return logger
 
 
-def log_to_client_or_fallback(
-    logger: logging.Logger,
-    message: str,
-    level: Literal["debug", "info", "warning", "error"] = "info",
-    extra: dict[str, Any] | None = None,
-    ctx: Context | None = None,
+async def log_to_client_or_fallback(
+    context: Context | None,
+    level: Literal["debug", "info", "warning", "error"],
+    log_data: dict[str, Any],
 ) -> None:
-    """Log a message to the client or fallback to standard logging."""
-    if ctx and hasattr(ctx, level):
-        log_obj = getattr(ctx, level)
-        log_obj(f"{message}\n\n{to_json(extra, indent=2) if extra else ''}", logger.name)
+    """Log structured data to the client or fallback to standard logging.
+
+    Args:
+        context: FastMCP context (optional)
+        level: Log level
+        log_data: Dict with 'msg' (required) and 'extra' (optional) keys
+    """
+    msg = log_data.get("msg", "")
+    extra = log_data.get("extra")
+
+    if context and hasattr(context, level):
+        log_obj = getattr(context, level)
+        if extra:
+            log_obj(f"{msg}\n\n{to_json(extra, indent=2).decode('utf-8')}")
+        else:
+            log_obj(msg)
     else:
+        # Fallback to standard logging
+        logger = logging.getLogger("codeweaver")
         match level:
             case "debug":
                 int_level: int = logging.DEBUG
@@ -105,7 +117,7 @@ def log_to_client_or_fallback(
                 int_level: int = logging.WARNING
             case "error":
                 int_level: int = logging.ERROR
-        logger.log(int_level, message, extra=extra)
+        logger.log(int_level, msg, extra=extra)
 
 
 __all__ = ("log_to_client_or_fallback", "setup_logger")

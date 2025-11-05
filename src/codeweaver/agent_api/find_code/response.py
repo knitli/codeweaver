@@ -101,6 +101,57 @@ def build_success_response(
     Returns:
         FindCodeResponseSummary with all fields populated
     """
+    # Determine search mode from strategies
+    search_mode = None
+    if SearchStrategy.HYBRID_SEARCH in strategies_used:
+        search_mode = "hybrid"
+    elif SearchStrategy.DENSE_ONLY in strategies_used:
+        search_mode = "dense_only"
+    elif SearchStrategy.SPARSE_ONLY in strategies_used:
+        search_mode = "sparse_only"
+    elif SearchStrategy.KEYWORD_FALLBACK in strategies_used:
+        search_mode = "keyword"
+
+    # Get indexing state from indexer if available
+    indexing_state = None
+    index_coverage = None
+    warnings = []
+    status = "success"
+
+    try:
+        from codeweaver.common.registry import get_indexer
+        indexer = get_indexer()
+
+        if indexer is not None:
+            stats = indexer.stats
+            # Determine indexing state
+            if stats.files_processed < stats.files_discovered:
+                indexing_state = "in_progress"
+                warnings.append(f"Index incomplete: {stats.files_processed}/{stats.files_discovered} files processed")
+                status = "partial"
+            elif stats.files_discovered > 0:
+                indexing_state = "complete"
+                index_coverage = (stats.files_processed / stats.files_discovered) * 100.0 if stats.files_discovered > 0 else 0.0
+            else:
+                indexing_state = "not_started"
+                warnings.append("No files have been indexed yet")
+                status = "partial"
+        else:
+            indexing_state = "unknown"
+    except Exception:
+        # Gracefully handle if indexer not available
+        indexing_state = "unknown"
+
+    # Add warnings for degraded search modes
+    if search_mode == "sparse_only":
+        warnings.append("Dense embeddings unavailable - using sparse search only (degraded mode)")
+        status = "partial"
+    elif search_mode == "dense_only":
+        warnings.append("Sparse embeddings unavailable - using dense search only")
+    elif search_mode == "keyword":
+        warnings.append("Embedding providers unavailable - using keyword fallback")
+        status = "partial"
+
     return FindCodeResponseSummary(
         matches=code_matches,
         summary=generate_summary(code_matches, intent_type, query),
@@ -111,6 +162,11 @@ def build_success_response(
         execution_time_ms=execution_time_ms,
         search_strategy=tuple(strategies_used),
         languages_found=extract_languages(code_matches),
+        status=status,
+        warnings=warnings,
+        indexing_state=indexing_state,
+        index_coverage=index_coverage,
+        search_mode=search_mode,
     )
 
 
@@ -127,6 +183,29 @@ def build_error_response(
     Returns:
         FindCodeResponseSummary indicating failure
     """
+    # Get indexing state even in error case
+    indexing_state = None
+    index_coverage = None
+
+    try:
+        from codeweaver.common.registry import get_indexer
+        indexer = get_indexer()
+
+        if indexer is not None:
+            stats = indexer.stats
+            if stats.files_processed < stats.files_discovered:
+                indexing_state = "in_progress"
+                index_coverage = (stats.files_processed / stats.files_discovered) * 100.0 if stats.files_discovered > 0 else 0.0
+            elif stats.files_discovered > 0:
+                indexing_state = "complete"
+                index_coverage = 100.0
+            else:
+                indexing_state = "not_started"
+        else:
+            indexing_state = "unknown"
+    except Exception:
+        indexing_state = "unknown"
+
     return FindCodeResponseSummary(
         matches=[],
         summary=f"Search failed: {str(error)[:500]}",
@@ -137,6 +216,11 @@ def build_error_response(
         execution_time_ms=execution_time_ms,
         search_strategy=(SearchStrategy.KEYWORD_FALLBACK,),
         languages_found=(),
+        status="error",
+        warnings=[f"Critical error: {type(error).__name__}: {str(error)[:200]}"],
+        indexing_state=indexing_state,
+        index_coverage=index_coverage,
+        search_mode="keyword",
     )
 
 

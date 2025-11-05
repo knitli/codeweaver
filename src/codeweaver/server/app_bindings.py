@@ -315,8 +315,8 @@ def register_tool(app: FastMCP[AppState]) -> FastMCP[AppState]:
         Tool.from_function(
             find_code_tool,
             name="find_code",
-            description="""Find code in the codebase (TEMPORARILY DISABLED - architectural improvements in progress)""",
-            enabled=False,  # Disabled during refactor - will be re-enabled soon
+            description="""Find code in the codebase using semantic search and intelligent analysis.""",
+            enabled=True,
             exclude_args=["context"],
             tags={"user", "external", "code-context"},
             annotations=ToolAnnotations(

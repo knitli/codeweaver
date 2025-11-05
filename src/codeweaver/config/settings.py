@@ -108,9 +108,7 @@ def _determine_setting(
     ):
         # Don't return class references - return None instead
         # This prevents TypedDict classes from being returned as values
-        if inspect.isclass(other):
-            return None
-        return other
+        return None if inspect.isclass(other) else other
     return None
 
 
@@ -750,15 +748,66 @@ class CodeWeaverSettings(BaseSettings):
         The file format is determined by the file extension (.toml, .yaml/.yml, .json).
         """
         default_settings = cls()
-        config = default_settings.model_dump(
-            exclude_unset=True,
-            by_alias=True,
-            exclude_defaults=True,
-            round_trip=True,
-            exclude_computed_fields=True,
-            exclude={"config_file"},
-            mode="python",
+        data = cls._to_serializable(default_settings, path=path)
+        cls._write_config_file(path, data)
+
+    @staticmethod
+    def _to_serializable(
+        obj: CodeWeaverSettings, path: Path | None = None, **override_kwargs: Any
+    ) -> Any:
+        """Convert an object to a serializable form."""
+        from codeweaver.common.utils.git import get_project_path
+
+        kwargs = {
+            "indent": 4,
+            "exclude_unset": True,
+            "by_alias": True,
+            "exclude_defaults": True,
+            "round_trip": True,
+            "exclude_computed_fields": True,
+            "mode": "python",
+        } | override_kwargs
+        as_obj = obj.model_dump(**kwargs)  # type: ignore
+        config_file = (
+            path
+            or obj.config_file
+            or (
+                obj.project_path
+                if isinstance(obj.project_path, Path)
+                else get_project_path() or Path.cwd()
+            )
+            / Path(".codeweaver.toml")
         )
+        extension = config_file.suffix.lower()
+        match extension:
+            case ".json":
+                from pydantic_core import to_json
+
+                data = to_json(
+                    as_obj,
+                    **{
+                        k: v
+                        for k, v in kwargs.items()
+                        if k not in {"exclude_unset", "exclude_defaults", "exclude_computed_fields"}
+                    },  # type: ignore
+                ).decode("utf-8")
+            case ".toml":
+                import tomli_w
+
+                data = tomli_w.dumps(as_obj)
+            case ".yaml" | ".yml":
+                import yaml
+
+                data = yaml.dump(obj.model_dump())
+            case _:
+                raise ValueError(f"Unsupported configuration file format: {extension}")
+        return data
+
+    @staticmethod
+    def _write_config_file(path: Path, data: str) -> None:
+        """Write configuration data to a file."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _ = path.write_text(data, encoding="utf-8")
 
     def save_to_file(self, path: Path | None = None) -> None:
         """Save the current settings to a configuration file.

@@ -49,7 +49,7 @@ import logging
 import time
 
 from pathlib import Path
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 from pydantic import NonNegativeInt, PositiveInt
 
@@ -95,6 +95,7 @@ async def find_code(
     include_tests: bool = False,
     focus_languages: tuple[str, ...] | None = None,
     max_results: int = 50,
+    context: Any | None = None,  # ADD THIS for MCP communication
 ) -> FindCodeResponseSummary:
     """Find relevant code based on semantic search with intent-driven ranking.
 
@@ -114,6 +115,7 @@ async def find_code(
         include_tests: Whether to include test files in results
         focus_languages: Optional language filter
         max_results: Maximum number of results to return (default: 50)
+        context: Optional FastMCP Context for client communication
 
     Returns:
         FindCodeResponseSummary with ranked matches and metadata
@@ -147,14 +149,14 @@ async def find_code(
         logger.info("Query intent detected: %s (confidence: %.2f)", intent_type, confidence)
 
         # Step 2: Embed query (dense + sparse)
-        embeddings = await embed_query(query)
+        embeddings = await embed_query(query, context=context)  # THREAD CONTEXT
 
         # Step 3: Build query vector and determine strategy
         query_vector = build_query_vector(embeddings, query)
         strategies_used.append(query_vector.strategy)
 
         # Step 4: Execute vector search
-        candidates = await execute_vector_search(query_vector)
+        candidates = await execute_vector_search(query_vector, context=context)  # THREAD CONTEXT
 
         # Step 5: Post-search filtering (v0.1 simple approach)
         candidates = apply_filters(
@@ -168,7 +170,7 @@ async def find_code(
             apply_hybrid_weights(candidates)
 
         # Step 7: Rerank (optional, if provider configured)
-        reranked_results, rerank_strategy = await rerank_results(query, candidates)
+        reranked_results, rerank_strategy = await rerank_results(query, candidates, context=context)  # THREAD CONTEXT
         if rerank_strategy:
             strategies_used.append(rerank_strategy)
 

@@ -9,7 +9,7 @@ Types and models for the find_code agent API.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Annotated, Any, NamedTuple
+from typing import TYPE_CHECKING, Annotated, Any, Literal, NamedTuple
 
 from pydantic import ConfigDict, Field, NonNegativeFloat, NonNegativeInt, model_validator
 
@@ -21,6 +21,7 @@ from codeweaver.core.spans import Span
 from codeweaver.core.types import LanguageName
 from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
+from codeweaver.exceptions import ValidationError
 from codeweaver.providers.embedding.types import SparseEmbedding
 
 
@@ -109,9 +110,30 @@ class CodeMatch(BasedModel):
         """Validate span consistency."""
         # Access Span attributes directly instead of unpacking
         if self.span.start > self.span.end:
-            raise ValueError("Start line must be <= end line")
+            raise ValidationError(
+                "Invalid span: start line must be less than or equal to end line",
+                details={
+                    "start_line": self.span.start,
+                    "end_line": self.span.end,
+                    "file_path": str(self.file.abs_path) if self.file else None,
+                },
+                suggestions=[
+                    "Check that the span coordinates are calculated correctly",
+                    "Verify the source code chunk boundaries",
+                ],
+            )
         if self.span.start < 1:
-            raise ValueError("Line numbers must start from 1")
+            raise ValidationError(
+                "Invalid span: line numbers must start from 1",
+                details={
+                    "start_line": self.span.start,
+                    "file_path": str(self.file.abs_path) if self.file else None,
+                },
+                suggestions=[
+                    "Verify span calculation logic uses 1-based indexing",
+                    "Check AST parsing configuration",
+                ],
+            )
         return self
 
     def serialize_for_cli(self) -> dict[str, Any]:
@@ -158,6 +180,48 @@ class FindCodeResponseSummary(BasedModel):
     token_count: Annotated[NonNegativeInt, Field(description="""Actual tokens used in response""")]
 
     execution_time_ms: Annotated[NonNegativeFloat, Field(description="""Total processing time""")]
+
+    # Operational status fields
+    status: Annotated[
+        Literal["success", "partial", "error"],
+        Field(
+            default="success",
+            description="""Overall operation status: success (all searches completed), partial (some searches failed/degraded), error (critical failure)""",
+        ),
+    ]
+
+    warnings: Annotated[
+        list[str],
+        Field(
+            default_factory=list,
+            description="""Non-critical issues encountered during search (e.g., index incomplete, fallback strategies used, provider degradation)""",
+        ),
+    ]
+
+    indexing_state: Annotated[
+        Literal["complete", "in_progress", "not_started", "unknown"] | None,
+        Field(
+            default=None,
+            description="""Current state of repository indexing: complete (all files indexed), in_progress (indexing ongoing), not_started (no index), unknown (unable to determine)""",
+        ),
+    ]
+
+    index_coverage: Annotated[
+        NonNegativeFloat | None,
+        Field(
+            default=None,
+            le=100.0,
+            description="""Percentage of repository indexed (0.0-100.0). Represents ratio of indexed files to total discoverable files.""",
+        ),
+    ]
+
+    search_mode: Annotated[
+        Literal["hybrid", "dense_only", "sparse_only", "keyword"] | None,
+        Field(
+            default=None,
+            description="""Actual search mode used: hybrid (dense+sparse embeddings), dense_only (semantic only), sparse_only (BM25/keyword-aware), keyword (text matching fallback)""",
+        ),
+    ]
 
     # Context information
     search_strategy: Annotated[
@@ -208,6 +272,23 @@ class FindCodeResponseSummary(BasedModel):
         table.add_column("Metric", justify="left", style="cyan", no_wrap=True)
         table.add_column("Value", justify="right", style="magenta")
 
+        # Operational status
+        status_style = "green" if self.status == "success" else "yellow" if self.status == "partial" else "red"
+        table.add_row("Status", f"[{status_style}]{self.status.upper()}[/{status_style}]")
+
+        if self.warnings:
+            table.add_row("Warnings", f"{len(self.warnings)} warning(s)")
+
+        if self.indexing_state:
+            table.add_row("Indexing State", self.indexing_state.replace("_", " ").title())
+
+        if self.index_coverage is not None:
+            table.add_row("Index Coverage", f"{self.index_coverage:.1f}%")
+
+        if self.search_mode:
+            table.add_row("Search Mode", self.search_mode.replace("_", " ").title())
+
+        # Results metrics
         table.add_row("Total Matches Found", str(self.total_matches))
         table.add_row("Total Results Returned", str(self.total_results))
         table.add_row(
@@ -266,8 +347,22 @@ class StrategizedQuery(NamedTuple):
         """Convert to a FusionQuery for hybrid search."""
         from qdrant_client.http.models import Fusion, FusionQuery, Prefetch, SparseVector
 
+        from codeweaver.exceptions import QueryError
+
         if not self.is_hybrid():
-            raise ValueError("Both dense and sparse embeddings must be present for hybrid query.")
+            raise QueryError(
+                "Cannot create hybrid query: both dense and sparse embeddings required",
+                details={
+                    "has_dense": self.has_dense(),
+                    "has_sparse": self.has_sparse(),
+                    "strategy": self.strategy.value,
+                },
+                suggestions=[
+                    "Ensure both embedding providers are configured",
+                    "Use dense-only or sparse-only search if one provider fails",
+                    "Check embedding provider logs for errors",
+                ],
+            )
 
         # Convert sparse dict to SparseVector with indices and values
         assert self.sparse is not None  # noqa: S101
@@ -286,9 +381,21 @@ class StrategizedQuery(NamedTuple):
 
     def to_query(self, kwargs: dict[str, Any]) -> dict[str, FusionQuery | list[Prefetch] | Any]:
         """Convert to a FusionQuery based on available embeddings."""
+        from codeweaver.exceptions import QueryError
+
         if self.is_empty():
-            raise ValueError(
-                "At least one of dense or sparse embeddings must be present for query."
+            raise QueryError(
+                "Cannot create query: at least one embedding type required",
+                details={
+                    "has_dense": self.has_dense(),
+                    "has_sparse": self.has_sparse(),
+                    "query": self.query,
+                },
+                suggestions=[
+                    "Configure at least one embedding provider (dense or sparse)",
+                    "Verify embedding provider initialization succeeded",
+                    "Check embedding provider logs for errors",
+                ],
             )
         if self.is_hybrid():
             return self.to_hybrid_query({}, kwargs)

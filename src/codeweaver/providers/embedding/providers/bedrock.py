@@ -38,7 +38,7 @@ from pydantic.alias_generators import to_camel, to_snake
 from types_boto3_bedrock_runtime import BedrockRuntimeClient
 
 from codeweaver.core.types.models import BasedModel
-from codeweaver.exceptions import ConfigurationError
+from codeweaver.exceptions import ConfigurationError, ProviderError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 from codeweaver.providers.provider import Provider
@@ -510,7 +510,20 @@ class BedrockEmbeddingProvider(EmbeddingProvider[bedrock_client]):
         """Handle the response from Bedrock for embedding requests and normalize to Sequence[float]."""
         deserialized = BedrockInvokeEmbeddingResponse.from_boto3_response(response)
         if not isinstance(deserialized.body, CohereEmbeddingResponse):
-            raise TypeError("Response body is not a CohereEmbeddingResponse.")
+            raise ProviderError(
+                "AWS Bedrock returned invalid response format for Cohere embedding",
+                details={
+                    "provider": "bedrock",
+                    "model": self._caps.name,
+                    "expected_type": "CohereEmbeddingResponse",
+                    "received_type": type(deserialized.body).__name__,
+                },
+                suggestions=[
+                    "Verify the Bedrock model ID is correct for Cohere embeddings",
+                    "Check that the Bedrock API response format has not changed",
+                    "Ensure the model supports the requested embedding operation",
+                ],
+            )
         self._fire_and_forget(
             lambda: self._update_token_stats(
                 from_docs=cast(

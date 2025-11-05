@@ -65,7 +65,7 @@ class LazyImport[Import: Any]:
     """
 
     __slots__ = ("_attrs", "_lock", "_module_name", "_parent", "_resolved")  # type: ignore
-    
+
     # Introspection attributes that should resolve the object immediately
     # rather than creating a new LazyImport child
     _INTROSPECTION_ATTRS = frozenset({
@@ -221,7 +221,7 @@ class LazyImport[Import: Any]:
             # This will raise AttributeError if the attribute doesn't exist,
             # which is the correct behavior for introspection
             return getattr(resolved, name)
-        
+
         # Normal attribute chaining
         module_name = object.__getattribute__(self, "_module_name")
         attrs = object.__getattribute__(self, "_attrs")

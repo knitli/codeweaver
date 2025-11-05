@@ -20,7 +20,8 @@ from typing import Any, Self, cast
 from pydantic import AnyHttpUrl, create_model
 
 from codeweaver.core.chunks import CodeChunk
-from codeweaver.exceptions import ConfigurationError
+from codeweaver.exceptions import ConfigurationError, ProviderError
+from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 from codeweaver.providers.provider import Provider
@@ -260,7 +261,22 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
             ),
         )
         if not response or not response.data:
-            raise ValueError("No response from OpenAI embeddings endpoint")
+            raise ProviderError(
+                "OpenAI embeddings endpoint returned empty response",
+                details={
+                    "provider": str(self._provider),
+                    "model": self.model_name,
+                    "base_url": self.base_url,
+                    "has_response": response is not None,
+                    "has_data": response.data is not None if response else False,
+                },
+                suggestions=[
+                    "Check API key is valid and has correct permissions",
+                    "Verify the model name is correct",
+                    "Check network connectivity to the API endpoint",
+                    "Review API rate limits and quotas",
+                ],
+            )
         self._report(response, cast(list[str], texts))
         results = sorted(response.data, key=lambda x: x.index)
         return [result.embedding for result in results]
@@ -270,7 +286,17 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
     ) -> list[list[float]] | list[list[int]]:
         """Embed a sequence of documents."""
         if not isinstance(next(iter(documents), CodeChunk), CodeChunk):
-            raise TypeError("Expected a sequence of CodeChunk instances")
+            raise CodeWeaverValidationError(
+                "Documents must be CodeChunk instances for embedding",
+                details={
+                    "received_type": type(next(iter(documents), None)).__name__,
+                    "document_count": len(documents),
+                },
+                suggestions=[
+                    "Ensure documents are CodeChunk objects",
+                    "Convert documents to CodeChunk format before embedding",
+                ],
+            )
         texts = self.chunks_to_strings(documents)
         return await self._get_vectors(cast(list[str], texts), **kwargs)
 
