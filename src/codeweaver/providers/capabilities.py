@@ -73,7 +73,7 @@ PROVIDER_CAPABILITIES: MappingProxyType[LiteralProvider, tuple[LiteralProviderKi
 
 
 FACTORY_IMPORT: LazyImport[OpenAIEmbeddingBase] = lazy_import(
-    "codeweaver.providers.embedding.providers.openai_factory", "OpenAIEmbeddingFactory"
+    "codeweaver.providers.embedding.providers.openai_factory", "OpenAIEmbeddingBase"
 )
 
 
@@ -99,7 +99,7 @@ CLIENT_MAP: MappingProxyType[LiteralProvider, tuple[Client, ...]] = cast(
                 kind=ProviderKind.VECTOR_STORE,
                 client=lazy_import("qdrant_client", "AsyncQdrantClient"),
                 provider_class=lazy_import(
-                    "codeweaver.providers.vector_store.qdrant", "QdrantVectorStoreProvider"
+                    "codeweaver.providers.vector_stores.qdrant", "QdrantVectorStoreProvider"
                 ),
             ),
         ),
@@ -110,7 +110,7 @@ CLIENT_MAP: MappingProxyType[LiteralProvider, tuple[Client, ...]] = cast(
                     kind=ProviderKind.VECTOR_STORE,
                     client=lazy_import("qdrant_client", "AsyncQdrantClient"),
                     provider_class=lazy_import(
-                        "codeweaver.providers.vector_store.inmemory", "InMemoryVectorStoreProvider"
+                        "codeweaver.providers.vector_stores.inmemory", "MemoryVectorStoreProvider"
                     ),
                 ),
             ),
@@ -148,7 +148,7 @@ CLIENT_MAP: MappingProxyType[LiteralProvider, tuple[Client, ...]] = cast(
                 provider=Provider.BEDROCK,
                 kind=ProviderKind.EMBEDDING,
                 origin="codeweaver",
-                client=lazy_import("boto3.client"),  # bedrock-runtime
+                client=lazy_import("boto3", "client"),  # bedrock-runtime
                 provider_class=lazy_import(
                     "codeweaver.providers.embedding.providers.bedrock", "BedrockEmbeddingProvider"
                 ),
@@ -157,7 +157,7 @@ CLIENT_MAP: MappingProxyType[LiteralProvider, tuple[Client, ...]] = cast(
                 provider=Provider.BEDROCK,
                 kind=ProviderKind.RERANKING,
                 origin="codeweaver",
-                client=lazy_import("boto3.client"),  # bedrock-runtime
+                client=lazy_import("boto3", "client"),  # bedrock-runtime
                 provider_class=lazy_import(
                     "codeweaver.providers.reranking.providers.bedrock", "BedrockRerankingProvider"
                 ),
@@ -227,7 +227,7 @@ CLIENT_MAP: MappingProxyType[LiteralProvider, tuple[Client, ...]] = cast(
                 provider=Provider.FASTEMBED,
                 kind=ProviderKind.RERANKING,
                 origin="codeweaver",
-                client=lazy_import("fastembed", "TextCrossEncoder"),
+                client=lazy_import("fastembed.rerank.cross_encoder", "TextCrossEncoder"),
                 provider_class=lazy_import(
                     "codeweaver.providers.reranking.providers.fastembed",
                     "FastEmbedRerankingProvider",

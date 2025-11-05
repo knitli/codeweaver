@@ -59,7 +59,7 @@ if TYPE_CHECKING:
 
 
 _get_statistics: LazyImport[SessionStatistics] = lazy_import(
-    "codeweaver.common.statistics", "get_statistics"
+    "codeweaver.common.statistics", "get_session_statistics"
 )
 
 logger = logging.getLogger(__name__)

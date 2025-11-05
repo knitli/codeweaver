@@ -75,9 +75,8 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
             "uvicorn_config": {},
             **kwargs.copy(),
         }  # type: ignore
-    # TODO: Fix or remove this - initialize_providers doesn't exist in registry
-    # registry = lazy_import("codeweaver.common.registry", "initialize_providers")  # type: ignore
-    # _ = registry()  # type: ignore
+    registry = lazy_import("codeweaver.common.registry.provider", "get_provider_registry")  # type: ignore
+    _ = registry()  # type: ignore
     await app.run_http_async(**resolved_kwargs)  # type: ignore
 
 

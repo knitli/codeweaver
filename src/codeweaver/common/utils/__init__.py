@@ -8,6 +8,7 @@
 from codeweaver.common.utils.checks import (
     file_is_binary,
     has_package,
+    is_ci,
     is_class,
     is_debug,
     is_pydantic_basemodel,
@@ -51,6 +52,7 @@ __all__ = (
     "get_user_config_dir",
     "has_package",
     "in_codeweaver_clone",
+    "is_ci",
     "is_class",
     "is_debug",
     "is_git_dir",

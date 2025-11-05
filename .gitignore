@@ -224,3 +224,5 @@ __pycache__/
 .local.env
 .codeweaver.local.env
 .codeweaver/local.env
+mise.local.toml
+mise.local.env

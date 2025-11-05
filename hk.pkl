@@ -57,6 +57,11 @@ local linters = new Mapping<String, Step> {
         fix = "./scripts/testing/apply-test-marks.py {{ files }}"
     }
 
+    ["validate-lazy-imports"] = new Step {
+        glob = "{src,tests,scripts,mise-tasks}/**/*.py"
+        check = "./mise-tasks/validate-lazy-imports.py {{ files }}"
+    }
+
 }
 
 hooks {

@@ -39,7 +39,7 @@ from types_boto3_bedrock_runtime import BedrockRuntimeClient
 
 from codeweaver.core.types.models import BasedModel
 from codeweaver.exceptions import ConfigurationError
-from codeweaver.providers.embedding.capabilities import EmbeddingModelCapabilities
+from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 from codeweaver.providers.provider import Provider
 

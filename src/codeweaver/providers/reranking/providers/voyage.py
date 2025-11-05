@@ -38,9 +38,6 @@ except ImportError as e:
 class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
     """Base class for reranking providers."""
 
-    # pydantic needs it at runtime
-    from codeweaver.core.chunks import CodeChunk
-
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
     _client: AsyncClient

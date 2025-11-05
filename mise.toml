@@ -76,6 +76,9 @@ mise --silent -y deactivate &>/dev/null
 echo "Environment deactivated."
 '''
 
+# NOTE: Between here and the `scripts` directory, our tasks are getting a bit crowded.
+# TODO: We should combine the scripts/ and these tasks into the `mise-tasks` directory as standalone scripts.
+
 [tasks]
 [tasks.sync]
 depends = ["source"]
@@ -320,7 +323,7 @@ description = "Run all CI checks."
 
 [tasks.pre-commit]
 run = '''
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Running %F{209}CodeWeaver%f pre-commit checks 🪝... %F{38} Thanks for your contributions! You're pretty cool.%f 🚀" &&
 hk fix || print -P "%F{209}[codeweaver]%f ⚠️  %F{red}You need to fix some issues%f before committing. %F{209}Do not pass go, do not collect $200.%f 💸 😦" && exit 1
 git add . &&
