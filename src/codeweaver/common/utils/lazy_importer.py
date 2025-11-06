@@ -5,7 +5,7 @@
 """
 Lazy import utilities for deferred module loading.
 
-This module provides a LazyImport class inspired by cyclopts' CommandSpec pattern,
+This module provides a LazyImport class inspired by cyclopts' [CommandSpec pattern](https://github.com/BrianPugh/cyclopts/blob/main/cyclopts/command_spec.py) (thanks Brian!),
 enabling true lazy loading where both module import AND attribute access are deferred
 until the imported object is actually used.
 
@@ -69,23 +69,23 @@ class LazyImport[Import: Any]:
     # Introspection attributes that should resolve the object immediately
     # rather than creating a new LazyImport child
     _INTROSPECTION_ATTRS = frozenset({
-        "__signature__",
-        "__wrapped__",
         "__annotations__",
-        "__name__",
-        "__qualname__",
-        "__module__",
-        "__doc__",
+        "__class__",
+        "__closure__",
         "__code__",
         "__defaults__",
-        "__kwdefaults__",
-        "__globals__",
-        "__closure__",
-        "__text_signature__",
         "__dict__",
-        "__class__",
+        "__doc__",
         "__func__",
+        "__globals__",
+        "__kwdefaults__",
+        "__module__",
+        "__name__",
+        "__qualname__",
         "__self__",
+        "__signature__",
+        "__text_signature__",
+        "__wrapped__",
     })
 
     def __init__(self, module_name: str, *attrs: str) -> None:
@@ -183,7 +183,6 @@ class LazyImport[Import: Any]:
 
         self._resolve_parents(default_to=True)
 
-    # TODO Rename this here and in `_handle_resolve` and `_mark_resolved`
     def _resolve_parents(self, *, default_to: bool) -> None:
         object.__setattr__(self, "_resolved", default_to)
         parent = object.__getattribute__(self, "_parent")
