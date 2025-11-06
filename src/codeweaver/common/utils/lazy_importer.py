@@ -347,6 +347,32 @@ def lazy_import[Import: Any](module_name: str, *attrs: str) -> LazyImport[Import
         ...     settings = _settings  # No import yet - it's the result of get_settings()
         ...     encoder = _tiktoken_encoder("gpt2")  # tiktoken imports NOW
 
+        IDE Support - Using TYPE_CHECKING pattern:
+
+        For full IDE autocomplete and type checking support, combine lazy_import
+        with TYPE_CHECKING blocks. This gives you both lazy loading at runtime
+        AND proper type information for your IDE:
+
+        >>> from typing import TYPE_CHECKING
+        >>>
+        >>> if TYPE_CHECKING:
+        ...     # IDE sees this - real imports for type checking
+        ...     from codeweaver.config import CodeWeaverSettings
+        ...     from tiktoken import Encoding
+        ... else:
+        ...     # Runtime uses this - lazy imports
+        ...     CodeWeaverSettings = lazy_import("codeweaver.config", "CodeWeaverSettings")
+        ...     Encoding = lazy_import("tiktoken", "Encoding")
+        >>>
+        >>> # Now your IDE knows the types, but imports are still lazy at runtime!
+        >>> def my_function() -> None:
+        ...     config: CodeWeaverSettings = CodeWeaverSettings()  # IDE autocomplete works!
+        ...     # Import only happens here when CodeWeaverSettings() is called
+
+        This pattern is used in codeweaver.core, codeweaver.config, and
+        codeweaver.common __init__.py modules to provide excellent IDE support
+        while maintaining lazy loading benefits.
+
     """
     return LazyImport(module_name, *attrs)
 

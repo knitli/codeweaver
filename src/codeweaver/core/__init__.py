@@ -11,6 +11,109 @@ are used so widely that it makes sense to define them globally here.
 
 from importlib import import_module
 from types import MappingProxyType
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    # Import everything for IDE and type checker support
+    # These imports are never executed at runtime, only during type checking
+    from codeweaver.core.chunks import (
+        ChunkSequence,
+        CodeChunk,
+        CodeChunkDict,
+        SearchResult,
+        SerializedCodeChunk,
+        StructuredDataInput,
+    )
+    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core.language import (
+        ConfigLanguage,
+        ConfigNamePair,
+        LanguageConfigFile,
+        SemanticSearchLanguage,
+        find_config_paths,
+        has_semantic_extension,
+        is_semantic_config_ext,
+        language_from_config_file,
+        languages_present_from_configs,
+    )
+    from codeweaver.core.metadata import (
+        ChunkKind,
+        ChunkSource,
+        ExtKind,
+        ExtLangPair,
+        ExtPair,
+        Metadata,
+        SemanticMetadata,
+    )
+    from codeweaver.core.spans import Span, SpanGroup, SpanTuple
+    from codeweaver.core.stores import (
+        BlakeHashKey,
+        BlakeKey,
+        BlakeStore,
+        StoreDict,
+        UUIDStore,
+        make_blake_store,
+        make_uuid_store,
+        to_uuid,
+    )
+    from codeweaver.core.types import (
+        BASEDMODEL_CONFIG,
+        DATACLASS_CONFIG,
+        FROZEN_BASEDMODEL_CONFIG,
+        UNSET,
+        AnonymityConversion,
+        BaseDataclassEnum,
+        BaseEnum,
+        BaseEnumData,
+        BasedModel,
+        CategoryName,
+        CategoryNameT,
+        DataclassSerializationMixin,
+        DeserializationKwargs,
+        DevToolName,
+        DevToolNameT,
+        DictView,
+        DirectoryName,
+        DirectoryNameT,
+        DirectoryPath,
+        DirectoryPathT,
+        EmbeddingModelName,
+        EmbeddingModelNameT,
+        FileExt,
+        FileExtensionT,
+        FileGlob,
+        FileGlobT,
+        FileName,
+        FileNameT,
+        FilePath,
+        FilePathT,
+        FilteredKey,
+        FilteredKeyT,
+        LanguageName,
+        LanguageNameT,
+        LiteralStringT,
+        LlmToolName,
+        LlmToolNameT,
+        ModelName,
+        ModelNameT,
+        RerankingModelName,
+        RerankingModelNameT,
+        Role,
+        RoleT,
+        RootedRoot,
+        Sentinel,
+        SentinelName,
+        SentinelNameT,
+        SerializationKwargs,
+        ThingName,
+        ThingNameT,
+        Unset,
+        UUID7Hex,
+        UUID7HexT,
+        generate_field_title,
+        generate_title,
+    )
+
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
@@ -146,6 +249,7 @@ __all__ = (
     "ConfigLanguage",
     "ConfigNamePair",
     "DataclassSerializationMixin",
+    "DeserializationKwargs",
     "DevToolName",
     "DevToolNameT",
     "DictView",

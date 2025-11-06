@@ -7,6 +7,64 @@
 
 from importlib import import_module
 from types import MappingProxyType
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    # Import everything for IDE and type checker support
+    # These imports are never executed at runtime, only during type checking
+    from codeweaver.common.logging import log_to_client_or_fallback, setup_logger
+    from codeweaver.common.statistics import (
+        FileStatistics,
+        Identifier,
+        SessionStatistics,
+        TimingStatistics,
+        TokenCategory,
+        TokenCounter,
+        add_failed_request,
+        add_successful_request,
+        get_session_statistics,
+        record_timed_http_request,
+        timed_http,
+    )
+    from codeweaver.common.types import (
+        CallHookTimingDict,
+        HttpRequestsDict,
+        McpComponentRequests,
+        McpComponentTimingDict,
+        McpOperationRequests,
+        McpTimingDict,
+        ResourceUri,
+        TimingStatisticsDict,
+        ToolOrPromptName,
+    )
+    from codeweaver.common.utils import (
+        MISSING,
+        LazyImport,
+        Missing,
+        ensure_iterable,
+        estimate_tokens,
+        file_is_binary,
+        get_git_branch,
+        get_git_revision,
+        get_possible_env_vars,
+        get_project_root,
+        has_package,
+        in_codeweaver_clone,
+        is_class,
+        is_debug,
+        is_git_dir,
+        is_pydantic_basemodel,
+        is_test_environment,
+        is_typeadapter,
+        lazy_import,
+        normalize_ext,
+        rpartial,
+        sanitize_unicode,
+        set_relative_path,
+        try_git_rev_parse,
+        uuid7,
+    )
+
 
 
 _MARKUP_TAG = "bold dark_orange"
