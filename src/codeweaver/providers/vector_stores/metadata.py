@@ -115,7 +115,7 @@ class CollectionMetadata(BasedModel):
                 ],
                 details={
                     "expected_dimension": self.embedding_dim_dense,
-                    "actual_dimension": expected_dense_dim,
+                    "actual_dimension": other.embedding_dim_dense,
                     "collection": self.project_name,
                 },
             )

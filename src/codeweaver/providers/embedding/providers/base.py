@@ -44,6 +44,7 @@ from codeweaver.core.stores import BlakeStore, UUIDStore, make_blake_store, make
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BasedModel
 from codeweaver.exceptions import ProviderError
+from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.registry import EmbeddingRegistry
 from codeweaver.providers.embedding.types import SparseEmbedding
@@ -375,8 +376,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                     "document_count": len(documents),
                     "is_reprocessing": is_old_batch,
                     "batch_id": str(batch_id or cache_key) if batch_id or cache_key else None,
-                }
-            }
+                },
+            },
         )
 
         try:
@@ -397,8 +398,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                         "provider": self._provider.value,
                         "document_count": len(documents),
                         "circuit_state": self._circuit_state.value,
-                    }
-                }
+                    },
+                },
             )
             return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)  # type: ignore
         except RetryError as e:
@@ -412,8 +413,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                         "provider": self._provider.value,
                         "document_count": len(documents),
                         "failure_count": self._failure_count,
-                    }
-                }
+                    },
+                },
             )
             return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)  # type: ignore
         except Exception as e:
@@ -427,8 +428,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                         "document_count": len(documents),
                         "error": str(e),
                         "error_type": type(e).__name__,
-                    }
-                }
+                    },
+                },
             )
             return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)  # type: ignore
         else:
@@ -459,8 +460,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                         "provider": self._provider.value,
                         "document_count": len(documents),
                         "embeddings_generated": len(results) if results else 0,
-                    }
-                }
+                    },
+                },
             )
 
             return results

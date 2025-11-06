@@ -27,9 +27,7 @@ def resolve_dimensions() -> PositiveInt:
     if not model_capabilities:
         raise ConfigurationError(
             "Embedding model not configured for vector store",
-            details={
-                "component": "vector_store",
-            },
+            details={"component": "vector_store"},
             suggestions=[
                 "Set embedding model in configuration",
                 "Ensure EMBEDDING_MODEL environment variable is set",

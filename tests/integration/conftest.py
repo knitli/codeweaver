@@ -273,8 +273,7 @@ def configured_providers(mock_provider_registry):
 
     with (
         patch(
-            "codeweaver.common.registry.get_provider_registry",
-            return_value=mock_provider_registry,
+            "codeweaver.common.registry.get_provider_registry", return_value=mock_provider_registry
         ),
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
     ):
@@ -307,7 +306,9 @@ def mock_settings_with_providers():
 
 
 @pytest.fixture
-def real_embedding_provider(actual_dense_embedding_provider) -> SentenceTransformersEmbeddingProvider:
+def real_embedding_provider(
+    actual_dense_embedding_provider,
+) -> SentenceTransformersEmbeddingProvider:
     """Provide a REAL embedding provider for behavior validation.
 
     Uses the existing actual_dense_embedding_provider fixture which is already
@@ -352,17 +353,17 @@ def real_reranking_provider(actual_reranking_provider) -> SentenceTransformersRe
 @pytest.fixture
 async def real_vector_store(tmp_path: Path):
     """Provide a REAL Qdrant vector store in memory mode for behavior validation.
-    
+
     Creates an actual in-memory Qdrant instance that:
     1. Stores real embeddings
     2. Performs real similarity search
     3. Cleans up automatically after test
-    
+
     This allows validating that:
     - Embeddings are stored correctly
     - Search actually finds relevant results
     - Vector similarity works as expected
-    
+
     Perfect for CI - no Docker required, just in-memory mode.
     """
     from qdrant_client import AsyncQdrantClient
@@ -375,8 +376,7 @@ async def real_vector_store(tmp_path: Path):
 
     # Create config for the vector store
     config = MemoryConfig(
-        persist_directory=str(tmp_path / "vector_store"),
-        collection_name="test_real_collection",
+        persist_directory=str(tmp_path / "vector_store"), collection_name="test_real_collection"
     )
 
     # Create the vector store provider
@@ -397,25 +397,25 @@ async def real_vector_store(tmp_path: Path):
 @pytest.fixture
 def known_test_codebase(tmp_path: Path) -> Path:
     """Create a small, known test codebase for search quality validation.
-    
+
     Creates 5 Python files with distinct, searchable content:
     - auth.py: Authentication and login functions
-    - database.py: Database connection and query functions  
+    - database.py: Database connection and query functions
     - api.py: REST API endpoints and routing
     - config.py: Configuration loading and validation
     - utils.py: Utility functions and helpers
-    
+
     Each file has distinct semantic content allowing us to write queries like:
     - "authentication" → should find auth.py in top results
     - "database connection" → should find database.py
     - "REST API" → should find api.py
-    
+
     This fixture validates that the ENTIRE search pipeline works:
     - Chunking extracts meaningful code segments
     - Embeddings capture semantic meaning
     - Search finds relevant code
     - Ranking prioritizes best matches
-    
+
     Returns:
         Path to the test codebase root directory
     """
@@ -431,45 +431,45 @@ Provides user authentication, password validation, and session tracking.
 
 def authenticate_user(username: str, password: str) -> bool:
     """Authenticate user credentials against database.
-    
+
     Validates username and password, checks against stored hashes.
     Returns True if authentication succeeds, False otherwise.
     """
     if not username or not password:
         raise ValueError("Username and password are required")
-    
+
     # Simplified for testing - real implementation would hash passwords
     valid_users = {
         "admin": "hashed_admin_password",
         "user1": "hashed_user_password",
     }
-    
+
     return valid_users.get(username) == password
 
 
 def create_session(user_id: str, expires_in_seconds: int = 3600) -> str:
     """Create authenticated session for user.
-    
+
     Generates session token, stores in session store, sets expiration.
     Returns session token for use in subsequent requests.
     """
     import time
     import uuid
-    
+
     session_id = str(uuid.uuid4())
     session_data = {
         "user_id": user_id,
         "created_at": time.time(),
         "expires_at": time.time() + expires_in_seconds,
     }
-    
+
     # Store session (simplified)
     return session_id
 
 
 def logout_user(session_id: str) -> None:
     """Logout user and invalidate session.
-    
+
     Removes session from session store, preventing further use.
     """
     # Remove from session store (simplified)
@@ -489,7 +489,7 @@ from contextlib import contextmanager
 
 def create_connection(db_path: str, timeout: int = 10):
     """Create database connection with error handling.
-    
+
     Establishes connection to SQLite database with configured timeout.
     Raises ConnectionError if connection fails.
     """
@@ -504,7 +504,7 @@ def create_connection(db_path: str, timeout: int = 10):
 @contextmanager
 def get_db_transaction(db_path: str):
     """Context manager for database transactions.
-    
+
     Automatically commits on success, rolls back on error.
     Ensures connection is properly closed.
     """
@@ -521,7 +521,7 @@ def get_db_transaction(db_path: str):
 
 def execute_query(conn, query: str, params: tuple = ()):
     """Execute SQL query with parameters.
-    
+
     Safely executes parameterized query, returns cursor with results.
     Use with SELECT statements to fetch data.
     """
@@ -532,10 +532,10 @@ def execute_query(conn, query: str, params: tuple = ()):
 
 class UserRepository:
     """User data access layer with CRUD operations."""
-    
+
     def __init__(self, db_path: str):
         self.db_path = db_path
-    
+
     def find_user_by_username(self, username: str):
         """Find user by username, return user data."""
         with get_db_transaction(self.db_path) as conn:
@@ -559,28 +559,28 @@ from typing import Any
 
 def handle_login(request_data: dict[str, Any]) -> dict[str, Any]:
     """Handle login POST request.
-    
+
     Authenticates user credentials, creates session, returns session token.
     Returns 401 error if authentication fails.
     """
     username = request_data.get("username")
     password = request_data.get("password")
-    
+
     if not username or not password:
         return {"error": "Missing credentials", "status": 400}
-    
+
     # Call authentication module
     # from auth import authenticate_user, create_session
     # if authenticate_user(username, password):
     #     session_id = create_session(username)
     #     return {"session_id": session_id, "status": 200}
-    
+
     return {"error": "Invalid credentials", "status": 401}
 
 
 def handle_get_user(user_id: str) -> dict[str, Any]:
     """Handle GET user endpoint.
-    
+
     Retrieves user data by ID, returns user profile.
     Returns 404 if user not found.
     """
@@ -588,13 +588,13 @@ def handle_get_user(user_id: str) -> dict[str, Any]:
     # from database import UserRepository
     # repo = UserRepository("users.db")
     # user = repo.find_user_by_username(user_id)
-    
+
     return {"user_id": user_id, "status": 200}
 
 
 def setup_routes(app):
     """Configure API routes.
-    
+
     Registers all HTTP endpoints with framework router.
     """
     app.route("/login", methods=["POST"])(handle_login)
@@ -614,7 +614,7 @@ from pathlib import Path
 
 def load_config_from_env() -> dict[str, str]:
     """Load configuration from environment variables.
-    
+
     Reads environment variables for database path, API keys, timeouts.
     Returns configuration dictionary with validated values.
     """
@@ -625,38 +625,38 @@ def load_config_from_env() -> dict[str, str]:
         "api_host": os.getenv("API_HOST", "0.0.0.0"),
         "api_port": int(os.getenv("API_PORT", "8000")),
     }
-    
+
     return config
 
 
 def load_config_from_file(config_path: Path) -> dict[str, str]:
     """Load configuration from YAML or JSON file.
-    
+
     Parses config file, validates schema, returns configuration dict.
     """
     import json
-    
+
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
-    
+
     with config_path.open() as f:
         config = json.load(f)
-    
+
     return config
 
 
 def validate_config(config: dict[str, str]) -> None:
     """Validate configuration values.
-    
+
     Checks required fields, validates types, ensures paths exist.
     Raises ValueError if configuration is invalid.
     """
     required = ["database_path", "session_timeout"]
-    
+
     for key in required:
         if key not in config:
             raise ValueError(f"Missing required config: {key}")
-    
+
     if config["session_timeout"] <= 0:
         raise ValueError("Session timeout must be positive")
 ''')
@@ -675,7 +675,7 @@ from typing import Any
 
 def hash_password(password: str, salt: str = "") -> str:
     """Hash password with salt using SHA-256.
-    
+
     Creates secure password hash for storage in database.
     """
     combined = f"{password}{salt}"
@@ -684,7 +684,7 @@ def hash_password(password: str, salt: str = "") -> str:
 
 def validate_email(email: str) -> bool:
     """Validate email address format.
-    
+
     Checks email against regex pattern, returns True if valid.
     """
     pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$'
@@ -693,7 +693,7 @@ def validate_email(email: str) -> bool:
 
 def format_timestamp(timestamp: float) -> str:
     """Format Unix timestamp to human-readable string.
-    
+
     Converts timestamp to ISO 8601 format string.
     """
     from datetime import datetime
@@ -702,16 +702,16 @@ def format_timestamp(timestamp: float) -> str:
 
 def sanitize_input(user_input: str) -> str:
     """Sanitize user input to prevent injection attacks.
-    
+
     Removes dangerous characters, escapes HTML entities.
     """
     # Remove potential SQL injection characters
     dangerous = ["'", '"', ";", "--", "/*", "*/"]
     sanitized = user_input
-    
+
     for char in dangerous:
         sanitized = sanitized.replace(char, "")
-    
+
     return sanitized.strip()
 ''')
 
@@ -720,21 +720,18 @@ def sanitize_input(user_input: str) -> str:
 
 @pytest.fixture
 def real_provider_registry(
-    real_embedding_provider,
-    real_sparse_provider,
-    real_vector_store,
-    real_reranking_provider,
+    real_embedding_provider, real_sparse_provider, real_vector_store, real_reranking_provider
 ):
     """Configure provider registry with REAL providers for behavior validation.
-    
+
     This fixture creates a complete provider ecosystem using actual implementations:
     - Real embedding generation (SentenceTransformers)
     - Real sparse embeddings (OpenSearch)
     - Real vector storage (Qdrant in-memory)
     - Real reranking (MS MARCO)
-    
+
     Tests using this fixture validate actual search behavior, not just structure.
-    
+
     Use for tests marked with @pytest.mark.real_providers.
     """
     from enum import Enum
@@ -783,43 +780,43 @@ def real_provider_registry(
 @pytest.fixture
 def real_providers(real_provider_registry):
     """Fixture that patches the provider registry with REAL providers.
-    
+
     This is the main fixture for Tier 2 tests. It provides actual provider
     implementations that generate real embeddings, store real vectors, and
     perform real search operations.
-    
+
     **When to use this vs configured_providers:**
-    
+
     - Use `configured_providers` (Tier 1) for:
       * Structure validation tests
       * Error path testing
       * Fast feedback loops
       * Response format verification
-    
+
     - Use `real_providers` (Tier 2) for:
       * Search quality validation
       * End-to-end pipeline testing
       * Performance benchmarking
       * Behavior validation
-    
+
     **Example usage:**
-    
+
     ```python
     @pytest.mark.integration
     @pytest.mark.real_providers
     async def test_search_finds_auth_code(real_providers, known_test_codebase):
         # This test validates actual search behavior
         response = await find_code("authentication logic")
-        
+
         # Should actually find auth.py in top results
         assert any("auth.py" in r.file_path for r in response.results[:3])
     ```
-    
+
     **Performance note:** These tests are slower (~2-10s each) because they:
     - Generate real embeddings (CPU/GPU intensive)
     - Perform real vector similarity search
     - Run actual reranking models
-    
+
     Mark tests with @pytest.mark.slow if they take >5s.
     """
     call_count = [0]
@@ -830,8 +827,7 @@ def real_providers(real_provider_registry):
 
     with (
         patch(
-            "codeweaver.common.registry.get_provider_registry",
-            return_value=real_provider_registry,
+            "codeweaver.common.registry.get_provider_registry", return_value=real_provider_registry
         ),
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
     ):

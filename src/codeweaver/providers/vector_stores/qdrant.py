@@ -231,7 +231,7 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
 
             search_results: list[SearchResult] = []
             # search() returns a list directly, query_points() returns object with .points
-            points = results.points if hasattr(results, 'points') else results
+            points = results.points if hasattr(results, "points") else results
             for point in points:
                 payload = HybridVectorPayload.model_validate(point.payload)
                 search_result = SearchResult.model_construct(
@@ -299,7 +299,7 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
 
                     vectors["sparse"] = SparseVector(
                         indices=list(sparse.embeddings.indices),
-                        values=list(sparse.embeddings.values)
+                        values=list(sparse.embeddings.values),
                     )
                 else:
                     # Old format: flat list (for backward compatibility during migration)

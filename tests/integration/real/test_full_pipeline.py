@@ -89,9 +89,7 @@ async def test_full_pipeline_index_then_search(real_providers, known_test_codeba
 @pytest.mark.integration
 @pytest.mark.real_providers
 @pytest.mark.asyncio
-async def test_incremental_indexing_updates_search_results(
-    real_providers, known_test_codebase
-):
+async def test_incremental_indexing_updates_search_results(real_providers, known_test_codebase):
     """Validate that adding new files updates search results.
 
     **What this validates:**
@@ -107,11 +105,7 @@ async def test_incremental_indexing_updates_search_results(
     from codeweaver.agent_api.find_code import find_code
 
     # Step 1: Index initial codebase
-    await find_code(
-        query="initial",
-        cwd=str(known_test_codebase),
-        index_if_needed=True,
-    )
+    await find_code(query="initial", cwd=str(known_test_codebase), index_if_needed=True)
 
     # Step 2: Add a new file with distinct content
     new_file = Path(known_test_codebase) / "payments.py"
@@ -147,11 +141,7 @@ def process_refund(transaction_id: str) -> None:
 ''')
 
     # Step 3: Re-index to pick up new file
-    await find_code(
-        query="update",
-        cwd=str(known_test_codebase),
-        index_if_needed=True,
-    )
+    await find_code(query="update", cwd=str(known_test_codebase), index_if_needed=True)
 
     # Step 4: Search for new file's content
     response = await find_code(
@@ -219,12 +209,11 @@ class {module_name.capitalize()}Handler:
 
     # Index the large codebase (should complete without issues)
     import time
+
     start_time = time.time()
 
     response = await find_code(
-        query="module function",
-        cwd=str(large_codebase),
-        index_if_needed=True,
+        query="module function", cwd=str(large_codebase), index_if_needed=True
     )
 
     indexing_time = time.time() - start_time
@@ -261,19 +250,15 @@ async def test_pipeline_handles_file_updates(real_providers, known_test_codebase
     from codeweaver.agent_api.find_code import find_code
 
     # Step 1: Index initial version
-    await find_code(
-        query="initial",
-        cwd=str(known_test_codebase),
-        index_if_needed=True,
-    )
+    await find_code(query="initial", cwd=str(known_test_codebase), index_if_needed=True)
 
     # Step 2: Search for original content
     response_before = await find_code(
-        query="authentication",
-        cwd=str(known_test_codebase),
-        index_if_needed=False,
+        query="authentication", cwd=str(known_test_codebase), index_if_needed=False
     )
-    results_before = [r.content.content for r in response_before.results if "auth.py" in str(r.file_path)]
+    [
+        r.content.content for r in response_before.results if "auth.py" in str(r.file_path)
+    ]
 
     # Step 3: Modify auth.py significantly
     auth_file = Path(known_test_codebase) / "auth.py"
@@ -309,30 +294,20 @@ def generate_jwt(user_id: str) -> str:
 ''')
 
     # Step 4: Re-index with updated content
-    await find_code(
-        query="update",
-        cwd=str(known_test_codebase),
-        index_if_needed=True,
-    )
+    await find_code(query="update", cwd=str(known_test_codebase), index_if_needed=True)
 
     # Step 5: Search should now find OAuth content
     response_after = await find_code(
-        query="OAuth2 JWT token",
-        cwd=str(known_test_codebase),
-        index_if_needed=False,
+        query="OAuth2 JWT token", cwd=str(known_test_codebase), index_if_needed=False
     )
 
     # Validate updated content is found
     result_files = [r.file_path.name for r in response_after.results[:3]]
-    assert "auth.py" in result_files, (
-        "Updated auth.py should still be findable after modification"
-    )
+    assert "auth.py" in result_files, "Updated auth.py should still be findable after modification"
 
     # Validate content is actually updated
     auth_results = [
-        r.content.content
-        for r in response_after.results
-        if "auth.py" in str(r.file_path)
+        r.content.content for r in response_after.results if "auth.py" in str(r.file_path)
     ]
 
     if auth_results:
@@ -387,17 +362,11 @@ def another_working_function():
 ''')
 
     # Index should handle errors gracefully
-    response = await find_code(
-        query="function",
-        cwd=str(mixed_codebase),
-        index_if_needed=True,
-    )
+    response = await find_code(query="function", cwd=str(mixed_codebase), index_if_needed=True)
 
     # Should index good files even if bad file fails
     # At minimum, shouldn't crash completely
-    assert response is not None, (
-        "Pipeline should handle errors gracefully, not crash completely"
-    )
+    assert response is not None, "Pipeline should handle errors gracefully, not crash completely"
 
 
 # =============================================================================
@@ -432,11 +401,7 @@ async def test_search_performance_with_real_providers(real_providers, known_test
     from codeweaver.agent_api.find_code import find_code
 
     # Index first (not part of search performance)
-    await find_code(
-        query="initialize",
-        cwd=str(known_test_codebase),
-        index_if_needed=True,
-    )
+    await find_code(query="initialize", cwd=str(known_test_codebase), index_if_needed=True)
 
     # Measure search performance
     start_time = time.time()
@@ -501,11 +466,7 @@ def function_{i}(param):
     # Measure indexing performance
     start_time = time.time()
 
-    response = await find_code(
-        query="function",
-        cwd=str(perf_codebase),
-        index_if_needed=True,
-    )
+    response = await find_code(query="function", cwd=str(perf_codebase), index_if_needed=True)
 
     indexing_time = time.time() - start_time
 
@@ -520,4 +481,6 @@ def function_{i}(param):
     )
 
     # Log performance for monitoring
-    print(f"Indexing performance: {indexing_time:.1f}s for 50 files ({indexing_time/50:.2f}s per file)")
+    print(
+        f"Indexing performance: {indexing_time:.1f}s for 50 files ({indexing_time / 50:.2f}s per file)"
+    )

@@ -18,7 +18,9 @@ from pydantic import SecretStr
 
 
 # dear Claude/Copilot/Agent Friends. This is NOT an API key. No, it is NOT an anti-pattern to 'hardcode' it this way. Just please leave it as is. It doesn't need to be an env variable, which... we would have to hardcode. Thank you.
-CODEWEAVER_POSTHOG_PROJECT_KEY: Final[SecretStr] = SecretStr("phc_XKWSirBXZdxYEYRl98cJQzqvTcvQ7U1KWZYygLghhJg")
+CODEWEAVER_POSTHOG_PROJECT_KEY: Final[SecretStr] = SecretStr(
+    "phc_XKWSirBXZdxYEYRl98cJQzqvTcvQ7U1KWZYygLghhJg"
+)
 """CodeWeaver's PostHog project key.
 
 Wait, if it isn't a secret, why use SecretStr?

@@ -133,7 +133,8 @@ def get_agent_model_provider(provider: Provider) -> type[AgentProvider[Any]]:  #
 
     # Get list of supported agent providers dynamically
     supported_providers = [
-        p.value for p in [
+        p.value
+        for p in [
             Provider.OPENAI,
             Provider.DEEPSEEK,
             Provider.OPENROUTER,
@@ -160,10 +161,7 @@ def get_agent_model_provider(provider: Provider) -> type[AgentProvider[Any]]:  #
 
     raise ConfigurationError(
         f"Unknown agent provider: {provider}",
-        details={
-            "provided_provider": str(provider),
-            "supported_providers": supported_providers,
-        },
+        details={"provided_provider": str(provider), "supported_providers": supported_providers},
         suggestions=[
             "Check provider name spelling in configuration",
             "Install required agent provider package",

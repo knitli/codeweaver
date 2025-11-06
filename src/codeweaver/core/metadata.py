@@ -84,6 +84,7 @@ class ChunkSource(BaseEnum):
 def _set_symbol(data: Any) -> str | None:
     """Helper function to set the symbol field based on the primary_thing."""
     from codeweaver.semantic.ast_grep import AstThing
+
     if thing := data.get("thing"):
         if isinstance(thing, AstThing) and thing.symbol and (0 < len(thing.symbol.strip()) < 20):
             return thing.symbol

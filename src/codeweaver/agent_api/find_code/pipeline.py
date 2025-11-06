@@ -83,8 +83,8 @@ async def embed_query(query: str, context: Any = None) -> QueryResult:
                 "query_length": len(query),
                 "dense_provider_available": dense_provider_enum is not None,
                 "sparse_provider_available": sparse_provider_enum is not None,
-            }
-        }
+            },
+        },
     )
 
     if not dense_provider_enum and not sparse_provider_enum:
@@ -93,11 +93,8 @@ async def embed_query(query: str, context: Any = None) -> QueryResult:
             "error",
             {
                 "msg": "No embedding providers configured",
-                "extra": {
-                    "phase": "query_embedding",
-                    "error": "no_providers",
-                }
-            }
+                "extra": {"phase": "query_embedding", "error": "no_providers"},
+            },
         )
         raise ConfigurationError(
             "No embedding providers configured",
@@ -132,8 +129,8 @@ async def embed_query(query: str, context: Any = None) -> QueryResult:
                             "phase": "query_embedding",
                             "embedding_type": "dense",
                             "error": result.get("error"),
-                        }
-                    }
+                        },
+                    },
                 )
                 if not sparse_provider_enum:
                     return raise_value_error(
@@ -150,8 +147,8 @@ async def embed_query(query: str, context: Any = None) -> QueryResult:
                             "phase": "query_embedding",
                             "embedding_type": "dense",
                             "embedding_dim": len(result[0]) if result and len(result) > 0 else 0,
-                        }
-                    }
+                        },
+                    },
                 )
         except Exception as e:
             await log_to_client_or_fallback(
@@ -164,8 +161,8 @@ async def embed_query(query: str, context: Any = None) -> QueryResult:
                         "embedding_type": "dense",
                         "error": str(e),
                         "error_type": type(e).__name__,
-                    }
-                }
+                    },
+                },
             )
             if not sparse_provider_enum:
                 return raise_value_error(f"Dense embedding failed: {e}")
@@ -189,8 +186,8 @@ async def embed_query(query: str, context: Any = None) -> QueryResult:
                             "phase": "query_embedding",
                             "embedding_type": "sparse",
                             "error": result.get("error"),
-                        }
-                    }
+                        },
+                    },
                 )
                 if not dense_query_embedding:
                     return raise_value_error(
@@ -203,11 +200,8 @@ async def embed_query(query: str, context: Any = None) -> QueryResult:
                     "debug",
                     {
                         "msg": "Sparse embedding successful",
-                        "extra": {
-                            "phase": "query_embedding",
-                            "embedding_type": "sparse",
-                        }
-                    }
+                        "extra": {"phase": "query_embedding", "embedding_type": "sparse"},
+                    },
                 )
         except Exception as e:
             await log_to_client_or_fallback(
@@ -220,8 +214,8 @@ async def embed_query(query: str, context: Any = None) -> QueryResult:
                         "embedding_type": "sparse",
                         "error": str(e),
                         "error_type": type(e).__name__,
-                    }
-                }
+                    },
+                },
             )
             if not dense_query_embedding:
                 return raise_value_error(f"Sparse embedding failed: {e}")
@@ -268,11 +262,7 @@ def build_query_vector(query_result: QueryResult, query: str) -> StrategizedQuer
     # Both failed - should not reach here due to earlier validation
     raise QueryError(
         "Both dense and sparse embeddings are None",
-        details={
-            "dense_embedding": None,
-            "sparse_embedding": None,
-            "query": query,
-        },
+        details={"dense_embedding": None, "sparse_embedding": None, "query": query},
         suggestions=[
             "Check embedding provider logs for errors",
             "Verify provider credentials are valid",
@@ -281,7 +271,9 @@ def build_query_vector(query_result: QueryResult, query: str) -> StrategizedQuer
     )
 
 
-async def execute_vector_search(query_vector: StrategizedQuery, context: Any = None) -> list[SearchResult]:
+async def execute_vector_search(
+    query_vector: StrategizedQuery, context: Any = None
+) -> list[SearchResult]:
     """Execute vector search against configured vector store.
 
     Args:
@@ -310,8 +302,8 @@ async def execute_vector_search(query_vector: StrategizedQuery, context: Any = N
                 "search_strategy": query_vector.strategy.value,
                 "has_dense": query_vector.dense is not None,
                 "has_sparse": query_vector.sparse is not None,
-            }
-        }
+            },
+        },
     )
 
     if not vector_store_enum:
@@ -320,18 +312,12 @@ async def execute_vector_search(query_vector: StrategizedQuery, context: Any = N
             "error",
             {
                 "msg": "No vector store provider configured",
-                "extra": {
-                    "phase": "vector_search",
-                    "error": "no_provider",
-                }
-            }
+                "extra": {"phase": "vector_search", "error": "no_provider"},
+            },
         )
         raise ConfigurationError(
             "No vector store provider configured",
-            details={
-                "available_providers": ["qdrant", "in_memory"],
-                "configured_provider": None,
-            },
+            details={"available_providers": ["qdrant", "in_memory"], "configured_provider": None},
             suggestions=[
                 "Configure vector store in .codeweaver.toml: vector_store_provider = 'qdrant'",
                 "Or use in-memory provider for testing: vector_store_provider = 'in_memory'",
@@ -356,8 +342,8 @@ async def execute_vector_search(query_vector: StrategizedQuery, context: Any = N
                 "phase": "vector_search",
                 "results_count": len(results),
                 "vector_store": type(vector_store).__name__,
-            }
-        }
+            },
+        },
     )
 
     return results
@@ -395,8 +381,8 @@ async def rerank_results(
                     "phase": "reranking",
                     "reason": "no_provider" if not reranking_enum else "no_candidates",
                     "candidates_count": len(candidates) if candidates else 0,
-                }
-            }
+                },
+            },
         )
         return None, None
 
@@ -405,11 +391,8 @@ async def rerank_results(
         "info",
         {
             "msg": "Starting reranking",
-            "extra": {
-                "phase": "reranking",
-                "candidates_count": len(candidates),
-            }
-        }
+            "extra": {"phase": "reranking", "candidates_count": len(candidates)},
+        },
     )
 
     try:
@@ -430,8 +413,8 @@ async def rerank_results(
                 "extra": {
                     "phase": "reranking",
                     "reranked_count": len(reranked_results) if reranked_results else 0,
-                }
-            }
+                },
+            },
         )
 
         return reranked_results, SearchStrategy.SEMANTIC_RERANK
@@ -447,8 +430,8 @@ async def rerank_results(
                     "error": str(e),
                     "error_type": type(e).__name__,
                     "fallback": "using_unranked_results",
-                }
-            }
+                },
+            },
         )
         return None, None
 

@@ -152,7 +152,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
             raise ProviderError(
                 "Vector store client not initialized",
                 details={
-                    "provider": self._provider.value if hasattr(self, '_provider') else "unknown",
+                    "provider": self._provider.value if hasattr(self, "_provider") else "unknown",
                     "client_type": type(self).__name__,
                 },
                 suggestions=[
@@ -268,7 +268,10 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         reraise=True,
     )
     async def _search_with_retry(
-        self, vector: list[float] | dict[str, list[float] | Any], query_filter: Filter | None = None, context: Any = None
+        self,
+        vector: list[float] | dict[str, list[float] | Any],
+        query_filter: Filter | None = None,
+        context: Any = None,
     ) -> list[SearchResult]:
         """Wrapper around search with retry logic and circuit breaker."""
         from codeweaver.common.logging import log_to_client_or_fallback
@@ -284,11 +287,8 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                 "debug",
                 {
                     "msg": "Vector store search successful",
-                    "extra": {
-                        "provider": self._provider.value,
-                        "results_count": len(result),
-                    }
-                }
+                    "extra": {"provider": self._provider.value, "results_count": len(result)},
+                },
             )
         except (ConnectionError, TimeoutError, OSError) as e:
             self._record_failure()
@@ -304,8 +304,8 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                         "error_type": type(e).__name__,
                         "attempt": self._failure_count,
                         "max_attempts": 5,
-                    }
-                }
+                    },
+                },
             )
             raise
         except Exception as e:
@@ -318,8 +318,8 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                         "provider": self._provider.value,
                         "error": str(e),
                         "error_type": type(e).__name__,
-                    }
-                }
+                    },
+                },
             )
             raise
         else:
@@ -377,11 +377,8 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
             "debug",
             {
                 "msg": "Starting vector store upsert",
-                "extra": {
-                    "provider": self._provider.value,
-                    "chunks_count": len(chunks),
-                }
-            }
+                "extra": {"provider": self._provider.value, "chunks_count": len(chunks)},
+            },
         )
 
         try:
@@ -393,11 +390,8 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                 "debug",
                 {
                     "msg": "Vector store upsert successful",
-                    "extra": {
-                        "provider": self._provider.value,
-                        "chunks_count": len(chunks),
-                    }
-                }
+                    "extra": {"provider": self._provider.value, "chunks_count": len(chunks)},
+                },
             )
         except (ConnectionError, TimeoutError, OSError) as e:
             self._record_failure()
@@ -414,8 +408,8 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                         "error_type": type(e).__name__,
                         "attempt": self._failure_count,
                         "max_attempts": 5,
-                    }
-                }
+                    },
+                },
             )
             raise
         except Exception as e:
@@ -429,8 +423,8 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                         "chunks_count": len(chunks),
                         "error": str(e),
                         "error_type": type(e).__name__,
-                    }
-                }
+                    },
+                },
             )
             raise
 

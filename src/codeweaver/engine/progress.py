@@ -7,8 +7,10 @@
 
 from __future__ import annotations
 
+import contextlib
+
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 from rich.console import Console
 from rich.live import Live
@@ -86,26 +88,19 @@ class IndexingProgressTracker:
         """
         # Initialize tasks
         self.discovery_task_id = self.progress.add_task(
-            "[cyan]Discovering files...",
-            total=total_files if total_files > 0 else None,
+            "[cyan]Discovering files...", total=total_files if total_files > 0 else None
         )
 
         self.chunking_task_id = self.progress.add_task(
-            "[blue]Chunking files...",
-            total=total_files if total_files > 0 else None,
-            visible=False,
+            "[blue]Chunking files...", total=total_files if total_files > 0 else None, visible=False
         )
 
         self.embedding_task_id = self.progress.add_task(
-            "[magenta]Generating embeddings...",
-            total=None,
-            visible=False,
+            "[magenta]Generating embeddings...", total=None, visible=False
         )
 
         self.indexing_task_id = self.progress.add_task(
-            "[green]Indexing to vector store...",
-            total=None,
-            visible=False,
+            "[green]Indexing to vector store...", total=None, visible=False
         )
 
         # Start live display
@@ -131,20 +126,17 @@ class IndexingProgressTracker:
 
         # Update phase if provided
         if phase:
-            try:
+            with contextlib.suppress(ValueError):
                 self.current_phase = IndexingPhase(phase)
-            except ValueError:
-                pass
 
         # Update discovery task
-        if self.discovery_task_id is not None:
-            if stats.files_discovered > 0:
-                self.progress.update(
-                    self.discovery_task_id,
-                    total=stats.files_discovered,
-                    completed=stats.files_discovered,
-                    visible=True,
-                )
+        if self.discovery_task_id is not None and stats.files_discovered > 0:
+            self.progress.update(
+                self.discovery_task_id,
+                total=stats.files_discovered,
+                completed=stats.files_discovered,
+                visible=True,
+            )
 
         # Update chunking task
         if self.chunking_task_id is not None and stats.files_processed > 0:
@@ -193,22 +185,17 @@ class IndexingProgressTracker:
         table.add_row("Time Elapsed", f"{stats.elapsed_time:.2f} seconds")
 
         if stats.total_errors > 0:
-            table.add_row(
-                "Files with Errors",
-                f"[yellow]{stats.total_errors}[/yellow]",
-            )
+            table.add_row("Files with Errors", f"[yellow]{stats.total_errors}[/yellow]")
 
         # Display in panel
         panel = Panel(
-            table,
-            title="[bold green]Indexing Summary[/bold green]",
-            border_style="green",
+            table, title="[bold green]Indexing Summary[/bold green]", border_style="green"
         )
 
         self.console.print()
         self.console.print(panel)
 
-    def __enter__(self) -> IndexingProgressTracker:
+    def __enter__(self) -> Self:
         """Context manager entry."""
         return self
 

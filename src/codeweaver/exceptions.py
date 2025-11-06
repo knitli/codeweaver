@@ -14,9 +14,6 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 
-# TODO: We got into a bad habit of not using native exception types. We need to systematically go through and improve exception handling and information.
-
-
 class CodeWeaverError(Exception):
     """Base exception for all CodeWeaver errors.
 

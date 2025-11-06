@@ -273,7 +273,9 @@ class FindCodeResponseSummary(BasedModel):
         table.add_column("Value", justify="right", style="magenta")
 
         # Operational status
-        status_style = "green" if self.status == "success" else "yellow" if self.status == "partial" else "red"
+        status_style = (
+            "green" if self.status == "success" else "yellow" if self.status == "partial" else "red"
+        )
         table.add_row("Status", f"[{status_style}]{self.status.upper()}[/{status_style}]")
 
         if self.warnings:

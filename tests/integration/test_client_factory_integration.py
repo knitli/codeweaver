@@ -65,7 +65,9 @@ class TestProviderInstantiationWithClientFactory:
             "MockVoyageProvider"  # Fix: Add __name__ to lazy mock (not resolved class)
         )
         mock_provider_lazy._resolve.return_value = mock_provider_class
-        mock_provider_lazy.return_value = mock_provider_instance  # Fix: mock_provider_lazy is called at line 959
+        mock_provider_lazy.return_value = (
+            mock_provider_instance  # Fix: mock_provider_lazy is called at line 959
+        )
         mock_provider_class.return_value = mock_provider_instance
 
         mock_client_map = {

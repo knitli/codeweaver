@@ -22,10 +22,7 @@ from codeweaver.exceptions import CodeWeaverError
 
 console = Console(markup=True, emoji=True)
 app = App(
-    "index",
-    default_command="index",
-    help="Index codebase for semantic search.",
-    console=console,
+    "index", default_command="index", help="Index codebase for semantic search.", console=console
 )
 
 
@@ -58,10 +55,7 @@ def index(
         if project_path:
             from codeweaver.config.settings import update_settings
 
-            settings = update_settings(**{
-                **settings.model_dump(),
-                "project_path": project_path,
-            })
+            settings = update_settings(**{**settings.model_dump(), "project_path": project_path})
 
         # Create indexer with progress tracking
         console.print(f"{CODEWEAVER_PREFIX} [blue]Initializing indexer...[/blue]")
@@ -71,13 +65,10 @@ def index(
         progress_tracker = IndexingProgressTracker(console=console)
 
         # Perform indexing with progress indicators
-        console.print(
-            f"{CODEWEAVER_PREFIX} [green]Starting indexing process...[/green]"
-        )
+        console.print(f"{CODEWEAVER_PREFIX} [green]Starting indexing process...[/green]")
 
-        files_indexed = indexer.prime_index(
-            force_reindex=force_reindex,
-            progress_callback=progress_tracker.update,
+        indexer.prime_index(
+            force_reindex=force_reindex, progress_callback=progress_tracker.update
         )
 
         # Display final summary
@@ -92,9 +83,7 @@ def index(
         console.print(f"  Time elapsed: [cyan]{stats.elapsed_time:.2f}[/cyan] seconds")
 
         if stats.total_errors > 0:
-            console.print(
-                f"  [yellow]Files with errors: {stats.total_errors}[/yellow]"
-            )
+            console.print(f"  [yellow]Files with errors: {stats.total_errors}[/yellow]")
 
         sys.exit(0)
 

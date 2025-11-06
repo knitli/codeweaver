@@ -62,10 +62,7 @@ def get_vector_store_provider(settings: VectorStoreProviderSettings) -> VectorSt
 
         raise ConfigurationError(
             "Qdrant configuration missing",
-            details={
-                "provider": "qdrant",
-                "config_location": "QdrantConfig parameter",
-            },
+            details={"provider": "qdrant", "config_location": "QdrantConfig parameter"},
             suggestions=[
                 "Provide QdrantConfig when using Qdrant provider",
                 "Set QDRANT_URL and QDRANT_API_KEY environment variables",

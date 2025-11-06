@@ -147,7 +147,11 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
                 keyword_args["client_options"]["model_name_or_path"] = caps.name
 
         # Extract model name for potential use
-        name = self.doc_kwargs.pop("model_name", None) or self.doc_kwargs.pop("model_name_or_path", None) or caps.name
+        name = (
+            self.doc_kwargs.pop("model_name", None)
+            or self.doc_kwargs.pop("model_name_or_path", None)
+            or caps.name
+        )
         self.query_kwargs.pop("model_name", None)
         self.query_kwargs.pop("model_name_or_path", None)
 
@@ -297,7 +301,9 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[SparseEncoder])
                 and "model_name_or_path" not in keyword_args["client_options"]
             ):
                 keyword_args["client_options"]["model_name_or_path"] = caps.name
-        name = self.doc_kwargs.pop("model_name", None) or self.doc_kwargs.pop("model_name_or_path", None)
+        self.doc_kwargs.pop("model_name", None) or self.doc_kwargs.pop(
+            "model_name_or_path", None
+        )
         self.query_kwargs.pop("model_name", None)
         self.query_kwargs.pop("model_name_or_path", None)
 

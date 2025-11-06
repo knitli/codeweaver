@@ -102,7 +102,11 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
             self.kwargs["model_name_or_path"] = self._caps.name
 
         # Extract model name, with fallback to capabilities name
-        name = self.kwargs.pop("model_name", None) or self.kwargs.pop("model_name_or_path", None) or self._caps.name
+        name = (
+            self.kwargs.pop("model_name", None)
+            or self.kwargs.pop("model_name_or_path", None)
+            or self._caps.name
+        )
 
         if not isinstance(name, str):
             raise CodeWeaverValidationError(

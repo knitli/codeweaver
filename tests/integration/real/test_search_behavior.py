@@ -158,9 +158,7 @@ async def test_search_distinguishes_different_concepts(real_providers, known_tes
 
     # Query 1: Authentication
     auth_response = await find_code(
-        query="user authentication login",
-        cwd=str(known_test_codebase),
-        index_if_needed=True,
+        query="user authentication login", cwd=str(known_test_codebase), index_if_needed=True
     )
     auth_files = {r.file_path.name for r in auth_response.results[:3]}
 
@@ -202,9 +200,7 @@ async def test_search_returns_relevant_code_chunks(real_providers, known_test_co
     from codeweaver.agent_api.find_code import find_code
 
     response = await find_code(
-        query="password hashing",
-        cwd=str(known_test_codebase),
-        index_if_needed=True,
+        query="password hashing", cwd=str(known_test_codebase), index_if_needed=True
     )
 
     # Validate we got results
@@ -245,9 +241,7 @@ async def test_search_respects_file_types(real_providers, known_test_codebase):
     from codeweaver.agent_api.find_code import find_code
 
     response = await find_code(
-        query="function definition",
-        cwd=str(known_test_codebase),
-        index_if_needed=True,
+        query="function definition", cwd=str(known_test_codebase), index_if_needed=True
     )
 
     # All results should be Python files
@@ -321,11 +315,7 @@ async def test_search_handles_empty_codebase(real_providers, tmp_path):
     empty_dir.mkdir()
 
     # Should handle empty codebase gracefully
-    response = await find_code(
-        query="any query",
-        cwd=str(empty_dir),
-        index_if_needed=True,
-    )
+    response = await find_code(query="any query", cwd=str(empty_dir), index_if_needed=True)
 
     # Should return no results, not crash
     assert len(response.results) == 0, "Empty codebase should return no results"
@@ -350,20 +340,10 @@ async def test_search_with_very_long_query(real_providers, known_test_codebase):
     from codeweaver.agent_api.find_code import find_code
 
     # Create a long but meaningful query
-    long_query = " ".join([
-        "I'm looking for code that handles user authentication",
-        "including login functionality, password validation,",
-        "session management, and logout procedures.",
-        "The code should validate credentials against a database",
-        "and create session tokens for authenticated users.",
-    ])
+    long_query = "I'm looking for code that handles user authentication including login functionality, password validation, session management, and logout procedures. The code should validate credentials against a database and create session tokens for authenticated users."
 
     # Should handle long query without crashing
-    response = await find_code(
-        query=long_query,
-        cwd=str(known_test_codebase),
-        index_if_needed=True,
-    )
+    response = await find_code(query=long_query, cwd=str(known_test_codebase), index_if_needed=True)
 
     # Should still find auth-related code
     result_files = [r.file_path.name for r in response.results[:3]]

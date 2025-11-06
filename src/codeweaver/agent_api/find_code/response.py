@@ -120,6 +120,7 @@ def build_success_response(
 
     try:
         from codeweaver.common.registry import get_indexer
+
         indexer = get_indexer()
 
         if indexer is not None:
@@ -127,11 +128,17 @@ def build_success_response(
             # Determine indexing state
             if stats.files_processed < stats.files_discovered:
                 indexing_state = "in_progress"
-                warnings.append(f"Index incomplete: {stats.files_processed}/{stats.files_discovered} files processed")
+                warnings.append(
+                    f"Index incomplete: {stats.files_processed}/{stats.files_discovered} files processed"
+                )
                 status = "partial"
             elif stats.files_discovered > 0:
                 indexing_state = "complete"
-                index_coverage = (stats.files_processed / stats.files_discovered) * 100.0 if stats.files_discovered > 0 else 0.0
+                index_coverage = (
+                    (stats.files_processed / stats.files_discovered) * 100.0
+                    if stats.files_discovered > 0
+                    else 0.0
+                )
             else:
                 indexing_state = "not_started"
                 warnings.append("No files have been indexed yet")
@@ -189,13 +196,18 @@ def build_error_response(
 
     try:
         from codeweaver.common.registry import get_indexer
+
         indexer = get_indexer()
 
         if indexer is not None:
             stats = indexer.stats
             if stats.files_processed < stats.files_discovered:
                 indexing_state = "in_progress"
-                index_coverage = (stats.files_processed / stats.files_discovered) * 100.0 if stats.files_discovered > 0 else 0.0
+                index_coverage = (
+                    (stats.files_processed / stats.files_discovered) * 100.0
+                    if stats.files_discovered > 0
+                    else 0.0
+                )
             elif stats.files_discovered > 0:
                 indexing_state = "complete"
                 index_coverage = 100.0

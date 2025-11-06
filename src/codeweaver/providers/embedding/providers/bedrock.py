@@ -29,7 +29,6 @@ from pydantic import (
     Field,
     Json,
     PositiveInt,
-    ValidationError,
     ValidationInfo,
     model_serializer,
     model_validator,
@@ -229,7 +228,7 @@ def shared_validator(
         data = data.getvalue()
 
     if not is_one_of_valid_types(data):
-        raise ValidationError(
+        raise CodeWeaverValidationError(
             f"Invalid data type. Expected one of: dict, str, bytes, bytearray, BytesIO. Full validation info:\n{info}"
         )
     data = cast(dict[str, Any] | str | bytes | bytearray, data)

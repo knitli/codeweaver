@@ -197,7 +197,7 @@ class LazyImport[Import: Any]:
         Returns a new LazyImport with the attribute added to the chain.
         This allows you to write: lazy_import("pkg").module.Class
         without triggering any imports until the final usage.
-        
+
         Special handling for introspection attributes: These attributes
         (like __signature__, __wrapped__, etc.) are accessed by inspection
         tools like pydantic. For these, we resolve the object first and

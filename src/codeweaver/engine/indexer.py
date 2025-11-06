@@ -331,7 +331,7 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         if not index_settings.inc_exc_set:
             # Check if there's already a running event loop
             try:
-                loop = asyncio.get_running_loop()
+                asyncio.get_running_loop()
                 # If we're here, there's a running loop
                 # We can't await here since from_settings is not async, so skip for now
                 logger.warning(
@@ -553,10 +553,12 @@ class Indexer(BasedModel):
                         "phase": "discovery",
                         "file_path": str(path),
                         "file_size": discovered_file.size,
-                        "file_language": discovered_file.language.value if discovered_file.language else None,
+                        "file_language": discovered_file.language.value
+                        if discovered_file.language
+                        else None,
                         "total_discovered": self._stats.files_discovered,
-                    }
-                }
+                    },
+                },
             )
 
             # 2. Chunk via ChunkingService (if available)
@@ -577,8 +579,8 @@ class Indexer(BasedModel):
                         "file_path": str(path),
                         "chunks_created": len(chunks),
                         "total_chunks": self._stats.chunks_created,
-                    }
-                }
+                    },
+                },
             )
 
             # 3. Embed chunks (if embedding providers available)
@@ -596,10 +598,14 @@ class Indexer(BasedModel):
                             "file_path": str(path),
                             "chunks_embedded": len(chunks),
                             "total_embedded": self._stats.chunks_embedded,
-                            "dense_provider": type(self._embedding_provider).__name__ if self._embedding_provider else None,
-                            "sparse_provider": type(self._sparse_provider).__name__ if self._sparse_provider else None,
-                        }
-                    }
+                            "dense_provider": type(self._embedding_provider).__name__
+                            if self._embedding_provider
+                            else None,
+                            "sparse_provider": type(self._sparse_provider).__name__
+                            if self._sparse_provider
+                            else None,
+                        },
+                    },
                 )
             else:
                 await log_to_client_or_fallback(
@@ -611,8 +617,8 @@ class Indexer(BasedModel):
                             "phase": "embedding",
                             "file_path": str(path),
                             "action": "skipped",
-                        }
-                    }
+                        },
+                    },
                 )
 
             # 4. Retrieve updated chunks from registry (single source of truth!)
@@ -644,8 +650,8 @@ class Indexer(BasedModel):
                             "chunks_indexed": len(updated_chunks),
                             "total_indexed": self._stats.chunks_indexed,
                             "vector_store": type(self._vector_store).__name__,
-                        }
-                    }
+                        },
+                    },
                 )
             else:
                 await log_to_client_or_fallback(
@@ -653,12 +659,8 @@ class Indexer(BasedModel):
                     "warning",
                     {
                         "msg": "No vector store configured",
-                        "extra": {
-                            "phase": "storage",
-                            "file_path": str(path),
-                            "action": "skipped",
-                        }
-                    }
+                        "extra": {"phase": "storage", "file_path": str(path), "action": "skipped"},
+                    },
                 )
 
             self._stats.files_processed += 1
@@ -673,9 +675,13 @@ class Indexer(BasedModel):
                         "chunks_created": len(chunks),
                         "files_processed": self._stats.files_processed,
                         "total_files": self._stats.files_discovered,
-                        "progress_pct": round((self._stats.files_processed / self._stats.files_discovered * 100), 1) if self._stats.files_discovered > 0 else 0,
-                    }
-                }
+                        "progress_pct": round(
+                            (self._stats.files_processed / self._stats.files_discovered * 100), 1
+                        )
+                        if self._stats.files_discovered > 0
+                        else 0,
+                    },
+                },
             )
 
         except Exception as e:
@@ -692,8 +698,8 @@ class Indexer(BasedModel):
                         "error": str(e),
                         "error_type": type(e).__name__,
                         "total_errors": len(self._stats.files_with_errors),
-                    }
-                }
+                    },
+                },
             )
 
     def _telemetry_keys(self) -> None:
@@ -911,7 +917,7 @@ class Indexer(BasedModel):
         if not index_settings.inc_exc_set:
             # Check if there's already a running event loop
             try:
-                loop = asyncio.get_running_loop()
+                asyncio.get_running_loop()
                 # If we're here, there's a running loop
                 # We can't await here since from_settings is not async, so skip for now
                 logger.warning(
@@ -952,7 +958,7 @@ class Indexer(BasedModel):
         if not index_settings.inc_exc_set:
             # Check if there's already a running event loop
             try:
-                loop = asyncio.get_running_loop()
+                asyncio.get_running_loop()
                 # If we're here, there's a running loop
                 # We can't await here since from_config is not async, so skip for now
                 logger.warning(
@@ -1094,11 +1100,8 @@ class Indexer(BasedModel):
                 "info",
                 {
                     "msg": "Shutdown requested",
-                    "extra": {
-                        "action": "stopping_batch_indexing",
-                        "files_remaining": len(files),
-                    }
-                }
+                    "extra": {"action": "stopping_batch_indexing", "files_remaining": len(files)},
+                },
             )
             return
 
@@ -1108,11 +1111,8 @@ class Indexer(BasedModel):
                 "warning",
                 {
                     "msg": "No chunking service configured",
-                    "extra": {
-                        "action": "cannot_batch_index",
-                        "files_count": len(files),
-                    }
-                }
+                    "extra": {"action": "cannot_batch_index", "files_count": len(files)},
+                },
             )
             return
 
@@ -1126,8 +1126,8 @@ class Indexer(BasedModel):
                     "phase": "discovery",
                     "batch_size": len(files),
                     "total_discovered": self._stats.files_discovered,
-                }
-            }
+                },
+            },
         )
 
         discovered_files = self._discover_files_for_batch(files)
@@ -1137,11 +1137,8 @@ class Indexer(BasedModel):
                 "info",
                 {
                     "msg": "No valid files to index",
-                    "extra": {
-                        "phase": "discovery",
-                        "files_attempted": len(files),
-                    }
-                }
+                    "extra": {"phase": "discovery", "files_attempted": len(files)},
+                },
             )
             return
 
@@ -1158,9 +1155,11 @@ class Indexer(BasedModel):
                 "extra": {
                     "phase": "chunking",
                     "files_discovered": len(discovered_files),
-                    "languages": list(set(f.language.value for f in discovered_files if f.language)),
-                }
-            }
+                    "languages": list(
+                        {f.language.value for f in discovered_files if f.language}
+                    ),
+                },
+            },
         )
 
         all_chunks = self._chunk_discovered_files(discovered_files)
@@ -1170,11 +1169,8 @@ class Indexer(BasedModel):
                 "info",
                 {
                     "msg": "No chunks created",
-                    "extra": {
-                        "phase": "chunking",
-                        "files_processed": len(discovered_files),
-                    }
-                }
+                    "extra": {"phase": "chunking", "files_processed": len(discovered_files)},
+                },
             )
             return
 
@@ -1188,8 +1184,8 @@ class Indexer(BasedModel):
                     "chunks_created": len(all_chunks),
                     "files_chunked": len(discovered_files),
                     "avg_chunks_per_file": round(len(all_chunks) / len(discovered_files), 1),
-                }
-            }
+                },
+            },
         )
 
         # Report progress after chunking
@@ -1207,10 +1203,14 @@ class Indexer(BasedModel):
                     "extra": {
                         "phase": "embedding",
                         "chunks_to_embed": len(all_chunks),
-                        "dense_provider": type(self._embedding_provider).__name__ if self._embedding_provider else None,
-                        "sparse_provider": type(self._sparse_provider).__name__ if self._sparse_provider else None,
-                    }
-                }
+                        "dense_provider": type(self._embedding_provider).__name__
+                        if self._embedding_provider
+                        else None,
+                        "sparse_provider": type(self._sparse_provider).__name__
+                        if self._sparse_provider
+                        else None,
+                    },
+                },
             )
 
             await self._embed_chunks_in_batches(all_chunks)
@@ -1220,11 +1220,8 @@ class Indexer(BasedModel):
                 "info",
                 {
                     "msg": "Embedding complete",
-                    "extra": {
-                        "phase": "embedding",
-                        "chunks_embedded": self._stats.chunks_embedded,
-                    }
-                }
+                    "extra": {"phase": "embedding", "chunks_embedded": self._stats.chunks_embedded},
+                },
             )
 
             # Report progress after embedding
@@ -1243,9 +1240,11 @@ class Indexer(BasedModel):
                     "extra": {
                         "phase": "storage",
                         "chunks_to_index": len(updated_chunks),
-                        "vector_store": type(self._vector_store).__name__ if self._vector_store else None,
-                    }
-                }
+                        "vector_store": type(self._vector_store).__name__
+                        if self._vector_store
+                        else None,
+                    },
+                },
             )
 
             await self._index_chunks_to_store(updated_chunks)
@@ -1255,11 +1254,8 @@ class Indexer(BasedModel):
                 "info",
                 {
                     "msg": "Vector store indexing complete",
-                    "extra": {
-                        "phase": "storage",
-                        "chunks_indexed": self._stats.chunks_indexed,
-                    }
-                }
+                    "extra": {"phase": "storage", "chunks_indexed": self._stats.chunks_indexed},
+                },
             )
 
             # Report progress after indexing
@@ -1271,10 +1267,8 @@ class Indexer(BasedModel):
                 "debug",
                 {
                     "msg": "Skipping embedding and indexing phases",
-                    "extra": {
-                        "reason": "no_providers_initialized",
-                    }
-                }
+                    "extra": {"reason": "no_providers_initialized"},
+                },
             )
 
         # Update stats with successful file count

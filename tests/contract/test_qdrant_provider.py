@@ -100,11 +100,7 @@ def _register_chunk_embeddings(chunk, dense=None, sparse=None):
         )
 
     # Register the embeddings - ChunkEmbeddings is a NamedTuple (sparse, dense, chunk)
-    registry[chunk.chunk_id] = ChunkEmbeddings(
-        sparse=sparse_info,
-        dense=dense_info,
-        chunk=chunk,
-    )
+    registry[chunk.chunk_id] = ChunkEmbeddings(sparse=sparse_info, dense=dense_info, chunk=chunk)
 
     # Update chunk with batch keys - need to add both dense and sparse keys
     from codeweaver.core.chunks import BatchKeys
@@ -176,9 +172,15 @@ class TestQdrantProviderContract:
         results = await qdrant_provider.search(vector={"dense": [0.1, 0.2, 0.3] * 256})
 
         assert isinstance(results, list)
-        assert len(results) > 0, "Search returned no results after upserting chunk with dense embeddings"
-        assert all(hasattr(r, "chunk") and hasattr(r, "score") for r in results), "Search results missing chunk or score attributes"
-        assert all(0.0 <= r.score <= 1.0 for r in results), "Search result scores out of valid range [0.0, 1.0]"
+        assert len(results) > 0, (
+            "Search returned no results after upserting chunk with dense embeddings"
+        )
+        assert all(hasattr(r, "chunk") and hasattr(r, "score") for r in results), (
+            "Search results missing chunk or score attributes"
+        )
+        assert all(0.0 <= r.score <= 1.0 for r in results), (
+            "Search result scores out of valid range [0.0, 1.0]"
+        )
 
     @pytest.mark.qdrant
     @pytest.mark.asyncio
@@ -193,10 +195,16 @@ class TestQdrantProviderContract:
         )
 
         assert isinstance(results, list)
-        assert len(results) > 0, "Search returned no results after upserting chunk with sparse embeddings"
-        assert all(hasattr(r, "chunk") and hasattr(r, "score") for r in results), "Search results missing chunk or score attributes"
+        assert len(results) > 0, (
+            "Search returned no results after upserting chunk with sparse embeddings"
+        )
+        assert all(hasattr(r, "chunk") and hasattr(r, "score") for r in results), (
+            "Search results missing chunk or score attributes"
+        )
         # Sparse vector scores can be unbounded (SPLADE/BM25), so we just check they're valid numbers
-        assert all(isinstance(r.score, (int, float)) and not isinstance(r.score, bool) for r in results), "Search result scores should be numeric"
+        assert all(
+            isinstance(r.score, (int, float)) and not isinstance(r.score, bool) for r in results
+        ), "Search result scores should be numeric"
 
     @pytest.mark.qdrant
     @pytest.mark.asyncio
@@ -214,10 +222,16 @@ class TestQdrantProviderContract:
         )
 
         assert isinstance(results, list)
-        assert len(results) > 0, "Hybrid search returned no results after upserting chunk with both dense and sparse embeddings"
-        assert all(hasattr(r, "chunk") and hasattr(r, "score") for r in results), "Search results missing chunk or score attributes"
+        assert len(results) > 0, (
+            "Hybrid search returned no results after upserting chunk with both dense and sparse embeddings"
+        )
+        assert all(hasattr(r, "chunk") and hasattr(r, "score") for r in results), (
+            "Search results missing chunk or score attributes"
+        )
         # Hybrid scores combine dense and sparse, so can be unbounded
-        assert all(isinstance(r.score, (int, float)) and not isinstance(r.score, bool) for r in results), "Search result scores should be numeric"
+        assert all(
+            isinstance(r.score, (int, float)) and not isinstance(r.score, bool) for r in results
+        ), "Search result scores should be numeric"
 
     @pytest.mark.qdrant
     @pytest.mark.asyncio

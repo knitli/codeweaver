@@ -693,11 +693,10 @@ def get_token_patterns_sync() -> TokenPatternCacheDict:
 
     # Need to compile patterns - check for running event loop
     try:
-        loop = asyncio.get_running_loop()
+        _ = asyncio.get_running_loop()
         # We're in an async context - compile synchronously to avoid nested event loop
         logger.warning(
-            "Compiling token patterns synchronously from async context. "
-            "This is a one-time operation but may cause brief blocking."
+            "Compiling token patterns synchronously from async context. This is a one-time operation but may cause brief blocking."
         )
 
         # Compile each pattern synchronously (no thread pool offloading)
@@ -716,10 +715,10 @@ def get_token_patterns_sync() -> TokenPatternCacheDict:
             keyword=keyword_pat,
             not_symbol=not_symbol_pat,
         )
-        return _token_pattern_cache
     except RuntimeError:
         # No running loop - use optimal async version with thread pool offloading
         return asyncio.run(_get_token_patterns())
+    return _token_pattern_cache
 
 
 TypeScriptLangs = frozenset({SemanticSearchLanguage.TYPESCRIPT, SemanticSearchLanguage.TSX})

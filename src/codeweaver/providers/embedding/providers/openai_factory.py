@@ -143,7 +143,12 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
                 client_instance = client
                 if client_instance is None:
                     from openai import AsyncOpenAI
-                    client_kwargs = {"api_key": kwargs.get("api_key", "ollama" if provider == Provider.OLLAMA else None)}
+
+                    client_kwargs = {
+                        "api_key": kwargs.get(
+                            "api_key", "ollama" if provider == Provider.OLLAMA else None
+                        )
+                    }
                     if base_url:
                         client_kwargs["base_url"] = base_url
                     client_instance = AsyncOpenAI(**client_kwargs)

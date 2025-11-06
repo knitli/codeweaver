@@ -170,7 +170,9 @@ async def find_code(
             apply_hybrid_weights(candidates)
 
         # Step 7: Rerank (optional, if provider configured)
-        reranked_results, rerank_strategy = await rerank_results(query, candidates, context=context)  # THREAD CONTEXT
+        reranked_results, rerank_strategy = await rerank_results(
+            query, candidates, context=context
+        )  # THREAD CONTEXT
         if rerank_strategy:
             strategies_used.append(rerank_strategy)
 

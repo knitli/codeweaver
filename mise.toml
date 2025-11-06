@@ -86,7 +86,7 @@ tools.uv = "latest"
 run = '''
 #!/bin/bash
 echo "Syncing dependencies..."
-uv sync --extra all --group all-dev
+uv sync --extra full --group dev --group docs --group build --group test
 '''
 
 [tasks.update-dependencies]
@@ -95,7 +95,7 @@ depends = ["source"]
 run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Updating dependencies..."
-uv sync --extra all --group dev --group docs --group build --group test -U
+uv sync --extra full --group dev --group docs --group build --group test -U
 '''
 
 [tasks.source]
@@ -197,8 +197,8 @@ tools."cargo:rust-parallel" = "latest"
 run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Applying formatting...hold onto your butts 🚬...🦖 "
-mise run fix-ruff-patterns || {
-    print -P "%F{209}[codeweaver]%f ⚠️  %F{red}Ruff pattern fixer encountered issues.%f"}
+# mise run fix-ruff-patterns || {  # there are some bugs to work out
+#    print -P "%F{209}[codeweaver]%f ⚠️  %F{red}Ruff pattern fixer encountered issues.%f"}
 uv run ruff format .
 files="$(git ls-files "*.yaml" "*.yml" "*.json" 2>/dev/null)"
 if [ -n "$files" ]; then

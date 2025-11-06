@@ -54,8 +54,7 @@ def mock_git_exists(mocker: MockerFixture) -> MagicMock:
     """Mock git as installed and available."""
     mock = mocker.patch("shutil.which", return_value="/usr/bin/git")
     mocker.patch(
-        "subprocess.run",
-        return_value=MagicMock(returncode=0, stdout="git version 2.40.0\n"),
+        "subprocess.run", return_value=MagicMock(returncode=0, stdout="git version 2.40.0\n")
     )
     return mock
 
@@ -104,10 +103,7 @@ class TestHasGit:
     def test_git_installed_and_working(self, mocker: MockerFixture) -> None:
         """Test has_git returns True when git is installed and functional."""
         mocker.patch("shutil.which", return_value="/usr/bin/git")
-        mocker.patch(
-            "subprocess.run",
-            return_value=MagicMock(returncode=0),
-        )
+        mocker.patch("subprocess.run", return_value=MagicMock(returncode=0))
         assert has_git() is True
 
     def test_git_not_installed(self, mock_no_git: MagicMock) -> None:
@@ -117,10 +113,7 @@ class TestHasGit:
     def test_git_command_fails(self, mocker: MockerFixture) -> None:
         """Test has_git returns False when git command fails."""
         mocker.patch("shutil.which", return_value="/usr/bin/git")
-        mocker.patch(
-            "subprocess.run",
-            return_value=MagicMock(returncode=1),
-        )
+        mocker.patch("subprocess.run", return_value=MagicMock(returncode=1))
         assert has_git() is False
 
     def test_git_exists_but_not_executable(self, mocker: MockerFixture) -> None:
@@ -190,11 +183,7 @@ class TestTryGitRevParse:
         superproject = tmp_path / "superproject"
         mocker.patch("shutil.which", return_value="/usr/bin/git")
         mocker.patch(
-            "subprocess.run",
-            return_value=MagicMock(
-                returncode=0,
-                stdout=str(superproject) + "\n",
-            ),
+            "subprocess.run", return_value=MagicMock(returncode=0, stdout=str(superproject) + "\n")
         )
         result = try_git_rev_parse()
         assert result == superproject
@@ -216,10 +205,7 @@ class TestTryGitRevParse:
     def test_not_in_git_repo(self, mocker: MockerFixture) -> None:
         """Test returns None when not in a git repository."""
         mocker.patch("shutil.which", return_value="/usr/bin/git")
-        mocker.patch(
-            "subprocess.run",
-            return_value=MagicMock(returncode=128, stdout=""),
-        )
+        mocker.patch("subprocess.run", return_value=MagicMock(returncode=128, stdout=""))
         result = try_git_rev_parse()
         assert result is None
 
@@ -298,10 +284,7 @@ class TestGetProjectPath:
 
     def test_uses_git_rev_parse(self, mocker: MockerFixture, temp_git_repo: Path) -> None:
         """Test uses git rev-parse when no root_path provided."""
-        mocker.patch(
-            "codeweaver.common.utils.git.try_git_rev_parse",
-            return_value=temp_git_repo,
-        )
+        mocker.patch("codeweaver.common.utils.git.try_git_rev_parse", return_value=temp_git_repo)
         result = get_project_path()
         assert result == temp_git_repo
 
@@ -347,14 +330,9 @@ class TestSetRelativePath:
         result = set_relative_path(rel_path)
         assert result == rel_path
 
-    def test_absolute_path_inside_project(
-        self, mocker: MockerFixture, temp_git_repo: Path
-    ) -> None:
+    def test_absolute_path_inside_project(self, mocker: MockerFixture, temp_git_repo: Path) -> None:
         """Test makes absolute path relative when inside project."""
-        mocker.patch(
-            "codeweaver.common.utils.git.get_project_path",
-            return_value=temp_git_repo,
-        )
+        mocker.patch("codeweaver.common.utils.git.get_project_path", return_value=temp_git_repo)
 
         abs_path = temp_git_repo / "src" / "module" / "file.py"
         result = set_relative_path(abs_path)
@@ -364,10 +342,7 @@ class TestSetRelativePath:
         self, mocker: MockerFixture, temp_git_repo: Path, tmp_path: Path
     ) -> None:
         """Test returns absolute path unchanged when outside project."""
-        mocker.patch(
-            "codeweaver.common.utils.git.get_project_path",
-            return_value=temp_git_repo,
-        )
+        mocker.patch("codeweaver.common.utils.git.get_project_path", return_value=temp_git_repo)
 
         outside_path = tmp_path / "external" / "file.py"
         result = set_relative_path(outside_path)
@@ -375,10 +350,7 @@ class TestSetRelativePath:
 
     def test_not_in_git_repo(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """Test handles gracefully when not in git repository."""
-        mocker.patch(
-            "codeweaver.common.utils.git.get_project_path",
-            side_effect=FileNotFoundError,
-        )
+        mocker.patch("codeweaver.common.utils.git.get_project_path", side_effect=FileNotFoundError)
 
         abs_path = tmp_path / "file.py"
         result = set_relative_path(abs_path)
@@ -386,10 +358,7 @@ class TestSetRelativePath:
 
     def test_string_path_conversion(self, mocker: MockerFixture, temp_git_repo: Path) -> None:
         """Test handles string paths correctly."""
-        mocker.patch(
-            "codeweaver.common.utils.git.get_project_path",
-            return_value=temp_git_repo,
-        )
+        mocker.patch("codeweaver.common.utils.git.get_project_path", return_value=temp_git_repo)
 
         str_path = str(temp_git_repo / "src" / "file.py")
         result = set_relative_path(str_path)
@@ -413,10 +382,7 @@ class TestGetGitDir:
         self, mocker: MockerFixture, temp_git_repo: Path
     ) -> None:
         """Test finds project path when directory is not git repository."""
-        mocker.patch(
-            "codeweaver.common.utils.git.get_project_path",
-            return_value=temp_git_repo,
-        )
+        mocker.patch("codeweaver.common.utils.git.get_project_path", return_value=temp_git_repo)
 
         non_git = temp_git_repo.parent / "other"
         non_git.mkdir()
@@ -428,10 +394,7 @@ class TestGetGitDir:
         self, mocker: MockerFixture, temp_non_git_dir: Path
     ) -> None:
         """Test returns MISSING when git directory not found."""
-        mocker.patch(
-            "codeweaver.common.utils.git.get_project_path",
-            side_effect=FileNotFoundError,
-        )
+        mocker.patch("codeweaver.common.utils.git.get_project_path", side_effect=FileNotFoundError)
 
         result = _get_git_dir(temp_non_git_dir)
         assert result is MISSING
@@ -450,20 +413,12 @@ class TestGetGitRevision:
         """Test returns short SHA-1 hash of HEAD."""
         mocker.patch("codeweaver.common.utils.git.has_git", return_value=True)
         mocker.patch("shutil.which", return_value="/usr/bin/git")
-        mocker.patch(
-            "subprocess.run",
-            return_value=MagicMock(
-                returncode=0,
-                stdout="abc123f\n",
-            ),
-        )
+        mocker.patch("subprocess.run", return_value=MagicMock(returncode=0, stdout="abc123f\n"))
 
         result = get_git_revision(temp_git_repo)
         assert result == "abc123f"
 
-    def test_returns_missing_when_no_git(
-        self, mocker: MockerFixture, temp_git_repo: Path
-    ) -> None:
+    def test_returns_missing_when_no_git(self, mocker: MockerFixture, temp_git_repo: Path) -> None:
         """Test returns MISSING when git is not installed."""
         mocker.patch("codeweaver.common.utils.git.has_git", return_value=False)
 
@@ -474,10 +429,7 @@ class TestGetGitRevision:
         self, mocker: MockerFixture, temp_non_git_dir: Path
     ) -> None:
         """Test returns MISSING for non-git directory."""
-        mocker.patch(
-            "codeweaver.common.utils.git.get_project_path",
-            side_effect=FileNotFoundError,
-        )
+        mocker.patch("codeweaver.common.utils.git.get_project_path", side_effect=FileNotFoundError)
 
         result = get_git_revision(temp_non_git_dir)
         assert result is MISSING
@@ -486,10 +438,7 @@ class TestGetGitRevision:
         """Test handles git command failure gracefully."""
         mocker.patch("codeweaver.common.utils.git.has_git", return_value=True)
         mocker.patch("shutil.which", return_value="/usr/bin/git")
-        mocker.patch(
-            "subprocess.run",
-            side_effect=subprocess.CalledProcessError(1, "git"),
-        )
+        mocker.patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "git"))
 
         result = get_git_revision(temp_git_repo)
         assert result is MISSING
@@ -506,13 +455,7 @@ class TestGetBranchFromOrigin:
     def test_simple_branch_name(self, mocker: MockerFixture, temp_git_repo: Path) -> None:
         """Test extracts simple branch name from origin/HEAD."""
         mocker.patch("shutil.which", return_value="/usr/bin/git")
-        mocker.patch(
-            "subprocess.run",
-            return_value=MagicMock(
-                returncode=0,
-                stdout="origin/main\n",
-            ),
-        )
+        mocker.patch("subprocess.run", return_value=MagicMock(returncode=0, stdout="origin/main\n"))
 
         result = _get_branch_from_origin(temp_git_repo)
         assert result == "main"
@@ -522,10 +465,7 @@ class TestGetBranchFromOrigin:
         mocker.patch("shutil.which", return_value="/usr/bin/git")
         mocker.patch(
             "subprocess.run",
-            return_value=MagicMock(
-                returncode=0,
-                stdout="origin/feature/my-feature\n",
-            ),
+            return_value=MagicMock(returncode=0, stdout="origin/feature/my-feature\n"),
         )
 
         result = _get_branch_from_origin(temp_git_repo)
@@ -540,10 +480,7 @@ class TestGetBranchFromOrigin:
     def test_git_command_fails(self, mocker: MockerFixture, temp_git_repo: Path) -> None:
         """Test returns MISSING when git command fails."""
         mocker.patch("shutil.which", return_value="/usr/bin/git")
-        mocker.patch(
-            "subprocess.run",
-            side_effect=subprocess.CalledProcessError(1, "git"),
-        )
+        mocker.patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "git"))
 
         result = _get_branch_from_origin(temp_git_repo)
         assert result is MISSING
@@ -562,19 +499,13 @@ class TestGetGitBranch:
         mocker.patch("codeweaver.common.utils.git.has_git", return_value=True)
         mocker.patch("shutil.which", return_value="/usr/bin/git")
         mocker.patch(
-            "subprocess.run",
-            return_value=MagicMock(
-                returncode=0,
-                stdout="feature-branch\n",
-            ),
+            "subprocess.run", return_value=MagicMock(returncode=0, stdout="feature-branch\n")
         )
 
         result = get_git_branch(temp_git_repo)
         assert result == "feature-branch"
 
-    def test_detached_head_with_origin(
-        self, mocker: MockerFixture, temp_git_repo: Path
-    ) -> None:
+    def test_detached_head_with_origin(self, mocker: MockerFixture, temp_git_repo: Path) -> None:
         """Test falls back to origin branch when HEAD is detached."""
         mocker.patch("codeweaver.common.utils.git.has_git", return_value=True)
         mocker.patch("shutil.which", return_value="/usr/bin/git")
@@ -591,18 +522,13 @@ class TestGetGitBranch:
         result = get_git_branch(temp_git_repo)
         assert result == "main"
 
-    def test_detached_head_no_origin(
-        self, mocker: MockerFixture, temp_git_repo: Path
-    ) -> None:
+    def test_detached_head_no_origin(self, mocker: MockerFixture, temp_git_repo: Path) -> None:
         """Test returns 'detached' when HEAD is detached and no origin."""
         mocker.patch("codeweaver.common.utils.git.has_git", return_value=True)
         mocker.patch("shutil.which", return_value="/usr/bin/git")
 
         # Mock _get_branch_from_origin to return MISSING
-        mocker.patch(
-            "codeweaver.common.utils.git._get_branch_from_origin",
-            return_value=MISSING,
-        )
+        mocker.patch("codeweaver.common.utils.git._get_branch_from_origin", return_value=MISSING)
 
         def mock_run(cmd: list[str], **kwargs):
             if "--abbrev-ref" in cmd and "HEAD" in cmd:
@@ -624,10 +550,7 @@ class TestGetGitBranch:
     def test_not_in_git_repo(self, mocker: MockerFixture, temp_non_git_dir: Path) -> None:
         """Test returns 'detached' when not in git repository."""
         mocker.patch("codeweaver.common.utils.git.has_git", return_value=True)
-        mocker.patch(
-            "codeweaver.common.utils.git.get_project_path",
-            side_effect=FileNotFoundError,
-        )
+        mocker.patch("codeweaver.common.utils.git.get_project_path", side_effect=FileNotFoundError)
 
         result = get_git_branch(temp_non_git_dir)
         assert result == "detached"
@@ -636,10 +559,7 @@ class TestGetGitBranch:
         """Test returns 'detached' when git command fails."""
         mocker.patch("codeweaver.common.utils.git.has_git", return_value=True)
         mocker.patch("shutil.which", return_value="/usr/bin/git")
-        mocker.patch(
-            "subprocess.run",
-            side_effect=subprocess.CalledProcessError(1, "git"),
-        )
+        mocker.patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "git"))
 
         result = get_git_branch(temp_git_repo)
         assert result == "detached"
@@ -668,13 +588,10 @@ class TestInCodeweaverClone:
         path = tmp_path / "CodeWeaver-MCP"
         assert in_codeweaver_clone(path) is True
 
-    def test_git_root_contains_codeweaver(
-        self, mocker: MockerFixture, tmp_path: Path
-    ) -> None:
+    def test_git_root_contains_codeweaver(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """Test checks git root directory name."""
         mocker.patch(
-            "codeweaver.common.utils.git.try_git_rev_parse",
-            return_value=tmp_path / "codeweaver",
+            "codeweaver.common.utils.git.try_git_rev_parse", return_value=tmp_path / "codeweaver"
         )
 
         path = tmp_path / "other"
@@ -685,10 +602,7 @@ class TestInCodeweaverClone:
         # Use a path that definitely doesn't contain 'codeweaver' or 'code-weaver'
         other_repo = Path("/home/user/my-project")
 
-        mocker.patch(
-            "codeweaver.common.utils.git.try_git_rev_parse",
-            return_value=other_repo,
-        )
+        mocker.patch("codeweaver.common.utils.git.try_git_rev_parse", return_value=other_repo)
 
         assert in_codeweaver_clone(other_repo) is False
 
@@ -709,10 +623,7 @@ class TestGitUtilsIntegration:
         repo.mkdir()
         subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
         subprocess.run(
-            ["git", "config", "user.name", "Test User"],
-            cwd=repo,
-            check=True,
-            capture_output=True,
+            ["git", "config", "user.name", "Test User"], cwd=repo, check=True, capture_output=True
         )
         subprocess.run(
             ["git", "config", "user.email", "test@example.com"],
@@ -726,10 +637,7 @@ class TestGitUtilsIntegration:
         test_file.write_text("test content")
         subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
         subprocess.run(
-            ["git", "commit", "-m", "Initial commit"],
-            cwd=repo,
-            check=True,
-            capture_output=True,
+            ["git", "commit", "-m", "Initial commit"], cwd=repo, check=True, capture_output=True
         )
 
         # Test functions with real repo

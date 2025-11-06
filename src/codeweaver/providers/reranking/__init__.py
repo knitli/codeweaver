@@ -73,7 +73,8 @@ def get_rerank_model_provider(provider: Provider) -> type[RerankingProvider[Any]
 
     # Get list of supported reranking providers dynamically
     supported_providers = [
-        p.value for p in [
+        p.value
+        for p in [
             Provider.VOYAGE,
             Provider.COHERE,
             Provider.BEDROCK,
@@ -84,10 +85,7 @@ def get_rerank_model_provider(provider: Provider) -> type[RerankingProvider[Any]
 
     raise ConfigurationError(
         f"Unknown reranking provider: {provider}",
-        details={
-            "provided_provider": str(provider),
-            "supported_providers": supported_providers,
-        },
+        details={"provided_provider": str(provider), "supported_providers": supported_providers},
         suggestions=[
             "Check provider name spelling in configuration",
             "Install required reranking provider package",
