@@ -31,9 +31,7 @@ if TYPE_CHECKING:
 
 console = Console(markup=True, emoji=True)
 app = App(
-    "doctor",
-    help="Validate prerequisites and configuration for CodeWeaver.",
-    console=console,
+    "doctor", help="Validate prerequisites and configuration for CodeWeaver.", console=console
 )
 
 
@@ -101,7 +99,7 @@ def check_required_dependencies() -> DoctorCheck:
         "rignore",
     ]
 
-    missing = []
+    missing: list[str] = []
     for package in required_packages:
         try:
             _ = version(package.replace("_", "-"))
@@ -114,10 +112,7 @@ def check_required_dependencies() -> DoctorCheck:
     else:
         check.status = "❌"
         check.message = f"Missing packages: {', '.join(missing)}"
-        check.suggestions = [
-            "Run: uv sync --all-groups",
-            "Or: pip install codeweaver-mcp[all]",
-        ]
+        check.suggestions = ["Run: uv sync --all-groups", "Or: pip install codeweaver-mcp[all]"]
 
     return check
 
@@ -166,8 +161,12 @@ def check_project_path(settings: CodeWeaverSettings) -> DoctorCheck:
     check = DoctorCheck("Project Path")
 
     try:
-        project_path = Path(settings.project_path)
+        if not isinstance(settings.project_path, Path):
+            from codeweaver.common.utils.git import get_project_path
 
+            project_path = get_project_path()
+        else:
+            project_path = settings.project_path
         if not project_path.exists():
             check.status = "❌"
             check.message = f"Path does not exist: {project_path}"
@@ -287,15 +286,9 @@ def _check_reranking_api_keys(settings: CodeWeaverSettings, warnings: list[str])
         return
 
     reranking_provider = getattr(settings.provider.reranking, "provider", None)
-    api_key_map = {
-        "cohere": "COHERE_API_KEY",
-        "voyageai": "VOYAGE_API_KEY",
-    }
+    api_key_map = {"cohere": "COHERE_API_KEY", "voyageai": "VOYAGE_API_KEY"}
 
-    if (
-        reranking_provider in api_key_map
-        and not os.getenv(api_key_map[reranking_provider])
-    ):
+    if reranking_provider in api_key_map and not os.getenv(api_key_map[reranking_provider]):
         warnings.append(f"{api_key_map[reranking_provider]} not set (for reranking)")
 
 
@@ -353,7 +346,8 @@ def check_provider_connections(settings: CodeWeaverSettings) -> DoctorCheck:
 
 
 def _print_check_suggestions(
-    checks: list[DoctorCheck], verbose: bool  # noqa: FBT001
+    checks: list[DoctorCheck],
+    verbose: bool,  # noqa: FBT001
 ) -> tuple[bool, bool]:
     """Print suggestions for failed/warning checks.
 
@@ -406,11 +400,7 @@ def _print_summary(has_failures: bool, has_warnings: bool) -> None:  # noqa: FBT
 
 
 @app.default
-def doctor(
-    *,
-    test_connections: bool = False,
-    verbose: bool = False,
-) -> None:
+def doctor(*, test_connections: bool = False, verbose: bool = False) -> None:
     """Validate prerequisites and configuration.
 
     Args:
@@ -424,10 +414,7 @@ def doctor(
     checks: list[DoctorCheck] = []
     settings: CodeWeaverSettings | None = None
 
-    # System requirements
-    checks.append(check_python_version())
-    checks.append(check_required_dependencies())
-
+    checks.extend((check_python_version(), check_required_dependencies()))
     # Configuration checks
     config_failed = False
     try:
@@ -453,10 +440,11 @@ def doctor(
 
     # Only run dependent checks if settings loaded successfully
     if not config_failed and settings is not None:
-        checks.append(check_project_path(settings))
-        checks.append(check_vector_store_path(settings))
-        checks.append(check_provider_api_keys(settings))
-
+        checks.extend((
+            check_project_path(settings),
+            check_vector_store_path(settings),
+            check_provider_api_keys(settings),
+        ))
         if test_connections:
             checks.append(check_provider_connections(settings))
 
@@ -485,8 +473,8 @@ def main() -> None:
     except KeyboardInterrupt:
         console.print("\n[red]Operation cancelled by user.[/red]")
         sys.exit(1)
-    except Exception as e:
-        console.print(f"[red]An unexpected error occurred: {e}[/red]")
+    except Exception:
+        console.print_exception()
         sys.exit(1)
 
 

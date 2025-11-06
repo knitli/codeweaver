@@ -133,17 +133,12 @@ def _create_codeweaver_config(project_path: Path) -> dict[str, Any]:
     return {
         "command": "fastmcp",
         "args": ["run", "codeweaver.server.server:app"],
-        "env": {
-            "CODEWEAVER_PROJECT_PATH": str(project_path.resolve())
-        }
+        "env": {"CODEWEAVER_PROJECT_PATH": str(project_path.resolve())},
     }
 
 
 def _merge_mcp_config(
-    existing: dict[str, Any],
-    project_path: Path,
-    *,
-    force: bool = False
+    existing: dict[str, Any], project_path: Path, *, force: bool = False
 ) -> tuple[dict[str, Any], bool]:
     """Merge CodeWeaver configuration into existing MCP config.
 
@@ -175,11 +170,7 @@ def _merge_mcp_config(
 
 
 def _add_to_client(
-    client_name: str,
-    config_path: Path | None,
-    project_path: Path,
-    *,
-    force: bool = False
+    client_name: str, config_path: Path | None, project_path: Path, *, force: bool = False
 ) -> bool:
     """Add CodeWeaver configuration to specific MCP client.
 
@@ -238,9 +229,9 @@ def _print_next_steps(configured_clients: list[str]) -> None:
         print("\n⚠️  No clients were configured. Nothing to do.")
         return
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("🎉 Configuration Complete!")
-    print("="*60)
+    print("=" * 60)
 
     print("\n📋 Next Steps:")
     print("   1. Restart your MCP client(s):")
@@ -339,15 +330,12 @@ def add(
     # Configure selected clients
     configured_clients: list[str] = []
 
-    for client_name, should_configure in clients_selected.items():
-        if should_configure and _add_to_client(
-            client_name,
-            config_paths[client_name],
-            project_path,
-            force=force
-        ):
-            configured_clients.append(client_name)
-
+    configured_clients.extend(
+        client_name
+        for client_name, should_configure in clients_selected.items()
+        if should_configure
+        and _add_to_client(client_name, config_paths[client_name], project_path, force=force)
+    )
     # Handle custom MCP JSON
     if has_custom_mcp_json and mcp_json is not None:
         print(f"\n📝 Configuring custom MCP JSON: {mcp_json}")

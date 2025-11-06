@@ -1,4 +1,4 @@
-# sourcery skip: no-complex-if-expressions
+# sourcery skip: avoid-global-variables, name-type-suffix, no-complex-if-expressions
 # sourcery skip: avoid-global-variables, no-complex-if-expressions
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
@@ -21,6 +21,7 @@ from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
 from codeweaver.common import CODEWEAVER_PREFIX
+from codeweaver.common.utils.git import get_project_path
 
 
 if TYPE_CHECKING:
@@ -39,7 +40,7 @@ app = App(
 @app.command(default_parameter="show")
 def config(
     *,
-    show: bool = False,
+    show: bool = True,
     project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
 ) -> None:
     """Manage CodeWeaver configuration."""
@@ -113,17 +114,14 @@ def init(
     from codeweaver.providers.capabilities import PROVIDER_CAPABILITIES
     from codeweaver.providers.provider import Provider, ProviderKind
 
-    console.print("\n[bold cyan]CodeWeaver Configuration Wizard[/bold cyan]\n")
+    console.print("\n{CODEWEAVER_PREFIX} [bold cyan]CodeWeaver Configuration Wizard[/bold cyan]\n")
     console.print("This wizard will help you create a configuration file for your project.")
     console.print("Press Ctrl+C at any time to cancel.\n")
 
     try:
         # 1. Project path
-        default_path = str(Path.cwd())
-        project_path_str = Prompt.ask(
-            "[cyan]Project path[/cyan]",
-            default=default_path,
-        )
+        default_path = get_project_path()
+        project_path_str = Prompt.ask("[cyan]Project path[/cyan]", default=default_path)
         project_path = Path(project_path_str).expanduser().resolve()
 
         if not project_path.exists():
@@ -169,18 +167,7 @@ def init(
 
         provider_choice = Prompt.ask(
             "\n[cyan]Select embedding provider[/cyan]",
-            choices=[
-                "1",
-                "2",
-                "3",
-                "4",
-                "5",
-                "voyage",
-                "openai",
-                "fastembed",
-                "cohere",
-                "other",
-            ],
+            choices=["1", "2", "3", "4", "5", "voyage", "openai", "fastembed", "cohere", "other"],
             default="1",
         )
 
@@ -219,8 +206,7 @@ def init(
 
             if needs_key:
                 api_key = Prompt.ask(
-                    f"[cyan]Enter {embedding_provider_name.upper()} API key[/cyan]",
-                    password=True,
+                    f"[cyan]Enter {embedding_provider_name.upper()} API key[/cyan]", password=True
                 )
 
                 if not api_key or api_key.strip() == "":
@@ -231,14 +217,9 @@ def init(
 
         # 5. Sparse embedding
         console.print("\n[bold]Sparse Embedding (Optional)[/bold]")
-        console.print(
-            "Sparse embeddings complement dense embeddings for better search accuracy."
-        )
+        console.print("Sparse embeddings complement dense embeddings for better search accuracy.")
 
-        use_sparse = Confirm.ask(
-            "[cyan]Enable sparse embedding?[/cyan]",
-            default=True,
-        )
+        use_sparse = Confirm.ask("[cyan]Enable sparse embedding?[/cyan]", default=True)
 
         sparse_provider_name = None
         if use_sparse:
@@ -260,10 +241,7 @@ def init(
         console.print("\n[bold]Reranking (Optional)[/bold]")
         console.print("Reranking improves search result quality by re-scoring results.")
 
-        use_reranking = Confirm.ask(
-            "[cyan]Enable reranking?[/cyan]",
-            default=False,
-        )
+        use_reranking = Confirm.ask("[cyan]Enable reranking?[/cyan]", default=False)
 
         reranking_provider_name = None
         reranking_api_key = None
@@ -317,8 +295,7 @@ def init(
         console.print("\n[bold]Vector Store[/bold]")
         default_vector_path = str(project_path / ".codeweaver" / "qdrant")
         vector_path_str = Prompt.ask(
-            "[cyan]Vector store location[/cyan]",
-            default=default_vector_path,
+            "[cyan]Vector store location[/cyan]", default=default_vector_path
         )
         vector_path = Path(vector_path_str).expanduser().resolve()
 
@@ -327,13 +304,8 @@ def init(
 
         # Build settings dict for customization
         settings_data: dict = {
-            "project_path": str(project_path),
-            "provider": {
-                "embedding": {
-                    "provider": embedding_provider_name,
-                    "enabled": True,
-                },
-            },
+            "project_path": project_path,
+            "provider": {"embedding": {"provider": embedding_provider_name, "enabled": True}},
         }
 
         # Add API key if provided
@@ -360,9 +332,7 @@ def init(
         settings_data["provider"]["vector_store"] = {
             "provider": "qdrant",
             "enabled": True,
-            "client_options": {
-                "path": str(vector_path),
-            },
+            "client_options": {"path": str(vector_path)},
         }
 
         # Create settings object with custom values
@@ -383,10 +353,7 @@ def init(
         console.print("  3. Start the MCP server: [cyan]codeweaver serve[/cyan]")
 
         # Show environment variable hints if API keys weren't provided
-        if (
-            embedding_provider_name not in ("fastembed", "sentence-transformers")
-            and not api_key
-        ):
+        if embedding_provider_name not in ("fastembed", "sentence-transformers") and not api_key:
             console.print(
                 f"\n[yellow]⚠[/yellow]  Don't forget to set your {embedding_provider_name.upper()}_API_KEY environment variable!"
             )

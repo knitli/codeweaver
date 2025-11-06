@@ -26,16 +26,31 @@ app = App(
     version=__version__,
     console=console,
 )
-app.command("codeweaver.cli.commands.config:main", name="config")
-app.command("codeweaver.cli.commands.server:main", name="server")
-app.command("codeweaver.cli.commands.search:main", name="search")
-app.command("codeweaver.cli.commands.index:main", name="index")
-app.command("codeweaver.cli.commands.doctor:app", name="doctor")
-app.command("codeweaver.cli.commands.list:app", name="list", alias="ls")
+app.command(
+    "codeweaver.cli.commands.config:main",
+    name="config",
+    help="Manage your CodeWeaver configuration.",
+)
+app.command("codeweaver.cli.commands.server:main", name="server", help="Run the CodeWeaver server.")
+app.command("codeweaver.cli.commands.search:main", name="search", help="Search your codebase.")
+app.command(
+    "codeweaver.cli.commands.index:main",
+    name="index",
+    help="Check the status of your codebase index.",
+)
+app.command(
+    "codeweaver.cli.commands.doctor:main", name="doctor", help="Diagnose and fix common issues."
+)
+app.command(
+    "codeweaver.cli.commands.list:main",
+    name="list",
+    alias="ls",
+    help="List available providers, models, and more.",
+)
 
 # these are scaffolded for future implementation
-# app.command("codeweaver.cli.commands.context:app", name="context", alias="prep")
-# app.command("codeweaver.cli.commands.init:app", name="init", alias="initialize")
+# app.command("codeweaver.cli.commands.context:main", name="context", alias="prep")
+# app.command("codeweaver.cli.commands.init:main", name="init", alias="initialize")
 
 
 def main() -> None:

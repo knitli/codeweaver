@@ -39,6 +39,7 @@ from types_boto3_bedrock_runtime import BedrockRuntimeClient
 
 from codeweaver.core.types.models import BasedModel
 from codeweaver.exceptions import ConfigurationError, ProviderError
+from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 from codeweaver.providers.provider import Provider
@@ -592,8 +593,20 @@ class BedrockEmbeddingProvider(EmbeddingProvider[bedrock_client]):
         requests: list[BedrockInvokeEmbeddingRequest] = []
         for doc in processed:
             if len(doc) > 50_000:
-                raise ValueError(
-                    f"Input text is too long for Titan Embedding V2. Max length is 50,000 characters. Input length is {len(doc)} characters."
+                raise CodeWeaverValidationError(
+                    "Input text exceeds Titan Embedding V2 maximum length",
+                    details={
+                        "provider": "bedrock",
+                        "model": "titan-embed-v2",
+                        "max_length": 50_000,
+                        "actual_length": len(doc),
+                        "excess_chars": len(doc) - 50_000,
+                    },
+                    suggestions=[
+                        "Split the text into smaller chunks (< 50,000 characters)",
+                        "Use a different embedding model with larger context window",
+                        "Consider summarizing the text before embedding",
+                    ],
                 )
             body = TitanEmbeddingV2RequestBody.model_validate({
                 "input_text": doc,

@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal
 from pydantic import ConfigDict, Field, NonNegativeInt, PositiveInt
 
 from codeweaver.core.types.models import BasedModel
+from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.provider import Provider
 from codeweaver.tokenizers.base import Tokenizer
 
@@ -132,7 +133,20 @@ class RerankingModelCapabilities(BasedModel):
     def _handle_int_max_input(self, input_chunks: Sequence[str]) -> tuple[bool, NonNegativeInt]:
         """Handle integer max_input case."""
         if not isinstance(self.max_input, int):
-            raise TypeError(f"Expected max_input to be an int, got {type(self.max_input).__name__}")
+            raise CodeWeaverValidationError(
+                "Reranking capability max_input must be an integer",
+                details={
+                    "field": "max_input",
+                    "expected_type": "int",
+                    "received_type": type(self.max_input).__name__,
+                    "received_value": str(self.max_input),
+                },
+                suggestions=[
+                    "Set max_input as an integer in capabilities",
+                    "Check capability configuration schema",
+                    "Verify model capability definition",
+                ],
+            )
         return self._process_max_input_with_tokenizer(input_chunks)
 
     def is_within_limits(

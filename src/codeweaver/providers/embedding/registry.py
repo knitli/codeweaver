@@ -14,6 +14,7 @@ from __future__ import annotations
 from codeweaver.core.stores import UUIDStore
 from codeweaver.core.types.aliases import ModelNameT
 from codeweaver.exceptions import ConfigurationError
+from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.embedding.types import ChunkEmbeddings, EmbeddingKind
 
 
@@ -71,8 +72,18 @@ class EmbeddingRegistry(UUIDStore[ChunkEmbeddings]):
             if getattr(embeddings, f"has_{kind.value}")
         }  # type: ignore
         if len(models) > 1:
-            raise ValueError(
-                f"Multiple models found for {kind.variable} embeddings. You can't use multiple models for the same data. Found: {models}"
+            raise CodeWeaverValidationError(
+                f"Multiple embedding models detected for {kind.variable} embeddings",
+                details={
+                    "embedding_kind": kind.variable,
+                    "detected_models": list(models),
+                    "model_count": len(models),
+                },
+                suggestions=[
+                    "Use a single embedding model for all data of the same type",
+                    "Clear existing embeddings before switching models",
+                    "Check configuration to ensure consistent model selection",
+                ],
             )
         return models.pop() if models else None
 

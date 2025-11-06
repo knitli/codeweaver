@@ -18,6 +18,7 @@ from typing import Any, cast
 import numpy as np
 
 from codeweaver.common.utils.utils import rpartial
+from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider
@@ -104,7 +105,19 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
         name = self.kwargs.pop("model_name", None) or self.kwargs.pop("model_name_or_path", None) or self._caps.name
 
         if not isinstance(name, str):
-            raise TypeError(f"Expected model_name to be str, got {type(name).__name__}")
+            raise CodeWeaverValidationError(
+                "Reranking model name must be a string",
+                details={
+                    "provider": "sentence_transformers",
+                    "received_type": type(name).__name__,
+                    "received_value": str(name)[:100],
+                },
+                suggestions=[
+                    "Provide model_name as a string, not an object",
+                    "Check model configuration in capabilities",
+                    "Verify model name is properly initialized",
+                ],
+            )
 
         # Note: _client is already initialized by __init__, no need to reinitialize
         if "Qwen3" in name:

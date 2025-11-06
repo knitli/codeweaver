@@ -55,7 +55,7 @@ class BaseProviderSettings(TypedDict, total=False):
 
     provider: Required[Provider]
     enabled: Required[bool]
-    api_key: NotRequired[str | None]
+    api_key: NotRequired[SecretStr | None]
     connection: NotRequired[ConnectionConfiguration | None]
     client_options: NotRequired[dict[str, Any] | None]
     """Options to pass to the provider's client (like to `qdrant_client` for qdrant) as keyword arguments. You should refer to the provider's documentation for what options are available."""

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from codeweaver.exceptions import ConfigurationError
+
 
 if TYPE_CHECKING:
     from codeweaver.config.providers import VectorStoreProviderSettings
@@ -58,13 +60,33 @@ def get_vector_store_provider(settings: VectorStoreProviderSettings) -> VectorSt
                 config=qdrant_config, _client=None, _metadata=None
             )
 
-        raise ValueError("Qdrant provider selected but no qdrant config provided")
+        raise ConfigurationError(
+            "Qdrant configuration missing",
+            details={
+                "provider": "qdrant",
+                "config_location": "QdrantConfig parameter",
+            },
+            suggestions=[
+                "Provide QdrantConfig when using Qdrant provider",
+                "Set QDRANT_URL and QDRANT_API_KEY environment variables",
+                "Check qdrant section in configuration file",
+            ],
+        )
     if provider_type == Provider.MEMORY:
         memory_config = settings.get("memory", {})
         return MemoryVectorStoreProvider.model_construct(config=memory_config, _client=None)
 
-    raise ValueError(
-        f"Unknown vector store provider: {provider_type}. Supported providers: 'qdrant', 'memory'"
+    raise ConfigurationError(
+        f"Unknown vector store provider: {provider_type}",
+        details={
+            "provided_provider": str(provider_type),
+            "supported_providers": ["qdrant", "memory"],
+        },
+        suggestions=[
+            "Use one of the supported providers: qdrant, memory",
+            "Check provider name spelling in configuration",
+            "Install required provider package",
+        ],
     )
 
 

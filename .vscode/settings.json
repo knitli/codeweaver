@@ -10,5 +10,9 @@
   },
   "ruff.path": [
     "/home/knitli/.local/share/mise/shims/ruff"
-  ]
+  ],
+  "ruff.interpreter": [
+    "/home/knitli/.local/share/mise/shims/python"
+  ],
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv"
 }

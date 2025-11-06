@@ -1,5 +1,8 @@
-#!/usr/bin/env python3
-
+#!/usr/bin/env -S uv run -s
+# ///script
+# requires-python = ">=3.10"
+# dependencies = ["rich"]
+# ///
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -11,6 +14,16 @@ import sys
 import traceback
 import warnings
 
+from rich.console import Console
+from rich.traceback import install
+
+
+console = Console()
+
+
+install(console=console, width=120, max_frames=100, show_locals=True)
+console.begin_capture()
+
 
 def warning_with_traceback(
     message: object,
@@ -21,9 +34,11 @@ def warning_with_traceback(
     line: str | None = None,
 ) -> None:
     """Print warning with full stack trace."""
-    log = sys.stderr
-    traceback.print_stack(file=log)
-    _ = log.write(warnings.formatwarning(message, category, filename, lineno, line))  # type: ignore
+    console.print("file=", file)
+    console.print("line=", line)
+    console.print("filename=", filename)
+    console.print("lineno=", lineno)
+    traceback.print_stack(file=sys.stdout)
 
 
 warnings.showwarning = warning_with_traceback
@@ -33,11 +48,14 @@ warnings.filterwarnings("error", category=Warning, message=".*default_factory.*"
 
 # Now import and test your application
 try:
-    import codeweaver.config.types  # noqa: F401
+    from codeweaver.cli import __main__ as main
 
-    print("✓ Successfully imported config types")
+    main.main()
 except Warning as w:
     if "UnsupportedFieldAttributeWarning" not in str(type(w)):
         raise
     print("\n✗ Found the problematic warning!")
     traceback.print_exc()
+console.end_capture()
+output = console.export_text()
+console.print(output)

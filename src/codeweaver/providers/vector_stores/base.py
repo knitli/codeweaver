@@ -23,6 +23,7 @@ from codeweaver.agent_api.find_code.types import StrategizedQuery
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.models import BasedModel
 from codeweaver.engine.filter import Filter
+from codeweaver.exceptions import ProviderError
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
@@ -148,7 +149,18 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
     def client(self) -> VectorStoreClient:
         """Returns the vector store client instance."""
         if not self._ensure_client(self._client):
-            raise RuntimeError("Vector store client is not initialized.")
+            raise ProviderError(
+                "Vector store client not initialized",
+                details={
+                    "provider": self._provider.value if hasattr(self, '_provider') else "unknown",
+                    "client_type": type(self).__name__,
+                },
+                suggestions=[
+                    "Ensure initialize() method was called before use",
+                    "Check vector store configuration is valid",
+                    "Verify required dependencies are installed",
+                ],
+            )
         return self._client
 
     @property

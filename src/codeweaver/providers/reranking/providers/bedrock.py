@@ -22,6 +22,7 @@ from pydantic.alias_generators import to_camel, to_snake
 
 from codeweaver.config.providers import AWSProviderSettings
 from codeweaver.core.types.models import BasedModel
+from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.amazon import get_amazon_reranking_capabilities
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
@@ -143,7 +144,20 @@ class DocumentSource(BaseBedrockModel):
         if (self.json_document and self.text_document) or (
             not self.json_document and not self.text_document
         ):
-            raise ValueError("Exactly one of json_document or text_document must be provided.")
+            raise CodeWeaverValidationError(
+                "Bedrock reranking requires exactly one document type",
+                details={
+                    "provider": "bedrock",
+                    "model": "reranking",
+                    "json_document_provided": self.json_document is not None,
+                    "text_document_provided": self.text_document is not None,
+                },
+                suggestions=[
+                    "Provide either json_document OR text_document, not both",
+                    "Ensure at least one document type is specified",
+                    "Check the document format matches the model requirements",
+                ],
+            )
         return self
 
 

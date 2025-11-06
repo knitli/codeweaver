@@ -98,23 +98,27 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
+  # Core functionality
   "aenum>=3.1.16",
   "ast-grep-py>=0.39.7",
   "blake3>=1.0.8",
+  # CLI framework and output
   "cyclopts>=4.2.1",
+  # MCP server framework
   "fastmcp>=2.13.0.2",
-  "httpx>=0.28.1",
   "mcp>=1.19.0",
+  # Numerical and ML
   "numpy>=2.3.4",
+  # Infrastructure and utilities
   "posthog>=6.8.0",
-  "pydantic>=2.12.3",
+  # Core data models and validation
+  "pydantic>=2.12.4",
   "pydantic-ai>=1.10.0",
   "pydantic-graph>=1.10.0",
-  "pydantic-settings[toml,yaml]>=2.11.0",
-  "pyyaml>=6.0.3",
+  "pydantic-settings[toml,yaml]>=2.11.0",  # Pulls: tomli>=2.0.1, pyyaml>=6.0.1
   "qdrant-client>=1.15.1",
   "rich>=14.2.0",
-  "rignore>=0.7.4",
+  "rignore>=0.7.6",
   "tenacity>=9.1.2",
   "textcase>=0.4.5",
   "tiktoken>=0.12.0",
@@ -138,88 +142,6 @@ Repository = "https://github.com/knitli/codeweaver-mcp"
 codeweaver = "codeweaver.cli.__main__:main"
 
 [project.optional-dependencies]
-# workos AuthKit middleware - see https://gofastmcp.com/integrations/authkit
-# No additional dependencies required, it's purely REST-based.
-# Enable with environment variables:
-#  ## Instruct FastMCP to use the AuthKit provider:
-#    FASTMCP_SERVER_AUTH=AUTHKIT
-#     configure the AuthKit provider
-#     FASTMCP_SERVER_AUTH_AUTHKITPROVIDER_AUTHKIT_DOMAIN="https://your-project-12345.authkit.app"
-#     FASTMCP_SERVER_AUTH_AUTHKITPROVIDER_BASE_URL="http://localhost:8000"
-# All groups for users
-all = [
-  "aenum",
-  "ast-grep-py",
-  "py-cpuinfo",
-  "cyclopts",
-  "eunomia-mcp",
-  "fastembed",
-  "fastmcp",
-  "httpx",
-  "mcp",
-  "numpy",
-  "permit-fastmcp",
-  "posthog",
-  "numpy",
-  "permit-fastmcp",
-  "pydantic-ai",
-  "pydantic-graph",
-  "pydantic-settings[toml,yaml]",
-  "pydantic",
-  "qdrant-client",
-  "rich",
-  "rignore",
-  "sentence-transformers[onnx]",
-  "textcase",
-  "tiktoken",
-  "tokenizers",
-  "pydantic-ai",
-  "pydantic-graph",
-  "pydantic-settings[toml,yaml]",
-  "pydantic",
-  "qdrant-client",
-  "rich",
-  "rignore",
-  "textcase",
-  "tiktoken",
-  "tokenizers",
-  "tomli-w",
-  "typing-extensions",
-  "uuid7; python_version < '3.14'",
-  "uvicorn[standard]",
-  "voyageai",
-  "watchfiles",
-]
-all-gpu = [
-  "aenum",
-  "ast-grep-py",
-  "py-cpuinfo",
-  "cyclopts",
-  "eunomia-mcp",
-  "fastembed-gpu",
-  "fastmcp",
-  "httpx",
-  "mcp",
-  "numpy",
-  "permit-fastmcp",
-  "posthog",
-  "pydantic-ai",
-  "pydantic-graph",
-  "pydantic-settings[toml,yaml]",
-  "pydantic",
-  "qdrant-client",
-  "rich",
-  "rignore",
-  "sentence-transformers[onnx-gpu]",
-  "tiktoken",
-  "tokenizers",
-  "tomli-w",
-  "typing-extensions",
-  "uuid7",
-  "uvicorn[standard]",
-  "voyageai",
-  "watchfiles",
-]
 # eunomia middleware - see https://gofastmcp.com/integrations/eunomia-authorization
 auth-eunomia = ["eunomia-mcp"]
 # ==== Authentication and Authorization Middleware ====
@@ -234,14 +156,32 @@ auth-permitio = ["permit-fastmcp"]
 aws-secrets-manager = ["pydantic-settings[yaml,toml,aws-secrets-manager]"]
 azure-key-vault = ["pydantic-settings[yaml,toml,azure-key-vault]"]
 cli = ["cyclopts", "rich", "tomli-w"]
-gcp-secret-manager = ["pydantic-settings[yaml,toml,gcp-secret-manager]"]
-# also requires one agent-capable provider, one embedding-capable provider, and a vector store
-pre-context = [
-  "cyclopts",
-  "rich",
-  "tomli-w",
-  "watchfiles",
+# workos AuthKit middleware - see https://gofastmcp.com/integrations/authkit
+# No additional dependencies required, it's purely REST-based.
+# Enable with environment variables:
+#  ## Instruct FastMCP to use the AuthKit provider:
+#    FASTMCP_SERVER_AUTH=AUTHKIT
+#     configure the AuthKit provider
+#     FASTMCP_SERVER_AUTH_AUTHKITPROVIDER_AUTHKIT_DOMAIN="https://your-project-12345.authkit.app"
+#     FASTMCP_SERVER_AUTH_AUTHKITPROVIDER_BASE_URL="http://localhost:8000"
+# All groups for users - full featured with all middleware
+full = [
+  "eunomia-mcp",
+  "fastembed",
+  "permit-fastmcp",
+  "py-cpuinfo",
+  "sentence-transformers[onnx]",
+  "tokenizers",
 ]
+full-gpu = [
+  "eunomia-mcp",
+  "fastembed-gpu",
+  "permit-fastmcp",
+  "py-cpuinfo",
+  "sentence-transformers[onnx-gpu]",
+  "tokenizers",
+]
+gcp-secret-manager = ["pydantic-settings[yaml,toml,gcp-secret-manager]"]
 # ==== Providers ====
 #    --- Agent-only Providers --- (no embedding/rerank)
 provider-anthropic = ["pydantic-ai-slim[anthropic]"]
@@ -258,11 +198,11 @@ provider-huggingface = ["pydantic-ai-slim[huggingface]"]
 # Requires additional setup, see https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/
 # ==== Vector Stores ====
 provider-in-memory = ["qdrant-client", "tokenizers"]
+provider-mistral = ["pydantic-ai-slim[mistral]"]
 # OpenAI includes support for:
 #   DeekSeek, Ollama, OpenRouter, Vercel, Perplexity, Moonshot, FireworksAI,
 #   TogetherAI, Azure AI Foundry, Heroku, and Github Models, X-AI
 # which all use the OpenAI API
-provider-mistral = ["pydantic-ai-slim[mistral]"]
 provider-openai = ["pydantic-ai-slim[openai]"]
 provider-qdrant = ["qdrant-client"]
 provider-sentence-transformers = [
@@ -280,113 +220,15 @@ provider-sentence-transformers-gpu = [
 # ]
 provider-voyageai = ["voyageai"]
 recommended = [
-  "aenum",
-  "ast-grep-py",
-  "cyclopts",
+  "fastembed",
   "py-cpuinfo",
-  "fastmcp",
-  "mcp",
-  "numpy",
-  "posthog",
-  "pydantic-ai",
-  "pydantic-graph",
-  "pydantic-settings[toml,yaml]",
-  "pydantic",
-  "qdrant-client",
-  "rich",
-  "rignore",
-  "textcase",
-  "tiktoken",
   "tokenizers",
-  "tomli-w",
-  "typing_extensions",
-  "uuid7; python_version < '3.14'",
-  "uvicorn[standard]",
-  "voyageai",
-  "watchfiles",
 ]
 recommended-local-only = [
-  "aenum",
-  "ast-grep-py",
-  "cyclopts",
-  "py-cpuinfo",
   "fastembed",
-  "fastmcp",
-  "mcp",
-  "numpy",
-  "posthog",
-  "pydantic-graph",
-  "pydantic-settings[toml,yaml]",
-  "pydantic",
-  "qdrant-client",
-  "rich",
-  "rignore",
-  "textcase",
-  "tiktoken",
-  "tokenizers",
-  "tomli-w",
-  "typing-extensions",
-  "uuid7; python_version < '3.14'",
-  "uvicorn[standard]",
-  "watchfiles",
-]
-recommended-no-telemetry = [
-  "aenum",
-  "ast-grep-py",
-  "cyclopts",
   "py-cpuinfo",
-  "fastmcp",
-  "mcp",
-  "numpy",
-  "posthog",
-  "pydantic-ai",
-  "pydantic-graph",
-  "pydantic-settings[toml,yaml]",
-  "pydantic",
-  "qdrant-client",
-  "rich",
-  "rignore",
-  "textcase",
-  "tiktoken",
+  "sentence-transformers",
   "tokenizers",
-  "tomli-w",
-  "typing-extensions",
-  "uuid7; python_version < '3.14'",
-  "uvicorn",
-  "voyageai",
-  "watchfiles",
-]
-# =================  A-La-Carte =================
-# Pick and choose what you want. You need:
-# 1. The `required-core` dependencies
-# 2. At least one provider for embedding generation (e.g. `provider-openai`)
-#      - If that provider is `provider-fastembed` or `provider-voyage` you also need to include
-#         any provider that uses pydantic-ai, like `provider-huggingface` or `provider-openai` or `provider-anthropic`
-# 3. At least one vector store provider (e.g. `provider-qdrant`)
-# **strongly recommended:**
-#    - `provider-filesystem` -- without it, you'll need to manually initiate indexing and handle file changes yourself
-#    - One agent-capable provider (e.g. `provider-openai`)
-#        We use agents to significantly improve results when you give us the necessary information (model, API key, installed client)
-#        We can do that without it, but we *can't do it outside of an MCP request*, such as for our `precontext` feature
-# Example install:
-#    `uv pip install 'codeweaver-mcp[required-core,provider-openai,provider-qdrant,source-filesystem]'`
-#    `uv pip install 'codeweaver-mcp[required-core,pre-context,provider-anthropic,provider-voyage,provider-qdrant]'`
-required-core = [
-  "aenum",
-  "ast-grep-py",
-  "fastmcp",
-  "mcp",
-  "numpy",
-  "pydantic-graph",
-  "pydantic-settings[toml,yaml]",
-  "pydantic",
-  "rignore",
-  "textcase",
-  "tiktoken",
-  "typing-extensions",
-  "uuid7; python_version < '3.14'",
-  "uvicorn[standard]",
-  "watchfiles",
 ]
 # ==== Data Sources ====
 source-duckduckgo = ["pydantic-ai-slim[duckduckgo]"]
@@ -409,55 +251,15 @@ dev = [
   "types-boto3-custom",
   "uv>=0.9.5",
 ]
-all-dev = [
-  "black",
-  "copychat",
-  "dirty-equals",
-  "hatchling",
-  "httpx",
-  "ipython",
-  "jsonlines",
-  "mkdocs",
-  "mkdocs-awesome-nav",
-  "mkdocs-gen-files",
-  "mkdocs-git-revision-date-localized-plugin",
-  "mkdocs-material",
-  "mkdocs-minify-plugin",
-  "mkdocs-redirects",
-  "mkdocs-rss-plugin",
-  "mkdocstrings[python]",
-  "mteb",
-  "pdbpp",
-  "py-cpuinfo",
-  "pydantic",
-  "pydantic-ai",
-  "pygments",
-  "pymdown-extensions",
-  "pyperclip",
-  "pyright",
-  "pytest",
-  "pytest-asyncio",
-  "pytest-cov",
-  "pytest-env",
-  "pytest-flakefinder",
-  "pytest-httpx",
-  "pytest-mock",
-  "pytest-report",
-  "pytest-timeout",
-  "ruff",
-  "superclaude",
-  "twine",
-  "types-boto3-custom",
-  "uv",
-  "uv-dynamic-versioning",
-]
 build = ["hatchling>=1.27.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.11.2"]
 docs = [
   "mkdocs>=1.6.1",
   "mkdocs-awesome-nav>=3.2.0",
   "mkdocs-gen-files>=0.5.0",
-  "mkdocs-git-revision-date-localized-plugin>=1.4.7",
-  "mkdocs-material>=9.6.22",
+  "mkdocs-git-revision-date-localized-plugin>=1.5.0",
+  # TODO: Add llms-txt to mkdocs.yml
+  "mkdocs-llmstxt>=0.4.0",
+  "mkdocs-material>=9.6.23",
   "mkdocs-minify-plugin>=0.8.0",
   "mkdocs-redirects>=1.2.2",
   "mkdocs-rss-plugin>=1.17.4",
@@ -467,12 +269,12 @@ docs = [
 ]
 test = [
   "dirty-equals>=0.10.0",
-  "httpx>=0.28.1",
   "pdbpp>=0.11.7",
   "pytest>=8.4.2",
   "pytest-asyncio>=1.2.0",
   "pytest-cov>=7.0.0",
   "pytest-env>=1.2.0",
+  "pytest-examples>=0.0.18",
   "pytest-flakefinder>=1.1.0",
   "pytest-httpx>=0.35.0",
   "pytest-mock>=3.15.1",
@@ -504,6 +306,7 @@ __all__ = ("__version__",)
 [tool.hatch.build.targets.wheel]
 artifacts = ["*.so", "src/**"]
 packages = ["src/codeweaver"]
+include = ["node_types/**", "typings/**", "vendored/**"]
 
 [tool.hatch.build.targets.sdist]
 include = [

@@ -6,6 +6,7 @@
 
 from typing import Any, Literal
 
+from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities import dependency_map, load_default_capabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider
@@ -69,7 +70,30 @@ def get_rerank_model_provider(provider: Provider) -> type[RerankingProvider[Any]
         )
 
         return SentenceTransformersRerankingProvider
-    raise ValueError(f"Unknown reranking provider: {provider}")
+
+    # Get list of supported reranking providers dynamically
+    supported_providers = [
+        p.value for p in [
+            Provider.VOYAGE,
+            Provider.COHERE,
+            Provider.BEDROCK,
+            Provider.FASTEMBED,
+            Provider.SENTENCE_TRANSFORMERS,
+        ]
+    ]
+
+    raise ConfigurationError(
+        f"Unknown reranking provider: {provider}",
+        details={
+            "provided_provider": str(provider),
+            "supported_providers": supported_providers,
+        },
+        suggestions=[
+            "Check provider name spelling in configuration",
+            "Install required reranking provider package",
+            "Review available providers in documentation",
+        ],
+    )
 
 
 __all__ = (

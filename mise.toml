@@ -95,7 +95,7 @@ depends = ["source"]
 run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Updating dependencies..."
-uv sync --extra all --group all-dev -U
+uv sync --extra all --group dev --group docs --group build --group test -U
 '''
 
 [tasks.source]

@@ -9,6 +9,8 @@ from typing import cast
 
 from pydantic import PositiveInt
 
+from codeweaver.exceptions import ConfigurationError
+
 
 def resolve_dimensions() -> PositiveInt:
     """Resolves embedding dimensions based on model capabilities and model settings. **Only applies to dense embeddings.**."""
@@ -23,7 +25,17 @@ def resolve_dimensions() -> PositiveInt:
         (capabilities[0] if isinstance(capabilities, tuple) else capabilities),
     )
     if not model_capabilities:
-        raise ValueError("No embedding model configured.")
+        raise ConfigurationError(
+            "Embedding model not configured for vector store",
+            details={
+                "component": "vector_store",
+            },
+            suggestions=[
+                "Set embedding model in configuration",
+                "Ensure EMBEDDING_MODEL environment variable is set",
+                "Check embedding provider is properly initialized",
+            ],
+        )
     if (
         (model_settings := get_settings_map()["embedding"].get("model_settings", {}))
         and (dimension := model_settings.get("dimension"))
