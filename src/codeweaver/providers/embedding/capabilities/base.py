@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, NotRequired, Required, Self, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Self
 
 from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
 
@@ -14,70 +14,8 @@ from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
 from codeweaver.providers.provider import Provider
 
 
-class EmbeddingSettingsDict(TypedDict, total=False):
-    """A dictionary representing the settings for an embedding client, embedding model, and the embedding call itself. If any."""
-
-    client_options: dict[str, Any]
-    model_kwargs: dict[str, Any]
-    call_kwargs: dict[str, Any]
-
-
-type PartialCapabilities = dict[
-    Literal[
-        "context_window",
-        "custom_document_prompt",
-        "custom_query_prompt",
-        "default_dimension",
-        "default_dtype",
-        "other",
-        "is_normalized",
-        "hf_name",
-        "name",
-        "output_dimensions",
-        "output_dtypes",
-        "preferred_metrics",
-        "provider",
-        "supports_context_chunk_embedding",
-        "supports_custom_prompts",
-        "tokenizer",
-        "tokenizer_model",
-        "version",
-    ],
-    Literal[
-        "tokenizers", "tiktoken", "dot", "cosine", "euclidean", "manhattan", "hamming", "chebyshev"
-    ]
-    | str
-    | PositiveInt
-    | PositiveFloat
-    | bool
-    | Provider
-    | None
-    | dict[str, Any]
-    | tuple[str, ...]
-    | tuple[PositiveInt, ...],
-]
-
-
-class EmbeddingCapabilities(TypedDict, total=False):
-    """Describes the capabilities of an embedding model, such as the default dimension."""
-
-    name: Required[str]
-    provider: Required[Provider]
-    version: NotRequired[str | int | None]
-    default_dimension: NotRequired[PositiveInt]
-    output_dimensions: NotRequired[tuple[PositiveInt, ...] | None]
-    default_dtype: NotRequired[str | None]
-    output_dtypes: NotRequired[tuple[str, ...] | None]
-    is_normalized: NotRequired[bool]
-    context_window: NotRequired[PositiveInt]
-    supports_context_chunk_embedding: NotRequired[bool]
-    tokenizer: NotRequired[Literal["tokenizers", "tiktoken"]]
-    tokenizer_model: NotRequired[str]
-    preferred_metrics: NotRequired[
-        tuple[Literal["dot", "cosine", "euclidean", "manhattan", "hamming", "chebyshev"], ...]
-    ]
-    hf_name: NotRequired[str]
-    other: NotRequired[dict[str, Any]]
+if TYPE_CHECKING:
+    from codeweaver.providers.embedding.capabilities.types import EmbeddingCapabilities
 
 
 class EmbeddingModelCapabilities(BasedModel):
@@ -93,7 +31,7 @@ class EmbeddingModelCapabilities(BasedModel):
         Field(
             description="""The provider of the model. Since available settings vary across providers, each capabilities instance is tied to a provider."""
         ),
-    ] = Provider.UNSET  # type: ignore
+    ] = Provider.NOT_SET
     version: Annotated[
         str | PositiveInt | PositiveFloat | None,
         Field(
@@ -156,7 +94,7 @@ class EmbeddingModelCapabilities(BasedModel):
             description="""The Hugging Face model name, if it applies *and* is different from the model name. Currently only applies to some models from `fastembed` and `ollama`"""
         ),
     ] = None
-    other: Annotated[dict[str, Any], Field(description="""Extra model-specific settings.""")] = {}
+    other: Annotated[dict[str, Any], Field(description="""Extra model-specific settings.""")] = {}  # noqa: RUF012
     _available: Annotated[
         bool,
         Field(
@@ -212,7 +150,7 @@ class SparseEmbeddingModelCapabilities(BasedModel):
     name: Annotated[str, Field(description="""The name of the model.""")]
     multilingual: bool = False
     provider: Annotated[
-        Literal[Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS, Provider.UNSET],  # pyright: ignore[reportPrivateUsage]
+        Literal[Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS, Provider.NOT_SET],  # pyright: ignore[reportPrivateUsage]
         Field(
             description="""The provider of the model. We currently only support local providers for sparse embeddings. Since Sparse embedding tend to be very efficient and low resource, they are well-suited for deployment in resource-constrained environments."""
         ),
@@ -221,7 +159,7 @@ class SparseEmbeddingModelCapabilities(BasedModel):
         if HAS_FASTEMBED
         else Provider.SENTENCE_TRANSFORMERS
         if HAS_ST
-        else Provider.UNSET  # pyright: ignore[reportPrivateUsage]
+        else Provider.NOT_SET  # pyright: ignore[reportPrivateUsage]
     )
     hf_name: Annotated[
         str | None,
@@ -309,10 +247,4 @@ def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:
     return fastembed_caps + st_caps
 
 
-__all__ = (
-    "EmbeddingCapabilities",
-    "EmbeddingModelCapabilities",
-    "PartialCapabilities",
-    "SparseEmbeddingModelCapabilities",
-    "get_sparse_caps",
-)
+__all__ = ("EmbeddingModelCapabilities", "SparseEmbeddingModelCapabilities", "get_sparse_caps")

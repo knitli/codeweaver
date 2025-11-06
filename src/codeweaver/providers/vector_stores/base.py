@@ -6,18 +6,24 @@
 
 from __future__ import annotations
 
+import logging
 import threading
+import time
 
 from abc import ABC, abstractmethod
+from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypedDict
 
-from pydantic import UUID4, ConfigDict
+from pydantic import UUID7, ConfigDict, PrivateAttr
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 from typing_extensions import TypeIs
 
-from codeweaver.core.chunks import CodeChunk, SearchResult
+from codeweaver.agent_api.find_code.types import StrategizedQuery
+from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.models import BasedModel
 from codeweaver.engine.filter import Filter
+from codeweaver.exceptions import ProviderError
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
@@ -26,71 +32,61 @@ from codeweaver.providers.provider import Provider
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.types import CodeWeaverSettingsDict
-    from codeweaver.core.types.dictview import DictView
+    from codeweaver.agent_api.find_code.results import SearchResult
 
 
-def _get_settings() -> DictView[CodeWeaverSettingsDict]:
-    """Get global CodeWeaver settings.
+logger = logging.getLogger(__name__)
 
-    Returns:
-        Global settings as a dictionary view.
-    """
-    from codeweaver.config.settings import get_settings_map
-
-    return get_settings_map()
+type MixedQueryInput = (
+    list[float] | list[int] | dict[Literal["dense", "sparse"], list[float] | list[int] | Any]
+)
 
 
-def _assemble_caps() -> dict[
-    Literal["dense", "sparse"],
-    list[EmbeddingModelCapabilities] | list[SparseEmbeddingModelCapabilities],
-]:
-    """Assemble embedding model capabilities from settings.
-
-    Returns:
-        EmbeddingModelCapabilities instance or None if not configured.
-    """
-    from codeweaver.common.registry import get_model_registry
-
-    settings_map: dict[Literal["dense", "sparse"], list[dict[str, Any]]] = {
-        "dense": [],
-        "sparse": [],
-    }
-    settings_map["dense"].extend(
-        model.get("model_settings") for model in _get_settings()["provider"]["embedding"]
-    )
-
-    settings_map["sparse"].extend(
-        model.get("sparse_model_settings") for model in _get_settings()["provider"]["embedding"]
-    )
-
-    embedding_caps: list[EmbeddingModelCapabilities] = (
-        [
-            cap
-            for cap in get_model_registry().list_embedding_models()
-            if cap.name in {config.name for config in settings_map["dense"]}
-        ]
-        if settings_map["dense"]
-        else []
-    )
-    sparse_caps: list[SparseEmbeddingModelCapabilities] = (
-        [
-            cap
-            for cap in get_model_registry().list_sparse_embedding_models()
-            if cap.name in {config.name for config in settings_map["sparse"]}
-        ]
-        if settings_map["sparse"]
-        else []
-    )
-    if embedding_caps or sparse_caps:
-        return {"dense": embedding_caps, "sparse": sparse_caps}
-    raise RuntimeError(
-        "No embedding model capabilities found in settings. We can't store vectors without embeddings."
-    )
+class EmbeddingCapsDict(TypedDict):
+    dense: EmbeddingModelCapabilities | None
+    sparse: SparseEmbeddingModelCapabilities | None
 
 
 # Lock for thread-safe initialization of class-level embedding capabilities
 _embedding_caps_lock = threading.Lock()
+
+
+class CircuitBreakerState(Enum):
+    """Circuit breaker states for provider resilience."""
+
+    CLOSED = "closed"  # Normal operation
+    OPEN = "open"  # Failing, rejecting requests
+    HALF_OPEN = "half_open"  # Testing if service recovered
+
+
+class CircuitBreakerOpenError(Exception):
+    """Raised when circuit breaker is open and rejecting requests."""
+
+
+def _get_caps(
+    *, sparse: bool = False
+) -> EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities | None:
+    """Get embedding capabilities for in-memory provider.
+
+    Args:
+        sparse: Whether to get sparse embedding capabilities.
+
+    Returns:
+        Embedding capabilities or None.
+    """
+    from codeweaver.common.registry import get_model_registry
+
+    registry = get_model_registry()
+    if sparse and (sparse_settings := registry.configured_models_for_kind(kind="sparse_embedding")):
+        return sparse_settings[0] if isinstance(sparse_settings, tuple) else sparse_settings  # type: ignore
+    if not sparse and (dense_settings := registry.configured_models_for_kind(kind="embedding")):
+        return dense_settings[0] if isinstance(dense_settings, tuple) else dense_settings  # type: ignore
+    return None
+
+
+def _default_embedding_caps() -> EmbeddingCapsDict:
+    """Default factory for embedding capabilities. Evaluated lazily at instance creation."""
+    return EmbeddingCapsDict(dense=_get_caps(), sparse=_get_caps(sparse=True))
 
 
 class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
@@ -98,20 +94,40 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
 
     model_config = BasedModel.model_config | ConfigDict(extra="allow")
 
+    config: Any = None  # Provider-specific configuration object
     _client: VectorStoreClient | None
-    _provider: Provider
+    _embedding_caps: EmbeddingCapsDict = PrivateAttr(default_factory=_default_embedding_caps)
 
-    def __init__(self, **data: Any) -> None:
+    _provider: ClassVar[Provider] = Provider.NOT_SET
+
+    # Circuit breaker state tracking
+    _circuit_state: CircuitBreakerState = CircuitBreakerState.CLOSED
+    _failure_count: int = 0
+    _last_failure_time: float | None = None
+    _circuit_open_duration: float = 30.0  # seconds
+
+    def __init__(
+        self,
+        config: Any = None,
+        client: VectorStoreClient | None = None,
+        embedding_caps: EmbeddingCapsDict | None = None,
+        **kwargs: Any,
+    ) -> None:
         """Initialize the vector store provider with embedding capabilities."""
-        super().__init__(**data)
-        # Initialize embedding caps on first instance creation if not already set at class level
-        # Use double-checked locking pattern for thread safety
-        if not hasattr(type(self), "_embedding_caps_initialized"):
-            with _embedding_caps_lock:
-                # Double-check after acquiring lock to avoid race condition
-                if not hasattr(type(self), "_embedding_caps_initialized"):
-                    type(self)._embedding_caps = _assemble_caps()
-                    type(self)._embedding_caps_initialized = True
+        # Pass parameters to Pydantic's __init__
+        init_data: dict[str, Any] = {**kwargs}
+        if config is not None:
+            init_data["config"] = config
+        if client is not None:
+            init_data["_client"] = client
+        if embedding_caps is not None:
+            init_data["_embedding_caps"] = embedding_caps
+        super().__init__(**init_data)
+
+        # Initialize circuit breaker state
+        self._circuit_state = CircuitBreakerState.CLOSED
+        self._failure_count = 0
+        self._last_failure_time = None
 
     async def _initialize(self) -> None:
         """Initialize the vector store provider.
@@ -133,7 +149,18 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
     def client(self) -> VectorStoreClient:
         """Returns the vector store client instance."""
         if not self._ensure_client(self._client):
-            raise RuntimeError("Vector store client is not initialized.")
+            raise ProviderError(
+                "Vector store client not initialized",
+                details={
+                    "provider": self._provider.value if hasattr(self, "_provider") else "unknown",
+                    "client_type": type(self).__name__,
+                },
+                suggestions=[
+                    "Ensure initialize() method was called before use",
+                    "Check vector store configuration is valid",
+                    "Verify required dependencies are installed",
+                ],
+            )
         return self._client
 
     @property
@@ -163,6 +190,64 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         """
         return None
 
+    def _check_circuit_breaker(self) -> None:
+        """Check circuit breaker state before making API calls.
+
+        Raises:
+            CircuitBreakerOpenError: If circuit breaker is open.
+        """
+        current_time = time.time()
+
+        if self._circuit_state == CircuitBreakerState.OPEN:
+            if (
+                self._last_failure_time
+                and (current_time - self._last_failure_time) > self._circuit_open_duration
+            ):
+                # Transition to half-open to test recovery
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.info(
+                    "Circuit breaker transitioning to half-open state for %s", self._provider
+                )
+                self._circuit_state = CircuitBreakerState.HALF_OPEN
+            else:
+                raise CircuitBreakerOpenError(
+                    f"Circuit breaker is open for {self._provider}. Failing fast."
+                )
+
+    def _record_success(self) -> None:
+        """Record successful API call and reset circuit breaker if needed."""
+        if self._circuit_state in (CircuitBreakerState.HALF_OPEN, CircuitBreakerState.OPEN):
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.info("Circuit breaker closing for %s after successful operation", self._provider)
+        self._circuit_state = CircuitBreakerState.CLOSED
+        self._failure_count = 0
+        self._last_failure_time = None
+
+    def _record_failure(self) -> None:
+        """Record failed API call and update circuit breaker state."""
+        self._failure_count += 1
+        self._last_failure_time = time.time()
+
+        if self._failure_count >= 3:  # 3 failures threshold as per spec FR-008a
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                "Circuit breaker opening for %s after %d consecutive failures",
+                self._provider,
+                self._failure_count,
+            )
+            self._circuit_state = CircuitBreakerState.OPEN
+
+    @property
+    def circuit_breaker_state(self) -> str:
+        """Get current circuit breaker state for health monitoring."""
+        return self._circuit_state.value
+
     @abstractmethod
     async def list_collections(self) -> list[str] | None:
         """List all collections in the vector store.
@@ -176,23 +261,91 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
             ProviderError: Provider-specific operation failure.
         """
 
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=1, min=1, max=16),  # 1s, 2s, 4s, 8s, 16s
+        retry=retry_if_exception_type((ConnectionError, TimeoutError, OSError)),
+        reraise=True,
+    )
+    async def _search_with_retry(
+        self,
+        vector: list[float] | dict[str, list[float] | Any],
+        query_filter: Filter | None = None,
+        context: Any = None,
+    ) -> list[SearchResult]:
+        """Wrapper around search with retry logic and circuit breaker."""
+        from codeweaver.common.logging import log_to_client_or_fallback
+
+        self._check_circuit_breaker()
+
+        try:
+            result = await self.search(vector, query_filter)
+            self._record_success()
+
+            await log_to_client_or_fallback(
+                context,
+                "debug",
+                {
+                    "msg": "Vector store search successful",
+                    "extra": {"provider": self._provider.value, "results_count": len(result)},
+                },
+            )
+        except (ConnectionError, TimeoutError, OSError) as e:
+            self._record_failure()
+
+            await log_to_client_or_fallback(
+                context,
+                "warning",
+                {
+                    "msg": "Vector store search failed",
+                    "extra": {
+                        "provider": self._provider.value,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "attempt": self._failure_count,
+                        "max_attempts": 5,
+                    },
+                },
+            )
+            raise
+        except Exception as e:
+            await log_to_client_or_fallback(
+                context,
+                "error",
+                {
+                    "msg": "Non-retryable error in vector store search",
+                    "extra": {
+                        "provider": self._provider.value,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                    },
+                },
+            )
+            raise
+        else:
+            return result
+
     @abstractmethod
     async def search(
-        self, vector: list[float] | dict[str, list[float] | Any], query_filter: Filter | None = None
+        self, vector: StrategizedQuery | MixedQueryInput, query_filter: Filter | None = None
     ) -> list[SearchResult]:
         """Search for similar vectors using query vector(s).
 
-        Supports both dense-only and hybrid search:
-        - Dense only: Pass a list[float] for the query vector
-        - Hybrid: Pass a dict with named vectors like {"dense": [...], "sparse": {...}}
+        Supports both dense-only and hybrid search.
 
         Args:
-            vector: Query vector (single dense vector or dict of named vectors for hybrid search).
-                For hybrid search, the dict can contain:
-                - "dense": list[float] - Dense embedding vector
-                - "sparse": dict with "indices" and "values" keys - Sparse embedding
+            vector: Preferred input is a StrategizedQuery object containing:
+                - query: Original query string (for logging/metadata/tracking)
+                - dense: Dense embedding vector (list of floats or ints) or None
+                - sparse: Sparse embedding vector (list of floats/ints) or None
+                - strategy: Search strategy to use (DENSE_ONLY, SPARSE_ONLY, HYBRID_SEARCH)
+
+                Alternatively, a MixedQueryInput can be provided (will be deprecated), which is any of:
+                - For dense-only: list of floats or ints
+                - For sparse-only: list of floats or ints
+                - For hybrid: dict with keys "dense" and "sparse" mapping to respective vectors
+
             query_filter: Optional filter to apply to search results.
-                Filter fields must exist in payload schema.
 
         Returns:
             List of search results sorted by relevance score (descending).
@@ -206,6 +359,74 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
             InvalidFilterError: Filter contains invalid fields or values.
             SearchError: Search operation failed.
         """
+
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=1, min=1, max=16),
+        retry=retry_if_exception_type((ConnectionError, TimeoutError, OSError)),
+        reraise=True,
+    )
+    async def _upsert_with_retry(self, chunks: list[CodeChunk], context: Any = None) -> None:
+        """Wrapper around upsert with retry logic and circuit breaker."""
+        from codeweaver.common.logging import log_to_client_or_fallback
+
+        self._check_circuit_breaker()
+
+        await log_to_client_or_fallback(
+            context,
+            "debug",
+            {
+                "msg": "Starting vector store upsert",
+                "extra": {"provider": self._provider.value, "chunks_count": len(chunks)},
+            },
+        )
+
+        try:
+            await self.upsert(chunks)
+            self._record_success()
+
+            await log_to_client_or_fallback(
+                context,
+                "debug",
+                {
+                    "msg": "Vector store upsert successful",
+                    "extra": {"provider": self._provider.value, "chunks_count": len(chunks)},
+                },
+            )
+        except (ConnectionError, TimeoutError, OSError) as e:
+            self._record_failure()
+
+            await log_to_client_or_fallback(
+                context,
+                "warning",
+                {
+                    "msg": "Vector store upsert failed",
+                    "extra": {
+                        "provider": self._provider.value,
+                        "chunks_count": len(chunks),
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "attempt": self._failure_count,
+                        "max_attempts": 5,
+                    },
+                },
+            )
+            raise
+        except Exception as e:
+            await log_to_client_or_fallback(
+                context,
+                "error",
+                {
+                    "msg": "Non-retryable error in vector store upsert",
+                    "extra": {
+                        "provider": self._provider.value,
+                        "chunks_count": len(chunks),
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                    },
+                },
+            )
+            raise
 
     @abstractmethod
     async def upsert(self, chunks: list[CodeChunk]) -> None:
@@ -249,12 +470,12 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         """
 
     @abstractmethod
-    async def delete_by_id(self, ids: list[UUID4]) -> None:
+    async def delete_by_id(self, ids: list[UUID7]) -> None:
         """Delete specific code chunks by their unique identifiers.
 
         Args:
             ids: List of chunk IDs to delete.
-                - Each ID must be valid UUID4.
+                - Each ID must be valid UUID7.
                 - Maximum 1000 IDs per batch.
 
         Raises:
@@ -283,6 +504,9 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
             - Idempotent: No error if some names don't exist.
             - Operation is atomic (all-or-nothing for batch).
         """
+
+    def _telemetry_keys(self) -> None:
+        return None
 
 
 __all__ = ("VectorStoreProvider",)

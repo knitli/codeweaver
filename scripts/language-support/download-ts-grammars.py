@@ -120,10 +120,12 @@ class TreeSitterGrammarResult:
                 response = await client.get(self.url, headers=get_request_headers())
                 _ = response.raise_for_status()
                 response_data = response.json()
-                return response_data.get("content", "")
         except httpx.HTTPError as e:
             console.print(f"[red]Failed to fetch node types for {self.language.value}:[/red] {e}")
             return None
+
+        else:
+            return response_data.get("content", "")
 
     async def get_grammar_file(self) -> str:
         """Returns the grammar file content."""
@@ -150,11 +152,13 @@ class TreeSitterGrammarResult:
                         return content
                     else:
                         return decoded_content
-                return content
         except httpx.HTTPStatusError as e:
             raise GrammarRetrievalError(
                 f"Failed to retrieve grammar file from {self.url}: {e}"
             ) from e
+
+        else:
+            return content
 
     async def save(
         self, content: str | bytes | None = None, save_dir: Path = GRAMMAR_SAVE_DIR
@@ -535,6 +539,7 @@ class AstGrepSupportedLanguage(Enum):
                 # everything else
                 case _:
                     return cls.__members__[normalized_value.upper()]
+
         except KeyError as e:
             # __members__ raises KeyError on missing item
             raise ValueError(f"{value} is not a valid AstGrepSupportedLanguage.") from e

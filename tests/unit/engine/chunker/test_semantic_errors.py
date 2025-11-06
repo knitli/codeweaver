@@ -17,7 +17,6 @@ the corresponding implementation is complete.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
@@ -29,9 +28,6 @@ from codeweaver.engine.chunker.exceptions import (
     ParseError,
 )
 
-
-if TYPE_CHECKING:
-    from pytest import MonkeyPatch
 
 pytestmark = [pytest.mark.unit]
 
@@ -81,7 +77,7 @@ class TestParseErrors:
 
         discovered_file = DiscoveredFile.from_path(malformed_file)
         with pytest.raises(ParseError) as exc_info:
-            chunker.chunk(content, file=discovered_file)
+            _ = chunker.chunk(content, file=discovered_file)
 
         # Verify error details
         error = exc_info.value
@@ -118,6 +114,7 @@ class TestParseErrors:
 class TestASTDepthErrors:
     """Tests for AST depth limit enforcement."""
 
+    @pytest.mark.slow
     def test_ast_depth_exceeded_error(self, mock_governor: MagicMock) -> None:
         """Verify that deeply nested code raises ASTDepthExceededError.
 
@@ -141,7 +138,7 @@ class TestASTDepthErrors:
 
         discovered_file = DiscoveredFile.from_path(deep_file)
         with pytest.raises(ASTDepthExceededError) as exc_info:
-            chunker.chunk(content, file=discovered_file)
+            _ = chunker.chunk(content, file=discovered_file)
 
         # Verify error details
         error = exc_info.value
@@ -150,6 +147,7 @@ class TestASTDepthErrors:
         assert error.actual_depth > error.max_depth, "Actual depth must exceed limit"
         assert error.file_path == str(deep_file), "Error should track file path"
 
+    @pytest.mark.slow
     def test_ast_depth_error_message_descriptive(self, mock_governor: MagicMock) -> None:
         """Verify that AST depth error messages are clear and actionable.
 
@@ -167,7 +165,7 @@ class TestASTDepthErrors:
 
         discovered_file = DiscoveredFile.from_path(deep_file)
         with pytest.raises(ASTDepthExceededError) as exc_info:
-            chunker.chunk(content, file=discovered_file)
+            _ = chunker.chunk(content, file=discovered_file)
 
         error = exc_info.value
         error_msg = str(error)
@@ -181,7 +179,10 @@ class TestTimeoutErrors:
     """Tests for chunking timeout enforcement."""
 
     def test_timeout_exceeded(
-        self, mock_governor: MagicMock, monkeypatch: MonkeyPatch, discovered_sample_python_file
+        self,
+        mock_governor: MagicMock,
+        monkeypatch: pytest.MonkeyPatch,
+        discovered_sample_python_file,
     ) -> None:
         """Verify that slow operations raise ChunkingTimeoutError.
 
@@ -208,9 +209,7 @@ class TestTimeoutErrors:
         def mock_time():
             call_count[0] += 1
             # First call sets start time, subsequent calls show elapsed time
-            if call_count[0] == 1:
-                return start_time
-            return start_time + elapsed_time
+            return start_time if call_count[0] == 1 else start_time + elapsed_time
 
         monkeypatch.setattr(time, "time", mock_time)
 

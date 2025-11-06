@@ -17,6 +17,11 @@ on:
 jobs:
   # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot.
   copilot-setup-steps:
+    env:
+      MISE_EXPERIMENTAL: true
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
+      VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
     runs-on: ubuntu-latest
     # Set the permissions to the lowest permissions possible needed for your steps.
     # Copilot will be given its own token for its operations.
@@ -28,51 +33,37 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - uses: jdx/mise-action@fcec31d82eb5c88cd7eb3fe3c270cb093aeeef18
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y zsh curl git
       - name: Setup Mise
         run: |
           current_dir="$(pwd)"
-          if [[ "$current_dir" != *codeweaver-mcp ]]; then
+          subdirs="$(ls -d */ 2>/dev/null || echo '')"
+          if [[ "$current_dir" != *codeweaver-mcp && "$current_dir" =~ $subdirs ]]; then
             cd codeweaver-mcp
           fi
-          chmod -R +x scripts
-          sudo apt-get update && sudo apt-get install -y zsh curl git
-          # Install mise - the script may show help and exit with code 2, which is expected
-          ./scripts/dev-env/install-mise.sh version || true
-          year="$(date +%Y)"
-          last_year="$((year - 1))"
-          # Find mise binary with corrected pattern matching
-          # In some temporary environments, the mise binary might be in ~/.cache/mise/
-          cache_files="$(find "$HOME/.cache/mise/" -maxdepth 1 -minddepth 1 -type f -name 'mise-*' 2>/dev/null || echo '')"
-          if [[ "$cache_files" == *mise-$year* ]]; then
-            mise_bin="$(find "$HOME/.cache/mise/" -maxdepth 1 -minddepth 1 -type f -name "mise-$year*" 2>/dev/null | head -1)"
-          elif [[ "$cache_files" == *mise-$last_year* ]]; then
-            mise_bin="$(find "$HOME/.cache/mise/" -maxdepth 1 -minddepth 1 -type f -name "mise-$last_year*" 2>/dev/null | head -1)"
-          else
-            mise_bin="$(which mise 2>/dev/null)"
-            mise_bin="${mise_bin:-"$HOME/.local/bin/mise"}"
-          fi
-          if [[ ! -f "$mise_bin" ]]; then
-            echo "ERROR: Could not find mise binary"
-            exit 1
-          fi
-          MISE="${mise_bin}"
-
-          echo "Using mise binary: $MISE"
-          "$MISE" version
-
-          # Trust the mise configuration
-          "$MISE" -yq trust
-
-          # Try to install tools, but don't fail if network issues occur
-          echo "Installing mise tools (allowing failures due to network limitations)..."
-          if ! "$MISE" -yq install 2>/dev/null; then
-            echo "Warning: Some tools failed to install due to network limitations in CI environment"
-          fi
-
-          # Activate mise environment for this session
-          echo "Activating mise environment..."
+          echo "Mise setup in directory: $(pwd)"
+          export MISE="$(which mise)"
+          export MISE_DIR="$(dirname "$MISE")"
           eval "$("$MISE" activate bash)" || echo "Warning: mise activate had issues, but continuing"
-
-          echo "Mise setup completed"
+          "$MISE" --quiet -y trust
+          "$MISE" --quiet -y install 2>&1 || echo "Warning: Some tools failed to install due to network limitations in CI environment"
         env:
-          MISE: ${{ vars.MISE }}
+          MISE_DIR: ${{ runner.temp }}/mise
+      - name: Configure Mise and Activate Environment
+        run: |
+          chmod -R +x scripts
+          echo "Setting up mise..."
+          # Trust the mise configuration
+          "$MISE" --quiet -y run setup &>/dev/null || echo "Warning: mise setup had issues, but continuing"
+          echo "Mise setup completed"
+      - name: Cache Dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/mise
+          key: ${{ runner.os }}-build-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-build-

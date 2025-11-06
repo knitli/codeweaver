@@ -1,5 +1,9 @@
+#!/usr/bin/env -S uv run -s
+# ///script
+# python-version: ">=3.11"
+# dependencies: "pydantic"
+# ///
 # sourcery skip: name-type-suffix, no-complex-if-expressions
-#!/usr/bin/env python3
 """Analyze grammar structure patterns across all supported languages.
 
 This script extracts and categorizes structural patterns from node_types.json
@@ -14,9 +18,11 @@ from __future__ import annotations
 import json
 
 from collections import Counter, defaultdict
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from pydantic import Field
+from pydantic.dataclasses import dataclass
 
 from codeweaver.core.language import SemanticSearchLanguage
 
@@ -31,36 +37,36 @@ class GrammarStructureStats:
     unnamed_nodes: int = 0
 
     # Abstract type patterns
-    abstract_types: dict[str, list[str]] = field(default_factory=dict)
+    abstract_types: dict[str, list[str]] = Field(default_factory=dict)
     abstract_type_count: int = 0
 
     # Field patterns
     nodes_with_fields: int = 0
-    common_field_names: Counter[str] = field(default_factory=Counter)
-    field_semantic_roles: dict[str, list[str]] = field(default_factory=lambda: defaultdict(list))
+    common_field_names: Counter[str] = Field(default_factory=Counter)
+    field_semantic_roles: dict[str, list[str]] = Field(default_factory=lambda: defaultdict(list))
 
     # Children patterns
     nodes_with_children: int = 0
     nodes_with_both: int = 0  # both fields and children
 
     # Extra patterns
-    extra_nodes: list[str] = field(default_factory=list)
+    extra_nodes: list[str] = Field(default_factory=list)
     extra_node_count: int = 0
 
     # Root patterns
-    root_nodes: list[str] = field(default_factory=list)
+    root_nodes: list[str] = Field(default_factory=list)
 
     # Q1: Category references in connections
-    field_references: dict[str, set[str]] = field(default_factory=lambda: defaultdict(set))
-    children_references: dict[str, set[str]] = field(default_factory=lambda: defaultdict(set))
-    category_references_in_fields: Counter[str] = field(default_factory=Counter)
-    category_references_in_children: Counter[str] = field(default_factory=Counter)
-    concrete_references_in_fields: Counter[str] = field(default_factory=Counter)
-    concrete_references_in_children: Counter[str] = field(default_factory=Counter)
+    field_references: dict[str, set[str]] = Field(default_factory=lambda: defaultdict(set))
+    children_references: dict[str, set[str]] = Field(default_factory=lambda: defaultdict(set))
+    category_references_in_fields: Counter[str] = Field(default_factory=Counter)
+    category_references_in_children: Counter[str] = Field(default_factory=Counter)
+    concrete_references_in_fields: Counter[str] = Field(default_factory=Counter)
+    concrete_references_in_children: Counter[str] = Field(default_factory=Counter)
 
     # Q2: Multiple category membership
-    concrete_to_categories: dict[str, set[str]] = field(default_factory=lambda: defaultdict(set))
-    multi_category_things: dict[str, list[str]] = field(default_factory=dict)
+    concrete_to_categories: dict[str, set[str]] = Field(default_factory=lambda: defaultdict(set))
+    multi_category_things: dict[str, list[str]] = Field(default_factory=dict)
 
     def summary(self) -> str:
         """Generate summary statistics."""
@@ -193,7 +199,7 @@ class GrammarStructureAnalyzer:
             stats.nodes_with_fields += 1
             fields = node_info["fields"]
 
-            # Count field names
+            # Count Field names
             for field_name, field_info in fields.items():
                 stats.common_field_names[field_name] += 1
 
@@ -237,7 +243,7 @@ class GrammarStructureAnalyzer:
         """
         abstract_types = set(stats.abstract_types.keys())
 
-        # Analyze field references
+        # Analyze Field references
         for target_types in stats.field_references.values():
             for target_type in target_types:
                 if target_type in abstract_types:
@@ -457,7 +463,7 @@ class GrammarStructureAnalyzer:
             "",
             "### Field Semantic Patterns",
             "",
-            "Shows which semantic categories commonly use each field name:",
+            "Shows which semantic categories commonly use each Field name:",
             "",
         ])
 

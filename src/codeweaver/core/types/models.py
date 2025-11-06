@@ -184,26 +184,19 @@ class DataclassSerializationMixin:
             default_group = {
                 key: conversion.filtered(getattr(self, str(key), None))
                 for key, conversion in telemetry_keys.items()
+                if conversion != AnonymityConversion.FORBIDDEN
             }
-        data = self.dump_python(
-            round_trip=True,
-            exclude_none=True,
-            exclude_defaults=True,
-            exclude_unset=True,
-            exclude=excludes,
-        )
+        data = self.dump_python(round_trip=True, exclude_none=True, exclude=excludes)
         filtered_group: dict[str, Any] = self._telemetry_handler(data)
         return {
-            # if a key is in the filtered group, use that value
-            key: filtered_group.get(
-                key,
-                (
-                    # otherwise, if it's in the default group, use that value
-                    default_group.get(FilteredKey(cast(LiteralStringT, key)), value)
-                ),
+            key: (
+                # First priority: handler override
+                filtered_group[key]
+                if key in filtered_group
+                # Second priority: filtered conversion from telemetry_keys
+                else default_group.get(FilteredKey(cast(LiteralStringT, key)), value)
             )
             for key, value in data.items()
-            if FilteredKey(cast(LiteralStringT, key)) not in excludes
         }
 
 
@@ -235,7 +228,6 @@ def generate_field_title(name: str, info: FieldInfo | ComputedFieldInfo) -> str:
 DATACLASS_CONFIG = ConfigDict(
     arbitrary_types_allowed=True,
     cache_strings="keys",
-    defer_build=True,
     field_title_generator=generate_field_title,
     model_title_generator=generate_title,
     serialize_by_alias=True,
@@ -314,6 +306,43 @@ class BasedModel(BaseModel):
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
         """Get telemetry keys for the dataclass."""
         raise NotImplementedError("Subclasses must implement _telemetry_keys method.")
+
+    def _telemetry_handler(self, _serialized_self: dict[str, Any], /) -> dict[str, Any]:
+        """An optional handler for subclasses to modify telemetry serialization. By default, it returns an empty dict.
+
+        We use any returned keys as overrides for the serialized_self.
+        """
+        return {}
+
+    def serialize_for_telemetry(self) -> dict[str, Any]:
+        """Serialize the model for telemetry output, filtering sensitive keys."""
+        from codeweaver.core.types.enum import AnonymityConversion
+
+        excludes: set[str] = set()
+        default_group: dict[FilteredKeyT, Any] = {}
+        if telemetry_keys := (self._telemetry_keys() or {}):
+            excludes = {
+                str(key)
+                for key, conversion in telemetry_keys.items()
+                if conversion == AnonymityConversion.FORBIDDEN
+            }
+            default_group = {
+                key: conversion.filtered(getattr(self, str(key), None))
+                for key, conversion in telemetry_keys.items()
+                if conversion != AnonymityConversion.FORBIDDEN
+            }
+        data = self.model_dump(round_trip=True, exclude_none=True, exclude=excludes)
+        filtered_group: dict[str, Any] = self._telemetry_handler(data)
+        return {
+            key: (
+                # First priority: handler override
+                filtered_group[key]
+                if key in filtered_group
+                # Second priority: filtered conversion from telemetry_keys
+                else default_group.get(FilteredKey(cast(LiteralStringT, key)), value)
+            )
+            for key, value in data.items()
+        }
 
 
 __all__ = (

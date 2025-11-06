@@ -8,6 +8,7 @@
 from codeweaver.common.utils.checks import (
     file_is_binary,
     has_package,
+    is_ci,
     is_class,
     is_debug,
     is_pydantic_basemodel,
@@ -15,11 +16,9 @@ from codeweaver.common.utils.checks import (
     is_typeadapter,
 )
 from codeweaver.common.utils.git import (
-    MISSING,
-    Missing,
     get_git_branch,
     get_git_revision,
-    get_project_root,
+    get_project_path,
     in_codeweaver_clone,
     is_git_dir,
     set_relative_path,
@@ -31,24 +30,25 @@ from codeweaver.common.utils.utils import (
     ensure_iterable,
     estimate_tokens,
     get_possible_env_vars,
+    get_user_config_dir,
     rpartial,
     uuid7,
 )
 
 
 __all__ = (
-    "MISSING",
     "LazyImport",
-    "Missing",
     "ensure_iterable",
     "estimate_tokens",
     "file_is_binary",
     "get_git_branch",
     "get_git_revision",
     "get_possible_env_vars",
-    "get_project_root",
+    "get_project_path",
+    "get_user_config_dir",
     "has_package",
     "in_codeweaver_clone",
+    "is_ci",
     "is_class",
     "is_debug",
     "is_git_dir",

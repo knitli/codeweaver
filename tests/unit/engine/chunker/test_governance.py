@@ -5,6 +5,9 @@ SPDX-FileContributor: Claude Code
 SPDX-License-Identifier: MIT OR Apache-2.0
 """
 
+import contextlib
+
+
 """Tests for ResourceGovernor resource limits enforcement."""
 
 import time
@@ -15,6 +18,7 @@ import pytest
 
 from codeweaver.engine.chunker.exceptions import ChunkingTimeoutError, ChunkLimitExceededError
 from codeweaver.engine.chunker.governance import ResourceGovernor
+
 
 pytestmark = [pytest.mark.unit]
 
@@ -78,14 +82,11 @@ def test_governor_context_manager_error():
     settings = MockPerformanceSettings()
     governor = ResourceGovernor(settings)
 
-    try:
+    with contextlib.suppress(ValueError):
         with governor:
             governor.register_chunk()
             assert governor._chunk_count == 1
             raise ValueError("Test error")
-    except ValueError:
-        pass
-
     # Verify cleanup even after error
     assert governor._start_time is None
     assert governor._chunk_count == 0

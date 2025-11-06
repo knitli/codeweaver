@@ -11,14 +11,30 @@ from unittest.mock import Mock
 import pytest
 
 from codeweaver.config.chunker import ChunkerSettings, PerformanceSettings
+from codeweaver.core.chunks import CodeChunk
 from codeweaver.engine.chunker.base import ChunkGovernor
+
+# Rebuild models to resolve forward references
+# This must happen after all imports to ensure all referenced types are available
+# Import types needed for forward reference resolution
+from codeweaver.engine.chunker.delimiters import DelimiterPattern, LanguageFamily
 from codeweaver.engine.chunker.governance import ResourceGovernor
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+from codeweaver.providers.embedding.types import EmbeddingBatchInfo  # noqa: F401
 
 
-# Rebuild ChunkGovernor model to resolve forward references
-# This must happen after all imports to ensure ChunkerSettings is available
-ChunkGovernor.model_rebuild()
+# Build namespace for Pydantic to resolve string annotations
+namespace = {
+    "DelimiterPattern": DelimiterPattern,
+    "LanguageFamily": LanguageFamily,
+    "ChunkerSettings": ChunkerSettings,
+    "CodeChunk": CodeChunk,
+}
+# Ensure ChunkerSettings models are rebuilt first
+ChunkerSettings.model_rebuild()
+# Then rebuild ChunkGovernor and CodeChunk with full namespace
+ChunkGovernor.model_rebuild(_types_namespace=namespace)
+CodeChunk.model_rebuild(_types_namespace=namespace)
 
 
 @pytest.fixture

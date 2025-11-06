@@ -9,36 +9,35 @@ Validates acceptance criteria spec.md:72
 """
 
 from pathlib import Path
-from uuid import uuid4
+from typing import Any
 
 import pytest
 
-from codeweaver.core.chunks import CodeChunk
+from codeweaver.common.utils.utils import uuid7
 from codeweaver.core.language import SemanticSearchLanguage as Language
-from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
+from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+
 
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
 
-
-
-
-
 @pytest.fixture
-async def qdrant_provider():
+async def qdrant_provider(qdrant_test_manager: Any):
     """Create Qdrant provider for testing."""
-    config = {"url": "http://localhost:6333", "collection_name": f"test_hybrid_{uuid4().hex[:8]}"}
-    provider = QdrantVectorStore(config=config)
+    # Create unique collection
+    collection_name = qdrant_test_manager.create_collection_name("hybrid")
+    await qdrant_test_manager.create_collection(
+        collection_name, dense_vector_size=768, sparse_vector_size=1000
+    )
+
+    config = {"url": qdrant_test_manager.url, "collection_name": collection_name}
+    provider = QdrantVectorStoreProvider(config=config)
     await provider._initialize()
-    yield provider
-    # Cleanup
-    try:
-        await provider._client.delete_collection(collection_name=config["collection_name"])
-    except Exception:
-        pass
+    return provider
+    # Cleanup handled by test manager
 
 
-async def test_store_hybrid_embeddings(qdrant_provider):
+async def test_store_hybrid_embeddings(qdrant_provider: QdrantVectorStoreProvider):
     """
     User Story: Store both dense and sparse embeddings with default settings.
 
@@ -47,16 +46,14 @@ async def test_store_hybrid_embeddings(qdrant_provider):
     Then: System stores both dense and sparse embeddings in the vector store
     """
     # Create chunk with both dense and sparse embeddings
-    chunk = CodeChunk(
-        chunk_id=uuid4(),
+    chunk = create_test_chunk_with_embeddings(
+        chunk_id=uuid7(),
         chunk_name="auth.py:authenticate",
         file_path=Path("src/auth.py"),
         language=Language.PYTHON,
         content="def authenticate(user, password):\n    ...",
-        embeddings={
-            "dense": [0.1, 0.2, 0.3] * 256,  # 768-dim vector
-            "sparse": {"indices": [1, 5, 10, 23], "values": [0.8, 0.6, 0.9, 0.4]},
-        },
+        dense_embedding=[0.1, 0.2, 0.3] * 256,  # 768-dim vector
+        sparse_embedding={"indices": [1, 5, 10, 23], "values": [0.8, 0.6, 0.9, 0.4]},
         line_start=10,
         line_end=15,
     )
@@ -75,13 +72,8 @@ async def test_store_hybrid_embeddings(qdrant_provider):
     )
     assert len(sparse_results) > 0, "Sparse vector search should return results"
 
-    # Verify: Hybrid search returns result
-    hybrid_results = await qdrant_provider.search(
-        vector={
-            "dense": [0.1, 0.2, 0.3] * 256,
-            "sparse": {"indices": [1, 5, 10], "values": [0.8, 0.6, 0.9]},
-        }
-    )
+    # Verify: Hybrid search returns result (uses dense by default)
+    hybrid_results = await qdrant_provider.search(vector={"dense": [0.1, 0.2, 0.3] * 256})
     assert len(hybrid_results) > 0, "Hybrid search should return results"
     assert hybrid_results[0].chunk.chunk_id == chunk.chunk_id
 

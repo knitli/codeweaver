@@ -6,15 +6,15 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-from codeweaver.providers.embedding.capabilities.base import (
-    EmbeddingCapabilities,
-    EmbeddingModelCapabilities,
-    PartialCapabilities,
-)
+from codeweaver.providers.embedding.capabilities.types import EmbeddingCapabilities
 from codeweaver.providers.provider import Provider
 
+
+if TYPE_CHECKING:
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    from codeweaver.providers.embedding.capabilities.types import PartialCapabilities
 
 type NomicAiProvider = Literal[
     Provider.FASTEMBED,
@@ -121,6 +121,8 @@ ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (
 
 def get_nomic_ai_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
     """Get the capabilities for nomic-ai embedding models."""
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+
     capabilities: list[EmbeddingCapabilities] = []
     for cap in ALL_CAPABILITIES:
         capabilities.extend([

@@ -14,9 +14,6 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 
-# TODO: We got into a bad habit of not using native exception types. We need to systematically go through and improve exception handling and information.
-
-
 class CodeWeaverError(Exception):
     """Base exception for all CodeWeaver errors.
 
@@ -55,29 +52,30 @@ class CodeWeaverError(Exception):
     def __str__(self) -> str:
         """Return descriptive error message with context details."""
         # Start with base message
-        parts = [self.message]
+        parts: list[str] = [self.message]
 
         # Add important details if present
         if self.details:
-            detail_parts = []
+            detail_parts: list[str] = []
             # Include file_path if present
             if "file_path" in self.details:
                 detail_parts.append(f"file: {self.details['file_path']}")
             # Include numeric metrics if present
-            for key in [
-                "actual_depth",
-                "max_depth",
-                "actual_tokens",
-                "max_tokens",
-                "chunk_count",
-                "max_chunks",
-                "timeout_seconds",
-                "elapsed_seconds",
-                "line_number",
-            ]:
-                if key in self.details:
-                    detail_parts.append(f"{key.replace('_', ' ')}: {self.details[key]}")
-
+            detail_parts.extend(
+                f"{key.replace('_', ' ')}: {self.details[key]}"
+                for key in [
+                    "actual_depth",
+                    "max_depth",
+                    "actual_tokens",
+                    "max_tokens",
+                    "chunk_count",
+                    "max_chunks",
+                    "timeout_seconds",
+                    "elapsed_seconds",
+                    "line_number",
+                ]
+                if key in self.details
+            )
             if detail_parts:
                 parts.append(f"({', '.join(detail_parts)})")
 
@@ -129,6 +127,14 @@ class ProviderError(CodeWeaverError):
 
     Raised when there are issues with embedding providers, vector stores,
     or other external service integrations.
+    """
+
+
+class ModelSwitchError(ProviderError):
+    """Model switching detection error.
+
+    Raised when the system detects that the embedding model has changed
+    from what was used to create the existing vector store collection.
     """
 
 

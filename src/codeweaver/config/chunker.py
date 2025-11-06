@@ -7,7 +7,9 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, Self
+import logging
+
+from typing import TYPE_CHECKING, Annotated, Any, Literal, NotRequired, Self, TypedDict
 
 from pydantic import ConfigDict, Field, NonNegativeFloat, PositiveInt, model_validator
 
@@ -16,7 +18,55 @@ from codeweaver.core.metadata import ExtLangPair
 from codeweaver.core.secondary_languages import SecondarySupportedLanguage
 from codeweaver.core.types.aliases import LanguageNameT
 from codeweaver.core.types.models import FROZEN_BASEDMODEL_CONFIG, BasedModel
-from codeweaver.engine.chunker.delimiters import DelimiterPattern, LanguageFamily
+
+
+if TYPE_CHECKING:
+    from codeweaver.engine.chunker.delimiters import DelimiterPattern, LanguageFamily
+
+
+logger = logging.getLogger(__name__)
+
+
+# ===========================================================================
+# *       TypedDict Representations of Chunker and Related Settings
+# ===========================================================================
+
+
+class PerformanceSettingsDict(TypedDict, total=False):
+    """TypedDict for performance settings.
+
+    Not intended to be used directly; used for internal type checking and validation.
+    """
+
+    max_file_size_mb: NotRequired[PositiveInt | None]
+    chunk_timeout_seconds: NotRequired[PositiveInt | None]
+    parse_timeout_seconds: NotRequired[PositiveInt | None]
+    max_chunks_per_file: NotRequired[PositiveInt | None]
+    max_memory_mb_per_operation: NotRequired[PositiveInt | None]
+    max_ast_depth: NotRequired[PositiveInt | None]
+
+
+class ConcurrencySettingsDict(TypedDict, total=False):
+    """TypedDict for concurrency settings.
+
+    Not intended to be used directly; used for internal type checking and validation.
+    """
+
+    max_parallel_files: NotRequired[PositiveInt | None]
+    use_process_pool: NotRequired[bool | None]
+
+
+class ChunkerSettingsDict(TypedDict, total=False):
+    """TypedDict for Chunker settings.
+
+    Not intended to be used directly; used for internal type checking and validation.
+    """
+
+    custom_delimiters: NotRequired[list[CustomDelimiter]] | None
+    custom_languages: NotRequired[list[CustomLanguage]] | None
+    semantic_importance_threshold: NotRequired[NonNegativeFloat | None]
+    performance: NotRequired[PerformanceSettingsDict | None]
+    concurrency: NotRequired[ConcurrencySettingsDict | None]
 
 
 class CustomLanguage(BasedModel):
@@ -197,26 +247,52 @@ class ChunkerSettings(BasedModel):
     def _telemetry_keys(self) -> None:
         return None
 
-    def __init__(
-        self,
-        *,
-        custom_delimiters: list[CustomDelimiter] | None = None,
-        custom_languages: dict[LanguageNameT, LanguageFamily] | None = None,
-        **data: Any,
-    ) -> None:
-        """Initialize ChunkerSettings with optional custom delimiters."""
-        # Pass values through to super().__init__ instead of setting them directly
-        super().__init__(
-            custom_delimiters=custom_delimiters or [],
-            custom_languages=custom_languages or {},
-            **data,
-        )
+    @classmethod
+    def ensure_models_rebuilt(cls) -> None:
+        """Ensure forward references are resolved before first use.
 
+        This method must be called at module level after all class definitions
+        to resolve forward references to LanguageFamily and DelimiterPattern types
+        used in CustomLanguage and CustomDelimiter models.
+        """
+        # Import the actual types now (after module initialization)
+        from codeweaver.engine.chunker.delimiters import DelimiterPattern, LanguageFamily
+
+        # Pass the types to model_rebuild so Pydantic can resolve string annotations
+        namespace = {"DelimiterPattern": DelimiterPattern, "LanguageFamily": LanguageFamily}
+        _ = cls.model_rebuild(_types_namespace=namespace)
+        _ = CustomLanguage.model_rebuild(_types_namespace=namespace)
+        _ = CustomDelimiter.model_rebuild(_types_namespace=namespace)
+        _ = cls.model_rebuild()
+
+    def model_post_init(self, /, __context: Any) -> None:
+        """Post-initialization hook."""
+        # Model rebuild is now handled at module level, so we don't need to call it here
+        # Calling it here was causing issues with ChunkGovernor's completion status
+        super().model_post_init(__context)
+
+
+DefaultChunkerSettings = ChunkerSettingsDict(
+    custom_delimiters=None,
+    custom_languages=None,
+    semantic_importance_threshold=0.3,
+    performance={},
+    concurrency={},
+)
+
+# Resolve forward references after all model definitions are complete
+# This ensures LanguageFamily and DelimiterPattern types are properly resolved
+# See: https://docs.pydantic.dev/2.12/api/base_model/#pydantic.main.BaseModel.model_rebuild
+ChunkerSettings.ensure_models_rebuilt()
 
 __all__ = (
     "ChunkerSettings",
+    "ChunkerSettingsDict",
     "ConcurrencySettings",
+    "ConcurrencySettingsDict",
     "CustomDelimiter",
     "CustomLanguage",
+    "DefaultChunkerSettings",
     "PerformanceSettings",
+    "PerformanceSettingsDict",
 )

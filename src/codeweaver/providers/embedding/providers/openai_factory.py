@@ -20,7 +20,8 @@ from typing import Any, Self, cast
 from pydantic import AnyHttpUrl, create_model
 
 from codeweaver.core.chunks import CodeChunk
-from codeweaver.exceptions import ConfigurationError
+from codeweaver.exceptions import ConfigurationError, ProviderError
+from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 from codeweaver.providers.provider import Provider
@@ -89,7 +90,7 @@ try:
     from openai.types.create_embedding_response import CreateEmbeddingResponse
 except ImportError as _import_error:
     raise ConfigurationError(
-        'Please install the `openai` package to use the OpenAI provider, \nyou can use the `openai` optional group — `pip install "codeweaver[openai]"`'
+        'Please install the `openai` package to use the OpenAI provider, \nyou can use the `openai` optional group — `pip install "codeweaver[provider-openai]"`'
     ) from _import_error
 
 
@@ -129,27 +130,38 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
                 """
                 Initialize the embedding provider.
                 """
-                self._provider = provider
-                self._caps = caps
-                if client is not None:
-                    self._client = client
+                # 1. Prepare kwargs before calling parent
                 kwargs.setdefault("model", model_name)
                 if base_url is not None:
                     kwargs.setdefault("base_url", base_url)
                 if provider_kwargs:
                     kwargs.setdefault("provider_kwargs", provider_kwargs)
-                if self._provider == Provider.OLLAMA:
+                if provider == Provider.OLLAMA:
                     kwargs.setdefault("api_key", "ollama")
-                base.__init__(self, *args, **kwargs)
+
+                # 2. Initialize client if not provided (use nonlocal to access outer scope)
+                client_instance = client
+                if client_instance is None:
+                    from openai import AsyncOpenAI
+
+                    client_kwargs = {
+                        "api_key": kwargs.get(
+                            "api_key", "ollama" if provider == Provider.OLLAMA else None
+                        )
+                    }
+                    if base_url:
+                        client_kwargs["base_url"] = base_url
+                    client_instance = AsyncOpenAI(**client_kwargs)
+
+                # 3. Call parent __init__ FIRST with proper arguments
+                # Base class expects (client, caps, kwargs) as per line 171-176 of base.py
+                base.__init__(self, client=client_instance, caps=caps, kwargs=kwargs)
+
+                # 4. Set provider-specific attributes AFTER parent initialization
+                self._provider = provider
 
             return __init__
 
-        attrs: dict[str, Any] = {
-            "_default_model_name": model_name,
-            "_default_provider": provider,
-            "_default_base_url": base_url,
-            "_default_provider_kwargs": provider_kwargs or {},
-        }
         parent_cls = cls
         # Because this is a BaseModel, we need to set __init__ on the parent class
         # so that it's there *before* pydantic does its thing so it can account for it.
@@ -157,23 +169,32 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         parent_cls.__init__ = make_init(
             cls, model_name, provider, base_url, provider_kwargs or {}, client=client
         )
-        return create_model(
+
+        # Create the new provider class with proper field definitions
+        new_class = create_model(
             name,
             __doc__=f"An embedding provider class for {str(provider).title()}.\n\nI was proudly made in the `codeweaver.providers.embedding.providers.openai_factory` module by hardworking electrons.",
             __base__=parent_cls,
             __module__="codeweaver.providers.embedding.providers.openai_factory",
             __validators__=None,
-            __cls_kwargs__=attrs,
             _client=(AsyncOpenAI, ...),
             _provider=(Provider, provider),
             _caps=(EmbeddingModelCapabilities, capabilities),
         )
 
+        # Set metadata attributes that aren't Pydantic fields
+        new_class._default_model_name = model_name
+        new_class._default_provider = provider
+        new_class._default_base_url = base_url
+        new_class._default_provider_kwargs = provider_kwargs or {}
+
+        return new_class
+
     _client: AsyncOpenAI
     _provider: Provider
     _caps: EmbeddingModelCapabilities
 
-    def _initialize(self) -> None:
+    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """Initialize the OpenAI embedding provider."""
         self._shared_kwargs = {"model": self.model_name, "encoding_format": "float", "timeout": 30}
         self.valid_client_kwargs = (
@@ -209,13 +230,25 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         return self.doc_kwargs.get("dimensions") or self._caps.default_dimension or 1024  # type: ignore
 
     def _report(self, response: CreateEmbeddingResponse, texts: Sequence[str]) -> None:
-        loop = asyncio.get_event_loop()
-        if response.usage and (token_count := response.usage.total_tokens):
-            _ = loop.run_in_executor(
-                None, lambda: self._update_token_stats(token_count=token_count)
-            )
-        else:
-            _ = loop.run_in_executor(None, lambda: self._update_token_stats(from_docs=texts))
+        """Report token usage statistics.
+
+        Note: This sync method is only called from async contexts.
+        """
+        try:
+            loop = asyncio.get_running_loop()
+            if response.usage and (token_count := response.usage.total_tokens):
+                _ = loop.run_in_executor(
+                    None, lambda: self._update_token_stats(token_count=token_count)
+                )
+            else:
+                _ = loop.run_in_executor(None, lambda: self._update_token_stats(from_docs=texts))
+        except RuntimeError:
+            # No running loop - shouldn't happen in normal usage since called from async methods
+            # Fall back to synchronous execution
+            if response.usage and (token_count := response.usage.total_tokens):
+                self._update_token_stats(token_count=token_count)
+            else:
+                self._update_token_stats(from_docs=texts)
 
     async def _get_vectors(
         self, texts: Sequence[str], **kwargs: Mapping[str, Any] | None
@@ -233,7 +266,22 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
             ),
         )
         if not response or not response.data:
-            raise ValueError("No response from OpenAI embeddings endpoint")
+            raise ProviderError(
+                "OpenAI embeddings endpoint returned empty response",
+                details={
+                    "provider": str(self._provider),
+                    "model": self.model_name,
+                    "base_url": self.base_url,
+                    "has_response": response is not None,
+                    "has_data": response.data is not None if response else False,
+                },
+                suggestions=[
+                    "Check API key is valid and has correct permissions",
+                    "Verify the model name is correct",
+                    "Check network connectivity to the API endpoint",
+                    "Review API rate limits and quotas",
+                ],
+            )
         self._report(response, cast(list[str], texts))
         results = sorted(response.data, key=lambda x: x.index)
         return [result.embedding for result in results]
@@ -243,7 +291,17 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
     ) -> list[list[float]] | list[list[int]]:
         """Embed a sequence of documents."""
         if not isinstance(next(iter(documents), CodeChunk), CodeChunk):
-            raise TypeError("Expected a sequence of CodeChunk instances")
+            raise CodeWeaverValidationError(
+                "Documents must be CodeChunk instances for embedding",
+                details={
+                    "received_type": type(next(iter(documents), None)).__name__,
+                    "document_count": len(documents),
+                },
+                suggestions=[
+                    "Ensure documents are CodeChunk objects",
+                    "Convert documents to CodeChunk format before embedding",
+                ],
+            )
         texts = self.chunks_to_strings(documents)
         return await self._get_vectors(cast(list[str], texts), **kwargs)
 
@@ -254,6 +312,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
 
     def _base_urls(self) -> dict[Provider, AnyHttpUrl | str]:
         return {
+            # TODO: Add LiteLLM, Cerebras
             Provider.FIREWORKS: "https://api.fireworks.ai/inference/v1",
             Provider.GROQ: "https://api.groq.com/openai/v1",
             Provider.OPENAI: "https://api.openai.com/v1",

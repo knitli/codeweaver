@@ -17,17 +17,24 @@ import asyncio
 import multiprocessing
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from typing import Any, ClassVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast, override
 
 import numpy as np
 
 from codeweaver.common.utils.utils import rpartial
-from codeweaver.core.chunks import CodeChunk
 from codeweaver.exceptions import ConfigurationError
-from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+from codeweaver.providers.embedding.capabilities.base import (
+    EmbeddingModelCapabilities,
+    SparseEmbeddingModelCapabilities,
+)
 from codeweaver.providers.embedding.providers import EmbeddingProvider
+from codeweaver.providers.embedding.providers.base import SparseEmbeddingProvider
 from codeweaver.providers.provider import Provider
 
+
+if TYPE_CHECKING:
+    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.providers.embedding.types import SparseEmbedding
 
 try:
     from fastembed.sparse import SparseTextEmbedding
@@ -79,6 +86,27 @@ def fastembed_output_transformer(output: list[np.ndarray]) -> list[list[float]] 
     return [emb.tolist() for emb in output]
 
 
+def fastembed_sparse_output_transformer(
+    output: list[np.ndarray] | list[SparseEmbedding],
+) -> list[SparseEmbedding]:
+    """Transform the sparse output of FastEmbed into indices and values format.
+
+    FastEmbed's SparseTextEmbedding returns SparseEmbedding objects with
+    indices and values attributes. We transform them into dicts for easier handling.
+    """
+    from codeweaver.providers.embedding.types import SparseEmbedding
+
+    if isinstance(output[0], SparseEmbedding):
+        return output
+
+    return [
+        SparseEmbedding(emb.indices.tolist(), emb.values.tolist())
+        if hasattr(emb.indices, "tolist") and hasattr(emb.values, "tolist")
+        else SparseEmbedding(emb.indices, emb.values)
+        for emb in output
+    ]
+
+
 class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
     """
     FastEmbed implementation of the embedding provider.
@@ -96,12 +124,18 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
         fastembed_output_transformer
     )
 
-    def _initialize(self) -> None:
+    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """Initialize the FastEmbed client."""
+        # 1. Set _caps from parameter
+        self._caps = caps
+
+        # 2. Configure model name in kwargs if not already set
         if "model_name" not in self._doc_kwargs:
-            model = self._caps.name
+            model = caps.name  # Use caps parameter, not self._caps
             self.doc_kwargs["model_name"] = model
             self.query_kwargs["model_name"] = model
+
+        # 3. Initialize the client
         self._client = _TextEmbedding(**self._doc_kwargs)
 
     @property
@@ -114,7 +148,7 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
     ) -> list[list[float]] | list[list[int]]:
         """Embed a list of documents into vectors."""
         ready_documents = self.chunks_to_strings(documents)
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(
             None,
             lambda: list(
@@ -129,7 +163,7 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
         self, query: Sequence[str], **kwargs: Mapping[str, Any] | None
     ) -> list[list[float]] | list[list[int]]:
         """Embed a query into a vector."""
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(
             None, lambda: list(self._client.query_embed(query, **kwargs))
         )
@@ -142,42 +176,59 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
         return self._client.embedding_size
 
 
-class FastEmbedSparseProvider(FastEmbedEmbeddingProvider):
+class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
     """
     FastEmbed implementation for sparse embeddings.
     """
 
-    _client: SparseTextEmbedding
+    _client: type[SparseTextEmbedding] | SparseTextEmbedding = _SparseTextEmbedding  # type: ignore
+    _output_transformer: ClassVar[Callable[[Any], list[SparseEmbedding]]] = (  # type: ignore
+        fastembed_sparse_output_transformer
+    )  # type: ignore
 
-    def _initialize(self) -> None:
+    @override
+    def _initialize(self, caps: SparseEmbeddingModelCapabilities) -> None:  # type: ignore
         """Initialize the FastEmbed client."""
+        # 1. Set _caps from parameter, not from self
+        self._caps = caps
+
+        # 2. Configure model name in kwargs if not already set
         if "model_name" not in self._doc_kwargs:
-            model = self._caps.name
+            model = caps.name  # Use caps parameter, not self._caps
             self.doc_kwargs["model_name"] = model
             self.query_kwargs["model_name"] = model
-        self._client = _SparseTextEmbedding(**self._doc_kwargs)  # pyright: ignore[reportIncompatibleVariableOverride]
+
+        # 3. Initialize client if it's still a class (not an instance)
+        # The _client class variable is set to the class type, so we need to instantiate it
+        if isinstance(self._client, type):
+            client_options = self._doc_kwargs.get("client_options") or self._doc_kwargs
+            self._client = self._client(**client_options)  # pyright: ignore[reportCallIssue, reportIncompatibleVariableOverride]
 
     async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any] | None
-    ) -> list[list[float]] | list[list[int]]:
-        """Embed a list of documents into vectors."""
+    ) -> list[SparseEmbedding]:
+        """Embed a list of documents into sparse vectors."""
         ready_documents = self.chunks_to_strings(documents)
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(
             None,
             lambda: list(self._client.embed(cast(Sequence[str], ready_documents), **kwargs)),  # pyright: ignore[reportArgumentType]
         )
+        tokens = sum(val.nonzero for emb in embeddings for val in emb.values)
+        self._update_token_stats(token_count=tokens, sparse=True)
         return await loop.run_in_executor(None, lambda: self._process_output(embeddings))  # type: ignore
 
     async def _embed_query(
         self, query: Sequence[str], **kwargs: Mapping[str, Any] | None
-    ) -> list[list[float]] | list[list[int]]:
-        """Embed a query into a vector."""
-        loop = asyncio.get_event_loop()
+    ) -> list[SparseEmbedding]:
+        """Embed a query into a sparse vector."""
+        loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(
             None, lambda: list(self._client.query_embed(query, **kwargs))
         )
-        return await loop.run_in_executor(None, lambda: self._process_output(embeddings))
+        tokens = sum(val.nonzero for emb in embeddings for val in emb.values)
+        self._update_token_stats(token_count=tokens, sparse=True)
+        return await loop.run_in_executor(None, lambda: self._process_output(embeddings))  # type: ignore
 
 
 __all__ = ("FastEmbedEmbeddingProvider", "FastEmbedSparseProvider")

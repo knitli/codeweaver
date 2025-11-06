@@ -111,7 +111,6 @@ class NodeTypeDTO(BasedModel):
             list[SimpleNodeTypeDTO],
             Field(
                 description="List of subtype objects if this is an abstract node type.",
-                default_factory=list,
             ),
         ]
         | None

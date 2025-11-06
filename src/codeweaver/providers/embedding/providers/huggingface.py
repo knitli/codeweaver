@@ -13,15 +13,18 @@ from __future__ import annotations
 import logging
 
 from collections.abc import Iterator, Mapping, Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from codeweaver.core.chunks import CodeChunk
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 from codeweaver.providers.provider import Provider
+
+
+if TYPE_CHECKING:
+    from codeweaver.core.chunks import CodeChunk
 
 
 logger = logging.getLogger(__name__)
@@ -30,6 +33,8 @@ logger = logging.getLogger(__name__)
 def huggingface_hub_input_transformer(chunks: Sequence[CodeChunk]) -> Iterator[str]:
     """Input transformer for Hugging Face Hub models."""
     # The hub client only takes a single string at a time, so we'll just use a generator here
+    from codeweaver.core.chunks import CodeChunk
+
     return CodeChunk.dechunkify(chunks)
 
 
@@ -93,7 +98,7 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
 
     _output_transformer = staticmethod(huggingface_hub_output_transformer)
 
-    def _initialize(self) -> None:
+    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """We don't need to do anything here."""
         self.doc_kwargs |= {
             "model": self._caps.name,

@@ -67,6 +67,25 @@ def is_debug() -> bool:
     return explicit_true or has_debugger or repo_heuristic
 
 
+def is_ci() -> bool:
+    """Check if the code is running in a Continuous Integration environment."""
+    ci_indicators = [
+        "APPVEYOR",
+        "BUILDKITE",
+        "BUILD_NUMBER",
+        "CI",
+        "CIRCLECI",
+        "CONTINUOUS_INTEGRATION",
+        "GITHUB_ACTIONS",
+        "GITLAB_CI",
+        "JENKINS_URL",
+        "RUN_ID",
+        "TF_BUILD",
+        "TRAVIS",
+    ]
+    return any(os.getenv(var) for var in ci_indicators)
+
+
 def file_is_binary(file_path: Path) -> bool:
     """Check if a file is binary by reading its initial bytes."""
     try:
@@ -94,6 +113,7 @@ def is_test_environment() -> bool:
 __all__ = (
     "file_is_binary",
     "has_package",
+    "is_ci",
     "is_class",
     "is_debug",
     "is_pydantic_basemodel",

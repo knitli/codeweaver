@@ -1,39 +1,63 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Qdrant provider for vector and hybrid search/store."""
+
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import UUID4
+from typing_extensions import TypeIs
 
 from codeweaver.config.providers import QdrantConfig
-from codeweaver.core.chunks import CodeChunk, SearchResult
-from codeweaver.core.spans import Span
+from codeweaver.core.chunks import CodeChunk
 from codeweaver.engine.filter import Filter
 from codeweaver.exceptions import ProviderError
-from codeweaver.providers.embedding.providers import EmbeddingProvider
 from codeweaver.providers.provider import Provider
-from codeweaver.providers.reranking import RerankingProvider
 from codeweaver.providers.vector_stores.base import VectorStoreProvider
+
+
+if TYPE_CHECKING:
+    from codeweaver.agent_api.find_code.results import SearchResult
+    from codeweaver.agent_api.find_code.types import StrategizedQuery
+    from codeweaver.providers.vector_stores.base import MixedQueryInput
 
 
 QdrantClient = None
 try:
     from qdrant_client import AsyncQdrantClient
 except ImportError as e:
-    raise ProviderError('Qdrant client is required for QdrantVectorStore. Install it with: pip install qdrant-client') from e
+    raise ProviderError(
+        "Qdrant client is required for QdrantVectorStoreProvider. Install it with: pip install qdrant-client"
+    ) from e
 
-class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
+
+class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
     """Qdrant vector store provider supporting local and remote deployments.
 
     Supports hybrid search with dense and sparse embeddings via named vectors.
     """
+
     _client: AsyncQdrantClient | None = None
-    _embedder: EmbeddingProvider[Any]
-    _reranker: RerankingProvider[Any] | None = None
-    config: QdrantConfig
+    config: QdrantConfig = QdrantConfig()
     _metadata: dict[str, Any] | None = None
-    _provider: Provider = Provider.QDRANT
+    _provider: Provider = Provider.QDRANT  # type: ignore
+
+    @staticmethod
+    def _ensure_client(client: Any) -> TypeIs[AsyncQdrantClient]:
+        """Ensure the Qdrant client is initialized and ready.
+
+        Args:
+            client: The client instance to check.
+
+        Returns:
+            True if the client is initialized and ready.
+        """
+        return client is not None and isinstance(client, AsyncQdrantClient)
 
     @property
     def base_url(self) -> str | None:
@@ -42,7 +66,7 @@ class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         Returns:
             Qdrant server URL or None if using default localhost.
         """
-        return self.config.get('url')
+        return self.config.get("url")
 
     @property
     def collection(self) -> str | None:
@@ -51,14 +75,9 @@ class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         Returns:
             Collection name from config or None.
         """
-        return self.config.get('collection_name')
+        return self.config.get("collection_name")
 
-    def _telemetry_keys(self) -> dict[str, str] | None:
-        """Get telemetry keys for the provider.
-
-        Returns:
-            None (no special telemetry handling needed).
-        """
+    def _telemetry_keys(self) -> None:
         return None
 
     async def _initialize(self) -> None:
@@ -68,15 +87,21 @@ class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
             ConnectionError: Failed to connect to Qdrant server.
             ProviderError: Client initialization failed.
         """
-        url = self.config.get('url', 'http://localhost:6333')
-        api_key = self.config.get('api_key')
-        prefer_grpc = self.config.get('prefer_grpc', False)
-        self._client = AsyncQdrantClient(url=url, api_key=str(api_key) if api_key else None, prefer_grpc=prefer_grpc)
-        collection_name = self.collection
-        if collection_name:
+        url = self.config.get("url", "http://localhost:6333")
+        api_key = self.config.get("api_key")
+        prefer_grpc = self.config.get("prefer_grpc", False)
+        grpc_port = self.config.get("grpc_port", 6334)
+
+        self._client = AsyncQdrantClient(
+            url=url,
+            api_key=str(api_key) if api_key else None,
+            prefer_grpc=prefer_grpc,
+            grpc_port=grpc_port,
+        )
+        if collection_name := self.collection:
             await self._ensure_collection(collection_name)
 
-    async def _ensure_collection(self, collection_name: str, dense_dim: int=768) -> None:
+    async def _ensure_collection(self, collection_name: str, dense_dim: int = 768) -> None:
         """Ensure collection exists, creating it if necessary.
 
         Args:
@@ -84,10 +109,17 @@ class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
             dense_dim: Dimension of dense vectors (default 768).
         """
         from qdrant_client.models import Distance, VectorParams
+
+        if not self._client:
+            raise ProviderError("Qdrant client is not initialized")
         collections = await self._client.get_collections()
         collection_names = [col.name for col in collections.collections]
         if collection_name not in collection_names:
-            await self._client.create_collection(collection_name=collection_name, vectors_config={'dense': VectorParams(size=dense_dim, distance=Distance.COSINE)}, sparse_vectors_config={'sparse': {}})
+            _ = await self._client.create_collection(
+                collection_name=collection_name,
+                vectors_config={"dense": VectorParams(size=dense_dim, distance=Distance.COSINE)},
+                sparse_vectors_config={"sparse": {}},
+            )
 
     async def list_collections(self) -> list[str] | None:
         """List all collections in the Qdrant instance.
@@ -99,14 +131,19 @@ class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
             ConnectionError: Failed to connect to Qdrant server.
             ProviderError: Qdrant operation failed.
         """
+        if not self._client:
+            raise ProviderError("Qdrant client is not initialized")
         collections = await self._client.get_collections()
         return [col.name for col in collections.collections]
 
-    async def search(self, vector: list[float] | dict[str, list[float] | Any], query_filter: Filter | None=None) -> list[SearchResult]:
+    async def search(
+        self, vector: StrategizedQuery | MixedQueryInput, query_filter: Filter | None = None
+    ) -> list[SearchResult]:
         """Search for similar vectors using dense, sparse, or hybrid search.
 
         Args:
-            vector: Query vector (list for dense-only or dict for hybrid).
+            vector: Query vector (StrategizedQuery or list of floats/ints or dict for hybrid
+            other inputs will be deprecated in favor of StrategizedQuery in the future).
             query_filter: Optional filter for search results.
 
         Returns:
@@ -114,41 +151,98 @@ class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
 
         Raises:
             CollectionNotFoundError: Collection doesn't exist.
-            DimensionMismatchError: Vector dimension doesn't match collection.
             SearchError: Search operation failed.
         """
+        from codeweaver.agent_api.find_code.results import SearchResult
+        from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
+        from codeweaver.providers.embedding.types import SparseEmbedding
+
+        if not self._ensure_client(self._client):
+            raise ProviderError("Qdrant client not initialized")
         collection_name = self.collection
         if not collection_name:
-            raise ProviderError('No collection configured')
+            raise ProviderError("No collection configured")
+
+        # Ensure collection exists
         await self._ensure_collection(collection_name)
-        if isinstance(vector, list):
-            query_vector = 'dense'
-            query_value = vector
-        elif vector.get('dense'):
-            query_vector = 'dense'
-            query_value = vector['dense']
-        elif vector.get('sparse'):
-            query_vector = 'sparse'
-            query_value = vector['sparse']
-        else:
-            raise ProviderError("No valid vector provided (expected 'dense' or 'sparse' key in dict)")
+        sparse, dense = None, None
+        if not hasattr(vector, "sparse") or not hasattr(vector, "dense"):
+            if isinstance(vector, dict) and "indices" in vector and "values" in vector:
+                sparse = SparseEmbedding(indices=vector["indices"], values=vector["values"])
+            elif isinstance(vector, dict) and "sparse" in vector:
+                sparse = SparseEmbedding(
+                    indices=vector["sparse"].get("indices", []),
+                    values=vector["sparse"].get("values", []),
+                )  # type: ignore
+            elif isinstance(vector, dict) and "dense" in vector:
+                dense = vector["dense"]
+                # Also check for sparse in the same dict
+                if "sparse" in vector:
+                    sparse = SparseEmbedding(
+                        indices=vector["sparse"].get("indices", []),
+                        values=vector["sparse"].get("values", []),
+                    )  # type: ignore
+            elif isinstance(vector, (list, tuple)):
+                sparse = None
+                dense = vector
+            vector = StrategizedQuery(
+                query="unavailable",
+                dense=dense,
+                sparse=sparse,
+                strategy=SearchStrategy.HYBRID_SEARCH
+                if dense and sparse
+                else SearchStrategy.DENSE_ONLY
+                if dense
+                else SearchStrategy.SPARSE_ONLY,
+            )
+        if not isinstance(vector, StrategizedQuery):
+            raise ProviderError("Invalid vector input for search")
+
         try:
+            # Perform search using Qdrant's query_points for hybrid support
+
+            # Build Qdrant filter from our Filter if provided
             qdrant_filter = None
-            if query_filter:
-                pass
-            if query_vector == 'sparse' and isinstance(query_value, dict):
-                from qdrant_client.models import SparseVector
-                query_value = SparseVector(indices=query_value.get('indices', []), values=query_value.get('values', []))
-            results = await self._client.query_points(collection_name=collection_name, query=query_value, using=query_vector, limit=100, with_payload=True, with_vectors=False, query_filter=qdrant_filter)
+            if vector.is_hybrid():
+                results = await self._client.query_points(
+                    **vector.to_hybrid_query(
+                        query_kwargs={
+                            "limit": 100,
+                            "with_payload": True,
+                            "with_vectors": False,
+                            "query_filter": qdrant_filter or None,
+                        },
+                        kwargs={"collection_name": collection_name},
+                    )  # type: ignore
+                )  # type: ignore
+            else:
+                results = await self._client.search(
+                    **vector.to_query(
+                        kwargs={
+                            "collection_name": collection_name,
+                            "limit": 100,
+                            "with_payload": True,
+                            "with_vectors": False,
+                            "query_filter": qdrant_filter or None,
+                        }
+                    )  # type: ignore
+                )
+            from codeweaver.providers.vector_stores.metadata import HybridVectorPayload
+
             search_results: list[SearchResult] = []
-            for point in results.points:
-                payload = point.payload or {}
-                from uuid import UUID
-                chunk = CodeChunk.model_construct(chunk_id=UUID(payload['chunk_id']) if payload.get('chunk_id') else None, chunk_name=payload.get('chunk_name'), file_path=Path(payload['file_path']) if payload.get('file_path') else None, language=payload.get('language'), content=payload.get('content', ''), line_range=Span(start=payload.get('line_start', 1), end=payload.get('line_end', 1)))
-                search_result = SearchResult.model_construct(content=chunk, file_path=Path(payload['file_path']) if payload.get('file_path') else None, score=point.score if point.score is not None else 0.0, metadata=None)
+            # search() returns a list directly, query_points() returns object with .points
+            points = results.points if hasattr(results, "points") else results
+            for point in points:
+                payload = HybridVectorPayload.model_validate(point.payload)
+                search_result = SearchResult.model_construct(
+                    content=payload.chunk,
+                    file_path=Path(payload.file_path) if payload.file_path else None,
+                    score=point.score or 0.0,
+                    metadata={"query": vector.query, "strategy": vector.strategy},
+                )
                 search_results.append(search_result)
         except Exception as e:
-            raise ProviderError(f'Search operation failed: {e}') from e
+            raise ProviderError(f"Search operation failed: {e}") from e
         else:
             return search_results
 
@@ -163,29 +257,90 @@ class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
             DimensionMismatchError: Embedding dimension mismatch.
             UpsertError: Upsert operation failed.
         """
-        if not chunks:
-            return
-        collection_name = self.collection
-        if not collection_name:
-            raise ProviderError('No collection configured')
-        if chunks:
-            first_embedding = chunks[0].embeddings
-            dense_dim = len(first_embedding.get('dense', [])) if first_embedding else 768
-            await self._ensure_collection(collection_name, dense_dim)
         from datetime import UTC, datetime
 
-        from qdrant_client.models import PointStruct
-        points = []
+        from qdrant_client.http.models import PointStruct
+
+        from codeweaver.providers.embedding.types import SparseEmbedding
+        from codeweaver.providers.vector_stores.metadata import HybridVectorPayload
+
+        if not chunks:
+            return
+        if not self._ensure_client(self._client):
+            raise ProviderError("Qdrant client not initialized")
+
+        collection_name = self.collection
+        if not collection_name:
+            raise ProviderError("No collection configured")
+
+        # Ensure collection exists
+        await self._ensure_collection(collection_name)
+        points: list[PointStruct] = []
         for chunk in chunks:
-            vectors: dict[str, list[float]] = {}
-            if chunk.embeddings.get('dense'):
-                vectors['dense'] = chunk.embeddings['dense']
-            if chunk.embeddings.get('sparse'):
-                sparse = chunk.embeddings['sparse']
-                vectors['sparse'] = sparse
-            payload = {'chunk_id': str(chunk.chunk_id), 'chunk_name': chunk.chunk_name, 'file_path': str(chunk.file_path), 'language': chunk.language.value if chunk.language else None, 'content': chunk.content, 'line_start': chunk.line_start, 'line_end': chunk.line_end, 'indexed_at': datetime.now(UTC).isoformat(), 'provider_name': 'qdrant', 'embedding_complete': bool(chunk.embeddings.get('dense') and chunk.embeddings.get('sparse'))}
-            points.append(PointStruct(id=str(chunk.chunk_id), vector=vectors, payload=payload))
-        await self._client.upsert(collection_name=collection_name, points=points)
+            # Prepare vectors dict for named vectors
+            vectors: dict[str, Any] = {}
+
+            # Try to get embeddings from proper embedding batch info
+            if chunk.dense_embeddings:
+                vectors["dense"] = list(chunk.dense_embeddings.embeddings)
+            elif hasattr(chunk, "__dict__") and "embeddings" in chunk.__dict__:
+                # Fallback for test chunks created with model_construct(embeddings={...})
+                emb_dict = chunk.__dict__["embeddings"]
+                if isinstance(emb_dict, dict) and "dense" in emb_dict:
+                    vectors["dense"] = list(emb_dict["dense"])
+
+            if chunk.sparse_embeddings:
+                # Qdrant sparse vector format requires indices and values
+                # sparse_embeddings.embeddings is a SparseEmbedding NamedTuple with .indices and .values
+                sparse = chunk.sparse_embeddings
+                if isinstance(sparse.embeddings, SparseEmbedding):
+                    # SparseEmbedding NamedTuple: access indices and values as fields
+                    from qdrant_client.http.models import SparseVector
+
+                    vectors["sparse"] = SparseVector(
+                        indices=list(sparse.embeddings.indices),
+                        values=list(sparse.embeddings.values),
+                    )
+                else:
+                    # Old format: flat list (for backward compatibility during migration)
+                    vectors["sparse"] = list(sparse.embeddings)
+            elif hasattr(chunk, "__dict__") and "embeddings" in chunk.__dict__:
+                # Fallback for test chunks created with model_construct(embeddings={...})
+                emb_dict = chunk.__dict__["embeddings"]
+                if isinstance(emb_dict, dict) and "sparse" in emb_dict:
+                    sparse_data = emb_dict["sparse"]
+                    from qdrant_client.http.models import SparseVector
+
+                    if isinstance(sparse_data, dict):
+                        vectors["sparse"] = SparseVector(
+                            indices=list(sparse_data.get("indices", [])),
+                            values=list(sparse_data.get("values", [])),
+                        )
+
+            payload = HybridVectorPayload(
+                chunk=chunk,
+                chunk_id=chunk.chunk_id.hex,
+                chunked_on=datetime.fromtimestamp(chunk.timestamp).astimezone(UTC).isoformat(),
+                file_path=str(chunk.file_path) if chunk.file_path else "",
+                line_start=chunk.line_range.start,
+                line_end=chunk.line_range.end,
+                indexed_at=datetime.now(UTC).isoformat(),
+                hash=str(chunk.blake_hash),
+                provider="memory",
+                embedding_complete=bool(chunk.dense_batch_key and chunk.sparse_batch_key),
+            )
+            serialized_payload = payload.model_dump(exclude_none=True, round_trip=True)
+
+            points.append(
+                PointStruct(
+                    id=chunk.chunk_id.hex,
+                    vector=vectors,  # type: ignore
+                    payload=serialized_payload,
+                )
+            )
+
+        # Upsert points
+        _result = await self._client.upsert(collection_name=collection_name, points=points)
 
     async def delete_by_file(self, file_path: Path) -> None:
         """Delete all chunks for a specific file.
@@ -197,13 +352,21 @@ class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
             CollectionNotFoundError: Collection doesn't exist.
             DeleteError: Delete operation failed.
         """
+        if not self._client:
+            raise ProviderError("Qdrant client is not initialized")
         collection_name = self.collection
         if not collection_name:
-            raise ProviderError('No collection configured')
+            raise ProviderError("No collection configured")
         await self._ensure_collection(collection_name)
         from qdrant_client.models import FieldCondition, MatchValue
         from qdrant_client.models import Filter as QdrantFilter
-        await self._client.delete(collection_name=collection_name, points_selector=QdrantFilter(must=[FieldCondition(key='file_path', match=MatchValue(value=str(file_path)))]))
+
+        _ = await self._client.delete(
+            collection_name=collection_name,
+            points_selector=QdrantFilter(
+                must=[FieldCondition(key="file_path", match=MatchValue(value=str(file_path)))]
+            ),
+        )
 
     async def delete_by_id(self, ids: list[UUID4]) -> None:
         """Delete chunks by their unique identifiers.
@@ -215,14 +378,16 @@ class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
             CollectionNotFoundError: Collection doesn't exist.
             DeleteError: Delete operation failed.
         """
+        if not self._client:
+            raise ProviderError("Qdrant client is not initialized")
         collection_name = self.collection
         if not collection_name:
-            raise ProviderError('No collection configured')
+            raise ProviderError("No collection configured")
         await self._ensure_collection(collection_name)
         point_ids = [str(id_) for id_ in ids]
         for i in range(0, len(point_ids), 1000):
-            batch = point_ids[i:i + 1000]
-            await self._client.delete(collection_name=collection_name, points_selector=batch)
+            batch = point_ids[i : i + 1000]
+            _ = await self._client.delete(collection_name=collection_name, points_selector=batch)
 
     async def delete_by_name(self, names: list[str]) -> None:
         """Delete chunks by their unique names.
@@ -234,11 +399,21 @@ class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
             CollectionNotFoundError: Collection doesn't exist.
             DeleteError: Delete operation failed.
         """
+        if not self._client:
+            raise ProviderError("Qdrant client is not initialized")
         collection_name = self.collection
         if not collection_name:
-            raise ProviderError('No collection configured')
+            raise ProviderError("No collection configured")
         await self._ensure_collection(collection_name)
         from qdrant_client.models import FieldCondition, MatchAny
         from qdrant_client.models import Filter as QdrantFilter
-        await self._client.delete(collection_name=collection_name, points_selector=QdrantFilter(must=[FieldCondition(key='chunk_name', match=MatchAny(any=names))]))
-__all__ = ('QdrantVectorStore',)
+
+        _ = await self._client.delete(
+            collection_name=collection_name,
+            points_selector=QdrantFilter(
+                must=[FieldCondition(key="chunk_name", match=MatchAny(any=names))]
+            ),
+        )
+
+
+__all__ = ("QdrantVectorStoreProvider",)

@@ -15,7 +15,6 @@ from codeweaver.core.chunks import CodeChunk
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers import EmbeddingProvider
-from codeweaver.providers.embedding.providers.base import default_output_transformer
 from codeweaver.providers.provider import Provider
 
 
@@ -56,23 +55,33 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
 
     _doc_kwargs: ClassVar[dict[str, Any]] = {"input_type": "document"}
     _query_kwargs: ClassVar[dict[str, Any]] = {"input_type": "query"}
-    _output_transformer: Callable[[Any], list[list[float]] | list[list[int]]] = (
-        default_output_transformer
+    _output_transformer: ClassVar[Callable[[Any], list[list[float]] | list[list[int]]]] = (
+        voyage_output_transformer  # Default, overridden in _process_output for context models
     )
 
-    def _initialize(self) -> None:
-        self._output_transformer = (
-            staticmethod(voyage_context_output_transformer)
-            if "context" in self._caps.name
-            else staticmethod(voyage_output_transformer)
-        )
+    # Store whether this is a context model (set during _initialize)
+    _is_context_model: bool = False
+
+    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
+        # Detect if this is a context model
+        self._is_context_model = "context" in caps.name
+
         shared_kwargs = {
-            "model": self._caps.name,
-            "output_dimension": self._caps.default_dimension,
-            "output_dtype": self._caps.default_dtype,
+            "model": caps.name,
+            "output_dimension": caps.default_dimension,
+            "output_dtype": caps.default_dtype,
         }
         self.doc_kwargs |= shared_kwargs
         self.query_kwargs |= shared_kwargs
+
+    def _process_output(self, output_data: Any) -> list[list[float]] | list[list[int]]:
+        """Process output data using the appropriate transformer."""
+        transformer = (
+            voyage_context_output_transformer
+            if self._is_context_model
+            else voyage_output_transformer
+        )
+        return transformer(output_data)
 
     @property
     def name(self) -> Provider:

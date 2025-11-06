@@ -57,7 +57,7 @@ def is_available(model: EmbeddingModelCapabilities) -> bool:
 def filter_unimplemented(
     models: tuple[EmbeddingModelCapabilities, ...],
 ) -> Generator[EmbeddingModelCapabilities]:
-    """Removes models that are not yet implemented. Currently these are models that require the full `transformers` library."""
+    """Removes models that are not yet implemented."""
     _unimplemented = {
         "heroku:cohere-embed-multilingual",
         "github:cohere/Cohere-embed-v3-english",

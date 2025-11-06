@@ -5,6 +5,17 @@
 [settings]
 idiomatic_version_file_enable_tools = []
 
+[settings.python]
+uv_venv_auto = true
+compile = true
+uv_venv_create_args = [
+  "--seed",
+  "--keyring-provider",
+  "subprocess",
+  "--python",
+  "3.13",
+]
+
 [tools]
 ast-grep = "latest"
 "cargo:rust-parallel" = "latest"
@@ -13,7 +24,6 @@ gh = "latest"
 gitsign = "latest"
 hk = "latest"
 node = "24"
-"npm:@changesets/cli" = "latest"
 "pipx:changesets" = "latest"
 "pipx:claude-monitor" = "latest"
 "pipx:copychat" = "latest"
@@ -21,360 +31,443 @@ node = "24"
 "pipx:mike" = "latest"
 "pipx:mteb" = "latest"
 "pipx:reuse" = "latest"
+"pipx:tombi" = "latest"
 pkl = "latest"
 ripgrep = "latest"
 ruff = "latest"
 shellcheck = "latest"
 shfmt = "latest"
-taplo = "latest"
 typos = "latest"
 uv = "latest"
+usage = "latest"
 yamlfmt = "latest"
 
-[env]
-GH_REPO = "knitli/codeweaver-mcp"
-
 [hooks]
-enter = """
-#!/usr/bin/env zsh
+enter = '''
 # Set up git aliases
-alias jj='jj --no-pager' &&
-alias git='git --no-pager' &&
-alias cdroot='cd $(git root)' &&
-if [ "$GITHUB_ACTIONS" = true ]; then
-    export CI=true
-else
-    export CI=false
-fi
-"""
+git config alias.root "rev-parse --show-toplevel"
 
-leave = """
-print -P "%F{209}[codeweaver]%f Exiting CodeWeaver environment..."
-eval "$(mise deactivate)" &>/dev/null &&
-print -P "%F{209}[codeweaver]%f Environment deactivated."
-"""
+# Check and set environment variables
+if [ -z "$GH_REPO" ]; then
+    mise --silent set 2>/dev/null || true
+fi
+
+if [ -z "$GITHUB_ACTIONS" ] || [ "$GITHUB_ACTIONS" = "false" ]; then
+    export CI=false
+else
+    export CI=true
+fi
+
+# Check if we're in the correct virtual environment
+python_path="$(command -v python 2>/dev/null || which python 2>/dev/null || echo "")"
+case "$python_path" in
+    *.venv/bin/python*)
+        # Already in venv, do nothing
+        ;;
+    *)
+        # Not in venv or python not found, source it
+        mise run source 2>/dev/null || true
+        ;;
+esac
+'''
+leave = '''
+echo "Exiting CodeWeaver environment..."
+mise --silent -y deactivate &>/dev/null
+echo "Environment deactivated."
+'''
+
+# NOTE: Between here and the `scripts` directory, our tasks are getting a bit crowded.
+# TODO: We should combine the scripts/ and these tasks into the `mise-tasks` directory as standalone scripts.
 
 [tasks]
-
-sync = """
+[tasks.sync]
+depends = ["source"]
+tools.uv = "latest"
+run = '''
 #!/bin/bash
 echo "Syncing dependencies..."
-uv sync --extra all --group all-dev
-"""
+uv sync --extra full --group dev --group docs --group build --group test
+'''
 
-update-dependencies = """
+[tasks.update-dependencies]
+tools.uv = "latest"
+depends = ["source"]
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Updating dependencies..."
-uv sync --extra all --group all-dev -U
-"""
+uv sync --extra full --group dev --group docs --group build --group test -U
+'''
 
-source = """
+[tasks.source]
+run = '''
 #!/usr/bin/env zsh
 # Source the virtual environment
 print -P "%F{209}[codeweaver]%f Sourcing virtual environment..."
-cdroot || true && source .venv/bin/activate
-"""
+git rev-parse --show-toplevel || true
+source .venv/bin/activate
+'''
 
-# Development setup
-setup = """
-#!/usr/bin/env zsh
-print -P "%F{209}[codeweaver]%f Setting up development environment for the first time..."
-# Determine if we're in CI
-# This doesn't change anything yet, but it's here for future use
-if [ "$GITHUB_ACTIONS" == true ]; then
+[tasks.set-ci]
+hide = true
+shell = "zsh -c"
+run = '''
+if [[ "$GITHUB_ACTIONS" == true ]]; then
     export CI=true
 else
     export CI=false
 fi
-mise --silent -y trust &&
-mise --silent -y install &>/dev/null || true &&
-mise --silent reshim &&
-eval "$(mise --silent activate zsh)" &&
-eval "$(mise --silent env -s zsh)" &&
-print -P "%F{209}[codeweaver]%f Initializing %F{209}CodeWeaver%f..."
-hk init --mise &>/dev/null || true &&
-mise run venv || true &&
-source .venv/bin/activate &
-mise --silent -y run sync &
-git config alias.root 'rev-parse --show-toplevel' &&
-alias cdroot='cd $(git root)'
-print -P "%F{209}[codeweaver]%f ✅ Development environment ready!"
-"""
+'''
 
-update-tools = """
-#!/usr/bin/env zsh
-print -P "%F{209}[codeweaver]%f Updating tools..."
-mise --silent -y upgrade &&
-mise --silent self-update -yq &&
-mise --silent reshim &&
-mise --silent -y prune
-print -P "%F{209}[codeweaver]%f ✅ Tools updated! 🧰"
-"""
+[tasks.update]
+silent = "stdout"
+alias = "update-tools"
+shell = "zsh -c"
+run = [
+  "print -P \"%F{209}[codeweaver]%f Updating tools...\"",
+  "mise -y upgrade",
+  "mise -y self-update",
+  "mise -y reshim",
+  "mise -y prune",
+  "print -P \"%F{209}[codeweaver]%f ✅ Tools updated! 🧰\""
+]
 
-install = "uv sync --all-groups"
+[tasks.setup]
+# Development setup
+shell = "zsh -c"
+run = [
+  "print -P \"%F{209}[codeweaver]%f Setting up development environment for the first time...\"",
+  "mise set &>/dev/null",
+  "mise -y trust &>/dev/null",
+  "mise -y install &>/dev/null || true",
+  "mise en .",
+  "mise run set-ci",
+]
+silent = "stdout"
 
-# Code quality and formatting
-fix = """
-#!/usr/bin/env zsh
-print -P "%F{209}[codeweaver]%f Fixing code issues..."
-ruff check --select I --fix . &&
-ruff check --fix --unsafe-fixes src/ &&
-scripts/code-quality/fix-ruff-patterns.sh src/ &&
-ruff format . &&
-hk fix &&
-print -P "%F{209}[codeweaver]%f ✅ Code fixes applied!"
-"""
+[tasks.fix-python]
+tools.uv = "latest"
+usage = '''
+arg "[dir]" help="directories to fix" var=#true default="."
+'''
+run = [
+  "uvx ruff format \"${usage_dir}\"",
+  "uvx ruff check --fix --unsafe-fixes \"${usage_dir}\"",
+]
+file = "scripts/code-quality/fix-ruff-patterns.sh "
+sources = ["{src,scripts,tests}/*.py"]
 
-check = """
+[tasks.fix-other]
+tools.hk = "latest"
+run = "hk fix"
+
+[tasks.fix]
+shell = "zsh -c"
+run = ["mise run fix-other", "mise run fix-python"]
+quiet = true
+
+[tasks.check]
+tools.hk = "latest"
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Running quality checks..."
 hk check
-"""
+'''
 
-lint = """
+[tasks.lint]
+tools.uv = "latest"
+run = '''
 #!/bin/bash
 echo "Running linting checks..."
-if [ "$CI" = "true" ]; then
+if [[ "$CI" == "true" ]]; then
     uv run ruff check . --output-format=github
 else
     uv run ruff check .
 fi
-"""
+'''
 
-format = """
+[tasks.format]
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Running formatting checks..."
 hk check
-"""
+'''
 
-format-fix = """
+[tasks.format-fix]
+tools."cargo:rust-parallel" = "latest"
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Applying formatting...hold onto your butts 🚬...🦖 "
-mise run fix-ruff-patterns || {
-    print -P "%F{209}[codeweaver]%f ⚠️  %F{red}Ruff pattern fixer encountered issues.%f"}
+# mise run fix-ruff-patterns || {  # there are some bugs to work out
+#    print -P "%F{209}[codeweaver]%f ⚠️  %F{red}Ruff pattern fixer encountered issues.%f"}
 uv run ruff format .
-files="$(git ls-files '*.yaml' '*.yml' '*.json' 2>/dev/null)"
+files="$(git ls-files "*.yaml" "*.yml" "*.json" 2>/dev/null)"
 if [ -n "$files" ]; then
-    echo "$files" | rust-parallel -d stderr -i - --no-run-if-empty yq -iP --indent=2 '.' || true
+    echo "$files" | rust-parallel -d stderr -i - --no-run-if-empty yq -iP --indent=2 "." || true
 fi
-files="$(git ls-files '*.toml' 2>/dev/null)"
+files="$(git ls-files "*.toml" 2>/dev/null)"
 if [ -n "$files" ]; then
-    taplo format --in-place $files 2>/dev/null || true
+    tombi format $files 2>/dev/null || true
 fi
-"""
+'''
 
-venv = """
-#!/usr/bin/env zsh
+[tasks.graph]
+usage = '''
+arg "[dir]" help="python directory to generate a graph for" default="src"
+'''
+run = '''mise x -- ruff analyze "${usage_dir:-src}"'''
+
+[tasks.venv]
+shell = "zsh -c"
+run = '''
 print -P "%F{209}[codeweaver]%f Setting up Python virtual environment..."
 uv venv --allow-existing --seed --keyring-provider subprocess --python 3.13 --refresh .venv &&
 print -P "%F{209}[codeweaver]%f ✅ Virtual environment is ready!"
 source .venv/bin/activate || print -P "%F{209}[codeweaver]%f ⚠️  %F{red}Failed to source virtual environment.%f"
 print -P "%F{209}[codeweaver]%f Running dependency sync..."
-mise run sync
-"""
+mise run sync &
+'''
 
+[tasks.test]
 # Testing
-test = """
+usage = '''
+args "[dir]" help="directory to test" default="tests/"
+flag "--marks [markers]" help="pytest markers to filter tests" default=""
+
+'''
+run = '''
 #!/bin/bash
 echo "Running tests..."
-uv run pytest tests/ -v
-"""
+uv run pytest
+'''
 
-test-cov = """
+[tasks.test-cov]
+run = '''
 #!/bin/bash
 echo "Running tests with coverage..."
 uv run pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v
-"""
+'''
 
-test-watch = """
+[tasks.test-watch]
+run = '''
 #!/bin/bash
 echo "Running tests in watch mode..."
 uv run pytest tests/ -f --tb=short
-"""
+'''
 
+[tasks.build]
 # Building and packaging
-build = """
+run = '''
 #!/bin/bash
 echo "Building package..."
 uv build &&
 echo "✅ Package built successfully!"
-"""
+'''
 
-clean = """
+[tasks.clean]
+run = '''
 #!/bin/bash
 echo "Cleaning build artifacts..."
 rm -rf dist/ build/ *.egg-info/ .coverage test-results.xml &&
 find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true &&
 find . -type f -name "*.pyc" -delete &&
 echo "✅ Build artifacts cleaned!"
-"""
+'''
+run_windows = '''
+
+'''
 
 # Documentation
-docs-serve = """
+[tasks.docs-serve]
+tools.uv = "latest"
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Starting %F{209}CodeWeaver%f documentation server..."
 uv run --group docs mkdocs serve
-"""
+'''
 
-docs-build = """
+[tasks.docs-build]
+tools.uv = "latest"
+run = '''
 #!/bin/bash
 echo "Building documentation..."
 uv run --group docs mkdocs build
-"""
+'''
 
 # Release and maintenance
-version = """
+[tasks.version]
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver] CodeWeaver%f version information:"
 print -P "%F{209}[codeweaver]%f 📦 Package version: $(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")"
 print -P "%F{209}[codeweaver]%f 🐍 Python version: $(python --version)"
 print -P "%F{209}[codeweaver]%f 🌞 UV version: $(uv --version)"
-"""
+'''
 
-changelog = """
+[tasks.changelog]
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Generating changelog..."
 npm exec changeset version
-"""
+'''
 
 # Combined workflows
-ci = """
-#!/usr/bin/env zsh
-print -P "%F{209}[codeweaver]%f Running full CI pipeline locally..."
-mise run check &&
-mise run lint &&
-mise run format &&
-mise run test-cov &&
-mise run build &&
-print -P "%F{209}[codeweaver]%f ✅ All CI checks passed!"
-"""
+[tasks.ci]
+run = [
+  "mise run check",
+  "mise run lint",
+  "mise run format",
+  "mise run test-cov",
+  "mise run build"
+]
+description = "Run all CI checks."
 
-pre-commit = """
-#!/usr/bin/env bash
+[tasks.pre-commit]
+run = '''
+#!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Running %F{209}CodeWeaver%f pre-commit checks 🪝... %F{38} Thanks for your contributions! You're pretty cool.%f 🚀" &&
-hk fix || print -P "%F{209}[codeweaver]%f ⚠️  %F{red}You need to fix some issues before committing. Do not pass go, do not collect $200.%f 💸 😦" && exit 1
+hk fix || print -P "%F{209}[codeweaver]%f ⚠️  %F{red}You need to fix some issues%f before committing. %F{209}Do not pass go, do not collect $200.%f 💸 😦" && exit 1
 git add . &&
 hk check || print -P "%F{209}[codeweaver]%f ⚠️  %F{red}You need to fix some issues before committing. Almost there!%f" && exit 1
 git add . &&
-print -P "%F{209}[codeweaver]%f ✅ All pre-commit checks passed! You're awesome! 🎉 ... and they said the Kobiyashi Maru was unwinnable! 🖖"
-"""
+print -P "%F{209}[codeweaver]%f ✅ %F{green}All pre-commit checks passed! You're awesome!%f 🎉 ... and they said the Kobiyashi Maru was unwinnable! 🖖"
+'''
 
-#!SECTION Aliases/Shortcuts for Scripts in scripts/ directory
-
-fix-ruff-patterns = """
+#! SECTION Aliases/Shortcuts for Scripts in scripts/ directory
+[tasks.fix-ruff-patterns]
+alias = "ruff-pats"
+description = "Fix ruff unfixable patterns in the codebase"
+run = '''
 #!/bin/bash
 echo "Running ruff pattern fixer..."
 ./scripts/code-quality/fix-ruff-patterns.sh "${*}"
-"""
-update-licenses = """
+'''
+
+[tasks.update-licenses]
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Updating %F{209}CodeWeaver%f license headers :..."
 uv run -s scripts/code-quality/update-licenses.py --interactive "${*}"
-"""
+'''
 
-dev-shell-init = """
+[tasks.dev-shell-init]
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Initializing development shell..."
 ./scripts/dev-env/dev-shell-init.zsh
-"""
+'''
 
-install-mise = """
+[tasks.install-mise]
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Installing Mise..."
 ./scripts/dev-env/install-mise.sh
-"""
+'''
 
-vscode-terminal-bootstrap = """
+[tasks.vscode-terminal-bootstrap]
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Bootstrapping VSCode terminal..."
 ./scripts/dev-env/vscode-terminal-bootstrap.sh
-"""
+'''
 
-add-plaintext-to-codeblock = """
+[tasks.add-plaintext-to-codeblock]
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Adding 'plaintext' to unmarked code blocks in markdown files..."
 uv run -s scripts/docs/add-plaintext-to-codeblock.py
-"""
+'''
 
-gen-ref-pages = """
+[tasks.gen-ref-pages]
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Generating docs reference pages..."
 uv run -s scripts/docs/gen-ref-pages.py
-"""
+'''
 
-analyze-grammar-structure = """
+[tasks.analyze-grammar-structure]
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Analyzing grammar structure..."
 uv run -s scripts/language-support/analyze-grammar-structure.py
-"""
+'''
 
-build-language-mappings = """
+[tasks.build-language-mappings]
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Building language mappings..."
 uv run -s scripts/language-support/build-language-mappings.py
-"""
+'''
 
-compare-delimiters = """
+[tasks.compare-delimiters]
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Comparing delimiters..."
 uv run -s scripts/language-support/compare-delimiters.py
-"""
+'''
 
-download-ts-grammars = """
+[tasks.download-ts-grammars]
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Downloading tree-sitter grammars..."
 uv run -s scripts/language-support/download-ts-grammars.py "${*}"
-"""
+'''
 
-generate-delimiters = """
+[tasks.generate-delimiters]
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Generating delimiters..."
 uv run -s scripts/language-support/generate-delimiters.py
-"""
+'''
 
-generate-supported-languages = """
+[tasks.generate-supported-languages]
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Generating supported languages..."
-uv run -s scripts/language-support/generate-supported-languages.py
-"""
+uv run -s scripts/build/generate-supported-languages.py
+'''
 
-mteb-to-codeweaver = """
+[tasks.mteb-to-codeweaver]
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Converting MTEB model data to CodeWeaver format..."
 uv run -s scripts/model-data/mteb-to-codeweaver.py "${*}"
-"""
+'''
 
-apply-test-marks = """
+[tasks.apply-test-marks]
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Applying test marks to tests..."
 uv run -s scripts/testing/apply-test-marks.py "${*}"
-"""
+'''
 
-benchmark-detection = """
+[tasks.benchmark-detection]
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Running benchmark detection..."
 uv run -s scripts/testing/benchmark-detection.py "${*}"
-"""
+'''
 
-ansi-color-tests = """
+[tasks.ansi-color-tests]
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Checking ANSI color codes..."
 uv run -s scripts/utils/ansi-color-tests.py "${*}"
-"""
+'''
 
-check-imports = """
+[tasks.check-imports]
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Checking imports..."
 uv run -s scripts/utils/check-imports.py "${*}"
-"""
+'''
 
-get-all-exceptions = """
+[tasks.get-all-exceptions]
+run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Getting all exceptions..."
 uv run -s scripts/utils/get-all-exceptions.py "${*}"
-"""
-
+'''
 
 [tasks.activate]
-run = """eval "$(mise activate)" &>/dev/null"""
+run = '''eval "$(mise activate)" &>/dev/null"'''
 hide = true

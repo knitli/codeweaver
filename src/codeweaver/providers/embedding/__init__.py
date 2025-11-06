@@ -20,7 +20,7 @@ from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
 )
-from codeweaver.providers.embedding.providers import EmbeddingProvider
+from codeweaver.providers.embedding.providers import EmbeddingProvider, SparseEmbeddingProvider
 from codeweaver.providers.provider import Provider
 
 
@@ -63,8 +63,6 @@ def _process_model_settings(model_settings: EmbeddingModelSettings) -> dict[str,
                 model_settings, {"client_options": "kwargs"}
             )
 
-    return processed_settings
-
 
 def user_settings_to_provider_settings(
     user_settings: EmbeddingProviderSettings,
@@ -88,6 +86,7 @@ __all__ = (
     "EmbeddingModelCapabilities",
     "EmbeddingProvider",
     "SparseEmbeddingModelCapabilities",
+    "SparseEmbeddingProvider",
     "get_embedding_model_provider",
     "load_default_capabilities",
     "load_sparse_capabilities",

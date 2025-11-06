@@ -12,21 +12,27 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
+import dataclasses
 import logging
+import signal
+import time
 
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from time import sleep
-from typing import Annotated, Any, ClassVar, Unpack, cast, overload
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Unpack, cast, overload
 
 import rignore
 import watchfiles
 
-from pydantic import PrivateAttr
+from pydantic import Field, PrivateAttr
+from pydantic.dataclasses import dataclass
 from watchfiles.main import Change, FileChange
 
-from codeweaver.config.types import CodeWeaverSettingsDict, RignoreSettings
+from codeweaver.config.chunker import ChunkerSettings
+from codeweaver.config.indexing import RignoreSettings
 from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.file_extensions import (
     CODE_FILES_EXTENSIONS,
@@ -37,10 +43,98 @@ from codeweaver.core.file_extensions import (
 )
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.stores import BlakeStore
+from codeweaver.core.types.aliases import DirectoryPath
 from codeweaver.core.types.dictview import DictView
+from codeweaver.core.types.models import BasedModel
+from codeweaver.core.types.sentinel import Unset
+from codeweaver.engine.checkpoint import CheckpointManager, IndexingCheckpoint
+from codeweaver.engine.chunking_service import ChunkingService
 
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from typing import Any
+
+    from codeweaver.config.types import CodeWeaverSettingsDict
+    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+
+
+def _get_embedding_instance(*, sparse: bool = False) -> EmbeddingProvider[Any] | None:
+    """Get embedding provider instance using new registry API."""
+    from codeweaver.common.registry import get_provider_registry
+
+    kind = "sparse_embedding" if sparse else "embedding"
+    registry = get_provider_registry()
+
+    if provider_enum := registry.get_provider_enum_for(kind):
+        return registry.get_provider_instance(provider_enum, kind, singleton=True)
+    return None
+
+
+def _get_vector_store_instance() -> Any | None:
+    """Get vector store provider instance using new registry API."""
+    from codeweaver.common.registry import get_provider_registry
+
+    registry = get_provider_registry()
+    if provider_enum := registry.get_provider_enum_for("vector_store"):
+        return registry.get_provider_instance(provider_enum, "vector_store", singleton=True)
+    return None
+
+
+def _get_chunking_service() -> ChunkingService:
+    """Stub function to get chunking service instance."""
+    # TODO: This should probably come from the services registry but that's not fully implemented yet
+    from codeweaver.config.settings import get_settings
+    from codeweaver.engine.chunker import ChunkGovernor
+    from codeweaver.engine.chunking_service import ChunkingService
+
+    chunk_settings = get_settings().chunker
+    governor = ChunkGovernor.from_settings(
+        ChunkerSettings() if isinstance(chunk_settings, Unset) else chunk_settings
+    )
+    return ChunkingService(governor=governor)
+
+
+@dataclass
+class IndexingStats:
+    """Statistics tracking for indexing progress."""
+
+    files_discovered: int = 0
+    files_processed: int = 0
+    chunks_created: int = 0
+    chunks_embedded: int = 0
+    chunks_indexed: int = 0
+    start_time: float = dataclasses.field(default_factory=time.time)
+    files_with_errors: ClassVar[
+        Annotated[
+            list[Path],
+            Field(description="""List of file paths that encountered errors during indexing."""),
+        ]
+    ] = []
+
+    @property
+    def elapsed_time(self) -> float:
+        """Calculate elapsed time since indexing started."""
+        return time.time() - self.start_time
+
+    @property
+    def processing_rate(self) -> float:
+        """Files processed per second."""
+        if self.elapsed_time == 0:
+            return 0.0
+        return self.files_processed / self.elapsed_time
+
+    @property
+    def total_errors(self) -> int:
+        """Total number of files with errors."""
+        return len(self.files_with_errors)
+
+    @property
+    def total_files_discovered(self) -> int:
+        """Total files discovered (alias for files_discovered)."""
+        return self.files_discovered
 
 
 class DefaultFilter(watchfiles.DefaultFilter):
@@ -223,11 +317,39 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         cls, settings: DictView[CodeWeaverSettingsDict] | None = None
     ) -> IgnoreFilter[rignore.Walker]:
         """Create an IgnoreFilter instance from settings."""
+        # we actually need the full object here
+        from codeweaver.common.utils.git import get_project_path
+        from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
         from codeweaver.config.settings import get_settings_map
 
-        settings = settings or get_settings_map()
-        filter_settings = settings["filter_settings"].to_settings()
-        return cls(base_path=None, settings=None, walker=rignore.walk(**filter_settings))
+        settings_map = settings or get_settings_map()
+        index_settings = (
+            IndexerSettings.model_validate(DefaultIndexerSettings)
+            if isinstance(settings_map["indexing"], Unset)
+            else settings_map["indexing"]
+        )
+        if not index_settings.inc_exc_set:
+            # Check if there's already a running event loop
+            try:
+                asyncio.get_running_loop()
+                # If we're here, there's a running loop
+                # We can't await here since from_settings is not async, so skip for now
+                logger.warning(
+                    "Cannot set inc_exc in Indexer.from_settings: already in async context. Will be set lazily when indexer is used."
+                )
+            except RuntimeError:
+                # No running loop, safe to use asyncio.run()
+                _ = asyncio.run(
+                    index_settings.set_inc_exc(
+                        get_project_path()
+                        if isinstance(settings_map["project_path"], Unset)
+                        else settings_map["project_path"]
+                    )
+                )
+        walker = rignore.Walker(
+            **(index_settings.to_settings())  # type: ignore
+        )
+        return cls(walker=walker, project_path=settings_map["project_path"])
 
     @property
     def walker(self) -> rignore.Walker:
@@ -235,26 +357,404 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         return self._walker
 
 
-class Indexer:
-    """Main indexer class. Wraps a vector store and parsers."""
+class Indexer(BasedModel):
+    """Main indexer class. Wraps a DiscoveredFilestore and chunkers."""
 
     _store: BlakeStore[DiscoveredFile] = PrivateAttr()
-    _parsers: Annotated[Sequence[Callable[[Path], Any]], PrivateAttr(default_factory=list)]
     _walker: rignore.Walker | None = PrivateAttr(default=None)
+    _project_root: Path | None = PrivateAttr(default=None)
+    _checkpoint_manager: CheckpointManager | None = PrivateAttr(default=None)
+    _checkpoint: IndexingCheckpoint | None = PrivateAttr(default=None)
+    _last_checkpoint_time: float = PrivateAttr(default=0.0)
+    _files_since_checkpoint: int = PrivateAttr(default=0)
 
     def __init__(
-        self, walker: rignore.Walker | None = None, store: BlakeStore[DiscoveredFile] | None = None
+        self,
+        walker: rignore.Walker | None = None,
+        store: BlakeStore[DiscoveredFile] | None = None,
+        chunking_service: Any | None = None,  # ChunkingService type
+        *,
+        auto_initialize_providers: bool = True,
+        project_path: Path | None = None,
+        project_root: Path | None = None,
     ) -> None:
-        """Initialize the Indexer."""
-        self._parsers = []
+        """Initialize the Indexer with optional pipeline components.
+
+        Args:
+            walker: rignore walker for file discovery
+            store: Store for discovered file metadata
+            chunking_service: Service for chunking files (optional)
+            auto_initialize_providers: Auto-initialize providers from global registry
+            project_path: Project path for checkpoint management (preferred)
+            project_root: Alias for project_path (deprecated, use project_path)
+        """
+        from codeweaver.common.utils.git import get_project_path
+
+        # Support both project_path and project_root for backward compatibility
+        if project_root is not None and project_path is None:
+            project_path = project_root
+        elif project_root is not None:
+            logger.warning(
+                "Both project_path and project_root specified, using project_path: %s", project_path
+            )
+
+        # Auto-create walker if project_path is provided but walker is not
+        if walker is None and project_path is not None:
+            walker = rignore.Walker(project_path)
+            logger.debug("Auto-created walker for project_path: %s", project_path)
+
         self._store = store or BlakeStore[DiscoveredFile](_value_type=DiscoveredFile)
         self._walker = walker
+        self._project_root = project_path
+        self._chunking_service = chunking_service or _get_chunking_service()
+        self._stats = IndexingStats()
+
+        # Pipeline provider Fields (initialized below or lazily)
+        self._embedding_provider: Any | None = None
+        self._sparse_provider: Any | None = None
+        self._vector_store: Any | None = None
+
+        # Initialize checkpoint manager
+        if project_path:
+            self._checkpoint_manager = CheckpointManager(project_path=project_path)
+        else:
+            from codeweaver.config.settings import get_settings
+
+            self._checkpoint_manager = CheckpointManager(
+                project_path=cast(
+                    Path,
+                    get_project_path()
+                    if isinstance(get_settings().project_path, Unset)
+                    else get_settings().project_path,
+                )
+            )
+
+        self._checkpoint = None
+        self._last_checkpoint_time = time.time()
+        self._files_since_checkpoint = 0
+        self._shutdown_requested = False
+        self._original_sigterm_handler = None
+        self._original_sigint_handler = None
+
+        if auto_initialize_providers:
+            self._initialize_providers()
+
+        # Register signal handlers for graceful shutdown
+        self._register_signal_handlers()
+
+    def _register_signal_handlers(self) -> None:
+        """Register signal handlers for graceful shutdown with checkpoint saving."""
+
+        def handle_shutdown_signal(signum: int, frame: Any) -> None:
+            """Handle shutdown signal by saving checkpoint and exiting gracefully."""
+            signal_name = signal.Signals(signum).name
+            logger.info("Received %s signal, saving checkpoint and shutting down...", signal_name)
+            self._shutdown_requested = True
+
+            # Save final checkpoint
+            try:
+                self.save_checkpoint()
+                logger.info("Checkpoint saved successfully before shutdown")
+            except Exception:
+                logger.exception("Failed to save checkpoint during shutdown")
+
+            # Call original handler if it existed
+            if signum == signal.SIGTERM and self._original_sigterm_handler:
+                if callable(self._original_sigterm_handler):
+                    self._original_sigterm_handler(signum, frame)
+            elif (
+                signum == signal.SIGINT
+                and self._original_sigint_handler
+                and callable(self._original_sigint_handler)
+            ):
+                self._original_sigint_handler(signum, frame)
+
+        # Store original handlers and install new ones
+        try:
+            self._original_sigterm_handler = signal.signal(signal.SIGTERM, handle_shutdown_signal)
+            self._original_sigint_handler = signal.signal(signal.SIGINT, handle_shutdown_signal)
+            logger.debug("Signal handlers registered for graceful shutdown")
+        except (ValueError, OSError) as e:
+            # Signal handling may not be available in all contexts (e.g., threads)
+            logger.debug("Could not register signal handlers: %s", e)
+
+    def _cleanup_signal_handlers(self) -> None:
+        """Restore original signal handlers."""
+        try:
+            if self._original_sigterm_handler is not None:
+                _ = signal.signal(signal.SIGTERM, self._original_sigterm_handler)
+            if self._original_sigint_handler is not None:
+                _ = signal.signal(signal.SIGINT, self._original_sigint_handler)
+            logger.debug("Signal handlers restored")
+        except (ValueError, OSError) as e:
+            logger.debug("Could not restore signal handlers: %s", e)
+
+    def _initialize_providers(self) -> None:
+        """Initialize pipeline providers from global registry."""
+        try:
+            try:
+                self._embedding_provider = _get_embedding_instance(sparse=False)
+                logger.info(
+                    "Initialized embedding provider: %s", type(self._embedding_provider).__name__
+                )
+            except Exception as e:
+                logger.warning("No embedding provider configured: %s", e)
+                self._embedding_provider = None
+
+            try:
+                self._sparse_provider = _get_embedding_instance(sparse=True)
+                logger.info("Initialized sparse provider: %s", type(self._sparse_provider).__name__)
+            except Exception as e:
+                logger.debug("No sparse embedding provider configured: %s", e)
+                self._sparse_provider = None
+
+            if not self._embedding_provider and not self._sparse_provider:
+                logger.warning(
+                    "No embedding providers configured - indexing will proceed without embeddings"
+                )
+
+            try:
+                self._vector_store = _get_vector_store_instance()
+                logger.info("Initialized vector store: %s", type(self._vector_store).__name__)
+            except Exception as e:
+                logger.warning("No vector store configured: %s", e)
+                self._vector_store = None
+
+            self._chunking_service = self._chunking_service or _get_chunking_service()
+
+        except ImportError:
+            logger.warning("Provider registry not available, providers not initialized")
+
+    async def _index_file(self, path: Path, context: Any = None) -> None:
+        """Execute full pipeline for a single file: discover → chunk → embed → index.
+
+        Args:
+            path: Path to the file to index
+            context: Optional FastMCP context for structured logging
+        """
+        from codeweaver.common.logging import log_to_client_or_fallback
+
+        try:
+            # 1. Discover and store file metadata
+            discovered_file = DiscoveredFile.from_path(path)
+            if not discovered_file or not discovered_file.is_text:
+                logger.debug("Skipping non-text file: %s", path)
+                return
+
+            self._store.set(discovered_file.file_hash, discovered_file)
+            self._stats.files_discovered += 1
+
+            await log_to_client_or_fallback(
+                context,
+                "debug",
+                {
+                    "msg": "File discovered",
+                    "extra": {
+                        "phase": "discovery",
+                        "file_path": str(path),
+                        "file_size": discovered_file.size,
+                        "file_language": discovered_file.language.value
+                        if discovered_file.language
+                        else None,
+                        "total_discovered": self._stats.files_discovered,
+                    },
+                },
+            )
+
+            # 2. Chunk via ChunkingService (if available)
+            if not self._chunking_service:
+                logger.warning("No chunking service configured, skipping file: %s", path)
+                return
+
+            chunks = self._chunking_service.chunk_file(discovered_file)
+            self._stats.chunks_created += len(chunks)
+
+            await log_to_client_or_fallback(
+                context,
+                "debug",
+                {
+                    "msg": "File chunked",
+                    "extra": {
+                        "phase": "chunking",
+                        "file_path": str(path),
+                        "chunks_created": len(chunks),
+                        "total_chunks": self._stats.chunks_created,
+                    },
+                },
+            )
+
+            # 3. Embed chunks (if embedding providers available)
+            if self._embedding_provider or self._sparse_provider:
+                await self._embed_chunks(chunks)
+                self._stats.chunks_embedded += len(chunks)
+
+                await log_to_client_or_fallback(
+                    context,
+                    "debug",
+                    {
+                        "msg": "Chunks embedded",
+                        "extra": {
+                            "phase": "embedding",
+                            "file_path": str(path),
+                            "chunks_embedded": len(chunks),
+                            "total_embedded": self._stats.chunks_embedded,
+                            "dense_provider": type(self._embedding_provider).__name__
+                            if self._embedding_provider
+                            else None,
+                            "sparse_provider": type(self._sparse_provider).__name__
+                            if self._sparse_provider
+                            else None,
+                        },
+                    },
+                )
+            else:
+                await log_to_client_or_fallback(
+                    context,
+                    "warning",
+                    {
+                        "msg": "No embedding providers configured",
+                        "extra": {
+                            "phase": "embedding",
+                            "file_path": str(path),
+                            "action": "skipped",
+                        },
+                    },
+                )
+
+            # 4. Retrieve updated chunks from registry (single source of truth!)
+            from codeweaver.providers.embedding.registry import get_embedding_registry
+
+            registry = get_embedding_registry()
+            updated_chunks = [
+                registry[chunk.chunk_id].chunk for chunk in chunks if chunk.chunk_id in registry
+            ]
+
+            # If no chunks were embedded, use original chunks
+            if not updated_chunks:
+                logger.debug("No embedded chunks, using original chunks for: %s", path)
+                updated_chunks = chunks
+
+            # 5. Index to vector store (if available)
+            if self._vector_store:
+                await self._vector_store.upsert(updated_chunks)
+                self._stats.chunks_indexed += len(updated_chunks)
+
+                await log_to_client_or_fallback(
+                    context,
+                    "debug",
+                    {
+                        "msg": "Chunks indexed to vector store",
+                        "extra": {
+                            "phase": "storage",
+                            "file_path": str(path),
+                            "chunks_indexed": len(updated_chunks),
+                            "total_indexed": self._stats.chunks_indexed,
+                            "vector_store": type(self._vector_store).__name__,
+                        },
+                    },
+                )
+            else:
+                await log_to_client_or_fallback(
+                    context,
+                    "warning",
+                    {
+                        "msg": "No vector store configured",
+                        "extra": {"phase": "storage", "file_path": str(path), "action": "skipped"},
+                    },
+                )
+
+            self._stats.files_processed += 1
+
+            await log_to_client_or_fallback(
+                context,
+                "info",
+                {
+                    "msg": "File processing complete",
+                    "extra": {
+                        "file_path": str(path),
+                        "chunks_created": len(chunks),
+                        "files_processed": self._stats.files_processed,
+                        "total_files": self._stats.files_discovered,
+                        "progress_pct": round(
+                            (self._stats.files_processed / self._stats.files_discovered * 100), 1
+                        )
+                        if self._stats.files_discovered > 0
+                        else 0,
+                    },
+                },
+            )
+
+        except Exception as e:
+            logger.exception("Failed to index file %s", path)
+            self._stats.files_with_errors.append(path)
+
+            await log_to_client_or_fallback(
+                context,
+                "error",
+                {
+                    "msg": "File indexing failed",
+                    "extra": {
+                        "file_path": str(path),
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "total_errors": len(self._stats.files_with_errors),
+                    },
+                },
+            )
+
+    def _telemetry_keys(self) -> None:
+        return None
+
+    async def _embed_chunks(self, chunks: list[Any]) -> None:
+        """Embed chunks with both dense and sparse providers.
+
+        Args:
+            chunks: List of CodeChunk objects to embed
+        """
+        if not chunks:
+            return
+
+        # Dense embeddings
+        if self._embedding_provider:
+            try:
+                await self._embedding_provider.embed_documents(chunks)
+                logger.debug("Generated dense embeddings for %d chunks", len(chunks))
+            except Exception:
+                logger.exception("Dense embedding failed")
+
+        # Sparse embeddings
+        if self._sparse_provider:
+            try:
+                await self._sparse_provider.embed_documents(chunks)
+                logger.debug("Generated sparse embeddings for %d chunks", len(chunks))
+            except Exception:
+                logger.exception("Sparse embedding failed")
+
+    async def _delete_file(self, path: Path) -> None:
+        """Remove file from store and vector store.
+
+        Args:
+            path: Path to the file to remove
+        """
+        try:
+            if removed := self._remove_path(path):
+                logger.debug("Removed %d entries from store for: %s", removed, path)
+
+            # Remove from vector store
+            if self._vector_store:
+                try:
+                    await self._vector_store.delete_by_file(path)
+                    logger.debug("Removed chunks from vector store for: %s", path)
+                except Exception:
+                    logger.exception("Failed to remove from vector store")
+        except Exception:
+            logger.exception("Failed to delete file %s", path)
 
     async def index(self, change: FileChange) -> None:
         """Index a single file based on a watchfiles change event.
 
-        Handles added, modified, and deleted file events. For add/modify, the file is hashed and
-        stored if it's an indexable file type. For delete, any indexed entries matching the path are removed.
+        Enhanced version that executes full pipeline: file → chunks → embeddings → vector store.
+        Handles added, modified, and deleted file events.
         """
         try:
             change_type, path_str = change
@@ -269,49 +769,539 @@ class Indexer:
                 # Skip non-files quickly
                 if not path.exists() or not path.is_file():
                     return
-                # Only index files we recognize (code/config/docs) via DiscoveredFile
-                discovered_file = DiscoveredFile.from_path(path)
-                if not discovered_file or not discovered_file.is_text:
-                    return
-                # Remove any prior entries for this path (hash may have changed)
-                _ = self._remove_path(path)
-                # Persist using the discovered file's own content hash as the key
-                self._store.set(discovered_file.file_hash, discovered_file)
-                logger.debug(
-                    "Indexed %s [%s] (%s bytes)",
-                    discovered_file.path,
-                    discovered_file.ext_kind,
-                    discovered_file.size,
-                )
+                # Execute full pipeline
+                await self._index_file(path)
+
             case Change.deleted:
-                if removed := self._remove_path(path):
-                    logger.debug("Removed %d index entries for deleted path %s", removed, path)
+                # Remove from store and vector store
+                await self._delete_file(path)
+
             case _:
                 logger.debug("Unhandled change type %s for %s", change_type, path)
 
     # ---- public helpers ----
-    def prime_index(self) -> int:
+    def prime_index(
+        self,
+        *,
+        force_reindex: bool = False,
+        progress_callback: Callable[[IndexingStats, str | None], None] | None = None,
+    ) -> int:
         """Perform an initial indexing pass using the configured rignore walker.
 
-        Returns the number of files indexed. If no walker was provided, does nothing.
+        Enhanced version with persistence support and batch processing.
+
+        Args:
+            force_reindex: If True, skip persistence checks and reindex everything
+            progress_callback: Optional callback to report progress (receives stats and phase)
+
+        Returns:
+            Number of files indexed
         """
         if not self._walker:
+            logger.warning("No walker configured, cannot prime index")
             return 0
 
-        count = 0
+        # Try to restore from persistence (unless force_reindex)
+        if not force_reindex:
+            try:
+                # Try loading checkpoint first
+                if self.load_checkpoint():
+                    logger.info("Resuming from checkpoint")
+                    # Note: In v0.1, we still need to reindex discovered files
+                    # In v0.2, we'll implement true resumption with file tracking
+                else:
+                    # Fallback: Try restoring from vector store
+                    # TODO: Implement in future phase
+                    # asyncio.run(self.initialize_from_vector_store())
+                    # if not self._store.is_empty:
+                    #     logger.info("Restored index from vector store")
+                    #     return len(self._store)
+                    pass  # type: ignore
+            except Exception as e:
+                logger.debug("Could not restore from persistence: %s", e)
+
+        # Reset stats for new indexing run
+        self._stats = IndexingStats()
+
+        # Collect files to index
+        files_to_index: list[Path] = []
         try:
             with contextlib.suppress(StopIteration):
-                for p in self._walker:
-                    # rignore returns absolute paths typically; ensure it's a file
-                    if not p or not p.is_file():
-                        continue
-                    if discovered_file := DiscoveredFile.from_path(p):
-                        _ = self._remove_path(discovered_file.path)
-                        self._store.set(discovered_file.file_hash, discovered_file)
-                        count += 1
+                files_to_index.extend(p for p in self._walker if p and p.is_file())
         except Exception:
-            logger.exception("Failure during initial indexing pass")
-        return count
+            logger.exception("Failure during file discovery")
+            return 0
+
+        if not files_to_index:
+            logger.info("No files found to index")
+            return 0
+
+        logger.info("Discovered %d files to index", len(files_to_index))
+        self._stats.files_discovered = len(files_to_index)
+
+        # Report discovery phase complete
+        if progress_callback:
+            progress_callback(self._stats, "discovery")
+
+        # Index files in batch (synchronous wrapper for async pipeline)
+        try:
+            # Check if we're already in an event loop
+            try:
+                asyncio.get_running_loop()
+                # Already in event loop - run in thread to avoid blocking
+                import concurrent.futures
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(
+                        asyncio.run, self._index_files_batch(files_to_index, progress_callback)
+                    )
+                    future.result()  # Wait for completion and propagate exceptions
+            except RuntimeError:
+                # No event loop running, use asyncio.run()
+                asyncio.run(self._index_files_batch(files_to_index, progress_callback))
+        except Exception:
+            logger.exception("Failure during batch indexing")
+
+        logger.info(
+            "Indexing complete: %d files processed, %d chunks created, %d indexed, %d errors in %.2fs (%.2f files/sec)",
+            self._stats.files_processed,
+            self._stats.chunks_created,
+            self._stats.chunks_indexed,
+            len(self._stats.files_with_errors),
+            self._stats.elapsed_time,
+            self._stats.processing_rate,
+        )
+
+        # Save final checkpoint
+        self.save_checkpoint()
+        logger.info("Final checkpoint saved")
+
+        # Clean up checkpoint file on successful completion
+        if self._checkpoint_manager and len(self._stats.files_with_errors) == 0:
+            self._checkpoint_manager.delete()
+            logger.info("Checkpoint file deleted after successful completion")
+
+        return self._stats.files_processed
+
+    @classmethod
+    def from_settings(cls, settings: DictView[CodeWeaverSettingsDict] | None = None) -> Indexer:
+        """Create an Indexer instance from settings.
+
+        Args:
+            settings: Optional settings dictionary view
+
+        Returns:
+            Configured Indexer instance
+        """
+        from codeweaver.common.utils.git import get_project_path
+        from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
+        from codeweaver.config.settings import get_settings_map
+
+        settings_map = settings or get_settings_map()
+        indexing_data = settings_map["indexing"]
+
+        # Handle different types of indexing_data
+        if isinstance(indexing_data, Unset):
+            index_settings = IndexerSettings.model_validate(DefaultIndexerSettings)
+        elif isinstance(indexing_data, IndexerSettings):
+            # Use the existing IndexerSettings instance directly
+            index_settings = indexing_data
+        else:
+            # If it's a dict or something else, try to validate it
+            index_settings = IndexerSettings.model_validate(
+                DefaultIndexerSettings | indexing_data
+                if isinstance(indexing_data, dict)
+                else DefaultIndexerSettings
+            )
+
+        if not index_settings.inc_exc_set:
+            # Check if there's already a running event loop
+            try:
+                asyncio.get_running_loop()
+                # If we're here, there's a running loop
+                # We can't await here since from_settings is not async, so skip for now
+                logger.warning(
+                    "Cannot set inc_exc in Indexer.from_settings: already in async context. Will be set lazily when indexer is used."
+                )
+            except RuntimeError:
+                # No running loop, safe to use asyncio.run()
+                _ = asyncio.run(
+                    index_settings.set_inc_exc(
+                        get_project_path()
+                        if isinstance(settings_map["project_path"], Unset)
+                        else settings_map["project_path"]
+                    )
+                )
+        walker = rignore.Walker(
+            **(index_settings.to_settings())  # type: ignore
+        )
+        return cls(walker=walker, project_path=settings_map["project_path"])
+
+    @classmethod
+    def from_config(
+        cls,
+        project_path: Path | None = None,
+        settings: DictView[CodeWeaverSettingsDict] | None = None,
+    ) -> Indexer:
+        """Create a new `Indexer` from configuration settings."""
+        from codeweaver.common.utils.git import get_project_path
+        from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
+        from codeweaver.config.settings import get_settings_map
+        from codeweaver.core.types.sentinel import Unset
+
+        settings_map = settings or get_settings_map()
+        index_settings = (
+            IndexerSettings.model_validate(DefaultIndexerSettings)
+            if isinstance(settings_map["indexing"], Unset)
+            else settings_map["indexing"]
+        )
+        if not index_settings.inc_exc_set:
+            # Check if there's already a running event loop
+            try:
+                asyncio.get_running_loop()
+                # If we're here, there's a running loop
+                # We can't await here since from_config is not async, so skip for now
+                logger.warning(
+                    "Cannot set inc_exc in Indexer.from_config: already in async context. Will be set lazily when indexer is used."
+                )
+            except RuntimeError:
+                # No running loop, safe to use asyncio.run()
+                _ = asyncio.run(
+                    index_settings.set_inc_exc(
+                        get_project_path()
+                        if isinstance(settings_map["project_path"], Unset)
+                        else settings_map["project_path"]
+                    )
+                )
+        indexing = index_settings.to_settings()
+        return cls(
+            base_path=settings_map["project_path"],
+            settings=None,
+            walker=rignore.walk(**indexing),  # type: ignore
+        )
+
+    def _discover_files_for_batch(self, files: list[Path]) -> list[DiscoveredFile]:
+        """Convert file paths to DiscoveredFile objects.
+
+        Args:
+            files: List of file paths to discover
+
+        Returns:
+            List of valid DiscoveredFile objects
+        """
+        discovered_files: list[DiscoveredFile] = []
+        for path in files:
+            try:
+                discovered_file = DiscoveredFile.from_path(path)
+                if discovered_file and discovered_file.is_text:
+                    discovered_files.append(discovered_file)
+                    self._store.set(discovered_file.file_hash, discovered_file)
+            except Exception:
+                logger.exception("Failed to discover file %s", path)
+                self._stats.files_with_errors.append(path)
+        return discovered_files
+
+    def _chunk_discovered_files(self, discovered_files: list[DiscoveredFile]) -> list[CodeChunk]:
+        """Chunk discovered files using the chunking service.
+
+        Args:
+            discovered_files: List of discovered files to chunk
+
+        Returns:
+            List of code chunks created from the files
+        """
+        if not self._chunking_service:
+            self._chunking_service = _get_chunking_service()
+        all_chunks: list[CodeChunk] = []
+        for file_path, chunks in self._chunking_service.chunk_files(discovered_files):
+            all_chunks.extend(chunks)
+            self._stats.chunks_created += len(chunks)
+            logger.debug("Chunked %s: %d chunks", file_path, len(chunks))
+        return all_chunks
+
+    async def _embed_chunks_in_batches(
+        self, chunks: list[CodeChunk], batch_size: int = 100
+    ) -> None:
+        """Embed chunks in batches.
+
+        Args:
+            chunks: List of chunks to embed
+            batch_size: Number of chunks per batch
+        """
+        for i in range(0, len(chunks), batch_size):
+            batch = chunks[i : i + batch_size]
+            try:
+                await self._embed_chunks(batch)
+                self._stats.chunks_embedded += len(batch)
+                logger.debug("Embedded batch %d-%d (%d chunks)", i, i + len(batch), len(batch))
+            except Exception:
+                logger.exception("Failed to embed batch %d-%d", i, i + len(batch))
+
+    def _retrieve_embedded_chunks(self, chunks: list[CodeChunk]) -> list[CodeChunk]:
+        """Retrieve embedded chunks from registry, falling back to originals if needed.
+
+        Args:
+            chunks: Original chunks to look up in registry
+
+        Returns:
+            Updated chunks from registry, or original chunks if none found
+        """
+        from codeweaver.providers.embedding.registry import get_embedding_registry
+
+        registry = get_embedding_registry()
+        updated_chunks = [
+            registry[chunk.chunk_id].chunk for chunk in chunks if chunk.chunk_id in registry
+        ]
+
+        if not updated_chunks:
+            logger.warning("No chunks were embedded, using original chunks")
+            return chunks
+        return updated_chunks
+
+    async def _index_chunks_to_store(self, chunks: list[CodeChunk]) -> None:
+        """Index chunks to the vector store.
+
+        Args:
+            chunks: List of chunks to index
+        """
+        if not self._vector_store:
+            logger.warning("No vector store configured, skipping indexing")
+            return
+
+        try:
+            await self._vector_store.upsert(chunks)
+            self._stats.chunks_indexed = len(chunks)
+            logger.info("Indexed %d chunks to vector store", len(chunks))
+        except Exception:
+            logger.exception("Failed to index to vector store")
+
+    async def _index_files_batch(
+        self,
+        files: list[Path],
+        progress_callback: Callable[[IndexingStats, str | None], None] | None = None,
+        context: Any = None,
+    ) -> None:
+        """Index multiple files in batch using the chunking service.
+
+        Args:
+            files: List of file paths to index
+            progress_callback: Optional callback to report progress (receives stats and phase)
+            context: Optional FastMCP context for structured logging
+        """
+        from codeweaver.common.logging import log_to_client_or_fallback
+
+        if not files:
+            return
+
+        # Check for shutdown request
+        if self._shutdown_requested:
+            await log_to_client_or_fallback(
+                context,
+                "info",
+                {
+                    "msg": "Shutdown requested",
+                    "extra": {"action": "stopping_batch_indexing", "files_remaining": len(files)},
+                },
+            )
+            return
+
+        if not self._chunking_service:
+            await log_to_client_or_fallback(
+                context,
+                "warning",
+                {
+                    "msg": "No chunking service configured",
+                    "extra": {"action": "cannot_batch_index", "files_count": len(files)},
+                },
+            )
+            return
+
+        # Phase 1: Discover files
+        await log_to_client_or_fallback(
+            context,
+            "info",
+            {
+                "msg": "Starting batch indexing",
+                "extra": {
+                    "phase": "discovery",
+                    "batch_size": len(files),
+                    "total_discovered": self._stats.files_discovered,
+                },
+            },
+        )
+
+        discovered_files = self._discover_files_for_batch(files)
+        if not discovered_files:
+            await log_to_client_or_fallback(
+                context,
+                "info",
+                {
+                    "msg": "No valid files to index",
+                    "extra": {"phase": "discovery", "files_attempted": len(files)},
+                },
+            )
+            return
+
+        # Report progress after discovery
+        if progress_callback:
+            progress_callback(self._stats, "discovery")
+
+        # Phase 2: Chunk files
+        await log_to_client_or_fallback(
+            context,
+            "info",
+            {
+                "msg": "Discovery complete, starting chunking",
+                "extra": {
+                    "phase": "chunking",
+                    "files_discovered": len(discovered_files),
+                    "languages": list(
+                        {f.language.value for f in discovered_files if f.language}
+                    ),
+                },
+            },
+        )
+
+        all_chunks = self._chunk_discovered_files(discovered_files)
+        if not all_chunks:
+            await log_to_client_or_fallback(
+                context,
+                "info",
+                {
+                    "msg": "No chunks created",
+                    "extra": {"phase": "chunking", "files_processed": len(discovered_files)},
+                },
+            )
+            return
+
+        await log_to_client_or_fallback(
+            context,
+            "info",
+            {
+                "msg": "Chunking complete",
+                "extra": {
+                    "phase": "chunking",
+                    "chunks_created": len(all_chunks),
+                    "files_chunked": len(discovered_files),
+                    "avg_chunks_per_file": round(len(all_chunks) / len(discovered_files), 1),
+                },
+            },
+        )
+
+        # Report progress after chunking
+        if progress_callback:
+            progress_callback(self._stats, "chunking")
+
+        # Phase 3-5: Only run if providers are initialized
+        if self._embedding_provider or self._sparse_provider or self._vector_store:
+            # Phase 3: Embed chunks in batches
+            await log_to_client_or_fallback(
+                context,
+                "info",
+                {
+                    "msg": "Starting embedding phase",
+                    "extra": {
+                        "phase": "embedding",
+                        "chunks_to_embed": len(all_chunks),
+                        "dense_provider": type(self._embedding_provider).__name__
+                        if self._embedding_provider
+                        else None,
+                        "sparse_provider": type(self._sparse_provider).__name__
+                        if self._sparse_provider
+                        else None,
+                    },
+                },
+            )
+
+            await self._embed_chunks_in_batches(all_chunks)
+
+            await log_to_client_or_fallback(
+                context,
+                "info",
+                {
+                    "msg": "Embedding complete",
+                    "extra": {"phase": "embedding", "chunks_embedded": self._stats.chunks_embedded},
+                },
+            )
+
+            # Report progress after embedding
+            if progress_callback:
+                progress_callback(self._stats, "embedding")
+
+            # Phase 4: Retrieve embedded chunks from registry
+            updated_chunks = self._retrieve_embedded_chunks(all_chunks)
+
+            # Phase 5: Index to vector store
+            await log_to_client_or_fallback(
+                context,
+                "info",
+                {
+                    "msg": "Starting vector store indexing",
+                    "extra": {
+                        "phase": "storage",
+                        "chunks_to_index": len(updated_chunks),
+                        "vector_store": type(self._vector_store).__name__
+                        if self._vector_store
+                        else None,
+                    },
+                },
+            )
+
+            await self._index_chunks_to_store(updated_chunks)
+
+            await log_to_client_or_fallback(
+                context,
+                "info",
+                {
+                    "msg": "Vector store indexing complete",
+                    "extra": {"phase": "storage", "chunks_indexed": self._stats.chunks_indexed},
+                },
+            )
+
+            # Report progress after indexing
+            if progress_callback:
+                progress_callback(self._stats, "indexing")
+        else:
+            await log_to_client_or_fallback(
+                context,
+                "debug",
+                {
+                    "msg": "Skipping embedding and indexing phases",
+                    "extra": {"reason": "no_providers_initialized"},
+                },
+            )
+
+        # Update stats with successful file count
+        self._stats.files_processed += len(discovered_files)
+        self._files_since_checkpoint += len(discovered_files)
+
+        # Save checkpoint if threshold reached
+        if self._should_checkpoint():
+            self.save_checkpoint()
+            logger.info(
+                "Checkpoint saved at %d/%d files processed",
+                self._stats.files_processed,
+                self._stats.files_discovered,
+            )
+
+    def _should_checkpoint(self) -> bool:
+        """Check if checkpoint should be saved based on frequency criteria.
+
+        Returns:
+            True if checkpoint should be saved (every 100 files or every 5 minutes)
+        """
+        # Check file count threshold
+        if self._files_since_checkpoint >= 100:
+            return True
+
+        # Check time threshold (300 seconds = 5 minutes)
+        elapsed_time = time.time() - self._last_checkpoint_time
+        return elapsed_time >= 300
+
+    @property
+    def stats(self) -> IndexingStats:
+        """Get current indexing statistics."""
+        return self._stats
 
     # ---- internal helpers ----
     def _remove_path(self, path: Path) -> int:
@@ -342,6 +1332,121 @@ class Indexer:
         except KeyboardInterrupt:
             # allow graceful stop
             return
+
+    # ---- Persistence methods (stubs for T007-T008) ----
+
+    async def initialize_from_vector_store(self) -> None:
+        """Query vector store for indexed files on cold start.
+
+        TODO: Implement in T007/T008
+        - Query vector store for all indexed chunks
+        - Reconstruct file metadata store from chunk payloads
+        - Populate self._store with DiscoveredFile objects
+        """
+        logger.debug("Persistence from vector store not yet implemented")
+
+    def save_state(self, state_path: Path) -> None:
+        """Save current indexer state to a file."""
+
+    def save_checkpoint(self, checkpoint_path: DirectoryPath | None = None) -> None:
+        """Save indexing state to checkpoint file.
+
+        Saves current indexing progress including:
+        - Files discovered/processed/indexed counts
+        - Chunks created/embedded/indexed counts
+        - Error list with file paths
+        - Settings hash for invalidation detection
+
+        Args:
+            checkpoint_path: Optional custom checkpoint file path (primarily for testing)
+        """
+        if not self._checkpoint_manager:
+            logger.warning("No checkpoint manager configured")
+            return
+
+        # Compute settings hash
+
+        settings_hash = self._checkpoint_manager.compute_settings_hash(
+            self._checkpoint_manager.get_relevant_settings()
+        )
+
+        # Create or update checkpoint
+        if not self._checkpoint:
+            self._checkpoint = IndexingCheckpoint(
+                project_path=self._checkpoint_manager.get_relevant_settings()["project_path"],
+                settings_hash=settings_hash,
+            )
+
+        # Update checkpoint with current stats
+        self._checkpoint.files_discovered = self._stats.files_discovered
+        self._checkpoint.files_embedding_complete = self._stats.files_processed
+        self._checkpoint.files_indexed = self._stats.files_processed
+        self._checkpoint.chunks_created = self._stats.chunks_created
+        self._checkpoint.chunks_embedded = self._stats.chunks_embedded
+        self._checkpoint.chunks_indexed = self._stats.chunks_indexed
+        self._checkpoint.files_with_errors = [str(p) for p in self._stats.files_with_errors]
+        self._checkpoint.settings_hash = settings_hash
+
+        # Save to disk
+        self._checkpoint_manager.save(self._checkpoint)
+        self._last_checkpoint_time = time.time()
+        self._files_since_checkpoint = 0
+
+    def _construct_checkpoint_fingerprint(self) -> str:
+        """Construct a fingerprint hash of current settings for checkpoint validation."""
+        if not self._checkpoint_manager:
+            raise RuntimeError("No checkpoint manager configured")
+        return self._checkpoint_manager.compute_settings_hash(
+            self._checkpoint_manager.get_relevant_settings()
+        )
+
+    def load_checkpoint(self, _checkpoint_path: Path | None = None) -> bool:
+        """Load indexing state from checkpoint file.
+
+        Loads checkpoint if available and valid:
+        - Verifies settings hash matches current config
+        - Skips if checkpoint >24 hours old
+        - Restores stats for progress tracking
+
+        Args:
+            _checkpoint_path: Optional custom checkpoint file path (primarily for testing)
+
+        Returns:
+            True if checkpoint was loaded successfully and is valid for resumption
+        """
+        if not self._checkpoint_manager:
+            logger.warning("No checkpoint manager configured")
+            return False
+
+        # Load checkpoint from disk
+        checkpoint = self._checkpoint_manager.load()
+        if not checkpoint:
+            return False
+
+        current_settings_hash = self._construct_checkpoint_fingerprint()
+
+        if not self._checkpoint_manager.should_resume(
+            checkpoint, current_settings_hash, max_age_hours=24
+        ):
+            logger.info("Checkpoint cannot be used for resumption, will reindex from scratch")
+            return False
+
+        # Restore stats from checkpoint
+        self._stats.files_discovered = checkpoint.files_discovered
+        self._stats.files_processed = checkpoint.files_embedding_complete
+        self._stats.chunks_created = checkpoint.chunks_created
+        self._stats.chunks_embedded = checkpoint.chunks_embedded
+        self._stats.chunks_indexed = checkpoint.chunks_indexed
+        type(self._stats).files_with_errors = [Path(p) for p in checkpoint.files_with_errors]
+
+        self._checkpoint = checkpoint
+        logger.info(
+            "Checkpoint loaded successfully: %d/%d files processed, %d chunks created",
+            checkpoint.files_embedding_complete,
+            checkpoint.files_discovered,
+            checkpoint.chunks_created,
+        )
+        return True
 
     @property
     def is_empty(self) -> bool:

@@ -41,14 +41,14 @@ def _setup_config_logger(
     *,
     level: int = logging.INFO,
     rich: bool = True,
-    rich_kwargs: dict[str, Any] | None = None,
+    rich_options: dict[str, Any] | None = None,
     logging_kwargs: LoggingConfigDict | None = None,
 ) -> logging.Logger:
     """Set up a logger with optional rich formatting."""
     if logging_kwargs:
         dictConfig({**logging_kwargs})
         if rich:
-            handler = get_rich_handler(**(rich_kwargs or {}))
+            handler = get_rich_handler(**(rich_options or {}))
             logger = logging.getLogger(name)
             logger.setLevel(level)
             logger.addHandler(handler)
@@ -62,7 +62,7 @@ def setup_logger(
     *,
     level: int = logging.INFO,
     rich: bool = True,
-    rich_kwargs: dict[str, Any] | None = None,
+    rich_options: dict[str, Any] | None = None,
     logging_kwargs: LoggingConfigDict | None = None,
 ) -> logging.Logger:
     """Set up a logger with optional rich formatting."""
@@ -71,31 +71,43 @@ def setup_logger(
             name=name,
             level=level,
             rich=rich,
-            rich_kwargs=rich_kwargs,
+            rich_options=rich_options,
             logging_kwargs=logging_kwargs,
         )
     if not rich:
         logging.basicConfig(level=level)
         return logging.getLogger(name)
-    handler = get_rich_handler(**(rich_kwargs or {}))
+    handler = get_rich_handler(**(rich_options or {}))
     logger = logging.getLogger(name)
     logger.setLevel(level)
     logger.addHandler(handler)
     return logger
 
 
-def log_to_client_or_fallback(
-    logger: logging.Logger,
-    message: str,
-    level: Literal["debug", "info", "warning", "error"] = "info",
-    extra: dict[str, Any] | None = None,
-    ctx: Context | None = None,
+async def log_to_client_or_fallback(
+    context: Context | None,
+    level: Literal["debug", "info", "warning", "error"],
+    log_data: dict[str, Any],
 ) -> None:
-    """Log a message to the client or fallback to standard logging."""
-    if ctx and hasattr(ctx, level):
-        log_obj = getattr(ctx, level)
-        log_obj(f"{message}\n\n{to_json(extra, indent=2) if extra else ''}", logger.name)
+    """Log structured data to the client or fallback to standard logging.
+
+    Args:
+        context: FastMCP context (optional)
+        level: Log level
+        log_data: Dict with 'msg' (required) and 'extra' (optional) keys
+    """
+    msg = log_data.get("msg", "")
+    extra = log_data.get("extra")
+
+    if context and hasattr(context, level):
+        log_obj = getattr(context, level)
+        if extra:
+            log_obj(f"{msg}\n\n{to_json(extra, indent=2).decode('utf-8')}")
+        else:
+            log_obj(msg)
     else:
+        # Fallback to standard logging
+        logger = logging.getLogger("codeweaver")
         match level:
             case "debug":
                 int_level: int = logging.DEBUG
@@ -105,7 +117,7 @@ def log_to_client_or_fallback(
                 int_level: int = logging.WARNING
             case "error":
                 int_level: int = logging.ERROR
-        logger.log(int_level, message, extra=extra)
+        logger.log(int_level, msg, extra=extra)
 
 
 __all__ = ("log_to_client_or_fallback", "setup_logger")

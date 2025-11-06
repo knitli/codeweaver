@@ -11,19 +11,16 @@ Validates acceptance criteria spec.md:78
 import tempfile
 
 from pathlib import Path
-from uuid import uuid4
 
 import pytest
 
-from codeweaver.core.chunks import CodeChunk
+from codeweaver.common.utils.utils import uuid7
 from codeweaver.core.language import SemanticSearchLanguage as Language
-from codeweaver.providers.vector_stores.inmemory import MemoryVectorStore
+from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
+from tests.conftest import create_test_chunk_with_embeddings
+
 
 pytestmark = pytest.mark.integration
-
-
-
-
 
 
 async def test_inmemory_persistence():
@@ -36,19 +33,23 @@ async def test_inmemory_persistence():
     """
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_path = Path(tmpdir) / "test_memory.json"
-        config = {"persist_path": temp_path, "auto_persist": True, "collection_name": "test_memory"}
+        config = {
+            "persist_path": str(temp_path),
+            "auto_persist": True,
+            "collection_name": "test_memory",
+        }
 
         # Phase 1: Create and populate
-        provider1 = MemoryVectorStore(config=config)
+        provider1 = MemoryVectorStoreProvider(config=config)
         await provider1._initialize()
 
-        chunk = CodeChunk(
-            chunk_id=uuid4(),
+        chunk = create_test_chunk_with_embeddings(
+            chunk_id=uuid7(),
             chunk_name="memory_test.py:func",
             file_path=Path("memory_test.py"),
             language=Language.PYTHON,
             content="test function",
-            embeddings={"dense": [0.7, 0.7, 0.7] * 256},
+            dense_embedding=[0.7, 0.7, 0.7] * 256,
             line_start=1,
             line_end=5,
         )
@@ -62,7 +63,7 @@ async def test_inmemory_persistence():
         assert temp_path.exists(), "Persistence file should be created"
 
         # Phase 2: Restore from disk
-        provider2 = MemoryVectorStore(config=config)
+        provider2 = MemoryVectorStoreProvider(config=config)
         await provider2._initialize()
 
         # Verify: Chunk restored from disk

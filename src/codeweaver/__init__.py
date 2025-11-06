@@ -7,20 +7,36 @@
 from codeweaver._version import __version__
 from codeweaver.exceptions import (
     CodeWeaverError,
+    CollectionNotFoundError,
     ConfigurationError,
+    DimensionMismatchError,
     IndexingError,
+    InitializationError,
+    MissingValueError,
+    ModelSwitchError,
+    PersistenceError,
     ProviderError,
+    ProviderSwitchError,
     QueryError,
-    ValidationError,
+    RerankingProviderError,
 )
+from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
 
 
 __all__ = (
     "CodeWeaverError",
+    "CodeWeaverValidationError",
+    "CollectionNotFoundError",
     "ConfigurationError",
+    "DimensionMismatchError",
     "IndexingError",
+    "InitializationError",
+    "MissingValueError",
+    "ModelSwitchError",
+    "PersistenceError",
     "ProviderError",
+    "ProviderSwitchError",
     "QueryError",
-    "ValidationError",
+    "RerankingProviderError",
     "__version__",
 )

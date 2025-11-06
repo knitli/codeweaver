@@ -13,6 +13,7 @@ import sys
 
 from collections.abc import Callable, ItemsView, Iterator, KeysView, ValuesView
 from functools import cached_property
+from pathlib import Path
 from types import MappingProxyType
 from typing import (
     TYPE_CHECKING,
@@ -238,7 +239,11 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
                 sample_item = self.value_type()
         if not sample_item:
             return lambda item: item  # no-op copy
-        if isinstance(sample_item, list | set | tuple):
+        # Tuples (including NamedTuples) are immutable, no copy needed
+        if isinstance(sample_item, tuple):
+            return lambda item: item
+        # Lists and sets have .copy() method
+        if isinstance(sample_item, list | set):
             return lambda item: item.copy()  # pyright: ignore[reportUnknownMemberType, reportUnknownLambdaType, reportAttributeAccessIssue]
         if copy_strategy := self._trial_and_error_copy(sample_item):
             if copy_strategy == "deepcopy":
@@ -451,6 +456,19 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {FilteredKey("store"): AnonymityConversion.COUNT}
+
+    def save(self, path: Path) -> None:
+        """Persist the store to disk at the specified path."""
+        from pydantic_core import to_json
+
+        _ = path.write_bytes(
+            to_json(self.model_dump_json(indent=2, exclude={"_trash_heap"}, round_trip=True))
+        )
+
+    @classmethod
+    def load(cls, path: Path) -> _SimpleTypedStore[KeyT, T]:
+        """Load the store from disk at the specified path."""
+        return cls.model_validate_json(path.read_bytes())
 
 
 class UUIDStore[T](_SimpleTypedStore[UUID7, T]):

@@ -359,9 +359,9 @@ class _LanguageStatistics(DataclassSerializationMixin):
     skipped: Annotated[
         NonNegativeInt, Field(description="""Number of files skipped for this language.""")
     ] = 0
-    unique_files: ClassVar[
-        Annotated[set[Path], Field(default_factory=set, init=False, repr=False, exclude=True)]
-    ] = set()
+    unique_files: ClassVar[Annotated[set[Path], Field(init=False, repr=False, exclude=True)]] = (
+        set()
+    )
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
@@ -564,12 +564,12 @@ class FileStatistics(DataclassSerializationMixin):
         }
     )
 
-    _other_files: ClassVar[
-        Annotated[set[Path], Field(default_factory=set, init=False, repr=False, exclude=True)]
-    ] = set()
+    _other_files: ClassVar[Annotated[set[Path], Field(init=False, repr=False, exclude=True)]] = (
+        set()
+    )
 
-    def _telemetry_keys(self):
-        from codeweaver.core import AnonymityConversion, FilteredKey
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {FilteredKey("_other_files"): AnonymityConversion.COUNT}
 
@@ -666,6 +666,8 @@ class TokenCategory(BaseEnum):
 
     EMBEDDING = "embedding"
     """Tokens generated for storing/using in embedding operations. Includes query tokens."""
+    SPARSE_EMBEDDING = "sparse_embedding"
+    """Tokens generated for storing/using in sparse embedding operations."""
     RERANKING = "reranking"
     """Embeddings generated for reranking search results."""
 
@@ -730,6 +732,7 @@ class TokenCounter(Counter[TokenCategory]):
         self.update({
             TokenCategory.EMBEDDING: 0,
             TokenCategory.RERANKING: 0,
+            TokenCategory.SPARSE_EMBEDDING: 0,
             TokenCategory.CONTEXT_AGENT: 0,
             TokenCategory.USER_AGENT: 0,
             TokenCategory.SEARCH_RESULTS: 0,
@@ -739,7 +742,11 @@ class TokenCounter(Counter[TokenCategory]):
     @property
     def total_generated(self) -> NonNegativeInt:
         """Get the total number of tokens generated across all operations."""
-        return sum((self[TokenCategory.EMBEDDING], self[TokenCategory.RERANKING]))
+        return sum((
+            self[TokenCategory.EMBEDDING],
+            self[TokenCategory.RERANKING],
+            self[TokenCategory.SPARSE_EMBEDDING],
+        ))
 
     @computed_field
     @property
@@ -777,12 +784,12 @@ class TokenCounter(Counter[TokenCategory]):
 
 
         For now we're using simple 'back-of-the-envelope' calculations. We assume:
-        - The average cost per 1,000 tokens for embedding models is $0.00018 (Voyage AI as of September 2025)
-        - The average cost per 1,000 tokens for reranking models is $0.00005 (Voyage AI as of September 2025)
+        - The average cost per 1,000 tokens for embedding models is $0.00018 (Voyage AI as of October 2025)
+        - The average cost per 1,000 tokens for reranking models is $0.00005 (Voyage AI as of October 2025)
         - Sparse models we consider `free` for this calculation, as compared to everything else, the costs to run them are miniscule.
         - CodeWeaver itself doesn't have control over what model is used for the context agent, but CodeWeaver does *recommend* models to the user's client. We choose light-weight, low-cost models because we don't need frontline models for the context agent to do its job well, and we want it to be fast.
-            - Assuming the user's client chooses to listen to our recommendation (a big assumption), we assume the selected model is GPT-5-mini. As of September 2025, GPT-5-mini is priced at $0.25/million tokens, or $0.00025/1,000 tokens for input, and $2/M tokens for output, or $0.002/1,000 tokens.
-        - We assume the user's agent is using a frontline model. As of September 2025, by far the most used model for coding is Anthropic's Claude 4 Sonnet. The costs for Sonnet are complex because they vary heavily based on context length and caching (for example, if the message is over 200,000 tokens, output cost jumps from $15/M to $22.5/M tokens).
+            - Assuming the user's client chooses to listen to our recommendation (a big assumption), we assume the selected model is Claude-Haiku-4.5. As of October 2025, Claude-Haiku-4.5 is priced at $0.25/million tokens, or $0.00025/1,000 tokens for input, and $2/M tokens for output, or $0.002/1,000 tokens.
+        - We assume the user's agent is using a frontline model. As of October 2025, by far the most used model for coding is Anthropic's Claude 4.5 Sonnet. The costs for Sonnet are complex because they vary heavily based on context length and caching (for example, if the message is over 200,000 tokens, output cost jumps from $15/M to $22.5/M tokens).
             - We assume the lower end of the pricing, which is $3/M input and $15/M output. Which is $0.003/1,000 tokens for input and $0.015/1,000 tokens for output.
             - Generally, about 80% of token use is for input, and 20% is for output, so we use that ratio to calculate an average cost per 1,000 tokens.
             - Any "savings" are calculated against this assumed cost.
@@ -790,7 +797,7 @@ class TokenCounter(Counter[TokenCategory]):
         """
         embedding_cost_per_1k = 0.00018
         reranking_cost_per_1k = 0.00005
-        _sparse_cost_per_1k = 0.0  # we don't track sparse token use because it's effectively free but it's here for clarity
+        _sparse_cost_per_1k = 0.0  # we don't track sparse token use because costs are negligible compared to everything else
         context_agent_cost_per_1k = 0.00025
         user_agent_cost_per_1k = (0.8 * 0.003) + (0.2 * 0.015)
 
@@ -1065,6 +1072,7 @@ class SessionStatistics(DataclassSerializationMixin):
         self,
         *,
         embedding_generated: NonNegativeInt = 0,
+        sparse_embedding_generated: NonNegativeInt = 0,
         reranking_generated: NonNegativeInt = 0,
         context_agent_used: NonNegativeInt = 0,
         user_agent_received: NonNegativeInt = 0,
@@ -1077,6 +1085,7 @@ class SessionStatistics(DataclassSerializationMixin):
 
         self.token_statistics[TokenCategory.EMBEDDING] += embedding_generated
         self.token_statistics[TokenCategory.RERANKING] += reranking_generated
+        self.token_statistics[TokenCategory.SPARSE_EMBEDDING] += sparse_embedding_generated
         self.token_statistics[TokenCategory.CONTEXT_AGENT] += context_agent_used
         self.token_statistics[TokenCategory.USER_AGENT] += user_agent_received
         self.token_statistics[TokenCategory.SEARCH_RESULTS] += search_results

@@ -15,18 +15,22 @@ import asyncio
 import logging
 
 from collections.abc import Iterator, Sequence
-from typing import Annotated, Any, Literal, Self, cast
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Self, cast
 
 from pydantic import AliasGenerator, ConfigDict, Field, JsonValue, PositiveInt, model_validator
 from pydantic.alias_generators import to_camel, to_snake
 
 from codeweaver.config.providers import AWSProviderSettings
-from codeweaver.core.chunks import CodeChunk, StructuredDataInput
 from codeweaver.core.types.models import BasedModel
+from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.amazon import get_amazon_reranking_capabilities
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult
+
+
+if TYPE_CHECKING:
+    from codeweaver.core.chunks import CodeChunk, StructuredDataInput
 
 
 class BaseBedrockModel(BasedModel):
@@ -140,7 +144,20 @@ class DocumentSource(BaseBedrockModel):
         if (self.json_document and self.text_document) or (
             not self.json_document and not self.text_document
         ):
-            raise ValueError("Exactly one of json_document or text_document must be provided.")
+            raise CodeWeaverValidationError(
+                "Bedrock reranking requires exactly one document type",
+                details={
+                    "provider": "bedrock",
+                    "model": "reranking",
+                    "json_document_provided": self.json_document is not None,
+                    "text_document_provided": self.text_document is not None,
+                },
+                suggestions=[
+                    "Provide either json_document OR text_document, not both",
+                    "Ensure at least one document type is specified",
+                    "Check the document format matches the model requirements",
+                ],
+            )
         return self
 
 
@@ -288,6 +305,8 @@ class BedrockRerankingProvider(RerankingProvider[boto3_client]):
         We can't actually produce the full objects we need here with just the documents. We need the query and model config to construct the full object.
         We're going to handle that in the rerank method, and break type override law. 👮
         """
+        from codeweaver.core.chunks import CodeChunk
+
         # Transform the input documents into the format expected by the Bedrock API
         if isinstance(documents, list | tuple | set):
             docs = [
@@ -328,6 +347,8 @@ class BedrockRerankingProvider(RerankingProvider[boto3_client]):
         original_chunks: tuple[CodeChunk, ...] | Iterator[CodeChunk],
     ) -> list[RerankingResult]:
         """Transform the Bedrock API response into the format expected by the reranking provider."""
+        from codeweaver.core.chunks import CodeChunk
+
         parsed_response = BedrockRerankingResult.model_validate_json(cast(bytes, response))
         results: list[RerankingResult] = []
         for item in parsed_response.results:

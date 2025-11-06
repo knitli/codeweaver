@@ -9,22 +9,21 @@ Validates acceptance criteria spec.md:76
 """
 
 from pathlib import Path
-from uuid import uuid4
 
 import pytest
 
-from codeweaver.core.chunks import CodeChunk
+from codeweaver.common.utils.utils import uuid7
 from codeweaver.core.language import SemanticSearchLanguage as Language
-from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
+from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+
+# sourcery skip: dont-import-test-modules
+from tests.conftest import create_test_chunk_with_embeddings
+
 
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
 
-
-
-
-
-async def test_hybrid_search_ranking():
+async def test_hybrid_search_ranking(qdrant_test_manager):
     """
     User Story: Hybrid search combines sparse and dense for better relevance.
 
@@ -32,48 +31,52 @@ async def test_hybrid_search_ranking():
     When: Query is processed
     Then: System returns hybrid search results ranked by relevance
     """
-    config = {"url": "http://localhost:6333", "collection_name": f"test_ranking_{uuid4().hex[:8]}"}
-    provider = QdrantVectorStore(config=config)
+    # Create unique collection
+    collection_name = qdrant_test_manager.create_collection_name("ranking")
+    await qdrant_test_manager.create_collection(
+        collection_name, dense_vector_size=768, sparse_vector_size=1000
+    )
+
+    config = {"url": qdrant_test_manager.url, "collection_name": collection_name}
+    provider = QdrantVectorStoreProvider(config=config)
     await provider._initialize()
 
-    # Insert chunks with varying similarity
+    # Insert chunks with varying similarity - using helper to create valid chunks
+    chunk_id_1 = uuid7()
+    chunk_id_2 = uuid7()
+    chunk_id_3 = uuid7()
+
     chunks = [
-        CodeChunk(
-            chunk_id=uuid4(),
+        create_test_chunk_with_embeddings(
+            chunk_id=chunk_id_1,
             chunk_name="exact_match.py:func",
             file_path=Path("exact_match.py"),
             language=Language.PYTHON,
             content="authentication function",
-            embeddings={
-                "dense": [1.0, 0.0, 0.0] * 256,  # Very similar
-                "sparse": {"indices": [1, 2, 3], "values": [1.0, 0.9, 0.8]},
-            },
+            dense_embedding=[1.0, 0.0, 0.0] * 256,  # Very similar
+            sparse_embedding={"indices": [1, 2, 3], "values": [1.0, 0.9, 0.8]},
             line_start=1,
             line_end=5,
         ),
-        CodeChunk(
-            chunk_id=uuid4(),
+        create_test_chunk_with_embeddings(
+            chunk_id=chunk_id_2,
             chunk_name="partial_match.py:func",
             file_path=Path("partial_match.py"),
             language=Language.PYTHON,
             content="auth helper",
-            embeddings={
-                "dense": [0.5, 0.5, 0.0] * 256,  # Somewhat similar
-                "sparse": {"indices": [1, 4], "values": [0.6, 0.5]},
-            },
+            dense_embedding=[0.5, 0.5, 0.0] * 256,  # Somewhat similar
+            sparse_embedding={"indices": [1, 4], "values": [0.6, 0.5]},
             line_start=10,
             line_end=15,
         ),
-        CodeChunk(
-            chunk_id=uuid4(),
+        create_test_chunk_with_embeddings(
+            chunk_id=chunk_id_3,
             chunk_name="no_match.py:func",
             file_path=Path("no_match.py"),
             language=Language.PYTHON,
             content="unrelated function",
-            embeddings={
-                "dense": [0.0, 0.0, 1.0] * 256,  # Not similar
-                "sparse": {"indices": [10, 11], "values": [0.3, 0.2]},
-            },
+            dense_embedding=[0.0, 0.0, 1.0] * 256,  # Not similar
+            sparse_embedding={"indices": [10, 11], "values": [0.3, 0.2]},
             line_start=20,
             line_end=25,
         ),
@@ -98,10 +101,6 @@ async def test_hybrid_search_ranking():
     assert results[0].score > results[1].score, "Results should be in descending score order"
     assert "partial_match.py:func" in [r.chunk.chunk_name for r in results]
 
-    # Cleanup
-    try:
-        await provider._client.delete_collection(collection_name=config["collection_name"])
-    except Exception:
-        pass
+    # Cleanup handled by test manager
 
     print(f"✅ Scenario 3 PASSED: Hybrid search ranked {len(results)} results correctly")

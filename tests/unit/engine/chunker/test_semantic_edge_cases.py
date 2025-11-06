@@ -4,13 +4,13 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Edge case tests for SemanticChunker."""
 
-
 import pytest
 
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.engine.chunker import SemanticChunker
 from codeweaver.engine.chunker.base import ChunkGovernor
 from codeweaver.engine.chunker.exceptions import BinaryFileError
+
 
 pytestmark = [pytest.mark.unit]
 

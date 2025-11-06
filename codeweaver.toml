@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+# CodeWeaver's CodeWeaver configuration file
+
+project_name = "codeweaver"
+token_limit = 30000
+max_file_size = 1048576
+max_results = 75
+enable_telemetry = true
+
+[[provider.embedding]]
+provider = "voyage"
+enabled = true
+model_settings = { model = "voyage-code-3" }
+
+[[provider.sparse_embedding]]
+provider = "fastembed"
+enabled = true
+model_settings = { model = "prithivida/Splade_PP_en_v2" }
+
+[[provider.reranking]]
+provider = "voyage"
+enabled = true
+model_settings = { model = "voyage-rerank-2.5" }
+
+[[provider.vector_store]]
+provider = "qdrant"
+enabled = true
+provider_settings = { url = "https://f3b7755c-ee6e-4605-8786-c4218f9e148b.us-east-1-1.aws.cloud.qdrant.io", collection_name = "codeweaver-dev", prefer_grpc = true }

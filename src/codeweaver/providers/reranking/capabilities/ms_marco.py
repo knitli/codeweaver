@@ -10,18 +10,21 @@ from __future__ import annotations
 import re
 
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
-from codeweaver.providers.provider import Provider
-from codeweaver.providers.reranking.capabilities.base import (
-    PartialRerankingCapabilities,
-    RerankingModelCapabilities,
-)
+
+if TYPE_CHECKING:
+    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
 def get_marco_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
     """
     Get the MS-Marco MiniLM reranking capabilities.
     """
+    from codeweaver.providers.provider import Provider
+    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+    from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilities
+
     shared_capabilities: PartialRerankingCapabilities = {
         "name": "Xenova/ms-marco-MiniLM-",
         "max_input": 512,

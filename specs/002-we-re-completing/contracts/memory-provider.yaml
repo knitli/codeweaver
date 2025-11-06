@@ -3,14 +3,14 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
-# Contract: MemoryVectorStore Provider
+# Contract: MemoryVectorStoreProvider Provider
 # Description: In-memory vector storage with JSON persistence for development/testing
 # Extends: VectorStoreProvider
 # Version: 1.0
 # Date: 2025-10-25
 
 contract:
-  name: MemoryVectorStore
+  name: MemoryVectorStoreProvider
   type: concrete_implementation
   extends: VectorStoreProvider
   location: src/codeweaver/providers/vector_stores/inmemory.py
@@ -246,7 +246,7 @@ error_handling:
     - MemoryError: Suggest migration to Qdrant for large datasets
     - CollectionExistsError: Use existing collection or fail
   operation_errors:
-    - Same as QdrantVectorStore (inherits base behavior)
+    - Same as QdrantVectorStoreProvider (inherits base behavior)
 
 performance_characteristics:
   search:

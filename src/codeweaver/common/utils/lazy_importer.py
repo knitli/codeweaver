@@ -64,7 +64,29 @@ class LazyImport[Import: Any]:
         ...     encoder = _tiktoken.get_encoding("gpt2")  # tiktoken imports NOW
     """
 
-    __slots__ = ("_attrs", "_lock", "_module_name", "_resolved")  # type: ignore
+    __slots__ = ("_attrs", "_lock", "_module_name", "_parent", "_resolved")  # type: ignore
+
+    # Introspection attributes that should resolve the object immediately
+    # rather than creating a new LazyImport child
+    _INTROSPECTION_ATTRS = frozenset({
+        "__signature__",
+        "__wrapped__",
+        "__annotations__",
+        "__name__",
+        "__qualname__",
+        "__module__",
+        "__doc__",
+        "__code__",
+        "__defaults__",
+        "__kwdefaults__",
+        "__globals__",
+        "__closure__",
+        "__text_signature__",
+        "__dict__",
+        "__class__",
+        "__func__",
+        "__self__",
+    })
 
     def __init__(self, module_name: str, *attrs: str) -> None:
         """
@@ -83,6 +105,7 @@ class LazyImport[Import: Any]:
         object.__setattr__(self, "_module_name", module_name)
         object.__setattr__(self, "_attrs", attrs)
         object.__setattr__(self, "_resolved", None)
+        object.__setattr__(self, "_parent", None)
         object.__setattr__(self, "_lock", threading.Lock())
 
     def _resolve(self) -> Import:
@@ -140,8 +163,32 @@ class LazyImport[Import: Any]:
                 msg = f"Module {module_name!r} has no attribute path {attr_path!r}"
                 raise AttributeError(msg) from e
 
-        object.__setattr__(self, "_resolved", result)
+        self._resolve_parents(default_to=result)
         return result
+
+    def _mark_resolved(self) -> None:
+        """
+        Mark this LazyImport as resolved without actually resolving it.
+
+        This is used to mark parent LazyImports as resolved when their children
+        are resolved, since accessing any attribute of a module means the module
+        itself has been imported.
+
+        This method is called recursively up the parent chain to ensure all
+        ancestors are marked as resolved.
+        """
+        # Already resolved, nothing to do
+        if object.__getattribute__(self, "_resolved") is not None:
+            return
+
+        self._resolve_parents(default_to=True)
+
+    # TODO Rename this here and in `_handle_resolve` and `_mark_resolved`
+    def _resolve_parents(self, *, default_to: bool) -> None:
+        object.__setattr__(self, "_resolved", default_to)
+        parent = object.__getattribute__(self, "_parent")
+        if parent is not None:
+            parent._mark_resolved()
 
     def __getattr__(self, name: str) -> LazyImport[Import]:
         """
@@ -151,15 +198,37 @@ class LazyImport[Import: Any]:
         This allows you to write: lazy_import("pkg").module.Class
         without triggering any imports until the final usage.
 
+        Special handling for introspection attributes: These attributes
+        (like __signature__, __wrapped__, etc.) are accessed by inspection
+        tools like pydantic. For these, we resolve the object first and
+        then access the attribute on it, raising AttributeError if it
+        doesn't exist.
+
         Args:
             name: Attribute name to access
 
         Returns:
-            New LazyImport with extended attribute chain
+            New LazyImport with extended attribute chain, or the actual
+            attribute value for introspection attributes
+
+        Raises:
+            AttributeError: If accessing an introspection attribute that
+                doesn't exist on the resolved object
         """
+        # Special handling for introspection attributes
+        if name in self._INTROSPECTION_ATTRS:
+            resolved = self._resolve()
+            # This will raise AttributeError if the attribute doesn't exist,
+            # which is the correct behavior for introspection
+            return getattr(resolved, name)
+
+        # Normal attribute chaining
         module_name = object.__getattribute__(self, "_module_name")
         attrs = object.__getattribute__(self, "_attrs")
-        return LazyImport(module_name, *attrs, name)
+        child: LazyImport[Import] = LazyImport(module_name, *attrs, name)
+        # Set parent reference so child can mark parent as resolved
+        object.__setattr__(child, "_parent", self)
+        return child
 
     def __call__(self, *args: Any, **kwargs: Any) -> Import:
         """
@@ -245,7 +314,7 @@ def lazy_import[Import: Any](module_name: str, *attrs: str) -> LazyImport[Import
     triggering any imports until the final usage point.
 
     Args:
-        module_name: Module to import (e.g., "codeweaver.config")
+        module_name: Module to import (e.g., "codeweaver.config.settings")
         *attrs: Optional attribute path to access (e.g., "get_settings")
 
     Returns:
@@ -259,18 +328,18 @@ def lazy_import[Import: Any](module_name: str, *attrs: str) -> LazyImport[Import
 
         Specific function import:
 
-        >>> get_settings = lazy_import("codeweaver.config", "get_settings")
+        >>> get_settings = lazy_import("codeweaver.config.settings", "get_settings")
         >>> settings = get_settings()  # Imports NOW
 
         Attribute chaining:
 
-        >>> Settings = lazy_import("codeweaver.config").CodeWeaverSettings
+        >>> Settings = lazy_import("codeweaver.config.settings").CodeWeaverSettings
         >>> config = Settings()  # Imports NOW
 
         Global-level usage (main use case):
 
         >>> # At module level - no imports happen
-        >>> _settings = lazy_import("codeweaver.config").get_settings()
+        >>> _settings = lazy_import("codeweaver.config.settings").get_settings()
         >>> _tiktoken_encoder = lazy_import("tiktoken").get_encoding
         >>>
         >>> # Later in code - imports happen when called

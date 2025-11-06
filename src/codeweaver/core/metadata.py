@@ -29,13 +29,8 @@ from typing import (
 from ast_grep_py import SgNode
 from pydantic import UUID7, ConfigDict, Field, PositiveFloat, SkipValidation
 
-from codeweaver.common.utils import normalize_ext, uuid7
-from codeweaver.core.language import (
-    ConfigLanguage,
-    SemanticSearchLanguage,
-    has_semantic_extension,
-    is_semantic_config_ext,
-)
+from codeweaver.common.utils import uuid7
+from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage, has_semantic_extension
 from codeweaver.core.types.aliases import (
     FileExt,
     FileExtensionT,
@@ -86,6 +81,16 @@ class ChunkSource(BaseEnum):
     EXTERNAL = "external"  # from internet or similar external sources, not from code files
 
 
+def _set_symbol(data: Any) -> str | None:
+    """Helper function to set the symbol field based on the primary_thing."""
+    from codeweaver.semantic.ast_grep import AstThing
+
+    if thing := data.get("thing"):
+        if isinstance(thing, AstThing) and thing.symbol and (0 < len(thing.symbol.strip()) < 20):
+            return thing.symbol
+    return None
+
+
 class SemanticMetadata(BasedModel):
     """Metadata associated with the semantics of a code chunk."""
 
@@ -102,12 +107,7 @@ class SemanticMetadata(BasedModel):
     # TODO: Logic for symbol extraction from AST nodes
     symbol: Annotated[
         str | None,
-        Field(
-            description="""The symbol represented by the node""",
-            default_factory=lambda data: data["primary_thing"].name
-            if data.get("primary_thing")
-            else None,
-        ),
+        Field(description="""The symbol represented by the node""", default_factory=_set_symbol),
     ]
     thing_id: UUID7 = uuid7()
     parent_thing_id: UUID7 | None = None
@@ -409,7 +409,7 @@ class ExtLangPair(NamedTuple):
 
 def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
     """Determine the ExtKind based on validated data (`Metadata` extraction)."""
-    if "file_path" in validated_data:
+    if "file_path" in validated_data and validated_data["file_path"] is not None:
         return ExtKind.from_file(validated_data["file_path"])
     source = (
         validated_data.get("source")
@@ -638,7 +638,10 @@ class ExtKind(NamedTuple):
         """
         Create an ExtKind from a file path.
         """
-        filename = Path(file).name if isinstance(file, str) else file.name
+        from codeweaver.core.language import language_from_path
+
+        file = Path(file) if isinstance(file, str) else file
+        filename = file.name
         # The order we do this in is important:
         if semantic_config_file := next(
             (
@@ -650,27 +653,15 @@ class ExtKind(NamedTuple):
         ):
             return cls(language=semantic_config_file.language, kind=ChunkKind.CONFIG)
 
-        filename_parts = tuple(part for part in filename.split(".") if part)
-        extension = (
-            normalize_ext(filename_parts[-1]) if filename_parts else filename_parts[0].lower()
-        )
-
-        if (
-            semantic_config_language := has_semantic_extension(extension)
-        ) and is_semantic_config_ext(extension):
-            return cls(language=semantic_config_language, kind=ChunkKind.CONFIG)
-
-        if semantic_language := has_semantic_extension(extension):
-            return cls(language=semantic_language, kind=ChunkKind.CODE)
-
-        return next(
-            (
-                cls(language=extpair.language, kind=ChunkKind.from_string(extpair.category))  # pyright: ignore[reportArgumentType]
-                for extpair in get_ext_lang_pairs()
-                if extpair.is_same(filename)
-            ),
-            None,
-        )
+        if language := language_from_path(file):
+            if isinstance(language, ConfigLanguage):
+                return cls(
+                    language=language.as_semantic_search_language or language, kind=ChunkKind.CONFIG
+                )
+            if not isinstance(language, SemanticSearchLanguage):
+                return cls(language=language, kind=_categorize_language(language))
+            return cls(language=language, kind=ChunkKind.CODE)
+        return None
 
     def serialize_for_cli(self) -> dict[str, Any]:
         """Serialize the ExtKind for CLI output."""

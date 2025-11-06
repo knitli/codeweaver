@@ -6,6 +6,7 @@
 
 from typing import Any, Literal
 
+from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities import dependency_map, load_default_capabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider
@@ -23,19 +24,19 @@ type KnownRerankModelName = Literal[
     "bedrock:cohere.rerank-v3-5:0",
     "fastembed:Xenova/ms-marco-MiniLM-L-6-v2",
     "fastembed:Xenova/ms-marco-MiniLM-L-12-v2",
-    "fastembed:BAAI/bge-reranker-base",
-    "fastembed:jinaai/jina-reranker-v2-base-multilingual",
-    "sentence-transformers:Qwen/Qwen3-Reranker-0.6B",
-    "sentence-transformers:Qwen/Qwen3-Reranker-4B",
-    "sentence-transformers:Qwen/Qwen3-Reranker-8B",
+    "fastembed:BAAI/bge-reranking-base",
+    "fastembed:jinaai/jina-reranking-v2-base-multilingual",
+    "sentence-transformers:Qwen/Qwen3-Reranking-0.6B",
+    "sentence-transformers:Qwen/Qwen3-Reranking-4B",
+    "sentence-transformers:Qwen/Qwen3-Reranking-8B",
     "sentence-transformers:mixedbread-ai/mxbai-rerank-large-v2",
     "sentence-transformers:mixedbread-ai/mxbai-rerank-base-v2",
-    "sentence-transformers:jinaai/jina-reranker-m0",
-    "sentence-transformers:BAAI/bge-reranker-v2-m3",
-    "sentence-transformers:BAAI/bge-reranker-large",
+    "sentence-transformers:jinaai/jina-reranking-m0",
+    "sentence-transformers:BAAI/bge-reranking-v2-m3",
+    "sentence-transformers:BAAI/bge-reranking-large",
     "sentence-transformers:cross-encoder/ms-marco-MiniLM-L6-v2",
     "sentence-transformers:cross-encoder/ms-marco-MiniLM-L12-v2",
-    "sentence-transformers:Alibaba-NLP/gte-multilingual-reranker-base",
+    "sentence-transformers:Alibaba-NLP/gte-multilingual-reranking-base",
     "sentence-transformers:mixedbread-ai/mxbai-rerank-xsmall-v1",
     "sentence-transformers:mixedbread-ai/mxbai-rerank-base-v1",
 ]
@@ -69,7 +70,28 @@ def get_rerank_model_provider(provider: Provider) -> type[RerankingProvider[Any]
         )
 
         return SentenceTransformersRerankingProvider
-    raise ValueError(f"Unknown reranking provider: {provider}")
+
+    # Get list of supported reranking providers dynamically
+    supported_providers = [
+        p.value
+        for p in [
+            Provider.VOYAGE,
+            Provider.COHERE,
+            Provider.BEDROCK,
+            Provider.FASTEMBED,
+            Provider.SENTENCE_TRANSFORMERS,
+        ]
+    ]
+
+    raise ConfigurationError(
+        f"Unknown reranking provider: {provider}",
+        details={"provided_provider": str(provider), "supported_providers": supported_providers},
+        suggestions=[
+            "Check provider name spelling in configuration",
+            "Install required reranking provider package",
+            "Review available providers in documentation",
+        ],
+    )
 
 
 __all__ = (

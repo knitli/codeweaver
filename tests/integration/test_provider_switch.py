@@ -9,39 +9,43 @@ Validates edge case spec.md:93
 """
 
 from pathlib import Path
-from uuid import uuid4
 
 import pytest
 
-from codeweaver.core.chunks import CodeChunk
+from codeweaver.common.utils.utils import uuid7
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.exceptions import ProviderSwitchError
-from codeweaver.providers.vector_stores.inmemory import MemoryVectorStore
-from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
+from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
+from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+from tests.conftest import create_test_chunk_with_embeddings
+
 
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
-async def test_provider_switch_detection():
+
+async def test_provider_switch_detection(qdrant_test_manager):
     """
     User Story: Warn when switching providers to prevent data loss.
 
     Edge Case: Provider switching
     Then: System detects provider changes and blocks startup with clear error
     """
-    collection_name = f"test_provider_switch_{uuid4().hex[:8]}"
+    # Create unique collection
+    collection_name = qdrant_test_manager.create_collection_name("provider_switch")
+    await qdrant_test_manager.create_collection(collection_name, dense_vector_size=768)
 
     # Phase 1: Create collection with Qdrant
-    qdrant_config = {"url": "http://localhost:6333", "collection_name": collection_name}
-    qdrant_provider = QdrantVectorStore(config=qdrant_config)
+    qdrant_config = {"url": qdrant_test_manager.url, "collection_name": collection_name}
+    qdrant_provider = QdrantVectorStoreProvider(config=qdrant_config)
     await qdrant_provider._initialize()
 
-    chunk = CodeChunk(
-        chunk_id=uuid4(),
+    chunk = create_test_chunk_with_embeddings(
+        chunk_id=uuid7(),
         chunk_name="test.py:func",
         file_path=Path("test.py"),
         language=Language.PYTHON,
         content="test",
-        embeddings={"dense": [0.5] * 768},
+        dense_embedding=[0.5] * 768,
         line_start=1,
         line_end=1,
     )
@@ -49,7 +53,7 @@ async def test_provider_switch_detection():
 
     # Phase 2: Try to use same collection with Memory provider
     memory_config = {"collection_name": collection_name}
-    memory_provider = MemoryVectorStore(config=memory_config)
+    memory_provider = MemoryVectorStoreProvider(config=memory_config)
 
     # Should raise ProviderSwitchError
     with pytest.raises(ProviderSwitchError) as exc_info:
@@ -59,10 +63,6 @@ async def test_provider_switch_detection():
     assert "different provider" in error_msg or "provider" in error_msg
     assert "re-index" in error_msg or "revert" in error_msg
 
-    # Cleanup
-    try:
-        await qdrant_provider._client.delete_collection(collection_name=collection_name)
-    except Exception:
-        pass
+    # Cleanup handled by test manager
 
     print("✅ Scenario 8 PASSED: Provider switch detected with error")

@@ -6,13 +6,14 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-from codeweaver.providers.embedding.capabilities.base import (
-    EmbeddingModelCapabilities,
-    PartialCapabilities,
-)
+from codeweaver.providers.embedding.capabilities.types import PartialCapabilities
 from codeweaver.providers.provider import Provider
+
+
+if TYPE_CHECKING:
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
 
 type MixedbreadAiProvider = Literal[Provider.OLLAMA]
@@ -63,6 +64,8 @@ ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (MXBAI_EMBED_LARGE_CAPABILIT
 
 def get_mixedbread_ai_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
     """Get the capabilities for mixedbread-ai embedding models."""
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+
     return (EmbeddingModelCapabilities.model_validate(MXBAI_EMBED_LARGE_CAPABILITIES),)
 
 

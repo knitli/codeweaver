@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator, Mapping, Sequence
+from enum import Enum
 from types import ModuleType
 from typing import (
     TYPE_CHECKING,
@@ -29,13 +31,23 @@ from uuid import UUID
 
 from pydantic import UUID7, ConfigDict
 from pydantic.main import IncEx
+from tenacity import (
+    RetryError,
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from codeweaver.common.utils import LazyImport, lazy_import, uuid7
-from codeweaver.core.chunks import CodeChunk, SerializedCodeChunk, StructuredDataInput
 from codeweaver.core.stores import BlakeStore, UUIDStore, make_blake_store, make_uuid_store
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BasedModel
+from codeweaver.exceptions import ProviderError
+from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+from codeweaver.providers.embedding.registry import EmbeddingRegistry
+from codeweaver.providers.embedding.types import SparseEmbedding
 from codeweaver.providers.provider import Provider
 from codeweaver.tokenizers import Tokenizer, get_tokenizer
 
@@ -44,15 +56,33 @@ statistics_module: LazyImport[ModuleType] = lazy_import("codeweaver.common.stati
 
 if TYPE_CHECKING:
     from codeweaver.common.statistics import SessionStatistics
+    from codeweaver.core.chunks import CodeChunk, SerializedCodeChunk, StructuredDataInput
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
-else:
-    SessionStatistics = statistics_module.SessionStatistics
+
 
 _get_statistics: LazyImport[SessionStatistics] = lazy_import(
-    "codeweaver.common.statistics", "get_statistics"
+    "codeweaver.common.statistics", "get_session_statistics"
 )
 
 logger = logging.getLogger(__name__)
+
+
+class CircuitBreakerState(Enum):
+    """Circuit breaker states for provider resilience."""
+
+    CLOSED = "closed"  # Normal operation
+    OPEN = "open"  # Failing, rejecting requests
+    HALF_OPEN = "half_open"  # Testing if service recovered
+
+
+class CircuitBreakerOpenError(Exception):
+    """Raised when circuit breaker is open and rejecting requests."""
+
+
+def _get_registry() -> EmbeddingRegistry:
+    from codeweaver.providers.embedding.registry import get_embedding_registry
+
+    return get_embedding_registry()
 
 
 class EmbeddingErrorInfo(TypedDict):
@@ -70,6 +100,8 @@ class EmbeddingErrorInfo(TypedDict):
 
 def default_input_transformer(chunks: StructuredDataInput) -> Iterator[CodeChunk]:
     """Default input transformer that serializes CodeChunks to strings."""
+    from codeweaver.core.chunks import CodeChunk
+
     return CodeChunk.chunkify(chunks)
 
 
@@ -84,7 +116,18 @@ def default_output_transformer(output: Any) -> list[list[float]] | list[list[int
         ("Received unexpected output format from embedding provider."),
         extra={"output_data": output},  # pyright: ignore[reportUnknownArgumentType]
     )
-    raise ValueError("Unexpected output format from embedding provider.")
+    raise ProviderError(
+        "Embedding provider returned unexpected output format",
+        details={
+            "output_type": type(output).__name__,
+            "output_preview": str(output)[:200] if output else None,
+        },
+        suggestions=[
+            "Check that the provider's response format matches expectations",
+            "Verify the provider's API has not changed",
+            "Review provider documentation for output format",
+        ],
+    )
 
 
 class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
@@ -102,6 +145,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
     The primary example of this one-to-many relationship is the OpenAI provider, which supports any OpenAI-compatible provider (Azure, Ollama, Fireworks, Heroku, Together, Github).
     """
+
+    from codeweaver.core.chunks import StructuredDataInput
 
     model_config = BasedModel.model_config | ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
@@ -130,6 +175,12 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     Note that we're only storing the hash keys and batch ID values, not the full CodeChunk objects. This keeps the store size small. We can lookup by batch ID in the main `_store` if needed, or if it has been ejected, in the `_store`'s `_trash_heap`. `SimpleTypedStore`, the parent class, handles that for us with a simple "get" method.
     """
 
+    # Circuit breaker state tracking
+    _circuit_state: CircuitBreakerState = CircuitBreakerState.CLOSED
+    _failure_count: int = 0
+    _last_failure_time: float | None = None
+    _circuit_open_duration: float = 30.0  # 30 seconds as per spec FR-008a
+
     def __init__(
         self,
         client: EmbeddingClient,
@@ -137,17 +188,27 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         kwargs: dict[str, Any] | None,
     ) -> None:
         """Initialize the embedding provider."""
+        # Determine provider - check if subclass has it set
+        getattr(type(self), "_provider", None) or caps.provider
+
+        # Initialize pydantic model with all required fields
+        super().__init__()
+
         self._model_dump_json = super().model_dump_json
-        self._client = client
-        self._caps = caps
-        if not self._provider:
-            self._provider = caps.provider
+
         self.doc_kwargs = type(self)._doc_kwargs.copy() or {}
         self.query_kwargs = type(self)._query_kwargs.copy() or {}
         self._add_kwargs(kwargs or {})
         """Add any user-provided kwargs to the embedding provider, after we merge the defaults together."""
         self._store: UUIDStore[list] = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)  # type: ignore # 3mb limit
-        self._initialize()
+
+        # Initialize circuit breaker state
+        self._circuit_state = CircuitBreakerState.CLOSED
+        self._failure_count = 0
+        self._last_failure_time = None
+
+        # Call _initialize with caps since pydantic may not have set _caps yet
+        self._initialize(caps)
 
     def _add_kwargs(self, kwargs: dict[str, Any]) -> None:
         """Add keyword arguments to the embedding provider."""
@@ -157,11 +218,14 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         self.query_kwargs = {**self.query_kwargs, **kwargs}
 
     @abstractmethod
-    def _initialize(self) -> None:
+    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """Initialize the embedding provider.
 
         This method is called at the end of __init__ to allow for any additional setup.
         It should minimally set up `_doc_kwargs` and `_query_kwargs` if they are not already set.
+
+        Args:
+            caps: The embedding model capabilities (passed since pydantic may not have set _caps yet).
         """
 
     @property
@@ -174,10 +238,95 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     def base_url(self) -> str | None:
         """Get the base URL of the embedding provider, if any."""
 
+    def _check_circuit_breaker(self) -> None:
+        """Check circuit breaker state before making API calls.
+
+        Raises:
+            CircuitBreakerOpenError: If circuit breaker is open.
+        """
+        current_time = time.time()
+
+        if self._circuit_state == CircuitBreakerState.OPEN:
+            if (
+                self._last_failure_time
+                and (current_time - self._last_failure_time) > self._circuit_open_duration
+            ):
+                # Transition to half-open to test recovery
+                logger.info(
+                    "Circuit breaker transitioning to half-open state for %s", self._provider
+                )
+                self._circuit_state = CircuitBreakerState.HALF_OPEN
+            else:
+                raise CircuitBreakerOpenError(
+                    f"Circuit breaker is open for {self._provider}. Failing fast."
+                )
+
+    def _record_success(self) -> None:
+        """Record successful API call and reset circuit breaker if needed."""
+        if self._circuit_state in (CircuitBreakerState.HALF_OPEN, CircuitBreakerState.OPEN):
+            logger.info("Circuit breaker closing for %s after successful operation", self._provider)
+        self._circuit_state = CircuitBreakerState.CLOSED
+        self._failure_count = 0
+        self._last_failure_time = None
+
+    def _record_failure(self) -> None:
+        """Record failed API call and update circuit breaker state."""
+        self._failure_count += 1
+        self._last_failure_time = time.time()
+
+        if self._failure_count >= 3:  # 3 failures threshold as per spec FR-008a
+            logger.warning(
+                "Circuit breaker opening for %s after %d consecutive failures",
+                self._provider,
+                self._failure_count,
+            )
+            self._circuit_state = CircuitBreakerState.OPEN
+
+    @property
+    def circuit_breaker_state(self) -> str:
+        """Get current circuit breaker state for health monitoring."""
+        return self._circuit_state.value
+
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(
+            multiplier=1, min=1, max=16
+        ),  # 1s, 2s, 4s, 8s, 16s as per spec FR-009c
+        retry=retry_if_exception_type((ConnectionError, TimeoutError, OSError)),
+        reraise=True,
+    )
+    async def _embed_documents_with_retry(
+        self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any] | None
+    ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]] | dict[str, list[int] | list[float]]:
+        """Wrapper around _embed_documents with retry logic and circuit breaker.
+
+        Applies exponential backoff (1s, 2s, 4s, 8s, 16s) and circuit breaker pattern.
+        """
+        self._check_circuit_breaker()
+
+        try:
+            result = await self._embed_documents(documents, **kwargs)
+            self._record_success()
+        except (ConnectionError, TimeoutError, OSError) as e:
+            self._record_failure()
+            logger.warning(
+                "API call failed for %s: %s (attempt %d/5)",
+                self._provider,
+                str(e),
+                self._failure_count,
+            )
+            raise
+        except Exception:
+            # Non-retryable errors don't affect circuit breaker
+            logger.exception("Non-retryable error in embedding")
+            raise
+        else:
+            return result
+
     @abstractmethod
     async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any] | None
-    ) -> list[list[float]] | list[list[int]]:
+    ) -> list[list[float]] | list[list[int]] | list[dict[str, list[int] | list[float]]]:
         """Abstract method to implement document embedding logic."""
 
     def _handle_embedding_error(
@@ -202,25 +351,150 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         documents: Sequence[CodeChunk],  # type: ignore # intentionally obscurred
         *,
         batch_id: UUID7 | None = None,
+        context: Any = None,
         **kwargs: Mapping[str, Any] | None,
-    ) -> list[list[float]] | list[list[int]] | EmbeddingErrorInfo:
+    ) -> list[list[float]] | list[list[int]] | list[SparseEmbedding] | EmbeddingErrorInfo:
         """Embed a list of documents into vectors.
 
         Optionally takes a `batch_id` parameter to reprocess a specific batch of documents.
         """
+        from codeweaver.common.logging import log_to_client_or_fallback
+
         is_old_batch = False
         if batch_id and self._store and batch_id in self._store:  # pyright: ignore[reportUnknownMemberType]
             documents: Sequence[CodeChunk] = self._store[batch_id]  # type: ignore
-            is_old_batch = True
+        is_old_batch = True
         chunks, cache_key = self._process_input(documents, is_old_batch=is_old_batch)  # type: ignore
+
+        await log_to_client_or_fallback(
+            context,
+            "debug",
+            {
+                "msg": "Starting document embedding",
+                "extra": {
+                    "provider": self._provider.value,
+                    "document_count": len(documents),
+                    "is_reprocessing": is_old_batch,
+                    "batch_id": str(batch_id or cache_key) if batch_id or cache_key else None,
+                },
+            },
+        )
+
         try:
+            # Use retry wrapper instead of calling _embed_documents directly
             results: (
-                Sequence[Sequence[float]] | Sequence[Sequence[int]]
-            ) = await self._embed_documents(tuple(chunks), **kwargs)
+                Sequence[Sequence[float]]
+                | Sequence[Sequence[int]]
+                | Sequence[dict[str, list[int] | list[float]]]
+            ) = await self._embed_documents_with_retry(tuple(chunks), **kwargs)
+        except CircuitBreakerOpenError as e:
+            # Circuit breaker open - return error immediately
+            await log_to_client_or_fallback(
+                context,
+                "error",
+                {
+                    "msg": "Circuit breaker open",
+                    "extra": {
+                        "provider": self._provider.value,
+                        "document_count": len(documents),
+                        "circuit_state": self._circuit_state.value,
+                    },
+                },
+            )
+            return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)  # type: ignore
+        except RetryError as e:
+            # All retry attempts exhausted
+            await log_to_client_or_fallback(
+                context,
+                "error",
+                {
+                    "msg": "All retry attempts exhausted",
+                    "extra": {
+                        "provider": self._provider.value,
+                        "document_count": len(documents),
+                        "failure_count": self._failure_count,
+                    },
+                },
+            )
+            return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)  # type: ignore
         except Exception as e:
+            await log_to_client_or_fallback(
+                context,
+                "error",
+                {
+                    "msg": "Document embedding failed",
+                    "extra": {
+                        "provider": self._provider.value,
+                        "document_count": len(documents),
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                    },
+                },
+            )
             return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)  # type: ignore
         else:
+            if isinstance(results, dict):
+                # Sparse embedding format
+                from codeweaver.providers.embedding.types import SparseEmbedding
+
+                results = [
+                    SparseEmbedding(
+                        indices=result["indices"],  # type: ignore
+                        values=result["values"],  # type: ignore
+                    )
+                    for result in results
+                ]
+            if not is_old_batch:
+                self._register_chunks(
+                    chunks=tuple(chunks),
+                    batch_id=cast(UUID7, batch_id or cache_key),
+                    embeddings=results,
+                )
+
+            await log_to_client_or_fallback(
+                context,
+                "debug",
+                {
+                    "msg": "Document embedding complete",
+                    "extra": {
+                        "provider": self._provider.value,
+                        "document_count": len(documents),
+                        "embeddings_generated": len(results) if results else 0,
+                    },
+                },
+            )
+
             return results
+
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=1, min=1, max=16),  # 1s, 2s, 4s, 8s, 16s
+        retry=retry_if_exception_type((ConnectionError, TimeoutError, OSError)),
+        reraise=True,
+    )
+    async def _embed_query_with_retry(
+        self, query: Sequence[str], **kwargs: Mapping[str, Any] | None
+    ) -> list[list[float]] | list[list[int]]:
+        """Wrapper around _embed_query with retry logic and circuit breaker."""
+        self._check_circuit_breaker()
+
+        try:
+            result = await self._embed_query(query, **kwargs)
+            self._record_success()
+        except (ConnectionError, TimeoutError, OSError) as e:
+            self._record_failure()
+            logger.warning(
+                "Query embedding failed for %s(attempt %d/5)",
+                self._provider,
+                self._failure_count,
+                extra={"query": query, "error": str(e)},
+            )
+            raise
+        except Exception:
+            logger.exception("Non-retryable error in query embedding")
+            raise
+        else:
+            return result
 
     @abstractmethod
     async def _embed_query(
@@ -230,23 +504,36 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
     async def embed_query(
         self, query: str | Sequence[str], **kwargs: Mapping[str, Any] | None
-    ) -> list[list[float]] | list[list[int]] | EmbeddingErrorInfo:
+    ) -> list[list[float]] | list[list[int]] | list[SparseEmbedding] | EmbeddingErrorInfo:
         """Embed a query into a vector."""
         processed_kwargs: Mapping[str, Any] = self._set_kwargs(self.query_kwargs, kwargs or {})
         queries: Sequence[str] = query if isinstance(query, list | tuple | set) else [query]  # pyright: ignore[reportAssignmentType]
         try:
-            results: Sequence[Sequence[float]] | Sequence[Sequence[int]] = await self._embed_query(
-                queries, **processed_kwargs
-            )  # pyright: ignore[reportUnknownVariableType, reportGeneralTypeIssues]
+            # Use retry wrapper instead of calling _embed_query directly
+            results: (
+                Sequence[Sequence[float]] | Sequence[Sequence[int]] | Sequence[SparseEmbedding]
+            ) = await self._embed_query_with_retry(queries, **processed_kwargs)  # pyright: ignore[reportUnknownVariableType, reportGeneralTypeIssues]
+        except CircuitBreakerOpenError as e:
+            logger.warning("Circuit breaker open for query embedding")
+            return self._handle_embedding_error(e, batch_id=None, documents=None, queries=queries)
+        except RetryError as e:
+            logger.exception("All retry attempts exhausted for query embedding")
+            return self._handle_embedding_error(e, batch_id=None, documents=None, queries=queries)
         except Exception as e:
             return self._handle_embedding_error(e, batch_id=None, documents=None, queries=queries)
         else:
-            return results
+            if isinstance(results, dict):
+                # Sparse embedding format
+                from codeweaver.providers.embedding.types import SparseEmbedding
 
-    @property
-    @abstractmethod
-    def dimension(self) -> int:
-        """Get the size of the vector for the collection."""
+                results = [
+                    SparseEmbedding(
+                        indices=result["indices"],  # type: ignore
+                        values=result["values"],  # type: ignore
+                    )
+                    for result in results
+                ]
+            return results
 
     @property
     def client(self) -> EmbeddingClient:
@@ -285,16 +572,23 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         )
 
     @overload
-    def _update_token_stats(self, *, token_count: int, from_docs: None = None) -> None: ...
+    def _update_token_stats(
+        self, *, token_count: int, from_docs: None = None, sparse: bool = False
+    ) -> None: ...
     @overload
     def _update_token_stats(
-        self, *, from_docs: Sequence[str] | Sequence[Sequence[str]], token_count: None = None
+        self,
+        *,
+        from_docs: Sequence[str] | Sequence[Sequence[str]],
+        token_count: None = None,
+        sparse: bool = False,
     ) -> None: ...
     def _update_token_stats(
         self,
         *,
         token_count: int | None = None,
         from_docs: Sequence[str] | Sequence[Sequence[str]] | None = None,
+        sparse: bool = False,
     ) -> None:
         """Update token statistics for the embedding provider."""
         statistics: SessionStatistics = _get_statistics()
@@ -307,9 +601,18 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 else sum(self.tokenizer.estimate_batch(item) for item in from_docs)  # type: ignore
             )
             statistics.add_token_usage(embedding_generated=token_count)
-        raise ValueError(
-            "Either `token_count` or `from_docs` must be provided to update token statistics."
-        )
+        else:
+            raise CodeWeaverValidationError(
+                "Token statistics update requires either token_count or from_docs",
+                details={
+                    "token_count_provided": token_count is not None,
+                    "from_docs_provided": from_docs is not None,
+                },
+                suggestions=[
+                    "Provide token_count directly from provider response",
+                    "Provide from_docs list to estimate token count",
+                ],
+            )
 
     @staticmethod
     def normalize(embedding: Sequence[float] | Sequence[int]) -> list[float]:
@@ -324,7 +627,19 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         if arr.size == 0:
             return arr.tolist()
         if not np.all(np.isfinite(arr)):
-            raise ValueError("Embedding contains non-finite values.")
+            raise CodeWeaverValidationError(
+                "Embedding vector contains non-finite values (NaN or Inf)",
+                details={
+                    "embedding_size": int(arr.size),
+                    "has_nan": bool(np.isnan(arr).any()),
+                    "has_inf": bool(np.isinf(arr).any()),
+                },
+                suggestions=[
+                    "Check the embedding model output for numerical stability issues",
+                    "Verify input text does not contain unusual characters",
+                    "Try re-generating the embedding",
+                ],
+            )
         denom = float(np.linalg.norm(arr))
         return arr.tolist() if denom == 0.0 else (arr / denom).tolist()
 
@@ -352,6 +667,67 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         passed_kwargs = passed_kwargs or {}
         return cast(dict[str, Any], instance_kwargs) | cast(dict[str, Any], passed_kwargs)
 
+    def _register_chunks(
+        self,
+        chunks: Sequence[CodeChunk],
+        batch_id: UUID7,
+        embeddings: Sequence[Sequence[float]] | Sequence[Sequence[int]] | Sequence[SparseEmbedding],
+    ) -> None:  # sourcery skip: low-code-quality
+        """Register chunks in the embedding registry."""
+        from codeweaver.core.types.aliases import LiteralStringT, ModelName
+        from codeweaver.providers.embedding.types import (
+            ChunkEmbeddings,
+            EmbeddingBatchInfo,
+            SparseEmbedding,
+        )
+
+        registry = _get_registry()
+        is_sparse = (
+            type(self).__name__.lower().startswith("sparse")
+            or "sparse" in type(self).__name__.lower()
+            or isinstance(embeddings[0], SparseEmbedding)
+        )
+        attr = "sparse" if is_sparse else "dense"
+
+        chunk_infos: list[EmbeddingBatchInfo] = []
+        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings, strict=True)):
+            if attr == "sparse" and isinstance(embedding, dict):
+                # For sparse embeddings, convert dict to SparseEmbedding
+                sparse_emb = SparseEmbedding(
+                    indices=embedding["indices"],  # type: ignore
+                    values=embedding["values"],  # type: ignore
+                )
+                chunk_info = EmbeddingBatchInfo.create_sparse(
+                    batch_id=batch_id,
+                    batch_index=i,
+                    chunk_id=chunk.chunk_id,
+                    model=ModelName(cast(LiteralStringT, self.model_name)),
+                    embeddings=sparse_emb,
+                )
+            else:
+                # For dense embeddings or old format
+                chunk_info = getattr(EmbeddingBatchInfo, f"create_{attr}")(
+                    batch_id=batch_id,
+                    batch_index=i,
+                    chunk_id=chunk.chunk_id,
+                    model=ModelName(cast(LiteralStringT, self.model_name)),
+                    embeddings=embedding,
+                )
+            chunk_infos.append(chunk_info)
+
+        for i, info in enumerate(chunk_infos):
+            if (registered := registry.get(info.chunk_id)) is not None:
+                registry[info.chunk_id] = registered.add(info)
+                if registered.chunk != chunks[i]:
+                    # because we create new CodeChunk instances during processing, we need to update the chunk reference
+                    registry[info.chunk_id] = registry[info.chunk_id]._replace(chunk=chunks[i])
+            else:
+                registry[info.chunk_id] = ChunkEmbeddings(
+                    dense=info if attr == "dense" else None,
+                    sparse=info if attr == "sparse" else None,
+                    chunk=chunks[i],
+                )
+
     def _process_input(
         self, input_data: StructuredDataInput, *, is_old_batch: bool = False
     ) -> tuple[Iterator[CodeChunk], UUID7 | None]:
@@ -359,17 +735,23 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         processed_chunks = default_input_transformer(input_data)
         if is_old_batch:
             return processed_chunks, None
+        from codeweaver.core.chunks import BatchKeys
+
         key = uuid7()
+        final_chunks: list[CodeChunk] = []
         hashes = [self._hash_store.keygen.__call__(chunk.content) for chunk in processed_chunks]
-        for i, chunk in enumerate(processed_chunks):
-            chunk.set_batch_id(key)
-            if hashes[i] not in self._hash_store:
-                self._hash_store[hashes[i]] = key
-            else:
-                chunk = None
-        final_chunks = [chunk for chunk in processed_chunks if chunk]
-        if self._store:  # type: ignore
-            self._store[key] = final_chunks  # type: ignore
+        starter_chunks = [
+            chunk
+            for i, chunk in enumerate(processed_chunks)
+            if chunk and hashes[i] not in self._hash_store
+        ]
+        for i, chunk in enumerate(starter_chunks):
+            batch_keys = BatchKeys(id=key, idx=i)
+            final_chunks.append(chunk.set_batch_keys(batch_keys))
+            self._hash_store[hashes[i]] = key
+        if not self._store:  # type: ignore
+            self._store = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)  # type: ignore
+        self._store[key] = final_chunks  # type: ignore
         return iter(final_chunks), key
 
     def _process_output(self, output_data: Any) -> list[list[float]] | list[list[int]]:
@@ -377,10 +759,22 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         return self._output_transformer(output_data)
 
     def _fire_and_forget(self, task: Callable[..., Any]) -> None:
-        """Execute a fire-and-forget task."""
+        """Execute a fire-and-forget task.
+
+        This method should only be called from within async contexts.
+        It schedules the task to run in a thread pool executor to avoid blocking.
+        """
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             _ = loop.run_in_executor(None, task)
+        except RuntimeError:
+            # No running loop - this shouldn't happen in normal usage
+            # since this is only called from async methods
+            logger.warning(
+                "Attempted to fire-and-forget task outside async context. "
+                "Running synchronously (may cause blocking)."
+            )
+            task()
         except Exception:
             logger.exception("Error occurred while executing fire-and-forget task.")
 
@@ -431,4 +825,22 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         )
 
 
-__all__ = ("EmbeddingErrorInfo", "EmbeddingProvider")
+class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC):
+    """Abstract class for sparse embedding providers."""
+
+    @abstractmethod
+    @override
+    async def _embed_documents(
+        self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any] | None
+    ) -> list[SparseEmbedding]:
+        """Abstract method to implement document embedding logic for sparse embeddings."""
+
+    @abstractmethod
+    @override
+    async def _embed_query(
+        self, query: Sequence[str], **kwargs: Mapping[str, Any] | None
+    ) -> list[SparseEmbedding]:
+        """Abstract method to implement query embedding logic for sparse embeddings."""
+
+
+__all__ = ("EmbeddingErrorInfo", "EmbeddingProvider", "SparseEmbeddingProvider")

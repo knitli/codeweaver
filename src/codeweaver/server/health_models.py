@@ -1,0 +1,187 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+"""Data models for the enhanced health endpoint (FR-010-Enhanced)."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from typing import Annotated, Literal
+
+from pydantic import Field, NonNegativeInt
+
+from codeweaver.core.types import BasedModel
+from codeweaver.core.types.aliases import FilteredKey
+from codeweaver.core.types.enum import AnonymityConversion
+
+
+class IndexingProgressInfo(BasedModel):
+    """Indexing progress details."""
+
+    files_discovered: Annotated[NonNegativeInt, Field(description="Total files discovered")]
+    files_processed: Annotated[NonNegativeInt, Field(description="Files processed so far")]
+    chunks_created: Annotated[NonNegativeInt, Field(description="Total chunks created")]
+    errors: Annotated[NonNegativeInt, Field(description="Number of errors during indexing")]
+    current_file: Annotated[
+        str | None, Field(default=None, description="Currently processing file (if indexing)")
+    ]
+    start_time: Annotated[
+        str | None, Field(default=None, description="Indexing start timestamp (ISO8601)")
+    ]
+    estimated_completion: Annotated[
+        str | None, Field(default=None, description="Estimated completion time (ISO8601)")
+    ]
+
+    def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
+        return {FilteredKey("current_file"): AnonymityConversion.HASH}
+
+
+class IndexingInfo(BasedModel):
+    """Indexing state and progress information."""
+
+    state: Annotated[
+        Literal["idle", "indexing", "error"], Field(description="Current indexing state")
+    ]
+    progress: Annotated[IndexingProgressInfo, Field(description="Indexing progress details")]
+    last_indexed: Annotated[
+        str | None, Field(default=None, description="Last successful indexing completion (ISO8601)")
+    ]
+
+    def _telemetry_keys(self) -> None:
+        return None
+
+
+class VectorStoreServiceInfo(BasedModel):
+    """Vector store service health information."""
+
+    status: Annotated[Literal["up", "down", "degraded"], Field(description="Vector store status")]
+    latency_ms: Annotated[float, Field(ge=0, description="Latency in milliseconds")]
+
+    def _telemetry_keys(self) -> None:
+        return None
+
+
+class EmbeddingProviderServiceInfo(BasedModel):
+    """Embedding provider service health information."""
+
+    status: Annotated[Literal["up", "down"], Field(description="Embedding provider status")]
+    model: Annotated[str, Field(description="Embedding model name")]
+    latency_ms: Annotated[float, Field(ge=0, description="Latency in milliseconds")]
+    circuit_breaker_state: Annotated[
+        Literal["closed", "open", "half_open"], Field(description="Circuit breaker state")
+    ]
+
+    def _telemetry_keys(self) -> None:
+        return None
+
+
+class SparseEmbeddingServiceInfo(BasedModel):
+    """Sparse embedding service health information."""
+
+    status: Annotated[Literal["up", "down"], Field(description="Sparse embedding status")]
+    provider: Annotated[str, Field(description="Sparse embedding provider name")]
+
+    def _telemetry_keys(self) -> None:
+        return None
+
+
+class RerankingServiceInfo(BasedModel):
+    """Reranking service health information."""
+
+    status: Annotated[Literal["up", "down"], Field(description="Reranking status")]
+    model: Annotated[str, Field(description="Reranking model name")]
+    latency_ms: Annotated[float, Field(ge=0, description="Latency in milliseconds")]
+
+    def _telemetry_keys(self) -> None:
+        return None
+
+
+class ServicesInfo(BasedModel):
+    """Health information for all services."""
+
+    vector_store: Annotated[VectorStoreServiceInfo, Field(description="Vector store health")]
+    embedding_provider: Annotated[
+        EmbeddingProviderServiceInfo, Field(description="Embedding provider health")
+    ]
+    sparse_embedding: Annotated[
+        SparseEmbeddingServiceInfo, Field(description="Sparse embedding health")
+    ]
+    reranking: Annotated[RerankingServiceInfo, Field(description="Reranking health")]
+
+    def _telemetry_keys(self) -> None:
+        return None
+
+
+class StatisticsInfo(BasedModel):
+    """Statistics and metrics information."""
+
+    total_chunks_indexed: Annotated[NonNegativeInt, Field(description="Total chunks indexed")]
+    total_files_indexed: Annotated[NonNegativeInt, Field(description="Total files indexed")]
+    languages_indexed: Annotated[
+        list[str], Field(default_factory=list, description="Languages indexed")
+    ]
+    index_size_mb: Annotated[
+        NonNegativeInt, Field(default=0, description="Index size in megabytes")
+    ]
+    queries_processed: Annotated[NonNegativeInt, Field(description="Total queries processed")]
+    avg_query_latency_ms: Annotated[
+        float, Field(ge=0, description="Average query latency in milliseconds")
+    ]
+
+    def _telemetry_keys(self) -> None:
+        return None
+
+
+class HealthResponse(BasedModel):
+    """Complete health response matching FR-010-Enhanced schema."""
+
+    status: Annotated[
+        Literal["healthy", "degraded", "unhealthy"], Field(description="Overall system health")
+    ]
+    timestamp: Annotated[
+        str,
+        Field(
+            description="Health check timestamp (ISO8601)",
+            default_factory=lambda: datetime.now(UTC).isoformat(),
+        ),
+    ]
+    uptime_seconds: Annotated[NonNegativeInt, Field(description="Server uptime in seconds")]
+    indexing: Annotated[IndexingInfo, Field(description="Indexing state and progress")]
+    services: Annotated[ServicesInfo, Field(description="Service health information")]
+    statistics: Annotated[StatisticsInfo, Field(description="Statistics and metrics")]
+
+    @classmethod
+    def create_with_current_timestamp(
+        cls,
+        status: Literal["healthy", "degraded", "unhealthy"],
+        uptime_seconds: int,
+        indexing: IndexingInfo,
+        services: ServicesInfo,
+        statistics: StatisticsInfo,
+    ) -> HealthResponse:
+        """Create health response with current timestamp."""
+        return cls(
+            status=status,
+            timestamp=datetime.now(UTC).isoformat(),
+            uptime_seconds=uptime_seconds,
+            indexing=indexing,
+            services=services,
+            statistics=statistics,
+        )
+
+    def _telemetry_keys(self) -> None:
+        return None
+
+
+__all__ = (
+    "EmbeddingProviderServiceInfo",
+    "HealthResponse",
+    "IndexingInfo",
+    "IndexingProgressInfo",
+    "RerankingServiceInfo",
+    "ServicesInfo",
+    "SparseEmbeddingServiceInfo",
+    "StatisticsInfo",
+    "VectorStoreServiceInfo",
+)

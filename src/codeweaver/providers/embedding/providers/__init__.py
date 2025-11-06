@@ -9,7 +9,7 @@
 
 """Entry point for embedding providers. Defines the abstract base class and includes a utility for retrieving specific provider implementations."""
 
-from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+from codeweaver.providers.embedding.providers.base import EmbeddingProvider, SparseEmbeddingProvider
 
 
-__all__ = ("EmbeddingProvider",)
+__all__ = ("EmbeddingProvider", "SparseEmbeddingProvider")

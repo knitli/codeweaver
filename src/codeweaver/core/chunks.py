@@ -22,8 +22,10 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
+    NamedTuple,
     NotRequired,
     Required,
+    Self,
     TypedDict,
     cast,
     is_typeddict,
@@ -33,7 +35,7 @@ from pydantic import (
     UUID7,
     AfterValidator,
     Field,
-    NonNegativeFloat,
+    NonNegativeInt,
     PositiveFloat,
     PositiveInt,
     computed_field,
@@ -44,13 +46,17 @@ from codeweaver.common.utils import ensure_iterable, set_relative_path, uuid7
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.metadata import ChunkSource, ExtKind, Metadata, determine_ext_kind
 from codeweaver.core.spans import Span, SpanTuple
-from codeweaver.core.types import BasedModel, LanguageNameT
+from codeweaver.core.stores import BlakeHashKey
+from codeweaver.core.types import BasedModel, FilteredKeyT, LanguageNameT
 from codeweaver.core.utils import truncate_text
 
 
 if TYPE_CHECKING:
     from codeweaver.core.discovery import DiscoveredFile
-    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
+    from codeweaver.core.types import AnonymityConversion
+    from codeweaver.providers.embedding.registry import EmbeddingRegistry
+    from codeweaver.providers.embedding.types import EmbeddingBatchInfo
+    from codeweaver.tokenizers.base import Tokenizer
 
 # ---------------------------------------------------------------------------
 # *                    Code Search and Chunks
@@ -70,33 +76,22 @@ type StructuredDataInput = (
 )
 
 
-class SearchResult(BasedModel):
-    """Result from vector search operations."""
+def _get_registry() -> EmbeddingRegistry:
+    from codeweaver.providers.embedding.registry import get_embedding_registry
 
-    content: str | CodeChunk
-    file_path: Annotated[
-        Path | None,
-        Field(description="""Path to the source file"""),
-        AfterValidator(set_relative_path),
+    return get_embedding_registry()
+
+
+class BatchKeys(NamedTuple):
+    """Tuple representing batch keys for embedding operations."""
+
+    id: Annotated[UUID7, Field(description="""The embedding batch ID the chunk belongs to.""")]
+    idx: Annotated[
+        NonNegativeInt, Field(description="""The index of the chunk within the batch.""")
     ]
-    score: Annotated[NonNegativeFloat, Field(description="""Similarity score""")]
-    metadata: Annotated[
-        Metadata | None, Field(description="""Additional metadata about the result""")
-    ] = None
-
-    @property
-    def chunk(self) -> CodeChunk | str:
-        """Alias for content field for backward compatibility."""
-        return self.content
-
-    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types import AnonymityConversion, FilteredKey
-
-        base = {FilteredKey("content"): AnonymityConversion.TEXT_COUNT}
-        return {
-            FilteredKey("file_path"): AnonymityConversion.BOOLEAN,
-            FilteredKey("metadata"): AnonymityConversion.BOOLEAN,
-        } | (base if isinstance(self.content, str) else {})
+    sparse: Annotated[bool, Field(description="""Whether the batch's embeddings are sparse.""")] = (
+        False
+    )
 
 
 class CodeChunkDict(TypedDict, total=False):
@@ -108,15 +103,23 @@ class CodeChunkDict(TypedDict, total=False):
     content: Required[str]
     line_range: Required[SpanTuple | Span]
     file_path: NotRequired[Path | None]
-    language: NotRequired[SemanticSearchLanguage | str | None]
+    language: NotRequired[SemanticSearchLanguage | LanguageNameT | None]
     source: NotRequired[ChunkSource | None]
     timestamp: NotRequired[PositiveFloat]
     chunk_id: NotRequired[UUID7]
     parent_id: NotRequired[UUID7 | None]
     metadata: NotRequired[Metadata | None]
     chunk_name: NotRequired[str | None]
-    embeddings: NotRequired[dict[str, list[float] | dict[str, Any]] | None]
-    _embedding_batch: NotRequired[UUID7 | None]
+    _embedding_batches: NotRequired[tuple[BatchKeys] | tuple[BatchKeys, BatchKeys] | None]
+    blake_hash: NotRequired[BlakeHashKey]
+    name: NotRequired[str]
+    title: NotRequired[str]
+    dense_batch_key: NotRequired[BatchKeys | None]
+    sparse_batch_key: NotRequired[BatchKeys | None]
+    length: NotRequired[PositiveInt]
+    token_estimate: NotRequired[PositiveInt]
+    line_start: NotRequired[PositiveInt]
+    line_end: NotRequired[PositiveInt]
 
 
 class CodeChunk(BasedModel):
@@ -127,7 +130,7 @@ class CodeChunk(BasedModel):
     file_path: Annotated[
         Path | None,
         Field(
-            description="""Path to the source file. Not all chunks are from files, so this can be None."""
+            description="""Relative path to the source file from project root. Not all chunks are from files, so this can be None."""
         ),
         AfterValidator(set_relative_path),
     ] = None
@@ -167,25 +170,19 @@ class CodeChunk(BasedModel):
             description="""Fully qualified chunk identifier (e.g., 'auth.py:UserAuth.validate')"""
         ),
     ] = None
-    embeddings: Annotated[
-        dict[str, list[float] | dict[str, Any]] | None,
-        Field(
-            description="""Hybrid embeddings with 'dense' (list[float]) and/or 'sparse' (dict) keys"""
-        ),
-    ] = None
 
     _version: Annotated[str, Field(repr=True, init=False, serialization_alias="chunk_version")] = (
         "1.0.0"
     )
-    _embedding_batch: Annotated[
-        UUID7 | None,
+    _embedding_batches: Annotated[
+        tuple[BatchKeys] | tuple[BatchKeys, BatchKeys] | None,
         Field(
-            repr=False,
-            description="""Batch ID for the embedding batch the chunk was processed in.""",
+            repr=True,
+            description="""Batch keys for embedding operations associated with this chunk""",
+            max_length=2,
         ),
     ] = None
 
-    # TODO: Add method to retrieve embedding information (model capabilities, dimensions and other settings)
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
@@ -193,18 +190,53 @@ class CodeChunk(BasedModel):
             FilteredKey("content"): AnonymityConversion.TEXT_COUNT,
             FilteredKey("file_path"): AnonymityConversion.BOOLEAN,
             FilteredKey("metadata"): AnonymityConversion.AGGREGATE,
-            FilteredKey("embeddings"): AnonymityConversion.BOOLEAN,
+            FilteredKey("_embedding_batches"): AnonymityConversion.BOOLEAN,
+            FilteredKey("chunk_name"): AnonymityConversion.BOOLEAN,
+            FilteredKey("name"): AnonymityConversion.HASH,
         }
+
+    @computed_field
+    @property
+    def blake_hash(self) -> BlakeHashKey:
+        """Compute a Blake3 hash of the chunk content for deduplication."""
+        from codeweaver.core.stores import get_blake_hash
+
+        return get_blake_hash(self.content)
 
     def serialize(self) -> SerializedCodeChunk[CodeChunk]:
         """Serialize the CodeChunk to a dictionary."""
         return self.model_dump_json(round_trip=True, exclude_none=True)
+
+    def _construct_name(self) -> str:
+        """Construct a name for the code chunk based on file path and line range."""
+        parts: list[str] = []
+        if self.file_path:
+            parts.append(str(self.file_path))
+        if self.line_range:
+            parts.append(f"lines {self.line_range.start}-{self.line_range.end}")
+        name = self.metadata.get("name") if self.metadata and self.metadata.get("name") else None
+        semantic_meta = self.metadata.get("semantic_meta") if self.metadata else None
+        semantic = (
+            semantic_meta.symbol if semantic_meta and hasattr(semantic_meta, "symbol") else None
+        )
+        if semantic:
+            parts.append(semantic)
+        elif name:
+            parts.append(name)
+        return " | ".join(parts) if parts else "unnamed_chunk"
+
+    @computed_field
+    @property
+    def name(self) -> str:
+        """Get or construct the name of the code chunk."""
+        return self.chunk_name or self._construct_name()
 
     @property
     def _serialization_order(self) -> tuple[str, ...]:
         """Define the order of fields during serialization."""
         return (
             "title",
+            "name",
             "content",
             "metadata",
             "file_path",
@@ -214,6 +246,50 @@ class CodeChunk(BasedModel):
             "source",
             "chunk_version",
         )
+
+    @computed_field
+    @property
+    def dense_batch_key(self) -> BatchKeys | None:
+        """Get the dense embedding batch key, if available."""
+        if self._embedding_batches:
+            for batch_key in self._embedding_batches:
+                if not batch_key.sparse:
+                    return batch_key
+        return None
+
+    @computed_field
+    @property
+    def sparse_batch_key(self) -> BatchKeys | None:
+        """Get the sparse embedding batch key, if available."""
+        if self._embedding_batches:
+            for batch_key in self._embedding_batches:
+                if batch_key.sparse:
+                    return batch_key
+        return None
+
+    @property
+    def embedding_batch_id(self) -> UUID7 | None:
+        """Get the embedding batch ID, if available.
+
+        Returns the ID from the dense batch key for backward compatibility.
+        """
+        return batch_key.id if (batch_key := self.dense_batch_key) else None
+
+    @property
+    def dense_embeddings(self) -> EmbeddingBatchInfo | None:
+        """Get the dense embeddings info, if available."""
+        if not self.dense_batch_key:
+            return None
+        registry = _get_registry()
+        return registry[self.chunk_id].dense if self.chunk_id in registry else None
+
+    @property
+    def sparse_embeddings(self) -> EmbeddingBatchInfo | None:
+        """Get the sparse embeddings info, if available."""
+        if not self.sparse_batch_key:
+            return None
+        registry = _get_registry()
+        return registry[self.chunk_id].sparse if self.chunk_id in registry else None
 
     def _serialize_metadata_for_cli(self) -> dict[str, Any]:
         """Serialize the metadata for CLI output."""
@@ -227,7 +303,13 @@ class CodeChunk(BasedModel):
 
     def serialize_for_embedding(self) -> SerializedCodeChunk[CodeChunk]:
         """Serialize the CodeChunk for embedding."""
-        self_map = self.model_dump(round_trip=True, exclude_unset=True, exclude=self._base_excludes)
+        self_map = self.model_dump(
+            round_trip=True,
+            exclude_none=True,
+            exclude=self._base_excludes,
+            exclude_computed_fields=True,  # Exclude all computed fields
+            warnings=False,  # Suppress serialization warnings
+        )
         if metadata := self.metadata:
             metadata = {k: v for k, v in metadata.items() if k in ("name", "tags", "semantic_meta")}
         self_map["version"] = self._version
@@ -236,26 +318,50 @@ class CodeChunk(BasedModel):
         return to_json({k: v for k, v in ordered_self_map.items() if v}, round_trip=True)
 
     @property
-    def embedding_batch_id(self) -> UUID7 | None:
-        """Get the batch ID for the code chunk."""
-        return self._embedding_batch
-
-    @property
     def _base_excludes(self) -> set[str]:
         """Get the base fields to exclude during serialization."""
         return {
             "_version",
             "_embedding_batch",
+            "_embedding_batches",
             "chunk_version",
             "timestamp",
             "chunk_id",
             "parent_id",
             "length",
+            "dense_batch_key",
+            "sparse_batch_key",
+            "token_estimate",
+            "line_start",
+            "line_end",
+            "title",
         }
 
-    def set_batch_id(self, batch_id: UUID7) -> None:
-        """Set the batch ID for the code chunk."""
-        self._embedding_batch = batch_id
+    def set_batch_keys(self, batch_keys: BatchKeys) -> Self:
+        """Set the batch keys for the code chunk.
+
+        Returns a new CodeChunk instance with updated batch keys.
+        Explicitly copies metadata dict to prevent shared references between instances.
+
+        Args:
+            batch_keys: The batch keys to set
+
+        Returns:
+            New CodeChunk instance with batch keys set
+        """
+        if self._embedding_batches and batch_keys in self._embedding_batches:
+            return self
+
+        metadata_copy = dict(self.metadata.items()) if self.metadata else None
+        return self.model_copy(
+            update={
+                "_embedding_batches": (*self._embedding_batches, batch_keys)
+                if self._embedding_batches
+                else (batch_keys,),
+                "metadata": metadata_copy,
+            },
+            deep=False,  # Shallow copy to avoid pickling issues with SgNode in metadata
+        )
 
     def serialize_for_cli(self) -> dict[str, Any]:
         """Serialize the CodeChunk for CLI output."""
@@ -304,14 +410,17 @@ class CodeChunk(BasedModel):
         return len(self.serialize_for_embedding())
 
     @computed_field
-    @cached_property
-    def token_count(self) -> PositiveInt:
+    @property
+    def token_estimate(self) -> PositiveInt:
         """Estimate token count for the chunk content.
 
         Uses rough approximation of 1 token per 4 characters.
-        TODO: Replace with proper tokenizer (tiktoken, transformers).
         """
-        return len(self.content) // 4
+        return len(self.serialize_for_embedding()) // 4
+
+    def token_count(self, tokenizer_instance: Tokenizer[Any]) -> PositiveInt:
+        """Return the token count for the chunk content."""
+        return tokenizer_instance.estimate(cast(str, self.serialize_for_embedding()))
 
     @computed_field
     @cached_property
@@ -356,7 +465,7 @@ class CodeChunk(BasedModel):
     def dechunkify(chunks: StructuredDataInput, *, for_embedding: bool = False) -> Iterator[str]:
         """Convert a sequence of CodeChunks or mixed serialized and deserialized chunks back to json strings."""
         for chunk in ensure_iterable(chunks):
-            if isinstance(chunk, str | bytes | bytearray):
+            if isinstance(chunk, str | bytes | bytearray):  # type: ignore
                 yield chunk.decode("utf-8") if isinstance(chunk, bytes | bytearray) else chunk
             elif is_typeddict(chunk):
                 result = (
@@ -371,22 +480,20 @@ class CodeChunk(BasedModel):
                 yield result.decode("utf-8") if isinstance(result, bytes | bytearray) else result
 
 
-import contextlib
-
-
 __all__ = (
     "ChunkSequence",
     "CodeChunk",
     "CodeChunkDict",
-    "SearchResult",
     "SerializedCodeChunk",
     "StructuredDataInput",
 )
 
+import contextlib
+
+
 # Rebuild models to resolve forward references
 # Force rebuild even if it fails - better to have working models than perfect ones
-with contextlib.suppress(Exception):
-    _ = SearchResult.model_rebuild(force=True)
+# Re-enabled after resolving circular import issues
 
 with contextlib.suppress(Exception):
     _ = CodeChunk.model_rebuild(force=True)

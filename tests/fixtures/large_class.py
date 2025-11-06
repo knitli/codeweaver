@@ -214,12 +214,9 @@ class LargeClass:
                 "total_edge_weight": total_edge_weight,
                 "average_edge_weight": total_edge_weight / node_degree if node_degree > 0 else 0,
                 "centrality": node_degree / 299.0,  # Simple degree centrality
-                "connected_categories": list(
-                    {
-                        nodes[neighbor]["metadata"]["category"]
-                        for neighbor in nodes[i]["neighbors"]
-                    }
-                ),
+                "connected_categories": list({
+                    nodes[neighbor]["metadata"]["category"] for neighbor in nodes[i]["neighbors"]
+                }),
             }
 
         return {

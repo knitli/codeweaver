@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Update pyproject.toml dependency constraints to match uv.lock versions."""
+
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+"""Update pyproject.toml dependency constraints to match uv.lock versions.
+
+EXPERIMENTAL -- Snapshot/Commit Changes Before Running!
+"""
 
 import re
 import tomllib
@@ -14,6 +23,13 @@ VERSION_PATTERN = re.compile(
 
 def main() -> None:
     """Update pyproject.toml dependencies to match uv.lock versions."""
+    print(
+        """WARNING: This script is experimental. Please snapshot/commit your changes before running it."""
+    )
+    result = input("enter 'OKAY' to proceed: ")
+    if result != "OKAY":
+        print("Aborting...")
+        return
     lock_data = tomllib.loads(Path("uv.lock").read_text())
     packages = lock_data["package"]
     locked_versions: dict[str, str] = {

@@ -8,9 +8,7 @@
 
 from functools import cache
 
-from codeweaver.agent_api.find_code import MatchedSection, find_code
-from codeweaver.agent_api.intent import IntentResult, QueryIntent
-from codeweaver.agent_api.models import CodeMatch, FindCodeResponseSummary, IntentType
+from codeweaver.agent_api.find_code import find_code  # find_code is now a subpackage
 
 
 @cache
@@ -21,13 +19,4 @@ def get_user_agent() -> str:
     return f"CodeWeaver/{__version__}"
 
 
-__all__ = (
-    "CodeMatch",
-    "FindCodeResponseSummary",
-    "IntentResult",
-    "IntentType",
-    "MatchedSection",
-    "QueryIntent",
-    "find_code",
-    "get_user_agent",
-)
+__all__ = ("find_code", "get_user_agent")

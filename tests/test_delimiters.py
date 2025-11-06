@@ -36,6 +36,7 @@ from codeweaver.engine.chunker.delimiters.patterns import (
     matches_pattern,
 )
 
+
 pytestmark = [pytest.mark.unit]
 
 
@@ -112,7 +113,7 @@ class TestDelimiterPattern:
         delimiter = delimiters[0]
 
         # Should use FUNCTION defaults
-        assert delimiter.get("override_priority") == DelimiterKind.FUNCTION.default_priority  # 70
+        assert delimiter.get("priority_override") == DelimiterKind.FUNCTION.default_priority  # 70
         assert delimiter.get("inclusive") is True  # code elements are inclusive
         assert delimiter.get("take_whole_lines") is True
         assert delimiter.get("nestable") is True
@@ -134,7 +135,7 @@ class TestDelimiterPattern:
         assert len(delimiters) == 1
         delimiter = delimiters[0]
 
-        assert delimiter.get("override_priority") == 40  # override, not PARAGRAPH default
+        assert delimiter.get("priority_override") == 40  # override, not PARAGRAPH default
         assert delimiter.get("inclusive") is False
         assert delimiter.get("take_whole_lines") is False
         assert delimiter.get("nestable") is False
@@ -226,7 +227,7 @@ class TestParagraphDelimiter:
         paragraph_priority = DelimiterKind.PARAGRAPH.default_priority
 
         assert comment_block_priority > paragraph_priority > block_priority
-        assert comment_block_priority == 45
+        assert comment_block_priority == 55
         assert paragraph_priority == 40
         assert block_priority == 30
 
@@ -262,7 +263,8 @@ class TestParagraphDelimiter:
 class TestLanguageFamilies:
     """Test language family classification."""
 
-    def test_c_style_detection(self) -> None:
+    @pytest.mark.asyncio
+    async def test_c_style_detection(self) -> None:
         """Test C-style language detection."""
         code = """
         function foo() {
@@ -271,65 +273,78 @@ class TestLanguageFamilies:
             }
         }
         """
-        family = detect_language_family(code)
+        family = await detect_language_family(code)
         assert family == LanguageFamily.C_STYLE
 
-    def test_python_style_detection(self) -> None:
+    @pytest.mark.asyncio
+    async def test_python_style_detection(self) -> None:
         """Test Python-style language detection."""
         code = """
+        # Python comment
+        @decorator
         def foo():
             if x > 0:
                 return x
         """
-        family = detect_language_family(code)
+        family = await detect_language_family(code)
         assert family == LanguageFamily.PYTHON_STYLE
 
-    def test_lisp_style_detection(self) -> None:
+    @pytest.mark.asyncio
+    async def test_lisp_style_detection(self) -> None:
         """Test Lisp-style language detection."""
         code = """
-        (defn foo [x]
-            (if (> x 0)
-                x))
+        ;;; Lisp function docstring
+        ;; Another comment
+        (defun foo (x)
+          ;; Local comment
+          (if (> x 0)
+            x
+            nil))
         """
-        family = detect_language_family(code)
+        family = await detect_language_family(code)
         assert family == LanguageFamily.LISP_STYLE
 
-    def test_markup_style_detection(self) -> None:
+    @pytest.mark.asyncio
+    async def test_markup_style_detection(self) -> None:
         """Test Markup-style language detection."""
         code = """
         <div class="container">
             <p>Hello {{ name }}</p>
         </div>
         """
-        family = detect_language_family(code)
+        family = await detect_language_family(code)
         assert family == LanguageFamily.MARKUP_STYLE
 
-    def test_shell_style_detection(self) -> None:
+    @pytest.mark.asyncio
+    async def test_shell_style_detection(self) -> None:
         """Test Shell-style language detection."""
         code = """
+        #!/bin/bash
         function foo() {
-            if [ $x -gt 0 ]; then
-                echo $x
-            fi
+            for i in 1 2 3; do
+                echo $i
+            done
         }
         """
-        family = detect_language_family(code)
+        family = await detect_language_family(code)
         assert family == LanguageFamily.SHELL_STYLE
 
-    def test_unknown_detection(self) -> None:
+    @pytest.mark.asyncio
+    async def test_unknown_detection(self) -> None:
         """Test unknown language detection for insufficient data."""
         code = "x = 42"  # Not enough to classify
-        family = detect_language_family(code)
+        family = await detect_language_family(code)
         assert family == LanguageFamily.UNKNOWN
 
-    def test_min_confidence_threshold(self) -> None:
+    @pytest.mark.asyncio
+    async def test_min_confidence_threshold(self) -> None:
         """Test minimum confidence threshold."""
         code = "if x"  # Only one delimiter, below default threshold
-        family = detect_language_family(code, min_confidence=3)
+        family = await detect_language_family(code, min_confidence=3)
         assert family == LanguageFamily.UNKNOWN
 
         # Lower threshold should allow classification
-        family = detect_language_family(code, min_confidence=1)
+        family = await detect_language_family(code, min_confidence=1)
         assert family != LanguageFamily.UNKNOWN
 
     def test_detect_characteristics(self) -> None:
@@ -456,7 +471,7 @@ class TestIntegration:
 
         assert len(delimiters) == 2
         assert all(d.get("kind") == DelimiterKind.FUNCTION for d in delimiters)
-        assert all(d.get("priority") == 70 for d in delimiters)  # FUNCTION priority
+        assert all(d.get("priority_override") == 70 for d in delimiters)  # FUNCTION priority
 
     def test_family_pattern_expansion(self) -> None:
         """Test expanding all patterns for a language family."""

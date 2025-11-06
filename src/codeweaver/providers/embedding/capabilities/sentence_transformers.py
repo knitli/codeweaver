@@ -6,15 +6,17 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-from codeweaver.providers.embedding.capabilities.base import (
+from codeweaver.providers.embedding.capabilities.types import (
     EmbeddingCapabilities,
-    EmbeddingModelCapabilities,
     PartialCapabilities,
 )
 from codeweaver.providers.provider import Provider
 
+
+if TYPE_CHECKING:
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
 type SentenceTransformersProvider = Literal[
     Provider.FASTEMBED, Provider.HUGGINGFACE_INFERENCE, Provider.SENTENCE_TRANSFORMERS
@@ -251,6 +253,8 @@ ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (
 
 def get_sentence_transformers_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
     """Get the capabilities for sentence-transformers embedding models."""
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+
     capabilities: list[EmbeddingCapabilities] = []
     for cap in ALL_CAPABILITIES:
         capabilities.extend([

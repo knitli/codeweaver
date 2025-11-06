@@ -7,12 +7,18 @@
 
 from __future__ import annotations
 
-from codeweaver.providers.provider import Provider
-from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
 def get_amazon_reranking_capabilities() -> tuple[RerankingModelCapabilities, ...]:
     """Get the capabilities of the Amazon reranking model."""
+    from codeweaver.providers.provider import Provider
+    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+
     return (
         RerankingModelCapabilities.model_validate({
             "name": "amazon.rerank-v1:0",

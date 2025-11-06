@@ -8,21 +8,38 @@
       "command": "npx",
       "type": "stdio"
     },
-    "sequential-thinking": {
+    "morph-llm-fast-apply": {
       "args": [
         "-y",
-        "@modelcontextprotocol/server-sequential-thinking"
+        "@morph-llm/morph-fast-apply@latest"
       ],
       "command": "npx",
+      "env": {
+        "ALL_TOOLS": "false",
+        "MORPH_API_KEY": "${env:MORPH_API_KEY}"
+      },
       "type": "stdio"
     },
     "serena": {
       "args": [
         "run",
         "serena",
-        "start-mcp-server"
+        "start-mcp-server",
+        "--context",
+        "agent"
       ],
       "command": "uv",
+      "type": "stdio"
+    },
+    "tavily": {
+      "args": [
+        "-y",
+        "tavily-mcp@latest"
+      ],
+      "command": "npx",
+      "env": {
+        "TAVILY_API_KEY": "${env:TAVILY_API_KEY}"
+      },
       "type": "stdio"
     }
   }
