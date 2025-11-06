@@ -48,9 +48,15 @@ app.command(
     help="List available providers, models, and more.",
 )
 
+app.command(
+    "codeweaver.cli.commands.init:main",
+    name="init",
+    alias="initialize",
+    help="Initialize CodeWeaver configuration and MCP client setup.",
+)
+
 # these are scaffolded for future implementation
 # app.command("codeweaver.cli.commands.context:main", name="context", alias="prep")
-# app.command("codeweaver.cli.commands.init:main", name="init", alias="initialize")
 
 
 def main() -> None:

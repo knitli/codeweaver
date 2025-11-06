@@ -17,29 +17,31 @@ uv_venv_create_args = [
 ]
 
 [tools]
-ast-grep = "latest"
 "cargo:rust-parallel" = "latest"
 "cargo:tree-sitter-cli" = "latest"
-gh = "latest"
-gitsign = "latest"
-hk = "latest"
-node = "24"
 "pipx:changesets" = "latest"
 "pipx:claude-monitor" = "latest"
 "pipx:copychat" = "latest"
+"pipx:fastmcp" = "latest"
 "pipx:git+https://github.com/microsoft/mcp-interviewer.git" = "latest"
 "pipx:mike" = "latest"
 "pipx:mteb" = "latest"
 "pipx:reuse" = "latest"
 "pipx:tombi" = "latest"
+ast-grep = "latest"
+gh = "latest"
+gitsign = "latest"
+hk = "latest"
+node = "24"
 pkl = "latest"
+python = "3.13"
 ripgrep = "latest"
 ruff = "latest"
 shellcheck = "latest"
 shfmt = "latest"
 typos = "latest"
-uv = "latest"
 usage = "latest"
+uv = "latest"
 yamlfmt = "latest"
 
 [hooks]
@@ -69,6 +71,8 @@ case "$python_path" in
         mise run source 2>/dev/null || true
         ;;
 esac
+eval "$(mise activate)" 2>/dev/null || true
+mise env 2>/dev/null || true
 '''
 leave = '''
 echo "Exiting CodeWeaver environment..."
@@ -139,8 +143,11 @@ run = [
   "mise set &>/dev/null",
   "mise -y trust &>/dev/null",
   "mise -y install &>/dev/null || true",
-  "mise en .",
+  "mise -y venv &>/dev/null",
+  "mise run sync &>/dev/null",
+  "mise env &>/dev/null || true",
   "mise run set-ci",
+  "eval \"$(mise activate zsh)\" &>/dev/null",
 ]
 silent = "stdout"
 

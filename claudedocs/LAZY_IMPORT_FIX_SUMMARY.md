@@ -36,8 +36,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
   - Added missing `DeserializationKwargs` to codeweaver.core
 
 ### 3. Validation Tools Created ✅
-- `scripts/utils/validate-lazy-imports.py` - Comprehensive validation script
-- `scripts/utils/test-lazy-import-ide-support.py` - IDE support verification test
+- `mise-tasks/validate-lazy-imports.py` - Comprehensive validation script (validates both lazy_import() function calls and package-level lazy imports)
 
 ### 4. Documentation ✅
 - Enhanced LazyImport docstring with TYPE_CHECKING examples
@@ -47,17 +46,14 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 ## Testing
 
-Run these commands to verify the fixes:
+Run this command to verify the fixes:
 
 ```bash
-# Test IDE support structure
-python scripts/utils/test-lazy-import-ide-support.py
-
-# Validate import consistency
-python scripts/utils/validate-lazy-imports.py
+# Validate both lazy_import() function calls and package-level lazy imports
+./mise-tasks/validate-lazy-imports.py
 ```
 
-Both tests pass! ✅
+All validations pass! ✅
 
 ---
 
@@ -136,9 +132,8 @@ This is a standard Python pattern used by:
 2. `src/codeweaver/config/__init__.py` - Added TYPE_CHECKING, fixed __all__
 3. `src/codeweaver/common/__init__.py` - Added TYPE_CHECKING
 4. `src/codeweaver/common/utils/lazy_importer.py` - Enhanced docs
-5. `scripts/utils/validate-lazy-imports.py` - New (validation)
-6. `scripts/utils/test-lazy-import-ide-support.py` - New (testing)
-7. `docs/lazy-import-investigation.md` - New (documentation)
+5. `mise-tasks/validate-lazy-imports.py` - Comprehensive validation (both lazy_import() calls and package-level imports)
+6. `docs/lazy-import-investigation.md` - New (documentation)
 
 ---
 
@@ -178,12 +173,13 @@ You should now see:
 
 ## Maintenance
 
-The validation script (`scripts/utils/validate-lazy-imports.py`) should be run when:
+The validation script (`mise-tasks/validate-lazy-imports.py`) should be run when:
 - Adding new exports to __all__
 - Modifying _dynamic_imports
 - Changing module structure
+- Adding or modifying lazy_import() function calls
 
-This prevents future regressions.
+This prevents future regressions. The script is also integrated into pre-commit hooks and CI via mise tasks.
 
 ---
 

@@ -61,9 +61,9 @@ def resolve_project_root() -> Path:
 
 
 def is_tty() -> bool:
-    """Check if the output is a TTY."""
+    """Check if the output is a TTY in an interactive terminal."""
     console: Console = globals()["console"]._resolve()()
-    return console.is_terminal and console.file.isatty()
+    return console.is_terminal and console.file.isatty() and console.is_interactive
 
 
 def get_terminal_width() -> int:
@@ -96,3 +96,14 @@ def format_file_link(file_path: str | Path, line: NonNegativeInt | None = None) 
             else f'File "{relative_path!s}"'
         )
     return f"{path.absolute()!s}:{line!s}" if line is not None else f"{path.absolute()!s}"
+
+
+__all__ = (
+    "format_file_link",
+    "get_terminal_width",
+    "in_ide",
+    "is_tty",
+    "resolve_project_root",
+    "we_are_in_jetbrains",
+    "we_are_in_vscode",
+)

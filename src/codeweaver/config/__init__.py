@@ -9,6 +9,7 @@ from importlib import import_module
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
+
 if TYPE_CHECKING:
     # Import everything for IDE and type checker support
     # These imports are never executed at runtime, only during type checking
@@ -40,9 +41,9 @@ if TYPE_CHECKING:
         RetryMiddlewareSettings,
     )
     from codeweaver.config.providers import (
-        AWSProviderSettings,
         AgentModelSettings,
         AgentProviderSettings,
+        AWSProviderSettings,
         AzureCohereProviderSettings,
         AzureOpenAIProviderSettings,
         DataProviderSettings,

@@ -79,10 +79,11 @@ Each block imports all exported types/functions from their respective submodules
 
 ### 3. Created Validation Script
 
-Created `scripts/utils/validate-lazy-imports.py` to:
+Created `mise-tasks/validate-lazy-imports.py` to:
 - Check consistency between `__all__` and `_dynamic_imports`
 - Verify TYPE_CHECKING blocks exist
 - Validate import paths
+- Validate `lazy_import()` function calls
 - Catch future regressions
 
 ## LazyImport Class - Recommendations
@@ -124,12 +125,12 @@ The TYPE_CHECKING pattern is the idiomatic Python solution used throughout the e
 
 ```bash
 # Run validation script
-python scripts/utils/validate-lazy-imports.py
+./mise-tasks/validate-lazy-imports.py
 
 # Test imports work at runtime
 python -c "
 from codeweaver.core import BasedModel
-from codeweaver.config import CodeWeaverSettings  
+from codeweaver.config import CodeWeaverSettings
 from codeweaver.common import lazy_import
 print('✓ All imports successful')
 "

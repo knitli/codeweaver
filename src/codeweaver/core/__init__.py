@@ -13,6 +13,7 @@ from importlib import import_module
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
+
 if TYPE_CHECKING:
     # Import everything for IDE and type checker support
     # These imports are never executed at runtime, only during type checking
@@ -63,9 +64,9 @@ if TYPE_CHECKING:
         UNSET,
         AnonymityConversion,
         BaseDataclassEnum,
+        BasedModel,
         BaseEnum,
         BaseEnumData,
-        BasedModel,
         CategoryName,
         CategoryNameT,
         DataclassSerializationMixin,

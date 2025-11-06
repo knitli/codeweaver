@@ -3,9 +3,10 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
-"""Init-related CLI commands for CodeWeaver.
+"""Unified init command for CodeWeaver configuration and MCP client setup.
 
-Adds CodeWeaver MCP server configuration to various MCP clients.
+Handles both CodeWeaver project configuration and MCP client configuration
+in a single command with proper HTTP streaming transport support.
 """
 
 from __future__ import annotations
@@ -18,50 +19,99 @@ import sys
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
+
+import cyclopts
+
+from rich.console import Console
+from rich.prompt import Confirm
 
 
-def _get_config_paths() -> dict[str, Path | None]:
-    """Get configuration file paths for various MCP clients based on OS.
+console = Console()
+
+# Create cyclopts app at module level
+app = cyclopts.App(
+    "init",
+    help="Initialize CodeWeaver configuration and MCP client setup.",
+    console=console,
+)
+
+
+def _get_mcp_client_config_path(client: str) -> Path:
+    """Get MCP client configuration file path.
+
+    Args:
+        client: MCP client name (claude_code, claude_desktop, cursor, continue)
 
     Returns:
-        Dictionary mapping client names to their config file paths.
-        Returns None for paths that don't apply to the current OS.
+        Path to client's MCP configuration file
+
+    Raises:
+        ValueError: If client is unknown or not supported on current platform
     """
     system = platform.system()
     home = Path.home()
 
-    paths: dict[str, Path | None] = {}
+    match client:
+        case "claude_code":
+            return home / ".config" / "claude" / "claude_code_config.json"
+        case "claude_desktop":
+            if system == "Darwin":
+                return (
+                    home
+                    / "Library"
+                    / "Application Support"
+                    / "Claude"
+                    / "claude_desktop_config.json"
+                )
+            if system == "Windows":
+                appdata = Path(os.environ.get("APPDATA", home / "AppData" / "Roaming"))
+                return appdata / "Claude" / "claude_desktop_config.json"
+            raise ValueError(
+                f"Claude Desktop not officially supported on {system}. "
+                "Use claude_code, cursor, or continue instead."
+            )
+        case "cursor":
+            # Prefer project-local .cursor/config.json
+            project_cursor = Path.cwd() / ".cursor" / "config.json"
+            return project_cursor if project_cursor.parent.exists() else home / ".cursor" / "config.json"
+        case "continue":
+            return home / ".continue" / "config.json"
+        case _:
+            raise ValueError(
+                f"Unknown MCP client: {client}. "
+                "Valid options: claude_code, claude_desktop, cursor, continue"
+            )
 
-    # Claude Code - cross-platform
-    paths["claude_code"] = home / ".config" / "claude" / "claude_code_config.json"
 
-    # Claude Desktop - OS-specific
-    if system == "Darwin":  # macOS
-        paths["claude_desktop"] = (
-            home / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
-        )
-    elif system == "Windows":
-        appdata = Path(os.environ.get("APPDATA", home / "AppData" / "Roaming"))
-        paths["claude_desktop"] = appdata / "Claude" / "claude_desktop_config.json"
-    else:  # Linux - Claude Desktop not officially supported but some use Wine
-        paths["claude_desktop"] = None
+def _generate_http_mcp_config(project_path: Path, host: str = "127.0.0.1", port: int = 9328) -> dict[str, Any]:
+    """Generate HTTP streaming MCP server configuration for CodeWeaver.
 
-    # Cursor - cross-platform, check both project and home directory
-    project_cursor = Path.cwd() / ".cursor" / "config.json"
-    home_cursor = home / ".cursor" / "config.json"
-    paths["cursor"] = project_cursor if project_cursor.parent.exists() else home_cursor
+    CodeWeaver uses HTTP streaming transport (not STDIO) for MCP protocol.
+    This enables:
+    - Single shared server instance across all clients
+    - Background indexing that persists between client sessions
+    - Concurrent request handling
+    - Proper session management
 
-    # Gemini CLI - based on typical CLI tool config patterns
-    # Note: As of 2025, Google's Gemini CLI MCP configuration is not well documented.
-    # This assumes XDG-style config location pending official documentation.
-    if system == "Windows":
-        paths["gemini_cli"] = None  # Not typically available on Windows
-    else:
-        xdg_config = Path(os.environ.get("XDG_CONFIG_HOME", home / ".config"))
-        paths["gemini_cli"] = xdg_config / "gemini" / "mcp_config.json"
+    Args:
+        project_path: Path to project directory for CodeWeaver to index
+        host: Server host address (default: 127.0.0.1)
+        port: Server port (default: 9328, 'WEAV' on phone keypad)
 
-    return paths
+    Returns:
+        Dictionary containing MCP server configuration for HTTP transport
+    """
+    # Note: Using 'codeweaver' command directly, not 'fastmcp run'
+    # Server must be started separately: codeweaver server
+    return {
+        "command": "codeweaver",
+        "args": ["server", "--transport", "http", "--host", host, "--port", str(port)],
+        "env": {
+            "CODEWEAVER_PROJECT_PATH": str(project_path.resolve()),
+            "VOYAGE_API_KEY": "${VOYAGE_API_KEY}",  # Will be replaced by user's actual key
+        },
+    }
 
 
 def _load_json_config(path: Path) -> dict[str, Any]:
@@ -83,8 +133,8 @@ def _load_json_config(path: Path) -> dict[str, Any]:
         with path.open("r", encoding="utf-8") as f:
             return json.load(f)
     except json.JSONDecodeError as e:
-        print(f"⚠️  Warning: Config file exists but contains invalid JSON: {path}")
-        print(f"   Error: {e}")
+        console.print(f"[yellow]⚠[/yellow]  Warning: Config file exists but contains invalid JSON: {path}")
+        console.print(f"   Error: {e}")
         raise
 
 
@@ -102,7 +152,7 @@ def _backup_config(path: Path) -> Path:
 
     if path.exists():
         shutil.copy2(path, backup_path)
-        print(f"✅ Created backup: {backup_path}")
+        console.print(f"[green]✓[/green] Created backup: {backup_path}")
 
     return backup_path
 
@@ -121,24 +171,13 @@ def _save_json_config(path: Path, config: dict[str, Any]) -> None:
         f.write("\n")  # Add trailing newline
 
 
-def _create_codeweaver_config(project_path: Path) -> dict[str, Any]:
-    """Create CodeWeaver MCP server configuration entry.
-
-    Args:
-        project_path: Path to project directory for CodeWeaver to index
-
-    Returns:
-        Dictionary containing CodeWeaver MCP server configuration
-    """
-    return {
-        "command": "fastmcp",
-        "args": ["run", "codeweaver.server.server:app"],
-        "env": {"CODEWEAVER_PROJECT_PATH": str(project_path.resolve())},
-    }
-
-
 def _merge_mcp_config(
-    existing: dict[str, Any], project_path: Path, *, force: bool = False
+    existing: dict[str, Any],
+    project_path: Path,
+    *,
+    force: bool = False,
+    host: str = "127.0.0.1",
+    port: int = 9328,
 ) -> tuple[dict[str, Any], bool]:
     """Merge CodeWeaver configuration into existing MCP config.
 
@@ -146,6 +185,8 @@ def _merge_mcp_config(
         existing: Existing configuration dictionary
         project_path: Path to project for CodeWeaver
         force: Whether to overwrite existing CodeWeaver configuration
+        host: Server host address
+        port: Server port
 
     Returns:
         Tuple of (merged config dict, whether changes were made)
@@ -159,110 +200,192 @@ def _merge_mcp_config(
     # Check if CodeWeaver already configured
     if "codeweaver" in config["mcpServers"]:
         if not force:
-            print("⚠️  CodeWeaver already configured. Use --force to overwrite.")
+            console.print("[yellow]⚠[/yellow]  CodeWeaver already configured. Use --force to overwrite.")
             return config, False
-        print("🔄 Overwriting existing CodeWeaver configuration (--force enabled)")
+        console.print("[yellow]🔄[/yellow] Overwriting existing CodeWeaver configuration (--force enabled)")
 
     # Add or update CodeWeaver configuration
-    config["mcpServers"]["codeweaver"] = _create_codeweaver_config(project_path)
+    config["mcpServers"]["codeweaver"] = _generate_http_mcp_config(project_path, host, port)
 
     return config, True
 
 
-def _add_to_client(
-    client_name: str, config_path: Path | None, project_path: Path, *, force: bool = False
-) -> bool:
-    """Add CodeWeaver configuration to specific MCP client.
+def _create_codeweaver_config(project_path: Path, quick: bool = False) -> Path:
+    """Create CodeWeaver configuration file interactively.
 
     Args:
-        client_name: Name of the MCP client
-        config_path: Path to client's configuration file
-        project_path: Path to project for CodeWeaver
-        force: Whether to overwrite existing configuration
+        project_path: Path to project directory
+        quick: Use recommended defaults without prompting
 
     Returns:
-        True if configuration was added/updated, False otherwise
+        Path to created configuration file
     """
-    if config_path is None:
-        print(f"❌ {client_name}: Not supported on {platform.system()}")
-        return False
+    from codeweaver.cli.commands.config import init as config_init_wizard
 
-    print(f"\n📝 Configuring {client_name}...")
-    print(f"   Config: {config_path}")
+    # Use existing config wizard
+    config_path = project_path / ".codeweaver.toml"
 
-    try:
-        # Load existing configuration
-        existing_config = _load_json_config(config_path)
+    if quick:
+        # Use recommended default profile
+        console.print("[cyan]Creating configuration with recommended defaults...[/cyan]")
+        # For quick mode, we'll use the config wizard with default answers
+        # This will be implemented by the config wizard's quick mode
 
-        # Backup if file exists
-        if config_path.exists():
-            _backup_config(config_path)
+    # Call the existing config wizard
+    config_init_wizard(output=config_path, force=False)
 
-        # Merge CodeWeaver configuration
-        merged_config, changed = _merge_mcp_config(existing_config, project_path, force=force)
-
-        if not changed:
-            return False
-
-        # Save updated configuration
-        _save_json_config(config_path, merged_config)
-
-        print(f"✅ {client_name}: Successfully configured!")
-
-    except json.JSONDecodeError:
-        print(f"❌ {client_name}: Failed due to invalid JSON in config file")
-        return False
-    except Exception as e:
-        print(f"❌ {client_name}: Failed with error: {e}")
-        return False
-    else:
-        return True
+    return config_path
 
 
-def _print_next_steps(configured_clients: list[str]) -> None:
-    """Print next steps after configuration.
+@app.default
+def init(
+    *,
+    project: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
+    config_only: Annotated[bool, cyclopts.Parameter(name=["--config-only"])] = False,
+    mcp_only: Annotated[bool, cyclopts.Parameter(name=["--mcp-only"])] = False,
+    quick: Annotated[bool, cyclopts.Parameter(name=["--quick", "-q"])] = False,
+    client: Annotated[str, cyclopts.Parameter(name=["--client", "-c"])] = "claude_code",
+    host: Annotated[str, cyclopts.Parameter(name=["--host"])] = "127.0.0.1",
+    port: Annotated[int, cyclopts.Parameter(name=["--port"])] = 9328,
+    force: Annotated[bool, cyclopts.Parameter(name=["--force", "-f"])] = False,
+) -> None:
+    """Initialize CodeWeaver configuration and MCP client setup.
+
+    By default, creates both CodeWeaver config and MCP client config.
+    Use --config-only or --mcp-only to create just one.
+
+    ARCHITECTURE NOTE:
+    CodeWeaver uses HTTP streaming (not STDIO) for the MCP protocol.
+    This means:
+    - Single server instance shared across all clients
+    - Background indexing persists between client sessions
+    - Server must be started separately: codeweaver server
+
+    This is why we don't use 'fastmcp install' - it assumes STDIO
+    per-client processes which breaks CodeWeaver's architecture.
 
     Args:
-        configured_clients: List of successfully configured client names
+        project: Path to project directory (defaults to current directory)
+        config_only: Only create CodeWeaver config file
+        mcp_only: Only create MCP client config
+        quick: Use recommended defaults without prompting
+        client: MCP client to configure (claude_code, claude_desktop, cursor, continue)
+        host: Server host address for MCP config (default: 127.0.0.1)
+        port: Server port for MCP config (default: 9328)
+        force: Overwrite existing configurations
+
+    Examples:
+        codeweaver init --quick              # Full setup with defaults
+        codeweaver init --config-only        # Just config file
+        codeweaver init --mcp-only           # Just MCP client config
+        codeweaver init --client cursor      # Setup for Cursor
     """
-    if not configured_clients:
-        print("\n⚠️  No clients were configured. Nothing to do.")
-        return
+    console.print("\n[bold cyan]CodeWeaver Initialization[/bold cyan]\n")
 
-    print("\n" + "=" * 60)
-    print("🎉 Configuration Complete!")
-    print("=" * 60)
+    # Determine project path
+    project_path = (project or Path.cwd()).resolve()
+    if not project_path.exists():
+        console.print(f"[red]✗[/red] Project path does not exist: {project_path}")
+        sys.exit(1)
 
-    print("\n📋 Next Steps:")
-    print("   1. Restart your MCP client(s):")
+    if not project_path.is_dir():
+        console.print(f"[red]✗[/red] Path is not a directory: {project_path}")
+        sys.exit(1)
 
-    for client in configured_clients:
-        if client == "claude_desktop":
-            print("      • Claude Desktop: Quit completely and relaunch")
-        elif client == "claude_code":
-            print("      • Claude Code: Restart VS Code or reload window")
-        elif client == "cursor":
-            print("      • Cursor: Restart Cursor editor")
-        elif client == "gemini_cli":
-            print("      • Gemini CLI: No restart needed, takes effect on next query")
+    console.print(f"[dim]Project:[/dim] {project_path}\n")
 
-    print("\n   2. Verify CodeWeaver is loaded:")
-    print("      • Look for the hammer icon (🔨) in your MCP client")
-    print("      • Check that 'codeweaver' appears in available servers")
+    # Default: do both if neither flag specified
+    if not config_only and not mcp_only:
+        config_only = mcp_only = True
 
-    print("\n   3. Test with a query:")
-    print("      • Try: 'Find the authentication logic'")
-    print("      • Try: 'Show me the database models'")
-    print("      • Try: 'Where is the API endpoint for users?'")
+    # Part 1: CodeWeaver Configuration
+    if config_only:
+        console.print("[bold]Step 1: CodeWeaver Configuration[/bold]\n")
 
-    print("\n📚 Troubleshooting:")
-    print("   • If server doesn't load, check that 'fastmcp' is in PATH")
-    print("   • Verify project path is correct in the config")
-    print("   • Check client logs for error messages")
-    print("   • See: https://docs.codeweaver.dev/troubleshooting")
-    print()
+        config_path = project_path / ".codeweaver.toml"
+
+        if config_path.exists() and not force:
+            overwrite = Confirm.ask(
+                f"[yellow]Configuration file already exists at {config_path}. Overwrite?[/yellow]",
+                default=False,
+            )
+            if not overwrite:
+                console.print("[yellow]Skipping CodeWeaver config creation.[/yellow]\n")
+            else:
+                config_path = _create_codeweaver_config(project_path, quick)
+                console.print(f"[green]✓[/green] Config created: {config_path}\n")
+        else:
+            config_path = _create_codeweaver_config(project_path, quick)
+            console.print(f"[green]✓[/green] Config created: {config_path}\n")
+
+    # Part 2: MCP Client Configuration
+    if mcp_only:
+        console.print("[bold]Step 2: MCP Client Configuration[/bold]\n")
+
+        try:
+            # Get client config path
+            client_config_path = _get_mcp_client_config_path(client)
+            console.print(f"[dim]Client:[/dim] {client}")
+            console.print(f"[dim]Config:[/dim] {client_config_path}\n")
+
+            # Load existing config
+            existing_config = _load_json_config(client_config_path)
+
+            # Backup if file exists
+            if client_config_path.exists():
+                _backup_config(client_config_path)
+
+            # Merge CodeWeaver configuration
+            merged_config, changed = _merge_mcp_config(
+                existing_config, project_path, force=force, host=host, port=port
+            )
+
+            if not changed:
+                console.print("[yellow]No changes made to MCP config.[/yellow]\n")
+            else:
+                # Save updated configuration
+                _save_json_config(client_config_path, merged_config)
+                console.print(f"[green]✓[/green] MCP config updated: {client_config_path}\n")
+
+        except ValueError as e:
+            console.print(f"[red]✗[/red] {e}")
+            sys.exit(1)
+        except json.JSONDecodeError:
+            console.print("[red]✗[/red] Failed to parse existing MCP config file")
+            sys.exit(1)
+        except Exception as e:
+            console.print(f"[red]✗[/red] Unexpected error: {e}")
+            sys.exit(1)
+
+    # Final Instructions
+    console.print("[bold green]Setup complete![/bold green]\n")
+    console.print("[bold]Next steps:[/bold]")
+    console.print("  1. Set VOYAGE_API_KEY environment variable:")
+    console.print("     [dim]export VOYAGE_API_KEY='your-api-key'[/dim]")
+    console.print("  2. Start the server: [cyan]codeweaver server[/cyan]")
+    console.print(f"  3. Restart {client} to load MCP config")
+    console.print("  4. Test with a query:")
+    console.print("     [dim]'Find the authentication logic'[/dim]\n")
+
+    console.print("[bold]Architecture Note:[/bold]")
+    console.print("CodeWeaver uses HTTP streaming transport, meaning the server")
+    console.print("must be running before your MCP client can connect. Background")
+    console.print("indexing persists between client sessions.\n")
 
 
+def main() -> None:
+    """CLI entry point for init command."""
+    try:
+        app()
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Initialization cancelled by user.[/yellow]")
+        sys.exit(0)
+    except Exception as e:
+        console.print(f"[red]✗[/red] Initialization failed: {e}")
+        sys.exit(1)
+
+
+# Legacy compatibility - deprecated
 def add(
     *,
     project: Path | None = None,
@@ -276,72 +399,34 @@ def add(
 ) -> None:
     """Add CodeWeaver MCP server configuration to specified clients.
 
+    [DEPRECATED] Use 'codeweaver init' instead. This command will be removed in v0.2.
+
     Args:
         project: Path to project directory (defaults to current directory)
         claude_code: Add to Claude Code configuration
         claude_desktop: Add to Claude Desktop configuration
         cursor: Add to Cursor configuration
-        gemini_cli: Add to Gemini CLI configuration
+        gemini_cli: Add to Gemini CLI configuration (not yet supported)
         mcp_json: Path to custom MCP JSON config file
         force: Overwrite existing CodeWeaver configuration if present
         all_clients: Configure all available clients
     """
-    # Check for fastmcp
-    if not (fastmcp_path := shutil.which("fastmcp")):
-        print("❌ Error: 'fastmcp' not found in PATH")
-        print("   Install with: pip install fastmcp")
-        print("   Or: uv tool install fastmcp")
-        sys.exit(1)
-
-    print(f"✅ Found fastmcp at: {fastmcp_path}")
-
-    # Determine project path
-    project_path = (project or Path.cwd()).resolve()
-    if not project_path.exists():
-        print(f"❌ Error: Project path does not exist: {project_path}")
-        sys.exit(1)
-
-    print(f"📁 Project: {project_path}")
-
-    # Check if any clients specified
-    clients_selected = {
-        "claude_code": claude_code or all_clients,
-        "claude_desktop": claude_desktop or all_clients,
-        "cursor": cursor or all_clients,
-        "gemini_cli": gemini_cli or all_clients,
-    }
-
-    has_custom_mcp_json = mcp_json is not None
-
-    if not any(clients_selected.values()) and not has_custom_mcp_json:
-        print("\n❌ Error: You need to specify at least one client to configure!")
-        print("\nOptions:")
-        print("  --claude-code      Configure Claude Code")
-        print("  --claude-desktop   Configure Claude Desktop")
-        print("  --cursor          Configure Cursor")
-        print("  --gemini-cli      Configure Gemini CLI")
-        print("  --mcp-json PATH   Configure custom MCP JSON file")
-        print("  --all-clients     Configure all available clients")
-        sys.exit(1)
-
-    # Get config paths
-    config_paths = _get_config_paths()
-
-    # Configure selected clients
-    configured_clients: list[str] = []
-
-    configured_clients.extend(
-        client_name
-        for client_name, should_configure in clients_selected.items()
-        if should_configure
-        and _add_to_client(client_name, config_paths[client_name], project_path, force=force)
+    console.print(
+        "[yellow]⚠ WARNING: This command is deprecated. Use 'codeweaver init' instead.[/yellow]"
     )
-    # Handle custom MCP JSON
-    if has_custom_mcp_json and mcp_json is not None:
-        print(f"\n📝 Configuring custom MCP JSON: {mcp_json}")
+    console.print("[yellow]   This command will be removed in v0.2.[/yellow]\n")
 
-        if _add_to_client("mcp_json", mcp_json, project_path, force=force):
-            configured_clients.append("mcp_json")
+    # Map old client flags to new client parameter
+    if claude_code or all_clients:
+        client = "claude_code"
+    elif claude_desktop or all_clients:
+        client = "claude_desktop"
+    elif cursor or all_clients:
+        client = "cursor"
+    else:
+        console.print("[red]✗[/red] Please specify at least one client to configure.")
+        console.print("[yellow]   Use 'codeweaver init' for the new unified interface.[/yellow]")
+        sys.exit(1)
 
-    # Print next steps
-    _print_next_steps(configured_clients)
+    # Call new unified init with mcp_only=True
+    init(project=project, mcp_only=True, client=client, force=force)

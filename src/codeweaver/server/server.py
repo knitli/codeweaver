@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import re
@@ -357,10 +358,50 @@ async def lifespan(
             "AppState should be an instance of AppState, but isn't. Something is wrong. Please report this issue.",
             details={"state": state},
         )
+
+    # Background indexing task
+    indexing_task = None
+
     try:
         console.print(f"{CODEWEAVER_PREFIX} [bold green]Ensuring services set up...[/bold green]")
         if not state.health:
             state.health.initialize()
+
+        # Start background indexing
+        async def background_indexing():
+            """Background task for indexing and file watching."""
+            try:
+                console.print(f"{CODEWEAVER_PREFIX} [blue]Starting background indexing...[/blue]")
+
+                # Prime index (initial indexing) - run in thread since it's sync
+                if state.indexer:
+                    await asyncio.to_thread(state.indexer.prime_index, force_reindex=False)
+                    console.print(f"{CODEWEAVER_PREFIX} [green]Initial indexing complete[/green]")
+
+                    # Start file watcher for real-time updates
+                    console.print(f"{CODEWEAVER_PREFIX} [blue]Starting file watcher...[/blue]")
+                    from codeweaver.engine.indexer import FileWatcher
+
+                    watcher = FileWatcher(
+                        settings.project_path,
+                        file_filter=None,  # Uses default filter
+                        walker=state.indexer._walker,
+                    )
+
+                    # Run watcher (this will block until cancelled)
+                    await watcher.run()
+                else:
+                    console.print(f"{CODEWEAVER_PREFIX} [yellow]No indexer configured, skipping background indexing[/yellow]")
+
+            except asyncio.CancelledError:
+                console.print(f"{CODEWEAVER_PREFIX} [yellow]Background indexing cancelled[/yellow]")
+                raise
+            except Exception as e:
+                console.print(f"{CODEWEAVER_PREFIX} [red]Background indexing error: {e}[/red]")
+                logger.exception("Background indexing error")
+
+        # Start background indexing task
+        indexing_task = asyncio.create_task(background_indexing())
 
         console.print(
             f"{CODEWEAVER_PREFIX} [bold aqua]Lifespan start actions complete, server initialized.[/bold aqua]"
@@ -373,6 +414,14 @@ async def lifespan(
         state.initialized = False
         raise
     finally:
+        # Cancel background indexing
+        if indexing_task:
+            indexing_task.cancel()
+            try:
+                await indexing_task
+            except asyncio.CancelledError:
+                console.print(f"{CODEWEAVER_PREFIX} [yellow]Background indexing stopped[/yellow]")
+
         # Shutdown telemetry client to flush pending events
         if state.telemetry:
             try:

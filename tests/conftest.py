@@ -305,3 +305,85 @@ def create_test_chunk_with_embeddings(
         registry[chunk_id] = ChunkEmbeddings(sparse=sparse_info, dense=dense_info, chunk=chunk)
 
     return chunk
+
+
+# ===========================================================================
+# *                    CLI Test Fixtures
+# ===========================================================================
+
+
+@pytest.fixture
+def clean_cli_env(monkeypatch):
+    """Clean environment variables for isolated CLI testing."""
+    env_vars_to_remove = [
+        "CODEWEAVER_PROJECT_PATH",
+        "CODEWEAVER_EMBEDDING_PROVIDER",
+        "CODEWEAVER_VECTOR_STORE_TYPE",
+        "VOYAGE_API_KEY",
+        "OPENAI_API_KEY",
+        "COHERE_API_KEY",
+        "QDRANT_API_KEY",
+        "QDRANT_URL",
+    ]
+
+    for var in env_vars_to_remove:
+        monkeypatch.delenv(var, raising=False)
+
+
+@pytest.fixture
+def isolated_home(tmp_path: Path, monkeypatch):
+    """Create isolated home directory for CLI testing."""
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    return home
+
+
+@pytest.fixture
+def cli_test_project(tmp_path: Path, monkeypatch):
+    """Create test project with git repository for CLI testing."""
+    project = tmp_path / "test_project"
+    project.mkdir()
+
+    # Initialize git
+    git_dir = project / ".git"
+    git_dir.mkdir()
+    (git_dir / "config").write_text("[core]\n")
+
+    # Create source structure
+    src = project / "src"
+    src.mkdir()
+    (src / "__init__.py").write_text("")
+    (src / "main.py").write_text('"""Main module."""\n\ndef main():\n    pass\n')
+    (src / "utils.py").write_text('"""Utilities."""\n\ndef helper():\n    pass\n')
+
+    # Change to project directory
+    monkeypatch.chdir(project)
+
+    return project
+
+
+@pytest.fixture
+def cli_api_keys(monkeypatch):
+    """Set test API keys for CLI testing."""
+    keys = {
+        "VOYAGE_API_KEY": "test-voyage-key",
+        "OPENAI_API_KEY": "test-openai-key",
+        "COHERE_API_KEY": "test-cohere-key",
+        "QDRANT_API_KEY": "test-qdrant-key",
+    }
+
+    for key, value in keys.items():
+        monkeypatch.setenv(key, value)
+
+    return keys
+
+
+@pytest.fixture(autouse=True)
+def reset_cli_settings_cache():
+    """Reset settings cache between CLI tests."""
+    from codeweaver.config.settings import reset_settings
+
+    reset_settings()
+    yield
+    reset_settings()

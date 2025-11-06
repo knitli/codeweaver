@@ -8,8 +8,11 @@
 """Verification test showing that the identified field is the source and how to fix it."""
 
 import warnings
+
 from typing import Annotated
-from pydantic import Field, BaseModel
+
+from pydantic import BaseModel, Field
+
 
 print("="*70)
 print("VERIFICATION: Demonstrating the issue and solution")
@@ -36,7 +39,7 @@ print(code_bad)
 with warnings.catch_warnings(record=True) as w:
     warnings.simplefilter("always")
     exec(code_bad, {'BaseModel': BaseModel, 'Annotated': Annotated, 'Field': Field, 'list': list})
-    
+
     if w:
         print("⚠️  WARNING TRIGGERED:")
         for warning in w:
@@ -62,7 +65,7 @@ print(code_solution1)
 with warnings.catch_warnings(record=True) as w:
     warnings.simplefilter("always")
     exec(code_solution1, {'BaseModel': BaseModel, 'Annotated': Annotated, 'Field': Field, 'list': list})
-    
+
     if w:
         print("⚠️  WARNING TRIGGERED")
     else:
@@ -83,7 +86,7 @@ print(code_solution2)
 with warnings.catch_warnings(record=True) as w:
     warnings.simplefilter("always")
     exec(code_solution2, {'BaseModel': BaseModel, 'Annotated': Annotated, 'Field': Field, 'list': list})
-    
+
     if w:
         print("⚠️  WARNING TRIGGERED")
     else:
@@ -107,7 +110,7 @@ print(code_solution3)
 with warnings.catch_warnings(record=True) as w:
     warnings.simplefilter("always")
     exec(code_solution3, {'BaseModel': BaseModel, 'Annotated': Annotated, 'Field': Field, 'list': list})
-    
+
     if w:
         print("⚠️  WARNING TRIGGERED")
     else:
