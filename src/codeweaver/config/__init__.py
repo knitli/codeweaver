@@ -7,6 +7,75 @@
 
 from importlib import import_module
 from types import MappingProxyType
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    # Import everything for IDE and type checker support
+    # These imports are never executed at runtime, only during type checking
+    from codeweaver.config.chunker import (
+        ChunkerSettings,
+        ChunkerSettingsDict,
+        CustomDelimiter,
+        CustomLanguage,
+    )
+    from codeweaver.config.logging import (
+        FilterID,
+        FiltersDict,
+        FormatterID,
+        FormattersDict,
+        HandlerID,
+        HandlersDict,
+        LoggerName,
+        LoggersDict,
+        LoggingConfigDict,
+        LoggingSettings,
+        SerializableLoggingFilter,
+    )
+    from codeweaver.config.middleware import (
+        AVAILABLE_MIDDLEWARE,
+        ErrorHandlingMiddlewareSettings,
+        LoggingMiddlewareSettings,
+        MiddlewareOptions,
+        RateLimitingMiddlewareSettings,
+        RetryMiddlewareSettings,
+    )
+    from codeweaver.config.providers import (
+        AWSProviderSettings,
+        AgentModelSettings,
+        AgentProviderSettings,
+        AzureCohereProviderSettings,
+        AzureOpenAIProviderSettings,
+        DataProviderSettings,
+        EmbeddingModelSettings,
+        EmbeddingProviderSettings,
+        FastembedGPUProviderSettings,
+        ModelString,
+        ProviderSettingsDict,
+        ProviderSettingsView,
+        ProviderSpecificSettings,
+        RerankingModelSettings,
+        RerankingProviderSettings,
+    )
+    from codeweaver.config.settings import (
+        CodeWeaverSettings,
+        CodeWeaverSettingsDict,
+        FastMcpServerSettings,
+        get_settings,
+        get_settings_map,
+        update_settings,
+    )
+    from codeweaver.config.types import (
+        ConnectionConfiguration,
+        ConnectionRateLimitConfig,
+        FastMcpHttpRunArgs,
+        FastMcpServerSettingsDict,
+        FileFilterSettingsDict,
+        RignoreSettings,
+        UvicornServerSettings,
+        UvicornServerSettingsDict,
+        default_config_file_locations,
+    )
+
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
@@ -104,7 +173,6 @@ __all__ = (
     "FastMcpServerSettings",
     "FastMcpServerSettingsDict",
     "FastembedGPUProviderSettings",
-    "FileFilterSettings",
     "FileFilterSettingsDict",
     "FilterID",
     "FiltersDict",
