@@ -21,7 +21,7 @@ from codeweaver.exceptions import CodeWeaverError
 
 
 console = Console(markup=True, emoji=True)
-app = App("server", default_command="server", help="Start CodeWeaver MCP server.", console=console)
+app = App("server", help="Start CodeWeaver MCP server.", console=console)
 
 
 async def _run_server(
@@ -38,7 +38,7 @@ async def _run_server(
     return await run(config_file=config_file, project_path=project_path, host=host, port=port)
 
 
-@app.command
+@app.default
 async def server(
     *,
     config_file: Annotated[FilePath | None, cyclopts.Parameter(name=["--config", "-c"])] = None,

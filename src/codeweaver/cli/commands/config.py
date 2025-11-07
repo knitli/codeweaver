@@ -34,7 +34,6 @@ if TYPE_CHECKING:
 console = Console(markup=True, emoji=True)
 app = App(
     "config",
-    default_command="config",
     help="Manage and view your CodeWeaver config.",
     console=console,
 )
@@ -86,7 +85,7 @@ def _show_sparse_embedding_info(console: Console) -> None:
     console.print("  • Result: Best of both worlds (semantic + keyword matching)\n")
 
 
-@app.command(default_parameter="show")
+@app.default
 def config(
     *,
     show: bool = True,
