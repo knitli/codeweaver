@@ -29,11 +29,11 @@ from codeweaver.exceptions import CodeWeaverError
 
 console = Console(markup=True, emoji=True)
 app = App(
-    "search", default_command="search", help="Search codebase from command line.", console=console
+    "search", help="Search codebase from command line.", console=console
 )
 
 
-@app.command
+@app.default
 async def search(
     query: str,
     *,

@@ -30,12 +30,11 @@ app.command(
     "codeweaver.cli.commands.config:app",
     name="config",
 )
-app.command("codeweaver.cli.commands.server:main", name="server", help="Run the CodeWeaver server.")
-app.command("codeweaver.cli.commands.search:main", name="search", help="Search your codebase.")
+app.command("codeweaver.cli.commands.server:app", name="server")
+app.command("codeweaver.cli.commands.search:app", name="search")
 app.command(
-    "codeweaver.cli.commands.index:main",
+    "codeweaver.cli.commands.index:app",
     name="index",
-    help="Check the status of your codebase index.",
 )
 app.command(
     "codeweaver.cli.commands.doctor:app", name="doctor"

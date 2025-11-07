@@ -23,7 +23,7 @@ from codeweaver.exceptions import CodeWeaverError
 
 console = Console(markup=True, emoji=True)
 app = App(
-    "index", default_command="index", help="Index codebase for semantic search.", console=console
+    "index", help="Index codebase for semantic search.", console=console
 )
 
 
@@ -56,7 +56,7 @@ def _trigger_server_reindex(force: bool) -> bool:
     return False
 
 
-@app.command
+@app.default
 def index(
     *,
     config_file: Annotated[FilePath | None, cyclopts.Parameter(name=["--config", "-c"])] = None,
