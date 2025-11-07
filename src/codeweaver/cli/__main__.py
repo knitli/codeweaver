@@ -27,9 +27,8 @@ app = App(
     console=console,
 )
 app.command(
-    "codeweaver.cli.commands.config:main",
+    "codeweaver.cli.commands.config:app",
     name="config",
-    help="Manage your CodeWeaver configuration.",
 )
 app.command("codeweaver.cli.commands.server:main", name="server", help="Run the CodeWeaver server.")
 app.command("codeweaver.cli.commands.search:main", name="search", help="Search your codebase.")
@@ -39,20 +38,18 @@ app.command(
     help="Check the status of your codebase index.",
 )
 app.command(
-    "codeweaver.cli.commands.doctor:main", name="doctor", help="Diagnose and fix common issues."
+    "codeweaver.cli.commands.doctor:app", name="doctor"
 )
 app.command(
-    "codeweaver.cli.commands.list:main",
+    "codeweaver.cli.commands.list:app",
     name="list",
     alias="ls",
-    help="List available providers, models, and more.",
 )
 
 app.command(
-    "codeweaver.cli.commands.init:main",
+    "codeweaver.cli.commands.init:app",
     name="init",
     alias="initialize",
-    help="Initialize CodeWeaver configuration and MCP client setup.",
 )
 
 # these are scaffolded for future implementation
