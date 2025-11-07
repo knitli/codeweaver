@@ -238,13 +238,16 @@ class TestInitIntegration:
             init_app("--quick")
         captured = capsys.readouterr()
 
-        if exc_info.value.code == 0:
-            # Config command should recognize it
-            from codeweaver.cli.commands.config import app as config_app
-            with pytest.raises(SystemExit) as config_exc_info:
-                config_app("--show")
+        # Only test config integration if init succeeded
+        if exc_info.value.code != 0:
+            return
 
-            assert config_exc_info.value.code == 0
+        # Config command should recognize it
+        from codeweaver.cli.commands.config import app as config_app
+        with pytest.raises(SystemExit) as config_exc_info:
+            config_app("--show")
+
+        assert config_exc_info.value.code == 0
 
     def test_init_respects_existing_config(
         self,
