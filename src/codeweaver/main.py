@@ -63,7 +63,7 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
             "middleware": server_setup.pop("middleware", set()),
             "uvicorn_config": settings.uvicorn or {},
         }
-        resolved_kwargs = new_kwargs | kwargs  # pyright: ignore[reportUnknownVariableType]
+        resolved_kwargs = new_kwargs | kwargs
     else:
         resolved_kwargs = {  # type: ignore
             "transport": "streamable-http",
@@ -107,10 +107,10 @@ async def run(
         _ = update_settings(**{
             **server_setup["settings"].model_dump(),
             "project_path": project_path,
-        })  # pyright: ignore[reportArgumentType]
+        })
     server_setup["app"], server_setup["middleware"] = await register_app_bindings(  # type: ignore
         server_setup["app"],
-        server_setup.get("middleware", set()),  # pyright: ignore[reportArgumentType]
+        server_setup.get("middleware", set()),
         server_setup.get("middleware_settings", {}),
     )
     server_setup["app"] = register_tool(server_setup["app"])

@@ -86,11 +86,7 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
 
         # Call super().__init__() which handles Pydantic initialization
         super().__init__(
-            capabilities,
-            client=self._client,  # pyright: ignore[reportCallIssue]
-            prompt=prompt,
-            top_n=top_n,
-            **rerank_kwargs,  # pyright: ignore[reportCallIssue]
+            capabilities, client=self._client, prompt=prompt, top_n=top_n, **rerank_kwargs
         )
 
     def _initialize(self) -> None:
@@ -148,11 +144,10 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
             else [(query, doc) for doc in documents]
         )
         predict_partial = rpartial(
-            cast(Callable[..., np.ndarray], self._client.predict),  # pyright: ignore[reportUnknownMemberType]
-            convert_to_numpy=True,
+            cast(Callable[..., np.ndarray], self._client.predict), convert_to_numpy=True
         )
         loop = asyncio.get_running_loop()
-        scores = await loop.run_in_executor(None, predict_partial, preprocessed)  # pyright: ignore[reportArgumentType, reportUnknownMemberType, reportUnknownVariableType]
+        scores = await loop.run_in_executor(None, predict_partial, preprocessed)
         return scores.tolist()
 
     def _setup_qwen3(self) -> None:

@@ -94,7 +94,7 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
                 )
                 embeddings = [cast("list[float]", item.embedding) for item in results.data]
                 if token_counts := results.usage.total_tokens:
-                    _ = self._update_token_stats(token_count=token_counts)  # pyright: ignore[reportGeneralTypeIssues]
+                    _ = self._update_token_stats(token_count=token_counts)
                     tokens_updated = True
         except Exception:
             if not embeddings:

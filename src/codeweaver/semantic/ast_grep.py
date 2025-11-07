@@ -526,7 +526,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         from codeweaver.semantic.scoring import SemanticScorer
 
         scorer = SemanticScorer()
-        return scorer.calculate_importance_score(self)  # pyright: ignore[reportArgumentType]
+        return scorer.calculate_importance_score(self)
 
     def importance_for_task(self, task: AgentTask) -> ImportanceScores:
         """Calculate the importance score for this node for a specific task."""

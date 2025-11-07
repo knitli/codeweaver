@@ -1155,13 +1155,15 @@ class Indexer(BasedModel):
                 "extra": {
                     "phase": "chunking",
                     "files_discovered": len(discovered_files),
-                    "languages": list(
-                        {
-                            (f.ext_kind.language.value if hasattr(f.ext_kind.language, "value") else str(f.ext_kind.language))
-                            for f in discovered_files
-                            if f.ext_kind
-                        }
-                    ),
+                    "languages": list({
+                        (
+                            f.ext_kind.language.value
+                            if hasattr(f.ext_kind.language, "value")
+                            else str(f.ext_kind.language)
+                        )
+                        for f in discovered_files
+                        if f.ext_kind
+                    }),
                 },
             },
         )
@@ -1476,8 +1478,7 @@ class FileWatcher:
         if walker is None and isinstance(file_filter, IgnoreFilter):
             walker = file_filter.walker
         self._indexer = Indexer(walker=walker)
-        ff = cast(watchfiles.BaseFilter | None, file_filter)
-        self.file_filter = ff
+        self.file_filter = file_filter
         self.paths = paths
         self.handler = handler or self._default_handler
         watch_kwargs: dict[str, Any] = (
@@ -1487,7 +1488,7 @@ class FileWatcher:
                 "target": Indexer.keep_alive,
                 "target_type": "function",
                 "callback": self._default_handler,
-                "watch_filter": ff,
+                "watch_filter": self.file_filter,
                 "grace_period": 20,
                 "debounce": 200_000,  # milliseconds - we want to avoid rapid re-indexing but not let things go stale, either.
                 "step": 15_000,  # milliseconds -- how long to wait for more changes before yielding on changes

@@ -1389,7 +1389,11 @@ class ProviderRegistry(BasedModel):
             except Exception:
                 return False
             else:  # make extra sure we don't have something that would return a truthy result and not be what we want :)
-                return not isinstance(resolved, LazyImport) and resolved is not None
+                return (
+                    not isinstance(resolved, LazyImport)
+                    and resolved is not None
+                    and (provider.has_env_auth or provider.is_local_provider)
+                )
         return False
 
     def is_provider_available(self, provider: Provider, provider_kind: ProviderKind) -> bool:

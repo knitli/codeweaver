@@ -411,7 +411,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
             statistics.add_token_usage(reranking_generated=token_count)
         elif from_docs and all(isinstance(doc, str) for doc in from_docs):
             token_count = (
-                self.tokenizer.estimate_batch(from_docs)  # pyright: ignore[reportArgumentType]
+                self.tokenizer.estimate_batch(from_docs)
                 if all(isinstance(doc, str) for doc in from_docs)
                 else sum(self.tokenizer.estimate_batch(item) for item in from_docs)  # type: ignore
             )
@@ -474,7 +474,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         # All discarded chunks are in the tail after the kept results
         discarded_chunks = processed_chunks[len(results) :]
         tokenizer = get_tokenizer("tiktoken", "cl100k_base")
-        return tokenizer.estimate_batch(discarded_chunks)  # pyright: ignore[reportArgumentType]
+        return tokenizer.estimate_batch(discarded_chunks)
 
     @classmethod
     def from_json(

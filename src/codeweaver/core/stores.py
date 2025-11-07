@@ -224,7 +224,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
                 return "constructor"
         if hasattr(item, "__iter__") and callable(item):
             with contextlib.suppress(Exception):
-                if item(iter(item)):  # pyright: ignore[reportCallIssue, reportArgumentType]
+                if item(iter(item)):
                     return "iter"
         return None
 
@@ -244,7 +244,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
             return lambda item: item
         # Lists and sets have .copy() method
         if isinstance(sample_item, list | set):
-            return lambda item: item.copy()  # pyright: ignore[reportUnknownMemberType, reportUnknownLambdaType, reportAttributeAccessIssue]
+            return lambda item: item.copy()
         if copy_strategy := self._trial_and_error_copy(sample_item):
             if copy_strategy == "deepcopy":
                 return copy.deepcopy
@@ -263,7 +263,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         # Try to recover from trash first, then return default
         return self.store.get(key, default) if self.recover(key) else default
 
-    def __iter__(self) -> Iterator[KeyT]:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def __iter__(self) -> Iterator[KeyT]:
         """Return an iterator over the keys in the store."""
         return iter(self.store)
 
@@ -325,7 +325,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         if not value:
             rand = os.urandom(16)
             value = rand
-        return cast(KeyT, self._keygen(value))  # pyright: ignore[reportCallIssue]
+        return cast(KeyT, self._keygen(value))
 
     def keys(self) -> KeysView[KeyT]:
         """Return the keys in the store."""
@@ -366,11 +366,11 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         """
         if not self._validate_value(value):
             raise TypeError(f"Invalid value: {value}")
-        key: UUID7 | None = to_uuid() if self.keygen == to_uuid else None  # pyright: ignore[reportAssignmentType]
+        key: UUID7 | None = to_uuid() if self.keygen == to_uuid else None
         if key:
             return self._check_and_set(cast(KeyT, key), value)
         if hash_value:
-            blake_key: BlakeHashKey = (  # pyright: ignore[reportRedeclaration]
+            blake_key: BlakeHashKey = (
                 get_blake_hash(hash_value)
                 if isinstance(hash_value, bytes)
                 else get_blake_hash(bytes(hash_value))

@@ -122,11 +122,11 @@ class DataclassSerializationMixin:
 
     def dump_json(self, **kwargs: Unpack[SerializationKwargs]) -> bytes:
         """Serialize the session statistics to JSON bytes."""
-        return self._adapted_self.dump_json(self, **kwargs)  # pyright: ignore[reportUnknownArgumentType]
+        return self._adapted_self.dump_json(self, **kwargs)
 
     def dump_python(self, **kwargs: Unpack[SerializationKwargs]) -> dict[str, Any]:
         """Serialize the session statistics to a Python dictionary."""
-        return self._adapted_self.dump_python(self, **kwargs)  # pyright: ignore[reportUnknownArgumentType]
+        return self._adapted_self.dump_python(self, **kwargs)
 
     @classmethod
     def validate_json(cls, data: bytes, **kwargs: Unpack[DeserializationKwargs]) -> Self:
@@ -250,7 +250,7 @@ class RootedRoot[RootType: Sequence[Any]](RootModel[Sequence[Any]]):
 
     model_config = BASEDMODEL_CONFIG
 
-    root: RootType  # pyright: ignore[reportIncompatibleVariableOverride]
+    root: RootType
 
     @override
     def __iter__(self) -> Generator[Any]:

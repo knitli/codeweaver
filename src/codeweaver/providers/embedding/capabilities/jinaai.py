@@ -172,8 +172,8 @@ def get_jinaai_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...
     capabilities: list[EmbeddingCapabilities] = []
     for cap in ALL_CAPABILITIES:
         capabilities.extend([
-            EmbeddingCapabilities({**cap, "provider": provider})  # pyright: ignore[reportArgumentType]
-            for provider in CAP_MAP[cap["name"]]  # pyright: ignore[reportArgumentType]
+            EmbeddingCapabilities({**cap, "provider": provider})
+            for provider in CAP_MAP[cap["name"]]
         ])
     return tuple(EmbeddingModelCapabilities.model_validate(cap) for cap in capabilities)
 

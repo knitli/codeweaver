@@ -92,7 +92,7 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
             query=query,
             documents=documents,
             top_n=top_n,
-            **kwargs,  # pyright: ignore[reportArgumentType]
+            **kwargs,
         )
 
     def process_cohere_output(

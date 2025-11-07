@@ -303,7 +303,9 @@ class LazyImport[Import: Any]:
         return object.__getattribute__(self, "_resolved") is not None
 
 
-def lazy_import[Import: Any](module_name: str, *attrs: str) -> LazyImport[Import]:  # pyright: ignore[reportInvalidTypeVarUse] # being explicit about return type
+def lazy_import[Import: Any](
+    module_name: str, *attrs: str
+) -> LazyImport[Import]:  # being explicit about return type
     """
     Create a lazy import that defers module loading until actual use.
 

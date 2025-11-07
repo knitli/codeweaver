@@ -103,7 +103,7 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
                 )
             )
 
-    async def _embed_documents(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any]
     ) -> list[list[float]]:
         """
@@ -126,7 +126,7 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
             if response.embeddings is not None and item
         ] or [[]]
         _ = await self._report_stats(content)
-        return embeddings  # pyright: ignore[reportReturnType]
+        return embeddings
 
     async def _embed_query(
         self, query: Sequence[str], **kwargs: Mapping[str, Any]
@@ -150,4 +150,4 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
             if response.embeddings is not None and item
         ] or [[]]
         _ = await self._report_stats(content)
-        return embeddings  # pyright: ignore[reportReturnType]
+        return embeddings

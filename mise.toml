@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 [settings]
 idiomatic_version_file_enable_tools = []
+status.show_env = true
 
 [settings.python]
 uv_venv_auto = true
@@ -43,52 +44,67 @@ typos = "latest"
 usage = "latest"
 uv = "latest"
 yamlfmt = "latest"
+"pipx:ty" = "latest"
+
+[env]
+GH_REPO = "{{config_root}}"
+REMOTE_ORIGIN_URL = '''http://github.com/knitli/codeweaver-mcp.git'''
+# Use the project name derived from the current directory
+PROJECT_NAME = "{{ config_root | basename }}"
+CODEWEAVER_VERSION = '''{{ read_file(path='src/codeweaver/_version.py') | split(pat=' = "') | nth(n=1) | split(pat='"') | nth(n=0) | trim }}'''
+CI = '''{{ exec(command='sh -c "if [ -z \"$GITHUB_ACTIONS\" ]; then echo \"false\"; else echo \"true\"; fi"') }}'''
+_.path = [
+  "scripts/dev-env",
+  "scripts/code-quality",
+  "scripts/build",
+  "scripts/language-support",
+  "scripts/testing",
+  "scripts/utils",
+  ".venv/bin"
+]
 
 [hooks]
-enter = '''
-# Set up git aliases
-git config alias.root "rev-parse --show-toplevel"
-
-# Check and set environment variables
-if [ -z "$GH_REPO" ]; then
-    mise --silent set 2>/dev/null || true
-fi
-
-if [ -z "$GITHUB_ACTIONS" ] || [ "$GITHUB_ACTIONS" = "false" ]; then
-    export CI=false
-else
-    export CI=true
-fi
-
-# Check if we're in the correct virtual environment
-python_path="$(command -v python 2>/dev/null || which python 2>/dev/null || echo "")"
-case "$python_path" in
-    *.venv/bin/python*)
-        # Already in venv, do nothing
-        ;;
-    *)
-        # Not in venv or python not found, source it
-        mise run source 2>/dev/null || true
-        ;;
-esac
-eval "$(mise activate)" 2>/dev/null || true
-mise env 2>/dev/null || true
-'''
-leave = '''
-echo "Exiting CodeWeaver environment..."
-mise --silent -y deactivate &>/dev/null
-echo "Environment deactivated."
-'''
+[hooks.enter]
+script = "mise run enter"
 
 # NOTE: Between here and the `scripts` directory, our tasks are getting a bit crowded.
 # TODO: We should combine the scripts/ and these tasks into the `mise-tasks` directory as standalone scripts.
 
 [tasks]
+[tasks.enter]
+shell = "zsh -c"
+silent = "stdout"
+run = [
+  '''
+case "$python_path" in
+*.venv/bin/python*)
+    # Already in venv, do nothing
+    ;;
+*)
+    # Not in venv or python not found, source it
+    mise run source 2>/dev/null || true
+    ;;
+esac
+''',
+  "mise run activate 2>/dev/null || true",
+  "git config alias.root 'rev-parse --show-toplevel'",
+  '''if [ -z "$VOYAGE_API_KEY" ]; then
+    mise --silent set 2>/dev/null || true
+fi''',
+]
+env = { GH_REPO = '''{{ env.GH_REPO | default(value=config_root) }}''', ACTIVE_SHELL = '''{{ exec(command='sh -c "ps -p $$ -o ppid=" | xargs -I "{}" readlink -f "/proc/{}/exe" | xargs basename') }}''', python_path = '''{{ exec(command='command -v python') }}''' }
+
+[tasks.info]
+description = "Print project information"
+run = '''
+echo "Project: $PROJECT_NAME"
+echo "Virtual Environment: $VIRTUAL_ENV"
+'''
+
 [tasks.sync]
 depends = ["source"]
 tools.uv = "latest"
 run = '''
-#!/bin/bash
 echo "Syncing dependencies..."
 uv sync --extra full --group dev --group docs --group build --group test
 '''
@@ -109,17 +125,6 @@ run = '''
 print -P "%F{209}[codeweaver]%f Sourcing virtual environment..."
 git rev-parse --show-toplevel || true
 source .venv/bin/activate
-'''
-
-[tasks.set-ci]
-hide = true
-shell = "zsh -c"
-run = '''
-if [[ "$GITHUB_ACTIONS" == true ]]; then
-    export CI=true
-else
-    export CI=false
-fi
 '''
 
 [tasks.update]
@@ -146,7 +151,6 @@ run = [
   "mise -y venv &>/dev/null",
   "mise run sync &>/dev/null",
   "mise env &>/dev/null || true",
-  "mise run set-ci",
   "eval \"$(mise activate zsh)\" &>/dev/null",
 ]
 silent = "stdout"

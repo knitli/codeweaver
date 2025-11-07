@@ -64,7 +64,7 @@ if TYPE_CHECKING:
 class FastMcpHttpRunArgs(TypedDict, total=False):
     """Arguments for running FastMCP over HTTP."""
 
-    transport: NotRequired[Literal["http", "streamable-http"]]
+    transport: NotRequired[Literal["http", "streamable-http", "stdio"]]
     host: NotRequired[str | None]
     port: NotRequired[PositiveInt | None]
     log_level: NotRequired[Literal["debug", "info", "warning", "error"] | None]

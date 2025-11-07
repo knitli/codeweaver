@@ -12,7 +12,7 @@ import contextlib
 from collections import defaultdict
 from collections.abc import Iterable, MutableMapping, Sequence
 from fnmatch import fnmatch
-from typing import cast
+from typing import NamedTuple, cast
 
 from pydantic import ConfigDict
 from rich.console import Console
@@ -30,6 +30,16 @@ from codeweaver.providers.reranking.capabilities.base import RerankingModelCapab
 
 
 console = Console(markup=True, emoji=True)
+
+
+class ModelResult(NamedTuple):
+    """Result of a model lookup in the registry for a Provider."""
+
+    provider: Provider
+    embedding: tuple[EmbeddingModelCapabilities, ...] | None = None
+    sparse_embedding: tuple[SparseEmbeddingModelCapabilities, ...] | None = None
+    reranking: tuple[RerankingModelCapabilities, ...] | None = None
+    agent: tuple[tuple[str, AgentProfileSpec], ...] | None = None
 
 
 class ModelRegistry(BasedModel):
@@ -300,6 +310,20 @@ class ModelRegistry(BasedModel):
         """Check if the registry is empty."""
         return not any(self._embedding_capabilities.values()) and not any(
             self._agent_profiles.values()
+        )
+
+    def models_for_provider(self, provider: Provider) -> ModelResult:
+        """Get all models registered for a specific provider."""
+        embedding_models = self.list_embedding_models(provider)
+        sparse_embedding_models = self.list_sparse_embedding_models(provider)
+        reranking_models = self.list_reranking_models(provider)
+        agent_profiles = self._agent_profiles.get(provider)
+        return ModelResult(
+            provider=provider,
+            embedding=embedding_models or None,
+            sparse_embedding=sparse_embedding_models or None,
+            reranking=reranking_models or None,
+            agent=tuple(agent_profiles) if agent_profiles else None,
         )
 
     def configured_models_for_kind(

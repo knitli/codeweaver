@@ -981,7 +981,7 @@ class GrammarBasedClassifier:
                         evidence=[EvidenceKind.CATEGORIES, EvidenceKind.HEURISTIC],
                         adjustment=5 * len(thing.categories),
                     ),
-                )  # pyright: ignore[reportArgumentType]
+                )
             results = [
                 self._to_classification_result(
                     classification,

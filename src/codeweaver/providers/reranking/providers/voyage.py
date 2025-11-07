@@ -66,9 +66,9 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
         try:
             response = await self.client.rerank(
                 query=query,
-                documents=documents,  # pyright: ignore[reportArgumentType]  # a list is a sequence...
+                documents=documents,  # a list is a sequence...
                 model=self._caps.name,
-                **{"top_n": top_n, **(kwargs or {})},  # pyright: ignore[reportArgumentType]
+                **{"top_n": top_n, **(kwargs or {})},
             )
         except Exception as e:
             raise ProviderError(

@@ -198,14 +198,12 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
             "input_type": "search_query" if is_query else "search_document",
         }
         if self.model_name.endswith("4.0") and not embed_kwargs.get("embedding_types"):
-            embed_kwargs["embedding_types"] = ["float"]  # pyright: ignore[reportArgumentType]
+            embed_kwargs["embedding_types"] = ["float"]
             attr = "float"
         else:
             attr = self.client_options.get("output_dtype") or self._caps.default_dtype or "float"
         response = await self._client.embed(
-            texts=texts,
-            model=self.client_options["model"],
-            **embed_kwargs,  # pyright: ignore[reportArgumentType]
+            texts=texts, model=self.client_options["model"], **embed_kwargs
         )
         embed_obj = response.embeddings
         embeddings = getattr(embed_obj, attr, None)

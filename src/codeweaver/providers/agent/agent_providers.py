@@ -175,7 +175,7 @@ def infer_agent_provider_class(provider: str | Provider) -> type[AgentProvider[P
     from codeweaver.providers.provider import Provider
 
     if not isinstance(provider, Provider):
-        provider = Provider.from_string(provider)  # pyright: ignore[reportAssignmentType]
+        provider = Provider.from_string(provider)
     provider_class: type[AgentProvider[Provider]] = get_agent_model_provider(provider)  # type: ignore
     return provider_class
 

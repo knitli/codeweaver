@@ -23,7 +23,7 @@ from codeweaver.core.types.models import BasedModel
 
 def _get_parent_frame() -> FrameType:
     """Get the parent frame of the caller."""
-    return _sys._getframe(2)  # pyright: ignore[reportPrivateUsage]
+    return _sys._getframe(2)
 
 
 _lock = _Lock()

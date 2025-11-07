@@ -256,7 +256,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         """Get vectors for a sequence of texts."""
         response = await self._client.embeddings.create(
             input=cast(list[str], texts),
-            **(  # pyright: ignore[reportArgumentType]
+            **(
                 self.doc_kwargs
                 | (
                     {k: v for k, v in kwargs.items() if k in self.valid_client_kwargs}
@@ -319,8 +319,8 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
             Provider.TOGETHER: "https://api.together.xyz/v1",
             Provider.OLLAMA: self.doc_kwargs.get(
                 "endpoint", self.doc_kwargs.get("api_base", "http://localhost:11434/v1")
-            ),  # pyright: ignore[reportReturnType]
-            Provider.HEROKU: try_for_heroku_endpoint(self.doc_kwargs or {}),  # pyright: ignore[reportUnknownArgumentType,reportUnknownMemberType,reportUnknownAssignmentType]
+            ),
+            Provider.HEROKU: try_for_heroku_endpoint(self.doc_kwargs or {}),
             Provider.AZURE: try_for_azure_endpoint(self.doc_kwargs or {}),
         }
 

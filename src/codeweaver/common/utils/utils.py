@@ -134,7 +134,7 @@ def rpartial[**P, R](func: Callable[P, R], *args: object, **kwargs: object) -> C
         """Return a new partial object which when called will behave like func called with the
         given arguments.
         """
-        return func(*(fargs + args), **dict(fkwargs | kwargs))  # pyright: ignore[reportCallIssue]
+        return func(*(fargs + args), **dict(fkwargs | kwargs))
 
     return partial_right
 

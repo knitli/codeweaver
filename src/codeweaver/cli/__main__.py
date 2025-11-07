@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import sys
 
-from cyclopts import App
+from cyclopts import App, Parameter
 from rich.console import Console
 
 from codeweaver import __version__
@@ -23,36 +23,21 @@ console = Console(markup=True, emoji=True)
 app = App(
     "codeweaver",
     help="CodeWeaver: Powerful code search and understanding for humans and agents.",
+    default_parameter=Parameter(negative=()),
     version=__version__,
     console=console,
 )
-app.command(
-    "codeweaver.cli.commands.config:app",
-    name="config",
-)
+app.command("codeweaver.cli.commands.config:app", name="config")
 app.command("codeweaver.cli.commands.server:app", name="server")
 app.command("codeweaver.cli.commands.search:app", name="search")
-app.command(
-    "codeweaver.cli.commands.index:app",
-    name="index",
-)
-app.command(
-    "codeweaver.cli.commands.doctor:app", name="doctor"
-)
-app.command(
-    "codeweaver.cli.commands.list:app",
-    name="list",
-    alias="ls",
-)
+app.command("codeweaver.cli.commands.index:app", name="index")
+app.command("codeweaver.cli.commands.doctor:app", name="doctor")
+app.command("codeweaver.cli.commands.list:app", name="list", alias="ls")
 
-app.command(
-    "codeweaver.cli.commands.init:app",
-    name="init",
-    alias="initialize",
-)
+app.command("codeweaver.cli.commands.init:app", name="init")
 
 # these are scaffolded for future implementation
-# app.command("codeweaver.cli.commands.context:main", name="context", alias="prep")
+# app.command("codeweaver.cli.commands.context:app", name="context", alias="prep")
 
 
 def main() -> None:

@@ -363,6 +363,26 @@ class Provider(BaseEnum):
         return None
 
     @property
+    def always_local(self) -> bool:
+        """Check if the provider is a local provider."""
+        return self in {Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS, Provider.MEMORY}
+
+    @property
+    def is_local_provider(self) -> bool:
+        """Check if the provider can be used as a local provider."""
+        return self.always_local or self in {Provider.OLLAMA, Provider.QDRANT}
+
+    @property
+    def is_cloud_provider(self) -> bool:
+        """Check if the provider is a cloud provider."""
+        return not self.always_local
+
+    @property
+    def always_cloud(self) -> bool:
+        """Check if the provider is always a cloud provider."""
+        return not self.is_local_provider
+
+    @property
     def is_huggingface_model_provider(self) -> bool:
         """Check if the provider is a Hugging Face model provider."""
         return self in {
@@ -386,6 +406,7 @@ class Provider(BaseEnum):
             Provider.MEMORY,
             Provider.DUCKDUCKGO,
             Provider.SENTENCE_TRANSFORMERS,
+            # Ollama does for cloud, but generally people associate it as local
             Provider.OLLAMA,
         }
 

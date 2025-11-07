@@ -323,17 +323,17 @@ def name_normalizer(name: str) -> str:
 
 def cat_name_normalizer(name: LiteralStringT | CategoryNameT) -> CategoryNameT:
     """Normalize category names by stripping leading underscores."""
-    return CategoryName(name_normalizer(str(name)))  # pyright: ignore[reportArgumentType]
+    return CategoryName(name_normalizer(str(name)))
 
 
 def thing_name_normalizer(name: LiteralStringT | ThingNameT) -> ThingNameT:
     """Normalize thing names by stripping leading underscores."""
-    return ThingName(name_normalizer(str(name)))  # pyright: ignore[reportArgumentType]
+    return ThingName(name_normalizer(str(name)))
 
 
 def role_name_normalizer(name: LiteralStringT | RoleT) -> RoleT:
     """Normalize role names by stripping leading underscores."""
-    return Role(name_normalizer(str(name)))  # pyright: ignore[reportArgumentType]
+    return Role(name_normalizer(str(name)))
 
 
 class AllThingsDict(TypedDict):
@@ -755,7 +755,7 @@ class Category(BasedModel):
 
     def __str__(self) -> str:
         """String representation of the Category."""
-        return f"Category: {self.name}, Language: {self.language.variable}, Members: [{', '.join(sorted(thing.name for thing in self.member_things), key=str.lower)}]"  # pyright: ignore[reportCallIssue]
+        return f"Category: {self.name}, Language: {self.language.variable}, Members: [{', '.join(sorted(thing.name for thing in self.member_things), key=str.lower)}]"
 
     @property
     def short_str(self) -> str:
@@ -767,7 +767,7 @@ class Category(BasedModel):
         return thing in self.member_things
 
     @override
-    def __iter__(self) -> Iterator[CompositeThing | Token]:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def __iter__(self) -> Iterator[CompositeThing | Token]:
         """Iterate over the member Things in this Category."""
         return iter(self.member_things)
 

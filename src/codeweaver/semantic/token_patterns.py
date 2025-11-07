@@ -253,7 +253,7 @@ _token_pattern_cache: TokenPatternCacheDict = {}.fromkeys((
     "annotation",
     "keyword",
     "not_symbol",
-))  # pyright: ignore[reportAssignmentType]
+))
 
 # spellchecker:off
 IS_OPERATOR = r"""^

@@ -87,7 +87,7 @@ def _decide_fastembed_runtime(
             import onnxruntime as ort
 
             logger.info("ONNX Runtime GPU package detected. Attempting to preload DLLs...")
-            ort.preload_dlls(cuda=True, cudnn=True, msvc=platform.system() == "Windows")  # pyright: ignore[reportUnknownMemberType]
+            ort.preload_dlls(cuda=True, cudnn=True, msvc=platform.system() == "Windows")
         except Exception:
             logger.exception("ONNX Runtime CUDA not usable despite being installed.")
             cuda_usable = False
@@ -254,7 +254,7 @@ def get_optimizations(model_kind: Literal["dense", "sparse", "both"]) -> Optimiz
     for key in ("use_small_chunks_for_dense", "chunk_func"):
         _ = sparse_opts.pop(key, None)
     sparse_opts = OptimizationDecisions(
-        **(sparse_opts | {"use_small_batch_for_sparse": sparse_opts["backend"] == "onnx_gpu"})  # pyright: ignore[reportArgumentType]
+        **(sparse_opts | {"use_small_batch_for_sparse": sparse_opts["backend"] == "onnx_gpu"})
     )
     return (
         dense_opts

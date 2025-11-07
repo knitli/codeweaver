@@ -249,6 +249,7 @@ dev = [
   "pyright>=1.1.407",
   "ruff>=0.14.2",
   "superclaude>=4.1.6",
+  "ty>=0.0.1a25",
   "types-boto3-custom",
   "uv>=0.9.5",
 ]
@@ -433,6 +434,19 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 timeout = 300
 timeout_method = "thread"
+
+[tool.ty.environment]
+python-version = "3.12"
+root = ["./src", "./tests", "./scripts", "./mise-tasks"]
+python = "./.venv"
+extra-paths = ["./vendored", "./typings"]
+
+[tool.ty.rules]
+possibly-missing-attribute = "ignore"
+
+[tool.ty.src]
+include = ["./src", "./tests", "./scripts", "./mise-tasks"]
+exclude = ["./typings", "./vendored"]
 
 [tool.uv.sources]
 types-boto3-custom = { path = "vendored/types_boto3_custom-1.40.16-py3-none-any.whl" }

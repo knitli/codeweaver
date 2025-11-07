@@ -167,7 +167,7 @@ class SemanticMetadata(BasedModel):
         from codeweaver.semantic.ast_grep import AstThing
 
         if isinstance(thing, SgNode):
-            thing = AstThing.from_sg_node(thing, language=language)  # pyright: ignore[reportUnknownVariableType]
+            thing = AstThing.from_sg_node(thing, language=language)
         # Use model_construct to bypass validation since AstThing may not be fully defined yet
         return cls.model_construct(
             language=language or thing.language or "",
@@ -427,14 +427,14 @@ def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
         if language == SemanticSearchLanguage.KOTLIN:
             return ExtKind.from_language(language, ChunkKind.CODE_OR_CONFIG)
         return (
-            ExtKind.from_language(language, source or ChunkKind.CODE)
+            ExtKind.from_language(language, ChunkKind.CODE)
             if language
             not in (
                 SemanticSearchLanguage.JSON,
                 SemanticSearchLanguage.YAML,
                 SemanticSearchLanguage.HCL,
             )
-            else ExtKind.from_language(language, source or ChunkKind.CONFIG)
+            else ExtKind.from_language(language, ChunkKind.CONFIG)
         )
 
     if language and isinstance(language, ConfigLanguage):
@@ -506,7 +506,7 @@ def get_ext_lang_pair_for_file(
         return ExtLangPair(
             ext=FileExt(cast(LiteralStringT, file_path.suffix or file_path.name)),
             language=get_semantic_or_config_lang(in_tests.language) or in_tests.language,  # type: ignore
-        )  # pyright: ignore[reportArgumentType]
+        )
     if config_lang := ConfigLanguage.from_extension(file_path.suffix or file_path.name):
         return ExtLangPair(
             ext=FileExt(cast(LiteralStringT, file_path.suffix or file_path.name)),

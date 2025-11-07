@@ -178,7 +178,7 @@ class ConfigLanguage(BaseEnum):
         This is used to quickly look up the SemanticSearchLanguage based on ConfigLanguage.
         """
         if self.is_semantic_search_language:
-            return SemanticSearchLanguage.from_string(self.value)  # pyright: ignore[reportReturnType]
+            return SemanticSearchLanguage.from_string(self.value)
         return None
 
     @classmethod
@@ -778,7 +778,7 @@ class SemanticSearchLanguage(str, BaseEnum):
             ConfigLanguage.from_string(self.value)
             if self in type(self).config_languages()
             else None
-        )  # pyright: ignore[reportReturnType]
+        )
 
     @classmethod
     def config_languages(cls) -> tuple[SemanticSearchLanguage, ...]:
@@ -804,7 +804,7 @@ class SemanticSearchLanguage(str, BaseEnum):
         """
         Returns all file extensions for all languages.
         """
-        yield from (ext for lang in cls for ext in cls.extension_map()[lang] if ext)  # pyright: ignore[reportReturnType]
+        yield from (ext for lang in cls for ext in cls.extension_map()[lang] if ext)
 
     @classmethod
     def filename_pairs(cls) -> Generator[ConfigNamePair]:
@@ -815,7 +815,7 @@ class SemanticSearchLanguage(str, BaseEnum):
             if lang.config_files is not None:
                 yield from (
                     ConfigNamePair(
-                        filename=config_file.path.name,  # pyright: ignore[reportArgumentType]
+                        filename=config_file.path.name,
                         language=config_file.language_type
                         if config_file.language_type != ConfigLanguage.SELF
                         else lang,

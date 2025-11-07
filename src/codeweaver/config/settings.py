@@ -61,6 +61,7 @@ from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.chunker import ChunkerSettings, DefaultChunkerSettings
 from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
 from codeweaver.config.logging import DefaultLoggingSettings, LoggingSettings
+from codeweaver.config.mcp import CodeWeaverMCPConfig, MCPServerConfig
 from codeweaver.config.middleware import (
     AVAILABLE_MIDDLEWARE,
     DefaultMiddlewareSettings,
@@ -431,6 +432,14 @@ class CodeWeaverSettings(BaseSettings):
         Field(description="""Telemetry configuration""", validate_default=False),
     ] = UNSET
 
+    default_mcp_config: Annotated[
+        MCPServerConfig | Unset,
+        Field(
+            description="""Default MCP server configuration for mcp clients. Setting this makes it quick and easy to add codeweaver to any mcp.json file using `codeweaver init`. Defaults to a streamable-http CodeWeaver server at `http://127.0.0.1:9328`. We strongly recommend using streamable-http instead of stdio for a better experience.""",
+            validate_default=False,
+        ),
+    ] = UNSET
+
     __version__: Annotated[
         str,
         Field(
@@ -462,7 +471,7 @@ class CodeWeaverSettings(BaseSettings):
         )
         self.provider = (
             ProviderSettings.model_validate(AllDefaultProviderSettings)
-            if isinstance(self.provider, Unset) or self.provider is None  # pyright: ignore[reportUnnecessaryComparison]
+            if isinstance(self.provider, Unset) or self.provider is None
             else self.provider
         )
         # Serena uses 17,000 tokens *each turn*, so I feel like 30,000 is a reasonable default limit. We'll strive to keep it well under that.
@@ -495,8 +504,13 @@ class CodeWeaverSettings(BaseSettings):
         )
         self.endpoints = (
             DefaultEndpointSettings
-            if isinstance(self.endpoints, Unset) or self.endpoints is None  # pyright: ignore[reportUnnecessaryComparison]
+            if isinstance(self.endpoints, Unset) or self.endpoints is None
             else DefaultEndpointSettings | self.endpoints
+        )
+        self.default_mcp_config = (
+            CodeWeaverMCPConfig()
+            if isinstance(self.default_mcp_config, Unset)
+            else self.default_mcp_config
         )
         if not type(self).__pydantic_complete__:
             result = type(self).model_rebuild()

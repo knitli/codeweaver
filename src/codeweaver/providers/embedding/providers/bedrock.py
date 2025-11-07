@@ -112,7 +112,7 @@ def is_one_of_valid_types(
 ) -> TypeGuard[dict[str, Any] | str | bytes | bytearray | BytesIO]:
     """Check if the data is one of the valid types."""
     if isinstance(data, dict):
-        return all(isinstance(key, str) for key in data if key)  # pyright: ignore[reportUnknownVariableType]
+        return all(isinstance(key, str) for key in data if key)
     return isinstance(data, str | bytes | bytearray | BytesIO)
 
 
@@ -535,7 +535,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[bedrock_client]):
             deserialized.body.embeddings
             if deserialized.body and deserialized.body.embeddings
             else []
-        )  # pyright: ignore[reportReturnType]
+        )
 
     def _create_cohere_request(
         self,

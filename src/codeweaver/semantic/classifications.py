@@ -233,9 +233,9 @@ class ThingClass(BasedModel):
         """Post-initialization validation."""
         with contextlib.suppress(KeyError, AttributeError, ValueError):
             if not self.name.category:
-                SemanticClass._update_categories(self)  # pyright: ignore[reportPrivateUsage]
+                SemanticClass._update_categories(self)
             if not self.name.rank:
-                SemanticClass._update_rank_map(self)  # pyright: ignore[reportPrivateUsage]
+                SemanticClass._update_rank_map(self)
 
     @field_validator("name", mode="before")
     @classmethod

@@ -131,10 +131,8 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
     ) -> list[list[float]] | list[list[int]]:
         """Embed a list of documents into vectors."""
         transformed_input = self.chunks_to_strings(documents)
-        all_output = await self._embed_sequence(transformed_input, **kwargs)  # pyright: ignore[reportArgumentType]
-        self._fire_and_forget(
-            lambda: self._update_token_stats(from_docs=transformed_input)  # pyright: ignore[reportArgumentType]
-        )
+        all_output = await self._embed_sequence(transformed_input, **kwargs)
+        self._fire_and_forget(lambda: self._update_token_stats(from_docs=transformed_input))
         return self._process_output(all_output)
 
     async def _embed_query(
@@ -142,7 +140,7 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
     ) -> list[list[float]] | list[list[int]]:
         """Embed a query into a vector."""
         query = [query] if isinstance(query, str) else query
-        output = await self._embed_sequence(query, **kwargs)  # pyright: ignore[reportArgumentType]
+        output = await self._embed_sequence(query, **kwargs)
         self._fire_and_forget(lambda: self._update_token_stats(from_docs=query))
         return self._process_output(output)
 

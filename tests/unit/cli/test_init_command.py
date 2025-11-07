@@ -59,8 +59,10 @@ class TestInitCommand:
         capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Test init creates both CodeWeaver config and MCP config."""
+        from codeweaver.cli.commands.init import _get_client_config_path
+        
         with pytest.raises(SystemExit) as exc_info:
-            init_app("--quick")
+            init_app("--quick --client claude_code")
         captured = capsys.readouterr()
 
         # Should succeed
@@ -70,13 +72,19 @@ class TestInitCommand:
         assert (temp_project / "codeweaver.toml").exists()
 
         # MCP config created
-        mcp_config_path = temp_home / ".config" / "claude" / "claude_code_config.json"
+        mcp_config_path = _get_client_config_path(
+            client="claude_code",
+            config_level="user",
+            project_path=temp_project,
+        )
         assert mcp_config_path.exists()
 
     def test_config_only_flag(self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """Test --config-only creates only CodeWeaver config."""
+        from codeweaver.cli.commands.init import _get_client_config_path
+        
         with pytest.raises(SystemExit) as exc_info:
-            init_app("--quick", "--config-only")
+            init_app("--quick --config-only")
         captured = capsys.readouterr()
 
         assert exc_info.value.code == 0
@@ -85,22 +93,31 @@ class TestInitCommand:
         assert (temp_project / "codeweaver.toml").exists()
 
         # MCP config should NOT be created
-        mcp_config_path = temp_home / ".config" / "claude" / "claude_code_config.json"
+        mcp_config_path = _get_client_config_path(
+            client="claude_code",
+            config_level="user",
+            project_path=temp_project,
+        )
         assert not mcp_config_path.exists()
 
     def test_mcp_only_flag(self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """Test --mcp-only creates only MCP config."""
+        from codeweaver.cli.commands.init import _get_client_config_path
+        
         with pytest.raises(SystemExit) as exc_info:
-            init_app("--mcp-only")
+            init_app("--mcp-only --client claude_code")
         captured = capsys.readouterr()
 
-        # Should succeed or prompt for client selection
-        assert exc_info.value.code in (0, 1)
+        # Should succeed
+        assert exc_info.value.code == 0
 
-        # MCP config should be created (if succeeded)
-        if exc_info.value.code == 0:
-            mcp_config_path = temp_home / ".config" / "claude" / "claude_code_config.json"
-            assert mcp_config_path.exists()
+        # MCP config should be created
+        mcp_config_path = _get_client_config_path(
+            client="claude_code",
+            config_level="user",
+            project_path=temp_project,
+        )
+        assert mcp_config_path.exists()
 
 
 @pytest.mark.unit
@@ -115,24 +132,27 @@ class TestHttpStreamingArchitecture:
         capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Test MCP config uses HTTP streaming, not STDIO."""
+        from codeweaver.cli.commands.init import _get_client_config_path
+        
         with pytest.raises(SystemExit) as exc_info:
-            init_app("--mcp-only", "--client", "claude_code")
+            init_app("--mcp-only --client claude_code --transport streamable-http")
         captured = capsys.readouterr()
 
         # If succeeded, check config
         if exc_info.value.code == 0:
-            mcp_config_path = temp_home / ".config" / "claude" / "claude_code_config.json"
+            mcp_config_path = _get_client_config_path(
+                client="claude_code",
+                config_level="user",
+                project_path=temp_project,
+            )
             if mcp_config_path.exists():
                 mcp_config = json.loads(mcp_config_path.read_text())
 
                 cw_config = mcp_config["mcpServers"]["codeweaver"]
 
-                # Should use HTTP transport
-                assert "--transport" in cw_config.get("args", [])
-                assert "http" in str(cw_config.get("args", [])).lower()
-
-                # Should NOT use STDIO patterns
-                assert "stdio" not in str(cw_config).lower()
+                # Should have URL for HTTP transport
+                assert "url" in cw_config
+                assert ":" in cw_config["url"]  # host:port format
 
     def test_http_streaming_command_structure(
         self,
@@ -141,40 +161,51 @@ class TestHttpStreamingArchitecture:
         capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Test HTTP streaming uses correct command structure."""
+        from codeweaver.cli.commands.init import _get_client_config_path
+        
         with pytest.raises(SystemExit) as exc_info:
-            init_app("--mcp-only", "--client", "claude_code")
+            init_app("--mcp-only --client claude_code --transport streamable-http")
         captured = capsys.readouterr()
 
         if exc_info.value.code == 0:
-            mcp_config_path = temp_home / ".config" / "claude" / "claude_code_config.json"
+            mcp_config_path = _get_client_config_path(
+                client="claude_code",
+                config_level="user",
+                project_path=temp_project,
+            )
             if mcp_config_path.exists():
                 mcp_config = json.loads(mcp_config_path.read_text())
                 cw_config = mcp_config["mcpServers"]["codeweaver"]
 
-                # Should have command
-                assert "command" in cw_config
-                assert cw_config["command"] == "codeweaver"
-
-                # Should have args with server subcommand
-                assert "args" in cw_config
-                args = cw_config["args"]
-                assert "server" in args or "serve" in args
+                # For HTTP transport, should have URL
+                assert "url" in cw_config
+                # Should have type
+                assert "type" in cw_config
+                assert cw_config["type"] == "streamable-http"
 
     def test_stdio_not_used(self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test STDIO transport is not used."""
+        """Test STDIO transport is not used by default."""
+        from codeweaver.cli.commands.init import _get_client_config_path
+        
         with pytest.raises(SystemExit) as exc_info:
-            init_app("--mcp-only", "--client", "claude_code")
+            init_app("--mcp-only --client claude_code")
         captured = capsys.readouterr()
 
         if exc_info.value.code == 0:
-            mcp_config_path = temp_home / ".config" / "claude" / "claude_code_config.json"
+            mcp_config_path = _get_client_config_path(
+                client="claude_code",
+                config_level="user",
+                project_path=temp_project,
+            )
             if mcp_config_path.exists():
                 mcp_config = json.loads(mcp_config_path.read_text())
                 cw_config = mcp_config["mcpServers"]["codeweaver"]
 
-                # Should not use STDIO
-                args_str = str(cw_config.get("args", [])).lower()
-                assert "stdio" not in args_str
+                # Default transport should be HTTP, not STDIO
+                config_type = cw_config.get("type", "")
+                assert config_type != "stdio"
+                # Should have URL for HTTP
+                assert "url" in cw_config
 
 
 @pytest.mark.unit
@@ -182,42 +213,56 @@ class TestHttpStreamingArchitecture:
 class TestMcpClientSupport:
     """Tests for MCP client support."""
 
-    def test_supported_clients(self) -> None:
+    def test_supported_clients(self, temp_project: Path) -> None:
         """Test all supported MCP clients are recognized."""
-        from codeweaver.cli.commands.init import _get_mcp_client_config_path
+        from codeweaver.cli.commands.init import _get_client_config_path
 
         # Should support at least these clients
-        expected_clients = {
+        expected_clients = [
             "claude_code",
-            "claude_desktop",
             "cursor",
-            "continue",
-        }
+            "vscode",
+            "mcpjson",
+        ]
 
-        # Test that each client returns a valid path
+        # Test that each client returns a valid path for project-level config
         for client in expected_clients:
             try:
-                config_path = _get_mcp_client_config_path(client)
+                config_path = _get_client_config_path(
+                    client=client,  # type: ignore[arg-type]
+                    config_level="project",
+                    project_path=temp_project,
+                )
                 assert config_path is not None
-            except ValueError:
-                # Client not supported on this platform (e.g., claude_desktop on Linux)
-                pass
+                assert isinstance(config_path, Path)
+            except ValueError as e:
+                # Client doesn't support this config level on this platform
+                assert "does not support" in str(e).lower()
 
-    def test_client_config_paths_correct(self, temp_home: Path) -> None:
+    def test_client_config_paths_correct(self, temp_home: Path, temp_project: Path) -> None:
         """Test client config paths are correct."""
-        from codeweaver.cli.commands.init import _get_mcp_client_config_path
+        from codeweaver.cli.commands.init import _get_client_config_path
 
-        # Test supported clients
-        test_clients = ["claude_code", "cursor", "continue"]
+        # Test project-level configs
+        test_cases = [
+            ("claude_code", "project", temp_project / ".claude" / "mcp.json"),
+            ("cursor", "project", temp_project / ".cursor" / "mcp.json"),
+            ("vscode", "project", temp_project / ".vscode" / "mcp.json"),
+            ("mcpjson", "project", temp_project / ".mcp.json"),
+        ]
         
-        for client in test_clients:
+        for client, config_level, expected_path in test_cases:
             try:
-                config_path = _get_mcp_client_config_path(client)
-                assert config_path is not None
+                config_path = _get_client_config_path(
+                    client=client,  # type: ignore[arg-type]
+                    config_level=config_level,  # type: ignore[arg-type]
+                    project_path=temp_project,
+                )
+                assert config_path == expected_path
                 # Path should be absolute
                 assert config_path.is_absolute()
             except ValueError:
-                # Client not supported on this platform
+                # Client doesn't support this config level
                 pass
 
 
@@ -270,3 +315,261 @@ provider = "fastembed"
 
         # Should either merge or prompt
         assert exc_info.value.code in (0, 1)
+
+
+
+@pytest.mark.unit
+@pytest.mark.config
+class TestHelperFunctions:
+    """Tests for new helper functions in init command."""
+
+    def test_create_stdio_config_basic(self) -> None:
+        """Test _create_stdio_config creates valid stdio config."""
+        from codeweaver.cli.commands.init import _create_stdio_config
+
+        config = _create_stdio_config()
+
+        # Check required fields
+        assert hasattr(config, "command")
+        assert config.command == "codeweaver server --transport stdio"
+        assert config.type == "stdio"
+
+    def test_create_stdio_config_with_custom_args(self) -> None:
+        """Test _create_stdio_config with custom command and args."""
+        from codeweaver.cli.commands.init import _create_stdio_config
+
+        config = _create_stdio_config(
+            cmd="uvx",
+            args=["codeweaver", "server", "--transport", "stdio"],
+        )
+
+        assert "uvx" in config.command
+        assert "codeweaver" in config.command
+        assert config.type == "stdio"
+
+    def test_create_stdio_config_with_env(self) -> None:
+        """Test _create_stdio_config includes environment variables."""
+        from codeweaver.cli.commands.init import _create_stdio_config
+
+        env_vars = {"VOYAGE_API_KEY": "test-key", "DEBUG": "true"}
+        config = _create_stdio_config(env=env_vars)
+
+        assert config.env == env_vars
+        assert "VOYAGE_API_KEY" in config.env
+        assert config.env["DEBUG"] == "true"
+
+    def test_create_stdio_config_with_timeout(self) -> None:
+        """Test _create_stdio_config with custom timeout."""
+        from codeweaver.cli.commands.init import _create_stdio_config
+
+        config = _create_stdio_config(timeout=300)
+
+        assert config.timeout == 300
+
+    def test_create_remote_config_basic(self) -> None:
+        """Test _create_remote_config creates valid HTTP config."""
+        from codeweaver.cli.commands.init import _create_remote_config
+
+        config = _create_remote_config()
+
+        # Check required fields
+        assert hasattr(config, "url")
+        assert config.url == "127.0.0.1:9328"  # default host:port
+
+    def test_create_remote_config_with_custom_host_port(self) -> None:
+        """Test _create_remote_config with custom host and port."""
+        from codeweaver.cli.commands.init import _create_remote_config
+
+        config = _create_remote_config(host="0.0.0.0", port=8000)
+
+        assert config.url == "0.0.0.0:8000"
+
+    def test_create_remote_config_with_timeout(self) -> None:
+        """Test _create_remote_config with custom timeout."""
+        from codeweaver.cli.commands.init import _create_remote_config
+
+        config = _create_remote_config(timeout=300)
+
+        assert config.timeout == 300
+
+    def test_handle_output_print_mode(
+        self,
+        temp_project: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test handle_output in print mode."""
+        from codeweaver.cli.commands.init import handle_output, _create_stdio_config
+
+        config = _create_stdio_config()
+
+        handle_output(
+            mcp_config=config,
+            output="print",
+            config_level="project",
+            client="claude_code",
+            file_path=None,
+            project_path=temp_project,
+        )
+
+        captured = capsys.readouterr()
+        # Should print JSON to stdout
+        assert "command" in captured.out or "codeweaver" in captured.out
+
+    def test_handle_output_write_mode(
+        self,
+        temp_project: Path,
+    ) -> None:
+        """Test handle_output in write mode."""
+        from codeweaver.cli.commands.init import handle_output, _create_stdio_config
+
+        config = _create_stdio_config()
+
+        handle_output(
+            mcp_config=config,
+            output="write",
+            config_level="project",
+            client="claude_code",
+            file_path=None,
+            project_path=temp_project,
+        )
+
+        # Should write file to project-level location
+        config_path = temp_project / ".claude" / "mcp.json"
+        assert config_path.exists()
+
+        # Verify content
+        import json
+        config_data = json.loads(config_path.read_text())
+        assert "mcpServers" in config_data
+        assert "codeweaver" in config_data["mcpServers"]
+
+    def test_handle_write_output_creates_parent_dirs(
+        self,
+        temp_project: Path,
+    ) -> None:
+        """Test _handle_write_output creates parent directories."""
+        from codeweaver.cli.commands.init import _handle_write_output, _create_stdio_config
+
+        config = _create_stdio_config()
+
+        # Create config in non-existent directory
+        config_path = temp_project / "new_dir" / "subdir" / "mcp.json"
+
+        _handle_write_output(
+            mcp_config=config,
+            config_level="project",
+            client="claude_code",
+            file_path=config_path,
+            project_path=temp_project,
+        )
+
+        # Parent dirs should be created
+        assert config_path.parent.exists()
+        assert config_path.exists()
+
+    def test_handle_write_output_backs_up_existing(
+        self,
+        temp_project: Path,
+    ) -> None:
+        """Test _handle_write_output backs up existing config."""
+        from codeweaver.cli.commands.init import _handle_write_output, _create_stdio_config
+
+        config_path = temp_project / ".claude" / "mcp.json"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Create existing config
+        existing_content = '{"mcpServers": {"old": {}}}'
+        config_path.write_text(existing_content)
+
+        config = _create_stdio_config()
+
+        _handle_write_output(
+            mcp_config=config,
+            config_level="project",
+            client="claude_code",
+            file_path=config_path,
+            project_path=temp_project,
+        )
+
+        # Backup should exist
+        backup_files = list(config_path.parent.glob("mcp.json.backup.*"))
+        assert len(backup_files) > 0
+
+    def test_mcp_command_stdio_transport(
+        self,
+        temp_project: Path,
+    ) -> None:
+        """Test mcp command creates stdio transport config."""
+        from codeweaver.cli.commands.init import mcp
+
+        with pytest.raises(SystemExit) as exc_info:
+            mcp(
+                output="write",
+                transport="stdio",
+                client="claude_code",
+                config_level="project",
+                project=temp_project,
+                file_path=None,
+                host="127.0.0.1",
+                port=9328,
+                timeout=120,
+                auth=None,
+                cmd=None,
+                args=None,
+                env=None,
+                authentication=None,
+            )
+
+        assert exc_info.value.code == 0
+
+        # Check config file
+        config_path = temp_project / ".claude" / "mcp.json"
+        assert config_path.exists()
+
+        import json
+        config_data = json.loads(config_path.read_text())
+        cw_config = config_data["mcpServers"]["codeweaver"]
+
+        # Should be stdio type
+        assert cw_config["type"] == "stdio"
+        assert "command" in cw_config
+
+    def test_mcp_command_http_transport(
+        self,
+        temp_project: Path,
+    ) -> None:
+        """Test mcp command creates HTTP transport config."""
+        from codeweaver.cli.commands.init import mcp
+
+        with pytest.raises(SystemExit) as exc_info:
+            mcp(
+                output="write",
+                transport="streamable-http",
+                client="claude_code",
+                config_level="project",
+                project=temp_project,
+                file_path=None,
+                host="127.0.0.1",
+                port=9328,
+                timeout=120,
+                auth=None,
+                cmd=None,
+                args=None,
+                env=None,
+                authentication=None,
+            )
+
+        assert exc_info.value.code == 0
+
+        # Check config file
+        config_path = temp_project / ".claude" / "mcp.json"
+        assert config_path.exists()
+
+        import json
+        config_data = json.loads(config_path.read_text())
+        cw_config = config_data["mcpServers"]["codeweaver"]
+
+        # Should be streamable-http type
+        assert cw_config["type"] == "streamable-http"
+        assert "url" in cw_config
+        assert "127.0.0.1:9328" == cw_config["url"]

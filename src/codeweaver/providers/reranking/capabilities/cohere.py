@@ -25,7 +25,7 @@ def cohere_max_input(chunks: Sequence[CodeChunk], query: str) -> tuple[bool, Non
     """Determine the maximum input length for the Cohere model."""
     tokenizer = get_tokenizer("tokenizers", "Cohere/rerank-v3.5")
     sizes = [
-        tokenizer.estimate(chunk.serialize_for_embedding()) + tokenizer.estimate(query)  # pyright: ignore[reportArgumentType]
+        tokenizer.estimate(chunk.serialize_for_embedding()) + tokenizer.estimate(query)
         for chunk in chunks
     ]
     if all(size <= 4096 for size in sizes):

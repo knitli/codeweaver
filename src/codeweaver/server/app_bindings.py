@@ -300,13 +300,13 @@ def setup_middleware(
                 mw = mw(**middleware_settings.get("rate_limiting", {}))  # type: ignore[reportCallIssue]
             case "LoggingMiddleware" | "StructuredLoggingMiddleware":
                 mw = mw(**middleware_settings.get("logging", {}))  # type: ignore[reportCallIssue]
-            case _:  # pyright: ignore[reportUnknownVariableType]
+            case _:
                 if any_settings := middleware_settings.get(mw.__name__.lower()):  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
                     mw = mw(**any_settings)  # type: ignore[reportCallIssue, reportUnknownVariableType]
                 else:
                     mw = mw()  # type: ignore[reportCallIssue, reportUnknownVariableType]
         mw: Middleware
-    return middleware  # pyright: ignore[reportReturnType]
+    return middleware
 
 
 def register_tool(app: FastMCP[AppState]) -> FastMCP[AppState]:
@@ -362,11 +362,11 @@ async def register_app_bindings(
             stats_info
         )  # type: ignore[arg-type]
     if endpoint_settings.get("enable_settings", True):
-        app.custom_route("/settings", methods=["GET"], name="settings", include_in_schema=True)(  # pyright: ignore[reportUnknownMemberType]
+        app.custom_route("/settings", methods=["GET"], name="settings", include_in_schema=True)(
             settings_info
         )  # type: ignore[arg-type]
     if endpoint_settings.get("enable_version", True):
-        app.custom_route("/version", methods=["GET"], name="version", include_in_schema=True)(  # pyright: ignore[reportUnknownMemberType]
+        app.custom_route("/version", methods=["GET"], name="version", include_in_schema=True)(
             version_info
         )  # type: ignore[arg-type]
     if endpoint_settings.get("enable_health", True):
@@ -375,7 +375,7 @@ async def register_app_bindings(
 
     middleware = setup_middleware(
         cast(Container[type[Middleware]], middleware), middleware_settings
-    )  # pyright: ignore[reportAssignmentType]
+    )
     middleware.add(
         StatisticsMiddleware(
             statistics=statistics(),

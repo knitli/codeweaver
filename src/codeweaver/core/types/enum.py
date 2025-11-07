@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 
 type EnumExtend = Callable[[Enum, str], Enum]
-extend_enum: EnumExtend = extend_enum  # pyright: ignore[reportUnknownVariableType]
+extend_enum: EnumExtend = extend_enum
 
 
 # ================================================
@@ -181,7 +181,7 @@ class BaseDataclassEnum(Enum):
     @classmethod
     def add_member(cls, name: str, value: BaseEnumData) -> Self:
         """Dynamically add a new member to the enum."""
-        extend_enum(cls, textcase.upper(name), value)  # pyright: ignore[reportPrivateUsage, reportCallIssue, reportUnknownVariableType]
+        extend_enum(cls, textcase.upper(name), value=value)
         return cls(value)
 
 
@@ -438,7 +438,7 @@ class BaseEnum(Enum):
         if isinstance(value, str):
             name = cls._encode_name(name).upper()
             value = name.lower()
-        extend_enum(cls, name, value)  # pyright: ignore[reportCallIssue, reportUnknownVariableType]
+        extend_enum(cls, name, value)
         return cls(value)
 
     def serialize_for_cli(self) -> str:

@@ -37,8 +37,8 @@ def fastembed_kwargs(**kwargs: Mapping[str, Any] | None) -> dict[str, Any]:
     """Get all possible kwargs for FastEmbed embedding methods."""
     default_kwargs: Mapping[str, Any] = {"threads": multiprocessing.cpu_count(), "lazy_load": True}
     if kwargs:
-        device_ids: list[int] | None = kwargs.get("device_ids")  # pyright: ignore[reportAssignmentType]
-        cuda: bool | None = kwargs.get("cuda")  # pyright: ignore[reportAssignmentType]
+        device_ids: list[int] | None = kwargs.get("device_ids")
+        cuda: bool | None = kwargs.get("cuda")
         if cuda == False:  # user **explicitly** disabled cuda  # noqa: E712
             return default_kwargs | kwargs
         cuda = bool(cuda)
@@ -55,9 +55,9 @@ def fastembed_kwargs(**kwargs: Mapping[str, Any] | None) -> dict[str, Any]:
             cuda = False
             device_ids = None
         if cuda:
-            kwargs["cuda"] = True  # pyright: ignore[reportArgumentType]
-            kwargs["device_ids"] = device_ids  # pyright: ignore[reportArgumentType]
-            kwargs["providers"] = ["CUDAExecutionProvider"]  # pyright: ignore[reportArgumentType]
+            kwargs["cuda"] = True
+            kwargs["device_ids"] = device_ids
+            kwargs["providers"] = ["CUDAExecutionProvider"]
     return default_kwargs | kwargs
 
 
@@ -79,7 +79,7 @@ class FastEmbedRerankingProvider(RerankingProvider[TextCrossEncoder]):
     def _initialize(self) -> None:
         if "model_name" not in self.kwargs:
             self.kwargs["model_name"] = self._caps.name
-        self._client = TextCrossEncoder(**self.kwargs)  # pyright: ignore[reportArgumentType]
+        self._client = TextCrossEncoder(**self.kwargs)
 
     async def _execute_rerank(
         self,

@@ -57,8 +57,8 @@ def fastembed_all_kwargs(**kwargs: Mapping[str, Any] | None) -> dict[str, Any]:
     """Get all possible kwargs for FastEmbed embedding methods."""
     default_kwargs: Mapping[str, Any] = {"threads": multiprocessing.cpu_count(), "lazy_load": True}
     if kwargs:
-        device_ids: list[int] | None = kwargs.get("device_ids")  # pyright: ignore[reportAssignmentType]
-        cuda: bool | None = kwargs.get("cuda")  # pyright: ignore[reportAssignmentType]
+        device_ids: list[int] | None = kwargs.get("device_ids")
+        cuda: bool | None = kwargs.get("cuda")
         if cuda == False:  # user **explicitly** disabled cuda  # noqa: E712
             return default_kwargs | kwargs
         cuda = bool(cuda)
@@ -75,9 +75,9 @@ def fastembed_all_kwargs(**kwargs: Mapping[str, Any] | None) -> dict[str, Any]:
             cuda = False
             device_ids = None
         if cuda:
-            kwargs["cuda"] = True  # pyright: ignore[reportArgumentType]
-            kwargs["device_ids"] = device_ids  # pyright: ignore[reportArgumentType]
-            kwargs["providers"] = ["CUDAExecutionProvider"]  # pyright: ignore[reportArgumentType]
+            kwargs["cuda"] = True
+            kwargs["device_ids"] = device_ids
+            kwargs["providers"] = ["CUDAExecutionProvider"]
     return default_kwargs
 
 
@@ -156,7 +156,7 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
             ),
         )
         partial_tokens = rpartial(self._update_token_stats, from_docs=ready_documents)
-        self._fire_and_forget(partial_tokens)  # pyright: ignore[reportArgumentType]
+        self._fire_and_forget(partial_tokens)
         return await loop.run_in_executor(None, lambda: self._process_output(embeddings))
 
     async def _embed_query(
@@ -202,7 +202,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         # The _client class variable is set to the class type, so we need to instantiate it
         if isinstance(self._client, type):
             client_options = self._doc_kwargs.get("client_options") or self._doc_kwargs
-            self._client = self._client(**client_options)  # pyright: ignore[reportCallIssue, reportIncompatibleVariableOverride]
+            self._client = self._client(**client_options)
 
     async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any] | None
@@ -211,8 +211,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         ready_documents = self.chunks_to_strings(documents)
         loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(
-            None,
-            lambda: list(self._client.embed(cast(Sequence[str], ready_documents), **kwargs)),  # pyright: ignore[reportArgumentType]
+            None, lambda: list(self._client.embed(cast(Sequence[str], ready_documents), **kwargs))
         )
         tokens = sum(val.nonzero for emb in embeddings for val in emb.values)
         self._update_token_stats(token_count=tokens, sparse=True)

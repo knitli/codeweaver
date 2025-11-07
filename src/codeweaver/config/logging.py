@@ -106,7 +106,7 @@ def walk_pattern(s: str) -> str:
     This aims to accept inputs written as if they were r-strings while remaining robust to
     config/env string parsing that may have processed standard escapes like "\n".
     """
-    if not isinstance(s, str):  # pyright: ignore[reportUnnecessaryIsInstance]  # just being defensive
+    if not isinstance(s, str):  # just being defensive
         raise TypeError("Pattern must be a string.")
 
     out: list[str] = []

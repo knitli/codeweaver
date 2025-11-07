@@ -217,7 +217,7 @@ class BedrockRerankingResult(BaseBedrockModel):
 
 
 try:
-    from boto3 import client as boto3_client  # pyright: ignore[reportUnknownVariableType]
+    from boto3 import client as boto3_client
 
 
 except ImportError as e:
@@ -228,7 +228,7 @@ except ImportError as e:
 class BedrockRerankingProvider(RerankingProvider[boto3_client]):
     """Provider for Bedrock reranking."""
 
-    _client: boto3_client  # pyright: ignore[reportGeneralTypeIssues]
+    _client: boto3_client
     _provider = Provider.BEDROCK
     _caps: RerankingModelCapabilities = get_amazon_reranking_capabilities()[0]
     _model_configuration: RerankConfiguration
@@ -240,7 +240,7 @@ class BedrockRerankingProvider(RerankingProvider[boto3_client]):
         bedrock_provider_settings: AWSProviderSettings,
         model_config: RerankConfiguration | None = None,
         capabilities: RerankingModelCapabilities | None = None,
-        client: boto3_client | None = None,  # pyright: ignore[reportGeneralTypeIssues, reportUnknownParameterType]
+        client: boto3_client | None = None,
         top_n: PositiveInt = 40,
         prompt: str | None = None,
         **kwargs: Any,
@@ -251,23 +251,21 @@ class BedrockRerankingProvider(RerankingProvider[boto3_client]):
             bedrock_provider_settings["model_arn"], kwargs.get("top_n", 40) if kwargs else top_n
         )
         _ = bedrock_provider_settings.pop("model_arn")
-        self._client = boto3_client("bedrock-runtime", **self._bedrock_provider_settings)  # pyright: ignore[reportCallIssue]  # we just popped it
+        self._client = boto3_client(
+            "bedrock-runtime", **self._bedrock_provider_settings
+        )  # we just popped it
         self._capabilities = capabilities or self._caps or get_amazon_reranking_capabilities()[0]
 
-        super().__init__(  # pyright: ignore[reportUnknownMemberType]
-            client=client,  # pyright: ignore[reportArgumentType]
-            capabilities=capabilities,  # pyright: ignore[reportArgumentType]
-            top_n=top_n,
-            prompt=prompt,
-            **kwargs,  # pyright: ignore[reportArgumentType]
+        super().__init__(
+            client=client, capabilities=capabilities, top_n=top_n, prompt=prompt, **kwargs
         )
 
     def _initialize(self) -> None:
         # Our input transformer can't conform to the expected signature because we need the query and model config to construct the full object. We'll handle that in the rerank method.
-        self._input_transformer = self.bedrock_reranking_input_transformer  # pyright: ignore[reportAttributeAccessIssue]
+        self._input_transformer = self.bedrock_reranking_input_transformer
         self._output_transformer = self.bedrock_reranking_output_transformer
 
-    async def _execute_rerank(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def _execute_rerank(
         self,
         query: str,
         documents: Sequence[BedrockInlineDocumentSource],
@@ -286,7 +284,7 @@ class BedrockRerankingProvider(RerankingProvider[boto3_client]):
             "reranking_configuration": config,
         })
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, self.client.rerank, request)  # pyright: ignore[reportFunctionMemberAccess, reportUnknownMemberType]
+        return await loop.run_in_executor(None, self.client.rerank, request)
 
     @staticmethod
     def _to_doc_sources(documents: list[DocumentSource]) -> list[BedrockInlineDocumentSource]:
@@ -353,12 +351,12 @@ class BedrockRerankingProvider(RerankingProvider[boto3_client]):
         results: list[RerankingResult] = []
         for item in parsed_response.results:
             # pyright doesn't know that this will always be CodeChunk-as-JSON because that's what we send.
-            chunk = CodeChunk.model_validate_json(item.document.json_document)  # pyright: ignore[reportUnknownArgumentType, reportArgumentType]
+            chunk = CodeChunk.model_validate_json(item.document.json_document)
             results.append(
                 RerankingResult(
                     original_index=original_chunks.index(chunk)
                     if isinstance(original_chunks, tuple)
-                    else tuple(original_chunks).index(chunk),  # pyright: ignore[reportUnknownMemberType]
+                    else tuple(original_chunks).index(chunk),
                     score=item.relevance_score,
                     batch_rank=item.index,
                     chunk=chunk,

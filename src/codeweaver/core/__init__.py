@@ -21,7 +21,6 @@ if TYPE_CHECKING:
         ChunkSequence,
         CodeChunk,
         CodeChunkDict,
-        SearchResult,
         SerializedCodeChunk,
         StructuredDataInput,
     )
@@ -42,7 +41,6 @@ if TYPE_CHECKING:
         ChunkSource,
         ExtKind,
         ExtLangPair,
-        ExtPair,
         Metadata,
         SemanticMetadata,
     )
@@ -116,7 +114,6 @@ if TYPE_CHECKING:
     )
 
 
-
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "BASEDMODEL_CONFIG": (__spec__.parent, "types"),
     "DATACLASS_CONFIG": (__spec__.parent, "types"),
@@ -183,7 +180,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "DiscoveredFile": (__spec__.parent, "discovery"),
     "ConfigLanguage": (__spec__.parent, "language"),
     "ConfigNamePair": (__spec__.parent, "language"),
-    "ExtPair": (__spec__.parent, "metadata"),
     "LanguageConfigFile": (__spec__.parent, "language"),
     "SemanticSearchLanguage": (__spec__.parent, "language"),
     "find_config_paths": (__spec__.parent, "language"),
@@ -263,7 +259,6 @@ __all__ = (
     "EmbeddingModelNameT",
     "ExtKind",
     "ExtLangPair",
-    "ExtPair",
     "FileExt",
     "FileExtensionT",
     "FileGlob",
@@ -288,7 +283,6 @@ __all__ = (
     "Role",
     "RoleT",
     "RootedRoot",
-    "SearchResult",
     "SemanticMetadata",
     "SemanticSearchLanguage",
     "Sentinel",

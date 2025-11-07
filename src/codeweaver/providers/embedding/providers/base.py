@@ -114,7 +114,7 @@ def default_output_transformer(output: Any) -> list[list[float]] | list[list[int
         return [output] if needs_wrapper else list(output)  # type: ignore
     logger.error(
         ("Received unexpected output format from embedding provider."),
-        extra={"output_data": output},  # pyright: ignore[reportUnknownArgumentType]
+        extra={"output_data": output},
     )
     raise ProviderError(
         "Embedding provider returned unexpected output format",
@@ -361,7 +361,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         from codeweaver.common.logging import log_to_client_or_fallback
 
         is_old_batch = False
-        if batch_id and self._store and batch_id in self._store:  # pyright: ignore[reportUnknownMemberType]
+        if batch_id and self._store and batch_id in self._store:
             documents: Sequence[CodeChunk] = self._store[batch_id]  # type: ignore
         is_old_batch = True
         chunks, cache_key = self._process_input(documents, is_old_batch=is_old_batch)  # type: ignore
@@ -507,12 +507,12 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     ) -> list[list[float]] | list[list[int]] | list[SparseEmbedding] | EmbeddingErrorInfo:
         """Embed a query into a vector."""
         processed_kwargs: Mapping[str, Any] = self._set_kwargs(self.query_kwargs, kwargs or {})
-        queries: Sequence[str] = query if isinstance(query, list | tuple | set) else [query]  # pyright: ignore[reportAssignmentType]
+        queries: Sequence[str] = query if isinstance(query, list | tuple | set) else [query]
         try:
             # Use retry wrapper instead of calling _embed_query directly
             results: (
                 Sequence[Sequence[float]] | Sequence[Sequence[int]] | Sequence[SparseEmbedding]
-            ) = await self._embed_query_with_retry(queries, **processed_kwargs)  # pyright: ignore[reportUnknownVariableType, reportGeneralTypeIssues]
+            ) = await self._embed_query_with_retry(queries, **processed_kwargs)
         except CircuitBreakerOpenError as e:
             logger.warning("Circuit breaker open for query embedding")
             return self._handle_embedding_error(e, batch_id=None, documents=None, queries=queries)
@@ -596,7 +596,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             statistics.add_token_usage(embedding_generated=token_count)
         elif from_docs and all(isinstance(doc, str) for doc in from_docs):
             token_count = (
-                self.tokenizer.estimate_batch(from_docs)  # pyright: ignore[reportArgumentType]
+                self.tokenizer.estimate_batch(from_docs)
                 if all(isinstance(doc, str) for doc in from_docs)
                 else sum(self.tokenizer.estimate_batch(item) for item in from_docs)  # type: ignore
             )

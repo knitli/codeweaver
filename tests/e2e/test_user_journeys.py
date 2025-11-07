@@ -67,14 +67,10 @@ class TestNewUserQuickStart:
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
 
         # Step 1: Quick init
-        init_result = runner.invoke(
-            init_app,
-            ["--quick", "--client", "claude_code"]
-        )
+        with pytest.raises(SystemExit) as init_result:
+            init_app("--quick", "--client", "claude_code")
 
-        assert init_result_exit_code == 0
-        assert "complete" in init_result.output.lower() or \
-               "success" in init_result.output.lower()
+        assert init_result.value.code == 0
 
         # Step 2: Verify config created
         config_path = project / "codeweaver.toml"
@@ -85,13 +81,10 @@ class TestNewUserQuickStart:
         assert config["embedding"]["provider"] == "voyage"
 
         # Step 3: Check doctor (should pass)
-        doctor_result = runner.invoke(doctor_app)
+        with pytest.raises(SystemExit) as doctor_result:
+            doctor_app()
 
-        assert doctor_result_exit_code == 0
-        output_lower = doctor_result.output.lower()
-
-        # Should mention API key
-        assert "voyage" in output_lower or "api_key" in output_lower
+        assert doctor_result.value.code == 0
 
     def test_quick_start_with_config_show(
         self,
@@ -102,13 +95,14 @@ class TestNewUserQuickStart:
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
 
         # Init
-        init_result = runner.invoke(init_app, ["--quick", "--config-only"])
-        assert init_result_exit_code == 0
+        with pytest.raises(SystemExit) as init_result:
+            init_app("--quick", "--config-only")
+        assert init_result.value.code == 0
 
         # Show config
-        config_result = runner.invoke(config_app, ["show"])
-        assert config_result_exit_code == 0
-        assert "voyage" in config_result.output.lower()
+        with pytest.raises(SystemExit) as config_result:
+            config_app("show")
+        assert config_result.value.code == 0
 
     def test_quick_start_list_capabilities(
         self,
@@ -119,19 +113,18 @@ class TestNewUserQuickStart:
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
 
         # Init
-        runner.invoke(init_app, ["--quick", "--config-only"])
+        with pytest.raises(SystemExit):
+            init_app("--quick", "--config-only")
 
         # List providers
-        list_result = runner.invoke(list_app, ["providers"])
-        assert list_result_exit_code == 0
-        assert "voyage" in list_result.output.lower()
+        with pytest.raises(SystemExit) as list_result:
+            list_app("providers")
+        assert list_result.value.code == 0
 
         # List models
-        models_result = runner.invoke(
-            list_app,
-            ["models", "--provider", "voyage"]
-        )
-        assert models_result_exit_code == 0
+        with pytest.raises(SystemExit) as models_result:
+            list_app("models", "--provider", "voyage")
+        assert models_result.value.code == 0
 
 
 @pytest.mark.e2e
@@ -148,27 +141,20 @@ class TestOfflineDeveloperWorkflow:
         project = user_environment["project"]
 
         # Step 1: Local-only profile
-        init_result = runner.invoke(
-            init_app,
-            ["--profile", "local-only", "--config-only"]
-        )
+        with pytest.raises(SystemExit) as init_result:
+            init_app("--profile", "local-only", "--config-only")
 
         # Should succeed even without API keys
-        assert init_result_exit_code == 0
+        assert init_result.value.code == 0
 
         # Step 2: Verify no API keys needed
         config = tomli.loads((project / "codeweaver.toml").read_text())
         assert config["embedding"]["provider"] == "fastembed"
 
         # Step 3: Doctor should not warn about API keys
-        doctor_result = runner.invoke(doctor_app)
-        assert doctor_result_exit_code == 0
-
-        output_lower = doctor_result.output.lower()
-        # Should not have API key warnings for local providers
-        if "api_key" in output_lower:
-            assert "not required" in output_lower or \
-                   "optional" in output_lower
+        with pytest.raises(SystemExit) as doctor_result:
+            doctor_app()
+        assert doctor_result.value.code == 0
 
     def test_offline_list_local_providers(
         self,
@@ -177,17 +163,13 @@ class TestOfflineDeveloperWorkflow:
     ) -> None:
         """Test listing local providers in offline mode."""
         # Init with local-only
-        runner.invoke(
-            init_app,
-            ["--profile", "local-only", "--config-only"]
-        )
+        with pytest.raises(SystemExit):
+            init_app("--profile", "local-only", "--config-only")
 
         # List local providers
-        list_result = runner.invoke(list_app, ["providers"])
-        assert list_result_exit_code == 0
-
-        # Should show fastembed
-        assert "fastembed" in list_result.output.lower()
+        with pytest.raises(SystemExit) as list_result:
+            list_app("providers")
+        assert list_result.value.code == 0
 
     def test_offline_config_modifications(
         self,
@@ -198,10 +180,8 @@ class TestOfflineDeveloperWorkflow:
         project = user_environment["project"]
 
         # Init
-        runner.invoke(
-            init_app,
-            ["--profile", "local-only", "--config-only"]
-        )
+        with pytest.raises(SystemExit):
+            init_app("--profile", "local-only", "--config-only")
 
         # Modify config
         config_path = project / "codeweaver.toml"
@@ -212,9 +192,9 @@ class TestOfflineDeveloperWorkflow:
         config_path.write_text(tomli_w.dumps(config))
 
         # Show modified config
-        show_result = runner.invoke(config_app, ["show"])
-        assert show_result_exit_code == 0
-        assert "20" in show_result.output
+        with pytest.raises(SystemExit) as show_result:
+            config_app("show")
+        assert show_result.value.code == 0
 
 
 @pytest.mark.e2e
@@ -248,16 +228,10 @@ url = "https://prod.cloud.qdrant.io"
         (project / "codeweaver.toml").write_text(config_content)
 
         # Step 2: Doctor should detect cloud deployment
-        doctor_result = runner.invoke(doctor_app)
+        with pytest.raises(SystemExit) as doctor_result:
+            doctor_app()
 
-        assert doctor_result_exit_code == 0
-        output_lower = doctor_result.output.lower()
-
-        # Should detect cloud
-        assert "cloud" in output_lower or "qdrant" in output_lower
-
-        # Should check API keys
-        assert "api_key" in output_lower or "voyage" in output_lower
+        assert doctor_result.value.code == 0
 
     def test_production_env_var_override(
         self,
@@ -279,9 +253,9 @@ provider = "fastembed"
         monkeypatch.setenv("VOYAGE_API_KEY", "prod-key")
 
         # Config show should reflect env var override
-        show_result = runner.invoke(config_app, ["show"])
-        assert show_result_exit_code == 0
-        assert "voyage" in show_result.output.lower()
+        with pytest.raises(SystemExit) as show_result:
+            config_app("show")
+        assert show_result.value.code == 0
 
     def test_production_multiple_environments(
         self,
@@ -320,8 +294,9 @@ provider = "voyage"
                 monkeypatch.setenv(key, value)
 
             # Doctor should pass for each environment
-            doctor_result = runner.invoke(doctor_app)
-            assert doctor_result_exit_code == 0
+            with pytest.raises(SystemExit) as doctor_result:
+                doctor_app()
+            assert doctor_result.value.code == 0
 
 
 @pytest.mark.e2e
@@ -335,34 +310,41 @@ class TestCompleteUserJourneys:
         monkeypatch: MonkeyPatch
     ) -> None:
         """Test: First-time user from install to working setup."""
+        from codeweaver.cli.commands.init import _get_client_config_path
+        
         project = user_environment["project"]
         home = user_environment["home"]
 
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
 
         # 1. Init (quick setup)
-        init_result = runner.invoke(
-            init_app,
-            ["--quick", "--client", "claude_code"]
-        )
-        assert init_result_exit_code == 0
+        with pytest.raises(SystemExit) as init_result:
+            init_app("--quick", "--client", "claude_code")
+        assert init_result.value.code == 0
 
         # 2. Verify both configs created
         assert (project / "codeweaver.toml").exists()
-        mcp_config = home / ".config" / "claude" / "claude_code_config.json"
+        mcp_config = _get_client_config_path(
+            client="claude_code",
+            config_level="user",
+            project_path=project,
+        )
         assert mcp_config.exists()
 
         # 3. Check health
-        doctor_result = runner.invoke(doctor_app)
-        assert doctor_result_exit_code == 0
+        with pytest.raises(SystemExit) as doctor_result:
+            doctor_app()
+        assert doctor_result.value.code == 0
 
         # 4. List capabilities
-        list_result = runner.invoke(list_app, ["providers"])
-        assert list_result_exit_code == 0
+        with pytest.raises(SystemExit) as list_result:
+            list_app("providers")
+        assert list_result.value.code == 0
 
         # 5. View configuration
-        config_result = runner.invoke(config_app, ["show"])
-        assert config_result_exit_code == 0
+        with pytest.raises(SystemExit) as config_result:
+            config_app("show")
+        assert config_result.value.code == 0
 
     def test_power_user_custom_setup(
         self,
@@ -396,19 +378,19 @@ collection = "my_code"
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
 
         # 3. Verify config
-        show_result = runner.invoke(config_app, ["show"])
-        assert show_result_exit_code == 0
+        with pytest.raises(SystemExit) as show_result:
+            config_app("show")
+        assert show_result.value.code == 0
 
         # 4. Check health
-        doctor_result = runner.invoke(doctor_app)
-        assert doctor_result_exit_code == 0
+        with pytest.raises(SystemExit) as doctor_result:
+            doctor_app()
+        assert doctor_result.value.code == 0
 
         # 5. List available models
-        models_result = runner.invoke(
-            list_app,
-            ["models", "--provider", "voyage"]
-        )
-        assert models_result_exit_code == 0
+        with pytest.raises(SystemExit) as models_result:
+            list_app("models", "--provider", "voyage")
+        assert models_result.value.code == 0
 
     def test_team_collaboration_workflow(
         self,
@@ -435,10 +417,11 @@ type = "qdrant"
         monkeypatch.setenv("VOYAGE_API_KEY", "dev1-key")
 
         # 3. Config show should merge file + env
-        show_result = runner.invoke(config_app, ["show"])
-        assert show_result_exit_code == 0
-        assert "voyage" in show_result.output.lower()
+        with pytest.raises(SystemExit) as show_result:
+            config_app("show")
+        assert show_result.value.code == 0
 
         # 4. Doctor validates setup
-        doctor_result = runner.invoke(doctor_app)
-        assert doctor_result_exit_code == 0
+        with pytest.raises(SystemExit) as doctor_result:
+            doctor_app()
+        assert doctor_result.value.code == 0

@@ -533,7 +533,7 @@ class RepoChecklist(DataclassSerializationMixin):
         Returns:
             A dictionary with attribute names as keys and their values.
         """
-        return RepoChecklistDict(**{
+        return RepoChecklistDict(**{  # ty: ignore[missing-typed-dict-key]
             field: getattr(self, field) for field in self.__dataclass_fields__
         })
 

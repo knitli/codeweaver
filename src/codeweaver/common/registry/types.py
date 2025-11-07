@@ -55,7 +55,7 @@ type LiteralVectorStoreKinds = Literal[ProviderKind.VECTOR_STORE, "vector_store"
 
 
 @override
-class Feature(IntFlag, BaseEnum):  # pyright: ignore[reportIncompatibleVariableOverride, reportIncompatibleMethodOverride]
+class Feature(IntFlag, BaseEnum):
     # We intentionally override BaseEnum here to get the IntFlag behavior where they overlap
     """Features supported by the CodeWeaver server.
 

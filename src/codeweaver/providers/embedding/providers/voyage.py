@@ -100,10 +100,10 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
 
     async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any]
-    ) -> list[list[float]] | list[list[int]]:  # pyright: ignore[reportReturnType]
+    ) -> list[list[float]] | list[list[int]]:
         """Embed a list of documents into vectors."""
         ready_documents = cast(list[str], self.chunks_to_strings(documents))
-        results: EmbeddingsObject = await self._client.embed(texts=ready_documents, **kwargs)  # pyright: ignore[reportArgumentType]
+        results: EmbeddingsObject = await self._client.embed(texts=ready_documents, **kwargs)
         self._fire_and_forget(lambda: self._update_token_stats(token_count=results.total_tokens))
         return self._process_output(results)
 
@@ -111,7 +111,7 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
         self, query: Sequence[str], **kwargs: Mapping[str, Any]
     ) -> list[list[float]] | list[list[int]]:
         """Embed a query or group of queries into vectors."""
-        results: EmbeddingsObject = await self._client.embed(texts=query, **kwargs)  # pyright: ignore[reportArgumentType]
+        results: EmbeddingsObject = await self._client.embed(texts=query, **kwargs)
         self._fire_and_forget(lambda: self._update_token_stats(token_count=results.total_tokens))
         return self._process_output(results)
 

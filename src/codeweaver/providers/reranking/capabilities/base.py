@@ -164,9 +164,9 @@ class RerankingModelCapabilities(BasedModel):
             and sum(len(chunk.content) for chunk in input_chunks) < (self.max_input * 4) * 0.85
         ):
             return True, 0
-        return self._handle_int_max_input([  # pyright: ignore[reportUnknownArgumentType]
-            (query + chunk.serialize_for_embedding())  # pyright: ignore[reportOperatorIssue]  # it's a string, I promise
-            for chunk in input_chunks  # pyright: ignore[reportOperatorIssue]
+        return self._handle_int_max_input([
+            (query + chunk.serialize_for_embedding())  # it's a string, I promise
+            for chunk in input_chunks
         ])
 
 

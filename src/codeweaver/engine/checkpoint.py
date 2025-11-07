@@ -84,13 +84,13 @@ def _get_settings_map() -> DictView[CheckpointSettingsFingerprint]:
     from codeweaver.config.settings import get_settings
 
     settings = get_settings()
-    if isinstance(settings.provider, Unset) or settings.provider is None:  # pyright: ignore[reportUnnecessaryComparison]
+    if isinstance(settings.provider, Unset) or settings.provider is None:
         from codeweaver.config.providers import AllDefaultProviderSettings, ProviderSettings
 
         settings.provider = ProviderSettings.model_validate(AllDefaultProviderSettings)
     settings.indexing = (
         IndexerSettings.model_validate(DefaultIndexerSettings)
-        if isinstance(settings.indexing, Unset) or settings.indexing is None  # pyright: ignore[reportUnnecessaryComparison]
+        if isinstance(settings.indexing, Unset) or settings.indexing is None
         else settings.indexing
     )
     settings.provider.embedding = (
@@ -377,7 +377,17 @@ class CheckpointManager:
         Returns:
             Dictionary of settings affecting indexing
         """
-        return CheckpointSettingsFingerprint(**_get_settings_map())
+        settings = _get_settings_map()
+
+        return CheckpointSettingsFingerprint({
+            "indexer": settings["indexer"],
+            "embedding_provider": settings["provider"]["embedding"],
+            "reranking_provider": settings["provider"]["reranking"],
+            "sparse_provider": settings["provider"]["sparse_embedding"],
+            "vector_store": settings["provider"]["vector_store"],
+            "project_path": settings["project_path"],
+            "project_name": settings["project_name"],
+        })
 
 
 __all__ = ("CheckpointManager", "CheckpointSettingsFingerprint", "IndexingCheckpoint")
