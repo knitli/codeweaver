@@ -1156,7 +1156,11 @@ class Indexer(BasedModel):
                     "phase": "chunking",
                     "files_discovered": len(discovered_files),
                     "languages": list(
-                        {f.language.value for f in discovered_files if f.language}
+                        {
+                            (f.ext_kind.language.value if hasattr(f.ext_kind.language, "value") else str(f.ext_kind.language))
+                            for f in discovered_files
+                            if f.ext_kind
+                        }
                     ),
                 },
             },

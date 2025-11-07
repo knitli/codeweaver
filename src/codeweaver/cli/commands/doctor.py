@@ -15,7 +15,7 @@ import sys
 
 from importlib.util import find_spec
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from cyclopts import App
 from pydantic import ValidationError
@@ -25,10 +25,13 @@ from rich.table import Table
 from codeweaver.common import CODEWEAVER_PREFIX
 from codeweaver.common.utils.git import get_project_path, is_git_dir
 from codeweaver.common.utils.utils import get_user_config_dir
+from codeweaver.core.types.sentinel import Unset
 
 
 if TYPE_CHECKING:
+    from codeweaver.config.providers import ProviderSettings
     from codeweaver.config.settings import CodeWeaverSettings
+    from codeweaver.providers.provider import Provider
 
 
 console = Console(markup=True, emoji=True)
@@ -60,6 +63,28 @@ class DoctorCheck:
         self.message = message
         self.suggestions = suggestions or []
 
+    @classmethod
+    def set_check(
+        cls,
+        name: str,
+        status: Literal["success", "fail", "warn"],
+        message: str,
+        suggestions: list[str],
+    ) -> DoctorCheck:
+        """Create a doctor check with given status.
+
+        Args:
+            name: Name of the check
+            status: Status of the check
+            message: Message to display
+            suggestions: List of actionable suggestions for resolution
+
+        Returns:
+            DoctorCheck instance with given status
+        """
+        status_symbol = {"success": "✅", "fail": "❌", "warn": "⚠️"}.get(status, "❓")
+        return cls(name, status=status_symbol, message=message, suggestions=suggestions)
+
 
 def check_python_version() -> DoctorCheck:
     """Check if Python version meets minimum requirements."""
@@ -71,64 +96,102 @@ def check_python_version() -> DoctorCheck:
     if current_version >= required_version:
         check.status = "✅"
         check.message = f"{current_version.major}.{current_version.minor}.{current_version.micro}"
-    else:
-        check.status = "❌"
-        check.message = (
+    return DoctorCheck.set_check(
+        "Python Version",
+        "success" if check.status else "fail",
+        check.message
+        or (
             f"{current_version.major}.{current_version.minor}.{current_version.micro} "
             f"(requires ≥{required_version[0]}.{required_version[1]})"
-        )
-        check.suggestions = [
+        ),
+        [
             f"Upgrade Python to version {required_version[0]}.{required_version[1]} or higher",
             "Visit https://www.python.org/downloads/ for installation instructions",
-        ]
-
-    return check
+        ],
+    )
 
 
 def check_required_dependencies() -> DoctorCheck:
     """Check if required dependencies are installed using find_spec."""
-    check = DoctorCheck("Required Dependencies")
-
-    required_packages = [
-        ("fastmcp", "fastmcp"),
-        ("pydantic", "pydantic"),
-        ("pydantic_settings", "pydantic_settings"),
-        ("cyclopts", "cyclopts"),
-        ("rich", "rich"),
-        ("ast_grep_py", "ast_grep_py"),
-        ("qdrant_client", "qdrant_client"),
-        ("voyageai", "voyageai"),
-        ("rignore", "rignore"),
-    ]
+    from importlib import metadata
 
     missing: list[str] = []
     installed: list[tuple[str, str]] = []
+    if our_dependencies := metadata.metadata("codeweaver-mcp").get_all("Requires-Dist") or []:
+        import re
 
-    for display_name, module_name in required_packages:
-        if spec := find_spec(module_name):
-            # Try to get version if available
-            try:
-                module = __import__(module_name)
-                pkg_version = getattr(module, "__version__", "installed")
-            except Exception:
-                pkg_version = "installed"
-            installed.append((display_name, pkg_version))
-        else:
-            missing.append(display_name)
-
-    if not missing:
-        check.status = "✅"
-        check.message = "All required packages installed"
-    else:
-        check.status = "❌"
-        check.message = f"Missing packages: {', '.join(missing)}"
-        check.suggestions = [
-            "Run: uv sync --all-groups",
-            "Or: pip install codeweaver-mcp[all]",
-            f"Missing: {', '.join(missing)}",
+        dependency_pattern = re.compile(r"^(?P<name>[\w\-]+)>=(?P<version>\d+\.\d+\.\d+\.?\d*)$")
+        dependencies = [
+            dep.split(";")[0].strip() if ";" in dep else dep.strip()
+            for dep in our_dependencies
+            if "extra" not in dep
+        ]
+        matches = [
+            dependency_pattern.match(dep) for dep in dependencies if dependency_pattern.match(dep)
+        ]
+        required_packages: list[tuple[str, str, str]] = [
+            (match["name"], match["name"].replace("-", "_"), match["version"] or "")
+            for match in matches
+            if match
         ]
 
-    return check
+        for display_name, module_name, _version in required_packages:
+            if find_spec(module_name):
+                pkg_version = metadata.version(display_name)
+                installed.append((display_name, pkg_version))
+            else:
+                missing.append(display_name)
+
+    return DoctorCheck.set_check(
+        "Required Dependencies",
+        "fail" if missing else "success",
+        f"Missing packages: {', '.join(missing)}" if missing else "All required packages installed",
+        [
+            "Run: uv pip install codeweaver-mcp[full]",
+            "Or: pip install codeweaver-mcp[full]",
+            f"Missing: {', '.join(missing)}",
+        ]
+        if missing
+        else [],
+    )
+
+
+def check_project_path(settings: CodeWeaverSettings) -> DoctorCheck:
+    """Check if project path exists and is accessible."""
+    check = DoctorCheck("Project Path")
+
+    project_path = (
+        settings.project_path if isinstance(settings.project_path, Path) else get_project_path()
+    )
+
+    if (
+        not project_path.exists()
+        or not project_path.is_dir()
+        or (project_path.exists() and not os.access(project_path, os.R_OK))
+    ):
+        check.status = "❌"
+        if not project_path.exists():
+            check.message = f"Path does not exist: {project_path}"
+            check.suggestions = [
+                "Ensure the project path is correct in your configuration",
+                "Create the directory or update the project_path setting",
+            ]
+        elif not project_path.is_dir():
+            check.message = f"Path is not a directory: {project_path}"
+            check.suggestions = ["Project path must be a directory, not a file"]
+        else:
+            check.message = f"No read permission: {project_path}"
+            check.suggestions = [
+                "Fix file permissions with: chmod +r <path>",
+                "Ensure your user has read access to the project directory",
+            ]
+    return DoctorCheck.set_check(
+        "Project Path",
+        "fail" if check.status else "success",
+        check.message
+        or f"{project_path}" + (" (git repository)" if is_git_dir(project_path) else ""),
+        check.suggestions or [],
+    )
 
 
 def check_configuration_file(settings: CodeWeaverSettings | None = None) -> DoctorCheck:
@@ -141,15 +204,16 @@ def check_configuration_file(settings: CodeWeaverSettings | None = None) -> Doct
 
             settings = get_settings()
 
-        if settings.config_file:
+        if settings.config_file and settings.config_file.exists():
             check.status = "✅"
             check.message = f"Valid config at {settings.config_file}"
         else:
             check.status = "⚠️"
-            check.message = "No config file (using defaults)"
+            check.message = "No config file (using defaults or other sources)"
             check.suggestions = [
-                "Create .codeweaver.toml in project root for custom configuration",
+                "Create your config file for custom configuration",
                 "Run: codeweaver config --generate",
+                "Or: codeweaver init",
             ]
 
     except ValidationError as e:
@@ -162,423 +226,288 @@ def check_configuration_file(settings: CodeWeaverSettings | None = None) -> Doct
     except Exception as e:
         check.status = "❌"
         check.message = f"Failed to load configuration: {e!s}"
-        check.suggestions = [
-            "Check file permissions and syntax",
-            "Run: codeweaver config --show to diagnose",
-        ]
+        check.suggestions = ["Check file permissions and syntax"]
 
     return check
 
 
-def check_project_path(settings: CodeWeaverSettings) -> DoctorCheck:
-    """Check if project path exists and is accessible."""
-    check = DoctorCheck("Project Path")
-
-    try:
-        # Use helper function to get project path
-        project_path = (
-            settings.project_path
-            if isinstance(settings.project_path, Path)
-            else get_project_path()
-        )
-
-        if not project_path.exists():
-            check.status = "❌"
-            check.message = f"Path does not exist: {project_path}"
-            check.suggestions = [
-                "Ensure the project path is correct in your configuration",
-                "Create the directory or update the project_path setting",
-            ]
-        elif not project_path.is_dir():
-            check.status = "❌"
-            check.message = f"Path is not a directory: {project_path}"
-            check.suggestions = ["Project path must be a directory, not a file"]
-        elif not os.access(project_path, os.R_OK):
-            check.status = "❌"
-            check.message = f"No read permission: {project_path}"
-            check.suggestions = [
-                "Fix file permissions with: chmod +r <path>",
-                "Ensure your user has read access to the project directory",
-            ]
-        else:
-            check.status = "✅"
-            check.message = f"{project_path}"
-            # Show git status if available
-            if is_git_dir(project_path):
-                check.message += " (git repository)"
-
-    except Exception as e:
-        check.status = "❌"
-        check.message = f"Failed to validate project path: {e!s}"
-        check.suggestions = ["Check configuration and file system permissions"]
-
-    return check
-
-
-def _is_docker_running() -> bool:
+def _docker_is_running() -> bool:
     """Check if Docker daemon is running."""
+    import shutil
     import subprocess
 
-    try:
-        result = subprocess.run(
-            ["docker", "info"],
-            capture_output=True,
-            timeout=2,
-        )
-        return result.returncode == 0
-    except (subprocess.TimeoutExpired, FileNotFoundError):
+    if not (docker := shutil.which("docker")):
         return False
 
+    try:
+        result = subprocess.run([docker, "info"], capture_output=True, timeout=2)  # noqa: S603
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return False
+    else:
+        return result.returncode == 0
 
-def check_vector_store_config(settings: CodeWeaverSettings) -> DoctorCheck:
+
+def _qdrant_running_at_url(url: Any | None = None) -> bool:
+    """Check if Qdrant is running at the given URL."""
+    import httpx
+
+    try:
+        response = httpx.get(f"http://{str(url) or '127.0.0.1:6333'}/health", timeout=2.0)
+    except (httpx.ConnectError, httpx.TimeoutException):
+        return False
+    else:
+        return response.status_code == 200
+
+
+type DeploymentType = Literal["local docker", "cloud", "local", "remote", "in-memory", "unknown"]
+
+
+def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
     """Check vector store configuration with Docker/Cloud detection."""
-    from codeweaver.core.types.sentinel import Unset
+    from codeweaver.providers.provider import Provider
 
     check = DoctorCheck("Vector Store Configuration")
 
     # Check if vector store is configured in provider settings
-    if not (
-        hasattr(settings, "provider")
-        and hasattr(settings.provider, "vector_store")
-        and not isinstance(settings.provider.vector_store, Unset)
-    ):
-        check.status = "⚠️"
-        check.message = "No vector store configured"
-        check.suggestions = ["Run: codeweaver config init"]
-        return check
+    if isinstance(settings.vector_store, Unset):
+        return DoctorCheck.set_check(
+            check.name,
+            "warn",
+            "No vector store configured",
+            ["Run: codeweaver config init to set up a vector store"],
+        )
 
-    vector_config = settings.provider.vector_store
+    vector_config = (
+        settings.vector_store[0]
+        if isinstance(settings.vector_store, tuple)
+        else settings.vector_store
+    )
 
     # Detect deployment type
     deployment_type = "unknown"
     url = None
-
-    if hasattr(vector_config, "url") and not isinstance(vector_config.url, Unset):
-        url = str(vector_config.url)
-        if "cloud.qdrant.io" in url:
+    vector_provider_config = vector_config["provider_settings"]
+    if (provider := vector_config["provider"]) == Provider.QDRANT and (
+        url := vector_provider_config.get("url")
+    ):
+        if "qdrant.io" in url:
             deployment_type = "cloud"
-        elif "localhost" in url or "127.0.0.1" in url:
-            deployment_type = "docker"
-        else:
+        elif url not in {"localhost", "127.0.0.1"}:
             deployment_type = "remote"
-    elif hasattr(vector_config, "location") and not isinstance(vector_config.location, Unset):
-        location = str(vector_config.location)
-        if location == "memory" or location == ":memory:":
-            deployment_type = "in-memory"
-        elif location == "local":
-            deployment_type = "local"
+        else:
+            deployment_type = (
+                "local docker"
+                if _docker_is_running()
+                else "local"
+                if _qdrant_running_at_url(url)
+                else "unknown"
+            )
+    elif provider == Provider.QDRANT:
+        deployment_type = "local" if _qdrant_running_at_url() else "unknown"
+    elif provider == Provider.MEMORY:
+        deployment_type = "in-memory"
 
-    console.print(f"\nVector Store: [cyan]qdrant[/cyan] ({deployment_type})")
+    console.print(
+        f"\nVector Store: [cyan]{provider.as_title}[/cyan] ({deployment_type})"
+        if deployment_type != "unknown"
+        else f"\nVector Store: [cyan]{provider.as_title}[/cyan] -- [bold yellow]Unknown Deployment Type[/bold yellow]"
+    )
 
     # Deployment-specific checks
     match deployment_type:
         case "cloud":
-            console.print("  [green]✓[/green] Qdrant Cloud detected")
-            if not os.getenv("QDRANT_API_KEY"):
-                console.print("  [yellow]⚠[/yellow] QDRANT_API_KEY not set (may cause auth errors)")
-                check.status = "⚠️"
-                check.message = f"Qdrant Cloud at {url}"
-                check.suggestions = ["Set QDRANT_API_KEY environment variable"]
-            else:
-                console.print("  [green]✓[/green] QDRANT_API_KEY configured")
-                check.status = "✅"
-                check.message = f"Qdrant Cloud at {url}"
-
-        case "docker":
-            console.print("  [green]✓[/green] Docker Qdrant detected")
+            _check_qdrant_cloud_api_key(provider, settings, check, url)
+        case "local" | "local docker":
+            console.print(
+                f"  [green]✓[/green] Local Qdrant {'docker container' if deployment_type == 'local docker' else 'install'} detected"
+            )
             # Check if Docker is running
-            if _is_docker_running():
-                console.print("  [green]✓[/green] Docker is running")
-                check.status = "✅"
-                check.message = f"Docker Qdrant at {url}"
-            else:
-                console.print("  [yellow]⚠[/yellow] Docker may not be running")
-                check.status = "⚠️"
-                check.message = f"Docker Qdrant at {url} (Docker not detected)"
-                check.suggestions = ["Start Docker", "Run: docker run -p 6333:6333 qdrant/qdrant"]
-
-        case "local":
-            if hasattr(vector_config, "path") and not isinstance(vector_config.path, Unset):
-                path = Path(vector_config.path)
-                if path.exists():
-                    console.print(f"  [green]✓[/green] Data directory exists: {path}")
-                    check.status = "✅"
-                    check.message = f"Local Qdrant at {path}"
-                else:
-                    console.print(f"  [yellow]~[/yellow] Data directory will be created: {path}")
-                    check.status = "✅"
-                    check.message = f"Local Qdrant at {path} (will be created)"
+            console.print(
+                f"  [green]✓[/green] {'Docker' if deployment_type == 'local docker' else 'Local Qdrant'} is running at {url!s}"
+            )
+        case "unknown":
+            console.print("  [yellow]⚠[/yellow] Docker may not be running")
+            check.status = "⚠️"
+            check.message = f"We didn't find a running local Qdrant instance at {url!s}"
+            check.suggestions = [
+                "The quickest way to fix this is with docker",
+                "Start Docker",
+                "Run: docker run -p 6333:6333 qdrant/qdrant",
+            ]
 
         case "in-memory":
-            console.print("  [yellow]⚠[/yellow] In-memory mode (data lost on restart)")
-            check.status = "⚠️"
-            check.message = "In-memory Qdrant (not persistent)"
-            check.suggestions = ["Use local or cloud Qdrant for production"]
-
+            console.print(
+                "  [yellow]⚠[/yellow] You're using in-memory Qdrant. While we do try to persist data to json, this isn't suitable for any serious use. We recommend using local or cloud Qdrant for any use beyond testing."
+            )
+            _set_warning_status(
+                check,
+                "In-memory Qdrant detected",
+                f"Use local or cloud Qdrant for non-testing purposes json persistence will be saved to {vector_provider_config.get('persistence_path', get_user_config_dir())}",
+            )
         case "remote":
-            console.print(f"  [green]✓[/green] Remote Qdrant at {url}")
-            check.status = "✅"
-            check.message = f"Remote Qdrant at {url}"
-
-        case _:
-            check.status = "⚠️"
-            check.message = "Vector store type unknown"
-
+            if _has_auth_configured(provider, settings):
+                _print_vector_store_status(
+                    "  [green]✓[/green] Remote Qdrant at ", url, check, "Remote Qdrant at "
+                )
+            else:
+                console.print(
+                    "  [yellow]⚠[/yellow] No API key or TLS certificates found for remote Qdrant. This may not be a problem if you have other authentication methods configured outside of the CodeWeaver settings."
+                )
     return check
 
 
-def check_vector_store_path(settings: CodeWeaverSettings) -> DoctorCheck:
-    """Check if vector store path is writable."""
-    check = DoctorCheck("Vector Store Path")
+def _has_auth_configured(provider: Provider, settings: ProviderSettings) -> bool:
+    """Check if the user has configured API keys or TLS certs for the provider."""
+    return settings.has_auth_configured(provider)
+
+
+def _check_qdrant_cloud_api_key(
+    provider: Provider, settings: ProviderSettings, check: DoctorCheck, url: str | None
+) -> None:
+    console.print("  [green]✓[/green] Qdrant Cloud detected")
+    # we know that there are API variables set in provider.api_key_env_vars for qdrant
+    if not _has_auth_configured(provider, settings):
+        possible_keys = cast(tuple[str, ...], provider.api_key_env_vars)
+        console.print(
+            f"  [yellow]⚠[/yellow] You need to set your Qdrant API key. You can set using one of these environment variables: {', '.join(possible_keys)}"
+            if len(possible_keys) > 1
+            else f"  [yellow]⚠[/yellow] You need to set your Qdrant API key. You can set using the environment variable: {possible_keys[0]}"  # type: ignore
+        )
+        check.status = "⚠️"
+        check.suggestions = [f"Set {possible_keys[0]} environment variable"]  # type: ignore
+    else:
+        console.print("  [green]✓[/green] We found your api_key for Qdrant Cloud")
+        check.status = "✅"
+    check.message = f"Qdrant Cloud at {url}"
+
+
+def _print_vector_store_status(
+    intro: str, url: str | Any | None, check: DoctorCheck, message: str
+) -> None:
+    console.print(f"{intro}{url!s}")
+    check.status = "✅"
+    check.message = f"{message}{url!s}"
+
+
+def _set_warning_status(check: DoctorCheck, message: str, suggestion: str) -> None:
+    check.status = "⚠️"
+    check.message = message
+    check.suggestions = [suggestion]
+
+
+def check_indexer_config(settings: CodeWeaverSettings) -> DoctorCheck:
+    """Check if the indexer is properly configured and cache directory is writable."""
+    from codeweaver.config.indexing import IndexerSettings
+
+    check = DoctorCheck("Indexer Configuration")
 
     try:
-        # Get cache directory from indexing settings using helper
-        if hasattr(settings.indexing, "cache_dir"):
-            cache_dir = Path(settings.indexing.cache_dir)
-        else:
-            # Fallback to default location using helper
-            cache_dir = get_user_config_dir() / "cache"
-
-        # Create if doesn't exist
-        if not cache_dir.exists():
-            try:
-                cache_dir.mkdir(parents=True, exist_ok=True)
-                check.status = "✅"
-                check.message = f"Created cache directory: {cache_dir}"
-            except PermissionError:
-                check.status = "❌"
-                check.message = f"Cannot create cache directory: {cache_dir}"
-                check.suggestions = [
-                    "Fix directory permissions",
-                    "Ensure your user can write to the parent directory",
-                ]
-                return check
-        elif not os.access(cache_dir, os.W_OK):
+        if not isinstance(settings.indexing, IndexerSettings):
+            return DoctorCheck.set_check(
+                check.name,
+                "warn",
+                "No indexer settings configured",
+                ["Configure indexer settings in your configuration file"],
+            )
+        # the cache_dir is created on access if it doesn't exist
+        # so it should always exist here unless there's a permission issue
+        cache_dir = settings.indexing.cache_dir
+        # cache dir will exist or there's an exception so we won't get here
+        if not os.access(cache_dir, os.W_OK):
             check.status = "❌"
             check.message = f"No write permission: {cache_dir}"
             check.suggestions = [
-                "Fix permissions with: chmod +w <path>",
+                f"Fix permissions with: chmod +w {cache_dir!s}",
                 "Ensure your user has write access to the cache directory",
             ]
         else:
             check.status = "✅"
             check.message = f"{cache_dir}"
-
+    except OSError as e:
+        check.status = "❌"
+        check.message = f"OS error accessing cache directory: {e.strerror}"
+        check.suggestions = [
+            "Check file system permissions",
+            "Ensure the cache directory path is valid",
+        ]
     except Exception as e:
         check.status = "❌"
         check.message = f"Failed to validate cache directory: {e!s}"
-        check.suggestions = ["Check configuration and file system permissions"]
+        check.suggestions = ["Check configuration"]
 
     return check
 
 
-def _check_embedding_api_keys(settings: CodeWeaverSettings, warnings: list[str]) -> None:
-    """Check embedding provider API keys using Provider.other_env_vars."""
-    if not (hasattr(settings, "provider") and hasattr(settings.provider, "embedding")):
-        return
-
-    from codeweaver.providers.provider import Provider
-
-    embedding_provider_name = getattr(settings.provider.embedding, "provider", None)
-    if not embedding_provider_name:
-        return
-
-    provider = Provider.from_string(embedding_provider_name)
-    if not provider or not (env_vars_list := provider.other_env_vars):
-        return
-
-    # Check required environment variables
-    for env_vars in env_vars_list:
-        if "api_key" in env_vars and not os.getenv(env_vars["api_key"].env):
-            warnings.append(f"{env_vars['api_key'].env} not set ({env_vars['api_key'].description})")
-
-        # Also check TLS certs if they exist
-        if "tls_cert_path" in env_vars:
-            cert_path_env = env_vars["tls_cert_path"].env
-            cert_path = os.getenv(cert_path_env)
-            if cert_path and not Path(cert_path).exists():
-                warnings.append(f"{cert_path_env} points to non-existent file: {cert_path}")
-
-
-def _check_vector_store_api_keys(settings: CodeWeaverSettings, warnings: list[str]) -> None:
-    """Check vector store provider API keys using Provider.other_env_vars."""
-    if not (hasattr(settings, "provider") and hasattr(settings.provider, "vector_store")):
-        return
-
-    from codeweaver.providers.provider import Provider
-
-    vector_store_name = getattr(settings.provider.vector_store, "provider", None)
-    if not vector_store_name:
-        return
-
-    # Only check if remote Qdrant (local doesn't need API keys)
-    if vector_store_name == "qdrant":
-        is_remote = (
-            hasattr(settings.provider.vector_store, "remote")
-            and settings.provider.vector_store.remote
-        )
-        if not is_remote:
-            return
-
-    provider = Provider.from_string(vector_store_name)
-    if not provider or not (env_vars_list := provider.other_env_vars):
-        return
-
-    # Check required environment variables
-    for env_vars in env_vars_list:
-        if "api_key" in env_vars and not os.getenv(env_vars["api_key"].env):
-            warnings.append(f"{env_vars['api_key'].env} not set ({env_vars['api_key'].description})")
-
-        # Check TLS certificates if configured
-        if "tls_cert_path" in env_vars:
-            cert_path_env = env_vars["tls_cert_path"].env
-            cert_path = os.getenv(cert_path_env)
-            if cert_path and not Path(cert_path).exists():
-                warnings.append(f"{cert_path_env} points to non-existent file: {cert_path}")
-
-
-def _check_reranking_api_keys(settings: CodeWeaverSettings, warnings: list[str]) -> None:
-    """Check reranking provider API keys using Provider.other_env_vars."""
-    if not (
-        hasattr(settings, "provider")
-        and hasattr(settings.provider, "reranking")
-        and settings.provider.reranking
-    ):
-        return
-
-    from codeweaver.providers.provider import Provider
-
-    reranking_provider_name = getattr(settings.provider.reranking, "provider", None)
-    if not reranking_provider_name:
-        return
-
-    provider = Provider.from_string(reranking_provider_name)
-    if not provider or not (env_vars_list := provider.other_env_vars):
-        return
-
-    # Check required environment variables
-    for env_vars in env_vars_list:
-        if "api_key" in env_vars and not os.getenv(env_vars["api_key"].env):
-            warnings.append(f"{env_vars['api_key'].env} not set (for reranking: {env_vars['api_key'].description})")
-
-
-def check_provider_api_keys(settings: CodeWeaverSettings) -> DoctorCheck:
-    """Check if provider API keys are configured."""
-    check = DoctorCheck("Provider API Keys")
-    warnings: list[str] = []
-    errors: list[str] = []
-
-    try:
-        _check_embedding_api_keys(settings, warnings)
-        _check_vector_store_api_keys(settings, warnings)
-        _check_reranking_api_keys(settings, warnings)
-    except Exception as e:
-        check.status = "⚠️"
-        check.message = f"Could not validate API keys: {e!s}"
-        return check
-
-    if errors:
-        check.status = "❌"
-        check.message = "; ".join(errors)
-        check.suggestions = [
-            "Set missing API keys as environment variables",
-            "Add them to .env file in project root",
-            "Or configure in .codeweaver.toml",
-        ]
-    elif warnings:
-        check.status = "⚠️"
-        check.message = "; ".join(warnings)
-        check.suggestions = [
-            "Provider may work without API key (e.g., local models)",
-            "Set API keys if using cloud providers",
-        ]
-    else:
-        check.status = "✅"
-        check.message = "API keys configured or not required"
-
-    return check
-
-
-def check_provider_connections(settings: CodeWeaverSettings) -> DoctorCheck:
+def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]:
     """Test basic connectivity to configured providers."""
-    check = DoctorCheck("Provider Connections")
+    check = DoctorCheck("Provider Availability")
 
     try:
         from codeweaver.common.registry import get_provider_registry
-        from codeweaver.core.types.sentinel import Unset
 
         registry = get_provider_registry()
-        all_passed = True
-        tested_providers: list[str] = []
+        tested_providers: list[DoctorCheck] = []
 
-        # Test embedding provider
-        if (
-            hasattr(settings, "provider")
-            and hasattr(settings.provider, "embedding")
-            and not isinstance(settings.provider.embedding, Unset)
-        ):
-            provider_name = getattr(settings.provider.embedding, "provider", None)
-            if provider_name:
-                try:
-                    # Basic connectivity check: try to get the provider instance
-                    from codeweaver.providers.provider import ProviderKind
+        if not (configs := settings.provider_configs):
+            return [
+                DoctorCheck.set_check(
+                    check.name,
+                    "fail",
+                    "No provider configurations found",
+                    ["Configure providers in your codeweaver configuration."],
+                )
+            ]
+        from codeweaver.providers.provider import ProviderKind
 
-                    if registry.is_provider_available(provider_name, ProviderKind.EMBEDDING):
-                        tested_providers.append(f"✅ Embedding: {provider_name}")
-                    else:
-                        tested_providers.append(f"❌ Embedding: {provider_name} (not available)")
-                        all_passed = False
-                except Exception as e:
-                    tested_providers.append(f"❌ Embedding: {provider_name} ({e!s})")
-                    all_passed = False
-
-        # Test vector store
-        if (
-            hasattr(settings, "provider")
-            and hasattr(settings.provider, "vector_store")
-            and not isinstance(settings.provider.vector_store, Unset)
-        ):
-            provider_name = getattr(settings.provider.vector_store, "provider", None)
-            if provider_name:
-                try:
-                    from codeweaver.providers.provider import ProviderKind
-
-                    if registry.is_provider_available(provider_name, ProviderKind.VECTOR_STORE):
-                        tested_providers.append(f"✅ Vector Store: {provider_name}")
-                    else:
-                        tested_providers.append(
-                            f"❌ Vector Store: {provider_name} (not available)"
+        for kind, provider_configs in configs.items():
+            if not provider_configs:
+                continue
+            for provider_config in provider_configs:
+                kind = ProviderKind.from_string(cast(str, kind))
+                provider = provider_config["provider"]
+                if registry.is_provider_available(provider, kind):
+                    tested_providers.append(
+                        DoctorCheck.set_check(
+                            f"{kind.as_title} ({provider.as_title}) Available",
+                            "success",
+                            "Available",
+                            [],
                         )
-                        all_passed = False
-                except Exception as e:
-                    tested_providers.append(f"❌ Vector Store: {provider_name} ({e!s})")
-                    all_passed = False
-
-        if not tested_providers:
-            check.status = "⚠️"
-            check.message = "No providers configured to test"
-            check.suggestions = ["Configure providers in .codeweaver.toml"]
-        elif all_passed:
-            check.status = "✅"
-            check.message = "; ".join(tested_providers)
-        else:
-            check.status = "❌"
-            check.message = "; ".join(tested_providers)
-            check.suggestions = [
-                "Check provider API keys and environment variables",
-                "Verify network connectivity",
-                "Run: codeweaver config --show to review configuration",
+                    )
+                else:
+                    tested_providers.append(
+                        DoctorCheck.set_check(
+                            f"{kind.as_title} ({provider.as_title})",
+                            "fail",
+                            "Not available",
+                            [
+                                "You may need to install extra dependencies for this provider.",
+                                "Run: uv pip install codeweaver-mcp[full]",
+                                "Or: pip install codeweaver-mcp[full]",
+                            ],
+                        )
+                    )
+        if not configs.get("embedding") and not configs.get("sparse_embedding"):
+            return [
+                DoctorCheck.set_check(
+                    check.name,
+                    "warn",
+                    "No embedding providers configured",
+                    ["Configure at least one embedding provider in your codeweaver configuration."],
+                )
             ]
 
     except Exception as e:
-        check.status = "❌"
-        check.message = f"Connection test failed: {e!s}"
-        check.suggestions = [
-            "Check provider configuration",
-            "Verify API keys are set correctly",
+        return [
+            DoctorCheck.set_check(
+                check.name,
+                "fail",
+                f"Failed to test provider availability: {e!s}",
+                ["Check logs for details", "Report issue if this persists"],
+            )
         ]
 
-    return check
+    return tested_providers
 
 
 def _print_check_suggestions(
@@ -635,22 +564,17 @@ def _print_summary(has_failures: bool, has_warnings: bool) -> None:  # noqa: FBT
         sys.exit(1)
 
 
-@app.default
-def doctor(*, test_connections: bool = False, verbose: bool = False) -> None:
-    """Validate prerequisites and configuration.
+def process_checks() -> list[DoctorCheck]:
+    """Process all doctor checks and return the results.
 
-    Args:
-        test_connections: Test actual connectivity to providers (may incur costs)
-        verbose: Show detailed information for all checks
+    Returns:
+        List of DoctorCheck results
     """
     from codeweaver.exceptions import CodeWeaverError
 
-    console.print(f"\n{CODEWEAVER_PREFIX} [bold blue]Running diagnostic checks...[/bold blue]\n")
-
-    checks: list[DoctorCheck] = []
     settings: CodeWeaverSettings | None = None
 
-    checks.extend((check_python_version(), check_required_dependencies()))
+    checks: list[DoctorCheck] = [check_python_version(), check_required_dependencies()]
     # Configuration checks
     config_failed = False
     try:
@@ -660,31 +584,80 @@ def doctor(*, test_connections: bool = False, verbose: bool = False) -> None:
         checks.append(check_configuration_file(settings))
 
     except CodeWeaverError as e:
+        checks.append(
+            DoctorCheck.set_check(
+                "Configuration Loading",
+                "fail",
+                e.message,
+                e.suggestions or ["Check configuration file for errors"],
+            )
+        )
         config_failed = True
-        error_check = DoctorCheck("Configuration Loading")
-        error_check.status = "❌"
-        error_check.message = e.message
-        error_check.suggestions = e.suggestions
-        checks.append(error_check)
     except Exception as e:
         config_failed = True
-        error_check = DoctorCheck("Configuration Loading")
-        error_check.status = "❌"
-        error_check.message = f"Unexpected error: {e!s}"
-        error_check.suggestions = ["Check logs for details", "Report issue if this persists"]
-        checks.append(error_check)
+        checks.append(
+            DoctorCheck.set_check(
+                "Configuration Loading",
+                "fail",
+                f"Unexpected error: {e!s}",
+                ["Check logs for details", "Report issue if this persists"],
+            )
+        )
+    if config_failed or settings is None or isinstance(settings, Unset):
+        return checks
+    checks.extend((check_project_path(settings), check_indexer_config(settings)))
+    if not (provider_settings := settings.provider) or isinstance(provider_settings, Unset):
+        checks.append(
+            DoctorCheck.set_check(
+                "Provider Settings",
+                "warn",
+                "No provider settings configured",
+                ["Configure providers in your codeweaver configuration."],
+            )
+        )
+        return checks
+    checks.extend((
+        check_vector_store_config(provider_settings),
+        *check_provider_availability(provider_settings),
+    ))
+    if remote_providers := {
+        provider for provider in provider_settings.providers if provider.requires_auth
+    }:
+        for provider in remote_providers:
+            if not _has_auth_configured(provider, provider_settings):
+                checks.append(
+                    DoctorCheck.set_check(
+                        f"{provider.as_title} Authentication",
+                        "warn",
+                        f"No authentication configured for {provider.as_title}",
+                        [
+                            f"Set up authentication for {provider.as_title} in your configuration",
+                            "Refer to the documentation for required API keys or credentials",
+                        ],
+                    )
+                )
+            else:
+                checks.append(
+                    DoctorCheck.set_check(
+                        f"{provider.as_title} Authentication",
+                        "success",
+                        f"Authentication configured for {provider.as_title}",
+                        [],
+                    )
+                )
+    return checks
 
-    # Only run dependent checks if settings loaded successfully
-    if not config_failed and settings is not None:
-        checks.extend((
-            check_project_path(settings),
-            check_vector_store_config(settings),
-            check_vector_store_path(settings),
-            check_provider_api_keys(settings),
-        ))
-        if test_connections:
-            checks.append(check_provider_connections(settings))
 
+@app.default
+def doctor(*, verbose: bool = False) -> None:
+    """Validate prerequisites and configuration.
+
+    Args:
+        verbose: Show detailed information for all checks
+    """
+    console.print(f"\n{CODEWEAVER_PREFIX} [bold blue]Running diagnostic checks...[/bold blue]\n")
+
+    checks: list[DoctorCheck] = process_checks()
     # Display results table
     table = Table(show_header=True, header_style="bold blue", box=None)
     table.add_column("Status", style="white", no_wrap=True, width=6)

@@ -19,8 +19,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from cyclopts.testing import CliRunner
-
 from codeweaver.cli.commands.doctor import app as doctor_app
 from codeweaver.config.settings import CodeWeaverSettings
 from codeweaver.core.types.sentinel import Unset
@@ -29,9 +27,6 @@ from codeweaver.providers.provider import Provider
 
 if TYPE_CHECKING:
     from pytest import MonkeyPatch
-
-
-runner = CliRunner()
 
 
 @pytest.fixture
@@ -68,7 +63,9 @@ class TestDoctorUnsetHandling:
         assert isinstance(unset_value, Unset)
         assert not isinstance(None, Unset)
 
-    def test_settings_with_unset_fields(self, temp_project: Path) -> None:
+    def test_settings_with_unset_fields(
+        self, temp_project: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Test doctor handles settings with Unset fields correctly."""
         # Create minimal settings
         settings = CodeWeaverSettings()
@@ -77,8 +74,9 @@ class TestDoctorUnsetHandling:
         assert isinstance(settings.project_path, Unset)
 
         # Doctor should not crash on Unset checks
-        result = runner.invoke(doctor_app)
-        assert result.exit_code == 0
+        with pytest.raises(SystemExit) as exc_info:
+            doctor_app()
+        assert exc_info.value.code == 0
 
     def test_unset_check_pattern_correct(self) -> None:
         """Test correct pattern for checking Unset values."""
@@ -206,12 +204,16 @@ class TestDoctorConnectionTests:
         result = await provider.health_check()
         assert result is True
 
-    def test_connection_test_flag_recognized(self, temp_project: Path) -> None:
+    def test_connection_test_flag_recognized(
+        self, temp_project: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Test --test-connections flag is recognized."""
-        result = runner.invoke(doctor_app, ["--test-connections"])
+        with pytest.raises(SystemExit):
+            doctor_app("--test-connections")
 
+        captured = capsys.readouterr()
         # Should not raise unknown option error
-        assert "unrecognized" not in result.output.lower()
+        assert "unrecognized" not in captured.out.lower()
 
 
 @pytest.mark.unit
@@ -222,7 +224,8 @@ class TestDoctorConfigAssumptions:
     def test_config_file_not_required(
         self,
         temp_project: Path,
-        monkeypatch: MonkeyPatch
+        monkeypatch: MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test config files are optional when using env vars."""
         # Set all required env vars
@@ -230,12 +233,14 @@ class TestDoctorConfigAssumptions:
         monkeypatch.setenv("CODEWEAVER_EMBEDDING_PROVIDER", "fastembed")
 
         # Doctor should not warn about missing config file
-        result = runner.invoke(doctor_app)
+        with pytest.raises(SystemExit) as exc_info:
+            doctor_app()
 
+        captured = capsys.readouterr()
         # Should not mention missing config file
-        assert result.exit_code == 0
-        assert "missing" not in result.output.lower() or \
-               "config" not in result.output.lower()
+        assert exc_info.value.code == 0
+        assert "missing" not in captured.out.lower() or \
+               "config" not in captured.out.lower()
 
     def test_env_only_setup_valid(
         self,

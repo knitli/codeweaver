@@ -18,7 +18,6 @@ from typing import TYPE_CHECKING
 import pytest
 import tomli
 
-from cyclopts.testing import CliRunner
 
 from codeweaver.cli.commands.config import app as config_app
 from codeweaver.cli.commands.doctor import app as doctor_app
@@ -29,8 +28,6 @@ from codeweaver.cli.commands.list import app as list_app
 if TYPE_CHECKING:
     from pytest import MonkeyPatch
 
-
-runner = CliRunner()
 
 
 @pytest.fixture
@@ -75,7 +72,7 @@ class TestNewUserQuickStart:
             ["--quick", "--client", "claude_code"]
         )
 
-        assert init_result.exit_code == 0
+        assert init_result_exit_code == 0
         assert "complete" in init_result.output.lower() or \
                "success" in init_result.output.lower()
 
@@ -90,7 +87,7 @@ class TestNewUserQuickStart:
         # Step 3: Check doctor (should pass)
         doctor_result = runner.invoke(doctor_app)
 
-        assert doctor_result.exit_code == 0
+        assert doctor_result_exit_code == 0
         output_lower = doctor_result.output.lower()
 
         # Should mention API key
@@ -106,11 +103,11 @@ class TestNewUserQuickStart:
 
         # Init
         init_result = runner.invoke(init_app, ["--quick", "--config-only"])
-        assert init_result.exit_code == 0
+        assert init_result_exit_code == 0
 
         # Show config
         config_result = runner.invoke(config_app, ["show"])
-        assert config_result.exit_code == 0
+        assert config_result_exit_code == 0
         assert "voyage" in config_result.output.lower()
 
     def test_quick_start_list_capabilities(
@@ -126,7 +123,7 @@ class TestNewUserQuickStart:
 
         # List providers
         list_result = runner.invoke(list_app, ["providers"])
-        assert list_result.exit_code == 0
+        assert list_result_exit_code == 0
         assert "voyage" in list_result.output.lower()
 
         # List models
@@ -134,7 +131,7 @@ class TestNewUserQuickStart:
             list_app,
             ["models", "--provider", "voyage"]
         )
-        assert models_result.exit_code == 0
+        assert models_result_exit_code == 0
 
 
 @pytest.mark.e2e
@@ -157,7 +154,7 @@ class TestOfflineDeveloperWorkflow:
         )
 
         # Should succeed even without API keys
-        assert init_result.exit_code == 0
+        assert init_result_exit_code == 0
 
         # Step 2: Verify no API keys needed
         config = tomli.loads((project / "codeweaver.toml").read_text())
@@ -165,7 +162,7 @@ class TestOfflineDeveloperWorkflow:
 
         # Step 3: Doctor should not warn about API keys
         doctor_result = runner.invoke(doctor_app)
-        assert doctor_result.exit_code == 0
+        assert doctor_result_exit_code == 0
 
         output_lower = doctor_result.output.lower()
         # Should not have API key warnings for local providers
@@ -187,7 +184,7 @@ class TestOfflineDeveloperWorkflow:
 
         # List local providers
         list_result = runner.invoke(list_app, ["providers"])
-        assert list_result.exit_code == 0
+        assert list_result_exit_code == 0
 
         # Should show fastembed
         assert "fastembed" in list_result.output.lower()
@@ -216,7 +213,7 @@ class TestOfflineDeveloperWorkflow:
 
         # Show modified config
         show_result = runner.invoke(config_app, ["show"])
-        assert show_result.exit_code == 0
+        assert show_result_exit_code == 0
         assert "20" in show_result.output
 
 
@@ -253,7 +250,7 @@ url = "https://prod.cloud.qdrant.io"
         # Step 2: Doctor should detect cloud deployment
         doctor_result = runner.invoke(doctor_app)
 
-        assert doctor_result.exit_code == 0
+        assert doctor_result_exit_code == 0
         output_lower = doctor_result.output.lower()
 
         # Should detect cloud
@@ -283,7 +280,7 @@ provider = "fastembed"
 
         # Config show should reflect env var override
         show_result = runner.invoke(config_app, ["show"])
-        assert show_result.exit_code == 0
+        assert show_result_exit_code == 0
         assert "voyage" in show_result.output.lower()
 
     def test_production_multiple_environments(
@@ -324,7 +321,7 @@ provider = "voyage"
 
             # Doctor should pass for each environment
             doctor_result = runner.invoke(doctor_app)
-            assert doctor_result.exit_code == 0
+            assert doctor_result_exit_code == 0
 
 
 @pytest.mark.e2e
@@ -348,7 +345,7 @@ class TestCompleteUserJourneys:
             init_app,
             ["--quick", "--client", "claude_code"]
         )
-        assert init_result.exit_code == 0
+        assert init_result_exit_code == 0
 
         # 2. Verify both configs created
         assert (project / "codeweaver.toml").exists()
@@ -357,15 +354,15 @@ class TestCompleteUserJourneys:
 
         # 3. Check health
         doctor_result = runner.invoke(doctor_app)
-        assert doctor_result.exit_code == 0
+        assert doctor_result_exit_code == 0
 
         # 4. List capabilities
         list_result = runner.invoke(list_app, ["providers"])
-        assert list_result.exit_code == 0
+        assert list_result_exit_code == 0
 
         # 5. View configuration
         config_result = runner.invoke(config_app, ["show"])
-        assert config_result.exit_code == 0
+        assert config_result_exit_code == 0
 
     def test_power_user_custom_setup(
         self,
@@ -400,18 +397,18 @@ collection = "my_code"
 
         # 3. Verify config
         show_result = runner.invoke(config_app, ["show"])
-        assert show_result.exit_code == 0
+        assert show_result_exit_code == 0
 
         # 4. Check health
         doctor_result = runner.invoke(doctor_app)
-        assert doctor_result.exit_code == 0
+        assert doctor_result_exit_code == 0
 
         # 5. List available models
         models_result = runner.invoke(
             list_app,
             ["models", "--provider", "voyage"]
         )
-        assert models_result.exit_code == 0
+        assert models_result_exit_code == 0
 
     def test_team_collaboration_workflow(
         self,
@@ -439,9 +436,9 @@ type = "qdrant"
 
         # 3. Config show should merge file + env
         show_result = runner.invoke(config_app, ["show"])
-        assert show_result.exit_code == 0
+        assert show_result_exit_code == 0
         assert "voyage" in show_result.output.lower()
 
         # 4. Doctor validates setup
         doctor_result = runner.invoke(doctor_app)
-        assert doctor_result.exit_code == 0
+        assert doctor_result_exit_code == 0

@@ -20,8 +20,6 @@ from typing import TYPE_CHECKING
 import pytest
 import tomli
 
-from cyclopts.testing import CliRunner
-
 from codeweaver.cli.commands.config import ConfigProfile
 from codeweaver.cli.commands.config import app as config_app
 from codeweaver.common.registry import get_provider_registry
@@ -30,9 +28,6 @@ from codeweaver.providers.provider import Provider, ProviderKind
 
 if TYPE_CHECKING:
     from pytest import MonkeyPatch
-
-
-runner = CliRunner()
 
 
 @pytest.fixture
@@ -50,11 +45,13 @@ def temp_project(tmp_path: Path, monkeypatch: MonkeyPatch) -> Path:
 class TestConfigInit:
     """Tests for config init command."""
 
-    def test_quick_flag_creates_config(self, temp_project: Path) -> None:
+    def test_quick_flag_creates_config(self, temp_project: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """Test --quick flag creates config with recommended defaults."""
-        result = runner.invoke(config_app, ["init", "--quick"])
+        with pytest.raises(SystemExit) as exc_info:
+            config_app("init", "--quick")
+        captured = capsys.readouterr()
 
-        assert result.exit_code == 0
+        assert exc_info.value.code == 0
         config_path = temp_project / "codeweaver.toml"
         assert config_path.exists()
 
@@ -63,28 +60,26 @@ class TestConfigInit:
         assert "voyage" in config_content.lower()
         assert "qdrant" in config_content.lower()
 
-    def test_profile_recommended(self, temp_project: Path) -> None:
+    def test_profile_recommended(self, temp_project: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """Test --profile recommended creates correct config."""
-        result = runner.invoke(
-            config_app,
-            ["init", "--profile", ConfigProfile.RECOMMENDED.value]
-        )
+        with pytest.raises(SystemExit) as exc_info:
+            config_app("init", "--profile", ConfigProfile.RECOMMENDED.value)
+        captured = capsys.readouterr()
 
-        assert result.exit_code == 0
+        assert exc_info.value.code == 0
         config_path = temp_project / "codeweaver.toml"
         config = tomli.loads(config_path.read_text())
 
         assert config["embedding"]["provider"] == "voyage"
         assert config["vector_store"]["type"] == "qdrant"
 
-    def test_profile_local_only(self, temp_project: Path) -> None:
+    def test_profile_local_only(self, temp_project: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """Test --profile local-only creates offline-capable config."""
-        result = runner.invoke(
-            config_app,
-            ["init", "--profile", ConfigProfile.LOCAL_ONLY.value]
-        )
+        with pytest.raises(SystemExit) as exc_info:
+            config_app("init", "--profile", ConfigProfile.LOCAL_ONLY.value)
+        captured = capsys.readouterr()
 
-        assert result.exit_code == 0
+        assert exc_info.value.code == 0
         config_path = temp_project / "codeweaver.toml"
         config = tomli.loads(config_path.read_text())
 
@@ -194,7 +189,7 @@ type = "qdrant"
 class TestConfigShow:
     """Tests for config show command."""
 
-    def test_show_displays_config(self, temp_project: Path) -> None:
+    def test_show_displays_config(self, temp_project: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """Test config show displays current configuration."""
         # Create config
         runner.invoke(config_app, ["init", "--quick"])
@@ -203,8 +198,8 @@ class TestConfigShow:
         result = runner.invoke(config_app, ["show"])
 
         assert result.exit_code == 0
-        assert "Configuration" in result.output
-        assert "project_path" in result.output.lower()
+        assert "Configuration" in captured.out
+        assert "project_path" in captured.out.lower()
 
     def test_show_handles_missing_config(self, temp_project: Path) -> None:
         """Test config show handles missing configuration gracefully."""
@@ -225,7 +220,7 @@ class TestConfigShow:
 
         assert result.exit_code == 0
         # Should show voyage from env var
-        assert "voyage" in result.output.lower()
+        assert "voyage" in captured.out.lower()
 
 
 @pytest.mark.unit
@@ -262,7 +257,7 @@ provider = "invalid_provider_xyz"
         )
 
         # Should warn about missing API key
-        assert "VOYAGE_API_KEY" in result.output or result.exit_code != 0
+        assert "VOYAGE_API_KEY" in captured.out or result.exit_code != 0
 
 
 @pytest.mark.unit

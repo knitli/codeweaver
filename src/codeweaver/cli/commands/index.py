@@ -29,23 +29,24 @@ app = App(
 
 def _check_server_health() -> bool:
     """Check if CodeWeaver server is running.
-    
+
     Returns:
         True if server is running and healthy
     """
     try:
         response = httpx.get("http://localhost:9328/health/", timeout=2.0)
-        return response.status_code == 200
     except (httpx.ConnectError, httpx.TimeoutException):
         return False
+    else:
+        return response.status_code == 200
 
 
 def _trigger_server_reindex(force: bool) -> bool:
     """Trigger re-index on running server.
-    
+
     Args:
         force: If True, force full re-index
-        
+
     Returns:
         True if re-index was successfully triggered
     """
@@ -68,15 +69,15 @@ def index(
     ] = False,
 ) -> None:
     """Index or re-index a codebase.
-    
+
     By default, checks if server is running and informs user about auto-indexing.
     Use --standalone to run indexing without server.
-    
+
     Examples:
         codeweaver index                  # Check server status
         codeweaver index --force          # Force full re-index in standalone mode
         codeweaver index --standalone     # Standalone indexing
-    
+
     Args:
         config_file: Optional path to CodeWeaver configuration file
         project_path: Optional path to project root directory
@@ -89,11 +90,11 @@ def index(
 
     # Check if server is running (unless --standalone)
     if not standalone:
-        server_running = _check_server_health()
-
-        if server_running:
+        if _check_server_health():
             console.print(f"{CODEWEAVER_PREFIX} [bold green]✓ Server is running[/bold green]\n")
-            console.print("[yellow]Info:[/yellow] The CodeWeaver server automatically indexes your codebase")
+            console.print(
+                "[yellow]Info:[/yellow] The CodeWeaver server automatically indexes your codebase"
+            )
             console.print("  • Initial indexing runs on server startup")
             console.print("  • File watcher monitors for changes in real-time")
             console.print("\n[cyan]To check indexing status:[/cyan]")
@@ -102,7 +103,9 @@ def index(
             return
         console.print(f"{CODEWEAVER_PREFIX} [yellow]⚠ Server not running[/yellow]")
         console.print("[blue]Info:[/blue] Running standalone indexing")
-        console.print("[dim]Tip: Start server with 'codeweaver server' for automatic indexing[/dim]\n")
+        console.print(
+            "[dim]Tip: Start server with 'codeweaver server' for automatic indexing[/dim]\n"
+        )
 
     # Standalone indexing (current implementation)
     try:
@@ -114,7 +117,7 @@ def index(
         if project_path:
             from codeweaver.config.settings import update_settings
 
-            settings = update_settings(**{**settings.model_dump(), "project_path": project_path})
+            settings = update_settings(**{**settings.model_dump(), "project_path": project_path})  # type: ignore
 
         # Create indexer with progress tracking
         console.print(f"{CODEWEAVER_PREFIX} [blue]Initializing indexer...[/blue]")
@@ -126,7 +129,7 @@ def index(
         # Perform indexing with progress indicators
         console.print(f"{CODEWEAVER_PREFIX} [green]Starting indexing process...[/green]")
 
-        indexer.prime_index(
+        _ = indexer.prime_index(
             force_reindex=force_reindex, progress_callback=progress_tracker.update
         )
 

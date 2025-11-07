@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # CLI Tests - Comprehensive Test Suite
 
 This test suite validates all corrections from `/claudedocs/CLI_CORRECTIONS_PLAN.md` and ensures user workflows function correctly.

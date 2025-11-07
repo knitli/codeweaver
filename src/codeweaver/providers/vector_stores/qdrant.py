@@ -156,6 +156,7 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
         from codeweaver.agent_api.find_code.results import SearchResult
         from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
         from codeweaver.providers.embedding.types import SparseEmbedding
+        from qdrant_client.http.models import SparseVector
 
         if not self._ensure_client(self._client):
             raise ProviderError("Qdrant client not initialized")
@@ -170,18 +171,40 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
             if isinstance(vector, dict) and "indices" in vector and "values" in vector:
                 sparse = SparseEmbedding(indices=vector["indices"], values=vector["values"])
             elif isinstance(vector, dict) and "sparse" in vector:
-                sparse = SparseEmbedding(
-                    indices=vector["sparse"].get("indices", []),
-                    values=vector["sparse"].get("values", []),
-                )  # type: ignore
+                sparse_data = vector["sparse"]
+                # Handle SparseVector model objects
+                if isinstance(sparse_data, SparseVector):
+                    sparse = SparseEmbedding(
+                        indices=sparse_data.indices,
+                        values=sparse_data.values,
+                    )
+                elif isinstance(sparse_data, dict):
+                    sparse = SparseEmbedding(
+                        indices=sparse_data.get("indices", []),
+                        values=sparse_data.get("values", []),
+                    )
+                else:
+                    # Assume it's a SparseEmbedding already
+                    sparse = sparse_data  # type: ignore
             elif isinstance(vector, dict) and "dense" in vector:
                 dense = vector["dense"]
                 # Also check for sparse in the same dict
                 if "sparse" in vector:
-                    sparse = SparseEmbedding(
-                        indices=vector["sparse"].get("indices", []),
-                        values=vector["sparse"].get("values", []),
-                    )  # type: ignore
+                    sparse_data = vector["sparse"]
+                    # Handle SparseVector model objects
+                    if isinstance(sparse_data, SparseVector):
+                        sparse = SparseEmbedding(
+                            indices=sparse_data.indices,
+                            values=sparse_data.values,
+                        )
+                    elif isinstance(sparse_data, dict):
+                        sparse = SparseEmbedding(
+                            indices=sparse_data.get("indices", []),
+                            values=sparse_data.get("values", []),
+                        )
+                    else:
+                        # Assume it's a SparseEmbedding already
+                        sparse = sparse_data  # type: ignore
             elif isinstance(vector, (list, tuple)):
                 sparse = None
                 dense = vector
@@ -411,7 +434,7 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
         _ = await self._client.delete(
             collection_name=collection_name,
             points_selector=QdrantFilter(
-                must=[FieldCondition(key="chunk_name", match=MatchAny(any=names))]
+                must=[FieldCondition(key="chunk.chunk_name", match=MatchAny(any=names))]
             ),
         )
 

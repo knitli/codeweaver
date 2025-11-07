@@ -167,7 +167,9 @@ class ProviderRegistry(BasedModel):
         self._reranking_providers: MutableMapping[
             Provider, LazyImport[type[RerankingProvider[Any]]] | type[RerankingProvider[Any]]
         ] = {}
-        self._agent_providers: MutableMapping[Provider, LazyImport[type[Any]] | type[Any]] = {}
+        self._agent_providers: MutableMapping[
+            Provider, LazyImport[type[AgentProvider[Any]]] | type[AgentProvider[Any]]
+        ] = {}
         self._data_providers: MutableMapping[Provider, LazyImport[type[Any]] | type[Any]] = {}
 
         self._embedding_instances: MutableMapping[Provider, EmbeddingProvider[Any]] = {}
@@ -176,7 +178,7 @@ class ProviderRegistry(BasedModel):
         ] = {}
         self._vector_store_instances: MutableMapping[Provider, VectorStoreProvider[Any]] = {}
         self._reranking_instances: MutableMapping[Provider, RerankingProvider[Any]] = {}
-        self._agent_instances: MutableMapping[Provider, Any] = {}
+        self._agent_instances: MutableMapping[Provider, AgentProvider[Any]] = {}
         self._data_instances: MutableMapping[Provider, Any] = {}
 
     def _telemetry_keys(self) -> None:
@@ -234,7 +236,7 @@ class ProviderRegistry(BasedModel):
             "agent": (self._agent_providers, "Agent"),
             ProviderKind.DATA: (self._data_providers, "Data"),
             "data": (self._data_providers, "Data"),
-        }
+        }  # type: ignore
 
     def _is_literal_data_kind(self, kind: Any) -> TypeIs[Literal[ProviderKind.DATA, "data"]]:
         """Check if the kind is a data provider kind."""
@@ -643,7 +645,7 @@ class ProviderRegistry(BasedModel):
 
         # Prepare client options
         provider_settings = provider_settings or {}
-        opts = self.get_configured_provider_settings(provider_kind) or {}  # type: ignore
+        opts = self.get_configured_provider_settings(provider_kind) or client_options or {}  # type: ignore
         env_vars = self.collect_env_vars(provider)
         base_url = self._get_base_url_for_provider(
             provider, **(provider_settings | env_vars | opts)
@@ -949,7 +951,9 @@ class ProviderRegistry(BasedModel):
                 )
 
         # Special handling for embedding provider (has different logic)
-        if provider_kind in (ProviderKind.EMBEDDING, "embedding"):
+        if provider_kind in (ProviderKind.EMBEDDING, "embedding") and self._is_any_provider_kind(
+            provider_kind
+        ):
             # Check if this is an OpenAI factory that needs construction
             if self._is_openai_factory(provider, provider_kind):
                 retrieved_cls = self._construct_openai_provider_class(

@@ -13,9 +13,20 @@ from __future__ import annotations
 import importlib.util as util
 import logging
 
-from typing import Annotated, Any, NamedTuple, NotRequired, Required, TypedDict
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Literal,
+    NamedTuple,
+    NotRequired,
+    Required,
+    TypedDict,
+    cast,
+    is_typeddict,
+)
 
-from pydantic import Field, PositiveFloat, PositiveInt, SecretStr
+from pydantic import Field, PositiveFloat, PositiveInt, SecretStr, computed_field
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
 from pydantic_ai.settings import merge_model_settings
 
@@ -23,6 +34,10 @@ from codeweaver.core.types import DictView
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.sentinel import Unset
 from codeweaver.providers.provider import Provider
+
+
+if TYPE_CHECKING:
+    from codeweaver.common.registry.types import LiteralKinds
 
 
 logger = logging.getLogger(__name__)
@@ -54,7 +69,7 @@ class BaseProviderSettings(TypedDict, total=False):
     """Base settings for all providers."""
 
     provider: Required[Provider]
-    enabled: Required[bool]
+    enabled: NotRequired[bool]
     api_key: NotRequired[SecretStr | None]
     connection: NotRequired[ConnectionConfiguration | None]
     client_options: NotRequired[dict[str, Any] | None]
@@ -192,7 +207,7 @@ class QdrantConfig(TypedDict, total=False):
     url: NotRequired[str | None]
     """Qdrant server URL. Defaults to http://localhost:6333 if not specified."""
     api_key: NotRequired[SecretStr | None]
-    """API key for authentication (required for remote instances)."""
+    """API key for authentication (required for remote instances unless you have custom authentication for a private instance)."""
     collection_name: NotRequired[str | None]
     """Collection name override. Defaults to project name if not specified."""
     prefer_grpc: NotRequired[bool]
@@ -290,12 +305,16 @@ class ProviderSettingsDict(TypedDict, total=False):
     data: NotRequired[tuple[DataProviderSettings, ...] | None]
     # we currently only support one each of embedding, reranking and vector store providers
     # but we use tuples to allow for future expansion for some less common use cases
-    embedding: NotRequired[tuple[EmbeddingProviderSettings, ...] | None]
+    embedding: NotRequired[tuple[EmbeddingProviderSettings, ...] | EmbeddingProviderSettings | None]
     # rerank is probably the priority for multiple providers in the future, because they're vector agnostic, so you could have fallback providers, or use different ones for different tasks
-    sparse_embedding: NotRequired[tuple[SparseEmbeddingProviderSettings, ...] | None]
-    reranking: NotRequired[tuple[RerankingProviderSettings, ...] | None]
-    vector: NotRequired[tuple[VectorStoreProviderSettings, ...] | None]
-    agent: NotRequired[tuple[AgentProviderSettings, ...] | None]
+    sparse_embedding: NotRequired[
+        tuple[SparseEmbeddingProviderSettings, ...] | SparseEmbeddingProviderSettings | None
+    ]
+    reranking: NotRequired[tuple[RerankingProviderSettings, ...] | RerankingProviderSettings | None]
+    vector: NotRequired[
+        tuple[VectorStoreProviderSettings, ...] | VectorStoreProviderSettings | None
+    ]
+    agent: NotRequired[tuple[AgentProviderSettings, ...] | AgentProviderSettings | None]
 
 
 type ProviderSettingsView = DictView[ProviderSettingsDict]
@@ -369,12 +388,10 @@ def _get_default_embedding_settings() -> DeterminedDefaults:
 
 _embedding_defaults = _get_default_embedding_settings()
 
-DefaultEmbeddingProviderSettings = (
-    EmbeddingProviderSettings(
-        provider=_embedding_defaults.provider,
-        enabled=_embedding_defaults.enabled,
-        model_settings=EmbeddingModelSettings(model=_embedding_defaults.model),
-    ),
+DefaultEmbeddingProviderSettings = EmbeddingProviderSettings(
+    provider=_embedding_defaults.provider,
+    enabled=_embedding_defaults.enabled,
+    model_settings=EmbeddingModelSettings(model=_embedding_defaults.model),
 )
 
 
@@ -401,12 +418,10 @@ def _get_default_sparse_embedding_settings() -> DeterminedDefaults:
 
 _sparse_embedding_defaults = _get_default_sparse_embedding_settings()
 
-DefaultSparseEmbeddingProviderSettings = (
-    SparseEmbeddingProviderSettings(
-        provider=_sparse_embedding_defaults.provider,
-        enabled=_sparse_embedding_defaults.enabled,
-        model_settings=SparseEmbeddingModelSettings(model=_sparse_embedding_defaults.model),
-    ),
+DefaultSparseEmbeddingProviderSettings = SparseEmbeddingProviderSettings(
+    provider=_sparse_embedding_defaults.provider,
+    enabled=_sparse_embedding_defaults.enabled,
+    model_settings=SparseEmbeddingModelSettings(model=_sparse_embedding_defaults.model),
 )
 
 
@@ -439,42 +454,51 @@ def _get_default_reranking_settings() -> DeterminedDefaults:
 
 _reranking_defaults = _get_default_reranking_settings()
 
-DefaultRerankingProviderSettings = (
-    RerankingProviderSettings(
-        provider=_reranking_defaults.provider,
-        enabled=_reranking_defaults.enabled,
-        model_settings=RerankingModelSettings(model=_reranking_defaults.model),
-    ),
+DefaultRerankingProviderSettings = RerankingProviderSettings(
+    provider=_reranking_defaults.provider,
+    enabled=_reranking_defaults.enabled,
+    model_settings=RerankingModelSettings(model=_reranking_defaults.model),
 )
 
 HAS_ANTHROPIC = util.find_spec("anthropic") is not None
-DefaultAgentProviderSettings = (
-    AgentProviderSettings(
-        provider=Provider.ANTHROPIC,
-        enabled=HAS_ANTHROPIC,
-        model="claude-sonnet-4-latest",
-        model_settings=AgentModelSettings(),
-    ),
+DefaultAgentProviderSettings = AgentProviderSettings(
+    provider=Provider.ANTHROPIC,
+    enabled=HAS_ANTHROPIC,
+    model="claude-sonnet-4-latest",
+    model_settings=AgentModelSettings(),
 )
 
 
-DefaultVectorStoreProviderSettings = (
-    VectorStoreProviderSettings(
-        provider=Provider.QDRANT, enabled=True, provider_settings=QdrantConfig()
-    ),
+DefaultVectorStoreProviderSettings = VectorStoreProviderSettings(
+    provider=Provider.QDRANT, enabled=True, provider_settings=QdrantConfig()
 )
+
+type ProviderField = Literal[
+    "data", "embedding", "sparse_embedding", "reranking", "vector_store", "agent"
+]
+
+
+class ProviderNameMap(TypedDict):
+    """Configured providers by kind."""
+
+    data: tuple[Provider, ...] | None
+    embedding: Provider | tuple[Provider, ...] | None
+    sparse_embedding: Provider | tuple[Provider, ...] | None
+    reranking: Provider | tuple[Provider, ...] | None
+    vector_store: Provider | tuple[Provider, ...] | None
+    agent: Provider | tuple[Provider, ...] | None
 
 
 class ProviderSettings(BasedModel):
     """Settings for provider configuration."""
 
     data: Annotated[
-        tuple[DataProviderSettings, ...] | Unset,
+        tuple[DataProviderSettings, ...] | DataProviderSettings | Unset,
         Field(description="""Data provider configuration"""),
     ] = DefaultDataProviderSettings
 
     embedding: Annotated[
-        tuple[EmbeddingProviderSettings, ...] | Unset,
+        tuple[EmbeddingProviderSettings, ...] | EmbeddingProviderSettings | Unset,
         Field(
             description="""Embedding provider configuration.
 
@@ -484,7 +508,7 @@ class ProviderSettings(BasedModel):
     ] = DefaultEmbeddingProviderSettings
 
     sparse_embedding: Annotated[
-        tuple[SparseEmbeddingProviderSettings, ...] | Unset,
+        tuple[SparseEmbeddingProviderSettings, ...] | SparseEmbeddingProviderSettings | Unset,
         Field(
             description="""Sparse embedding provider configuration.
 
@@ -493,7 +517,7 @@ class ProviderSettings(BasedModel):
     ] = DefaultSparseEmbeddingProviderSettings
 
     reranking: Annotated[
-        tuple[RerankingProviderSettings, ...] | Unset,
+        tuple[RerankingProviderSettings, ...] | RerankingProviderSettings | Unset,
         Field(
             description="""Reranking provider configuration.
 
@@ -502,19 +526,151 @@ class ProviderSettings(BasedModel):
     ] = DefaultRerankingProviderSettings
 
     vector_store: Annotated[
-        tuple[VectorStoreProviderSettings, ...] | Unset,
+        tuple[VectorStoreProviderSettings, ...] | VectorStoreProviderSettings | Unset,
         Field(
             description="""Vector store provider configuration (Qdrant or in-memory), defaults to a local Qdrant instance."""
         ),
     ] = DefaultVectorStoreProviderSettings
 
     agent: Annotated[
-        tuple[AgentProviderSettings, ...] | Unset,
+        tuple[AgentProviderSettings, ...] | AgentProviderSettings | Unset,
         Field(description="""Agent provider configuration"""),
     ] = DefaultAgentProviderSettings
 
     def _telemetry_keys(self) -> None:
         return None
+
+    def has_setting(self, setting_name: ProviderField | LiteralKinds) -> bool:
+        """Check if a specific provider setting is configured.
+
+        Args:
+            setting_name: The name of the setting or ProviderKind to check.
+        """
+        from codeweaver.providers.provider import ProviderKind
+
+        setting = (
+            setting_name
+            if setting_name
+            in {"data", "embedding", "sparse_embedding", "reranking", "vector_store", "agent"}
+            else cast(ProviderKind, setting_name).variable
+        )
+        return getattr(self, setting) is not Unset  # type: ignore
+
+    def multiple_embedding_providers(self) -> bool:
+        """Check if multiple embedding providers are configured."""
+        return isinstance(self.embedding, tuple) and len(self.embedding) > 1
+
+    def multiple_reranking_providers(self) -> bool:
+        """Check if multiple reranking providers are configured."""
+        return isinstance(self.reranking, tuple) and len(self.reranking) > 1
+
+    def multiple_vector_store_providers(self) -> bool:
+        """Check if multiple vector store providers are configured."""
+        return isinstance(self.vector_store, tuple) and len(self.vector_store) > 1
+
+    def multiple_agent_providers(self) -> bool:
+        """Check if multiple agent providers are configured."""
+        return isinstance(self.agent, tuple) and len(self.agent) > 1
+
+    @computed_field
+    @property
+    def providers(self) -> frozenset[Provider]:
+        """Get a set of configured providers."""
+        return frozenset({
+            p
+            for prov in self.provider_name_map.values()
+            if prov
+            for p in (prov if isinstance(prov, tuple) else (prov,))
+        })  # type: ignore
+
+    @property
+    def _field_names(self) -> tuple[ProviderField, ...]:
+        """Get the field names for provider settings."""
+        return ("data", "embedding", "sparse_embedding", "reranking", "vector_store", "agent")
+
+    @property
+    def provider_configs(self) -> dict[ProviderField, tuple[BaseProviderSettings, ...] | None]:
+        """Get a summary of configured provider settings by kind."""
+        configs: dict[ProviderField, tuple[BaseProviderSettings, ...] | None] = {}
+        for field in self._field_names:
+            setting = self.settings_for_kind(field)
+            if setting is None:
+                continue
+            # Normalize to tuple form
+            configs[field] = setting if isinstance(setting, tuple) else (setting,)
+        return configs or None  # type: ignore[return-value]
+
+    @property
+    def provider_name_map(self) -> ProviderNameMap:
+        """Get a summary of configured providers by kind."""
+        provider_data: dict[ProviderField, Provider | tuple[Provider, ...] | None] = {
+            field_name: (
+                tuple(s["provider"] for s in setting if setting and is_typeddict(s))  # type: ignore
+                if isinstance(setting, tuple)
+                else (setting["provider"] if setting else None)
+            )
+            for field_name, setting in self.provider_configs.items()
+        }
+
+        return ProviderNameMap(**provider_data)  # type: ignore
+
+    def get_provider_settings(
+        self, provider: Provider
+    ) -> BaseProviderSettings | tuple[BaseProviderSettings, ...] | None:
+        """Get the settings for a specific provider."""
+        if (
+            provider
+            not in {
+                prov if isinstance(provider, tuple) else provider
+                for prov in self.provider_configs.values()
+            }
+            or provider == Provider.NOT_SET
+        ):
+            return None
+        fields = [
+            k for k, v in self.provider_configs.items() if (v and (provider in v)) or v == provider
+        ]
+        if settings := [
+            self.settings_for_kind(field) for field in fields if self.settings_for_kind(field)
+        ]:
+            flattened_settings: list[BaseProviderSettings] = [
+                s if isinstance(setting, tuple) else setting
+                for setting in settings
+                for s in (setting if isinstance(setting, tuple) else (setting,))
+            ]  # type: ignore
+            return (
+                flattened_settings[0] if len(flattened_settings) == 1 else tuple(flattened_settings)
+            )
+        return None
+
+    def has_auth_configured(self, provider: Provider) -> bool:
+        """Check if API key or TLS certs are set for the provider through settings or environment."""
+        if not (settings := self.get_provider_settings(provider)):
+            return False
+        settings = settings if isinstance(settings, tuple) else (settings,)
+        return next(
+            (True for setting in settings if isinstance(setting.get("api_key"), SecretStr)),
+            provider.has_env_auth,
+        )
+
+    def settings_for_kind(
+        self, kind: ProviderField | LiteralKinds
+    ) -> BaseProviderSettings | tuple[BaseProviderSettings, ...] | None:
+        """Get the settings for a specific provider kind.
+
+        Args:
+            kind: The kind of provider or ProviderKind to get settings for.
+        """
+        from codeweaver.providers.provider import ProviderKind
+
+        setting_field = (
+            kind
+            if kind
+            in {"data", "embedding", "sparse_embedding", "reranking", "vector_store", "agent"}
+            else cast(ProviderKind, kind).variable
+        )
+        setting = getattr(self, setting_field, None)  # type: ignore
+        return None if setting is Unset else setting  # type: ignore
 
 
 AllDefaultProviderSettings = ProviderSettingsDict(

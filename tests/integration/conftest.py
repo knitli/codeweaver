@@ -18,8 +18,10 @@ if TYPE_CHECKING:
     from codeweaver.core.chunks import CodeChunk
     from codeweaver.providers.embedding.providers.sentence_transformers import (
         SentenceTransformersEmbeddingProvider,
-        SentenceTransformersRerankingProvider,
         SentenceTransformersSparseProvider,
+    )
+    from codeweaver.providers.reranking.providers.sentence_transformers import (
+        SentenceTransformersRerankingProvider,
     )
 
 # ===========================================================================
@@ -183,10 +185,13 @@ def mock_reranking_provider():
 @pytest.fixture
 def actual_reranking_provider() -> SentenceTransformersRerankingProvider:
     """Provide an actual reranking provider using SentenceTransformers."""
-    from fastembed import TextEmbedding
+    from sentence_transformers import CrossEncoder
 
     from codeweaver.providers.reranking.capabilities.ms_marco import (
         get_marco_reranking_capabilities,
+    )
+    from codeweaver.providers.reranking.providers.sentence_transformers import (
+        SentenceTransformersRerankingProvider,
     )
 
     # nice lightweight model
@@ -195,7 +200,7 @@ def actual_reranking_provider() -> SentenceTransformersRerankingProvider:
         for cap in get_marco_reranking_capabilities()
         if cap.name == "Xenova/ms-marco-MiniLM-L6-v2"
     )
-    return SentenceTransformersRerankingProvider(capabilities=caps, client=TextEmbedding(caps.name))
+    return SentenceTransformersRerankingProvider(capabilities=caps, client=CrossEncoder(caps.name))
 
 
 # ===========================================================================

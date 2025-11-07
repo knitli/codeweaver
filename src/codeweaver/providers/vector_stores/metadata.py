@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+import logging
 from typing import TYPE_CHECKING, Annotated, Any
 
 from pydantic import Field, PositiveInt
@@ -19,6 +20,8 @@ from codeweaver.exceptions import DimensionMismatchError, ModelSwitchError
 if TYPE_CHECKING:
     from codeweaver.core.types.aliases import FilteredKeyT
     from codeweaver.core.types.enum import AnonymityConversion
+
+logger = logging.getLogger(__name__)
 
 
 class HybridVectorPayload(BasedModel):
@@ -80,10 +83,28 @@ class CollectionMetadata(BasedModel):
             other: Other collection metadata to compare against
 
         Raises:
-            ProviderSwitchError: If provider doesn't match collection metadata
+            ModelSwitchError: If embedding models don't match
             DimensionMismatchError: If embedding dimensions don't match
+
+        Warnings:
+            Logs warning if provider has changed (suggests reindexing)
         """
-        if self.embedding_model and self.embedding_model != other.embedding_model:
+        # Warn on provider switch - suggests reindexing but doesn't block
+        if self.provider != other.provider:
+            logger.warning(
+                f"Provider switch detected: collection created with '{other.provider}', "
+                f"but current provider is '{self.provider}'. "
+                f"You should reindex your codebase to ensure data consistency. "
+                f"Run 'codeweaver index' to rebuild the collection with the new provider."
+            )
+
+        # Error on model switch - this corrupts search results
+        # Only raise if both have models and they differ (allow None for backwards compatibility)
+        if (
+            self.embedding_model
+            and other.embedding_model
+            and self.embedding_model != other.embedding_model
+        ):
             raise ModelSwitchError(
                 f"Your existing embedding collection was created with model '{other.embedding_model}', but the current model is '{self.embedding_model}'. You can't use different embedding models for the same collection.",
                 suggestions=[

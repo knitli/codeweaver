@@ -112,38 +112,57 @@ def _determine_setting(
     return None
 
 
+def _process_nested_value(value: Any) -> Any:
+    """Process a nested value, ensuring all fields are set."""
+    if isinstance(value, BaseSettings | BasedModel):
+        return ensure_set_fields(value)
+    if isinstance(value, list):
+        return [
+            ensure_set_fields(item) if isinstance(item, BaseSettings | BasedModel) else item
+            for item in value
+        ]
+    if isinstance(value, dict):
+        return {
+            key: ensure_set_fields(item) if isinstance(item, BaseSettings | BasedModel) else item
+            for key, item in value.items()
+        }  # type: ignore
+    return value
+
+
+def _should_set_field(value: Any, field_type: Any) -> bool:
+    """Check if a None value should be set for a field based on its type annotation."""
+    if value is not None:
+        return True
+    if not field_type:
+        return True
+    args = getattr(field_type, "__args__", None)
+    return type(None) in args if args else True
+
+
 def ensure_set_fields(obj: BaseSettings | BasedModel) -> BaseSettings | BasedModel:
     """Ensure all fields in a pydantic model are set, replacing Unset with None where applicable."""
     for field_name in type(obj).model_fields:
         value = getattr(obj, field_name)
-        if isinstance(value, Unset):
-            value = _determine_setting(field_name, type(obj).model_fields[field_name], obj)
-            # If we still got None and the field doesn't accept None, skip it (leave as Unset)
-            if value is None:
-                field_type = type(obj).model_fields[field_name].annotation
-                # Check if None is in the union type
-                if field_type and (args := field_type.__args__) and type(None) not in args:
-                    continue
-                # None is allowed, set it
-                setattr(obj, field_name, None)
-                continue
-            setattr(
-                obj,
-                field_name,
-                ensure_set_fields(value())
-                if inspect.isclass(value) and issubclass(value, BaseSettings | BasedModel)
-                else value,
-            )
-        elif isinstance(value, BaseSettings | BasedModel):
-            setattr(obj, field_name, ensure_set_fields(value))
-        elif isinstance(value, list):
-            for i, item in enumerate(value):  # type: ignore
-                if isinstance(item, BaseSettings | BasedModel):
-                    value[i] = ensure_set_fields(item)
-        elif isinstance(value, dict):
-            for key, item in value.items():  # type: ignore
-                if isinstance(item, BaseSettings | BasedModel):
-                    value[key] = ensure_set_fields(item)
+
+        if not isinstance(value, Unset):
+            setattr(obj, field_name, _process_nested_value(value))
+            continue
+
+        # Handle Unset values
+        field_info = type(obj).model_fields[field_name]
+        new_value = _determine_setting(field_name, field_info, obj)
+
+        # Handle class references - instantiate if it's a BaseSettings/BasedModel subclass
+        if inspect.isclass(new_value) and issubclass(new_value, BaseSettings | BasedModel):
+            new_value = ensure_set_fields(new_value())
+
+        # Check if None is acceptable for this field
+        field_type = field_info.annotation
+        if not _should_set_field(new_value, field_type):
+            continue
+
+        setattr(obj, field_name, new_value)
+
     return obj
 
 
@@ -820,29 +839,25 @@ class CodeWeaverSettings(BaseSettings):
         if path is None:
             raise ValueError("No path provided to save configuration file.")
         extension = path.suffix.lower()
-        kwargs = {
-            "indent": 4,
+        # Use mode='json' to serialize Path objects to strings (needed for TOML/YAML)
+        # model_dump kwargs (indent is NOT a valid model_dump parameter)
+        dump_kwargs = {
             "exclude_unset": True,
             "by_alias": True,
             "exclude_defaults": True,
             "round_trip": True,
             "exclude_computed_fields": True,
-            "mode": "python",
+            "mode": "json",  # Changed from "python" to handle Path serialization
         }
-        as_obj = self.model_dump(**kwargs)  # type: ignore
+        # JSON serialization kwargs (includes indent for to_json)
+        json_kwargs = {"indent": 4, "round_trip": True}
+        as_obj = self.model_dump(**dump_kwargs)  # type: ignore
         data: str
         match extension:
             case ".json":
                 from pydantic_core import to_json
 
-                data = to_json(
-                    as_obj,
-                    **{
-                        k: v
-                        for k, v in kwargs.items()
-                        if k not in {"exclude_unset", "exclude_defaults", "exclude_computed_fields"}
-                    },  # type: ignore
-                ).decode("utf-8")
+                data = to_json(as_obj, **json_kwargs).decode("utf-8")  # type: ignore
             case ".toml":
                 import tomli_w
 

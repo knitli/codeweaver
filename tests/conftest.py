@@ -285,16 +285,19 @@ def create_test_chunk_with_embeddings(
         chunk = chunk.set_batch_keys(dense_batch_key)
 
     if sparse_embedding:
-        # Convert sparse dict format to flat list for storage
-        # Qdrant sparse format uses indices and values separately
-        # For simplicity in tests, store the values list
-        sparse_values = sparse_embedding.get("values", [])
+        # Convert sparse dict format to SparseEmbedding object
+        from codeweaver.providers.embedding.types import SparseEmbedding
+
+        sparse_emb = SparseEmbedding(
+            indices=sparse_embedding.get("indices", []),
+            values=sparse_embedding.get("values", [])
+        )
         sparse_info = EmbeddingBatchInfo.create_sparse(
             batch_id=sparse_batch_id,
             batch_index=0,
             chunk_id=chunk_id,
             model="test-sparse-model",
-            embeddings=sparse_values,
+            embeddings=sparse_emb,
         )
         # Set batch key on chunk
         sparse_batch_key = BatchKeys(id=sparse_batch_id, idx=0, sparse=True)

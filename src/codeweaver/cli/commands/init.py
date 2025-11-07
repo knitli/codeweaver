@@ -31,9 +31,7 @@ console = Console()
 
 # Create cyclopts app at module level
 app = cyclopts.App(
-    "init",
-    help="Initialize CodeWeaver configuration and MCP client setup.",
-    console=console,
+    "init", help="Initialize CodeWeaver configuration and MCP client setup.", console=console
 )
 
 
@@ -74,7 +72,11 @@ def _get_mcp_client_config_path(client: str) -> Path:
         case "cursor":
             # Prefer project-local .cursor/config.json
             project_cursor = Path.cwd() / ".cursor" / "config.json"
-            return project_cursor if project_cursor.parent.exists() else home / ".cursor" / "config.json"
+            return (
+                project_cursor
+                if project_cursor.parent.exists()
+                else home / ".cursor" / "config.json"
+            )
         case "continue":
             return home / ".continue" / "config.json"
         case _:
@@ -84,7 +86,9 @@ def _get_mcp_client_config_path(client: str) -> Path:
             )
 
 
-def _generate_http_mcp_config(project_path: Path, host: str = "127.0.0.1", port: int = 9328) -> dict[str, Any]:
+def _generate_http_mcp_config(
+    project_path: Path, host: str = "127.0.0.1", port: int = 9328
+) -> dict[str, Any]:
     """Generate HTTP streaming MCP server configuration for CodeWeaver.
 
     CodeWeaver uses HTTP streaming transport (not STDIO) for MCP protocol.
@@ -133,7 +137,9 @@ def _load_json_config(path: Path) -> dict[str, Any]:
         with path.open("r", encoding="utf-8") as f:
             return json.load(f)
     except json.JSONDecodeError as e:
-        console.print(f"[yellow]⚠[/yellow]  Warning: Config file exists but contains invalid JSON: {path}")
+        console.print(
+            f"[yellow]⚠[/yellow]  Warning: Config file exists but contains invalid JSON: {path}"
+        )
         console.print(f"   Error: {e}")
         raise
 
@@ -200,9 +206,13 @@ def _merge_mcp_config(
     # Check if CodeWeaver already configured
     if "codeweaver" in config["mcpServers"]:
         if not force:
-            console.print("[yellow]⚠[/yellow]  CodeWeaver already configured. Use --force to overwrite.")
+            console.print(
+                "[yellow]⚠[/yellow]  CodeWeaver already configured. Use --force to overwrite."
+            )
             return config, False
-        console.print("[yellow]🔄[/yellow] Overwriting existing CodeWeaver configuration (--force enabled)")
+        console.print(
+            "[yellow]🔄[/yellow] Overwriting existing CodeWeaver configuration (--force enabled)"
+        )
 
     # Add or update CodeWeaver configuration
     config["mcpServers"]["codeweaver"] = _generate_http_mcp_config(project_path, host, port)
@@ -305,15 +315,14 @@ def init(
         config_path = project_path / ".codeweaver.toml"
 
         if config_path.exists() and not force:
-            overwrite = Confirm.ask(
+            if Confirm.ask(
                 f"[yellow]Configuration file already exists at {config_path}. Overwrite?[/yellow]",
                 default=False,
-            )
-            if not overwrite:
-                console.print("[yellow]Skipping CodeWeaver config creation.[/yellow]\n")
-            else:
+            ):
                 config_path = _create_codeweaver_config(project_path, quick)
                 console.print(f"[green]✓[/green] Config created: {config_path}\n")
+            else:
+                console.print("[yellow]Skipping CodeWeaver config creation.[/yellow]\n")
         else:
             config_path = _create_codeweaver_config(project_path, quick)
             console.print(f"[green]✓[/green] Config created: {config_path}\n")
@@ -333,7 +342,7 @@ def init(
 
             # Backup if file exists
             if client_config_path.exists():
-                _backup_config(client_config_path)
+                _ = _backup_config(client_config_path)
 
             # Merge CodeWeaver configuration
             merged_config, changed = _merge_mcp_config(
@@ -349,9 +358,6 @@ def init(
 
         except ValueError as e:
             console.print(f"[red]✗[/red] {e}")
-            sys.exit(1)
-        except json.JSONDecodeError:
-            console.print("[red]✗[/red] Failed to parse existing MCP config file")
             sys.exit(1)
         except Exception as e:
             console.print(f"[red]✗[/red] Unexpected error: {e}")
@@ -385,48 +391,5 @@ def main() -> None:
         sys.exit(1)
 
 
-# Legacy compatibility - deprecated
-def add(
-    *,
-    project: Path | None = None,
-    claude_code: bool = False,
-    claude_desktop: bool = False,
-    cursor: bool = False,
-    gemini_cli: bool = False,
-    mcp_json: Path | None = None,
-    force: bool = False,
-    all_clients: bool = False,
-) -> None:
-    """Add CodeWeaver MCP server configuration to specified clients.
-
-    [DEPRECATED] Use 'codeweaver init' instead. This command will be removed in v0.2.
-
-    Args:
-        project: Path to project directory (defaults to current directory)
-        claude_code: Add to Claude Code configuration
-        claude_desktop: Add to Claude Desktop configuration
-        cursor: Add to Cursor configuration
-        gemini_cli: Add to Gemini CLI configuration (not yet supported)
-        mcp_json: Path to custom MCP JSON config file
-        force: Overwrite existing CodeWeaver configuration if present
-        all_clients: Configure all available clients
-    """
-    console.print(
-        "[yellow]⚠ WARNING: This command is deprecated. Use 'codeweaver init' instead.[/yellow]"
-    )
-    console.print("[yellow]   This command will be removed in v0.2.[/yellow]\n")
-
-    # Map old client flags to new client parameter
-    if claude_code or all_clients:
-        client = "claude_code"
-    elif claude_desktop or all_clients:
-        client = "claude_desktop"
-    elif cursor or all_clients:
-        client = "cursor"
-    else:
-        console.print("[red]✗[/red] Please specify at least one client to configure.")
-        console.print("[yellow]   Use 'codeweaver init' for the new unified interface.[/yellow]")
-        sys.exit(1)
-
-    # Call new unified init with mcp_only=True
-    init(project=project, mcp_only=True, client=client, force=force)
+if __name__ == "__main__":
+    main()

@@ -95,7 +95,9 @@ async def qdrant_store(qdrant_test_manager) -> QdrantVectorStoreProvider:
     """Create a QdrantVectorStoreProvider for testing."""
     # Create unique collection
     collection_name = qdrant_test_manager.create_collection_name("perf_test")
-    await qdrant_test_manager.create_collection(collection_name, dense_vector_size=384)
+    await qdrant_test_manager.create_collection(
+        collection_name, dense_vector_size=384, sparse_vector_size=1
+    )
 
     config = QdrantConfig(
         url=qdrant_test_manager.url, collection_name=collection_name, batch_size=64

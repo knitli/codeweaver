@@ -16,6 +16,7 @@ import pytest
 from codeweaver.common.utils.utils import uuid7
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+from tests.conftest import create_test_chunk_with_embeddings
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]

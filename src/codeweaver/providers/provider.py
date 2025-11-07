@@ -22,6 +22,7 @@ The `Provider` enum also includes methods for retrieving some provider-specific 
 from __future__ import annotations
 
 import contextlib
+import os
 
 from typing import NamedTuple, NotRequired, TypedDict, cast, is_typeddict
 
@@ -355,6 +356,13 @@ class Provider(BaseEnum):
                 return None
 
     @property
+    def api_key_env_vars(self) -> tuple[str, ...] | None:
+        """Get the environment variable names used for API keys by the provider's client that are not part of CodeWeaver's settings."""
+        if envs := self.other_env_vars:
+            return tuple(env["api_key"].env for env in envs if "api_key" in env)
+        return None
+
+    @property
     def is_huggingface_model_provider(self) -> bool:
         """Check if the provider is a Hugging Face model provider."""
         return self in {
@@ -367,6 +375,18 @@ class Provider(BaseEnum):
             Provider.OLLAMA,
             Provider.SENTENCE_TRANSFORMERS,
             Provider.TOGETHER,
+        }
+
+    @property
+    def requires_auth(self) -> bool:
+        """Check if the provider requires authentication."""
+        return self not in {
+            # Qdrant may not require auth -- we check for API key presence elsewhere
+            Provider.FASTEMBED,
+            Provider.MEMORY,
+            Provider.DUCKDUCKGO,
+            Provider.SENTENCE_TRANSFORMERS,
+            Provider.OLLAMA,
         }
 
     @property
@@ -445,6 +465,17 @@ class Provider(BaseEnum):
 
         return ProviderKind.RERANKING in get_provider_kinds(cast(LiteralProvider, self))
 
+    @property
+    def has_env_auth(self) -> bool:
+        """Check if API key or TLS certs are set for the provider."""
+        if self.other_env_vars:
+            auth_vars = ("api_key", "tls_cert_path", "tls_key_path")
+            for env_info in self.other_env_vars:
+                for var in auth_vars:
+                    if (env_var := env_info.get(var)) and (env := env_var.env) and os.getenv(env):
+                        return True
+        return False
+
 
 class ProviderKind(BaseEnum):
     """Enumeration of available provider kinds."""
@@ -468,7 +499,7 @@ class ProviderKind(BaseEnum):
     """Provider for agents (e.g. OpenAI or Anthropic)"""
 
     UNSET = "unset"
-    """A setting to identify when a `ProviderKind` is not set or is configured."""
+    """A setting to identify when a `ProviderKind` is not set or configured."""
 
 
 __all__ = ("Provider", "ProviderEnvVars", "ProviderKind")

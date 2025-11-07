@@ -19,7 +19,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from cyclopts.testing import CliRunner
 
 from codeweaver.cli.commands.init import app as init_app
 
@@ -27,8 +26,6 @@ from codeweaver.cli.commands.init import app as init_app
 if TYPE_CHECKING:
     from pytest import MonkeyPatch
 
-
-runner = CliRunner()
 
 
 @pytest.fixture
@@ -61,10 +58,13 @@ class TestInitCommand:
         temp_home: Path
     ) -> None:
         """Test init creates both CodeWeaver config and MCP config."""
-        result = runner.invoke(init_app, ["--quick"])
+        with pytest.raises(SystemExit) as exc_info:
+            init_app(--quick)
+        captured = capsys.readouterr()
+        exc_info.value.code = exc_info.value.code
 
         # Should succeed
-        assert result.exit_code == 0
+        assert exc_info.value.code == 0
 
         # CodeWeaver config created
         assert (temp_project / "codeweaver.toml").exists()
@@ -73,11 +73,14 @@ class TestInitCommand:
         mcp_config_path = temp_home / ".config" / "claude" / "claude_code_config.json"
         assert mcp_config_path.exists()
 
-    def test_config_only_flag(self, temp_project: Path, temp_home: Path) -> None:
+    def test_config_only_flag(self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """Test --config-only creates only CodeWeaver config."""
-        result = runner.invoke(init_app, ["--quick", "--config-only"])
+        with pytest.raises(SystemExit) as exc_info:
+            init_app(--quick, --config-only)
+        captured = capsys.readouterr()
+        exc_info.value.code = exc_info.value.code
 
-        assert result.exit_code == 0
+        assert exc_info.value.code == 0
 
         # CodeWeaver config created
         assert (temp_project / "codeweaver.toml").exists()
@@ -86,15 +89,18 @@ class TestInitCommand:
         mcp_config_path = temp_home / ".config" / "claude" / "claude_code_config.json"
         assert not mcp_config_path.exists()
 
-    def test_mcp_only_flag(self, temp_project: Path, temp_home: Path) -> None:
+    def test_mcp_only_flag(self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """Test --mcp-only creates only MCP config."""
-        result = runner.invoke(init_app, ["--mcp-only"])
+        with pytest.raises(SystemExit) as exc_info:
+            init_app(--mcp-only)
+        captured = capsys.readouterr()
+        exc_info.value.code = exc_info.value.code
 
         # Should succeed or prompt for client selection
-        assert result.exit_code in (0, 1)
+        assert exc_info.value.code in (0, 1)
 
         # MCP config should be created (if succeeded)
-        if result.exit_code == 0:
+        if exc_info.value.code == 0:
             mcp_config_path = temp_home / ".config" / "claude" / "claude_code_config.json"
             assert mcp_config_path.exists()
 
@@ -110,10 +116,13 @@ class TestHttpStreamingArchitecture:
         temp_home: Path
     ) -> None:
         """Test MCP config uses HTTP streaming, not STDIO."""
-        result = runner.invoke(init_app, ["--mcp-only", "--client", "claude_code"])
+        with pytest.raises(SystemExit) as exc_info:
+            init_app(--mcp-only, --client, "claude_code")
+        captured = capsys.readouterr()
+        exc_info.value.code = exc_info.value.code
 
         # If succeeded, check config
-        if result.exit_code == 0:
+        if exc_info.value.code == 0:
             mcp_config_path = temp_home / ".config" / "claude" / "claude_code_config.json"
             if mcp_config_path.exists():
                 mcp_config = json.loads(mcp_config_path.read_text())
@@ -133,9 +142,12 @@ class TestHttpStreamingArchitecture:
         temp_home: Path
     ) -> None:
         """Test HTTP streaming uses correct command structure."""
-        result = runner.invoke(init_app, ["--mcp-only", "--client", "claude_code"])
+        with pytest.raises(SystemExit) as exc_info:
+            init_app(--mcp-only, --client, "claude_code")
+        captured = capsys.readouterr()
+        exc_info.value.code = exc_info.value.code
 
-        if result.exit_code == 0:
+        if exc_info.value.code == 0:
             mcp_config_path = temp_home / ".config" / "claude" / "claude_code_config.json"
             if mcp_config_path.exists():
                 mcp_config = json.loads(mcp_config_path.read_text())
@@ -150,11 +162,14 @@ class TestHttpStreamingArchitecture:
                 args = cw_config["args"]
                 assert "server" in args or "serve" in args
 
-    def test_stdio_not_used(self, temp_project: Path, temp_home: Path) -> None:
+    def test_stdio_not_used(self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """Test STDIO transport is not used."""
-        result = runner.invoke(init_app, ["--mcp-only", "--client", "claude_code"])
+        with pytest.raises(SystemExit) as exc_info:
+            init_app(--mcp-only, --client, "claude_code")
+        captured = capsys.readouterr()
+        exc_info.value.code = exc_info.value.code
 
-        if result.exit_code == 0:
+        if exc_info.value.code == 0:
             mcp_config_path = temp_home / ".config" / "claude" / "claude_code_config.json"
             if mcp_config_path.exists():
                 mcp_config = json.loads(mcp_config_path.read_text())
@@ -209,15 +224,18 @@ class TestInitIntegration:
     ) -> None:
         """Test init command integrates with config command."""
         # Init should create valid config
-        result = runner.invoke(init_app, ["--quick"])
+        with pytest.raises(SystemExit) as exc_info:
+            init_app(--quick)
+        captured = capsys.readouterr()
+        exc_info.value.code = exc_info.value.code
 
-        if result.exit_code == 0:
+        if exc_info.value.code == 0:
             # Config command should recognize it
             from codeweaver.cli.commands.config import app as config_app
             config_result = runner.invoke(config_app, ["show"])
 
-            assert config_result.exit_code == 0
-            assert "configuration" in config_result.output.lower()
+            assert config_exc_info.value.code == 0
+            assert "configuration" in config_captured.out.lower()
 
     def test_init_respects_existing_config(
         self,
@@ -233,7 +251,10 @@ provider = "fastembed"
 """)
 
         # Init should detect and handle existing config
-        result = runner.invoke(init_app, ["--quick"])
+        with pytest.raises(SystemExit) as exc_info:
+            init_app(--quick)
+        captured = capsys.readouterr()
+        exc_info.value.code = exc_info.value.code
 
         # Should either merge or prompt
-        assert result.exit_code in (0, 1)
+        assert exc_info.value.code in (0, 1)
