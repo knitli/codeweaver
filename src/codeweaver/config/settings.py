@@ -862,6 +862,7 @@ class CodeWeaverSettings(BaseSettings):
             "round_trip": True,
             "exclude_computed_fields": True,
             "mode": "json",  # Changed from "python" to handle Path serialization
+            "exclude_none": True,  # Exclude None values for TOML compatibility
         }
         # JSON serialization kwargs (includes indent for to_json)
         json_kwargs = {"indent": 4, "round_trip": True}

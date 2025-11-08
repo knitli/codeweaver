@@ -115,6 +115,11 @@ def check_required_dependencies() -> DoctorCheck:
     """Check if required dependencies are installed using find_spec."""
     from importlib import metadata
 
+    # Special case mapping for packages where PyPI name differs from import name
+    package_to_module_map = {
+        "uuid7": "uuid_extensions",
+    }
+
     missing: list[str] = []
     installed: list[tuple[str, str]] = []
     if our_dependencies := metadata.metadata("codeweaver-mcp").get_all("Requires-Dist") or []:
@@ -130,7 +135,11 @@ def check_required_dependencies() -> DoctorCheck:
             dependency_pattern.match(dep) for dep in dependencies if dependency_pattern.match(dep)
         ]
         required_packages: list[tuple[str, str, str]] = [
-            (match["name"], match["name"].replace("-", "_"), match["version"] or "")
+            (
+                match["name"],
+                package_to_module_map.get(match["name"], match["name"].replace("-", "_")),
+                match["version"] or "",
+            )
             for match in matches
             if match
         ]
