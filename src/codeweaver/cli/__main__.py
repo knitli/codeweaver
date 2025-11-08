@@ -10,7 +10,23 @@ Commands are registered and lazy-loaded from here.
 
 from __future__ import annotations
 
+import os
 import sys
+
+# Set warning filter via environment before any imports
+# This catches warnings that happen during lazy imports
+os.environ.setdefault(
+    "PYTHONWARNINGS",
+    "ignore::DeprecationWarning:google.genai.types"
+)
+
+import warnings
+
+# Also set via warnings module for runtime warnings
+warnings.filterwarnings(
+    "ignore",
+    module="google.genai.types",
+)
 
 from cyclopts import App, Parameter
 from rich.console import Console
