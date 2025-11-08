@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal
 import cyclopts
 import httpx
 
-from fastmcp.cli.install import claude_code, claude_desktop, cursor, gemini_cli, mcp_json
+from fastmcp import claude_code, claude_desktop, cursor, gemini_cli, mcp_json
 from pydantic_core import from_json as from_json
 from pydantic_core import to_json as to_json
 from rich.console import Console

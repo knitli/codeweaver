@@ -13,7 +13,7 @@ import time
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypedDict
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypedDict, overload
 
 from pydantic import UUID7, ConfigDict, PrivateAttr
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
@@ -61,6 +61,14 @@ class CircuitBreakerState(Enum):
 
 class CircuitBreakerOpenError(Exception):
     """Raised when circuit breaker is open and rejecting requests."""
+
+
+@overload
+def _get_caps(*, sparse: Literal[False] = False) -> EmbeddingModelCapabilities | None: ...
+
+
+@overload
+def _get_caps(*, sparse: Literal[True]) -> SparseEmbeddingModelCapabilities | None: ...
 
 
 def _get_caps(

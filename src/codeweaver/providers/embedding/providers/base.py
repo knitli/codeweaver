@@ -739,7 +739,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
         key = uuid7()
         final_chunks: list[CodeChunk] = []
-        hashes = [self._hash_store.keygen.__call__(chunk.content) for chunk in processed_chunks]
+        hashes = [self._hash_store.keygen(chunk.content) for chunk in processed_chunks]
         starter_chunks = [
             chunk
             for i, chunk in enumerate(processed_chunks)

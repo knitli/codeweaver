@@ -780,70 +780,63 @@ class Indexer(BasedModel):
                 logger.debug("Unhandled change type %s for %s", change_type, path)
 
     # ---- public helpers ----
-    def prime_index(
-        self,
-        *,
-        force_reindex: bool = False,
-        progress_callback: Callable[[IndexingStats, str | None], None] | None = None,
-    ) -> int:
-        """Perform an initial indexing pass using the configured rignore walker.
-
-        Enhanced version with persistence support and batch processing.
+    def _try_restore_from_checkpoint(self, *, force_reindex: bool) -> bool:
+        """Attempt to restore indexing state from checkpoint.
 
         Args:
-            force_reindex: If True, skip persistence checks and reindex everything
-            progress_callback: Optional callback to report progress (receives stats and phase)
+            force_reindex: If True, skip restoration
 
         Returns:
-            Number of files indexed
+            True if successfully restored, False otherwise
+        """
+        if force_reindex:
+            return False
+
+        try:
+            if self.load_checkpoint():
+                logger.info("Resuming from checkpoint")
+                return True
+        except Exception as e:
+            logger.debug("Could not restore from persistence: %s", e)
+        return False
+
+    def _discover_files_to_index(self) -> list[Path]:
+        """Discover files to index using the configured walker.
+
+        Returns:
+            List of file paths to index
         """
         if not self._walker:
             logger.warning("No walker configured, cannot prime index")
-            return 0
+            return []
 
-        # Try to restore from persistence (unless force_reindex)
-        if not force_reindex:
-            try:
-                # Try loading checkpoint first
-                if self.load_checkpoint():
-                    logger.info("Resuming from checkpoint")
-                    # Note: In v0.1, we still need to reindex discovered files
-                    # In v0.2, we'll implement true resumption with file tracking
-                else:
-                    # Fallback: Try restoring from vector store
-                    # TODO: Implement in future phase
-                    # asyncio.run(self.initialize_from_vector_store())
-                    # if not self._store.is_empty:
-                    #     logger.info("Restored index from vector store")
-                    #     return len(self._store)
-                    pass  # type: ignore
-            except Exception as e:
-                logger.debug("Could not restore from persistence: %s", e)
-
-        # Reset stats for new indexing run
-        self._stats = IndexingStats()
-
-        # Collect files to index
         files_to_index: list[Path] = []
         try:
             with contextlib.suppress(StopIteration):
                 files_to_index.extend(p for p in self._walker if p and p.is_file())
         except Exception:
             logger.exception("Failure during file discovery")
-            return 0
+            return []
 
         if not files_to_index:
             logger.info("No files found to index")
-            return 0
+            return []
 
         logger.info("Discovered %d files to index", len(files_to_index))
         self._stats.files_discovered = len(files_to_index)
+        return files_to_index
 
-        # Report discovery phase complete
-        if progress_callback:
-            progress_callback(self._stats, "discovery")
+    def _perform_batch_indexing(
+        self,
+        files_to_index: list[Path],
+        progress_callback: Callable[[IndexingStats, str | None], None] | None,
+    ) -> None:
+        """Execute batch indexing for discovered files.
 
-        # Index files in batch (synchronous wrapper for async pipeline)
+        Args:
+            files_to_index: List of files to process
+            progress_callback: Optional progress reporting callback
+        """
         try:
             # Check if we're already in an event loop
             try:
@@ -862,6 +855,8 @@ class Indexer(BasedModel):
         except Exception:
             logger.exception("Failure during batch indexing")
 
+    def _finalize_indexing(self) -> None:
+        """Log final statistics, save checkpoint, and cleanup."""
         logger.info(
             "Indexing complete: %d files processed, %d chunks created, %d indexed, %d errors in %.2fs (%.2f files/sec)",
             self._stats.files_processed,
@@ -880,6 +875,47 @@ class Indexer(BasedModel):
         if self._checkpoint_manager and len(self._stats.files_with_errors) == 0:
             self._checkpoint_manager.delete()
             logger.info("Checkpoint file deleted after successful completion")
+
+    def prime_index(
+        self,
+        *,
+        force_reindex: bool = False,
+        progress_callback: Callable[[IndexingStats, str | None], None] | None = None,
+    ) -> int:
+        """Perform an initial indexing pass using the configured rignore walker.
+
+        Enhanced version with persistence support and batch processing.
+
+        Args:
+            force_reindex: If True, skip persistence checks and reindex everything
+            progress_callback: Optional callback to report progress (receives stats and phase)
+
+        Returns:
+            Number of files indexed
+        """
+        # Try to restore from persistence (unless force_reindex)
+        if self._try_restore_from_checkpoint(force_reindex):
+            # Note: In v0.1, we still need to reindex discovered files
+            # In v0.2, we'll implement true resumption with file tracking
+            pass
+
+        # Reset stats for new indexing run
+        self._stats = IndexingStats()
+
+        # Discover files to index
+        files_to_index = self._discover_files_to_index()
+        if not files_to_index:
+            return 0
+
+        # Report discovery phase complete
+        if progress_callback:
+            progress_callback(self._stats, "discovery")
+
+        # Index files in batch
+        self._perform_batch_indexing(files_to_index, progress_callback)
+
+        # Finalize and report
+        self._finalize_indexing()
 
         return self._stats.files_processed
 
@@ -1075,6 +1111,172 @@ class Indexer(BasedModel):
         except Exception:
             logger.exception("Failed to index to vector store")
 
+    async def _phase_embed_and_index(
+        self,
+        all_chunks: list[CodeChunk],
+        progress_callback: Callable[[IndexingStats, str | None], None] | None,
+        context: Any,
+    ) -> None:
+        """Execute embedding and indexing phases if providers are initialized."""
+        from codeweaver.common.logging import log_to_client_or_fallback
+
+        if not (self._embedding_provider or self._sparse_provider or self._vector_store):
+            await log_to_client_or_fallback(
+                context,
+                "debug",
+                {
+                    "msg": "Skipping embedding and indexing phases",
+                    "extra": {"reason": "no_providers_initialized"},
+                },
+            )
+            return
+
+        # Phase 3: Embed chunks in batches
+        await log_to_client_or_fallback(
+            context,
+            "info",
+            {
+                "msg": "Starting embedding phase",
+                "extra": {
+                    "phase": "embedding",
+                    "chunks_to_embed": len(all_chunks),
+                    "dense_provider": type(self._embedding_provider).__name__
+                    if self._embedding_provider
+                    else None,
+                    "sparse_provider": type(self._sparse_provider).__name__
+                    if self._sparse_provider
+                    else None,
+                },
+            },
+        )
+
+        await self._embed_chunks_in_batches(all_chunks)
+
+        await log_to_client_or_fallback(
+            context,
+            "info",
+            {
+                "msg": "Embedding complete",
+                "extra": {"phase": "embedding", "chunks_embedded": self._stats.chunks_embedded},
+            },
+        )
+
+        if progress_callback:
+            progress_callback(self._stats, "embedding")
+
+        # Phase 4: Retrieve embedded chunks from registry
+        updated_chunks = self._retrieve_embedded_chunks(all_chunks)
+
+        # Phase 5: Index to vector store
+        await log_to_client_or_fallback(
+            context,
+            "info",
+            {
+                "msg": "Starting vector store indexing",
+                "extra": {
+                    "phase": "storage",
+                    "chunks_to_index": len(updated_chunks),
+                    "vector_store": type(self._vector_store).__name__
+                    if self._vector_store
+                    else None,
+                },
+            },
+        )
+
+        await self._index_chunks_to_store(updated_chunks)
+
+        await log_to_client_or_fallback(
+            context,
+            "info",
+            {
+                "msg": "Vector store indexing complete",
+                "extra": {"phase": "storage", "chunks_indexed": self._stats.chunks_indexed},
+            },
+        )
+
+        if progress_callback:
+            progress_callback(self._stats, "indexing")
+
+    async def _phase_discovery(
+        self,
+        files: list[Path],
+        progress_callback: Callable[[IndexingStats, str | None], None] | None,
+        context: Any,
+    ) -> list[DiscoveredFile]:
+        """Execute discovery phase and return discovered files."""
+        from codeweaver.common.logging import log_to_client_or_fallback
+
+        await log_to_client_or_fallback(
+            context,
+            "info",
+            {
+                "msg": "Starting batch indexing",
+                "extra": {
+                    "phase": "discovery",
+                    "batch_size": len(files),
+                    "total_discovered": self._stats.files_discovered,
+                },
+            },
+        )
+
+        discovered_files = self._discover_files_for_batch(files)
+
+        if progress_callback:
+            progress_callback(self._stats, "discovery")
+
+        return discovered_files
+
+    async def _phase_chunking(
+        self,
+        discovered_files: list[DiscoveredFile],
+        progress_callback: Callable[[IndexingStats, str | None], None] | None,
+        context: Any,
+    ) -> list[CodeChunk]:
+        """Execute chunking phase and return chunks."""
+        from codeweaver.common.logging import log_to_client_or_fallback
+
+        await log_to_client_or_fallback(
+            context,
+            "info",
+            {
+                "msg": "Discovery complete, starting chunking",
+                "extra": {
+                    "phase": "chunking",
+                    "files_discovered": len(discovered_files),
+                    "languages": list({
+                        (
+                            f.ext_kind.language.value
+                            if hasattr(f.ext_kind.language, "value")
+                            else str(f.ext_kind.language)
+                        )
+                        for f in discovered_files
+                        if f.ext_kind
+                    }),
+                },
+            },
+        )
+
+        all_chunks = self._chunk_discovered_files(discovered_files)
+
+        await log_to_client_or_fallback(
+            context,
+            "info",
+            {
+                "msg": "Chunking complete",
+                "extra": {
+                    "phase": "chunking",
+                    "chunks_created": len(all_chunks),
+                    "files_chunked": len(discovered_files),
+                    "avg_chunks_per_file": round(len(all_chunks) / len(discovered_files), 1),
+                },
+            },
+        )
+
+        if progress_callback:
+            progress_callback(self._stats, "chunking")
+
+        return all_chunks
+
     async def _index_files_batch(
         self,
         files: list[Path],
@@ -1117,20 +1319,7 @@ class Indexer(BasedModel):
             return
 
         # Phase 1: Discover files
-        await log_to_client_or_fallback(
-            context,
-            "info",
-            {
-                "msg": "Starting batch indexing",
-                "extra": {
-                    "phase": "discovery",
-                    "batch_size": len(files),
-                    "total_discovered": self._stats.files_discovered,
-                },
-            },
-        )
-
-        discovered_files = self._discover_files_for_batch(files)
+        discovered_files = await self._phase_discovery(files, progress_callback, context)
         if not discovered_files:
             await log_to_client_or_fallback(
                 context,
@@ -1142,33 +1331,8 @@ class Indexer(BasedModel):
             )
             return
 
-        # Report progress after discovery
-        if progress_callback:
-            progress_callback(self._stats, "discovery")
-
         # Phase 2: Chunk files
-        await log_to_client_or_fallback(
-            context,
-            "info",
-            {
-                "msg": "Discovery complete, starting chunking",
-                "extra": {
-                    "phase": "chunking",
-                    "files_discovered": len(discovered_files),
-                    "languages": list({
-                        (
-                            f.ext_kind.language.value
-                            if hasattr(f.ext_kind.language, "value")
-                            else str(f.ext_kind.language)
-                        )
-                        for f in discovered_files
-                        if f.ext_kind
-                    }),
-                },
-            },
-        )
-
-        all_chunks = self._chunk_discovered_files(discovered_files)
+        all_chunks = await self._phase_chunking(discovered_files, progress_callback, context)
         if not all_chunks:
             await log_to_client_or_fallback(
                 context,
@@ -1180,102 +1344,8 @@ class Indexer(BasedModel):
             )
             return
 
-        await log_to_client_or_fallback(
-            context,
-            "info",
-            {
-                "msg": "Chunking complete",
-                "extra": {
-                    "phase": "chunking",
-                    "chunks_created": len(all_chunks),
-                    "files_chunked": len(discovered_files),
-                    "avg_chunks_per_file": round(len(all_chunks) / len(discovered_files), 1),
-                },
-            },
-        )
-
-        # Report progress after chunking
-        if progress_callback:
-            progress_callback(self._stats, "chunking")
-
-        # Phase 3-5: Only run if providers are initialized
-        if self._embedding_provider or self._sparse_provider or self._vector_store:
-            # Phase 3: Embed chunks in batches
-            await log_to_client_or_fallback(
-                context,
-                "info",
-                {
-                    "msg": "Starting embedding phase",
-                    "extra": {
-                        "phase": "embedding",
-                        "chunks_to_embed": len(all_chunks),
-                        "dense_provider": type(self._embedding_provider).__name__
-                        if self._embedding_provider
-                        else None,
-                        "sparse_provider": type(self._sparse_provider).__name__
-                        if self._sparse_provider
-                        else None,
-                    },
-                },
-            )
-
-            await self._embed_chunks_in_batches(all_chunks)
-
-            await log_to_client_or_fallback(
-                context,
-                "info",
-                {
-                    "msg": "Embedding complete",
-                    "extra": {"phase": "embedding", "chunks_embedded": self._stats.chunks_embedded},
-                },
-            )
-
-            # Report progress after embedding
-            if progress_callback:
-                progress_callback(self._stats, "embedding")
-
-            # Phase 4: Retrieve embedded chunks from registry
-            updated_chunks = self._retrieve_embedded_chunks(all_chunks)
-
-            # Phase 5: Index to vector store
-            await log_to_client_or_fallback(
-                context,
-                "info",
-                {
-                    "msg": "Starting vector store indexing",
-                    "extra": {
-                        "phase": "storage",
-                        "chunks_to_index": len(updated_chunks),
-                        "vector_store": type(self._vector_store).__name__
-                        if self._vector_store
-                        else None,
-                    },
-                },
-            )
-
-            await self._index_chunks_to_store(updated_chunks)
-
-            await log_to_client_or_fallback(
-                context,
-                "info",
-                {
-                    "msg": "Vector store indexing complete",
-                    "extra": {"phase": "storage", "chunks_indexed": self._stats.chunks_indexed},
-                },
-            )
-
-            # Report progress after indexing
-            if progress_callback:
-                progress_callback(self._stats, "indexing")
-        else:
-            await log_to_client_or_fallback(
-                context,
-                "debug",
-                {
-                    "msg": "Skipping embedding and indexing phases",
-                    "extra": {"reason": "no_providers_initialized"},
-                },
-            )
+        # Phase 3-5: Embed and index
+        await self._phase_embed_and_index(all_chunks, progress_callback, context)
 
         # Update stats with successful file count
         self._stats.files_processed += len(discovered_files)
@@ -1502,6 +1572,8 @@ class FileWatcher:
             if initial_count := self._indexer.prime_index():
                 logger.info("Initial indexing complete: %d files indexed", initial_count)
             self.watcher = watchfiles.arun_process(*self.paths, **watch_kwargs)
+        except KeyboardInterrupt:
+            logger.info("FileWatcher interrupted by user.")
         except Exception:
             logger.exception("Something happened...")
             raise

@@ -119,7 +119,7 @@ def build_success_response(
     status = "success"
 
     try:
-        from codeweaver.common.registry import get_indexer
+        from codeweaver.engine.indexer import get_indexer
 
         indexer = get_indexer()
 

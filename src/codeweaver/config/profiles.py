@@ -16,10 +16,14 @@ The recommended flag gives you access to:
 """
 
 from codeweaver.config.providers import (
+    AgentModelSettings,
     AgentProviderSettings,
     DataProviderSettings,
+    EmbeddingModelSettings,
     EmbeddingProviderSettings,
     ProviderSettingsDict,
+    QdrantConfig,
+    RerankingModelSettings,
     RerankingProviderSettings,
     VectorStoreProviderSettings,
 )
@@ -35,19 +39,33 @@ def recommended_default() -> ProviderSettingsDict:
     return ProviderSettingsDict(
         embedding=(
             EmbeddingProviderSettings(
-                provider=Provider.VOYAGE, enabled=True, model="voyage-code-3"
+                model_settings=EmbeddingModelSettings(model="voyage-code-3"),
+                provider=Provider.VOYAGE,
+                enabled=True,
             ),
         ),
         reranking=(
             RerankingProviderSettings(
-                provider=Provider.VOYAGE, enabled=True, model="voyage-rerank-2.5"
+                provider=Provider.VOYAGE,
+                enabled=True,
+                model_settings=RerankingModelSettings(model="voyage-rerank-2.5"),
             ),
         ),
         agent=(
             AgentProviderSettings(
-                provider=Provider.ANTHROPIC, enabled=True, model="claude-haiku-4.5"
+                provider=Provider.ANTHROPIC,
+                enabled=True,
+                model_settings=AgentModelSettings(),
+                model="claude-haiku-4.5",
             ),
         ),
-        data=(DataProviderSettings(enabled=True),),
-        vector=(VectorStoreProviderSettings(provider=Provider.QDRANT, enabled=True),),
+        data=(
+            DataProviderSettings(provider=Provider.TAVILY, enabled=True),
+            DataProviderSettings(provider=Provider.DUCKDUCKGO, enabled=True),
+        ),
+        vector=(
+            VectorStoreProviderSettings(
+                provider=Provider.QDRANT, enabled=True, provider_settings=QdrantConfig()
+            ),
+        ),
     )

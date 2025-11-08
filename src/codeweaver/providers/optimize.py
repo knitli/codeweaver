@@ -147,7 +147,7 @@ def decide_fastembed_runtime(
 type SimdExtensions = Literal["arm64", "avx2", "avx512", "avx512_vnni"]
 
 
-class AvailableOptimizations(TypedDict):
+class AvailableOptimizations(TypedDict, total=False):
     """Available optimizations in the current environment."""
 
     onnx: bool
@@ -253,15 +253,22 @@ def get_optimizations(model_kind: Literal["dense", "sparse", "both"]) -> Optimiz
     sparse_opts = dense_opts
     for key in ("use_small_chunks_for_dense", "chunk_func"):
         _ = sparse_opts.pop(key, None)
-    sparse_opts = OptimizationDecisions(
-        **(sparse_opts | {"use_small_batch_for_sparse": sparse_opts["backend"] == "onnx_gpu"})
+    sparse_opts = OptimizationDecisions(  # ty: ignore[missing-typed-dict-key]
+        **(
+            sparse_opts
+            | {
+                "use_small_batch_for_sparse": sparse_opts["backend"] == "onnx_gpu",
+                "backend": sparse_opts["backend"],
+                "dtype": sparse_opts["dtype"],
+            }
+        )
     )
     return (
         dense_opts
         if model_kind == "dense"
         else sparse_opts
         if model_kind == "sparse"
-        else OptimizationDecisions(**(dense_opts | sparse_opts))
+        else OptimizationDecisions(**(dense_opts | sparse_opts))  # ty: ignore[missing-typed-dict-key]
     )
 
 

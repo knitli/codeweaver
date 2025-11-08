@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, Self, cast
 
 from pydantic import AliasGenerator, ConfigDict, Field, JsonValue, PositiveInt, model_validator
 from pydantic.alias_generators import to_camel, to_snake
+from types_boto3_bedrock_runtime.client import BedrockRuntimeClient
 
 from codeweaver.config.providers import AWSProviderSettings
 from codeweaver.core.types.models import BasedModel
@@ -225,10 +226,10 @@ except ImportError as e:
     raise ImportError("boto3 is not installed. Please install it with `pip install boto3`.") from e
 
 
-class BedrockRerankingProvider(RerankingProvider[boto3_client]):
+class BedrockRerankingProvider(RerankingProvider[BedrockRuntimeClient]):
     """Provider for Bedrock reranking."""
 
-    _client: boto3_client
+    _client: BedrockRuntimeClient
     _provider = Provider.BEDROCK
     _caps: RerankingModelCapabilities = get_amazon_reranking_capabilities()[0]
     _model_configuration: RerankConfiguration
@@ -240,25 +241,37 @@ class BedrockRerankingProvider(RerankingProvider[boto3_client]):
         bedrock_provider_settings: AWSProviderSettings,
         model_config: RerankConfiguration | None = None,
         capabilities: RerankingModelCapabilities | None = None,
-        client: boto3_client | None = None,
+        client: BedrockRuntimeClient | None = None,
         top_n: PositiveInt = 40,
         prompt: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Override base init to set up Bedrock-specific client and configuration."""
-        self._bedrock_provider_settings = bedrock_provider_settings
+        from pydantic import SecretStr
+
+        self._bedrock_provider_settings = {
+            k: v.get_secret_value() if isinstance(v, SecretStr) else v
+            for k, v in bedrock_provider_settings.items()
+            if v is not None
+        }
         self._model_configuration = model_config or RerankConfiguration.from_arn(
             bedrock_provider_settings["model_arn"], kwargs.get("top_n", 40) if kwargs else top_n
         )
-        _ = bedrock_provider_settings.pop("model_arn")
+        _ = bedrock_provider_settings.pop("model_arn")  # ty: ignore[invalid-argument-type]  # the typed dict is mine, I do what I want
         self._client = boto3_client(
             "bedrock-runtime", **self._bedrock_provider_settings
         )  # we just popped it
         self._capabilities = capabilities or self._caps or get_amazon_reranking_capabilities()[0]
-
-        super().__init__(
-            client=client, capabilities=capabilities, top_n=top_n, prompt=prompt, **kwargs
-        )
+        if client or self._client:
+            super().__init__(
+                client=client or self._client,
+                capabilities=capabilities or self._capabilities,
+                top_n=top_n,
+                prompt=prompt,
+                **kwargs,
+            )
+        else:
+            raise ValueError("Either a Bedrock client or provider settings must be provided.")
 
     def _initialize(self) -> None:
         # Our input transformer can't conform to the expected signature because we need the query and model config to construct the full object. We'll handle that in the rerank method.

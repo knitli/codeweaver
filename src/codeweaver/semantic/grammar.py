@@ -755,7 +755,7 @@ class Category(BasedModel):
 
     def __str__(self) -> str:
         """String representation of the Category."""
-        return f"Category: {self.name}, Language: {self.language.variable}, Members: [{', '.join(sorted(thing.name for thing in self.member_things), key=str.lower)}]"
+        return f"Category: {self.name}, Language: {self.language.variable}, Members: [{', '.join(sorted((thing.name for thing in self.member_things if thing), key=str.lower))}]"
 
     @property
     def short_str(self) -> str:

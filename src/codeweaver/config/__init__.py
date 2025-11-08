@@ -19,6 +19,7 @@ if TYPE_CHECKING:
         CustomDelimiter,
         CustomLanguage,
     )
+    from codeweaver.config.indexing import IndexerSettings, IndexerSettingsDict, RignoreSettings
     from codeweaver.config.logging import (
         FilterID,
         FiltersDict,
@@ -31,6 +32,14 @@ if TYPE_CHECKING:
         LoggingConfigDict,
         LoggingSettings,
         SerializableLoggingFilter,
+    )
+    from codeweaver.config.mcp import (
+        CodeWeaverMCPConfig,
+        CodeWeaverMCPConfigDict,
+        MCPConfig,
+        MCPConfigDict,
+        StdioCodeWeaverConfig,
+        StdioCodeWeaverConfigDict,
     )
     from codeweaver.config.middleware import (
         AVAILABLE_MIDDLEWARE,
@@ -46,6 +55,8 @@ if TYPE_CHECKING:
         AWSProviderSettings,
         AzureCohereProviderSettings,
         AzureOpenAIProviderSettings,
+        ConnectionConfiguration,
+        ConnectionRateLimitConfig,
         DataProviderSettings,
         EmbeddingModelSettings,
         EmbeddingProviderSettings,
@@ -66,17 +77,12 @@ if TYPE_CHECKING:
         update_settings,
     )
     from codeweaver.config.types import (
-        ConnectionConfiguration,
-        ConnectionRateLimitConfig,
         FastMcpHttpRunArgs,
         FastMcpServerSettingsDict,
-        FileFilterSettingsDict,
-        RignoreSettings,
         UvicornServerSettings,
         UvicornServerSettingsDict,
         default_config_file_locations,
     )
-
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
@@ -89,6 +95,12 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ChunkerSettings": (__spec__.parent, "chunker"),
     "ChunkerSettingsDict": (__spec__.parent, "chunker"),
     "CodeWeaverSettings": (__spec__.parent, "settings"),
+    "CodeWeaverMCPConfig": (__spec__.parent, "mcp"),
+    "CodeWeaverMCPConfigDict": (__spec__.parent, "mcp"),
+    "MCPConfig": (__spec__.parent, "mcp"),
+    "MCPConfigDict": (__spec__.parent, "mcp"),
+    "StdioCodeWeaverConfig": (__spec__.parent, "mcp"),
+    "StdioCodeWeaverConfigDict": (__spec__.parent, "mcp"),
     "CodeWeaverSettingsDict": (__spec__.parent, "types"),
     "ConnectionConfiguration": (__spec__.parent, "providers"),
     "ConnectionRateLimitConfig": (__spec__.parent, "providers"),
@@ -162,6 +174,8 @@ __all__ = (
     "AzureOpenAIProviderSettings",
     "ChunkerSettings",
     "ChunkerSettingsDict",
+    "CodeWeaverMCPConfig",
+    "CodeWeaverMCPConfigDict",
     "CodeWeaverSettings",
     "CodeWeaverSettingsDict",
     "ConnectionConfiguration",
@@ -176,7 +190,6 @@ __all__ = (
     "FastMcpServerSettings",
     "FastMcpServerSettingsDict",
     "FastembedGPUProviderSettings",
-    "FileFilterSettingsDict",
     "FilterID",
     "FiltersDict",
     "FormatterID",
@@ -190,6 +203,8 @@ __all__ = (
     "LoggingConfigDict",
     "LoggingMiddlewareSettings",
     "LoggingSettings",
+    "MCPConfig",
+    "MCPConfigDict",
     "MiddlewareOptions",
     "ModelString",
     "ProviderSettingsDict",
@@ -201,6 +216,8 @@ __all__ = (
     "RetryMiddlewareSettings",
     "RignoreSettings",
     "SerializableLoggingFilter",
+    "StdioCodeWeaverConfig",
+    "StdioCodeWeaverConfigDict",
     "UvicornServerSettings",
     "UvicornServerSettingsDict",
     "default_config_file_locations",

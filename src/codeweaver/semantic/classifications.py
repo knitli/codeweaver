@@ -139,7 +139,7 @@ class ImportanceScores(DataclassSerializationMixin):
 
     def as_dict(self) -> ImportanceScoresDict:
         """Convert importance scores to a dictionary format."""
-        return ImportanceScoresDict(**self.dump_python())
+        return ImportanceScoresDict(**self.dump_python())  # ty: ignore[missing-typed-dict-key]
 
     @classmethod
     def from_dict(cls, **data: Unpack[ImportanceScoresDict]) -> Self:

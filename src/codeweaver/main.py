@@ -12,9 +12,11 @@ import logging
 
 from pathlib import Path
 from types import EllipsisType
-from typing import TYPE_CHECKING, Any, TypeGuard, is_typeddict
+from typing import TYPE_CHECKING, Any, is_typeddict
 
+from fastmcp import FastMCP
 from pydantic import FilePath
+from typing_extensions import TypeIs
 
 from codeweaver.common.utils import lazy_import
 from codeweaver.core.types.sentinel import Unset
@@ -22,18 +24,13 @@ from codeweaver.providers.provider import Provider as Provider  # needed for pyd
 
 
 if TYPE_CHECKING:
-    from fastmcp import FastMCP
-
     from codeweaver.config.settings import CodeWeaverSettings
     from codeweaver.server import AppState, ServerSetup
-else:
-    # Import FastMCP at runtime for isinstance checks
-    from fastmcp import FastMCP
 
 logger = logging.getLogger(__name__)
 
 
-def is_server_setup(obj: Any) -> TypeGuard[ServerSetup]:
+def is_server_setup(obj: Any) -> TypeIs[ServerSetup]:
     """Type guard to check if an object is a ServerSetup TypedDict."""
     return (
         is_typeddict(obj)

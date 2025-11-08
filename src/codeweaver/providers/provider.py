@@ -438,10 +438,10 @@ class Provider(BaseEnum):
         found_vars: list[ProviderEnvVarInfo] = []
         for key, value in env_vars.items():
             if key not in ("note", "other") and isinstance(value, tuple):
-                found_vars.append((key, value))
+                found_vars.append(value)
             elif key == "other" and isinstance(value, dict) and value:
                 found_vars.extend(
-                    (key, nested_value)
+                    nested_value
                     for nested_value in value.values()  # type: ignore
                 )
         return found_vars

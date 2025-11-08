@@ -150,10 +150,11 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
             self.client_options = client_options
         else:
             # Client was provided - extract or use default client_options
-            self.client_options = config_kwargs.get("client_options", {}) or config_kwargs
-            if not self.client_options:
-                # Minimal client options if none provided
-                self.client_options = {"model": caps.name, "client_name": "codeweaver"}
+            self.client_options = (
+                config_kwargs.get("client_options", {})
+                or config_kwargs
+                or {"model": caps.name, "client_name": "codeweaver"}
+            )
 
         # Store client BEFORE super().__init__()
         self._client = _client

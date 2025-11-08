@@ -111,7 +111,7 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
         self, query: Sequence[str], **kwargs: Mapping[str, Any]
     ) -> list[list[float]] | list[list[int]]:
         """Embed a query or group of queries into vectors."""
-        results: EmbeddingsObject = await self._client.embed(texts=query, **kwargs)
+        results: EmbeddingsObject = await self._client.embed(texts=list(query), **kwargs)
         self._fire_and_forget(lambda: self._update_token_stats(token_count=results.total_tokens))
         return self._process_output(results)
 

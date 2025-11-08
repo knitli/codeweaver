@@ -39,16 +39,14 @@ if TYPE_CHECKING:
         ToolOrPromptName,
     )
     from codeweaver.common.utils import (
-        MISSING,
         LazyImport,
-        Missing,
         ensure_iterable,
         estimate_tokens,
         file_is_binary,
         get_git_branch,
         get_git_revision,
         get_possible_env_vars,
-        get_project_root,
+        get_project_path,
         has_package,
         in_codeweaver_clone,
         is_class,
@@ -65,7 +63,6 @@ if TYPE_CHECKING:
         try_git_rev_parse,
         uuid7,
     )
-
 
 
 _MARKUP_TAG = "bold dark_orange"

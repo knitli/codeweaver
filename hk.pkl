@@ -59,6 +59,12 @@ local linters = new Mapping<String, Step> {
         check = "./mise-tasks/validate-lazy-imports.py {{ files }}"
     }
 
+    // ty typechecker for python
+    ["ty"] = new Step {
+        glob = "{src,tests,scripts,mise-tasks}/**/*.py"
+        check = "ty check {{ files }}"
+    }
+
 }
 
 hooks {

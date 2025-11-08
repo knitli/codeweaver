@@ -23,6 +23,8 @@ from typing import (
     cast,
 )
 
+import types_boto3_bedrock_runtime.client
+
 from pydantic import (
     AliasGenerator,
     ConfigDict,
@@ -438,7 +440,9 @@ except ImportError as e:
     ) from e
 
 
-class BedrockEmbeddingProvider(EmbeddingProvider[bedrock_client]):
+class BedrockEmbeddingProvider(
+    EmbeddingProvider[types_boto3_bedrock_runtime.client.BedrockRuntimeClient]
+):
     """Bedrock embedding provider."""
 
     _client: BedrockRuntimeClient = bedrock_client

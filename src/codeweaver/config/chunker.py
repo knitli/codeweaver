@@ -62,8 +62,8 @@ class ChunkerSettingsDict(TypedDict, total=False):
     Not intended to be used directly; used for internal type checking and validation.
     """
 
-    custom_delimiters: NotRequired[list[CustomDelimiter]] | None
-    custom_languages: NotRequired[list[CustomLanguage]] | None
+    custom_delimiters: Annotated[list[CustomDelimiter] | None, NotRequired]
+    custom_languages: Annotated[list[CustomLanguage] | None, NotRequired]
     semantic_importance_threshold: NotRequired[NonNegativeFloat | None]
     performance: NotRequired[PerformanceSettingsDict | None]
     concurrency: NotRequired[ConcurrencySettingsDict | None]

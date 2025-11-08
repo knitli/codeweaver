@@ -224,7 +224,7 @@ async def health(_request: Request) -> PlainTextResponse:
             return PlainTextResponse(content=info.report(), media_type="application/json")
         # Get health response from health Service
         if state.health_service:
-            health_response = state.health_service.get_health_response()
+            health_response = await state.health_service.get_health_response()
             return PlainTextResponse(
                 content=health_response.model_dump_json(), media_type="application/json"
             )

@@ -964,6 +964,12 @@ class ProviderRegistry(BasedModel):
             if isinstance(retrieved_cls, LazyImport):
                 return self._create_provider(provider, retrieved_cls, **kwargs)
 
+            # Handle tuple types (shouldn't happen for embedding, but guard against it)
+            if isinstance(retrieved_cls, tuple) or retrieved_cls is None:
+                raise ConfigurationError(
+                    f"Embedding provider '{provider}' returned invalid type: {type(retrieved_cls)}"
+                )
+
             # we need to access a property to execute the import and ensure it exists
             name = None
             with contextlib.suppress(Exception):
@@ -974,30 +980,24 @@ class ProviderRegistry(BasedModel):
             return cast(EmbeddingProvider[Any], retrieved_cls(**kwargs))
 
         # Standard handling for other providers
+        # Handle None case
+        if retrieved_cls is None:
+            raise ConfigurationError(
+                f"Provider '{provider}' of kind '{provider_kind}' is not registered"
+            )
+
+        # Handle tuple types (data providers return tuples)
+        if isinstance(retrieved_cls, tuple):
+            # For data providers, we need different instantiation logic
+            # This should be handled by caller or needs special logic here
+            raise ConfigurationError(
+                f"Provider '{provider}' of kind '{provider_kind}' returned tuple type - use appropriate getter"
+            )
+
         if isinstance(retrieved_cls, LazyImport):
             return self._create_provider(provider, retrieved_cls, **kwargs)
+
         return retrieved_cls(**kwargs)
-
-    def _create_provider(
-        self, provider: Provider, importer: LazyImport[type[Any]], **kwargs: Any
-    ) -> Any:
-        """Create a provider instance using the given importer.
-
-        Args:
-            provider: The provider enum identifier
-            importer: The lazy import of the provider class
-            **kwargs: Provider-specific initialization arguments
-
-        Returns:
-            An initialized provider instance
-        """
-        resolved = None
-        try:
-            resolved = importer._resolve()  # type: ignore  # yes, we're accessing a private attribute in our own app
-        except Exception as e:
-            logger.exception("Provider '%s' could not be imported.", provider)
-            raise ConfigurationError(f"Provider '{provider}' could not be imported.") from e
-        return resolved(**kwargs)
 
     @overload
     def get_provider_instance(
