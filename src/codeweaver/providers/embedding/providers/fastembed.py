@@ -53,9 +53,9 @@ _TextEmbedding = get_text_embedder()
 _SparseTextEmbedding = get_sparse_embedder()
 
 
-def fastembed_all_kwargs(**kwargs: Mapping[str, Any] | None) -> dict[str, Any]:
+def fastembed_all_kwargs(**kwargs: Any) -> dict[str, Any]:
     """Get all possible kwargs for FastEmbed embedding methods."""
-    default_kwargs: Mapping[str, Any] = {"threads": multiprocessing.cpu_count(), "lazy_load": True}
+    default_kwargs: dict[str, Any] = {"threads": multiprocessing.cpu_count(), "lazy_load": True}
     if kwargs:
         device_ids: list[int] | None = kwargs.get("device_ids")
         cuda: bool | None = kwargs.get("cuda")
@@ -78,6 +78,7 @@ def fastembed_all_kwargs(**kwargs: Mapping[str, Any] | None) -> dict[str, Any]:
             kwargs["cuda"] = True
             kwargs["device_ids"] = device_ids
             kwargs["providers"] = ["CUDAExecutionProvider"]
+        return default_kwargs | kwargs
     return default_kwargs
 
 

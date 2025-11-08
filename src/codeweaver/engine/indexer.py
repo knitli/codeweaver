@@ -894,7 +894,7 @@ class Indexer(BasedModel):
             Number of files indexed
         """
         # Try to restore from persistence (unless force_reindex)
-        if self._try_restore_from_checkpoint(force_reindex):
+        if self._try_restore_from_checkpoint(force_reindex=force_reindex):
             # Note: In v0.1, we still need to reindex discovered files
             # In v0.2, we'll implement true resumption with file tracking
             pass
