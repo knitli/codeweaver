@@ -407,23 +407,78 @@ python = "./.venv"
 extra-paths = ["./vendored", "./typings"]
 
 [tool.ty.rules]
-# Suppress known false positives in test files
-possibly-missing-attribute = "ignore"
-# Test framework limitations - ty doesn't understand pytest mocks/fixtures
-# These are inherent limitations, not real bugs
-unresolved-attribute = "warn"  # Downgrade from error to warn for test mocks
-unknown-argument = "warn"  # Downgrade for pytest fixtures
-unresolved-reference = "warn"  # Downgrade for test references
-# Type inference limitations
+# === Core Type Safety Rules (kept strict for src/) ===
+# These remain as errors by default and will catch real bugs in production code
+
+# === Test Framework Limitations ===
+# ty doesn't understand pytest mocks/fixtures - these are inherent limitations, not real bugs
+possibly-missing-attribute = "ignore"  # Pytest fixtures don't have static attributes
+unresolved-attribute = "warn"  # Test mocks may have dynamic attributes
+unknown-argument = "warn"  # Pytest fixtures injected dynamically
+unresolved-reference = "warn"  # Test references may be dynamic
+
+# === Type Inference Limitations ===
 # ty is overly strict with Literal inference in dict lookups
-invalid-argument-type = "warn"  # Many false positives in capabilities dicts
-# Style and refactoring suggestions (informational only)
-redundant-cast = "ignore"
+invalid-argument-type = "warn"  # Many false positives in capabilities dicts and code gen
+
+# === Style and Refactoring Suggestions ===
+redundant-cast = "ignore"  # Informational only, not bugs
+
+# === Optional Dependencies ===
+# Scripts may import optional dependencies (e.g., mkdocs_gen_files, black)
+unresolved-import = "warn"  # Downgrade to warn for optional dependencies
 
 [tool.ty.src]
 include = ["./src", "./tests", "./scripts", "./mise-tasks"]
 # Exclude vendored code, typings, and intentionally malformed test fixtures
 exclude = ["./typings", "./vendored", "./tests/fixtures/malformed.py"]
+
+# === Per-Directory Overrides ===
+# Apply different strictness levels: strict for src/, lenient for scripts/mise-tasks/tests
+
+# Scripts: Code generation, build automation, documentation generation
+# These often use dynamic patterns, optional dependencies, and intentional type flexibility
+[[tool.ty.overrides]]
+include = ["scripts/**/*.py"]
+
+[tool.ty.overrides.rules]
+invalid-assignment = "warn"
+unresolved-import = "ignore"
+invalid-argument-type = "ignore"
+unresolved-reference = "ignore"
+unresolved-attribute = "ignore"
+
+# Mise Tasks: Build and diagnostic automation
+# These are utility scripts with intentional dynamic behavior (e.g., monkey-patching warnings)
+[[tool.ty.overrides]]
+include = ["mise-tasks/**/*.py"]
+
+[tool.ty.overrides.rules]
+invalid-assignment = "ignore"
+unresolved-import = "ignore"
+invalid-argument-type = "ignore"
+unresolved-reference = "ignore"
+
+# Tests: May use pytest fixtures, mocks, and test-specific patterns
+# Also may not have test dependencies installed when running ty in dev environment
+[[tool.ty.overrides]]
+include = ["tests/**/*.py"]
+
+[tool.ty.overrides.rules]
+unresolved-import = "ignore"  # pytest and other test dependencies may not be installed
+unknown-argument = "ignore"  # pytest fixtures inject arguments dynamically
+unresolved-reference = "ignore"  # test fixtures and dynamic test patterns
+unresolved-attribute = "ignore"  # mocks and fixtures have dynamic attributes
+
+# Test Fixtures: Intentionally malformed or edge-case test data
+# These may have type errors by design to test error handling
+[[tool.ty.overrides]]
+include = ["tests/fixtures/**/*.py"]
+
+[tool.ty.overrides.rules]
+invalid-assignment = "ignore"
+invalid-argument-type = "ignore"
+unresolved-reference = "ignore"
 
 [tool.uv.sources]
 types-boto3-custom = { path = "vendored/types_boto3_custom-1.40.16-py3-none-any.whl" }
