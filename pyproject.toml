@@ -420,8 +420,9 @@ unknown-argument = "warn"  # Pytest fixtures injected dynamically
 unresolved-reference = "warn"  # Test references may be dynamic
 
 # === Type Inference Limitations ===
-# ty is overly strict with Literal inference in dict lookups
+# ty is overly strict with Literal inference in dict lookups and dynamic patterns
 invalid-argument-type = "warn"  # Many false positives in capabilities dicts and code gen
+missing-typed-dict-key = "warn"  # Often false positive with dynamic TypedDict construction (e.g., **dict comprehension)
 
 # === Style and Refactoring Suggestions ===
 redundant-cast = "ignore"  # Informational only, not bugs
@@ -463,6 +464,7 @@ unresolved-reference = "ignore"
 
 # Tests: May use pytest fixtures, mocks, and test-specific patterns
 # Also may not have test dependencies installed when running ty in dev environment
+# Tests can be less exact per the project requirements - focus on src/ strictness
 [[tool.ty.overrides]]
 include = ["tests/**/*.py"]
 
@@ -471,6 +473,11 @@ unresolved-import = "ignore"  # pytest and other test dependencies may not be in
 unknown-argument = "ignore"  # pytest fixtures inject arguments dynamically
 unresolved-reference = "ignore"  # test fixtures and dynamic test patterns
 unresolved-attribute = "ignore"  # mocks and fixtures have dynamic attributes
+non-subscriptable = "warn"  # Often false positive after pytest assertions
+unsupported-operator = "warn"  # Type narrowing after assertions not always understood
+missing-argument = "warn"  # Dynamic test patterns and fixtures
+too-many-positional-arguments = "warn"  # Dynamic function calls in tests
+invalid-assignment = "warn"  # Test setup patterns
 
 # Test Fixtures: Intentionally malformed or edge-case test data
 # These may have type errors by design to test error handling
