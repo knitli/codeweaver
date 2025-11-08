@@ -118,11 +118,74 @@ def check_required_dependencies() -> DoctorCheck:
     from importlib import metadata
 
     # Special case mapping for packages where PyPI name differs from import name
+<<<<<<< HEAD
     package_to_module_map = {"uuid7": "uuid_extensions"}
+||||||| parent of a1d309b1 (Fix critical bugs: init config TOML crash, doctor uuid7 false positive, search error messaging)
+=======
+    package_to_module_map = {
+        "uuid7": "uuid_extensions",
+    }
+>>>>>>> a1d309b1 (Fix critical bugs: init config TOML crash, doctor uuid7 false positive, search error messaging)
 
     missing: list[str] = []
     if our_dependencies := metadata.metadata("codeweaver-mcp").get_all("Requires-Dist") or []:
+<<<<<<< HEAD
         _identify_missing_dependencies(our_dependencies, package_to_module_map, metadata, missing)
+||||||| parent of a1d309b1 (Fix critical bugs: init config TOML crash, doctor uuid7 false positive, search error messaging)
+        import re
+
+        dependency_pattern = re.compile(r"^(?P<name>[\w\-]+)>=(?P<version>\d+\.\d+\.\d+\.?\d*)$")
+        dependencies = [
+            dep.split(";")[0].strip() if ";" in dep else dep.strip()
+            for dep in our_dependencies
+            if "extra" not in dep
+        ]
+        matches = [
+            dependency_pattern.match(dep) for dep in dependencies if dependency_pattern.match(dep)
+        ]
+        required_packages: list[tuple[str, str, str]] = [
+            (match["name"], match["name"].replace("-", "_"), match["version"] or "")
+            for match in matches
+            if match
+        ]
+
+        for display_name, module_name, _version in required_packages:
+            if find_spec(module_name):
+                pkg_version = metadata.version(display_name)
+                installed.append((display_name, pkg_version))
+            else:
+                missing.append(display_name)
+
+=======
+        import re
+
+        dependency_pattern = re.compile(r"^(?P<name>[\w\-]+)>=(?P<version>\d+\.\d+\.\d+\.?\d*)$")
+        dependencies = [
+            dep.split(";")[0].strip() if ";" in dep else dep.strip()
+            for dep in our_dependencies
+            if "extra" not in dep
+        ]
+        matches = [
+            dependency_pattern.match(dep) for dep in dependencies if dependency_pattern.match(dep)
+        ]
+        required_packages: list[tuple[str, str, str]] = [
+            (
+                match["name"],
+                package_to_module_map.get(match["name"], match["name"].replace("-", "_")),
+                match["version"] or "",
+            )
+            for match in matches
+            if match
+        ]
+
+        for display_name, module_name, _version in required_packages:
+            if find_spec(module_name):
+                pkg_version = metadata.version(display_name)
+                installed.append((display_name, pkg_version))
+            else:
+                missing.append(display_name)
+
+>>>>>>> a1d309b1 (Fix critical bugs: init config TOML crash, doctor uuid7 false positive, search error messaging)
     return DoctorCheck.set_check(
         "Required Dependencies",
         "fail" if missing else "success",
