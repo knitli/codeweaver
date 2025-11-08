@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import os
 import sys
-import warnings
 
 from importlib.util import find_spec
 from pathlib import Path
@@ -28,14 +27,6 @@ from codeweaver.common.utils.git import get_project_path, is_git_dir
 from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.core.types.sentinel import Unset
 from codeweaver.providers.provider import ProviderKind
-
-# Suppress pydantic deprecation warnings from third-party dependencies
-warnings.filterwarnings(
-    "ignore",
-    category=DeprecationWarning,
-    module="google.genai.types",
-    message=".*@model_validator.*mode='after'.*classmethod.*",
-)
 
 
 if TYPE_CHECKING:

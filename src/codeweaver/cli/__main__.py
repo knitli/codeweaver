@@ -10,23 +10,17 @@ Commands are registered and lazy-loaded from here.
 
 from __future__ import annotations
 
-import os
 import sys
-
-# Set warning filter via environment before any imports
-# This catches warnings that happen during lazy imports
-os.environ.setdefault(
-    "PYTHONWARNINGS",
-    "ignore::DeprecationWarning:google.genai.types"
-)
-
 import warnings
 
-# Also set via warnings module for runtime warnings
-warnings.filterwarnings(
-    "ignore",
-    module="google.genai.types",
-)
+# NOTE: google.genai emits a pydantic deprecation warning during module import
+# (before our code runs). To suppress it, set: PYTHONWARNINGS='ignore::pydantic.warnings.PydanticDeprecatedSince212'
+# We try to suppress it here for runtime warnings, but import-time warnings occur too early.
+try:
+    from pydantic.warnings import PydanticDeprecatedSince212
+    warnings.simplefilter("ignore", PydanticDeprecatedSince212)
+except (ImportError, Exception):
+    pass
 
 from cyclopts import App, Parameter
 from rich.console import Console
