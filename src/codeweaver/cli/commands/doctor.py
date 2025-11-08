@@ -116,16 +116,9 @@ def check_required_dependencies() -> DoctorCheck:
     """Check if required dependencies are installed using find_spec."""
     from importlib import metadata
 
-<<<<<<< HEAD
-    # Map of package names to actual module names (for cases where they differ)
-    PACKAGE_TO_MODULE_MAP = {
-        "uuid7": "uuid_extensions"  # uuid7 package provides uuid_extensions module
-||||||| 30a77436
-=======
     # Special case mapping for packages where PyPI name differs from import name
     package_to_module_map = {
         "uuid7": "uuid_extensions",
->>>>>>> origin/copilot/triage-codeweaver-beta
     }
 
     missing: list[str] = []
@@ -145,13 +138,7 @@ def check_required_dependencies() -> DoctorCheck:
         required_packages: list[tuple[str, str, str]] = [
             (
                 match["name"],
-<<<<<<< HEAD
-                PACKAGE_TO_MODULE_MAP.get(match["name"], match["name"].replace("-", "_")),
-||||||| 30a77436
-            (match["name"], match["name"].replace("-", "_"), match["version"] or "")
-=======
                 package_to_module_map.get(match["name"], match["name"].replace("-", "_")),
->>>>>>> origin/copilot/triage-codeweaver-beta
                 match["version"] or "",
             )
             for match in matches
