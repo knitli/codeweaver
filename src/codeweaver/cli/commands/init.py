@@ -21,7 +21,6 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal
 import cyclopts
 import httpx
 
-from fastmcp import claude_code, claude_desktop, cursor, gemini_cli, mcp_json
 from pydantic_core import from_json as from_json
 from pydantic_core import to_json as to_json
 from rich.console import Console
@@ -32,15 +31,6 @@ from codeweaver.common.utils.utils import get_user_config_dir
 
 if TYPE_CHECKING:
     from codeweaver.config.mcp import CodeWeaverMCPConfig, StdioCodeWeaverConfig
-
-
-client_modules = {
-    "claude_code": claude_code,
-    "claude_desktop": claude_desktop,
-    "cursor": cursor,
-    "mcpjson": mcp_json,
-    "gemini_cli": gemini_cli,
-}
 
 console = Console(markup=True, emoji=True)
 
@@ -70,16 +60,17 @@ def _backup_config(path: Path) -> Path:
 
 
 def _create_codeweaver_config(project_path: Path, *, quick: bool = False) -> Path:
-    """Create CodeWeaver configuration file interactively.
+    """Create CodeWeaver configuration file with defaults.
 
     Args:
         project_path: Path to project directory
-        quick: Use recommended defaults without prompting
+        quick: Use recommended defaults without prompting (currently ignored)
 
     Returns:
         Path to created configuration file
     """
-    # Create minimal configuration file
+    from codeweaver.config.settings import CodeWeaverSettings
+
     config_path = project_path / ".codeweaver.toml"
 
     # Basic configuration template
@@ -92,12 +83,13 @@ max_file_size = 1048576
 max_results = 75
 """
 
-    if quick:
-        console.print("[cyan]Creating configuration with recommended defaults...[/cyan]")
+    # Create settings with defaults for this project
+    settings = CodeWeaverSettings(project_path=project_path)
 
-    # Write config file
-    config_path.write_text(config_content.format(project_name=project_path.name))
-    console.print(f"[green]✓[/green] Created configuration: {config_path}")
+    # Save to TOML file
+    settings.save_to_file(config_path)
+
+    console.print(f"[green]✓[/green] Created configuration file: {config_path}")
 
     return config_path
 
@@ -106,7 +98,6 @@ max_results = 75
 def config(
     *,
     project: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
-    interactive: Annotated[bool, cyclopts.Parameter(name=["--interactive", "-i"])] = True,
     quick: Annotated[bool, cyclopts.Parameter(name=["--quick", "-q"])] = False,
     force: Annotated[bool, cyclopts.Parameter(name=["--force", "-f"])] = False,
 ) -> None:

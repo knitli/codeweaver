@@ -175,7 +175,7 @@ def models(
     # Validate provider
     try:
         provider = (
-            Provider if isinstance(provider_name, Provider) else Provider.from_string(provider_name)
+            provider_name if isinstance(provider_name, Provider) else Provider.from_string(provider_name)
         )
     except (AttributeError, KeyError, ValueError):
         console.print(f"[red]Invalid provider: {provider_name}[/red]")

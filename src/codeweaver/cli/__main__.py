@@ -33,7 +33,6 @@ app.command("codeweaver.cli.commands.search:app", name="search")
 app.command("codeweaver.cli.commands.index:app", name="index")
 app.command("codeweaver.cli.commands.doctor:app", name="doctor")
 app.command("codeweaver.cli.commands.list:app", name="list", alias="ls")
-
 app.command("codeweaver.cli.commands.init:app", name="init")
 
 # these are scaffolded for future implementation

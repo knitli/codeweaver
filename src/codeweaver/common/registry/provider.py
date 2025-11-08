@@ -181,6 +181,10 @@ class ProviderRegistry(BasedModel):
         self._agent_instances: MutableMapping[Provider, AgentProvider[Any]] = {}
         self._data_instances: MutableMapping[Provider, Any] = {}
 
+        # Register builtin providers
+        self._register_builtin_pydantic_ai_providers()
+        self._register_builtin_providers()
+
     def _telemetry_keys(self) -> None:
         return None
 
@@ -341,16 +345,24 @@ class ProviderRegistry(BasedModel):
 
     def _register_builtin_pydantic_ai_providers(self) -> None:
         """Register built-in Pydantic AI providers."""
-        agent_module = importlib.import_module(self._agent_prefix)
-        if providers := getattr(agent_module, "load_default_agent_providers", None):
-            for provider_class in providers:
-                provider = next(
-                    p for p in Provider if str(p).lower() in provider_class.__name__.lower()
-                )
-                self.register(provider, ProviderKind.AGENT, provider_class)
+        try:
+            agent_module = importlib.import_module(self._agent_prefix.rstrip("."))
+            if providers_func := getattr(agent_module, "load_default_agent_providers", None):
+                providers = providers_func()
+                for provider_class in providers:
+                    # Find matching provider enum value, skip if not found
+                    provider = next(
+                        (p for p in Provider if str(p).lower() in provider_class.__name__.lower()),
+                        None
+                    )
+                    if provider:
+                        self.register(provider, ProviderKind.AGENT, provider_class)
+        except Exception:
+            # Skip agent providers if they fail to load
+            pass
         data_module = importlib.import_module("codeweaver.providers.data")
-        if tools := getattr(data_module, "load_default_data_providers", None):
-            for tool in tools:
+        if tools_func := getattr(data_module, "load_default_data_providers", None):
+            for tool in tools_func():
                 provider = (
                     Provider.DUCKDUCKGO if "duck" in tool.__name__.lower() else Provider.TAVILY
                 )
@@ -408,7 +420,13 @@ class ProviderRegistry(BasedModel):
         """Get the provider name for embedding providers."""
         if provider == Provider.HUGGINGFACE_INFERENCE:
             return "HuggingFaceEmbeddingProvider"
-        if module.args[0]._module_name == "codeweaver.providers.embedding.providers.openai_factory":
+
+        # Handle both string and LazyImport module names
+        module_name = module.args[0]
+        if hasattr(module_name, '_module_name'):
+            module_name = module_name._module_name
+
+        if module_name == "codeweaver.providers.embedding.providers.openai_factory":
             return "OpenAIEmbeddingBase"
         return f"{pascal(str(provider))}EmbeddingProvider"
 

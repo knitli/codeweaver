@@ -364,7 +364,9 @@ class BaseEnum(Enum):
             return NotImplemented
         if self.value_type is str and isinstance(other, str):
             return str(self).lower() < other.lower()
-        return self.value < other
+        # When comparing with another enum, extract its value
+        other_value = other.value if isinstance(other, self.__class__) else other
+        return self.value < other_value
 
     def __le__(self, other: Self) -> bool:
         """Less than or equal to comparison for enum members."""
