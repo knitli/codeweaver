@@ -33,9 +33,9 @@ except ImportError as e:
     ) from e
 
 
-def fastembed_kwargs(**kwargs: Mapping[str, Any] | None) -> dict[str, Any]:
+def fastembed_kwargs(**kwargs: Any) -> dict[str, Any]:
     """Get all possible kwargs for FastEmbed embedding methods."""
-    default_kwargs: Mapping[str, Any] = {"threads": multiprocessing.cpu_count(), "lazy_load": True}
+    default_kwargs: dict[str, Any] = {"threads": multiprocessing.cpu_count(), "lazy_load": True}
     if kwargs:
         device_ids: list[int] | None = kwargs.get("device_ids")
         cuda: bool | None = kwargs.get("cuda")

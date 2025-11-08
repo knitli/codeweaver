@@ -47,6 +47,8 @@ async def get_health() -> HealthResponse | Any:
     try:
         ctx = get_state()
         # Get health service from app state
+        if ctx.health_service is None:
+            raise RuntimeError("Health service not initialized")
         health_service: HealthService = ctx.health_service
 
         # Collect health information from all components
