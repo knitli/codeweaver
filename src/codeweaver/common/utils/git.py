@@ -75,7 +75,11 @@ def _walk_up_to_git_root(path: Path | None = None) -> Path:
         if is_git_dir(path):
             return path
         path = path.parent
-    msg = "No .git directory found in the path hierarchy."
+    msg = (
+        "No .git directory found in the path hierarchy.\n"
+        "CodeWeaver requires a git repository to determine the project root.\n"
+        "Please run this command from within a git repository, or initialize one with: git init"
+    )
     raise FileNotFoundError(msg)
 
 
