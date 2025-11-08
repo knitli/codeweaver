@@ -142,7 +142,7 @@ def providers(
                     "kind": _get_provider_type(provider),
                     "status": _get_status_indicator(provider, has_key=has_key),
                 }
-            elif provider_map[provider] is not None:
+            else:
                 provider_map[provider]["capabilities"].append(capability)
 
     for provider, info in provider_map.items():

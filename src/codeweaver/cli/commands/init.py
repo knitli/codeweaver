@@ -81,7 +81,7 @@ def _create_codeweaver_config(project_path: Path, *, quick: bool = False) -> Pat
     """
     # Create minimal configuration file
     config_path = project_path / ".codeweaver.toml"
-    
+
     # Basic configuration template
     config_content = """# CodeWeaver Configuration
 # For more options, see: https://github.com/knitli/codeweaver-mcp
@@ -91,14 +91,14 @@ token_limit = 30000
 max_file_size = 1048576
 max_results = 75
 """
-    
+
     if quick:
         console.print("[cyan]Creating configuration with recommended defaults...[/cyan]")
-    
+
     # Write config file
     config_path.write_text(config_content.format(project_name=project_path.name))
     console.print(f"[green]✓[/green] Created configuration: {config_path}")
-    
+
     return config_path
 
 
