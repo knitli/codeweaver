@@ -31,6 +31,8 @@ htmlcov/
 .testbuild/*
 .testbuild/**/*
 .history
+.temp/
+.temp/*
 
 # Workspace files
 *.code-workspace
