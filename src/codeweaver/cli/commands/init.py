@@ -79,20 +79,26 @@ def _create_codeweaver_config(project_path: Path, *, quick: bool = False) -> Pat
     Returns:
         Path to created configuration file
     """
-    from codeweaver.cli.commands.config import init as config_init_wizard
-
-    # Use existing config wizard
+    # Create minimal configuration file
     config_path = project_path / ".codeweaver.toml"
+    
+    # Basic configuration template
+    config_content = """# CodeWeaver Configuration
+# For more options, see: https://github.com/knitli/codeweaver-mcp
 
+project_name = "{project_name}"
+token_limit = 30000
+max_file_size = 1048576
+max_results = 75
+"""
+    
     if quick:
-        # Use recommended default profile
         console.print("[cyan]Creating configuration with recommended defaults...[/cyan]")
-        # For quick mode, we'll use the config wizard with default answers
-        # This will be implemented by the config wizard's quick mode
-
-    # Call the existing config wizard
-    config_init_wizard(output=config_path, force=False)
-
+    
+    # Write config file
+    config_path.write_text(config_content.format(project_name=project_path.name))
+    console.print(f"[green]✓[/green] Created configuration: {config_path}")
+    
     return config_path
 
 

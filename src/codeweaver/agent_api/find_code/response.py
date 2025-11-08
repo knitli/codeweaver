@@ -118,36 +118,10 @@ def build_success_response(
     warnings = []
     status = "success"
 
-    try:
-        from codeweaver.engine.indexer import get_indexer
-
-        indexer = get_indexer()
-
-        if indexer is not None:
-            stats = indexer.stats
-            # Determine indexing state
-            if stats.files_processed < stats.files_discovered:
-                indexing_state = "in_progress"
-                warnings.append(
-                    f"Index incomplete: {stats.files_processed}/{stats.files_discovered} files processed"
-                )
-                status = "partial"
-            elif stats.files_discovered > 0:
-                indexing_state = "complete"
-                index_coverage = (
-                    (stats.files_processed / stats.files_discovered) * 100.0
-                    if stats.files_discovered > 0
-                    else 0.0
-                )
-            else:
-                indexing_state = "not_started"
-                warnings.append("No files have been indexed yet")
-                status = "partial"
-        else:
-            indexing_state = "unknown"
-    except Exception:
-        # Gracefully handle if indexer not available
-        indexing_state = "unknown"
+    # NOTE: Indexer state tracking not yet implemented
+    # When implemented, this will check global indexer instance
+    # For now, we mark state as unknown
+    indexing_state = "unknown"
 
     # Add warnings for degraded search modes
     if search_mode == "sparse_only":
@@ -191,32 +165,11 @@ def build_error_response(
         FindCodeResponseSummary indicating failure
     """
     # Get indexing state even in error case
-    indexing_state = None
+    # NOTE: Indexer state tracking not yet implemented
+    # When implemented, this will check global indexer instance
+    # For now, we mark state as unknown
+    indexing_state = "unknown"
     index_coverage = None
-
-    try:
-        from codeweaver.common.registry import get_indexer
-
-        indexer = get_indexer()
-
-        if indexer is not None:
-            stats = indexer.stats
-            if stats.files_processed < stats.files_discovered:
-                indexing_state = "in_progress"
-                index_coverage = (
-                    (stats.files_processed / stats.files_discovered) * 100.0
-                    if stats.files_discovered > 0
-                    else 0.0
-                )
-            elif stats.files_discovered > 0:
-                indexing_state = "complete"
-                index_coverage = 100.0
-            else:
-                indexing_state = "not_started"
-        else:
-            indexing_state = "unknown"
-    except Exception:
-        indexing_state = "unknown"
 
     return FindCodeResponseSummary(
         matches=[],

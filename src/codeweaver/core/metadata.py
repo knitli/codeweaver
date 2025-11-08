@@ -65,8 +65,8 @@ class ChunkKind(BaseEnum):
     @classmethod
     def from_path(cls, path: Path, *, include_data: bool = False) -> ChunkKind | None:
         """Create a ChunkKind from a file path."""
-        from codeweaver.core.metadata import get_ext_lang_pair_for_file
-
+        # Note: get_ext_lang_pair_for_file is defined later in this module
+        # Using forward reference to avoid circular import
         if ext_lang_pair := get_ext_lang_pair_for_file(path, include_data=include_data):
             return cls.from_string(ext_lang_pair.category)
         return None
