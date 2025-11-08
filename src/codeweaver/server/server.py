@@ -212,14 +212,14 @@ class AppState(DataclassSerializationMixin):
     config_path: Annotated[
         Path | None,
         Field(
-            default_factory=lambda data: data["settings"].get("config_file"),
+            default=None,
             description="Path to the configuration file, if any",
         ),
     ]
     project_path: Annotated[
         DirectoryPath,
         Field(
-            default_factory=lambda data: data["settings"].get("project_path") or get_project_path(),
+            default_factory=get_project_path,
             description="Path to the project root",
         ),
     ]

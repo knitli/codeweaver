@@ -51,6 +51,7 @@ GH_REPO = "{{config_root}}"
 REMOTE_ORIGIN_URL = '''http://github.com/knitli/codeweaver-mcp.git'''
 # Use the project name derived from the current directory
 PROJECT_NAME = "{{ config_root | basename }}"
+CODEWEAVER_PROJECT_PATH = '''{{ config_root }}'''
 CODEWEAVER_VERSION = '''{{ read_file(path='src/codeweaver/_version.py') | split(pat=' = "') | nth(n=1) | split(pat='"') | nth(n=0) | trim }}'''
 CI = '''{{ exec(command='sh -c "if [ -z \"$GITHUB_ACTIONS\" ]; then echo \"false\"; else echo \"true\"; fi"') }}'''
 _.path = [

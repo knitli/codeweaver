@@ -94,6 +94,72 @@ def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
 
     console.print(table)
 
+    # Provider configuration
+    if provider_settings := settings.get("provider"):
+        _show_provider_config(provider_settings)
+
+
+def _show_provider_config(provider_settings: dict) -> None:
+    """Display provider configuration details."""
+    from codeweaver.core.types.sentinel import Unset
+
+    console.print("\n[bold blue]Provider Configuration[/bold blue]\n")
+
+    # provider_settings dict directly contains the configs by kind
+    if not provider_settings or isinstance(provider_settings, Unset):
+        console.print("[yellow]No providers configured[/yellow]")
+        return
+
+    # Group by provider kind - filter to only config dicts/tuples
+    valid_kinds = ('data', 'embedding', 'sparse_embedding', 'reranking', 'vector_store', 'agent')
+    for kind, configs in provider_settings.items():
+        if kind not in valid_kinds or not configs or isinstance(configs, Unset):
+            continue
+
+        # Normalize to tuple
+        config_list = configs if isinstance(configs, tuple) else (configs,)
+
+        # Create table for this kind
+        table = Table(title=f"{kind.replace('_', ' ').title()}", show_header=True, header_style="bold cyan")
+        table.add_column("Provider", style="cyan")
+        table.add_column("Status", style="white", no_wrap=True)
+        table.add_column("Details", style="white")
+
+        for config in config_list:
+            provider = config.get("provider")
+            enabled = config.get("enabled", True)
+
+            # Get status with icon
+            status = "✅ Enabled" if enabled else "⚠️ Disabled"
+
+            # Build details string
+            details = []
+            if model_settings := config.get("model_settings"):
+                if model := model_settings.get("model"):
+                    details.append(f"Model: {model}")
+
+            if provider_settings_dict := config.get("provider_settings"):
+                # Show key provider-specific settings
+                if url := provider_settings_dict.get("url"):
+                    # Truncate long URLs
+                    url_display = url if len(url) < 50 else f"{url[:47]}..."
+                    details.append(f"URL: {url_display}")
+                if collection := provider_settings_dict.get("collection_name"):
+                    details.append(f"Collection: {collection}")
+                if path := provider_settings_dict.get("persistence_path"):
+                    details.append(f"Path: {path}")
+
+            details_str = " | ".join(details) if details else "Default settings"
+
+            table.add_row(
+                provider.as_title if hasattr(provider, 'as_title') else str(provider),
+                status,
+                details_str
+            )
+
+        console.print(table)
+        console.print()  # Add spacing between tables
+
 
 def main() -> None:
     """Main entry point for config CLI."""

@@ -381,10 +381,10 @@ class CheckpointManager:
 
         return CheckpointSettingsFingerprint({
             "indexer": settings["indexer"],
-            "embedding_provider": settings["provider"]["embedding"],
-            "reranking_provider": settings["provider"]["reranking"],
-            "sparse_provider": settings["provider"]["sparse_embedding"],
-            "vector_store": settings["provider"]["vector_store"],
+            "embedding_provider": settings["embedding_provider"],
+            "reranking_provider": settings["reranking_provider"],
+            "sparse_provider": settings["sparse_provider"],
+            "vector_store": settings["vector_store"],
             "project_path": settings["project_path"],
             "project_name": settings["project_name"],
         })

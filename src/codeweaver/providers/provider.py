@@ -440,10 +440,7 @@ class Provider(BaseEnum):
             if key not in ("note", "other") and isinstance(value, tuple):
                 found_vars.append(value)
             elif key == "other" and isinstance(value, dict) and value:
-                found_vars.extend(
-                    nested_value
-                    for nested_value in value.values()  # type: ignore
-                )
+                found_vars.extend(iter(value.values()))
         return found_vars
 
     @classmethod

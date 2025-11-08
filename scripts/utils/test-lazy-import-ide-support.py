@@ -38,42 +38,41 @@ def check_type_checking_block(module_path: Path, module_name: str) -> dict:
     tree = ast.parse(source)
 
     results = {
-        'has_type_checking_import': False,
-        'has_type_checking_block': False,
-        'type_checking_imports': [],
-        'has_dynamic_imports': False,
-        'has_getattr': False,
-        'has_all': False,
+        "has_type_checking_import": False,
+        "has_type_checking_block": False,
+        "type_checking_imports": [],
+        "has_dynamic_imports": False,
+        "has_getattr": False,
+        "has_all": False,
     }
 
     for node in ast.walk(tree):
         # Check for "from typing import TYPE_CHECKING"
-        if isinstance(node, ast.ImportFrom):
-            if node.module == 'typing':
-                for alias in node.names:
-                    if alias.name == 'TYPE_CHECKING':
-                        results['has_type_checking_import'] = True
+        if isinstance(node, ast.ImportFrom) and node.module == "typing":
+            for alias in node.names:
+                if alias.name == "TYPE_CHECKING":
+                    results["has_type_checking_import"] = True
 
         # Check for "if TYPE_CHECKING:" block
-        if isinstance(node, ast.If):
-            if isinstance(node.test, ast.Name) and node.test.id == 'TYPE_CHECKING':
-                results['has_type_checking_block'] = True
+        if isinstance(node, ast.If):  # noqa: SIM102
+            if isinstance(node.test, ast.Name) and node.test.id == "TYPE_CHECKING":
+                results["has_type_checking_block"] = True
                 # Count imports in the block
                 for stmt in node.body:
                     if isinstance(stmt, (ast.Import, ast.ImportFrom)):
-                        results['type_checking_imports'].append(stmt)
+                        results["type_checking_imports"].append(stmt)
 
     # Check for _dynamic_imports
-    if '_dynamic_imports' in source:
-        results['has_dynamic_imports'] = True
+    if "_dynamic_imports" in source:
+        results["has_dynamic_imports"] = True
 
     # Check for __getattr__
-    if 'def __getattr__' in source:
-        results['has_getattr'] = True
+    if "def __getattr__" in source:
+        results["has_getattr"] = True
 
     # Check for __all__
-    if '__all__' in source:
-        results['has_all'] = True
+    if "__all__" in source:
+        results["has_all"] = True
 
     return results
 
@@ -84,31 +83,31 @@ def verify_module(module_path: Path, module_name: str) -> bool:
 
     all_good = True
 
-    if results['has_type_checking_import']:
+    if results["has_type_checking_import"]:
         print("  ✓ Has TYPE_CHECKING import from typing")
     else:
         print("  ✗ Missing TYPE_CHECKING import")
         all_good = False
 
-    if results['has_type_checking_block']:
+    if results["has_type_checking_block"]:
         print(f"  ✓ Has TYPE_CHECKING block with {len(results['type_checking_imports'])} imports")
     else:
         print("  ✗ Missing TYPE_CHECKING block")
         all_good = False
 
-    if results['has_dynamic_imports']:
+    if results["has_dynamic_imports"]:
         print("  ✓ Has _dynamic_imports dictionary")
     else:
         print("  ✗ Missing _dynamic_imports")
         all_good = False
 
-    if results['has_getattr']:
+    if results["has_getattr"]:
         print("  ✓ Has __getattr__ function")
     else:
         print("  ✗ Missing __getattr__")
         all_good = False
 
-    if results['has_all']:
+    if results["has_all"]:
         print("  ✓ Has __all__ tuple")
     else:
         print("  ✗ Missing __all__")
@@ -130,14 +129,17 @@ def test_imports_available() -> None:
     # because we're only importing the module objects themselves
     try:
         import codeweaver.core
+
         print("  ✓ codeweaver.core module imports")
         print(f"    - Exports: {len(codeweaver.core.__all__)} items")
 
         import codeweaver.config
+
         print("  ✓ codeweaver.config module imports")
         print(f"    - Exports: {len(codeweaver.config.__all__)} items")
 
         import codeweaver.common
+
         print("  ✓ codeweaver.common module imports")
         print(f"    - Exports: {len(codeweaver.common.__all__)} items")
 
@@ -203,4 +205,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     sys.exit(main())
-

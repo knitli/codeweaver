@@ -406,20 +406,27 @@ class ProviderRegistry(BasedModel):
         self, provider: Provider, module: partial[LazyImport[Any]], destination: ProviderKind
     ) -> None:
         """Register an embedding provider from a module."""
-        provider_name = self._get_embedding_provider_name(provider, module)
+        provider_name = self._get_embedding_provider_name(provider, module, destination)
         lazy_class_import = module(provider_name)
 
         if getattr(lazy_class_import, provider_name, None):
             if destination == ProviderKind.EMBEDDING:
                 self._embedding_providers[provider] = lazy_class_import
-            self._sparse_embedding_providers[provider] = lazy_class_import
+            elif destination == ProviderKind.SPARSE_EMBEDDING:
+                self._sparse_embedding_providers[provider] = lazy_class_import
 
     def _get_embedding_provider_name(
-        self, provider: Provider, module: partial[LazyImport[Any]]
+        self, provider: Provider, module: partial[LazyImport[Any]], destination: ProviderKind | None = None
     ) -> str:
         """Get the provider name for embedding providers."""
         if provider == Provider.HUGGINGFACE_INFERENCE:
             return "HuggingFaceEmbeddingProvider"
+        
+        # Special handling for fastembed - uses different class names
+        if provider == Provider.FASTEMBED:
+            if destination == ProviderKind.SPARSE_EMBEDDING:
+                return "FastEmbedSparseProvider"
+            return "FastEmbedEmbeddingProvider"
 
         # Handle both string and LazyImport module names
         module_name = module.args[0]
@@ -1390,29 +1397,49 @@ class ProviderRegistry(BasedModel):
     def _check_for_provider_availability(
         self, provider: Provider, provider_kind: ProviderKind
     ) -> bool:
-        """Check if a provider is available in any provider kind.
+        """Check if a provider package is available (can be imported).
 
         Args:
             provider: The provider to check
             provider_kind: The type of provider to check
         """
-        if (
-            provider_class_method := getattr(
-                self, f"_create_{provider_kind.name.lower()}_provider", None
+        # Get the appropriate provider dictionary based on kind
+        provider_dict_name = f"_{provider_kind.name.lower()}_providers"
+        provider_dict = getattr(self, provider_dict_name, None)
+
+        if provider_dict is None or provider not in provider_dict:
+            return False
+
+        provider_class = provider_dict[provider]
+
+        # If it's not a LazyImport, it's already available
+        if not isinstance(provider_class, LazyImport):
+            return True
+
+        # Try to resolve the LazyImport
+        try:
+            resolved = provider_class._resolve()
+        except Exception as e:
+            # Log the actual error for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(
+                f"Failed to resolve {provider_kind.name} provider {provider.value}: {e.__class__.__name__}: {e}"
             )
-        ) and (provider_class := provider_class_method(provider)):
-            resolved = None
-            try:
-                resolved = provider_class._resolve()
-            except Exception:
-                return False
-            else:  # make extra sure we don't have something that would return a truthy result and not be what we want :)
-                return (
-                    not isinstance(resolved, LazyImport)
-                    and resolved is not None
-                    and (provider.has_env_auth or provider.is_local_provider)
+            return False
+        else:
+            # Check if it resolved to a real class (not still a LazyImport)
+            is_available = (
+                not isinstance(resolved, LazyImport)
+                and resolved is not None
+            )
+            if not is_available:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.debug(
+                    f"Provider {provider.value} resolved but not available: resolved={type(resolved).__name__}, is_lazy={isinstance(resolved, LazyImport)}"
                 )
-        return False
+            return is_available
 
     def is_provider_available(self, provider: Provider, provider_kind: ProviderKind) -> bool:
         """Check if a provider is available for a given provider kind.

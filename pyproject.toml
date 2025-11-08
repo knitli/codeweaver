@@ -246,7 +246,6 @@ dev = [
   "pdbpp>=0.11.7",
   "pydantic-ai>=1.6.0",
   "pyperclip>=1.11.0",
-  "pyright>=1.1.407",
   "ruff>=0.14.2",
   "superclaude>=4.1.6",
   "ty>=0.0.1a25",
@@ -335,38 +334,6 @@ include = [
 [tool.hatch.version]
 source = "uv-dynamic-versioning"
 
-[tool.pyright]
-strict = ["src/codeweaver/**/*.py"]
-include = ["src/codeweaver/**/*.py", "tests/**/*.py", "scripts/**/*.py"]
-exclude = [
-  "src/codeweaver/parsers/**/*.py",
-  ".venv/**",
-  "dist/**",
-  "build/**",
-  "docs/**",
-  "tests/data/**",
-  "typings/**",
-]
-deprecateTypingAliases = true
-pythonPlatform = "Linux"
-pythonVersion = "3.12"
-reportArgumentType = "information"
-reportImplicitStringConcatenation = "error"
-reportImportCycles = "none"  # this is overly noisy and doesn't account for lazy imports
-reportPrivateImportUsage = "none"
-reportPrivateUsage = "none"  # It's our own internal use...
-reportPropertyTypeMismatch = "error"
-reportUninitializedInstanceVariable = "information"
-reportUnusedCallResult = "information"
-strictDictionaryInference = true
-strictListInference = true
-strictParameterNoneValue = true
-strictSetInference = true
-venvPath = ".venv"
-# we use standard for internal scripts and tooling,
-# the `strict` parameter above sets strict for the main codebase
-typeCheckingMode = "standard"
-
 [tool.pytest.ini_options]
 addopts = [
   "-ra",
@@ -444,20 +411,16 @@ extra-paths = ["./vendored", "./typings"]
 [tool.ty.rules]
 # Suppress known false positives in test files
 possibly-missing-attribute = "ignore"
-
 # Test framework limitations - ty doesn't understand pytest mocks/fixtures
 # These are inherent limitations, not real bugs
 unresolved-attribute = "warn"  # Downgrade from error to warn for test mocks
-unknown-argument = "warn"      # Downgrade for pytest fixtures
+unknown-argument = "warn"  # Downgrade for pytest fixtures
 unresolved-reference = "warn"  # Downgrade for test references
-
 # Type inference limitations
 # ty is overly strict with Literal inference in dict lookups
 invalid-argument-type = "warn"  # Many false positives in capabilities dicts
-
 # Style and refactoring suggestions (informational only)
 redundant-cast = "ignore"
-C901 = "ignore"  # Complexity warnings
 
 [tool.ty.src]
 include = ["./src", "./tests", "./scripts", "./mise-tasks"]

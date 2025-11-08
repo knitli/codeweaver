@@ -215,7 +215,6 @@ def mock_provider_registry(
     """Configure mock provider registry with all providers."""
     from enum import Enum
 
-    # Create simple mock enums for providers
     class MockProviderEnum(Enum):
         VOYAGE = "voyage"
         FASTEMBED = "fastembed"
@@ -231,9 +230,7 @@ def mock_provider_registry(
             return MockProviderEnum.FASTEMBED
         if kind == "vector_store":
             return MockProviderEnum.QDRANT
-        if kind == "reranking":
-            return MockProviderEnum.VOYAGE
-        return None
+        return MockProviderEnum.VOYAGE if kind == "reranking" else None
 
     mock_registry.get_provider_enum_for = MagicMock(side_effect=get_provider_enum_for)
 
@@ -245,9 +242,7 @@ def mock_provider_registry(
             return mock_sparse_provider
         if kind == "vector_store":
             return mock_vector_store
-        if kind == "reranking":
-            return mock_reranking_provider
-        return None
+        return mock_reranking_provider if kind == "reranking" else None
 
     mock_registry.get_provider_instance = MagicMock(side_effect=get_provider_instance)
 
@@ -381,7 +376,7 @@ async def real_vector_store(tmp_path: Path):
 
     # Create config for the vector store
     config = MemoryConfig(
-        persist_directory=str(tmp_path / "vector_store"), collection_name="test_real_collection"
+        persist_path=str(tmp_path / "vector_store"), collection_name="test_real_collection"
     )
 
     # Create the vector store provider

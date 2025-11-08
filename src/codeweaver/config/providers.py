@@ -618,18 +618,34 @@ class ProviderSettings(BasedModel):
         self, provider: Provider
     ) -> BaseProviderSettings | tuple[BaseProviderSettings, ...] | None:
         """Get the settings for a specific provider."""
-        if (
-            provider
-            not in {
-                prov if isinstance(provider, tuple) else provider
-                for prov in self.provider_configs.values()
-            }
-            or provider == Provider.NOT_SET
-        ):
+        if provider == Provider.NOT_SET:
             return None
-        fields = [
-            k for k, v in self.provider_configs.items() if (v and (provider in v)) or v == provider
-        ]
+
+        # Check if provider exists in any config
+        found = False
+        for config_value in self.provider_configs.values():
+            if isinstance(config_value, tuple):
+                # Multiple configs for this kind
+                if any(cfg.get('provider') == provider for cfg in config_value):
+                    found = True
+                    break
+            elif isinstance(config_value, dict) and config_value.get('provider') == provider:
+                # Single config for this kind
+                found = True
+                break
+
+        if not found:
+            return None
+
+        # Find which kinds (fields) contain this provider
+        fields = []
+        for k, v in self.provider_configs.items():
+            if isinstance(v, tuple):
+                if any(cfg.get('provider') == provider for cfg in v):
+                    fields.append(k)
+            elif isinstance(v, dict) and v.get('provider') == provider:
+                fields.append(k)
+
         if settings := [
             self.settings_for_kind(field) for field in fields if self.settings_for_kind(field)
         ]:
