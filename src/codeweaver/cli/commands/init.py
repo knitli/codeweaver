@@ -73,16 +73,6 @@ def _create_codeweaver_config(project_path: Path, *, quick: bool = False) -> Pat
 
     config_path = project_path / ".codeweaver.toml"
 
-    # Basic configuration template
-    config_content = """# CodeWeaver Configuration
-# For more options, see: https://github.com/knitli/codeweaver-mcp
-
-project_name = "{project_name}"
-token_limit = 30000
-max_file_size = 1048576
-max_results = 75
-"""
-
     # Create settings with defaults for this project
     settings = CodeWeaverSettings(project_path=project_path)
 

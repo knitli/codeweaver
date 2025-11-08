@@ -44,6 +44,8 @@ async def search(
     output_format: Literal["json", "table", "markdown"] = "table",
 ) -> None:
     """Search your codebase from the command line with plain language."""
+    from codeweaver.exceptions import ConfigurationError
+
     try:
         settings = get_settings_map()
         if project_path:
@@ -66,6 +68,20 @@ async def search(
             context=None,
         )
 
+        # Check for error status in response
+        if response.status.lower() == "error":
+            console.print(f"\n{CODEWEAVER_PREFIX} [red bold]Configuration Error:[/red bold] {response.summary}\n")
+
+            # Check if error is about missing embedding providers
+            if "embedding providers" in response.summary.lower():
+                console.print(f"{CODEWEAVER_PREFIX} [yellow]To fix this:[/yellow]")
+                console.print("  [yellow]•[/yellow] Set VOYAGE_API_KEY environment variable for cloud embeddings")
+                console.print("  [yellow]•[/yellow] Or install local provider: pip install codeweaver-mcp[provider-fastembed]")
+                console.print("  [yellow]•[/yellow] Or configure fastembed in .codeweaver.toml")
+                console.print("  [yellow]•[/yellow] See docs: https://github.com/knitli/codeweaver-mcp#configuration")
+            console.print()  # Add blank line
+            sys.exit(1)
+
         # Limit results for CLI display
         limited_matches = response.matches[:limit]
 
@@ -79,6 +95,14 @@ async def search(
         elif output_format == "markdown":
             _display_markdown_results(query, response, limited_matches)
 
+    except ConfigurationError as e:
+        console.print(f"\n{CODEWEAVER_PREFIX} [red bold]Configuration Error:[/red bold] {e.message}\n")
+        if e.suggestions:
+            console.print(f"{CODEWEAVER_PREFIX} [yellow]To fix this:[/yellow]")
+            for suggestion in e.suggestions:
+                console.print(f"  [yellow]•[/yellow] {suggestion}")
+        console.print()  # Add blank line
+        sys.exit(1)
     except CodeWeaverError as e:
         console.print(f"{CODEWEAVER_PREFIX} [red]Error: {e.message}[/red]")
         if e.suggestions:

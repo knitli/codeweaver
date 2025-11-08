@@ -26,7 +26,6 @@ from codeweaver.common import CODEWEAVER_PREFIX
 from codeweaver.common.utils.git import get_project_path, is_git_dir
 from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.core.types.sentinel import Unset
-from codeweaver.providers.provider import ProviderKind
 
 
 if TYPE_CHECKING:
@@ -116,9 +115,9 @@ def check_required_dependencies() -> DoctorCheck:
     """Check if required dependencies are installed using find_spec."""
     from importlib import metadata
 
-    # Map of package names to actual module names (for cases where they differ)
-    PACKAGE_TO_MODULE_MAP = {
-        "uuid7": "uuid_extensions"  # uuid7 package provides uuid_extensions module
+    # Special case mapping for packages where PyPI name differs from import name
+    package_to_module_map = {
+        "uuid7": "uuid_extensions",
     }
 
     missing: list[str] = []
@@ -138,7 +137,7 @@ def check_required_dependencies() -> DoctorCheck:
         required_packages: list[tuple[str, str, str]] = [
             (
                 match["name"],
-                PACKAGE_TO_MODULE_MAP.get(match["name"], match["name"].replace("-", "_")),
+                package_to_module_map.get(match["name"], match["name"].replace("-", "_")),
                 match["version"] or "",
             )
             for match in matches
@@ -214,39 +213,12 @@ def check_configuration_file(settings: CodeWeaverSettings | None = None) -> Doct
 
             settings = get_settings()
 
-        # Check all possible config file locations
-        from codeweaver.common.utils.utils import get_user_config_dir
-
-        user_config_dir = get_user_config_dir()
-        possible_config_locations = [
-            Path("codeweaver.local.toml"),
-            Path("codeweaver.toml"),
-            Path(".codeweaver.local.toml"),
-            Path(".codeweaver.toml"),
-            Path(".codeweaver/codeweaver.local.toml"),
-            Path(".codeweaver/codeweaver.toml"),
-            user_config_dir / "codeweaver.toml",
-            Path("codeweaver.local.yaml"),
-            Path("codeweaver.yaml"),
-            Path(".codeweaver.local.yaml"),
-            Path(".codeweaver.yaml"),
-            Path(".codeweaver/codeweaver.local.yaml"),
-            Path(".codeweaver/codeweaver.yaml"),
-        ]
-
-        # Find which config file actually exists
-        found_config = next((loc for loc in possible_config_locations if loc.exists()), None)
-
-        if found_config:
-            check.status = "✅"
-            check.message = f"Valid config at {found_config}"
-        elif settings.config_file and settings.config_file.exists():
-            # Fallback to settings.config_file if set
+        if settings.config_file and settings.config_file.exists():
             check.status = "✅"
             check.message = f"Valid config at {settings.config_file}"
         else:
             check.status = "⚠️"
-            check.message = "No config file (using defaults or environment variables)"
+            check.message = "No config file (using defaults or other sources)"
             check.suggestions = [
                 "Create your config file for custom configuration",
                 "Run: codeweaver config --generate",
@@ -405,34 +377,13 @@ def _check_qdrant_cloud_api_key(
     # we know that there are API variables set in provider.api_key_env_vars for qdrant
     if not _has_auth_configured(provider, settings):
         possible_keys = cast(tuple[str, ...], provider.api_key_env_vars)
-
-        # Check if env vars are actually set (for debugging)
-        import os
-
-        set_vars = [key for key in possible_keys if os.getenv(key)]
-
-        if set_vars:
-            # Env var is set but not being detected by has_auth_configured
-            console.print(
-                f"  [yellow]⚠[/yellow] Found {', '.join(set_vars)} in environment, but authentication check failed."
-            )
-            console.print(
-                "  [yellow]⚠[/yellow] This might be an issue with how the provider checks credentials."
-            )
-        else:
-            # Env var not set
-            console.print(
-                f"  [yellow]⚠[/yellow] You need to set your Qdrant API key. You can set using one of these environment variables: {', '.join(possible_keys)}"
-                if len(possible_keys) > 1
-                else f"  [yellow]⚠[/yellow] You need to set your Qdrant API key. You can set using the environment variable: {possible_keys[0]}"  # type: ignore
-            )
+        console.print(
+            f"  [yellow]⚠[/yellow] You need to set your Qdrant API key. You can set using one of these environment variables: {', '.join(possible_keys)}"
+            if len(possible_keys) > 1
+            else f"  [yellow]⚠[/yellow] You need to set your Qdrant API key. You can set using the environment variable: {possible_keys[0]}"  # type: ignore
+        )
         check.status = "⚠️"
-        check.suggestions = [
-            f"Set {possible_keys[0]} environment variable"
-            if not set_vars
-            else "Check provider authentication logic",  # type: ignore
-            "Or configure api_key in your .codeweaver.toml file",
-        ]
+        check.suggestions = [f"Set {possible_keys[0]} environment variable"]  # type: ignore
     else:
         console.print("  [green]✓[/green] We found your api_key for Qdrant Cloud")
         check.status = "✅"
@@ -496,26 +447,6 @@ def check_indexer_config(settings: CodeWeaverSettings) -> DoctorCheck:
     return check
 
 
-def _report_unimplemented_status(
-    kind: ProviderKind, provider: Provider, *, is_available: bool, has_auth: bool
-) -> DoctorCheck | None:
-    """Report unimplemented provider status checks for DATA and AGENT providers."""
-    if kind not in {ProviderKind.DATA, ProviderKind.AGENT}:
-        return None
-    name = f"{kind.as_title} ({provider.as_title})"
-    if kind == ProviderKind.DATA:
-        message = "We're still integrating data providers into CodeWeaver. Stay tuned!"
-        return DoctorCheck.set_check(name, "warn", message, [])
-    message = (
-        "CodeWeaver is set up for agents, but they aren't integrated into the search pipeline yet."
-    )
-    if is_available and has_auth:
-        message += " You've done everything right; we're just working on the integration!"
-    if is_available and not has_auth:
-        message += " The provider is available, but authentication isn't set up yet. You can get ready for v0.2 by configuring authentication."
-    return DoctorCheck.set_check(name, "warn", message, [])
-
-
 def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]:
     """Test basic connectivity to configured providers."""
     check = DoctorCheck("Provider Availability")
@@ -543,53 +474,23 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
             for provider_config in provider_configs:
                 kind = ProviderKind.from_string(cast(str, kind))
                 provider = provider_config["provider"]
-                # Let users know these aren't fully available
-                is_package_available = registry.is_provider_available(provider, kind)
-                has_auth = provider.has_env_auth or provider.is_local_provider
-                # TODO: Unblock when these provider types are fully supported
-                if kind in {ProviderKind.DATA, ProviderKind.AGENT}:
-                    tested_providers.append(
-                        _report_unimplemented_status(
-                            kind, provider, is_available=is_package_available, has_auth=has_auth
-                        )  # type: ignore
-                    )
-                    continue
-
-                if is_package_available and has_auth:
-                    # Package installed AND credentials configured
+                if registry.is_provider_available(provider, kind):
                     tested_providers.append(
                         DoctorCheck.set_check(
-                            f"{kind.as_title} ({provider.as_title})",
+                            f"{kind.as_title} ({provider.as_title}) Available",
                             "success",
-                            "Package installed and configured",
+                            "Available",
                             [],
                         )
                     )
-                elif is_package_available:
-                    # Package installed but missing credentials
-                    env_vars = provider.api_key_env_vars
-                    tested_providers.append(
-                        DoctorCheck.set_check(
-                            f"{kind.as_title} ({provider.as_title})",
-                            "warn",
-                            "Package installed but missing credentials",
-                            [
-                                f"Set environment variable: {env_vars[0]}"
-                                if env_vars
-                                else "Configure API key in settings",
-                                "Or configure in your .codeweaver.toml file",
-                            ],
-                        )
-                    )
                 else:
-                    # Package not installed
                     tested_providers.append(
                         DoctorCheck.set_check(
                             f"{kind.as_title} ({provider.as_title})",
                             "fail",
-                            "Package not installed",
+                            "Not available",
                             [
-                                f"Install extra dependencies for {provider.as_title}",
+                                "You may need to install extra dependencies for this provider.",
                                 "Run: uv pip install codeweaver-mcp[full]",
                                 "Or: pip install codeweaver-mcp[full]",
                             ],
