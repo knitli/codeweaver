@@ -61,6 +61,8 @@ Applies various filters to search results.
 
 **Purpose:** Makes it easy to add new filtering strategies without modifying core search logic.
 
+### `intent.py` - Intent Identification and Weighting
+
 ### `pipeline.py` - Search Pipeline
 Orchestrates the search pipeline components.
 
@@ -103,6 +105,7 @@ Each module has a single, well-defined responsibility. This makes the code easie
 ### 2. Extensibility
 New features can be added by extending individual modules:
 - Add new filters in `filters.py`
+- Add new intent approaches in `intent.py`
 - Add new scoring strategies in `scoring.py`
 - Add new pipeline steps in `pipeline.py`
 - Add new result formats in `conversion.py`

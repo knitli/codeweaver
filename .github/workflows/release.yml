@@ -18,8 +18,71 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 jobs:
+  tests:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version:
+          - "3.12"
+          - "3.13"
+          - "3.14"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b3498302c5c423fa896b97a26bb183df735d08f8
+        with:
+          fetch-depth: 0
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@9b03c627221f32cb88b299427119da30671cf9cc
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y zsh
+      - name: Cache mise tools
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            ~/.local/share/mise
+            ~/.local/bin/mise
+            ~/.local/share/mise/shims
+            ~/.cache/mise
+            ~/.local/bin
+          key: mise-${{ runner.os }}-${{ hashFiles('mise.toml') }}
+          restore-keys: |
+            mise-${{ runner.os }}-
+      - name: Cache UV dependencies
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: uv-${{ runner.os }}-python${{ matrix.python-version }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-python${{ matrix.python-version }}-
+            uv-${{ runner.os }}-
+      - name: Install mise
+        run: |
+          if [ ! -f "$HOME/.local/bin/mise" ]; then
+            curl https://mise.run | sh
+            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          fi
+      - name: Install tools with mise
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          mise run setup > /dev/null 2>&1 || true
+      - name: Run quality checks
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          mise run check
+        continue-on-error: true # Allow reuse lint failures to be warnings
+      - name: Run tests with coverage
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          mise run test-cov
   build:
     name: Build Distribution
+    needs: tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -43,32 +106,15 @@ jobs:
       - name: Install UV and build tools
         run: |
           python -m pip install uv twine
-      - name: Install dependencies
-        run: |
-          uv sync
-      - name: Verify version matches tag
-        if: github.event_name == 'push'
-        run: |
-          TAG_VERSION=${GITHUB_REF#refs/tags/v}
-          PROJECT_VERSION=$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
-          echo "Tag version: $TAG_VERSION"
-          echo "Project version: $PROJECT_VERSION"
-          if [ "$TAG_VERSION" != "$PROJECT_VERSION" ]; then
-            echo "❌ Version mismatch: tag $TAG_VERSION != project $PROJECT_VERSION"
-            exit 1
-          fi
-          echo "✅ Version match confirmed"
-      - name: Run tests before build
-        run: |
-          uv run pytest tests/ -x --tb=short
       - name: Build package
         run: |
-          uv build
+          uv build --clean
       - name: Verify build artifacts
         run: "ls -la dist/\necho \"Built packages:\"\nfor file in dist/*; do\n  echo \"\U0001F4E6 $(basename \"$file\")\"\ndone\n"
-      - name: Check package integrity
+      - name: Check package integrity with twine
         run: |
-          uv run python -m twine check dist/*
+          uv pip install twine
+          twine check dist/*
       - name: Upload artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -105,7 +151,70 @@ jobs:
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
       - name: Generate release notes
         id: release_notes
-        run: "# Get the latest release tag (before current)\nPREVIOUS_TAG=\"$(git tag --sort=-version:refname | grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+' | head -2 | tail -1 || echo \"\")\"\nCURRENT_TAG=\"${{ steps.version.outputs.tag }}\"\n\necho \"Previous tag: $PREVIOUS_TAG\"\necho \"Current tag: $CURRENT_TAG\"\n\n# Generate changelog\ncat > release_notes.md << 'EOF'\n## What's Changed\n\nEOF\n\nif [ -n \"$PREVIOUS_TAG\" ] && [ \"$PREVIOUS_TAG\" != \"$CURRENT_TAG\" ]; then\n  # Get commits since last release\n  git log --pretty=format:\"- %s (%h)\" --no-merges \"$PREVIOUS_TAG..$CURRENT_TAG\" >> release_notes.md\nelse\n  echo \"- Initial release\" >> release_notes.md\nfi\n\ncat >> release_notes.md << 'EOF'\n\n## Installation\n\nInstall from PyPI:\n```bash\npip install codeweaver\n```\n\nOr download the wheel/source distribution from the assets below.\n\n## Verification\n\nAll release artifacts are built from source and include:\n- \U0001F4E6 Wheel distribution (.whl)\n- \U0001F4E6 Source distribution (.tar.gz)\n\n**Full Changelog**: \"https://github.com/knitli/code-weaver-mcp/compare/$PREVIOUS_TAG...$CURRENT_TAG\"\nEOF\n\nif [ -z \"$PREVIOUS_TAG\" ]; then\n  sed -i 's|**Full Changelog**: .*|**Full Changelog**: https://github.com/knitli/code-weaver-mcp/commits/'$CURRENT_TAG'|' release_notes.md\nfi\n"
+        run: |
+          # Get the latest release tag (before current)
+          PREVIOUS_TAG="$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | head -2 | tail -1 || echo "")"
+          CURRENT_TAG="${{ steps.version.outputs.tag }}"
+
+          echo "Previous tag: $PREVIOUS_TAG"
+          echo "Current tag: $CURRENT_TAG"
+
+          # Generate changelog
+          cat > release_notes.md << 'EOF'
+          ## What's Changed
+
+          EOF
+
+          if [ -n "$PREVIOUS_TAG" ] && [ "$PREVIOUS_TAG" != "$CURRENT_TAG" ]; then
+            # Get commits since last release
+            git log --pretty=format:"- %s (%h)" --no-merges "$PREVIOUS_TAG..$CURRENT_TAG" >> release_notes.md
+          else
+            echo "- Initial alpha release" >> release_notes.md
+          fi
+
+          cat >> release_notes.md << 'EOF'
+
+          ## Installation
+
+          EOF
+
+          # Add pre-release specific installation instructions
+          VERSION="${{ steps.version.outputs.version }}"
+          if [[ "$VERSION" == *"a"* ]] || [[ "$VERSION" == *"b"* ]] || [[ "$VERSION" == *"rc"* ]]; then
+            cat >> release_notes.md << 'EOF'
+          **This is a pre-release version.** Install with:
+          ```bash
+          pip install --pre codeweaver-mcp
+          # Or specific version:
+          pip install codeweaver-mcp==${{ steps.version.outputs.version }}
+          ```
+          EOF
+          else
+            cat >> release_notes.md << 'EOF'
+          Install from PyPI:
+          ```bash
+          pip install codeweaver-mcp
+          ```
+          EOF
+          fi
+
+          cat >> release_notes.md << 'EOF'
+
+          Or download the wheel/source distribution from the assets below.
+
+          ## Verification
+
+          All release artifacts are built from source and include:
+          - 📦 Wheel distribution (.whl)
+          - 📦 Source distribution (.tar.gz)
+
+          EOF
+
+          if [ -n "$PREVIOUS_TAG" ]; then
+            echo "**Full Changelog**: https://github.com/knitli/codeweaver-mcp/compare/$PREVIOUS_TAG...$CURRENT_TAG" >> release_notes.md
+          else
+            echo "**Full Changelog**: https://github.com/knitli/codeweaver-mcp/commits/$CURRENT_TAG" >> release_notes.md
+          fi
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -118,50 +227,25 @@ jobs:
           draft: false
           prerelease: ${{ contains(steps.version.outputs.version, 'a') || contains(steps.version.outputs.version, 'b') || contains(steps.version.outputs.version, 'rc') }}
           generate_release_notes: false
-# PyPI publishing - commented out initially as requested
-# Uncomment and configure when ready to publish to PyPI
-#
-# publish-to-pypi:
-#   name: Publish to PyPI
-#   needs: [github-release]
-#   runs-on: ubuntu-latest
-#   environment:
-#     name: pypi
-#     url: https://pypi.org/p/codeweaver
-#   permissions:
-#     id-token: write
-#
-#   steps:
-#   - name: Download artifacts
-#     uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
-#     with:
-#       name: python-package-distributions
-#       path: dist/
-#
-#   - name: Publish to PyPI
-#     uses: pypa/gh-action-pypi-publish@release/v1
-#     with:
-#       attestations: true
-#
-# publish-to-testpypi:
-#   name: Publish to TestPyPI
-#   needs: [build]
-#   runs-on: ubuntu-latest
-#   environment:
-#     name: testpypi
-#     url: https://test.pypi.org/p/codeweaver
-#   permissions:
-#     id-token: write
-#
-#   steps:
-#   - name: Download artifacts
-#     uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
-#     with:
-#       name: python-package-distributions
-#       path: dist/
-#
-#   - name: Publish to TestPyPI
-#     uses: pypa/gh-action-pypi-publish@release/v1
-#     with:
-#       repository-url: https://test.pypi.org/legacy/
-#       attestations: true
+
+  publish-to-pypi:
+    name: Publish to PyPI
+    needs: [tests, build, github-release]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://pypi.org/p/codeweaver-mcp
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: python-package-distributions
+          path: dist/
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://upload.pypi.org/legacy/
+          attestations: true

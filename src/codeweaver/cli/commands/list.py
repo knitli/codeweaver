@@ -114,9 +114,13 @@ def providers(
             sys.exit(1)
 
     # Build table
-    table = Table(show_header=True, header_style="bold blue", title="Available Providers")
+    table = Table(
+        show_header=True,
+        header_style="bold blue",
+        title=f"Available {kind.as_title} Providers" if kind_filter else "Available Providers",
+    )
     table.add_column("Provider", style="cyan", no_wrap=True)
-    table.add_column("Capabilities", style="white")
+    table.add_column("Kind", style="white")
     table.add_column("Type", style="white")
     table.add_column("Status", style="white")
 
@@ -142,7 +146,7 @@ def providers(
                     "kind": _get_provider_type(provider),
                     "status": _get_status_indicator(provider, has_key=has_key),
                 }
-            else:
+            elif capability and provider_map[provider]:
                 provider_map[provider]["capabilities"].append(capability)
 
     for provider, info in provider_map.items():
@@ -175,7 +179,9 @@ def models(
     # Validate provider
     try:
         provider = (
-            provider_name if isinstance(provider_name, Provider) else Provider.from_string(provider_name)
+            provider_name
+            if isinstance(provider_name, Provider)
+            else Provider.from_string(provider_name)
         )
     except (AttributeError, KeyError, ValueError):
         console.print(f"[red]Invalid provider: {provider_name}[/red]")
@@ -307,7 +313,7 @@ def _list_sparse_embedding_models(
         )
 
 
-@app.command
+@app.command(alias="embed")
 def embedding() -> None:
     """List all embedding providers (shortcut).
 
@@ -326,7 +332,7 @@ def sparse_embedding() -> None:
 
 
 @app.command
-def vector_store() -> None:
+def vector_store(alias="vec") -> None:
     """List all vector-store providers (shortcut).
 
     Equivalent to: codeweaver list providers --kind vector-store
@@ -334,7 +340,7 @@ def vector_store() -> None:
     providers(kind=ProviderKind.VECTOR_STORE)
 
 
-@app.command
+@app.command(alias="rerank")
 def reranking() -> None:
     """List all reranking providers (shortcut).
 

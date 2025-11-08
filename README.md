@@ -5,6 +5,9 @@ SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 SPDX-License-Identifier: MIT OR Apache-2.0
 -->
 # CodeWeaver
+---
+by Knitli
+---
 
 Extensible context platform and MCP server for hybrid semantic code search and targeted context delivery to AI coding agents.
 
@@ -89,17 +92,32 @@ Cost: $0.03-$0.06 per query
 
 ---
 
+> **⚠️ Alpha Software**: CodeWeaver is in active alpha development. We welcome early testers and feedback! The infrastructure is robust (20+ providers supported), but not all features are heavily tested. Expect rough edges and breaking changes.
+
 ## Installation
 
-**Current Status**: v0.1 Development - Install from repository for working features
+**Current Status**: Alpha Release - Install from PyPI with pre-release flag
 
 ### Prerequisites
 - Python 3.12 or higher
-- Git for cloning repository
+- Git for cloning repository (if installing from source)
 - 8GB RAM minimum for vector operations
 - VoyageAI API key (for embeddings and reranking)
 
-### Quick Install
+### Quick Install (PyPI - Alpha)
+
+```bash
+# Install latest alpha release
+pip install --pre codeweaver-mcp
+
+# Or install specific alpha version
+pip install codeweaver-mcp==0.1.0a1
+
+# Verify installation
+codeweaver --version
+```
+
+### Install from Source (Development)
 
 ```bash
 # Clone repository

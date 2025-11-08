@@ -23,6 +23,32 @@ git push origin v0.1.0
 
 The build will create packages with version `0.1.0` (clean semantic version).
 
+### Alpha Release (Early Testing)
+**Format**: `X.Y.Z-alpha.N`
+**Example**: `0.1.0-alpha.1`
+**PyPI Format**: `0.1.0a1` (normalized per PEP 440)
+
+For early alpha releases:
+```bash
+git tag v0.1.0-alpha.1
+git push origin v0.1.0-alpha.1
+```
+
+The build will create packages with version `0.1.0a1` (Python normalizes `-alpha.1` to `a1`).
+
+### Beta Release (Feature Complete)
+**Format**: `X.Y.Z-beta.N`
+**Example**: `0.1.0-beta.1`
+**PyPI Format**: `0.1.0b1` (normalized per PEP 440)
+
+For beta releases:
+```bash
+git tag v0.1.0-beta.1
+git push origin v0.1.0-beta.1
+```
+
+The build will create packages with version `0.1.0b1` (Python normalizes `-beta.1` to `b1`).
+
 ### Pre-Release (Development)
 **Format**: `X.Y.ZrcN+gHASH`
 **Example**: `0.1.0rc295+gfc4f90a`
@@ -47,7 +73,20 @@ Building with uncommitted changes appends `.dirty` suffix.
 2. Each commit gets unique pre-release version
 3. Build creates: `codeweaver_mcp-0.1.0rc298+g2080710-py3-none-any.whl`
 
-### Release Workflow
+### Alpha Release Workflow
+1. Commit and push changes to your branch
+2. Create alpha tag:
+   ```bash
+   git tag v0.1.0-alpha.1
+   git push origin v0.1.0-alpha.1
+   ```
+3. GitHub Actions automatically:
+   - Runs tests on Python 3.12, 3.13, 3.14
+   - Builds package with version `0.1.0a1`
+   - Publishes to PyPI (users must explicitly opt-in to pre-releases)
+   - Creates GitHub release marked as "pre-release"
+
+### Production Release Workflow
 1. Merge to main branch
 2. Create version tag:
    ```bash
@@ -131,10 +170,44 @@ git push origin v0.1.1
 ## Best Practices
 
 1. **Use semantic versioning**: Major.Minor.Patch (e.g., 1.2.3)
-2. **Tag on main branch**: Only create release tags after merging to main
+2. **Tag on main branch**: Only create release tags after merging to main (alpha/beta can be on feature branches)
 3. **Clean working directory**: Commit all changes before tagging
 4. **Test on TestPyPI first**: Use TestPyPI workflow to validate before production
 5. **Document changes**: Update CHANGELOG.md before tagging
+
+### Pre-Release Strategy
+
+**Alpha** (`-alpha.N`): Robust infrastructure, not heavily tested
+- Signals "feature-complete but not battle-tested"
+- Sets appropriate expectations for early testers
+- Users must explicitly install: `pip install --pre codeweaver-mcp`
+
+**Beta** (`-beta.N`): Feature complete, undergoing testing
+- Signals "mostly stable, finding edge cases"
+- Ready for broader testing audience
+- Users must explicitly install: `pip install --pre codeweaver-mcp`
+
+**Release Candidate** (`-rc.N`): Final testing before release
+- Signals "production-ready pending final validation"
+- No new features, bug fixes only
+- Last stop before stable release
+
+### Installing Pre-Releases
+
+Users who want to test alpha/beta versions must explicitly opt-in:
+
+```bash
+# Install latest pre-release (alpha, beta, or rc)
+pip install --pre codeweaver-mcp
+
+# Install specific alpha version
+pip install codeweaver-mcp==0.1.0a1
+
+# Upgrade to latest pre-release
+pip install --pre --upgrade codeweaver-mcp
+```
+
+By default, `pip install codeweaver-mcp` will **not** install pre-releases.
 
 ## Integration with Changesets
 

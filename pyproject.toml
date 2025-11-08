@@ -104,6 +104,7 @@ dependencies = [
   "blake3>=1.0.8",
   # CLI framework and output
   "cyclopts>=4.2.1",
+  "fastembed>=1.6.3",
   # MCP server framework
   "fastmcp>=2.13.0.2",
   "httpx>=0.28.1",
@@ -123,6 +124,7 @@ dependencies = [
   "tenacity>=9.1.2",
   "textcase>=0.4.5",
   "tiktoken>=0.12.0",
+  "tokenizers>=0.26.0",
   "tomli-w>=1.2.0",
   "typing_extensions>=4.15.0",
   "uuid7>=0.1.0; python_version < '3.14'",
@@ -141,6 +143,7 @@ Repository = "https://github.com/knitli/codeweaver-mcp"
 
 [project.scripts]
 codeweaver = "codeweaver.cli.__main__:main"
+cw = "codeweaver.cli.__main__:main"
 
 [project.optional-dependencies]
 # eunomia middleware - see https://gofastmcp.com/integrations/eunomia-authorization
@@ -168,7 +171,7 @@ cli = ["cyclopts", "rich", "tomli-w"]
 # All groups for users - full featured with all middleware
 full = [
   "eunomia-mcp",
-  "fastembed",
+  "pydantic-settings[yaml,toml,gcp-secret-manager]",
   "permit-fastmcp",
   "py-cpuinfo",
   "sentence-transformers[onnx]",
@@ -220,11 +223,6 @@ provider-sentence-transformers-gpu = [
 #     "py-cpuinfo",
 # ]
 provider-voyageai = ["voyageai"]
-recommended = [
-  "fastembed",
-  "py-cpuinfo",
-  "tokenizers",
-]
 recommended-local-only = [
   "fastembed",
   "py-cpuinfo",
