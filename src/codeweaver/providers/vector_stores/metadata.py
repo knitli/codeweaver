@@ -54,6 +54,15 @@ class HybridVectorPayload(BasedModel):
 
         return {FilteredKey("file_path"): AnonymityConversion.HASH}
 
+    def to_payload(self) -> dict[str, Any]:
+        """Convert to a dictionary payload for storage."""
+        return self.model_dump(mode="json", exclude_none=True, by_alias=True, round_trip=True)
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any]) -> HybridVectorPayload:
+        """Create a HybridVectorPayload from a dictionary payload."""
+        return cls.model_validate(payload)
+
 
 class CollectionMetadata(BasedModel):
     """Metadata stored with collections for validation and compatibility checks."""
@@ -93,10 +102,21 @@ class CollectionMetadata(BasedModel):
         # Warn on provider switch - suggests reindexing but doesn't block
         if self.provider != other.provider:
             logger.warning(
-                f"Provider switch detected: collection created with '{other.provider}', "
-                f"but current provider is '{self.provider}'. "
-                f"You should reindex your codebase to ensure data consistency. "
-                f"Run 'codeweaver index' to rebuild the collection with the new provider."
+                "Provider switch detected: collection created with '%s', but current provider is '%s'.",
+                other.provider,
+                self.provider,
+                extra={
+                    "collection_provider": other.provider,
+                    "current_provider": self.provider,
+                    "collection": other.collection_name,
+                    "current_collection": self.collection_name,
+                    "project_name": self.project_name,
+                    "suggestions": [
+                        "Changing vector storage providers without changing models *may* be OK.",
+                        "To ensure compatibility, consider re-indexing your codebase with the new provider.",
+                        "If you encounter issues, you may need to delete the existing collection and re-index. Run `codeweaver index` to re-index.",
+                    ],
+                },
             )
 
         # Error on model switch - this corrupts search results
@@ -138,6 +158,17 @@ class CollectionMetadata(BasedModel):
                 details={
                     "expected_dimension": self.embedding_dim_dense,
                     "actual_dimension": other.embedding_dim_dense,
+                    "collection": self.project_name,
+                },
+            )
+        if self.embedding_dtype_dense != other.embedding_dtype_dense:
+            logger.warning(
+                "Embedding data type mismatch: collection was created with '%s', but current embedder produces '%s'. This can produce unexpected results.",
+                other.embedding_dtype_dense,
+                self.embedding_dtype_dense,
+                extra={
+                    "expected_dtype": other.embedding_dtype_dense,
+                    "actual_dtype": self.embedding_dtype_dense,
                     "collection": self.project_name,
                 },
             )
