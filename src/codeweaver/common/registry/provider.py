@@ -778,10 +778,11 @@ class ProviderRegistry(BasedModel):
             return client_class(**client_options)
 
         # Construct client based on what parameters it accepts
-        from codeweaver.common.utils.utils import set_args_on_signature
+        from codeweaver.common.utils.introspect import clean_args
 
         provider_settings = provider_settings or {}
-        args, kwargs = set_args_on_signature(client_class, **(provider_settings | client_options))
+        merged_settings = provider_settings | client_options
+        args, kwargs = clean_args(merged_settings, client_class)
         args = tuple(arg.get_secret_value() if isinstance(arg, SecretStr) else arg for arg in args)
         kwargs = {
             k: v.get_secret_value() if isinstance(v, SecretStr) else v for k, v in kwargs.items()

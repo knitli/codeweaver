@@ -340,6 +340,9 @@ def _construct_kwargs(
     kw_args = {}
     if not takes_kwargs(func):
         kw_args = {k: v for k, v in combined.items() if k in keywords}
+    else:
+        # When function accepts **kwargs, pass through all args
+        kw_args = combined.copy()
     kw_args |= _add_conditional_kwargs(keywords, combined, takes_kwargs=takes_kwargs(func))
     return kw_args
 
@@ -351,14 +354,18 @@ def clean_args(
 
     Args:
         args (dict[str, Any]): The arguments dictionary to clean.
+        func: The function, method, or class to clean arguments for.
 
     Returns:
         tuple[tuple[Any], dict[str, Any]]: The cleaned arguments tuple and dictionary.
     """
-    if not isfunction(func) and not ismethod(func):
-        raise TypeError("func must be a function or method")
+    # Handle class constructors first
     if isclass(func):
         func = get_class_constructor(func).object
+    
+    if not isfunction(func) and not ismethod(func):
+        raise TypeError("func must be a function, method, or class")
+    
     keywords = keyword_args(func)
     positional = [arg for arg in positional_args(func) if arg not in keywords]
     if "kwargs" in args and isinstance(args.get("kwargs"), dict) and "kwargs" not in keywords:
