@@ -751,14 +751,13 @@ class ProviderRegistry(BasedModel):
                 except Exception as e:
                     logger.warning("Failed to create Qdrant client: %s", e)
                     logger.info("Falling back to in-memory mode")
-                    # Clean client_options of collection_name for fallback too
-                    clean_opts = {
-                        k: v for k, v in (client_options or {}).items() if k != "collection_name"
-                    }
+                    # For in-memory fallback, remove ALL connection-related options
+                    # Only keep generic client options like timeout, grpc_port, etc.
+                    clean_opts = {}
                     return client_class(location=":memory:", **clean_opts)
                 else:
                     return client
-            return client_class(location=":memory:", **client_options)
+            return client_class(location=":memory:")
 
         # 4. Local model libraries (no authentication needed)
         if provider in (Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS):
