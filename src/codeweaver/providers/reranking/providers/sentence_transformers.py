@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Sequence
 from types import MappingProxyType
 from typing import Any, cast
 
@@ -86,7 +86,11 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
 
         # Call super().__init__() which handles Pydantic initialization
         super().__init__(
-            capabilities, client=self._client, prompt=prompt, top_n=top_n, **rerank_kwargs
+            client=self._client,
+            capabilities=capabilities,
+            prompt=prompt,
+            top_n=top_n,
+            **rerank_kwargs,
         )
 
     def _initialize(self) -> None:
@@ -124,12 +128,7 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
             self._setup_qwen3()
 
     async def _execute_rerank(
-        self,
-        query: str,
-        documents: Sequence[str],
-        *,
-        top_n: int = 40,
-        **kwargs: Mapping[str, Any] | None,
+        self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: Any
     ) -> Any:
         """Execute the reranking process."""
         preprocessed = (

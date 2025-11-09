@@ -318,7 +318,6 @@ class CodeWeaverSettings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        allow_arbitrary_types=True,
         case_sensitive=False,
         cli_kebab_case=True,
         extra="allow",  # Allow extra fields in the configuration for plugins/extensions

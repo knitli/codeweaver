@@ -30,14 +30,17 @@ def resolve_dimensions() -> PositiveInt:
             details={"component": "vector_store"},
             suggestions=[
                 "Set embedding model in configuration",
-                "Ensure EMBEDDING_MODEL environment variable is set",
                 "Check embedding provider is properly initialized",
             ],
         )
     if (
-        (model_settings := get_settings_map()["embedding"].get("model_settings", {}))
+        (provider_settings := get_settings_map()["provider"])
+        and (embedding_settings := provider_settings["embedding"])
+        and (model_settings := embedding_settings["embedding"]["model_settings"])
         and (dimension := model_settings.get("dimension"))
-        and (dimension in model_capabilities.output_dimensions)
+        and model_settings.capabilities.output_dimensions
+        and isinstance(model_settings.capabilities.output_dimensions, tuple)
+        and (dimension in model_settings.capabilities.output_dimensions)
     ):
         return dimension
     return model_capabilities.default_dimension

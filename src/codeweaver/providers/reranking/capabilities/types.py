@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any, Literal, NotRequired, Required, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, Literal, NotRequired, Required, TypedDict
 
 from pydantic import NonNegativeInt, PositiveInt
 
@@ -50,11 +50,10 @@ class RerankingCapabilities(TypedDict, total=False):
     name: Required[str]
     provider: Required[Provider]
     max_query: NotRequired[PositiveInt | None]
-    max_input: (
-        NotRequired[PositiveInt]
-        | Callable[[Sequence[CodeChunk], str], tuple[bool, NonNegativeInt]]
-        | None
-    )
+    max_input: Annotated[
+        PositiveInt | Callable[[Sequence[CodeChunk], str], tuple[bool, NonNegativeInt]] | None,
+        NotRequired,
+    ]
     context_window: NotRequired[PositiveInt]
     supports_custom_prompt: NotRequired[bool]
     custom_prompt: NotRequired[str]

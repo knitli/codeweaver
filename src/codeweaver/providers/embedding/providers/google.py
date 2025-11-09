@@ -6,9 +6,21 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 
-from collections.abc import Iterable, Mapping, Sequence
+
+with contextlib.suppress(Exception):
+    import warnings
+
+    from pydantic.warnings import PydanticDeprecatedSince212
+
+    warnings.simplefilter("ignore", PydanticDeprecatedSince212)
+    import os
+
+    os.environ["PYTHONWARNINGS"] = "ignore::pydantic.warnings.PydanticDeprecatedSince212"
+
+from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from google.genai.types import HttpOptions
@@ -104,7 +116,7 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
             )
 
     async def _embed_documents(
-        self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any]
+        self, documents: Sequence[CodeChunk], **kwargs: Any
     ) -> list[list[float]]:
         """
         Embed the documents using the Google embedding provider.
@@ -128,9 +140,7 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
         _ = await self._report_stats(content)
         return embeddings
 
-    async def _embed_query(
-        self, query: Sequence[str], **kwargs: Mapping[str, Any]
-    ) -> list[list[float]]:
+    async def _embed_query(self, query: Sequence[str], **kwargs: Any) -> list[list[float]]:
         """
         Embed the query using the Google embedding provider.
         """

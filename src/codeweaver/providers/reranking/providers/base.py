@@ -161,7 +161,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         capabilities: RerankingModelCapabilities,
         prompt: str | None = None,
         top_n: PositiveInt = 40,
-        **kwargs: Mapping[str, Any] | None,
+        **kwargs: Any,
     ) -> None:
         """Initialize the RerankingProvider."""
         self._model_dump_json = super().model_dump_json
@@ -246,12 +246,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         reraise=True,
     )
     async def _execute_rerank_with_retry(
-        self,
-        query: str,
-        documents: Sequence[str],
-        *,
-        top_n: int = 40,
-        **kwargs: Mapping[str, Any] | None,
+        self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: Any
     ) -> Any:
         """Wrapper around _execute_rerank with retry logic and circuit breaker.
 
@@ -280,12 +275,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
 
     @abstractmethod
     async def _execute_rerank(
-        self,
-        query: str,
-        documents: Sequence[str],
-        *,
-        top_n: int = 40,
-        **kwargs: Mapping[str, Any] | None,
+        self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: Any
     ) -> Any:
         """Execute the reranking process.
 
@@ -295,7 +285,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         raise NotImplementedError
 
     async def rerank(
-        self, query: str, documents: StructuredDataInput, **kwargs: Mapping[str, Any] | None
+        self, query: str, documents: StructuredDataInput, **kwargs: Any
     ) -> Sequence[RerankingResult]:
         """Rerank the given documents based on the query."""
         from codeweaver.core.chunks import CodeChunk
@@ -389,7 +379,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         """Get the tokenizer for the reranking provider."""
         return self._tokenizer()
 
-    def _set_kwargs(self, **kwargs: Mapping[str, Any] | None) -> Mapping[str, Any]:
+    def _set_kwargs(self, **kwargs: Any) -> Mapping[str, Any]:
         """Set the keyword arguments for the reranking provider."""
         return self.kwargs | (kwargs or {})
 

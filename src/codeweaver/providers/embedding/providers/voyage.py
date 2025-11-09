@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Sequence
 from typing import Any, ClassVar, cast
 
 from voyageai.object.embeddings import EmbeddingsObject
@@ -93,25 +93,20 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
         """Get the base URL of the embedding provider."""
         return "https://api.voyageai.com/v1"
 
-    @property
-    def client(self) -> AsyncClient:
-        """Get the client for the embedding provider."""
-        return self._client
-
     async def _embed_documents(
-        self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any]
+        self, documents: Sequence[CodeChunk], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         """Embed a list of documents into vectors."""
         ready_documents = cast(list[str], self.chunks_to_strings(documents))
-        results: EmbeddingsObject = await self._client.embed(texts=ready_documents, **kwargs)
+        results: EmbeddingsObject = await self.client.embed(texts=ready_documents, **kwargs)
         self._fire_and_forget(lambda: self._update_token_stats(token_count=results.total_tokens))
         return self._process_output(results)
 
     async def _embed_query(
-        self, query: Sequence[str], **kwargs: Mapping[str, Any]
+        self, query: Sequence[str], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         """Embed a query or group of queries into vectors."""
-        results: EmbeddingsObject = await self._client.embed(texts=list(query), **kwargs)
+        results: EmbeddingsObject = await self.client.embed(texts=list(query), **kwargs)
         self._fire_and_forget(lambda: self._update_token_stats(token_count=results.total_tokens))
         return self._process_output(results)
 

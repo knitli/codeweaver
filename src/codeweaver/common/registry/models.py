@@ -345,7 +345,13 @@ class ModelRegistry(BasedModel):
         kind = kind if isinstance(kind, ProviderKind) else ProviderKind.from_string(kind)
         if settings := get_provider_config_for(kind):
             provider = settings["provider"]
-            model_name = settings["model"]
+            # Extract model from nested model_settings structure
+            model_settings = settings.get("model_settings")
+            if not model_settings:
+                return None
+            model_name = model_settings.get("model")
+            if not model_name:
+                return None
             if kind == "embedding":
                 return self.get_embedding_capabilities(provider, model_name)  # type: ignore
             if kind == "sparse_embedding":

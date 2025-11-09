@@ -14,5 +14,6 @@
   "ruff.interpreter": [
     "/home/knitli/.local/share/mise/shims/python"
   ],
-  "python.defaultInterpreterPath": "${workspaceFolder}/.venv"
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv",
+  "shellcheck.executablePath": "/home/knitli/.local/share/mise/shims/shellcheck"
 }

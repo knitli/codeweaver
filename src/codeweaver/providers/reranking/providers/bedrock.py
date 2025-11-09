@@ -19,7 +19,6 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, Self, cast
 
 from pydantic import AliasGenerator, ConfigDict, Field, JsonValue, PositiveInt, model_validator
 from pydantic.alias_generators import to_camel, to_snake
-from types_boto3_bedrock_runtime.client import BedrockRuntimeClient
 
 from codeweaver.config.providers import AWSProviderSettings
 from codeweaver.core.types.models import BasedModel
@@ -219,17 +218,17 @@ class BedrockRerankingResult(BaseBedrockModel):
 
 try:
     from boto3 import client as boto3_client
-
+    from types_boto3_bedrock_agent_runtime.client import AgentsforBedrockRuntimeClient
 
 except ImportError as e:
     logger.exception("Failed to import boto3")
     raise ImportError("boto3 is not installed. Please install it with `pip install boto3`.") from e
 
 
-class BedrockRerankingProvider(RerankingProvider[BedrockRuntimeClient]):
+class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient]):
     """Provider for Bedrock reranking."""
 
-    _client: BedrockRuntimeClient
+    _client: AgentsforBedrockRuntimeClient
     _provider = Provider.BEDROCK
     _caps: RerankingModelCapabilities = get_amazon_reranking_capabilities()[0]
     _model_configuration: RerankConfiguration
@@ -241,7 +240,7 @@ class BedrockRerankingProvider(RerankingProvider[BedrockRuntimeClient]):
         bedrock_provider_settings: AWSProviderSettings,
         model_config: RerankConfiguration | None = None,
         capabilities: RerankingModelCapabilities | None = None,
-        client: BedrockRuntimeClient | None = None,
+        client: AgentsforBedrockRuntimeClient | None = None,
         top_n: PositiveInt = 40,
         prompt: str | None = None,
         **kwargs: Any,
@@ -258,8 +257,9 @@ class BedrockRerankingProvider(RerankingProvider[BedrockRuntimeClient]):
             bedrock_provider_settings["model_arn"], kwargs.get("top_n", 40) if kwargs else top_n
         )
         _ = bedrock_provider_settings.pop("model_arn")  # ty: ignore[invalid-argument-type]  # the typed dict is mine, I do what I want
-        self._client = boto3_client(
-            "bedrock-runtime", **self._bedrock_provider_settings
+        self._client = boto3_client(  # ty: ignore[invalid-assignment]
+            "bedrock-agent-runtime",
+            **self._bedrock_provider_settings,  # ty: ignore[invalid-argument-type]
         )  # we just popped it
         self._capabilities = capabilities or self._caps or get_amazon_reranking_capabilities()[0]
         if client or self._client:

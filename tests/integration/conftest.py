@@ -13,6 +13,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from pytest import MonkeyPatch
+
 
 if TYPE_CHECKING:
     from codeweaver.core.chunks import CodeChunk
@@ -23,6 +25,24 @@ if TYPE_CHECKING:
     from codeweaver.providers.reranking.providers.sentence_transformers import (
         SentenceTransformersRerankingProvider,
     )
+
+# ===========================================================================
+# CLI Mock Fixtures
+# ===========================================================================
+
+
+@pytest.fixture
+def mock_confirm(monkeypatch: MonkeyPatch):
+    """Mock rich.prompt.Confirm for CLI tests.
+
+    Returns a mock Confirm object that automatically returns True for all confirmations.
+    Tests can override by setting mock_confirm.ask.return_value to False.
+    """
+    mock = MagicMock()
+    mock.ask.return_value = True
+    monkeypatch.setattr("rich.prompt.Confirm", mock)
+    return mock
+
 
 # ===========================================================================
 # Mock Provider Fixtures
@@ -89,7 +109,14 @@ def mock_sparse_provider():
 @pytest.fixture
 def actual_sparse_embedding_provider() -> SentenceTransformersSparseProvider:
     """Provide an actual sparse embedding provider using SentenceTransformers."""
-    from sentence_transformers import SparseEncoder
+    # Check if SparseEncoder is available in sentence_transformers
+    try:
+        from sentence_transformers import SparseEncoder
+    except ImportError:
+        pytest.skip(
+            "SparseEncoder not available in sentence_transformers. "
+            "This feature may require a different version of sentence-transformers."
+        )
 
     from codeweaver.providers.embedding.capabilities.base import get_sparse_caps
     from codeweaver.providers.embedding.providers.sentence_transformers import (

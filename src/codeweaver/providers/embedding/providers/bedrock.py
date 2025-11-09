@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from io import BytesIO
 from typing import (
     TYPE_CHECKING,
@@ -545,7 +545,7 @@ class BedrockEmbeddingProvider(
         self,
         inputs: Sequence[CodeChunk] | Sequence[str],
         kind: Literal["documents", "query"],
-        **kwargs: Mapping[str, Any],
+        **kwargs: Any,
     ) -> InvokeRequestDict:
         """Create the Cohere embedding request."""
         body_kwargs = (
@@ -568,13 +568,13 @@ class BedrockEmbeddingProvider(
             "body": body,
             "model_id": self._caps.name,
         })
-        return InvokeRequestDict(**dict(request.model_dump(by_alias=True)))
+        return InvokeRequestDict(**dict(request.model_dump(by_alias=True)))  # ty: ignore[missing-typed-dict-key]
 
     def _create_titan_request(
         self,
         inputs: Sequence[CodeChunk] | Sequence[str],
         kind: Literal["documents", "query"],
-        **kwargs: Mapping[str, Any],
+        **kwargs: Any,
     ) -> list[InvokeRequestDict]:
         """Create the Titan embedding request."""
         from codeweaver.core.chunks import CodeChunk
@@ -630,7 +630,7 @@ class BedrockEmbeddingProvider(
         self,
         inputs: Sequence[CodeChunk] | Sequence[str],
         kind: Literal["documents", "query"],
-        **kwargs: Mapping[str, Any],
+        **kwargs: Any,
     ) -> list[InvokeRequestDict] | InvokeRequestDict:
         """Create the Bedrock embedding request."""
         if "cohere" in self._caps.name.lower():
@@ -648,7 +648,7 @@ class BedrockEmbeddingProvider(
         return responses
 
     async def _embed_documents(
-        self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any] | None
+        self, documents: Sequence[CodeChunk], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         """Embed a batch of documents using the Bedrock API."""
         kwargs = kwargs or {}
@@ -662,7 +662,7 @@ class BedrockEmbeddingProvider(
         ]
 
     async def _embed_query(
-        self, query: Sequence[str], **kwargs: Mapping[str, Any] | None
+        self, query: Sequence[str], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         """Embed a batch of queries using the Bedrock API."""
         kwargs = kwargs or {}

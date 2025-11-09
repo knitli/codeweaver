@@ -153,10 +153,11 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
             CollectionNotFoundError: Collection doesn't exist.
             SearchError: Search operation failed.
         """
+        from qdrant_client.http.models import SparseVector
+
         from codeweaver.agent_api.find_code.results import SearchResult
         from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
         from codeweaver.providers.embedding.types import SparseEmbedding
-        from qdrant_client.http.models import SparseVector
 
         if not self._ensure_client(self._client):
             raise ProviderError("Qdrant client not initialized")
@@ -174,14 +175,10 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
                 sparse_data = vector["sparse"]
                 # Handle SparseVector model objects
                 if isinstance(sparse_data, SparseVector):
-                    sparse = SparseEmbedding(
-                        indices=sparse_data.indices,
-                        values=sparse_data.values,
-                    )
+                    sparse = SparseEmbedding(indices=sparse_data.indices, values=sparse_data.values)
                 elif isinstance(sparse_data, dict):
                     sparse = SparseEmbedding(
-                        indices=sparse_data.get("indices", []),
-                        values=sparse_data.get("values", []),
+                        indices=sparse_data.get("indices", []), values=sparse_data.get("values", [])
                     )
                 else:
                     # Assume it's a SparseEmbedding already
@@ -194,8 +191,7 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
                     # Handle SparseVector model objects
                     if isinstance(sparse_data, SparseVector):
                         sparse = SparseEmbedding(
-                            indices=sparse_data.indices,
-                            values=sparse_data.values,
+                            indices=sparse_data.indices, values=sparse_data.values
                         )
                     elif isinstance(sparse_data, dict):
                         sparse = SparseEmbedding(
@@ -254,8 +250,8 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
 
             search_results: list[SearchResult] = []
             # search() returns a list directly, query_points() returns object with .points
-            points = results.points if hasattr(results, "points") else results
-            for point in points:
+            points: Any = results.points if hasattr(results, "points") else results
+            for point in points:  # ty: ignore[not-iterable]
                 payload = HybridVectorPayload.model_validate(point.payload)
                 search_result = SearchResult.model_construct(
                     content=payload.chunk,

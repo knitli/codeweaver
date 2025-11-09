@@ -133,15 +133,10 @@ def function_three():
                 delimiter_kind = chunk.metadata.get("delimiter_kind")
                 is_inclusive = chunk.metadata.get("delimiter_inclusive", True)
 
-                if delimiter_kind and "def" in first_line:
-                    # If inclusive, "def" should be in chunk
-                    # If exclusive, chunk should start after "def" line
-                    if is_inclusive:
-                        assert "def" in chunk.content, (
-                            "Inclusive delimiter should include 'def' keyword"
-                        )
-                    # Exclusive behavior would strip the delimiter line
-                    # This is configuration-dependent
+                if delimiter_kind and "def" in first_line and is_inclusive:
+                    assert "def" in chunk.content, (
+                        "Inclusive delimiter should include 'def' keyword"
+                    )
 
 
 class TestLineExpansion:

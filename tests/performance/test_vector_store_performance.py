@@ -20,6 +20,7 @@ import statistics
 import tempfile
 import time
 
+from collections.abc import AsyncGenerator
 from pathlib import Path
 
 import pytest
@@ -109,7 +110,7 @@ async def qdrant_store(qdrant_test_manager) -> QdrantVectorStoreProvider:
 
 
 @pytest.fixture
-async def memory_store() -> MemoryVectorStoreProvider:
+async def memory_store() -> AsyncGenerator[MemoryVectorStoreProvider, None]:
     """Create a MemoryVectorStoreProvider for testing."""
     from codeweaver.common.utils.utils import uuid7
 

@@ -285,28 +285,31 @@ async def health(_request: Request) -> PlainTextResponse:
 
 def setup_middleware(
     middleware: Container[type[Middleware]], middleware_settings: MiddlewareOptions
-) -> Container[Middleware]:
+) -> set[Middleware]:
     """Setup middleware for the application."""
+    # Convert container to set for modification
+    result: set[Middleware] = set()
+
     # Apply middleware settings
     # pyright gets very confused here, so we ignore most issues
     for mw in middleware:  # type: ignore
         mw: type[Middleware]  # type: ignore
         match mw.__name__:  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
             case "ErrorHandlingMiddleware":
-                mw = mw(**middleware_settings.get("error_handling", {}))  # type: ignore[reportCallIssue]
+                instance = mw(**middleware_settings.get("error_handling", {}))  # type: ignore[reportCallIssue]
             case "RetryMiddleware":
-                mw = mw(**middleware_settings.get("retry", {}))  # type: ignore[reportCallIssue]
+                instance = mw(**middleware_settings.get("retry", {}))  # type: ignore[reportCallIssue]
             case "RateLimitingMiddleware":
-                mw = mw(**middleware_settings.get("rate_limiting", {}))  # type: ignore[reportCallIssue]
+                instance = mw(**middleware_settings.get("rate_limiting", {}))  # type: ignore[reportCallIssue]
             case "LoggingMiddleware" | "StructuredLoggingMiddleware":
-                mw = mw(**middleware_settings.get("logging", {}))  # type: ignore[reportCallIssue]
+                instance = mw(**middleware_settings.get("logging", {}))  # type: ignore[reportCallIssue]
             case _:
                 if any_settings := middleware_settings.get(mw.__name__.lower()):  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
-                    mw = mw(**any_settings)  # type: ignore[reportCallIssue, reportUnknownVariableType]
+                    instance = mw(**any_settings)  # type: ignore[reportCallIssue, reportUnknownVariableType]
                 else:
-                    mw = mw()  # type: ignore[reportCallIssue, reportUnknownVariableType]
-        mw: Middleware
-    return middleware
+                    instance = mw()  # type: ignore[reportCallIssue, reportUnknownVariableType]
+        result.add(instance)
+    return result
 
 
 def register_tool(app: FastMCP[AppState]) -> FastMCP[AppState]:

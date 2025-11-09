@@ -31,7 +31,10 @@ from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.agent.agent_providers import AgentProvider
 from codeweaver.providers.embedding.capabilities.base import SparseEmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider, SparseEmbeddingProvider
-from codeweaver.providers.provider import Provider, ProviderKind
+
+# NOTE: Re-export Provider and ProviderKind for easier access -- anyone importing the registry likely needs these too
+from codeweaver.providers.provider import Provider as Provider
+from codeweaver.providers.provider import ProviderKind as ProviderKind
 from codeweaver.providers.reranking.providers.base import RerankingProvider
 from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
@@ -345,21 +348,16 @@ class ProviderRegistry(BasedModel):
 
     def _register_builtin_pydantic_ai_providers(self) -> None:
         """Register built-in Pydantic AI providers."""
-        try:
+        with contextlib.suppress(Exception):
             agent_module = importlib.import_module(self._agent_prefix.rstrip("."))
             if providers_func := getattr(agent_module, "load_default_agent_providers", None):
                 providers = providers_func()
                 for provider_class in providers:
-                    # Find matching provider enum value, skip if not found
-                    provider = next(
+                    if provider := next(
                         (p for p in Provider if str(p).lower() in provider_class.__name__.lower()),
-                        None
-                    )
-                    if provider:
+                        None,
+                    ):
                         self.register(provider, ProviderKind.AGENT, provider_class)
-        except Exception:
-            # Skip agent providers if they fail to load
-            pass
         data_module = importlib.import_module("codeweaver.providers.data")
         if tools_func := getattr(data_module, "load_default_data_providers", None):
             for tool in tools_func():
@@ -416,12 +414,15 @@ class ProviderRegistry(BasedModel):
                 self._sparse_embedding_providers[provider] = lazy_class_import
 
     def _get_embedding_provider_name(
-        self, provider: Provider, module: partial[LazyImport[Any]], destination: ProviderKind | None = None
+        self,
+        provider: Provider,
+        module: partial[LazyImport[Any]],
+        destination: ProviderKind | None = None,
     ) -> str:
         """Get the provider name for embedding providers."""
         if provider == Provider.HUGGINGFACE_INFERENCE:
             return "HuggingFaceEmbeddingProvider"
-        
+
         # Special handling for fastembed - uses different class names
         if provider == Provider.FASTEMBED:
             if destination == ProviderKind.SPARSE_EMBEDDING:
@@ -430,7 +431,7 @@ class ProviderRegistry(BasedModel):
 
         # Handle both string and LazyImport module names
         module_name = module.args[0]
-        if hasattr(module_name, '_module_name'):
+        if hasattr(module_name, "_module_name"):
             module_name = module_name._module_name
 
         if module_name == "codeweaver.providers.embedding.providers.openai_factory":
@@ -578,8 +579,8 @@ class ProviderRegistry(BasedModel):
                 if role == "note":
                     continue
                 if role == "other":
-                    var_info: dict[str, ProviderEnvVarInfo]
-                    values: list[ProviderEnvVarInfo] = list(var_info.values())
+                    other_vars: dict[str, ProviderEnvVarInfo] = var_info  # type: ignore[assignment]
+                    values: list[ProviderEnvVarInfo] = list(other_vars.values())
                     for info in values:
                         if (var_present := os.getenv(info.env)) and info.env not in (
                             "HTTPS_PROXY",
@@ -670,11 +671,17 @@ class ProviderRegistry(BasedModel):
 
         # Prepare client options
         provider_settings = provider_settings or {}
-        opts = self.get_configured_provider_settings(provider_kind) or client_options or {}  # type: ignore
+        opts_raw = self.get_configured_provider_settings(provider_kind) or client_options or {}  # type: ignore
+        # Convert DictView to dict for union operations
+        opts = dict(opts_raw) if opts_raw else {}
+        # Extract nested provider_settings from configured settings if present
+        if "provider_settings" in opts:
+            opts = opts["provider_settings"]  # type: ignore
         env_vars = self.collect_env_vars(provider)
-        base_url = self._get_base_url_for_provider(
-            provider, **(provider_settings | env_vars | opts)
-        )
+        # Merge settings and filter out 'provider' key to avoid conflicts
+        merged_settings = provider_settings | env_vars | opts
+        base_url_kwargs = {k: v for k, v in merged_settings.items() if k != "provider"}
+        base_url = self._get_base_url_for_provider(provider, **base_url_kwargs)
         if base_url and (
             "base_url" not in provider_settings or not provider_settings.get("base_url")
         ):
@@ -712,17 +719,28 @@ class ProviderRegistry(BasedModel):
             Configured client instance
         """
         # Handle special cases first
+        if provider_kind == ProviderKind.UNSET:
+            raise ConfigurationError(
+                f"Cannot create client for provider '{provider}' with unset kind."
+            )
 
         # 1. Boto3 clients (Bedrock)
         if provider == Provider.BEDROCK:
             provider_settings = provider_settings or {}
-            return client_class("bedrock-runtime", **(provider_settings | client_options))
+            return client_class(
+                "bedrock-runtime"
+                if provider_kind == ProviderKind.EMBEDDING
+                else "bedrock-agent-runtime",
+                **(provider_settings | client_options),
+            )
 
         # 3. Qdrant (supports URL, path, or memory)
         if provider in (Provider.QDRANT, Provider.MEMORY):
             if provider == Provider.QDRANT:
                 try:
-                    client = client_class(**provider_settings, **client_options)
+                    # Merge options, with provider_settings taking precedence
+                    merged_opts = client_options | provider_settings
+                    client = client_class(**merged_opts)
                 except Exception as e:
                     logger.warning("Failed to create Qdrant client: %s", e)
                     logger.info("Falling back to in-memory mode")
@@ -740,7 +758,7 @@ class ProviderRegistry(BasedModel):
             if (capabilities := self.get_configured_provider_settings(provider_kind)) and (
                 model_settings := capabilities.get("model_settings")
             ):  # type: ignore
-                model: str = model_settings["model_name"]
+                model: str = model_settings["model"]
                 return client_class(model_name=model, **client_options)
             # Let provider handle default model selection
             return client_class(**client_options)
@@ -943,6 +961,11 @@ class ProviderRegistry(BasedModel):
         Returns:
             An initialized provider instance
         """
+        provider_kind = (
+            provider_kind
+            if isinstance(provider_kind, ProviderKind)
+            else ProviderKind.from_string(provider_kind)
+        )
         retrieved_cls = None
         if self._is_literal_model_kind(provider_kind):
             retrieved_cls = self.get_provider_class(provider, provider_kind)  # type: ignore
@@ -987,7 +1010,8 @@ class ProviderRegistry(BasedModel):
 
             # Resolve LazyImport if needed before accessing __name__
             if isinstance(retrieved_cls, LazyImport):
-                return self._create_provider(provider, retrieved_cls, **kwargs)
+                resolved_cls = retrieved_cls._resolve()
+                return cast(EmbeddingProvider[Any], resolved_cls(**kwargs))
 
             # Handle tuple types (shouldn't happen for embedding, but guard against it)
             if isinstance(retrieved_cls, tuple) or retrieved_cls is None:
@@ -1020,7 +1044,8 @@ class ProviderRegistry(BasedModel):
             )
 
         if isinstance(retrieved_cls, LazyImport):
-            return self._create_provider(provider, retrieved_cls, **kwargs)
+            resolved_cls = retrieved_cls._resolve()
+            return resolved_cls(**kwargs)
 
         return retrieved_cls(**kwargs)
 
@@ -1105,6 +1130,11 @@ class ProviderRegistry(BasedModel):
         Returns:
             A provider instance
         """
+        provider_kind = (
+            provider_kind
+            if isinstance(provider_kind, ProviderKind)
+            else ProviderKind.from_string(provider_kind)
+        )
         # Get instance cache for this provider kind
         instance_cache = self._get_instance_cache_for_kind(provider_kind)
 
@@ -1123,7 +1153,7 @@ class ProviderRegistry(BasedModel):
         constructor_kwargs = self._prepare_constructor_kwargs(provider_kind, config, **kwargs)
 
         # Create the instance with proper type narrowing
-        if (
+        if provider_kind != ProviderKind.UNSET and (
             self._is_literal_embedding_kind(provider_kind)
             or self._is_literal_sparse_embedding_kind(provider_kind)
             or self._is_literal_reranking_kind(provider_kind)
@@ -1152,6 +1182,8 @@ class ProviderRegistry(BasedModel):
         Returns:
             The appropriate instance cache dictionary
         """
+        if provider_kind == ProviderKind.UNSET:
+            return {}
         if self._is_literal_embedding_kind(provider_kind):
             return self._embedding_instances
         if self._is_literal_sparse_embedding_kind(provider_kind):
@@ -1192,6 +1224,11 @@ class ProviderRegistry(BasedModel):
         Returns:
             Complete kwargs dictionary for provider constructor
         """
+        provider_kind = (
+            provider_kind
+            if isinstance(provider_kind, ProviderKind)
+            else ProviderKind.from_string(provider_kind)
+        )
         if self._is_literal_model_kind(provider_kind):
             return self._prepare_model_provider_kwargs(config, **user_kwargs)  # type: ignore
         if self._is_literal_vector_store_kind(provider_kind):
@@ -1248,10 +1285,16 @@ class ProviderRegistry(BasedModel):
         ):
             kwargs["caps"] = caps
 
-        # Add model-specific settings
+        # Collect model-specific settings into nested kwargs dict
+        # These will be passed as the 'kwargs' parameter to EmbeddingProvider.__init__
+        provider_kwargs: dict[str, Any] = {}
         for key in ("dimension", "data_type", "custom_prompt", "embed_options", "model_options"):
             if value := model_settings.get(key):
-                kwargs[key] = value
+                provider_kwargs[key] = value
+
+        # Always set kwargs parameter (required by EmbeddingProvider.__init__)
+        # Pass empty dict if no settings, as the parameter doesn't have a default
+        kwargs["kwargs"] = provider_kwargs or {}
 
     def _add_provider_settings_to_kwargs(
         self, config: DictView[Any], kwargs: dict[str, Any]
@@ -1404,13 +1447,13 @@ class ProviderRegistry(BasedModel):
             provider_kind: The type of provider to check
         """
         # Get the appropriate provider dictionary based on kind
-        provider_dict_name = f"_{provider_kind.name.lower()}_providers"
-        provider_dict = getattr(self, provider_dict_name, None)
+        provider_kind_name = f"_{provider_kind.name.lower()}_providers"
+        provider_info = getattr(self, provider_kind_name, None)
 
-        if provider_dict is None or provider not in provider_dict:
+        if provider_info is None or provider not in provider_info:
             return False
 
-        provider_class = provider_dict[provider]
+        provider_class = provider_info[provider]
 
         # If it's not a LazyImport, it's already available
         if not isinstance(provider_class, LazyImport):
@@ -1422,22 +1465,28 @@ class ProviderRegistry(BasedModel):
         except Exception as e:
             # Log the actual error for debugging
             import logging
+
             logger = logging.getLogger(__name__)
             logger.debug(
-                f"Failed to resolve {provider_kind.name} provider {provider.value}: {e.__class__.__name__}: {e}"
+                "Failed to resolve %s provider %s: %s",
+                provider_kind.name,
+                provider.value,
+                e.__class__.__name__,
+                exc_info=True,
             )
             return False
         else:
             # Check if it resolved to a real class (not still a LazyImport)
-            is_available = (
-                not isinstance(resolved, LazyImport)
-                and resolved is not None
-            )
+            is_available = not isinstance(resolved, LazyImport) and resolved is not None
             if not is_available:
                 import logging
+
                 logger = logging.getLogger(__name__)
                 logger.debug(
-                    f"Provider {provider.value} resolved but not available: resolved={type(resolved).__name__}, is_lazy={isinstance(resolved, LazyImport)}"
+                    "Provider %s resolved but not available: resolved=%s, is_lazy=%s",
+                    provider.as_title,
+                    type(resolved).__name__,
+                    str(isinstance(resolved, LazyImport)),
                 )
             return is_available
 
@@ -1637,3 +1686,12 @@ def get_provider_config_for(
     """
     registry = get_provider_registry()
     return registry.get_configured_provider_settings(kind)  # type: ignore
+
+
+__all__ = (
+    "Provider",
+    "ProviderKind",
+    "ProviderRegistry",
+    "get_provider_config_for",
+    "get_provider_registry",
+)

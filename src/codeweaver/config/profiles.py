@@ -63,7 +63,7 @@ def recommended_default() -> ProviderSettingsDict:
             DataProviderSettings(provider=Provider.TAVILY, enabled=True),
             DataProviderSettings(provider=Provider.DUCKDUCKGO, enabled=True),
         ),
-        vector=(
+        vector_store=(
             VectorStoreProviderSettings(
                 provider=Provider.QDRANT, enabled=True, provider_settings=QdrantConfig()
             ),

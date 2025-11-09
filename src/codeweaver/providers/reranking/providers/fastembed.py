@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import multiprocessing
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from typing import Any, ClassVar
 
 from codeweaver.exceptions import ProviderError
@@ -82,12 +82,7 @@ class FastEmbedRerankingProvider(RerankingProvider[TextCrossEncoder]):
         self._client = TextCrossEncoder(**self.kwargs)
 
     async def _execute_rerank(
-        self,
-        query: str,
-        documents: Sequence[str],
-        *,
-        top_n: int = 40,
-        **kwargs: Mapping[str, Any] | None,
+        self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: Any
     ) -> Any:
         """Execute the reranking process."""
         try:

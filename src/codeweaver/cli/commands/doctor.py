@@ -90,23 +90,17 @@ class DoctorCheck:
 
 def check_python_version() -> DoctorCheck:
     """Check if Python version meets minimum requirements."""
-    check = DoctorCheck("Python Version")
-
     current_version = sys.version_info
     required_version = (3, 12)
 
-    if current_version >= required_version:
-        check.status = "✅"
-        check.message = f"{current_version.major}.{current_version.minor}.{current_version.micro}"
+    is_valid = current_version >= required_version
+    version_str = f"{current_version.major}.{current_version.minor}.{current_version.micro}"
+
     return DoctorCheck.set_check(
         "Python Version",
-        "success" if check.status else "fail",
-        check.message
-        or (
-            f"{current_version.major}.{current_version.minor}.{current_version.micro} "
-            f"(requires ≥{required_version[0]}.{required_version[1]})"
-        ),
-        [
+        "success" if is_valid else "fail",
+        version_str if is_valid else f"{version_str} (requires ≥{required_version[0]}.{required_version[1]})",
+        [] if is_valid else [
             f"Upgrade Python to version {required_version[0]}.{required_version[1]} or higher",
             "Visit https://www.python.org/downloads/ for installation instructions",
         ],
@@ -118,74 +112,15 @@ def check_required_dependencies() -> DoctorCheck:
     from importlib import metadata
 
     # Special case mapping for packages where PyPI name differs from import name
-<<<<<<< HEAD
     package_to_module_map = {"uuid7": "uuid_extensions"}
-||||||| parent of a1d309b1 (Fix critical bugs: init config TOML crash, doctor uuid7 false positive, search error messaging)
-=======
-    package_to_module_map = {
-        "uuid7": "uuid_extensions",
-    }
->>>>>>> a1d309b1 (Fix critical bugs: init config TOML crash, doctor uuid7 false positive, search error messaging)
 
     missing: list[str] = []
+    installed: list[tuple[str, str]] = []
+
     if our_dependencies := metadata.metadata("codeweaver-mcp").get_all("Requires-Dist") or []:
-<<<<<<< HEAD
-        _identify_missing_dependencies(our_dependencies, package_to_module_map, metadata, missing)
-||||||| parent of a1d309b1 (Fix critical bugs: init config TOML crash, doctor uuid7 false positive, search error messaging)
-        import re
-
-        dependency_pattern = re.compile(r"^(?P<name>[\w\-]+)>=(?P<version>\d+\.\d+\.\d+\.?\d*)$")
-        dependencies = [
-            dep.split(";")[0].strip() if ";" in dep else dep.strip()
-            for dep in our_dependencies
-            if "extra" not in dep
-        ]
-        matches = [
-            dependency_pattern.match(dep) for dep in dependencies if dependency_pattern.match(dep)
-        ]
-        required_packages: list[tuple[str, str, str]] = [
-            (match["name"], match["name"].replace("-", "_"), match["version"] or "")
-            for match in matches
-            if match
-        ]
-
-        for display_name, module_name, _version in required_packages:
-            if find_spec(module_name):
-                pkg_version = metadata.version(display_name)
-                installed.append((display_name, pkg_version))
-            else:
-                missing.append(display_name)
-
-=======
-        import re
-
-        dependency_pattern = re.compile(r"^(?P<name>[\w\-]+)>=(?P<version>\d+\.\d+\.\d+\.?\d*)$")
-        dependencies = [
-            dep.split(";")[0].strip() if ";" in dep else dep.strip()
-            for dep in our_dependencies
-            if "extra" not in dep
-        ]
-        matches = [
-            dependency_pattern.match(dep) for dep in dependencies if dependency_pattern.match(dep)
-        ]
-        required_packages: list[tuple[str, str, str]] = [
-            (
-                match["name"],
-                package_to_module_map.get(match["name"], match["name"].replace("-", "_")),
-                match["version"] or "",
-            )
-            for match in matches
-            if match
-        ]
-
-        for display_name, module_name, _version in required_packages:
-            if find_spec(module_name):
-                pkg_version = metadata.version(display_name)
-                installed.append((display_name, pkg_version))
-            else:
-                missing.append(display_name)
-
->>>>>>> a1d309b1 (Fix critical bugs: init config TOML crash, doctor uuid7 false positive, search error messaging)
+        missing, installed = _check_required_dependencies(
+            our_dependencies, package_to_module_map, metadata
+        )
     return DoctorCheck.set_check(
         "Required Dependencies",
         "fail" if missing else "success",
@@ -200,11 +135,24 @@ def check_required_dependencies() -> DoctorCheck:
     )
 
 
+def _check_required_dependencies(
+    our_dependencies: list[str], package_to_module_map: dict[str, str], metadata: ModuleType
+) -> tuple[list[str], list[tuple[str, str]]]:
+    """Check for required dependencies and return missing and installed packages."""
+    missing: list[str] = []
+    installed: list[tuple[str, str]] = []
+    missing, installed = _identify_missing_dependencies(
+        our_dependencies, package_to_module_map, metadata, missing, installed
+    )
+    return missing, installed
+
+
 def _identify_missing_dependencies(
     our_dependencies: list[str],
     package_to_module_map: dict[str, str],
     metadata: ModuleType,
     missing: list[str],
+    installed: list[tuple[str, str]],
 ):
     """Identify missing dependencies from the list of required dependencies."""
     import re
@@ -228,50 +176,47 @@ def _identify_missing_dependencies(
         if match
     ]
 
-    installed: list[tuple[str, str]] = []
     for display_name, module_name, _version in required_packages:
         if find_spec(module_name):
             pkg_version = metadata.version(display_name)
             installed.append((display_name, pkg_version))
         else:
             missing.append(display_name)
+    return missing, installed
 
 
 def check_project_path(settings: CodeWeaverSettings) -> DoctorCheck:
     """Check if project path exists and is accessible."""
-    check = DoctorCheck("Project Path")
-
     project_path = (
         settings.project_path if isinstance(settings.project_path, Path) else get_project_path()
     )
 
-    if (
-        not project_path.exists()
-        or not project_path.is_dir()
-        or (project_path.exists() and not os.access(project_path, os.R_OK))
-    ):
-        check.status = "❌"
-        if not project_path.exists():
-            check.message = f"Path does not exist: {project_path}"
-            check.suggestions = [
-                "Ensure the project path is correct in your configuration",
-                "Create the directory or update the project_path setting",
-            ]
-        elif not project_path.is_dir():
-            check.message = f"Path is not a directory: {project_path}"
-            check.suggestions = ["Project path must be a directory, not a file"]
-        else:
-            check.message = f"No read permission: {project_path}"
-            check.suggestions = [
-                "Fix file permissions with: chmod +r <path>",
-                "Ensure your user has read access to the project directory",
-            ]
+    error_message = ""
+    suggestions: list[str] = []
+
+    if not project_path.exists():
+        error_message = f"Path does not exist: {project_path}"
+        suggestions = [
+            "Ensure the project path is correct in your configuration",
+            "Create the directory or update the project_path setting",
+        ]
+    elif not project_path.is_dir():
+        error_message = f"Path is not a directory: {project_path}"
+        suggestions = ["Project path must be a directory, not a file"]
+    elif not os.access(project_path, os.R_OK):
+        error_message = f"No read permission: {project_path}"
+        suggestions = [
+            "Fix file permissions with: chmod +r <path>",
+            "Ensure your user has read access to the project directory",
+        ]
+
+    has_error = bool(error_message)
+
     return DoctorCheck.set_check(
         "Project Path",
-        "fail" if check.status else "success",
-        check.message
-        or f"{project_path}" + (" (git repository)" if is_git_dir(project_path) else ""),
-        check.suggestions or [],
+        "fail" if has_error else "success",
+        error_message if has_error else f"{project_path}" + (" (git repository)" if is_git_dir(project_path) else ""),
+        suggestions,
     )
 
 
@@ -305,10 +250,7 @@ def check_configuration_file(settings: CodeWeaverSettings | None = None) -> Doct
             Path(".codeweaver/codeweaver.yaml"),
         ]
 
-        # Find which config file actually exists
-        found_config = next((loc for loc in possible_config_locations if loc.exists()), None)
-
-        if found_config:
+        if found_config := next((loc for loc in possible_config_locations if loc.exists()), None):
             check.status = "✅"
             check.message = f"Valid config at {found_config}"
         elif settings.config_file and settings.config_file.exists():
@@ -424,7 +366,7 @@ def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
     # Deployment-specific checks
     match deployment_type:
         case "cloud":
-            _check_qdrant_cloud_api_key(provider, settings, check, url)
+            return _check_qdrant_cloud_api_key(provider, settings, check, url)
         case "local" | "local docker":
             console.print(
                 f"  [green]✓[/green] Local Qdrant {'docker container' if deployment_type == 'local docker' else 'install'} detected"
@@ -471,43 +413,47 @@ def _has_auth_configured(provider: Provider, settings: ProviderSettings) -> bool
 
 def _check_qdrant_cloud_api_key(
     provider: Provider, settings: ProviderSettings, check: DoctorCheck, url: str | None
-) -> None:
+) -> DoctorCheck:
     console.print("  [green]✓[/green] Qdrant Cloud detected")
-    # we know that there are API variables set in provider.api_key_env_vars for qdrant
     if not _has_auth_configured(provider, settings):
-        possible_keys = cast(tuple[str, ...], provider.api_key_env_vars)
-
-        # Check if env vars are actually set (for debugging)
-        import os
-
-        set_vars = [key for key in possible_keys if os.getenv(key)]
-
-        if set_vars:
-            # Env var is set but not being detected by has_auth_configured
-            console.print(
-                f"  [yellow]⚠[/yellow] Found {', '.join(set_vars)} in environment, but authentication check failed."
-            )
-            console.print(
-                "  [yellow]⚠[/yellow] This might be an issue with how the provider checks credentials."
-            )
-        else:
-            # Env var not set
-            console.print(
-                f"  [yellow]⚠[/yellow] You need to set your Qdrant API key. You can set using one of these environment variables: {', '.join(possible_keys)}"
-                if len(possible_keys) > 1
-                else f"  [yellow]⚠[/yellow] You need to set your Qdrant API key. You can set using the environment variable: {possible_keys[0]}"  # type: ignore
-            )
-        check.status = "⚠️"
-        check.suggestions = [
-            f"Set {possible_keys[0]} environment variable"
-            if not set_vars
-            else "Check provider authentication logic",  # type: ignore
-            "Or configure api_key in your .codeweaver.toml file",
-        ]
-    else:
-        console.print("  [green]✓[/green] We found your api_key for Qdrant Cloud")
-        check.status = "✅"
+        return _check_qdrant_api_key_env_vars(provider, check)
+    console.print("  [green]✓[/green] We found your api_key for Qdrant Cloud")
+    check.status = "✅"
     check.message = f"Qdrant Cloud at {url}"
+    return check
+
+
+def _check_qdrant_api_key_env_vars(provider, check) -> DoctorCheck:
+    possible_keys = cast(tuple[str, ...], provider.api_key_env_vars)
+
+    # Check if env vars are actually set (for debugging)
+    import os
+
+    set_vars = [key for key in possible_keys if os.getenv(key)]
+
+    if set_vars:
+        # Env var is set but not being detected by has_auth_configured
+        console.print(
+            f"  [yellow]⚠[/yellow] Found {', '.join(set_vars)} in environment, but authentication check failed."
+        )
+        console.print(
+            "  [yellow]⚠[/yellow] This might be an issue with how the provider checks credentials."
+        )
+    else:
+        # Env var not set
+        console.print(
+            f"  [yellow]⚠[/yellow] You need to set your Qdrant API key. You can set using one of these environment variables: {', '.join(possible_keys)}"
+            if len(possible_keys) > 1
+            else f"  [yellow]⚠[/yellow] You need to set your Qdrant API key. You can set using the environment variable: {possible_keys[0]}"  # type: ignore
+        )
+    check.status = "⚠️"
+    check.suggestions = [
+        "Check provider authentication logic"
+        if set_vars
+        else f"Set {possible_keys[0]} environment variable",  # type: ignore
+        "Or configure api_key in your .codeweaver.toml file",
+    ]
+    return check
 
 
 def _print_vector_store_status(

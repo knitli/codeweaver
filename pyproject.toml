@@ -104,7 +104,7 @@ dependencies = [
   "blake3>=1.0.8",
   # CLI framework and output
   "cyclopts>=4.2.1",
-  "fastembed>=1.6.3",
+  "fastembed>=0.7.3",
   # MCP server framework
   "fastmcp>=2.13.0.2",
   "httpx>=0.28.1",
@@ -114,6 +114,7 @@ dependencies = [
   # Infrastructure and utilities
   "posthog>=6.9.0",
   # Core data models and validation
+  "py-cpuinfo>=9.0.0",
   "pydantic>=2.12.4",
   "pydantic-ai>=1.10.0",
   "pydantic-graph>=1.10.0",
@@ -124,8 +125,9 @@ dependencies = [
   "tenacity>=9.1.2",
   "textcase>=0.4.5",
   "tiktoken>=0.12.0",
-  "tokenizers>=0.26.0",
+  "tokenizers>=0.22.1",
   "tomli-w>=1.2.0",
+  "types-boto3-bedrock-agent-runtime>=1.40.61",
   "typing_extensions>=4.15.0",
   "uuid7>=0.1.0; python_version < '3.14'",
   "uvicorn[standard]>=0.38.0",
@@ -159,7 +161,7 @@ auth-permitio = ["permit-fastmcp"]
 # Settings/Config Secrets
 aws-secrets-manager = ["pydantic-settings[yaml,toml,aws-secrets-manager]"]
 azure-key-vault = ["pydantic-settings[yaml,toml,azure-key-vault]"]
-cli = ["cyclopts", "rich", "tomli-w"]
+cli = ["cyclopts", "httpx", "rich", "tomli-w"]
 # workos AuthKit middleware - see https://gofastmcp.com/integrations/authkit
 # No additional dependencies required, it's purely REST-based.
 # Enable with environment variables:
@@ -170,41 +172,44 @@ cli = ["cyclopts", "rich", "tomli-w"]
 #     FASTMCP_SERVER_AUTH_AUTHKITPROVIDER_BASE_URL="http://localhost:8000"
 # All groups for users - full featured with all middleware
 full = [
-  "eunomia-mcp",
-  "pydantic-settings[yaml,toml,gcp-secret-manager]",
   "permit-fastmcp",
-  "py-cpuinfo",
-  "sentence-transformers[onnx]",
-  "tokenizers",
+  "eunomia-mcp",
+  "pydantic-settings[yaml,toml,aws-secrets-manager,azure-key-vault,gcp-secret-manager]",
+  "permit-fastmcp",
+  "sentence-transformers",
 ]
 full-gpu = [
+  "permit-fastmcp",
   "eunomia-mcp",
   "fastembed-gpu",
   "permit-fastmcp",
-  "py-cpuinfo",
+  "pydantic-settings[yaml,toml,aws-secrets-manager,azure-key-vault,gcp-secret-manager]",
   "sentence-transformers[onnx-gpu]",
-  "tokenizers",
 ]
 gcp-secret-manager = ["pydantic-settings[yaml,toml,gcp-secret-manager]"]
 # ==== Providers ====
 #    --- Agent-only Providers --- (no embedding/rerank)
 provider-anthropic = ["pydantic-ai-slim[anthropic]"]
 # --- Embedding, Rerank and Agent Providers --- (the trifecta)
-provider-bedrock = ["pydantic-ai-slim[bedrock]"]
+# we need types for runtime because our implementation is a pydantic model that uses boto3 types
+provider-bedrock = [
+  "pydantic-ai-slim[bedrock]",
+  "types-boto3-bedrock-agent-runtime>=1.40.61"
+]
 provider-cohere = ["pydantic-ai-slim[cohere]"]
 # --- Embedding and Rerank Only --- (no agent)
 provider-fastembed = ["fastembed", "py-cpuinfo"]
+# Requires additional setup, see https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/
 provider-fastembed-gpu = ["fastembed-gpu", "py-cpuinfo"]
 provider-google = ["pydantic-ai-slim[google]"]
 provider-groq = ["pydantic-ai-slim[groq]"]
 # --- Embedding and Agent Providers --- (no rerank)
 provider-huggingface = ["pydantic-ai-slim[huggingface]"]
-# Requires additional setup, see https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/
 # ==== Vector Stores ====
 provider-in-memory = ["qdrant-client", "tokenizers"]
 provider-mistral = ["pydantic-ai-slim[mistral]"]
 # OpenAI includes support for:
-#   DeekSeek, Ollama, OpenRouter, Vercel, Perplexity, Moonshot, FireworksAI,
+#   Cerebras, DeekSeek, Ollama, OpenRouter, Vercel, Perplexity, Moonshot, FireworksAI,
 #   TogetherAI, Azure AI Foundry, Heroku, and Github Models, X-AI
 # which all use the OpenAI API
 provider-openai = ["pydantic-ai-slim[openai]"]
@@ -214,6 +219,7 @@ provider-sentence-transformers = [
   "py-cpuinfo",
 ]
 provider-sentence-transformers-gpu = [
+  # GPU requires additional setup
   "sentence-transformers[onnx-gpu]",
   "py-cpuinfo",
 ]
@@ -416,15 +422,12 @@ possibly-missing-attribute = "ignore"  # Pytest fixtures don't have static attri
 unresolved-attribute = "warn"  # Test mocks may have dynamic attributes
 unknown-argument = "warn"  # Pytest fixtures injected dynamically
 unresolved-reference = "warn"  # Test references may be dynamic
-
 # === Type Inference Limitations ===
 # ty is overly strict with Literal inference in dict lookups and dynamic patterns
 invalid-argument-type = "warn"  # Many false positives in capabilities dicts and code gen
 missing-typed-dict-key = "warn"  # Often false positive with dynamic TypedDict construction (e.g., **dict comprehension)
-
 # === Style and Refactoring Suggestions ===
 redundant-cast = "ignore"  # Informational only, not bugs
-
 # === Optional Dependencies ===
 # Scripts may import optional dependencies (e.g., mkdocs_gen_files, black)
 unresolved-import = "warn"  # Downgrade to warn for optional dependencies
@@ -488,7 +491,7 @@ invalid-argument-type = "ignore"
 unresolved-reference = "ignore"
 
 [tool.uv.sources]
-types-boto3-custom = { path = "vendored/types_boto3_custom-1.40.16-py3-none-any.whl" }
+types-boto3-custom = { path = "vendored/types_boto3_custom-1.40.66-py3-none-any.whl" }
 
 [tool.uv-dynamic-versioning]
 vcs = "git"

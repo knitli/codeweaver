@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from collections.abc import MutableMapping
 from types import MappingProxyType
-from typing import ClassVar
+from typing import Annotated, ClassVar
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, PrivateAttr
 
 from codeweaver.common.registry.types import Feature, ServiceCard, ServiceCardDict, ServiceName
 from codeweaver.core.types.models import BasedModel
@@ -25,15 +25,14 @@ class ServicesRegistry(BasedModel):
         arbitrary_types_allowed=True, validate_assignment=True, defer_build=True
     )
 
-    _services: ClassVar[MutableMapping[Feature, list[ServiceCard]]] = {
-        feature: [] for feature in Feature if feature != Feature.UNKNOWN
-    }
+    _services: MutableMapping[Feature, list[ServiceCard]] = PrivateAttr(default_factory=dict)
 
-    _instance: ServicesRegistry | None = None
+    _instance: ClassVar[ServicesRegistry | None] = None
 
     def __init__(self) -> None:
         """Initialize the services registry."""
         # TODO register default services
+        super().__init__()
 
     def _telemetry_keys(self) -> None:
         return None

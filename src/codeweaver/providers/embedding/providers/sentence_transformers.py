@@ -31,11 +31,23 @@ if TYPE_CHECKING:
 
 
 try:
-    from sentence_transformers import SentenceTransformer, SparseEncoder
+    from sentence_transformers import SentenceTransformer
 except ImportError as e:
     raise ConfigurationError(
         'Please install the `sentence-transformers` package to use the Sentence Transformers provider, \nyou can use the `sentence-transformers` optional group — `pip install "codeweaver[sentence-transformers]"` or `codeweaver[sentence-transformers-gpu]`'
     ) from e
+
+# SparseEncoder is not available in all versions of sentence-transformers
+# Import it conditionally for sparse embedding support
+try:
+    from sentence_transformers.sparse_encoder import SparseEncoder
+
+    HAS_SPARSE_ENCODER = True
+except ImportError:
+    HAS_SPARSE_ENCODER = False
+    # Create a placeholder for type hints
+    if TYPE_CHECKING:
+        SparseEncoder = Any  # type: ignore
 
 
 def default_client_args(model: str, *, query: bool = False) -> dict[str, Any]:
@@ -247,14 +259,22 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
             )
 
 
-class SentenceTransformersSparseProvider(SparseEmbeddingProvider[SparseEncoder]):
+# Use SparseEncoder if available, otherwise use Any as a placeholder
+_SparseEncoderType = SparseEncoder if HAS_SPARSE_ENCODER else Any  # type: ignore
+
+
+class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderType]):  # type: ignore
     """Sentence Transformers sparse embedding provider.
 
     This provider handles sparse embeddings from SparseEncoder models,
     returning properly formatted sparse embeddings with indices and values.
+
+    Note: This provider requires SparseEncoder which may not be available in all
+    versions of sentence-transformers. The __init__ method will raise ConfigurationError
+    if SparseEncoder is not available.
     """
 
-    _client: SparseEncoder
+    _client: _SparseEncoderType  # type: ignore
     _provider: Provider = Provider.SENTENCE_TRANSFORMERS
     _caps: SparseEmbeddingModelCapabilities
 
@@ -264,14 +284,20 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[SparseEncoder])
     def __init__(
         self,
         capabilities: SparseEmbeddingModelCapabilities,
-        client: SparseEncoder | None = None,
+        client: _SparseEncoderType | None = None,  # type: ignore
         **kwargs: Any,
     ) -> None:
         """Initialize the Sentence Transformers sparse embedding provider."""
+        if not HAS_SPARSE_ENCODER:
+            raise ConfigurationError(
+                "SparseEncoder is not available in the installed version of sentence-transformers. "
+                "Sparse embedding support may require a different version or additional dependencies."
+            )
+
         # Initialize client if not provided
         if client is None:
             doc_kwargs = {**self._doc_kwargs, **(kwargs or {})}
-            client = SparseEncoder(
+            client = _SparseEncoderType(  # type: ignore
                 model_name_or_path=capabilities.name, **doc_kwargs.get("client_options", {})
             )
 
@@ -301,9 +327,7 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[SparseEncoder])
                 and "model_name_or_path" not in keyword_args["client_options"]
             ):
                 keyword_args["client_options"]["model_name_or_path"] = caps.name
-        self.doc_kwargs.pop("model_name", None) or self.doc_kwargs.pop(
-            "model_name_or_path", None
-        )
+        self.doc_kwargs.pop("model_name", None) or self.doc_kwargs.pop("model_name_or_path", None)
         self.query_kwargs.pop("model_name", None)
         self.query_kwargs.pop("model_name_or_path", None)
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 from codeweaver.exceptions import ConfigurationError
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from codeweaver.core.chunks import CodeChunk
 
 
-def try_for_heroku_endpoint(kwargs: Mapping[str, Any]) -> str:
+def try_for_heroku_endpoint(kwargs: Any) -> str:
     """Try to identify the Heroku endpoint."""
     if kwargs.get("base_url"):
         return kwargs["base_url"]
@@ -51,7 +51,7 @@ def parse_endpoint(endpoint: str, region: str | None = None) -> str:
     return f"https://{endpoint}.{region}.inference.ai.azure.com"
 
 
-def try_for_azure_endpoint(kwargs: Mapping[str, Any]) -> str:
+def try_for_azure_endpoint(kwargs: Any) -> str:
     """Try to identify the Azure endpoint.
 
     Azure uses this format: `https://<endpoint>.<region_name>.inference.ai.azure.com`,
@@ -190,7 +190,7 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
         }
 
     async def _fetch_embeddings(
-        self, texts: list[str], *, is_query: bool, **kwargs: Mapping[str, Any]
+        self, texts: list[str], *, is_query: bool, **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         """Fetch embeddings from the Cohere API."""
         embed_kwargs = {
@@ -220,7 +220,7 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
         return embeddings or [[]]
 
     async def _embed_documents(
-        self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any]
+        self, documents: Sequence[CodeChunk], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         """Embed a list of documents."""
         kwargs = (
@@ -234,7 +234,7 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
         )
 
     async def _embed_query(
-        self, query: Sequence[str], **kwargs: Mapping[str, Any]
+        self, query: Sequence[str], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         """Embed a query or list of queries."""
         kwargs = (

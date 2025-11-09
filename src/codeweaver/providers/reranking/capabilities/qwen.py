@@ -20,7 +20,7 @@ def _get_shared_capabilities() -> PartialRerankingCapabilities:
     """Returns shared_capabilities across all Qwen reranking models."""
     from codeweaver.providers.provider import Provider
 
-    return {
+    return {  # ty: ignore[invalid-return-type]
         "name": "Qwen/Qwen3-Reranking-",
         "provider": Provider.HUGGINGFACE_INFERENCE,
         "max_input": 32_000,

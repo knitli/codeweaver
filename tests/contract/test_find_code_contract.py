@@ -90,9 +90,9 @@ class TestFindCodeSignature:
 
         # The return type should be FindCodeResponseSummary
         # Note: Direct type comparison is tricky with generics, so we check the name
-        return_type_str = str(type_hints["return"])
-        assert "FindCodeResponseSummary" in return_type_str, (
-            f"find_code must return FindCodeResponseSummary, got {return_type_str}"
+        return_type_repr = str(type_hints["return"])
+        assert "FindCodeResponseSummary" in return_type_repr, (
+            f"find_code must return FindCodeResponseSummary, got {return_type_repr}"
         )
 
 
@@ -447,10 +447,10 @@ class TestTypesSafety:
         """Verify find_code returns Pydantic model, not dict."""
         # This is enforced by type hints and Pydantic
         type_hints = get_type_hints(find_code)
-        return_type_str = str(type_hints["return"])
+        return_type_repr = str(type_hints["return"])
 
         # Should NOT return dict or dict[str, Any]
-        assert "dict" not in return_type_str.lower(), (
+        assert "dict" not in return_type_repr.lower(), (
             "find_code must not return dict, must return FindCodeResponseSummary"
         )
 

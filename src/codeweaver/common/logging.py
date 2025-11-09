@@ -46,7 +46,7 @@ def _setup_config_logger(
 ) -> logging.Logger:
     """Set up a logger with optional rich formatting."""
     if logging_kwargs:
-        dictConfig({**logging_kwargs})
+        dictConfig({**logging_kwargs})  # ty: ignore[missing-typed-dict-key]
         if rich:
             handler = get_rich_handler(**(rich_options or {}))
             logger = logging.getLogger(name)

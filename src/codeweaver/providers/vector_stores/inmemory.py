@@ -248,21 +248,27 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
             # Perform search using Qdrant's query_points for hybrid support
 
             # Build Qdrant filter from our Filter if provided
+            from qdrant_client.http.models import QueryResponse, ScoredPoint
+
+            # hybrid search (top) returns QueryResponse, which is a BaseModel with `points` attribute
+            # The points attribute is a list of ScoredPoint objects
+            # Single-vector search (bottom) returns list[ScoredPoint] directly
             qdrant_filter = None
             if vector.is_hybrid():
-                results = await self._client.query_points(
+                results: QueryResponse = await self._client.query_points(
                     **vector.to_hybrid_query(
                         query_kwargs={
                             "limit": 100,
                             "with_payload": True,
                             "with_vectors": False,
                             "query_filter": qdrant_filter or None,
+                            "consistency": "quorum",
                         },
                         kwargs={"collection_name": collection_name},
                     )  # type: ignore
                 )  # type: ignore
             else:
-                results = await self._client.search(
+                results: list[ScoredPoint] = await self._client.search(
                     **vector.to_query(
                         kwargs={
                             "collection_name": collection_name,
@@ -270,13 +276,19 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
                             "with_payload": True,
                             "with_vectors": False,
                             "query_filter": qdrant_filter or None,
+                            "consistency": "quorum",
                         }
                     )  # type: ignore
                 )
+            # ! Important: ScoredPoint is **not a simple list of scores** - it's a BaseModel with attributes: id, version, score, payload, vector, shard_key and order_value
+            #  - payload contains our stored HybridVectorPayload data, or specific fields if requested
+            #  - vector contains the stored vector (not requested here)
+            #  - score is the similarity score (e.g. cosine similarity)
             # Convert Qdrant results to SearchResult objects
             search_results: list[SearchResult] = []
             # Handle both query_points (returns object with .points) and search (returns list directly)
-            points = results.points if hasattr(results, "points") else results
+
+            points = results.points if isinstance(results, QueryResponse) else results
             for point in points:
                 # Extract payload data
                 payload = HybridVectorPayload.model_validate(point.payload or {})  # type: ignore
@@ -342,11 +354,11 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
                 line_start=chunk.line_range.start,
                 line_end=chunk.line_range.end,
                 indexed_at=datetime.now(UTC).isoformat(),
-                hash=str(chunk.blake_hash),
+                hash=chunk.blake_hash.hexdigest(),
                 provider="memory",
                 embedding_complete=bool(chunk.dense_batch_key and chunk.sparse_batch_key),
             )
-            serialized_payload = payload.model_dump(exclude_none=True, round_trip=True)
+            serialized_payload = payload.model_dump(mode="json", exclude_none=True, round_trip=True)
 
             points.append(
                 PointStruct(

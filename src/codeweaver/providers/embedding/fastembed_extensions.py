@@ -15,7 +15,7 @@ try:
     from fastembed.common.model_description import (
         DenseModelDescription,
         ModelSource,
-        SparseModelDescription,
+        #    SparseModelDescription,
     )
     from fastembed.sparse import SparseTextEmbedding
     from fastembed.text import TextEmbedding
@@ -27,18 +27,19 @@ except ImportError as e:
         "fastembed is not installed. Please install it with `pip install codeweaver[provider-fastembed]` or `codeweaver[provider-fastembed-gpu]`."
     ) from e
 
+"""
 SPARSE_MODELS = (
     SparseModelDescription(
         model="prithivida/Splade_PP_en_v2",
         vocab_size=30522,  # BERT base uncased vocab
-        description="""SPLADE++ v2""",
+        description="SPLADE++ v2",
         license="apache-2.0",
         size_in_GB=0.6,
         sources=ModelSource(hf="prithivida/Splade_PP_en_v2"),
         model_file="model.onnx",
     ),
 )
-
+"""
 DENSE_MODELS = (
     DenseModelDescription(
         model="BAAI/bge-m3",
@@ -87,10 +88,10 @@ DENSE_MODELS = (
 def get_sparse_embedder() -> type[SparseTextEmbedding]:
     """
     Get the sparse embedder with added custom models.
-    """
-    from fastembed.sparse import splade_pp
 
-    splade_pp.supported_splade_models.append(SPARSE_MODELS[0])
+    TODO: Temporarily disabled until we can work out the bugs on added sparse models in Fastembed.
+    """
+    # splade_pp.supported_splade_models.append(SPARSE_MODELS[0])
     return SparseTextEmbedding
 
 

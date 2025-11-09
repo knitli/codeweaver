@@ -40,16 +40,29 @@ def get_provider_settings() -> DictView[ProviderSettingsDict]:
     return _provider_settings
 
 
+def _normalize_to_tuple(settings: tuple[dict, ...] | dict | None) -> tuple[dict, ...]:
+    """Normalize settings to a tuple.
+
+    Handles the case where settings can be either a single dict or a tuple of dicts.
+    """
+    if settings is None:
+        return ()
+    return (settings,) if isinstance(settings, dict) else settings
+
+
 def _get_sparse_config(
-    embedding_settings: tuple[SparseEmbeddingProviderSettings, ...],
+    embedding_settings: tuple[SparseEmbeddingProviderSettings, ...]
+    | SparseEmbeddingProviderSettings
+    | None,
 ) -> DictView[SparseEmbeddingProviderSettings] | None:
     """Get the config for sparse config, if any."""
     from codeweaver.core.types.dictview import DictView
 
+    normalized = _normalize_to_tuple(embedding_settings)
     return next(
         (
             DictView(setting)
-            for setting in embedding_settings
+            for setting in normalized
             if setting.get("model_settings") and setting.get("enabled")
         ),
         None,
@@ -57,15 +70,16 @@ def _get_sparse_config(
 
 
 def _get_embedding_config(
-    embedding_settings: tuple[EmbeddingProviderSettings, ...],
+    embedding_settings: tuple[EmbeddingProviderSettings, ...] | EmbeddingProviderSettings | None,
 ) -> DictView[EmbeddingProviderSettings] | None:
     """Get the embedding model config."""
     from codeweaver.core.types.dictview import DictView
 
+    normalized = _normalize_to_tuple(embedding_settings)
     return next(
         (
             DictView(setting)
-            for setting in embedding_settings
+            for setting in normalized
             if setting.get("model_settings") and setting.get("enabled")
         ),
         None,
@@ -73,15 +87,16 @@ def _get_embedding_config(
 
 
 def _get_reranking_config(
-    reranking_settings: tuple[RerankingProviderSettings, ...],
+    reranking_settings: tuple[RerankingProviderSettings, ...] | RerankingProviderSettings | None,
 ) -> DictView[RerankingProviderSettings] | None:
     """Get the reranking model config."""
     from codeweaver.core.types.dictview import DictView
 
+    normalized = _normalize_to_tuple(reranking_settings)
     return next(
         (
             DictView(setting)
-            for setting in reranking_settings
+            for setting in normalized
             if setting.get("model_settings") and setting.get("enabled")
         ),
         None,
@@ -89,15 +104,16 @@ def _get_reranking_config(
 
 
 def _get_agent_config(
-    agent_settings: tuple[AgentProviderSettings, ...],
+    agent_settings: tuple[AgentProviderSettings, ...] | AgentProviderSettings | None,
 ) -> DictView[AgentProviderSettings] | None:
     """Get the agent model config."""
     from codeweaver.core.types.dictview import DictView
 
+    normalized = _normalize_to_tuple(agent_settings)
     return next(
         (
             DictView(setting)
-            for setting in agent_settings
+            for setting in normalized
             if setting.get("model_settings") and setting.get("enabled")
         ),
         None,
@@ -181,14 +197,8 @@ def get_vector_store_config() -> DictView[VectorStoreProviderSettings] | None:
     from codeweaver.core.types.dictview import DictView
 
     provider_settings = get_provider_settings()
-    return next(
-        (
-            DictView(setting)
-            for setting in provider_settings["vector_store"]
-            if setting.get("enabled")
-        ),
-        None,
-    )
+    normalized = _normalize_to_tuple(provider_settings.get("vector_store"))
+    return next((DictView(setting) for setting in normalized if setting.get("enabled")), None)
 
 
 def get_data_configs() -> tuple[DictView[DataProviderSettings], ...]:

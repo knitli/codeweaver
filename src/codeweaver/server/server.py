@@ -12,7 +12,7 @@ import os
 import re
 import time
 
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import (
@@ -78,19 +78,19 @@ if TYPE_CHECKING:
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
 # lazy imports for default factory functions
-get_provider_registry: LazyImport[ProviderRegistry] = lazy_import(
+get_provider_registry: LazyImport[Callable[[], ProviderRegistry]] = lazy_import(
     "codeweaver.common.registry", "get_provider_registry"
 )
-get_services_registry: LazyImport[ServicesRegistry] = lazy_import(
+get_services_registry: LazyImport[Callable[[], ServicesRegistry]] = lazy_import(
     "codeweaver.common.registry", "get_services_registry"
 )
-get_model_registry: LazyImport[ModelRegistry] = lazy_import(
+get_model_registry: LazyImport[Callable[[], ModelRegistry]] = lazy_import(
     "codeweaver.common.registry", "get_model_registry"
 )
-get_session_statistics: LazyImport[SessionStatistics] = lazy_import(
+get_session_statistics: LazyImport[Callable[[], SessionStatistics]] = lazy_import(
     "codeweaver.common.statistics", "get_session_statistics"
 )
-get_settings: LazyImport[CodeWeaverSettings] = lazy_import(
+get_settings: LazyImport[Callable[[], CodeWeaverSettings]] = lazy_import(
     "codeweaver.config.settings", "get_settings"
 )
 
@@ -210,18 +210,11 @@ class AppState(DataclassSerializationMixin):
         Field(default_factory=get_settings, description="CodeWeaver configuration settings"),
     ]
     config_path: Annotated[
-        Path | None,
-        Field(
-            default=None,
-            description="Path to the configuration file, if any",
-        ),
+        Path | None, Field(default=None, description="Path to the configuration file, if any")
     ]
     project_path: Annotated[
         DirectoryPath,
-        Field(
-            default_factory=get_project_path,
-            description="Path to the project root",
-        ),
+        Field(default_factory=get_project_path, description="Path to the project root"),
     ]
     provider_registry: Annotated[
         ProviderRegistry,
@@ -316,6 +309,102 @@ def _get_health_service() -> HealthService:
     )
 
 
+async def _run_background_indexing(
+    state: AppState, settings: CodeWeaverSettings, console: Any
+) -> None:
+    """Background task for indexing and file watching."""
+    from codeweaver.common import CODEWEAVER_PREFIX
+
+    try:
+        console.print(f"{CODEWEAVER_PREFIX} [blue]Starting background indexing...[/blue]")
+
+        if not state.indexer:
+            console.print(
+                f"{CODEWEAVER_PREFIX} [yellow]No indexer configured, skipping background indexing[/yellow]"
+            )
+            return
+
+        # Prime index (initial indexing) - run in thread since it's sync
+        await asyncio.to_thread(state.indexer.prime_index, force_reindex=False)
+        console.print(f"{CODEWEAVER_PREFIX} [green]Initial indexing complete[/green]")
+
+        # Start file watcher for real-time updates
+        console.print(f"{CODEWEAVER_PREFIX} [blue]Starting file watcher...[/blue]")
+        from codeweaver.common.utils import get_project_path
+        from codeweaver.engine.indexer import FileWatcher, IgnoreFilter
+
+        watcher = FileWatcher(
+            get_project_path()
+            if isinstance(settings.project_path, Unset)
+            else settings.project_path,
+            file_filter=IgnoreFilter.from_settings(),  # Uses default filter
+            walker=state.indexer._walker,
+        )
+
+        # Run watcher (this will block until cancelled)
+        await watcher.run()
+
+    except asyncio.CancelledError:
+        console.print(f"{CODEWEAVER_PREFIX} [yellow]Background indexing cancelled[/yellow]")
+        raise
+    except Exception as e:
+        console.print(f"{CODEWEAVER_PREFIX} [red]Background indexing error: {e}[/red]")
+        logger.exception("Background indexing error")
+
+
+def _initialize_app_state(
+    app: FastMCP[AppState], settings: CodeWeaverSettings, statistics: SessionStatistics | None
+) -> AppState:
+    """Initialize application state if not already present."""
+    if hasattr(app, "state"):
+        return cast(AppState, app.state)
+
+    state = AppState(  # type: ignore
+        initialized=False,
+        settings=settings,
+        health=get_health_info(),
+        statistics=statistics or get_session_statistics._resolve()(),
+        project_path=settings.project_path,
+        config_path=settings.config_file if settings else get_settings().config_file,
+        provider_registry=get_provider_registry._resolve()(),
+        services_registry=get_services_registry._resolve()(),
+        model_registry=get_model_registry._resolve()(),
+        middleware_stack=tuple(getattr(app, "middleware", ())),
+        health_service=None,  # Initialize as None, will be set after AppState construction
+        telemetry=PostHogClient.from_settings(),
+        indexer=Indexer.from_settings(),
+    )
+    object.__setattr__(app, "state", state)
+    # Now that AppState is constructed and _state is set, create the HealthService
+    state.health_service = _get_health_service()
+    return state
+
+
+async def _cleanup_state(state: AppState, indexing_task: asyncio.Task | None, console: Any) -> None:
+    """Clean up application state and shutdown services."""
+    from codeweaver.common import CODEWEAVER_PREFIX
+
+    # Cancel background indexing
+    if indexing_task:
+        indexing_task.cancel()
+        try:
+            await indexing_task
+        except asyncio.CancelledError:
+            console.print(f"{CODEWEAVER_PREFIX} [yellow]Background indexing stopped[/yellow]")
+
+    # Shutdown telemetry client to flush pending events
+    if state.telemetry:
+        try:
+            state.telemetry.shutdown()
+        except Exception:
+            logging.getLogger(__name__).exception("Error shutting down telemetry client")
+
+    console.print(
+        f"{CODEWEAVER_PREFIX} [bold red]Exiting CodeWeaver lifespan context manager...[/bold red]"
+    )
+    state.initialized = False
+
+
 @asynccontextmanager
 async def lifespan(
     app: FastMCP[AppState],
@@ -325,33 +414,17 @@ async def lifespan(
     """Context manager for application lifespan with proper initialization."""
     from rich.console import Console
 
+    from codeweaver.common import CODEWEAVER_PREFIX
+
     console = Console(markup=True)
     console.print("[bold red]Entering lifespan context manager...[/bold red]")
+
     if settings is None:
-        settings = get_settings()
+        settings = get_settings._resolve()()
     if isinstance(settings.project_path, Unset):
         settings.project_path = get_project_path()
-    if not hasattr(app, "state"):
-        state = AppState(  # type: ignore
-            initialized=False,
-            settings=settings,
-            health=get_health_info(),
-            statistics=statistics or get_session_statistics(),
-            project_path=settings.project_path,
-            config_path=settings.config_file if settings else get_settings().config_file,
-            provider_registry=get_provider_registry(),
-            services_registry=get_services_registry(),
-            model_registry=get_model_registry(),
-            middleware_stack=tuple(getattr(app, "middleware", ())),
-            health_service=None,  # Initialize as None, will be set after AppState construction
-            telemetry=PostHogClient.from_settings(),
-            indexer=Indexer.from_settings(),
-        )
-        object.__setattr__(app, "state", state)
-        # Now that AppState is constructed and _state is set, create the HealthService
-        state.health_service = _get_health_service()
-    state: AppState = app.state  # type: ignore
-    from codeweaver.common import CODEWEAVER_PREFIX
+
+    state = _initialize_app_state(app, settings, statistics)
 
     if not isinstance(state, AppState):
         raise InitializationError(
@@ -359,7 +432,6 @@ async def lifespan(
             details={"state": state},
         )
 
-    # Background indexing task
     indexing_task = None
 
     try:
@@ -367,41 +439,8 @@ async def lifespan(
         if not state.health:
             state.health.initialize()
 
-        # Start background indexing
-        async def background_indexing():
-            """Background task for indexing and file watching."""
-            try:
-                console.print(f"{CODEWEAVER_PREFIX} [blue]Starting background indexing...[/blue]")
-
-                # Prime index (initial indexing) - run in thread since it's sync
-                if state.indexer:
-                    await asyncio.to_thread(state.indexer.prime_index, force_reindex=False)
-                    console.print(f"{CODEWEAVER_PREFIX} [green]Initial indexing complete[/green]")
-
-                    # Start file watcher for real-time updates
-                    console.print(f"{CODEWEAVER_PREFIX} [blue]Starting file watcher...[/blue]")
-                    from codeweaver.engine.indexer import FileWatcher
-
-                    watcher = FileWatcher(
-                        settings.project_path,
-                        file_filter=None,  # Uses default filter
-                        walker=state.indexer._walker,
-                    )
-
-                    # Run watcher (this will block until cancelled)
-                    await watcher.run()
-                else:
-                    console.print(f"{CODEWEAVER_PREFIX} [yellow]No indexer configured, skipping background indexing[/yellow]")
-
-            except asyncio.CancelledError:
-                console.print(f"{CODEWEAVER_PREFIX} [yellow]Background indexing cancelled[/yellow]")
-                raise
-            except Exception as e:
-                console.print(f"{CODEWEAVER_PREFIX} [red]Background indexing error: {e}[/red]")
-                logger.exception("Background indexing error")
-
         # Start background indexing task
-        indexing_task = asyncio.create_task(background_indexing())
+        indexing_task = asyncio.create_task(_run_background_indexing(state, settings, console))
 
         console.print(
             f"{CODEWEAVER_PREFIX} [bold aqua]Lifespan start actions complete, server initialized.[/bold aqua]"
@@ -414,26 +453,7 @@ async def lifespan(
         state.initialized = False
         raise
     finally:
-        # Cancel background indexing
-        if indexing_task:
-            indexing_task.cancel()
-            try:
-                await indexing_task
-            except asyncio.CancelledError:
-                console.print(f"{CODEWEAVER_PREFIX} [yellow]Background indexing stopped[/yellow]")
-
-        # Shutdown telemetry client to flush pending events
-        if state.telemetry:
-            try:
-                state.telemetry.shutdown()
-            except Exception:
-                logging.getLogger(__name__).exception("Error shutting down telemetry client")
-
-        # TODO: Add state caching/saving and cleanup logic here
-        console.print(
-            f"{CODEWEAVER_PREFIX} [bold red]Exiting CodeWeaver lifespan context manager...[/bold red]"
-        )
-        state.initialized = False
+        await _cleanup_state(state, indexing_task, console)
 
 
 def get_default_middleware_settings(
@@ -558,7 +578,6 @@ def _create_base_fastmcp_settings() -> FastMcpServerSettingsDict:
     return {
         "instructions": "Ask a question, describe what you're trying to do, and get the exact context you need. CodeWeaver is an advanced code search and code context tool. It keeps an updated vector, AST, and text index of your codebase, and uses intelligent intent analysis to provide the most relevant context for AI Agents to complete tasks. It's just one easy-to-use tool - the `find_code` tool. To use it, you only need to provide a plain language description of what you want to find, and what you are trying to do. CodeWeaver will return the most relevant code matches, along with their context and precise locations.",
         "version": version,
-        "lifespan": lifespan,
         # CodeWeaver has three APIs:
         #  - Human -- through config and CLI
         #  - *User* Agent: through the `find_code` tool
@@ -598,7 +617,7 @@ def _integrate_user_settings(
                 if s
             ]
         if key in base_fast_mcp_settings:
-            _ = base_fast_mcp_settings.pop(key, None)
+            _ = base_fast_mcp_settings.pop(key, None)  # ty: ignore[no-matching-overload]
         if (value := getattr(settings, key, None)) and isinstance(value, list):
             base_fast_mcp_settings[replacement_key].extend(  # type: ignore
                 string_to_class(item) if isinstance(item, str) else item
@@ -709,14 +728,14 @@ def build_app() -> ServerSetup:
     int_level = next((k for k, v in LEVEL_MAP.items() if v == _final_level), "INFO")
     for key, middleware_setting in middleware_settings.items():
         if "logger" in cast(dict[str, Any], middleware_setting):
-            middleware_settings[key]["logger"] = final_app_logger
+            middleware_settings[key]["logger"] = final_app_logger  # ty: ignore[invalid-key]
         if "log_level" in cast(dict[str, Any], middleware_setting):
-            middleware_settings[key]["log_level"] = int_level
+            middleware_settings[key]["log_level"] = int_level  # ty: ignore[invalid-key]
     global _logger
     _logger = final_app_logger
     host = base_fast_mcp_settings.pop("host", "127.0.0.1")
     port = base_fast_mcp_settings.pop("port", 9328)
-    http_path = base_fast_mcp_settings.pop("streamable_http_path", "/codeweaver")
+    http_path = "/codeweaver"
     server = FastMCP[AppState](name="CodeWeaver", **base_fast_mcp_settings)  # type: ignore
     local_logger.info("FastMCP application initialized successfully.")
     return ServerSetup(

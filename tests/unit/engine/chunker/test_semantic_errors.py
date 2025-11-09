@@ -108,6 +108,7 @@ class TestParseErrors:
 
         error = exc_info.value
         assert hasattr(error, "suggestions"), "ParseError should have suggestions attribute"
+        assert isinstance(error.suggestions, list), "ParseError suggestions should be a list"
         assert len(error.suggestions) > 0, "ParseError should provide actionable suggestions"
 
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import os
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 from codeweaver.providers.provider import Provider
@@ -85,7 +85,7 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
         return "https://api.cohere.com"
 
     async def _execute_rerank(
-        self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: Mapping[str, Any]
+        self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: Any
     ) -> V2RerankResponse:
         return await self._client.rerank(
             model=self.model_name or self._caps.name,

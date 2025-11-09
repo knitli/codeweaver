@@ -22,7 +22,7 @@ import time
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from time import sleep
-from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Unpack, cast, overload
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, TypedDict, Unpack, cast, overload
 
 import rignore
 import watchfiles
@@ -42,7 +42,7 @@ from codeweaver.core.file_extensions import (
     DOC_FILES_EXTENSIONS,
 )
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
-from codeweaver.core.stores import BlakeStore
+from codeweaver.core.stores import BlakeStore, make_blake_store
 from codeweaver.core.types.aliases import DirectoryPath
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.models import BasedModel
@@ -56,9 +56,37 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import Any
 
+    from codeweaver.config.providers import (
+        EmbeddingProviderSettings,
+        SparseEmbeddingProviderSettings,
+        VectorStoreProviderSettings,
+    )
     from codeweaver.config.types import CodeWeaverSettingsDict
     from codeweaver.core.chunks import CodeChunk
     from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+
+
+class UserProviderSelectionDict(TypedDict):
+    embedding: DictView[EmbeddingProviderSettings[Any]] | None
+    sparse_embedding: DictView[SparseEmbeddingProviderSettings[Any]] | None
+    vector_store: DictView[VectorStoreProviderSettings] | None
+
+
+_user_config: None | UserProviderSelectionDict = None
+
+
+def _get_user_provider_config() -> UserProviderSelectionDict:
+    from codeweaver.common.registry.provider import get_provider_config_for
+    from codeweaver.providers.provider import ProviderKind
+
+    global _user_config
+    if _user_config is None:
+        _user_config = UserProviderSelectionDict(
+            embedding=get_provider_config_for(ProviderKind.EMBEDDING),
+            sparse_embedding=get_provider_config_for(ProviderKind.SPARSE_EMBEDDING),
+            vector_store=get_provider_config_for(ProviderKind.VECTOR_STORE),
+        )
+    return _user_config
 
 
 def _get_embedding_instance(*, sparse: bool = False) -> EmbeddingProvider[Any] | None:
@@ -158,6 +186,8 @@ class DefaultFilter(watchfiles.DefaultFilter):
 class ExtensionFilter(DefaultFilter):
     """Filter files by extension on top of the default directory/path ignores."""
 
+    __slots__ = ("extensions",)
+
     def __init__(
         self,
         extensions: Sequence[str],
@@ -173,7 +203,6 @@ class ExtensionFilter(DefaultFilter):
         self.extensions: tuple[str, ...] = (
             extensions if isinstance(extensions, tuple) else tuple(extensions)
         )
-        self.__slots__ = (*super().__slots__, "extensions")
         super().__init__()
 
     def __call__(self, change: Change, path: str) -> bool:
@@ -183,6 +212,8 @@ class ExtensionFilter(DefaultFilter):
 
 class DefaultExtensionFilter(ExtensionFilter):
     """Filter with a default excluded extension set augmented by provided ones."""
+
+    __slots__ = ("_ignore_paths",)
 
     def __init__(
         self,
@@ -194,7 +225,6 @@ class DefaultExtensionFilter(ExtensionFilter):
         self.extensions: tuple[str, ...] = (
             extensions if isinstance(extensions, tuple) else tuple(extensions)
         )
-        self.__slots__ = (*super().__slots__, "extensions", "_ignore_paths")
         super().__init__(extensions=extensions, ignore_paths=ignore_paths)
 
     def __call__(self, change: Change, path: str) -> bool:
@@ -232,9 +262,16 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
     seen paths.
     """
 
+    __slots__: ClassVar[tuple[str, ...]] = (
+        *watchfiles.DefaultFilter.__slots__,
+        "_walker",
+        "_allowed_complete",
+        "_allowed",
+    )
+
     _walker: Walker
-    _allowed: ClassVar[set[Path]] = set()
-    _allowed_complete: bool = False
+    _allowed: set[Path]
+    _allowed_complete: bool
 
     @overload
     def __init__(self, *, base_path: None, settings: None, walker: rignore.Walker) -> None: ...
@@ -250,7 +287,6 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         settings: RignoreSettings | None = None,
     ) -> None:
         """Initialize the IgnoreFilter with either rignore settings or a pre-configured walker."""
-        self.__slots__ = (*super().__slots__, "_walker", "_allowed_complete", "_allowed")
         if not walker and not (settings and base_path):
             self = type(self).from_settings()
             return
@@ -264,13 +300,9 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
                 raise ValueError("You must provide either settings or a walker.")
             if base_path is None:
                 raise ValueError("Base path must be provided if walker is not.")
-            if (
-                (filter_present := settings.pop("filter", None))
-                and callable(filter_present)
-                and settings.get("should_exclude_entry") is None
-            ) or not callable(settings.get("should_exclude_entry")):
-                settings |= {"should_exclude_entry": filter_present}  # type: ignore
             self._walker = rignore.walk(path=base_path, **cast(dict[str, Any], settings))  # type: ignore
+        self._allowed = set()
+        self._allowed_complete = False
         super().__init__()
 
     def __call__(self, change: Change, path: str) -> bool:
@@ -334,7 +366,7 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
                 asyncio.get_running_loop()
                 # If we're here, there's a running loop
                 # We can't await here since from_settings is not async, so skip for now
-                logger.warning(
+                logger.info(
                     "Cannot set inc_exc in Indexer.from_settings: already in async context. Will be set lazily when indexer is used."
                 )
             except RuntimeError:
@@ -393,17 +425,14 @@ class Indexer(BasedModel):
         # Support both project_path and project_root for backward compatibility
         if project_root is not None and project_path is None:
             project_path = project_root
-        elif project_root is not None:
-            logger.warning(
-                "Both project_path and project_root specified, using project_path: %s", project_path
-            )
 
         # Auto-create walker if project_path is provided but walker is not
         if walker is None and project_path is not None:
             walker = rignore.Walker(project_path)
             logger.debug("Auto-created walker for project_path: %s", project_path)
+        from codeweaver.core.discovery import DiscoveredFile
 
-        self._store = store or BlakeStore[DiscoveredFile](_value_type=DiscoveredFile)
+        self._store = store or make_blake_store(value_type=DiscoveredFile)
         self._walker = walker
         self._project_root = project_path
         self._chunking_service = chunking_service or _get_chunking_service()
@@ -415,7 +444,7 @@ class Indexer(BasedModel):
         self._vector_store: Any | None = None
 
         # Initialize checkpoint manager
-        if project_path:
+        if project_path and not isinstance(project_path, Unset):
             self._checkpoint_manager = CheckpointManager(project_path=project_path)
         else:
             from codeweaver.config.settings import get_settings
@@ -553,9 +582,15 @@ class Indexer(BasedModel):
                         "phase": "discovery",
                         "file_path": str(path),
                         "file_size": discovered_file.size,
-                        "file_language": discovered_file.language.value
-                        if discovered_file.language
-                        else None,
+                        "file_language": discovered_file.ext_kind.language.as_variable
+                        if discovered_file.ext_kind
+                        and isinstance(
+                            discovered_file.ext_kind.language,
+                            SemanticSearchLanguage | ConfigLanguage,
+                        )
+                        else str(discovered_file.ext_kind.language)
+                        if discovered_file.ext_kind
+                        else "unknown",
                         "total_discovered": self._stats.files_discovered,
                     },
                 },
@@ -1523,11 +1558,6 @@ class Indexer(BasedModel):
             checkpoint.chunks_created,
         )
         return True
-
-    @property
-    def is_empty(self) -> bool:
-        """Check if the indexer is empty."""
-        return len(self._store) == 0
 
 
 class FileWatcher:

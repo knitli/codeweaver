@@ -150,10 +150,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
     model_config = BasedModel.model_config | ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
-    _client: EmbeddingClient
-    _provider: Provider
-    _caps: EmbeddingModelCapabilities
-
+    client: EmbeddingClient
+    caps: EmbeddingModelCapabilities
+    _provider: ClassVar[Provider] = Provider.NOT_SET
     _input_transformer: ClassVar[Callable[[StructuredDataInput], Any]] = default_input_transformer
     _output_transformer: ClassVar[Callable[[Any], list[list[float]] | list[list[int]]]] = (
         default_output_transformer
@@ -162,7 +161,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     _query_kwargs: ClassVar[dict[str, Any]] = {}
 
     # Typing note: we can't type this properly because: 1) Pyright wants us to define the subtype for `list` and 2) pydantic does not support parameterized subtypes for generics.
-    _store: UUIDStore[list] = make_uuid_store(  # type: ignore
+    _store: ClassVar[UUIDStore[list]] = make_uuid_store(  # type: ignore
         value_type=list, size_limit=1024 * 1024 * 3
     )
 
@@ -179,7 +178,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     _circuit_state: CircuitBreakerState = CircuitBreakerState.CLOSED
     _failure_count: int = 0
     _last_failure_time: float | None = None
-    _circuit_open_duration: float = 30.0  # 30 seconds as per spec FR-008a
+    _circuit_open_duration: float = 30.0  # 30 seconds
 
     def __init__(
         self,
@@ -190,7 +189,6 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         """Initialize the embedding provider."""
         # Determine provider - check if subclass has it set
         getattr(type(self), "_provider", None) or caps.provider
-
         # Initialize pydantic model with all required fields
         super().__init__()
 
@@ -296,7 +294,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         reraise=True,
     )
     async def _embed_documents_with_retry(
-        self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any] | None
+        self, documents: Sequence[CodeChunk], **kwargs: Any
     ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]] | dict[str, list[int] | list[float]]:
         """Wrapper around _embed_documents with retry logic and circuit breaker.
 
@@ -325,7 +323,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
     @abstractmethod
     async def _embed_documents(
-        self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any] | None
+        self, documents: Sequence[CodeChunk], **kwargs: Any
     ) -> list[list[float]] | list[list[int]] | list[dict[str, list[int] | list[float]]]:
         """Abstract method to implement document embedding logic."""
 
@@ -352,7 +350,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         *,
         batch_id: UUID7 | None = None,
         context: Any = None,
-        **kwargs: Mapping[str, Any] | None,
+        **kwargs: Any,
     ) -> list[list[float]] | list[list[int]] | list[SparseEmbedding] | EmbeddingErrorInfo:
         """Embed a list of documents into vectors.
 
@@ -473,7 +471,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         reraise=True,
     )
     async def _embed_query_with_retry(
-        self, query: Sequence[str], **kwargs: Mapping[str, Any] | None
+        self, query: Sequence[str], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         """Wrapper around _embed_query with retry logic and circuit breaker."""
         self._check_circuit_breaker()
@@ -498,15 +496,15 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
     @abstractmethod
     async def _embed_query(
-        self, query: Sequence[str], **kwargs: Mapping[str, Any] | None
+        self, query: Sequence[str], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         """Abstract method to implement query embedding logic."""
 
     async def embed_query(
-        self, query: str | Sequence[str], **kwargs: Mapping[str, Any] | None
+        self, query: str | Sequence[str], **kwargs: Any
     ) -> list[list[float]] | list[list[int]] | list[SparseEmbedding] | EmbeddingErrorInfo:
         """Embed a query into a vector."""
-        processed_kwargs: Mapping[str, Any] = self._set_kwargs(self.query_kwargs, kwargs or {})
+        processed_kwargs: Any = self._set_kwargs(self.query_kwargs, kwargs or {})
         queries: Sequence[str] = query if isinstance(query, list | tuple | set) else [query]
         try:
             # Use retry wrapper instead of calling _embed_query directly
@@ -595,11 +593,17 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         if token_count is not None:
             statistics.add_token_usage(embedding_generated=token_count)
         elif from_docs and all(isinstance(doc, str) for doc in from_docs):
-            token_count = (
-                self.tokenizer.estimate_batch(from_docs)
-                if all(isinstance(doc, str) for doc in from_docs)
-                else sum(self.tokenizer.estimate_batch(item) for item in from_docs)  # type: ignore
-            )
+            token_count = self.tokenizer.estimate_batch(from_docs)  # type: ignore
+            statistics.add_token_usage(embedding_generated=token_count)
+        elif from_docs:
+            # Handle nested sequences by flattening
+            flattened: list[str] = []
+            for item in from_docs:
+                if isinstance(item, str):
+                    flattened.append(item)
+                else:
+                    flattened.extend(item)  # type: ignore
+            token_count = self.tokenizer.estimate_batch(flattened)
             statistics.add_token_usage(embedding_generated=token_count)
         else:
             raise CodeWeaverValidationError(
@@ -660,9 +664,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         return [chunk.serialize_for_embedding() for chunk in chunks if chunk]
 
     @staticmethod
-    def _set_kwargs(
-        instance_kwargs: Mapping[str, Any], passed_kwargs: Mapping[str, Any]
-    ) -> Mapping[str, Any]:
+    def _set_kwargs(instance_kwargs: Any, passed_kwargs: Any) -> Mapping[str, Any]:
         """Set keyword arguments for the embedding provider."""
         passed_kwargs = passed_kwargs or {}
         return cast(dict[str, Any], instance_kwargs) | cast(dict[str, Any], passed_kwargs)
@@ -739,7 +741,11 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
         key = uuid7()
         final_chunks: list[CodeChunk] = []
-        hashes = [self._hash_store.keygen(chunk.content) for chunk in processed_chunks]
+        # We map the hashes to the original UUID key for processed_chunks so we're not double-storing them.
+        hashes = [
+            self._hash_store.add(key, hash_value=chunk.content.encode("utf-8"))
+            for chunk in processed_chunks
+        ]
         starter_chunks = [
             chunk
             for i, chunk in enumerate(processed_chunks)
@@ -831,15 +837,13 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
     @abstractmethod
     @override
     async def _embed_documents(
-        self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any] | None
+        self, documents: Sequence[CodeChunk], **kwargs: Any
     ) -> list[SparseEmbedding]:
         """Abstract method to implement document embedding logic for sparse embeddings."""
 
     @abstractmethod
     @override
-    async def _embed_query(
-        self, query: Sequence[str], **kwargs: Mapping[str, Any] | None
-    ) -> list[SparseEmbedding]:
+    async def _embed_query(self, query: Sequence[str], **kwargs: Any) -> list[SparseEmbedding]:
         """Abstract method to implement query embedding logic for sparse embeddings."""
 
 

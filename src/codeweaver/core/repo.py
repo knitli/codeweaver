@@ -373,12 +373,12 @@ class RepoChecklist(DataclassSerializationMixin):
         - tuple[...] for tooling/config collections assigned later
         """
         # ensure the dict can hold mixed value types (Path|False and tuples)
-        attrs: RepoChecklistDict = RepoChecklistDict(**{
+        attrs: RepoChecklistDict = RepoChecklistDict(**{  # type: ignore[missing-typed-dict-key]
             key: False if key.startswith("has_") else () for key in cls.__dataclass_fields__
         })  # type: ignore # it doesn't infer the keys
         for name in dir_checks:
             if name in root_level_dir_names:
-                attrs[f"has_{name}_dir"] = project_path / name
+                attrs[f"has_{name}_dir"] = project_path / name  # ty: ignore[invalid-key]
             elif name == "parent_named" and (
                 (project_path / project_path.name).is_dir()
                 or any(
@@ -405,7 +405,7 @@ class RepoChecklist(DataclassSerializationMixin):
             elif name in cls._DIR_VARIANTS and (
                 found_dir := cls._find_directory_variant(name, root_level_dir_names, project_path)
             ):
-                attrs[f"has_{name}_dir"] = found_dir
+                attrs[f"has_{name}_dir"] = found_dir  # ty: ignore[invalid-key]
         return attrs
 
     @staticmethod

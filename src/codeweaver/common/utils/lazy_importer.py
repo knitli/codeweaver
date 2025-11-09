@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import threading
 
-from typing import Any
+from typing import Any, cast
 
 
 class LazyImport[Import: Any]:
@@ -163,8 +163,9 @@ class LazyImport[Import: Any]:
                 msg = f"Module {module_name!r} has no attribute path {attr_path!r}"
                 raise AttributeError(msg) from e
 
-        self._resolve_parents(default_to=result)
-        return result
+        object.__setattr__(self, "_resolved", result)
+        self._resolve_parents(default_to=True)
+        return cast(Import, result)
 
     def _mark_resolved(self) -> None:
         """
@@ -184,7 +185,11 @@ class LazyImport[Import: Any]:
         self._resolve_parents(default_to=True)
 
     def _resolve_parents(self, *, default_to: bool) -> None:
-        object.__setattr__(self, "_resolved", default_to)
+        # Only set default if not already resolved to avoid overwriting the actual resolved object
+        current = object.__getattribute__(self, "_resolved")
+        if current is None:
+            object.__setattr__(self, "_resolved", default_to)
+
         parent = object.__getattribute__(self, "_parent")
         if parent is not None:
             parent._mark_resolved()

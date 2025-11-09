@@ -251,7 +251,8 @@ class TestVectorStoreProviderWithClientFactory:
 
             # Verify client was created with memory mode (second call after exception)
             assert mock_client_class.call_count == 2
-            mock_client_class.assert_called_with(location=":memory:")
+            # Check that location=':memory:' was passed (may have other kwargs from global config)
+            assert mock_client_class.call_args[1]["location"] == ":memory:"
 
             # Verify client was passed to provider
             mock_provider_lazy.assert_called_once()
@@ -293,10 +294,11 @@ class TestVectorStoreProviderWithClientFactory:
                 provider_settings={"url": "http://localhost:6333", "api_key": "test_key"},
             )
 
-            # Verify client was created with URL
-            mock_client_class.assert_called_once_with(
-                url="http://localhost:6333", api_key="test_key"
-            )
+            # Verify client was created with URL (explicit settings override global config)
+            mock_client_class.assert_called_once()
+            call_kwargs = mock_client_class.call_args[1]
+            assert call_kwargs["url"] == "http://localhost:6333"
+            assert call_kwargs["api_key"] == "test_key"
 
 
 class TestProviderKindStringHandling:

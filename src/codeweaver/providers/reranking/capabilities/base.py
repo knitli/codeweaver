@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
 from pydantic import ConfigDict, Field, NonNegativeInt, PositiveInt
 
@@ -165,7 +165,7 @@ class RerankingModelCapabilities(BasedModel):
         ):
             return True, 0
         return self._handle_int_max_input([
-            (query + chunk.serialize_for_embedding())  # it's a string, I promise
+            (query + cast(str, chunk.serialize_for_embedding()))  # it's a string, I promise
             for chunk in input_chunks
         ])
 

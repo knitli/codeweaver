@@ -18,7 +18,7 @@ from pydantic import UUID7, AfterValidator, Field, NonNegativeInt, computed_fiel
 from pydantic.dataclasses import dataclass
 
 from codeweaver.common.utils import get_git_branch, sanitize_unicode, set_relative_path, uuid7
-from codeweaver.common.utils.git import Missing
+from codeweaver.common.utils.git import MISSING, Missing
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import is_semantic_config_ext
 from codeweaver.core.metadata import ExtKind
@@ -59,7 +59,7 @@ class DiscoveredFile(DataclassSerializationMixin):
     ] = None
     _git_branch: Annotated[
         str | Missing, Field(description="""Git branch the file was discovered in, if detected.""")
-    ] = Missing  # type: ignore
+    ] = MISSING
 
     source_id: Annotated[
         UUID7,

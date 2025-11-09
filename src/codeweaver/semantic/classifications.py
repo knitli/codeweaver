@@ -882,8 +882,17 @@ class BaseAgentTask(BaseEnumData):
 
     def __init__(self, profile: ImportanceScoresDict | None, *args: Any, **kwargs: Any) -> None:
         """Initialize BaseAgentTask with profile."""
-        self._profile = profile or ImportanceScoresDict(
-            discovery=0.25, comprehension=0.25, modification=0.2, debugging=0.15, documentation=0.15
+        object.__setattr__(
+            self,
+            "_profile",
+            profile
+            or ImportanceScoresDict(
+                discovery=0.25,
+                comprehension=0.25,
+                modification=0.2,
+                debugging=0.15,
+                documentation=0.15,
+            ),
         )
         super().__init__(*args, **kwargs)
 

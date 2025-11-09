@@ -18,17 +18,34 @@ from __future__ import annotations
 import logging
 
 from functools import cache
+from importlib.util import find_spec
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Self
+from typing import Any, Self
 
 from pydantic import HttpUrl
 
 from codeweaver.core.types.sentinel import Unset
 
 
-if TYPE_CHECKING:
-    from posthog import Posthog
+Posthog: Any
+NO_HOG = find_spec("posthog") is None
 
+if NO_HOG:
+
+    class Posthog:
+        """Dummy Posthog client when package is not installed."""
+
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def capture(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def flush(self) -> None:
+            pass
+
+else:
+    from posthog import Posthog
 
 logger = logging.getLogger(__name__)
 

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterator, Sequence
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -45,13 +45,13 @@ def huggingface_hub_output_transformer(
     return [out.tolist() for out in output]
 
 
-def huggingface_hub_embed_kwargs(**kwargs: Mapping[str, Any]) -> dict[str, Any]:
+def huggingface_hub_embed_kwargs(**kwargs: Any) -> dict[str, Any]:
     """Keyword arguments for Hugging Face Hub models."""
     kwargs = kwargs or {}
     return {"normalize": True, "prompt_name": "passage", **kwargs}
 
 
-def huggingface_hub_query_kwargs(**kwargs: Mapping[str, Any]) -> dict[str, Any]:
+def huggingface_hub_query_kwargs(**kwargs: Any) -> dict[str, Any]:
     """Keyword arguments for the query embedding method."""
     kwargs = kwargs or {}
     return {"normalize": True, "prompt_name": "query", **kwargs}
@@ -117,7 +117,7 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
         return "https://router.huggingface.co/hf-inference/models/"
 
     async def _embed_sequence(
-        self, sequence: Sequence[str], **kwargs: Mapping[str, Any]
+        self, sequence: Sequence[str], **kwargs: Any
     ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]]:
         """Embed a sequence of strings into vectors."""
         all_output: Sequence[Sequence[float]] | Sequence[Sequence[int]] = []
@@ -127,7 +127,7 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
         return all_output
 
     async def _embed_documents(
-        self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any] | None
+        self, documents: Sequence[CodeChunk], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         """Embed a list of documents into vectors."""
         transformed_input = self.chunks_to_strings(documents)
@@ -136,7 +136,7 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
         return self._process_output(all_output)
 
     async def _embed_query(
-        self, query: str | Sequence[str], **kwargs: Mapping[str, Any] | None
+        self, query: str | Sequence[str], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         """Embed a query into a vector."""
         query = [query] if isinstance(query, str) else query

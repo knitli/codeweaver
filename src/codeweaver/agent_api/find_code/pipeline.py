@@ -47,6 +47,118 @@ def raise_value_error(message: str) -> NoReturn:
     )
 
 
+async def _embed_dense(query: str, dense_provider_enum: Any, context: Any) -> list[float] | None:
+    """Attempt dense embedding, return None on failure."""
+    from codeweaver.common.logging import log_to_client_or_fallback
+    from codeweaver.common.registry import get_provider_registry
+
+    registry = get_provider_registry()
+    try:
+        dense_provider = registry.get_provider_instance(
+            dense_provider_enum, "embedding", singleton=True
+        )
+        result = await dense_provider.embed_query(query)
+
+        if isinstance(result, dict) and "error" in result:
+            await log_to_client_or_fallback(
+                context,
+                "warning",
+                {
+                    "msg": "Dense embedding returned error",
+                    "extra": {
+                        "phase": "query_embedding",
+                        "embedding_type": "dense",
+                        "error": result.get("error"),
+                    },
+                },
+            )
+            return None
+
+        await log_to_client_or_fallback(
+            context,
+            "debug",
+            {
+                "msg": "Dense embedding successful",
+                "extra": {
+                    "phase": "query_embedding",
+                    "embedding_type": "dense",
+                    "embedding_dim": len(result[0]) if result and len(result) > 0 else 0,
+                },
+            },
+        )
+    except Exception as e:
+        await log_to_client_or_fallback(
+            context,
+            "warning",
+            {
+                "msg": "Dense embedding failed",
+                "extra": {
+                    "phase": "query_embedding",
+                    "embedding_type": "dense",
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                },
+            },
+        )
+        return None
+    else:
+        return result
+
+
+async def _embed_sparse(query: str, sparse_provider_enum: Any, context: Any) -> Any | None:
+    """Attempt sparse embedding, return None on failure."""
+    from codeweaver.common.logging import log_to_client_or_fallback
+    from codeweaver.common.registry import get_provider_registry
+
+    registry = get_provider_registry()
+    try:
+        sparse_provider = registry.get_provider_instance(
+            sparse_provider_enum, "sparse_embedding", singleton=True
+        )
+        result = await sparse_provider.embed_query(query)
+
+        if isinstance(result, dict) and "error" in result:
+            await log_to_client_or_fallback(
+                context,
+                "warning",
+                {
+                    "msg": "Sparse embedding returned error",
+                    "extra": {
+                        "phase": "query_embedding",
+                        "embedding_type": "sparse",
+                        "error": result.get("error"),
+                    },
+                },
+            )
+            return None
+
+        await log_to_client_or_fallback(
+            context,
+            "debug",
+            {
+                "msg": "Sparse embedding successful",
+                "extra": {"phase": "query_embedding", "embedding_type": "sparse"},
+            },
+        )
+    except Exception as e:
+        await log_to_client_or_fallback(
+            context,
+            "warning",
+            {
+                "msg": "Sparse embedding failed",
+                "extra": {
+                    "phase": "query_embedding",
+                    "embedding_type": "sparse",
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                },
+            },
+        )
+        return None
+    else:
+        return result
+
+
 async def embed_query(query: str, context: Any = None) -> QueryResult:
     """Embed query using configured embedding providers.
 
@@ -64,7 +176,7 @@ async def embed_query(query: str, context: Any = None) -> QueryResult:
         ValueError: If no embedding providers configured or both fail
     """
     from codeweaver.common.logging import log_to_client_or_fallback
-    from codeweaver.common.registry import get_provider_registry  # Lazy import
+    from codeweaver.common.registry import get_provider_registry
     from codeweaver.providers.embedding.types import QueryResult
 
     registry = get_provider_registry()
@@ -110,117 +222,16 @@ async def embed_query(query: str, context: Any = None) -> QueryResult:
             ],
         )
 
-    # Dense embedding
+    # Attempt embeddings
     dense_query_embedding = None
     if dense_provider_enum:
-        try:
-            dense_provider = registry.get_provider_instance(
-                dense_provider_enum, "embedding", singleton=True
-            )
-            result = await dense_provider.embed_query(query)
-            # Check for embedding error
-            if isinstance(result, dict) and "error" in result:
-                await log_to_client_or_fallback(
-                    context,
-                    "warning",
-                    {
-                        "msg": "Dense embedding returned error",
-                        "extra": {
-                            "phase": "query_embedding",
-                            "embedding_type": "dense",
-                            "error": result.get("error"),
-                        },
-                    },
-                )
-                if not sparse_provider_enum:
-                    return raise_value_error(
-                        "Dense embedding returned error and no sparse provider available"
-                    )
-            else:
-                dense_query_embedding = result
-                await log_to_client_or_fallback(
-                    context,
-                    "debug",
-                    {
-                        "msg": "Dense embedding successful",
-                        "extra": {
-                            "phase": "query_embedding",
-                            "embedding_type": "dense",
-                            "embedding_dim": len(result[0]) if result and len(result) > 0 else 0,
-                        },
-                    },
-                )
-        except Exception as e:
-            await log_to_client_or_fallback(
-                context,
-                "warning",
-                {
-                    "msg": "Dense embedding failed",
-                    "extra": {
-                        "phase": "query_embedding",
-                        "embedding_type": "dense",
-                        "error": str(e),
-                        "error_type": type(e).__name__,
-                    },
-                },
-            )
-            if not sparse_provider_enum:
-                return raise_value_error(f"Dense embedding failed: {e}")
+        dense_query_embedding = await _embed_dense(query, dense_provider_enum, context)
 
-    # Sparse embedding
     sparse_query_embedding = None
     if sparse_provider_enum:
-        try:
-            sparse_provider = registry.get_provider_instance(
-                sparse_provider_enum, "sparse_embedding", singleton=True
-            )
-            result = await sparse_provider.embed_query(query)
-            # Check for embedding error
-            if isinstance(result, dict) and "error" in result:
-                await log_to_client_or_fallback(
-                    context,
-                    "warning",
-                    {
-                        "msg": "Sparse embedding returned error",
-                        "extra": {
-                            "phase": "query_embedding",
-                            "embedding_type": "sparse",
-                            "error": result.get("error"),
-                        },
-                    },
-                )
-                if not dense_query_embedding:
-                    return raise_value_error(
-                        "Sparse embedding returned error and dense embedding unavailable"
-                    )
-            else:
-                sparse_query_embedding = result
-                await log_to_client_or_fallback(
-                    context,
-                    "debug",
-                    {
-                        "msg": "Sparse embedding successful",
-                        "extra": {"phase": "query_embedding", "embedding_type": "sparse"},
-                    },
-                )
-        except Exception as e:
-            await log_to_client_or_fallback(
-                context,
-                "warning",
-                {
-                    "msg": "Sparse embedding failed",
-                    "extra": {
-                        "phase": "query_embedding",
-                        "embedding_type": "sparse",
-                        "error": str(e),
-                        "error_type": type(e).__name__,
-                    },
-                },
-            )
-            if not dense_query_embedding:
-                return raise_value_error(f"Sparse embedding failed: {e}")
+        sparse_query_embedding = await _embed_sparse(query, sparse_provider_enum, context)
 
-    # Return whatever we got (at least one must have succeeded)
+    # Validate at least one succeeded
     if dense_query_embedding is None and sparse_query_embedding is None:
         return raise_value_error("Both dense and sparse embedding failed")
 
@@ -379,7 +390,7 @@ async def rerank_results(
                 "msg": "Reranking skipped",
                 "extra": {
                     "phase": "reranking",
-                    "reason": "no_provider" if not reranking_enum else "no_candidates",
+                    "reason": "no_candidates" if reranking_enum else "no_provider",
                     "candidates_count": len(candidates) if candidates else 0,
                 },
             },
@@ -417,8 +428,6 @@ async def rerank_results(
             },
         )
 
-        return reranked_results, SearchStrategy.SEMANTIC_RERANK
-
     except Exception as e:
         await log_to_client_or_fallback(
             context,
@@ -434,6 +443,8 @@ async def rerank_results(
             },
         )
         return None, None
+    else:
+        return reranked_results, SearchStrategy.SEMANTIC_RERANK
 
 
 __all__ = (

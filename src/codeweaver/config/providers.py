@@ -311,7 +311,7 @@ class ProviderSettingsDict(TypedDict, total=False):
         tuple[SparseEmbeddingProviderSettings, ...] | SparseEmbeddingProviderSettings | None
     ]
     reranking: NotRequired[tuple[RerankingProviderSettings, ...] | RerankingProviderSettings | None]
-    vector: NotRequired[
+    vector_store: NotRequired[
         tuple[VectorStoreProviderSettings, ...] | VectorStoreProviderSettings | None
     ]
     agent: NotRequired[tuple[AgentProviderSettings, ...] | AgentProviderSettings | None]
@@ -594,7 +594,7 @@ class ProviderSettings(BasedModel):
         configs: dict[ProviderField, tuple[BaseProviderSettings, ...] | None] = {}
         for field in self._field_names:
             setting = self.settings_for_kind(field)
-            if setting is None:
+            if setting is None or setting is Unset:
                 continue
             # Normalize to tuple form
             configs[field] = setting if isinstance(setting, tuple) else (setting,)
@@ -626,10 +626,10 @@ class ProviderSettings(BasedModel):
         for config_value in self.provider_configs.values():
             if isinstance(config_value, tuple):
                 # Multiple configs for this kind
-                if any(cfg.get('provider') == provider for cfg in config_value):
+                if any(cfg.get("provider") == provider for cfg in config_value):
                     found = True
                     break
-            elif isinstance(config_value, dict) and config_value.get('provider') == provider:
+            elif isinstance(config_value, dict) and config_value.get("provider") == provider:
                 # Single config for this kind
                 found = True
                 break
@@ -641,9 +641,9 @@ class ProviderSettings(BasedModel):
         fields = []
         for k, v in self.provider_configs.items():
             if isinstance(v, tuple):
-                if any(cfg.get('provider') == provider for cfg in v):
+                if any(cfg.get("provider") == provider for cfg in v):
                     fields.append(k)
-            elif isinstance(v, dict) and v.get('provider') == provider:
+            elif isinstance(v, dict) and v.get("provider") == provider:
                 fields.append(k)
 
         if settings := [

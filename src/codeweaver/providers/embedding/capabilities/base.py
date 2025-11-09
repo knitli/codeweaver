@@ -202,6 +202,8 @@ def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:
             "other": {},
             "_available": HAS_FASTEMBED,
         },
+        """
+        # TODO: Disabled until we work out the bugs on adding custom sparse models to FastEmbed
         "prithivida/Splade-PP_en_v2": {
             "name": "prithivida/Splade-PP_en_v2",
             "multilingual": False,
@@ -209,6 +211,7 @@ def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:
             "other": {},
             "_available": HAS_FASTEMBED or HAS_ST,
         },
+        """
         "ibm-granite/granite-embedding-30m-sparse": {
             "name": "ibm-granite/granite-embedding-30m-sparse",
             "multilingual": False,
@@ -236,13 +239,13 @@ def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:
     }
     fastembed_caps = tuple(
         SparseEmbeddingModelCapabilities.model_validate(cap | {"provider": Provider.FASTEMBED})
-        for cap in list(caps.values())[:4]  # type: ignore
+        for cap in list(caps.values())[:3]  # type: ignore
     )
     st_caps = tuple(
         SparseEmbeddingModelCapabilities.model_validate(
             cap | {"provider": Provider.SENTENCE_TRANSFORMERS}
         )
-        for cap in list(caps.values())[3:]  # type: ignore
+        for cap in list(caps.values())[2:]  # type: ignore
     )
     return fastembed_caps + st_caps
 

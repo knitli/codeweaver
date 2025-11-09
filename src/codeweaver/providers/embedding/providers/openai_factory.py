@@ -14,7 +14,7 @@ from __future__ import annotations as _annotations
 import asyncio
 import os
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Sequence
 from typing import Any, Self, cast
 
 from pydantic import AnyHttpUrl, create_model
@@ -32,7 +32,7 @@ def ensure_v1(url: str) -> str:
     return url if url.rstrip("/").endswith("/v1") else f"{url.rstrip('/')}/v1"
 
 
-def try_for_heroku_endpoint(kwargs: Mapping[str, Any]) -> str:
+def try_for_heroku_endpoint(kwargs: Any) -> str:
     """Try to identify the Heroku endpoint."""
     if "base_url" in kwargs:
         return ensure_v1(kwargs["base_url"])
@@ -60,7 +60,7 @@ def parse_endpoint(endpoint: str, region: str | None = None) -> str:
     return f"https://{endpoint}.{region}.inference.ai.azure.com/v1"
 
 
-def try_for_azure_endpoint(kwargs: Mapping[str, Any]) -> str:
+def try_for_azure_endpoint(kwargs: Any) -> str:
     """Try to identify the Azure endpoint.
 
     Azure uses this format: `https://<endpoint>.<region_name>.inference.ai.azure.com/v1`,
@@ -105,7 +105,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         capabilities: EmbeddingModelCapabilities,
         *,
         base_url: str | None = None,
-        provider_kwargs: Mapping[str, Any] | None = None,
+        provider_kwargs: Any = None,
         client: AsyncOpenAI | None = None,
     ) -> type[Self]:
         """
@@ -119,7 +119,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
             model_name: str,
             provider: Provider,
             base_url: str | None,
-            provider_kwargs: Mapping[str, Any] | None,
+            provider_kwargs: Any,
             client: AsyncOpenAI | None = None,
         ) -> Callable[..., None]:
             """
@@ -155,10 +155,10 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
 
                 # 3. Call parent __init__ FIRST with proper arguments
                 # Base class expects (client, caps, kwargs) as per line 171-176 of base.py
-                base.__init__(self, client=client_instance, caps=caps, kwargs=kwargs)
+                cls.__init__(self, client=client_instance, caps=caps, kwargs=kwargs)
 
                 # 4. Set provider-specific attributes AFTER parent initialization
-                self._provider = provider
+                cls._provider = provider
 
             return __init__
 
@@ -251,7 +251,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
                 self._update_token_stats(from_docs=texts)
 
     async def _get_vectors(
-        self, texts: Sequence[str], **kwargs: Mapping[str, Any] | None
+        self, texts: Sequence[str], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         """Get vectors for a sequence of texts."""
         response = await self._client.embeddings.create(
@@ -287,7 +287,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         return [result.embedding for result in results]
 
     async def _embed_documents(
-        self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any]
+        self, documents: Sequence[CodeChunk], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         """Embed a sequence of documents."""
         if not isinstance(next(iter(documents), CodeChunk), CodeChunk):
@@ -306,7 +306,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         return await self._get_vectors(cast(list[str], texts), **kwargs)
 
     async def _embed_query(
-        self, query: Sequence[str], **kwargs: Mapping[str, Any] | None
+        self, query: Sequence[str], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         return await self._get_vectors(query, **kwargs)
 

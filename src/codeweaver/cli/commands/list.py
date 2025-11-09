@@ -10,7 +10,7 @@ from __future__ import annotations
 import sys
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Annotated, Literal, TypedDict
+from typing import TYPE_CHECKING, Annotated, Literal, TypedDict, is_typeddict
 
 import cyclopts
 
@@ -146,8 +146,8 @@ def providers(
                     "kind": _get_provider_type(provider),
                     "status": _get_status_indicator(provider, has_key=has_key),
                 }
-            elif capability and provider_map[provider]:
-                provider_map[provider]["capabilities"].append(capability)
+            elif capability and provider_map.get(provider) and is_typeddict(provider_map[provider]):
+                provider_map[provider]["capabilities"].append(capability)  # ty: ignore[non-subscriptable]  # not sure how else to prove it..
 
     for provider, info in provider_map.items():
         if not info:
