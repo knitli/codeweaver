@@ -752,6 +752,10 @@ class ProviderRegistry(BasedModel):
         # 4. Local model libraries (no authentication needed)
         if provider in (Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS):
             # These take model name/path in provider_settings, not client_options
+            # Ensure lazy_load is set for fastembed to avoid blocking model downloads
+            if provider == Provider.FASTEMBED:
+                client_options = {"lazy_load": True, **(client_options or {})}
+            
             model_name_or_path = provider_settings.get("model") if provider_settings else None
             if model_name_or_path:
                 return client_class(model_name=model_name_or_path, **client_options)
@@ -990,12 +994,35 @@ class ProviderRegistry(BasedModel):
                     logger.debug(
                         "Created client for %s provider (kind: %s)", provider, provider_kind
                     )
+                else:
+                    # Client creation returned None - provider may not need a client or is misconfigured
+                    logger.debug(
+                        "No client created for %s provider (kind: %s) - provider may handle client internally",
+                        provider,
+                        provider_kind,
+                    )
             except Exception as e:
                 logger.warning(
                     "Client creation failed for %s provider (kind: %s): %s. Provider may handle client internally.",
                     provider,
                     provider_kind,
                     e,
+                )
+        
+        # Clean up kwargs before passing to provider constructor
+        # Remove provider_settings and client_options as they're only used for client creation
+        kwargs_for_provider = {
+            k: v for k, v in kwargs.items() 
+            if k not in ("provider_settings", "client_options")
+        }
+        
+        # For model providers, verify required parameters are present
+        # Only check if caps are present (meaning provider is configured and model is set)
+        if self._is_literal_model_kind(provider_kind) and "caps" in kwargs_for_provider:
+            if "client" not in kwargs_for_provider:
+                raise ConfigurationError(
+                    f"Provider '{provider}' (kind: {provider_kind}) requires a client but none was created. "
+                    f"Check that required API keys/credentials are configured or that the provider is properly installed."
                 )
 
         # Special handling for embedding provider (has different logic)
@@ -1005,13 +1032,13 @@ class ProviderRegistry(BasedModel):
             # Check if this is an OpenAI factory that needs construction
             if self._is_openai_factory(provider, provider_kind):
                 retrieved_cls = self._construct_openai_provider_class(
-                    provider, retrieved_cls, **kwargs
+                    provider, retrieved_cls, **kwargs_for_provider
                 )
 
             # Resolve LazyImport if needed before accessing __name__
             if isinstance(retrieved_cls, LazyImport):
                 resolved_cls = retrieved_cls._resolve()
-                return cast(EmbeddingProvider[Any], resolved_cls(**kwargs))
+                return cast(EmbeddingProvider[Any], resolved_cls(**kwargs_for_provider))
 
             # Handle tuple types (shouldn't happen for embedding, but guard against it)
             if isinstance(retrieved_cls, tuple) or retrieved_cls is None:
@@ -1026,7 +1053,7 @@ class ProviderRegistry(BasedModel):
             if not name:
                 logger.warning("Embedding provider '%s' could not be imported.", provider)
                 raise ConfigurationError(f"Embedding provider '{provider}' could not be imported.")
-            return cast(EmbeddingProvider[Any], retrieved_cls(**kwargs))
+            return cast(EmbeddingProvider[Any], retrieved_cls(**kwargs_for_provider))
 
         # Standard handling for other providers
         # Handle None case
@@ -1045,9 +1072,9 @@ class ProviderRegistry(BasedModel):
 
         if isinstance(retrieved_cls, LazyImport):
             resolved_cls = retrieved_cls._resolve()
-            return resolved_cls(**kwargs)
+            return resolved_cls(**kwargs_for_provider)
 
-        return retrieved_cls(**kwargs)
+        return retrieved_cls(**kwargs_for_provider)
 
     @overload
     def get_provider_instance(
