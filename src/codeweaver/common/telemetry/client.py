@@ -65,8 +65,8 @@ class PostHogClient:
     """
 
     # ---------------------------------------------------------------------------
-    #!         THIS IS NOT AN API_KEY!! This key is a write-only project key
-    #!         safe to include in public repositories. It cannot be used to
+    #!         THIS IS NOT AN API_KEY!! This key is a write-only project key.
+    #!         It is safe to include in public repositories. It cannot be used to
     #!         read data or access CodeWeaver's PostHog project.
     # ---------------------------------------------------------------------------
     def __init__(

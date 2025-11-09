@@ -68,9 +68,9 @@ class FastEmbedRerankingProvider(RerankingProvider[TextCrossEncoder]):
     model_name: The name of the FastEmbed model to use.
     """
 
-    _client: TextCrossEncoder
+    client: TextCrossEncoder
     _provider: Provider = Provider.FASTEMBED
-    _caps: RerankingModelCapabilities
+    caps: RerankingModelCapabilities
 
     _kwargs: ClassVar[dict[str, Any]] = fastembed_kwargs()
 
@@ -78,8 +78,8 @@ class FastEmbedRerankingProvider(RerankingProvider[TextCrossEncoder]):
 
     def _initialize(self) -> None:
         if "model_name" not in self.kwargs:
-            self.kwargs["model_name"] = self._caps.name
-        self._client = TextCrossEncoder(**self.kwargs)
+            self.kwargs["model_name"] = self.caps.name
+        self.client = TextCrossEncoder(**self.kwargs)
 
     async def _execute_rerank(
         self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: Any
@@ -96,7 +96,7 @@ class FastEmbedRerankingProvider(RerankingProvider[TextCrossEncoder]):
                 f"FastEmbed reranking execution failed: {e}",
                 details={
                     "provider": "fastembed",
-                    "model": self._caps.name,
+                    "model": self.caps.name,
                     "query_length": len(query),
                     "document_count": len(documents),
                     "batch_size": len(documents),

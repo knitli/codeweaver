@@ -15,9 +15,19 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from functools import cache
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, cast, overload, override
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    ClassVar,
+    Literal,
+    NamedTuple,
+    cast,
+    overload,
+    override,
+)
 
-from pydantic import ConfigDict, PositiveInt, PrivateAttr, TypeAdapter
+from pydantic import ConfigDict, Field, PositiveInt, PrivateAttr, TypeAdapter
 from pydantic import ValidationError as PydanticValidationError
 from pydantic.main import IncEx
 from pydantic_core import from_json
@@ -127,23 +137,36 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         extra="allow", arbitrary_types_allowed=True, defer_build=True
     )
 
-    _client: RerankingClient
+    client: Annotated[
+        RerankingClient,
+        Field(
+            exclude=True,
+            description="The client for the reranking provider.",
+            validation_alias="_client",
+        ),
+    ]
     _provider: Provider
-    _caps: RerankingModelCapabilities
-    _prompt: str | None = None
+    caps: Annotated[
+        RerankingModelCapabilities,
+        Field(description="The capabilities of the reranking model.", validation_alias="_caps"),
+    ]
+    prompt: Annotated[
+        str | None,
+        Field(description="The prompt for the reranking provider.", validation_alias="_prompt"),
+    ]
 
-    _rerank_kwargs: MappingProxyType[str, Any]
+    _rerank_kwargs: ClassVar[MappingProxyType[str, Any]]
     # transforms the input documents into a format suitable for the provider
-    _input_transformer: Callable[[StructuredDataInput], Any] = PrivateAttr(
+    _input_transformer: ClassVar[Callable[[StructuredDataInput], Any]] = PrivateAttr(
         default=staticmethod(default_reranking_input_transformer)
     )
     """The input transformer is a function that takes the input documents and returns them in a format suitable for the provider.
 
     The `StructuredDataInput` type is a CodeChunk or iterable of CodeChunks, but they can be in string, bytes, bytearray, python dictionary, or CodeChunk format.
     """
-    _output_transformer: Callable[[Any, Iterator[CodeChunk]], Sequence[RerankingResult]] = (
-        PrivateAttr(default=staticmethod(default_reranking_output_transformer))
-    )
+    _output_transformer: ClassVar[
+        Callable[[Any, Iterator[CodeChunk]], Sequence[RerankingResult]]
+    ] = PrivateAttr(default=staticmethod(default_reranking_output_transformer))
     """The output transformer is a function that takes the raw results from the provider and returns a Sequence of RerankingResult."""
 
     _chunk_store: tuple[CodeChunk, ...] | None = PrivateAttr(default=None)
@@ -165,9 +188,9 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     ) -> None:
         """Initialize the RerankingProvider."""
         self._model_dump_json = super().model_dump_json
-        self._client = client
-        self._prompt = prompt
-        self._caps = capabilities
+        self.client = client
+        self.prompt = prompt
+        self.caps = capabilities
         self.kwargs = {**(type(self)._rerank_kwargs or {}), **(kwargs or {})}
         logger.debug("RerankingProvider kwargs", extra=self.kwargs)
         self._top_n = cast(int, self.kwargs.get("top_n", top_n))
@@ -342,11 +365,6 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         return processed_results
 
     @property
-    def client(self) -> RerankingClient:
-        """Get the client for the reranking provider."""
-        return self._client
-
-    @property
     def provider(self) -> Provider:
         """Get the provider for the reranking provider."""
         return self._provider
@@ -354,17 +372,12 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     @property
     def model_name(self) -> str:
         """Get the model name for the reranking provider."""
-        return self._caps.name
+        return self.caps.name
 
     @property
     def model_capabilities(self) -> RerankingModelCapabilities:
         """Get the model capabilities for the reranking provider."""
-        return self._caps
-
-    @property
-    def prompt(self) -> str | None:
-        """Get the prompt for the reranking provider."""
-        return self._prompt
+        return self.caps
 
     def _tokenizer(self) -> Tokenizer[Any]:
         """Retrieves the tokenizer associated with the reranking model."""
@@ -401,7 +414,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
             statistics.add_token_usage(reranking_generated=token_count)
         elif from_docs and all(isinstance(doc, str) for doc in from_docs):
             token_count = (
-                self.tokenizer.estimate_batch(from_docs)
+                self.tokenizer.estimate_batch(from_docs)  # ty: ignore[invalid-argument-type]
                 if all(isinstance(doc, str) for doc in from_docs)
                 else sum(self.tokenizer.estimate_batch(item) for item in from_docs)  # type: ignore
             )

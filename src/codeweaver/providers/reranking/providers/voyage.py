@@ -55,27 +55,23 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
         self._output_transformer = self.voyage_reranking_output_transformer
 
     async def _execute_rerank(
-        self,
-        query: str,
-        documents: Sequence[str],
-        *,
-        top_n: int = 40,
-        **kwargs: dict[str, Any] | None,
+        self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: Any
     ) -> Any:
         """Execute the reranking process."""
         try:
             response = await self.client.rerank(
                 query=query,
-                documents=documents,  # a list is a sequence...
-                model=self._caps.name,
-                **{"top_n": top_n, **(kwargs or {})},
+                documents=[documents] if isinstance(documents, str) else documents,  # ty: ignore[invalid-argument-type]
+                model=self.caps.name,
+                top_k=top_n,
+                **kwargs,
             )
         except Exception as e:
             raise ProviderError(
                 f"Voyage AI reranking request failed: {e}",
                 details={
                     "provider": "voyage",
-                    "model": self._caps.name,
+                    "model": self.caps.name,
                     "query_length": len(query),
                     "document_count": len(documents),
                     "error_type": type(e).__name__,

@@ -108,9 +108,9 @@ def process_for_instruction_model(queries: Sequence[str], instruction: str) -> l
 class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransformer]):
     """Sentence Transformers embedding provider for dense embeddings."""
 
-    _client: SentenceTransformer
+    client: SentenceTransformer
     _provider: Provider = Provider.SENTENCE_TRANSFORMERS
-    _caps: EmbeddingModelCapabilities
+    caps: EmbeddingModelCapabilities
 
     _doc_kwargs: ClassVar[dict[str, Any]] = {"client_options": {"trust_remote_code": True}}
     _query_kwargs: ClassVar[dict[str, Any]] = {"client_options": {"trust_remote_code": True}}
@@ -130,7 +130,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
             )
 
         # Store client before calling super() so _initialize() can access it
-        self._client = client
+        self.client = client
 
         # Call super().__init__() which handles all initialization
         # The base class will set doc_kwargs, query_kwargs, and call _initialize()
@@ -144,7 +144,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
     def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """Initialize the Sentence Transformers embedding provider."""
         # Set _caps for later use
-        self._caps = caps
+        self.caps = caps
 
         for keyword_args in (self.doc_kwargs, self.query_kwargs):
             keyword_args.setdefault("client_options", {})
@@ -168,7 +168,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         self.query_kwargs.pop("model_name_or_path", None)
 
         # Note: _client is already set by __init__ when client is provided
-        # The old code here (self._client = self._client(name, ...)) was incorrect
+        # The old code here (self.client = self.client(name, ...)) was incorrect
         # as it tried to call an instance as if it were a class
 
         if (
@@ -189,7 +189,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         if "nomic" in self.model_name:
             preprocessed = [f"search_document: {doc}" for doc in preprocessed]
         embed_partial = rpartial(  # type: ignore
-            self._client.encode,  # type: ignore
+            self.client.encode,  # type: ignore
             **(
                 self.doc_kwargs.get("client_options", {})
                 | {"model_kwargs": self.doc_kwargs.get("model_kwargs", {})}
@@ -211,7 +211,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         elif "nomic" in self.model_name:
             preprocessed = [f"search_query: {query}" for query in preprocessed]
         embed_partial = rpartial(  # type: ignore
-            self._client.encode,  # type: ignore
+            self.client.encode,  # type: ignore
             **(
                 self.query_kwargs.get("client_options", {})
                 | {"model_kwargs": self.query_kwargs.get("model_kwargs", {})}
@@ -229,15 +229,15 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
     def st_pooling_config(self) -> dict[str, Any]:
         """The pooling configuration for the SentenceTransformer."""
         # pyright doesn't like these because the model doesn't exist statically
-        if isinstance(self._client, SentenceTransformer) and callable(self._client[1]):  # type: ignore
-            return self._client[1].get_config_dict()  # type: ignore
+        if isinstance(self.client, SentenceTransformer) and callable(self.client[1]):  # type: ignore
+            return self.client[1].get_config_dict()  # type: ignore
         return {}
 
     @property
     def transformer_config(self) -> dict[str, Any]:
         """Returns the transformer configuration for the SentenceTransformer."""
-        if isinstance(self._client, SentenceTransformer) and callable(self._client[0]):  # type: ignore
-            return self._client[0].get_config_dict()  # type: ignore
+        if isinstance(self.client, SentenceTransformer) and callable(self.client[0]):  # type: ignore
+            return self.client[0].get_config_dict()  # type: ignore
         return {}
 
     def _setup_qwen3(self) -> None:
@@ -274,9 +274,9 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
     if SparseEncoder is not available.
     """
 
-    _client: _SparseEncoderType  # type: ignore
+    client: _SparseEncoderType  # type: ignore
     _provider: Provider = Provider.SENTENCE_TRANSFORMERS
-    _caps: SparseEmbeddingModelCapabilities
+    caps: SparseEmbeddingModelCapabilities
 
     _doc_kwargs: ClassVar[dict[str, Any]] = {"client_options": {"trust_remote_code": True}}
     _query_kwargs: ClassVar[dict[str, Any]] = {"client_options": {"trust_remote_code": True}}
@@ -302,7 +302,7 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
             )
 
         # Store client before calling super() so _initialize() can access it
-        self._client = client
+        self.client = client
 
         # Call super().__init__() which handles all initialization
         # The base class will set doc_kwargs, query_kwargs, and call _initialize()
@@ -316,7 +316,7 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
     def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """Initialize the Sentence Transformers sparse embedding provider."""
         # Set _caps for later use
-        self._caps = caps  # type: ignore
+        self.caps = caps  # type: ignore
 
         for keyword_args in (self.doc_kwargs, self.query_kwargs):
             keyword_args.setdefault("client_options", {})
@@ -332,7 +332,7 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
         self.query_kwargs.pop("model_name_or_path", None)
 
         # Note: _client is already set by __init__ when client is provided
-        # The old code here (self._client = SparseEncoder(name, ...)) was incorrect
+        # The old code here (self.client = SparseEncoder(name, ...)) was incorrect
         # as it tried to re-initialize an already-initialized client
 
     def _to_sparse_format(self, embedding: Any) -> SparseEmbedding:
@@ -351,7 +351,7 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
         """Embed a sequence of documents into sparse vectors."""
         preprocessed = cast(list[str], self.chunks_to_strings(documents))
         embed_partial = rpartial(  # type: ignore
-            self._client.encode,  # type: ignore
+            self.client.encode,  # type: ignore
             **(
                 self.doc_kwargs.get("client_options", {})
                 | {"model_kwargs": self.doc_kwargs.get("model_kwargs", {})}
@@ -370,7 +370,7 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
         """Embed a sequence of queries into sparse vectors."""
         preprocessed = cast(list[str], query)
         embed_partial = rpartial(  # type: ignore
-            self._client.encode,  # type: ignore
+            self.client.encode,  # type: ignore
             **(
                 self.query_kwargs.get("client_options", {})
                 | {"model_kwargs": self.query_kwargs.get("model_kwargs", {})}

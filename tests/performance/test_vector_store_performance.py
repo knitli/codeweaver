@@ -28,6 +28,7 @@ import pytest
 from qdrant_client import models
 from qdrant_client.async_qdrant_client import AsyncQdrantClient
 
+from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
 from codeweaver.config.providers import MemoryConfig, QdrantConfig
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage
@@ -57,7 +58,7 @@ def create_test_chunk(
 
     return CodeChunk(
         chunk_id=chunk_id,
-        file_path=file_path,
+        file_path=Path(file_path),
         ext_kind=ExtKind(kind=ChunkKind.CODE, language=SemanticSearchLanguage.PYTHON),
         line_range=Span(chunk_index * 10 + 1, (chunk_index + 1) * 10, chunk_id),
         language=SemanticSearchLanguage.PYTHON,
@@ -227,7 +228,7 @@ async def test_qdrant_delete_by_file_performance(
         file_path = f"test/file_{file_idx}.py"
 
         start = time.perf_counter()
-        await qdrant_store.delete_by_file(file_path)
+        await qdrant_store.delete_by_file(Path(file_path))
         latency_ms = (time.perf_counter() - start) * 1000
         latencies.append(latency_ms)
 
@@ -384,7 +385,14 @@ async def test_hybrid_search_performance(qdrant_store: QdrantVectorStoreProvider
     hybrid_latencies = []
     for _ in range(num_queries):
         start = time.perf_counter()
-        await qdrant_store.search(vector=hybrid_query)
+        await qdrant_store.search(
+            StrategizedQuery(
+                query="test",
+                strategy=SearchStrategy.HYBRID,
+                dense=dense_vector,
+                sparse=sparse_vector,
+            )
+        )
         latency_ms = (time.perf_counter() - start) * 1000
         hybrid_latencies.append(latency_ms)
 
@@ -428,7 +436,7 @@ async def test_performance_regression_check(qdrant_store: QdrantVectorStoreProvi
         search_latencies.append((time.perf_counter() - start) * 1000)
 
     # Delete performance
-    file_path = "test/file_0.py"
+    file_path = Path("test/file_0.py")
     start = time.perf_counter()
     await qdrant_store.delete_by_file(file_path)
     delete_latency = (time.perf_counter() - start) * 1000

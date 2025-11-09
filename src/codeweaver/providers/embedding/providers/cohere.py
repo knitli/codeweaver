@@ -94,9 +94,9 @@ except ImportError as e:
 class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
     """Cohere embedding provider."""
 
-    _client: CohereClient
+    client: CohereClient
     _provider = Provider.COHERE  # can also be Heroku or Azure, but default to Cohere
-    _caps: EmbeddingModelCapabilities
+    caps: EmbeddingModelCapabilities
 
     def __init__(
         self, caps: EmbeddingModelCapabilities, _client: CohereClient | None = None, **kwargs: Any
@@ -157,7 +157,7 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
             )
 
         # Store client BEFORE super().__init__()
-        self._client = _client
+        self.client = _client
 
         # Call super with correct signature (client, caps, kwargs as dict)
         super().__init__(client=_client, caps=caps, kwargs=config_kwargs)
@@ -168,7 +168,7 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
         Sets up provider-specific configuration after Pydantic initialization.
         """
         # Set _caps at the start
-        self._caps = caps
+        self.caps = caps
         self._provider = caps.provider or self._provider
 
         # Client options were already configured in __init__
@@ -202,8 +202,8 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
             embed_kwargs["embedding_types"] = ["float"]
             attr = "float"
         else:
-            attr = self.client_options.get("output_dtype") or self._caps.default_dtype or "float"
-        response = await self._client.embed(
+            attr = self.client_options.get("output_dtype") or self.caps.default_dtype or "float"
+        response = await self.client.embed(
             texts=texts, model=self.client_options["model"], **embed_kwargs
         )
         embed_obj = response.embeddings

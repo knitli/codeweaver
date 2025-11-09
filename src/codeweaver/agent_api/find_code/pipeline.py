@@ -47,7 +47,9 @@ def raise_value_error(message: str) -> NoReturn:
     )
 
 
-async def _embed_dense(query: str, dense_provider_enum: Any, context: Any) -> list[float] | None:
+async def _embed_dense(
+    query: str, dense_provider_enum: Any, context: Any
+) -> list[list[float]] | list[list[int]] | None:
     """Attempt dense embedding, return None on failure."""
     from codeweaver.common.logging import log_to_client_or_fallback
     from codeweaver.common.registry import get_provider_registry
@@ -102,7 +104,11 @@ async def _embed_dense(query: str, dense_provider_enum: Any, context: Any) -> li
         )
         return None
     else:
-        return result
+        if not result:
+            return None
+        if isinstance(result, list) and len(result) > 0 and isinstance(result[0], list):
+            return result  # ty: ignore[invalid-return-type]
+        return [result]  # ty: ignore[invalid-return-type]
 
 
 async def _embed_sparse(query: str, sparse_provider_enum: Any, context: Any) -> Any | None:
@@ -444,7 +450,7 @@ async def rerank_results(
         )
         return None, None
     else:
-        return reranked_results, SearchStrategy.SEMANTIC_RERANK
+        return list(reranked_results), SearchStrategy.SEMANTIC_RERANK
 
 
 __all__ = (

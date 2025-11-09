@@ -32,10 +32,11 @@ def sample_chunk() -> CodeChunk:
         "created_at": datetime.now(UTC).timestamp(),
         "name": "test_function",
     }
+
     return CodeChunk(
         content="def hello():\n    print('world')",
         file_path=Path("test.py"),
-        line_range=Span(start=1, end=2),
+        line_range=Span(start=1, end=2, _source_id=uuid7()),
         ext_kind=ExtKind.from_file("test.py"),
         language="python",
         source=ChunkSource.SEMANTIC,

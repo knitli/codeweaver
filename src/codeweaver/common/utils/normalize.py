@@ -56,7 +56,7 @@ def sanitize_unicode(
     if not text.strip():
         return ""
 
-    text = unicodedata.normalize(normalize_form, text)
+    text = unicodedata.normalize(normalize_form, cast(str, text))
     filtered = INVISIBLE_PATTERN.sub("", text)
 
     matches = list(INJECT_PATTERN.finditer(filtered))

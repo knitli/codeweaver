@@ -26,45 +26,45 @@ class TestLazyImportBasics:
         os_lazy = lazy_import("os")
 
         # Should not be resolved yet
-        assert not os_lazy.is_resolved
+        assert not os_lazy.is_resolved()
         assert "not resolved" in repr(os_lazy)
 
         # Access an attribute - should still not resolve
         path_lazy = os_lazy.path
-        assert not os_lazy.is_resolved
+        assert not os_lazy.is_resolved()
         assert isinstance(path_lazy, LazyImport)
 
         # Actually use it - should resolve
         path_lazy = os_lazy.path
         assert isinstance(path_lazy, LazyImport)
-        assert not path_lazy.is_resolved
+        assert not path_lazy.is_resolved()
 
         result = os_lazy.path.join("a", "b")
         assert result == "a/b"
-        assert os_lazy.is_resolved
+        assert os_lazy.is_resolved()
 
     def test_lazy_import_function(self):
         """Test lazy importing a specific function."""
         # Import specific function
         join_lazy = lazy_import("os.path", "join")
 
-        assert not join_lazy.is_resolved
+        assert not join_lazy.is_resolved()
 
         # Call it - should resolve and execute
         result = join_lazy("a", "b", "c")
         assert result == "a/b/c"
-        assert join_lazy.is_resolved
+        assert join_lazy.is_resolved()
 
     def test_lazy_import_class(self):
         """Test lazy importing a class."""
         # Import a class
         Path = lazy_import("pathlib", "Path")
 
-        assert not Path.is_resolved
+        assert not Path.is_resolved()
 
         # Instantiate it
         p = Path("/tmp")
-        assert Path.is_resolved
+        assert Path.is_resolved()
         assert str(p) == "/tmp"
 
     def test_lazy_import_nested_attributes(self):
@@ -72,35 +72,35 @@ class TestLazyImportBasics:
         # Create lazy import with nested attributes
         lazy = lazy_import("collections", "abc", "Mapping")
 
-        assert not lazy.is_resolved
+        assert not lazy.is_resolved()
 
         # Should work when used
         from collections.abc import Mapping
 
         assert lazy._resolve() is Mapping
-        assert lazy.is_resolved
+        assert lazy.is_resolved()
 
     def test_lazy_import_chaining(self):
         """Test attribute chaining without resolution."""
         # Start with module
         collections = lazy_import("collections")
-        assert not collections.is_resolved
+        assert not collections.is_resolved()
 
         # Chain attribute access
         abc = collections.abc
-        assert not collections.is_resolved
+        assert not collections.is_resolved()
         assert isinstance(abc, LazyImport)
 
         # Chain more
         Mapping = abc.Mapping
-        assert not collections.is_resolved
+        assert not collections.is_resolved()
         assert isinstance(Mapping, LazyImport)
 
         # Finally resolve
         from collections.abc import Mapping as ActualMapping
 
         assert Mapping._resolve() is ActualMapping
-        assert Mapping.is_resolved
+        assert Mapping.is_resolved()
 
 
 class TestLazyImportErrors:
@@ -149,7 +149,7 @@ class TestLazyImportCaching:
 
         # Should be the same object
         assert result1 is result2
-        assert lazy.is_resolved
+        assert lazy.is_resolved()
 
     def test_multiple_calls_same_resolution(self):
         """Test that multiple calls use cached resolution."""
@@ -162,7 +162,7 @@ class TestLazyImportCaching:
         # Both should work
         assert result1 == "a/b"
         assert result2 == "c/d"
-        assert lazy.is_resolved
+        assert lazy.is_resolved()
 
 
 class TestLazyImportThreadSafety:
@@ -196,7 +196,7 @@ class TestLazyImportThreadSafety:
         # All results should be the same
         assert all(r == "a/b" for r in results)
         # Should be resolved exactly once
-        assert lazy.is_resolved
+        assert lazy.is_resolved()
 
 
 class TestLazyImportRealWorldUseCases:
@@ -217,12 +217,12 @@ class TestLazyImportRealWorldUseCases:
         try:
             # Create lazy import chain
             lazy_getter = lazy_import("test_settings_module").get_settings
-            assert not lazy_getter.is_resolved
+            assert not lazy_getter.is_resolved()
 
             # Call it - should resolve and execute
             settings = lazy_getter()
             assert settings == {"key": "value"}
-            assert lazy_getter.is_resolved
+            assert lazy_getter.is_resolved()
         finally:
             del sys.modules["test_settings_module"]
 
@@ -241,12 +241,12 @@ class TestLazyImportRealWorldUseCases:
         try:
             # Simulate: CodeWeaverSettings = lazy_import("module", "Class")
             LazyClass = lazy_import("test_types_module", "MyClass")
-            assert not LazyClass.is_resolved
+            assert not LazyClass.is_resolved()
 
             # Use it at runtime
             instance = LazyClass(42)
             assert instance.x == 42
-            assert LazyClass.is_resolved
+            assert LazyClass.is_resolved()
         finally:
             del sys.modules["test_types_module"]
 
@@ -270,17 +270,17 @@ class TestLazyImportRealWorldUseCases:
             _tiktoken = lazy_import("mock_tiktoken")
 
             # Neither should be resolved yet
-            assert not _get_settings.is_resolved
-            assert not _tiktoken.is_resolved
+            assert not _get_settings.is_resolved()
+            assert not _tiktoken.is_resolved()
 
             # Use them later (like in functions)
             settings = _get_settings()
             assert settings == {"loaded": True}
-            assert _get_settings.is_resolved
+            assert _get_settings.is_resolved()
 
             encoder = _tiktoken.get_encoding("gpt2")
             assert encoder == "Encoding(gpt2)"
-            assert _tiktoken.is_resolved
+            assert _tiktoken.is_resolved()
         finally:
             del sys.modules["mock_config"]
             del sys.modules["mock_tiktoken"]
@@ -308,9 +308,9 @@ class TestLazyImportMagicMethods:
         lazy = lazy_import("os")
 
         # dir() should resolve and forward
-        assert not lazy.is_resolved
+        assert not lazy.is_resolved()
         dirs = dir(lazy)
-        assert lazy.is_resolved
+        assert lazy.is_resolved()
         assert "path" in dirs
         assert "name" in dirs
 
@@ -324,9 +324,9 @@ class TestLazyImportMagicMethods:
             lazy = lazy_import("test_setattr_module")
 
             # Set an attribute - should resolve
-            assert not lazy.is_resolved
+            assert not lazy.is_resolved()
             lazy.custom_attr = "value"
-            assert lazy.is_resolved
+            assert lazy.is_resolved()
             assert test_module.custom_attr == "value"
         finally:
             del sys.modules["test_setattr_module"]
@@ -352,11 +352,11 @@ class TestLazyImportComparison:
 
         # NEW: Can chain without execution
         lazy = lazy_import("os").path.join
-        assert not lazy.is_resolved  # Still lazy!
+        assert not lazy.is_resolved()  # Still lazy!
 
         result = lazy("a", "b")
         assert result == "a/b"
-        assert lazy.is_resolved
+        assert lazy.is_resolved()
 
 
 class TestEdgeCases:
@@ -525,7 +525,7 @@ class TestLazyImportIntrospection:
         assert "config_file" in str(sig)
 
         # The lazy import should now be resolved
-        assert get_settings_lazy.is_resolved
+        assert get_settings_lazy.is_resolved()
 
     def test_pydantic_default_factory_compatibility(self):
         """Test that LazyImport can be used as a pydantic default_factory."""
@@ -550,12 +550,12 @@ class TestLazyImportIntrospection:
         get_settings_lazy = lazy_import("codeweaver.config.settings", "get_settings")
 
         # Should not be resolved yet
-        assert not get_settings_lazy.is_resolved
+        assert not get_settings_lazy.is_resolved()
 
         # Accessing __name__ should resolve
         name = get_settings_lazy.__name__
         assert name == get_settings.__name__
-        assert get_settings_lazy.is_resolved
+        assert get_settings_lazy.is_resolved()
 
     def test_introspection_attributes_missing(self):
         """Test that missing introspection attributes raise AttributeError."""

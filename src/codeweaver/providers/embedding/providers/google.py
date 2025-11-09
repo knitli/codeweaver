@@ -90,14 +90,14 @@ except ImportError as e:
 class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
     """Google embedding provider."""
 
-    _client: genai.Client
+    client: genai.Client
 
     async def _report_stats(self, documents: Iterable[genai_types.Part]) -> None:
         """Report token usage statistics."""
         http_kwargs = self.doc_kwargs.get("config", {}).get("http_options", {})
         try:
-            response = await self._client.aio.models.count_tokens(
-                model=self._caps.name,
+            response = await self.client.aio.models.count_tokens(
+                model=self.caps.name,
                 contents=list(documents),
                 config=genai_types.CountTokensConfig(http_options=http_kwargs),
             )
@@ -124,8 +124,8 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
         readied_docs = self.chunks_to_strings(documents)
         config_kwargs = self.doc_kwargs.get("config", {})
         content = (genai_types.Part.from_text(text=cast(str, doc)) for doc in readied_docs)
-        response = await self._client.aio.models.embed_content(
-            model=self._caps.name,
+        response = await self.client.aio.models.embed_content(
+            model=self.caps.name,
             contents=list(content),
             config=genai_types.EmbedContentConfig(
                 task_type=str(GoogleEmbeddingTasks.RETRIEVAL_DOCUMENT), **config_kwargs
@@ -146,8 +146,8 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
         """
         config_kwargs = self.query_kwargs.get("config", {})
         content = [genai_types.Part.from_text(text=q) for q in query]
-        response = await self._client.aio.models.embed_content(
-            model=self._caps.name,
+        response = await self.client.aio.models.embed_content(
+            model=self.caps.name,
             contents=cast(genai_types.ContentListUnion, content),
             config=genai_types.EmbedContentConfig(
                 task_type=str(GoogleEmbeddingTasks.CODE_RETRIEVAL_QUERY), **config_kwargs

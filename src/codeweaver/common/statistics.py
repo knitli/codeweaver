@@ -751,14 +751,14 @@ class TokenCounter(Counter[TokenCategory]):
     @computed_field
     @property
     def total_used(self) -> NonNegativeInt:
-        """Get the total number of tokens used across all operations."""
+        """Get the total number of tokens used across all operations as a current snapshot."""
         return sum((self[TokenCategory.CONTEXT_AGENT], self[TokenCategory.USER_AGENT]))
 
     @computed_field
     @property
     def context_saved(self) -> NonNegativeInt:
         """
-        Get the total number of tokens that CodeWeaver saved from the user_agent.
+        Get the total number of tokens that CodeWeaver saved from the user_agent as a current snapshot.
 
         !!! note
             The number returned by `context_saved` is a low estimate of the actual number of tokens saved.
@@ -778,9 +778,9 @@ class TokenCounter(Counter[TokenCategory]):
     @property
     def money_saved(self) -> float:
         """
-        Estimate the money saved by using CodeWeaver based on token savings.
+        Estimate the money saved by using CodeWeaver based on token savings as a current snapshot.
 
-        This is a work in progress, and currently uses a simple heuristic to approximate savings.  Longter term we'd like to make it more accurate by pulling actual prices for models used, and ideally getting actual token counts from the user's agent (with their permission of course).
+        This is a work in progress, and currently uses a simple heuristic to approximate savings.  We'd eventually like to make it more accurate by pulling actual prices for models used, and ideally getting actual token counts from the user's agent (with their permission of course).
 
 
         For now we're using simple 'back-of-the-envelope' calculations. We assume:

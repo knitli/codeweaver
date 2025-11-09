@@ -23,6 +23,7 @@ import ast
 import sys
 
 from pathlib import Path
+from typing import Literal
 
 
 # Add src to path for testing
@@ -121,7 +122,7 @@ def verify_module(module_path: Path, module_name: str) -> bool:
     return all_good
 
 
-def test_imports_available() -> None:
+def test_imports_available() -> bool:
     """Test that the imports are available at the module level."""
     print("\nTesting import availability...")
 
@@ -146,11 +147,10 @@ def test_imports_available() -> None:
     except Exception as e:
         print(f"  ✗ Import failed: {e}")
         return False
-
     return True
 
 
-def main() -> None:
+def main() -> Literal[0, 1]:
     """Run all tests."""
     print("=" * 70)
     print("IDE Support Verification for Lazy Imports")

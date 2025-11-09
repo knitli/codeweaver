@@ -516,7 +516,7 @@ async def test_graceful_shutdown_with_checkpoint(initialize_test_settings):
 
         # Simulate SIGTERM by calling signal handler
         # Note: Actual signal testing requires special setup
-        if hasattr(indexer, "_handle_shutdown"):
+        if hasattr(indexer, "_handle_shutdown") and callable(indexer._handle_shutdown):
             indexer._handle_shutdown(None, None)
 
         # Verify checkpoint exists

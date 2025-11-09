@@ -223,7 +223,7 @@ class Span(DataclassSerializationMixin):
         """
         if isinstance(span, int):
             return self._is_contained(span)
-        if isinstance(span, tuple) and len(span) == 3 and self._is_span_tuple(span):
+        if self._is_span_tuple(span):
             return bool(self & Span.from_tuple(span))
         if self._is_file_end_tuple(span):
             start, end = span[:2]

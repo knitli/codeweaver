@@ -28,9 +28,7 @@ from codeweaver.exceptions import CodeWeaverError
 
 
 console = Console(markup=True, emoji=True)
-app = App(
-    "search", help="Search codebase from command line.", console=console
-)
+app = App(help="Search codebase from command line.", console=console)
 
 
 @app.default
@@ -70,15 +68,23 @@ async def search(
 
         # Check for error status in response
         if response.status.lower() == "error":
-            console.print(f"\n{CODEWEAVER_PREFIX} [red bold]Configuration Error:[/red bold] {response.summary}\n")
+            console.print(
+                f"\n{CODEWEAVER_PREFIX} [red bold]Configuration Error:[/red bold] {response.summary}\n"
+            )
 
             # Check if error is about missing embedding providers
             if "embedding providers" in response.summary.lower():
                 console.print(f"{CODEWEAVER_PREFIX} [yellow]To fix this:[/yellow]")
-                console.print("  [yellow]•[/yellow] Set VOYAGE_API_KEY environment variable for cloud embeddings")
-                console.print("  [yellow]•[/yellow] Or install local provider: pip install codeweaver-mcp[provider-fastembed]")
+                console.print(
+                    "  [yellow]•[/yellow] Set VOYAGE_API_KEY environment variable for cloud embeddings"
+                )
+                console.print(
+                    "  [yellow]•[/yellow] Or install local provider: pip install codeweaver-mcp[provider-fastembed]"
+                )
                 console.print("  [yellow]•[/yellow] Or configure fastembed in .codeweaver.toml")
-                console.print("  [yellow]•[/yellow] See docs: https://github.com/knitli/codeweaver-mcp#configuration")
+                console.print(
+                    "  [yellow]•[/yellow] See docs: https://github.com/knitli/codeweaver-mcp#configuration"
+                )
             console.print()  # Add blank line
             sys.exit(1)
 
@@ -96,7 +102,9 @@ async def search(
             _display_markdown_results(query, response, limited_matches)
 
     except ConfigurationError as e:
-        console.print(f"\n{CODEWEAVER_PREFIX} [red bold]Configuration Error:[/red bold] {e.message}\n")
+        console.print(
+            f"\n{CODEWEAVER_PREFIX} [red bold]Configuration Error:[/red bold] {e.message}\n"
+        )
         if e.suggestions:
             console.print(f"{CODEWEAVER_PREFIX} [yellow]To fix this:[/yellow]")
             for suggestion in e.suggestions:

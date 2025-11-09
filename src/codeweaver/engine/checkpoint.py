@@ -123,13 +123,13 @@ def _get_settings_map() -> DictView[CheckpointSettingsFingerprint]:
     )
     # Convert IndexerSettings to dict to avoid circular reference from computed fields
     # The filter property creates a partial function containing self, causing circular ref
-    indexer_dict = settings.indexing.model_dump(
+    indexer_map = settings.indexing.model_dump(
         mode="json", exclude_computed_fields=True, exclude_none=True
     )
 
     return DictView(
         CheckpointSettingsFingerprint(
-            indexer=indexer_dict,  # type: ignore[typeddict-item]
+            indexer=indexer_map,  # type: ignore[typeddict-item]
             embedding_provider=tuple(settings.provider.embedding)
             if settings.provider.embedding
             else None,
@@ -205,6 +205,20 @@ class IndexingCheckpoint(BasedModel):
         Field(description="Blake3 hash of indexing settings (detect config changes)"),
     ] = None
 
+    def __init__(self, **data: Any):
+        super().__init__(**data)
+        if self.project_path:
+            self.project_path = self.project_path.resolve()
+        if not self.settings_hash:
+            if data.get("settings_hash") is str:
+                self.settings_hash = BlakeHashKey(data["settings_hash"])
+            elif data.get("settings_hash") is object and hasattr(
+                data["settings_hash"], "hexdigest"
+            ):
+                self.settings_hash = BlakeHashKey(data["settings_hash"].hexdigest())
+            else:
+                self.settings_hash = self.current_settings_hash()
+
     def _telemetry_handler(self, _serialized_self: dict[str, Any]) -> dict[str, Any]:
         if errors := self.errors:
             from codeweaver.core.types.enum import AnonymityConversion
@@ -217,6 +231,15 @@ class IndexingCheckpoint(BasedModel):
             ])
             _serialized_self["errors"] = converted
         return _serialized_self
+
+    def current_settings_hash(self) -> BlakeHashKey:
+        """Compute Blake3 hash of the checkpoint state (excluding non-deterministic fields).
+
+        Returns:
+            Hex-encoded Blake3 hash of the checkpoint state
+        """
+        # Exclude non-deterministic fields
+        return get_blake_hash(to_json(_get_settings_map()))
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types.aliases import FilteredKey
@@ -237,9 +260,14 @@ class IndexingCheckpoint(BasedModel):
             True if checkpoint is older than max_age_hours
         """
         age_hours = (datetime.now(UTC) - self.last_checkpoint).total_seconds() / 3600
-        return age_hours > max_age_hours
+        return (
+            (age_hours > max_age_hours)
+            or (age_hours < 0)
+            or (self.last_checkpoint < self.start_time)
+            or (not self.matches_settings())
+        )
 
-    def matches_settings(self, current_settings_hash: str) -> bool:
+    def matches_settings(self) -> bool:
         """Check if checkpoint settings match current configuration.
 
         Args:
@@ -248,7 +276,7 @@ class IndexingCheckpoint(BasedModel):
         Returns:
             True if settings match (safe to resume)
         """
-        return self.settings_hash == current_settings_hash
+        return self.settings_hash == self.current_settings_hash()
 
 
 class CheckpointManager:
@@ -364,7 +392,7 @@ class CheckpointManager:
             )
             return False
 
-        if not checkpoint.matches_settings(current_settings_hash):
+        if not checkpoint.matches_settings():
             logger.warning("Settings have changed since checkpoint, will reindex from scratch")
             return False
 

@@ -177,9 +177,9 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
             __base__=parent_cls,
             __module__="codeweaver.providers.embedding.providers.openai_factory",
             __validators__=None,
-            _client=(AsyncOpenAI, ...),
+            client=(AsyncOpenAI, ...),
             _provider=(Provider, provider),
-            _caps=(EmbeddingModelCapabilities, capabilities),
+            caps=(EmbeddingModelCapabilities, capabilities),
         )
 
         # Set metadata attributes that aren't Pydantic fields
@@ -227,7 +227,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
     @property
     def dimension(self) -> int:
         """Get the dimension of the embeddings."""
-        return self.doc_kwargs.get("dimensions") or self._caps.default_dimension or 1024  # type: ignore
+        return self.doc_kwargs.get("dimensions") or self.caps.default_dimension or 1024  # type: ignore
 
     def _report(self, response: CreateEmbeddingResponse, texts: Sequence[str]) -> None:
         """Report token usage statistics.
@@ -254,7 +254,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         self, texts: Sequence[str], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         """Get vectors for a sequence of texts."""
-        response = await self._client.embeddings.create(
+        response = await self.client.embeddings.create(
             input=cast(list[str], texts),
             **(
                 self.doc_kwargs

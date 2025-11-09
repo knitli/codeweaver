@@ -19,7 +19,6 @@ import logging
 import os
 
 from collections.abc import Callable
-from functools import cached_property
 from importlib import util
 from pathlib import Path
 from typing import Annotated, Any, Literal, Self, Unpack, cast
@@ -576,7 +575,6 @@ class CodeWeaverSettings(BaseSettings):
         return cls(project_path=get_project_path(), **{**kwargs, "config_file": path})  # type: ignore
 
     @computed_field
-    @cached_property
     def project_root(self) -> Path:
         """Get the project root directory. Alias for `project_path`."""
         if isinstance(self.project_path, Unset):

@@ -445,9 +445,9 @@ class BedrockEmbeddingProvider(
 ):
     """Bedrock embedding provider."""
 
-    _client: BedrockRuntimeClient = bedrock_client
+    client: BedrockRuntimeClient = bedrock_client
     _provider: Provider = Provider.BEDROCK
-    _caps: EmbeddingModelCapabilities
+    caps: EmbeddingModelCapabilities
 
     _doc_kwargs: ClassVar[dict[str, Any]] = {}
     _query_kwargs: ClassVar[dict[str, Any]] = {}
@@ -459,7 +459,7 @@ class BedrockEmbeddingProvider(
     @property
     def base_url(self) -> str | None:
         """Get the base URL for the Bedrock client."""
-        return self._client.meta.endpoint_url
+        return self.client.meta.endpoint_url
 
     @property
     def dimension(self) -> int:
@@ -470,7 +470,7 @@ class BedrockEmbeddingProvider(
             return self.doc_kwargs.get("dimensions") or self.doc_kwargs.get("body", {}).get(
                 "dimensions"
             )
-        return self._caps.default_dimension
+        return self.caps.default_dimension
 
     def _handle_response(
         self, response: dict[str, Any], doc: CodeChunk | None = None
@@ -518,7 +518,7 @@ class BedrockEmbeddingProvider(
                 "AWS Bedrock returned invalid response format for Cohere embedding",
                 details={
                     "provider": "bedrock",
-                    "model": self._caps.name,
+                    "model": self.caps.name,
                     "expected_type": "CohereEmbeddingResponse",
                     "received_type": type(deserialized.body).__name__,
                 },
@@ -535,10 +535,11 @@ class BedrockEmbeddingProvider(
                 )
             )
         )
-        return (
+        return cast(
+            list[list[float]] | list[list[int]],
             deserialized.body.embeddings
             if deserialized.body and deserialized.body.embeddings
-            else []
+            else [],
         )
 
     def _create_cohere_request(
@@ -566,7 +567,7 @@ class BedrockEmbeddingProvider(
         }
         request: BedrockInvokeEmbeddingRequest = BedrockInvokeEmbeddingRequest.model_validate({
             "body": body,
-            "model_id": self._caps.name,
+            "model_id": self.caps.name,
         })
         return InvokeRequestDict(**dict(request.model_dump(by_alias=True)))  # ty: ignore[missing-typed-dict-key]
 
@@ -621,7 +622,7 @@ class BedrockEmbeddingProvider(
             requests.extend([
                 BedrockInvokeEmbeddingRequest.model_validate({
                     "body": body,
-                    "model_id": self._caps.name,
+                    "model_id": self.caps.name,
                 })
             ])
         return [InvokeRequestDict(**dict(req.model_dump(by_alias=True))) for req in requests]
@@ -633,7 +634,7 @@ class BedrockEmbeddingProvider(
         **kwargs: Any,
     ) -> list[InvokeRequestDict] | InvokeRequestDict:
         """Create the Bedrock embedding request."""
-        if "cohere" in self._caps.name.lower():
+        if "cohere" in self.caps.name.lower():
             return self._create_cohere_request(inputs, kind, **kwargs)
         return self._create_titan_request(inputs, kind, **kwargs)
 
@@ -643,7 +644,7 @@ class BedrockEmbeddingProvider(
         """Get vectors for a sequence of texts using the Bedrock API."""
         responses: list[BedrockInvokeEmbeddingResponse] = []
         for req in requests:
-            response: BedrockInvokeEmbeddingResponse = await self._client.invoke_model(**req)  # type: ignore
+            response: BedrockInvokeEmbeddingResponse = await self.client.invoke_model(**req)  # type: ignore
             responses.append(response)  # type: ignore
         return responses
 

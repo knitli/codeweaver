@@ -53,8 +53,8 @@ def resolve_project_root() -> Path:
     from codeweaver.config.settings import get_settings_map
 
     settings_map = get_settings_map()
-    if isinstance(settings_map.get("project_root"), Path):
-        return settings_map["project_root"]
+    if isinstance(settings_map.get("project_path"), Path):
+        return settings_map["project_path"]
     from codeweaver.common.utils.git import get_project_path
 
     return get_project_path()

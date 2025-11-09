@@ -231,7 +231,7 @@ async def test_indexing_completes_successfully(indexer: Indexer, test_project_pa
 
     # Check completion time is reasonable (<120s for small project)
     # Increased to accommodate CI environment variability (observed: 40-102s)
-    duration = stats.elapsed_time
+    duration = stats.elapsed_time()
     assert duration < 120, f"Indexing took {duration}s, expected <120s"
 
 
@@ -334,7 +334,7 @@ async def test_indexing_performance(indexer: Indexer):
     assert stats.start_time is not None
 
     # Verify processing rate calculated
-    duration = stats.elapsed_time
+    duration = stats.elapsed_time()
     if duration > 0 and stats.files_processed > 0:
         rate = stats.files_processed / (duration / 60)  # files/minute
         # For small project, just verify rate is reasonable (not negative, not infinite)

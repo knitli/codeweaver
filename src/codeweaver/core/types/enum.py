@@ -440,7 +440,8 @@ class BaseEnum(Enum):
         if isinstance(value, str):
             name = cls._encode_name(name).upper()
             value = name.lower()
-        extend_enum(cls, name, value)
+        # the signature here is (cls, name, *args, **kwargs), but the function applies a tuple to single args (value -> (value,)). Bottom line: it works fine. This is much more clear.
+        extend_enum(cls, name, value)  # ty: ignore[too-many-positional-arguments]
         return cls(value)
 
     def serialize_for_cli(self) -> str:

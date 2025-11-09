@@ -107,14 +107,14 @@ class ChunkingService:
             return
 
         if force_parallel or (self.enable_parallel and len(files) >= self.parallel_threshold):
-            logger.info(
+            logger.debug(
                 "Chunking %d files in parallel (threshold: %d)", len(files), self.parallel_threshold
             )
             yield from chunk_files_parallel(
                 files, self.governor, max_workers=max_workers, executor_type=executor_type
             )
         else:
-            logger.info("Chunking %d files sequentially", len(files))
+            logger.debug("Chunking %d files sequentially", len(files))
             yield from self._chunk_sequential(files)
 
     def _chunk_sequential(

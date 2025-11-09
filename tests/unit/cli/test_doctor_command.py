@@ -15,7 +15,6 @@ Tests validate corrections from CLI_CORRECTIONS_PLAN.md:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
 
@@ -25,12 +24,8 @@ from codeweaver.core.types.sentinel import Unset
 from codeweaver.providers.provider import Provider
 
 
-if TYPE_CHECKING:
-    from pytest import MonkeyPatch
-
-
 @pytest.fixture
-def temp_project(tmp_path: Path, monkeypatch: MonkeyPatch) -> Path:
+def temp_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Create temporary project directory."""
     project = tmp_path / "test_project"
     project.mkdir()
@@ -52,13 +47,11 @@ class TestDoctorUnsetHandling:
         # Should use isinstance(x, Unset), not isinstance(x, Path)
         assert isinstance(settings.project_path, Unset)
 
-        # Should NOT raise TypeError
-        result = isinstance(settings.project_path, Unset)
-        assert result is True
+        assert isinstance(settings.project_path, Unset)
 
     def test_unset_vs_none_distinction(self) -> None:
         """Test Unset is correctly distinguished from None."""
-        unset_value = Unset()
+        unset_value = Unset(name="UNSET", module_name=__name__)
 
         assert unset_value is not None
         assert isinstance(unset_value, Unset)
@@ -123,15 +116,27 @@ class TestDoctorProviderEnvVars:
         """Test doctor uses Provider.other_env_vars for API key checks."""
         # Should use Provider enum, not hardcoded dict
         voyage = Provider.VOYAGE
-        voyage_env = voyage.other_env_vars[0] if isinstance(voyage.other_env_vars, tuple) else voyage.other_env_vars
+        voyage_env = (
+            voyage.other_env_vars[0]
+            if isinstance(voyage.other_env_vars, tuple)
+            else voyage.other_env_vars
+        )
         assert voyage_env["api_key"].env == "VOYAGE_API_KEY"
 
         openai = Provider.OPENAI
-        openai_env = openai.other_env_vars[0] if isinstance(openai.other_env_vars, tuple) else openai.other_env_vars
+        openai_env = (
+            openai.other_env_vars[0]
+            if isinstance(openai.other_env_vars, tuple)
+            else openai.other_env_vars
+        )
         assert openai_env["api_key"].env == "OPENAI_API_KEY"
 
         cohere = Provider.COHERE
-        cohere_env = cohere.other_env_vars[0] if isinstance(cohere.other_env_vars, tuple) else cohere.other_env_vars
+        cohere_env = (
+            cohere.other_env_vars[0]
+            if isinstance(cohere.other_env_vars, tuple)
+            else cohere.other_env_vars
+        )
         assert cohere_env["api_key"].env == "COHERE_API_KEY"
 
     @pytest.mark.skip(reason="Bedrock and other providers have different env var structure")
@@ -145,15 +150,24 @@ class TestDoctorProviderEnvVars:
 
         # Cloud providers should have env vars
         cloud_providers = {
-            "voyage", "openai", "cohere", "anthropic",
-            "google", "mistral", "bedrock"
+            "voyage",
+            "openai",
+            "cohere",
+            "anthropic",
+            "google",
+            "mistral",
+            "bedrock",
         }
 
         for provider_name in cloud_providers:
             try:
                 provider = Provider.from_string(provider_name)
                 if provider and provider.other_env_vars:
-                    env_vars = provider.other_env_vars[0] if isinstance(provider.other_env_vars, tuple) else provider.other_env_vars
+                    env_vars = (
+                        provider.other_env_vars[0]
+                        if isinstance(provider.other_env_vars, tuple)
+                        else provider.other_env_vars
+                    )
                     assert "api_key" in env_vars
             except ValueError:
                 pass  # Provider not in enum
@@ -197,11 +211,9 @@ class TestDoctorConnectionTests:
     """Tests for connection testing functionality."""
 
     @pytest.mark.asyncio
-    async def test_connection_tests_implemented(
-        self,
-        monkeypatch: MonkeyPatch
-    ) -> None:
+    async def test_connection_tests_implemented(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test connection tests are implemented."""
+
         # Mock providers
         class MockProvider:
             async def health_check(self) -> bool:
@@ -233,7 +245,7 @@ class TestDoctorConfigAssumptions:
     def test_config_file_not_required(
         self,
         temp_project: Path,
-        monkeypatch: MonkeyPatch,
+        monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test config files are optional when using env vars."""
@@ -248,14 +260,11 @@ class TestDoctorConfigAssumptions:
         captured = capsys.readouterr()
         # Should not mention missing config file
         assert exc_info.value.code == 0
-        assert "missing" not in captured.out.lower() or \
-               "config" not in captured.out.lower()
+        assert "missing" not in captured.out.lower() or "config" not in captured.out.lower()
 
     @pytest.mark.skip(reason="Settings structure changed")
     def test_env_only_setup_valid(
-        self,
-        temp_project: Path,
-        monkeypatch: MonkeyPatch
+        self, temp_project: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test environment-only setup is valid."""
         # Set env vars for complete config
@@ -272,9 +281,7 @@ class TestDoctorConfigAssumptions:
 
     @pytest.mark.skip(reason="Settings structure changed")
     def test_config_sources_hierarchy(
-        self,
-        temp_project: Path,
-        monkeypatch: MonkeyPatch
+        self, temp_project: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test config can come from multiple sources."""
         from codeweaver.config.settings import CodeWeaverSettings
@@ -329,12 +336,7 @@ class TestDoctorDependencyChecks:
         """Test core dependencies are available."""
         from importlib.util import find_spec
 
-        core_packages = [
-            "pydantic",
-            "pydantic_settings",
-            "qdrant_client",
-            "rich",
-        ]
+        core_packages = ["pydantic", "pydantic_settings", "qdrant_client", "rich"]
 
         for package in core_packages:
             spec = find_spec(package)

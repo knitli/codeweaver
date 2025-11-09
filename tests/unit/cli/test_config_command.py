@@ -14,8 +14,9 @@ Tests validate corrections from CLI_CORRECTIONS_PLAN.md:
 
 from __future__ import annotations
 
+import contextlib
+
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
 import tomli
@@ -27,12 +28,8 @@ from codeweaver.common.registry import get_provider_registry
 from codeweaver.providers.provider import Provider, ProviderKind
 
 
-if TYPE_CHECKING:
-    from pytest import MonkeyPatch
-
-
 @pytest.fixture
-def temp_project(tmp_path: Path, monkeypatch: MonkeyPatch) -> Path:
+def temp_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Create temporary project directory."""
     project = tmp_path / "test_project"
     project.mkdir()
@@ -46,7 +43,9 @@ def temp_project(tmp_path: Path, monkeypatch: MonkeyPatch) -> Path:
 class TestConfigInit:
     """Tests for config init command."""
 
-    def test_quick_flag_creates_config(self, temp_project: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_quick_flag_creates_config(
+        self, temp_project: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Test --quick flag creates config with recommended defaults."""
         with pytest.raises(SystemExit) as exc_info:
             init_app(["config", "--quick"])
@@ -57,7 +56,9 @@ class TestConfigInit:
         assert config_path.exists()
 
     @pytest.mark.skip(reason="Profile feature not yet implemented in init config command")
-    def test_profile_recommended(self, temp_project: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_profile_recommended(
+        self, temp_project: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Test --profile recommended creates correct config."""
         with pytest.raises(SystemExit) as exc_info:
             init_app(["config", "--profile", ConfigProfile.RECOMMENDED.value])
@@ -71,7 +72,9 @@ class TestConfigInit:
         assert config["vector_store"]["type"] == "qdrant"
 
     @pytest.mark.skip(reason="Profile feature not yet implemented in init config command")
-    def test_profile_local_only(self, temp_project: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_profile_local_only(
+        self, temp_project: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Test --profile local-only creates offline-capable config."""
         with pytest.raises(SystemExit) as exc_info:
             init_app(["config", "--profile", ConfigProfile.LOCAL_ONLY.value])
@@ -87,10 +90,7 @@ class TestConfigInit:
 
     @pytest.mark.skip(reason="User flag not yet implemented in init config command")
     def test_user_flag_creates_user_config(
-        self,
-        tmp_path: Path,
-        monkeypatch: MonkeyPatch,
-        capsys: pytest.CaptureFixture[str]
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Test --user flag creates config in user directory."""
         monkeypatch.setenv("HOME", str(tmp_path))
@@ -104,7 +104,9 @@ class TestConfigInit:
         assert user_config.exists()
 
     @pytest.mark.skip(reason="Local flag not yet implemented in init config command")
-    def test_local_flag_creates_local_override(self, temp_project: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_local_flag_creates_local_override(
+        self, temp_project: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Test --local flag creates .codeweaver.toml override."""
         with pytest.raises(SystemExit) as exc_info:
             init_app(["config", "--quick", "--local"])
@@ -143,15 +145,15 @@ class TestConfigInit:
         openai_env_vars = openai.other_env_vars
         assert openai_env_vars is not None
         assert len(openai_env_vars) > 0
-        openai_env_vars_dict = openai_env_vars[0] if isinstance(openai_env_vars, tuple) else openai_env_vars
+        openai_env_vars_dict = (
+            openai_env_vars[0] if isinstance(openai_env_vars, tuple) else openai_env_vars
+        )
         assert "api_key" in openai_env_vars_dict
         assert openai_env_vars_dict["api_key"].env == "OPENAI_API_KEY"
 
     @pytest.mark.skip(reason="Settings API structure changed - provider is now a dict")
     def test_settings_construction_respects_hierarchy(
-        self,
-        temp_project: Path,
-        monkeypatch: MonkeyPatch
+        self, temp_project: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test settings construction respects pydantic-settings hierarchy."""
         from codeweaver.config.settings import CodeWeaverSettings
@@ -176,10 +178,12 @@ type = "qdrant"
         # Settings should respect env var over file
         settings = CodeWeaverSettings(config_file=config_path)
         # Test needs updating for new settings structure
-        assert settings.provider["embedding"]["provider"] == "voyage"
+        assert settings.provider["embedding"]["provider"] == "voyage"  # ty: ignore
 
     @pytest.mark.skip(reason="Profile feature not yet implemented in init config command")
-    def test_profile_includes_sparse_embeddings(self, temp_project: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_profile_includes_sparse_embeddings(
+        self, temp_project: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Test recommended profile includes sparse embeddings."""
         with pytest.raises(SystemExit) as exc_info:
             init_app(["config", "--profile", ConfigProfile.RECOMMENDED.value])
@@ -197,7 +201,9 @@ type = "qdrant"
 class TestConfigShow:
     """Tests for config show command."""
 
-    def test_show_displays_config(self, temp_project: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_show_displays_config(
+        self, temp_project: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Test config show displays current configuration."""
         # Create config first
         with pytest.raises(SystemExit):
@@ -214,26 +220,22 @@ class TestConfigShow:
     def test_show_handles_missing_config(self, temp_project: Path) -> None:
         """Test config show handles missing configuration gracefully."""
         # Run config command without creating config first
-        try:
+        with pytest.raises(SystemExit) as exc_info:
             config_app([])
-        except SystemExit as e:
-            # Should not crash, should show defaults or warning
-            assert e.code in (0, 1)
+        # Should not crash, should show defaults or warning
+        assert exc_info.value.code in (0, 1)
 
     def test_show_respects_env_vars(
         self,
         temp_project: Path,
-        monkeypatch: MonkeyPatch,
-        capsys: pytest.CaptureFixture[str]
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test config show displays env var overrides."""
         monkeypatch.setenv("CODEWEAVER_EMBEDDING_PROVIDER", "voyage")
 
-        try:
+        with contextlib.suppress(SystemExit):
             config_app([])
-        except SystemExit:
-            pass
-
         captured = capsys.readouterr()
         # Config command should display settings - may not show voyage if no config exists
         assert len(captured.out) > 0  # At least some output
@@ -264,18 +266,18 @@ provider = "invalid_provider_xyz"
     def test_missing_required_api_key_warned(
         self,
         temp_project: Path,
-        monkeypatch: MonkeyPatch,
-        capsys: pytest.CaptureFixture[str]
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test missing API keys are warned about."""
         monkeypatch.delenv("VOYAGE_API_KEY", raising=False)
 
-        try:
+        with pytest.raises(SystemExit) as exc_info:
             init_app(["config", "--profile", ConfigProfile.RECOMMENDED.value])
-        except SystemExit as e:
-            captured = capsys.readouterr()
-            # Should warn about missing API key
-            assert "VOYAGE_API_KEY" in captured.out or e.code != 0
+
+        captured = capsys.readouterr()
+        # Should warn about missing API key
+        assert "VOYAGE_API_KEY" in captured.out or exc_info.value.code != 0
 
 
 @pytest.mark.unit
@@ -303,7 +305,7 @@ class TestConfigProfiles:
         expected_profiles = {
             ConfigProfile.RECOMMENDED,
             ConfigProfile.LOCAL_ONLY,
-            ConfigProfile.MINIMAL
+            ConfigProfile.MINIMAL,
         }
 
         assert len(ConfigProfile) == len(expected_profiles)

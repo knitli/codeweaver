@@ -181,8 +181,8 @@ class IndexingProgressTracker:
         table.add_row("Chunks Created", str(stats.chunks_created))
         table.add_row("Chunks Embedded", str(stats.chunks_embedded))
         table.add_row("Chunks Indexed", str(stats.chunks_indexed))
-        table.add_row("Processing Rate", f"{stats.processing_rate:.2f} files/sec")
-        table.add_row("Time Elapsed", f"{stats.elapsed_time:.2f} seconds")
+        table.add_row("Processing Rate", f"{stats.processing_rate():.2f} files/sec")
+        table.add_row("Time Elapsed", f"{stats.elapsed_time():.2f} seconds")
 
         if stats.total_errors > 0:
             table.add_row("Files with Errors", f"[yellow]{stats.total_errors}[/yellow]")

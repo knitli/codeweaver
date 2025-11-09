@@ -109,9 +109,12 @@ def get_alibaba_nlp_embedding_capabilities() -> tuple[EmbeddingModelCapabilities
     """Get the capabilities for Alibaba-NLP embedding models."""
     capabilities: list[EmbeddingCapabilities] = []
     for cap in ALL_CAPABILITIES:
+        model_name = cap["name"]
+        assert isinstance(model_name, str)  # noqa: S101
+        assert model_name in CAP_MAP, f"Invalid model name: {model_name}"  # noqa: S101
         capabilities.extend([
-            EmbeddingCapabilities({**cap, "provider": provider})
-            for provider in CAP_MAP[cap["name"]]
+            EmbeddingCapabilities({**cap, "provider": provider})  # type: ignore[missing-typeddict-key]
+            for provider in CAP_MAP[model_name]  # ty: ignore[invalid-argument-type]
         ])
     return tuple(EmbeddingModelCapabilities.model_validate(cap) for cap in capabilities)
 

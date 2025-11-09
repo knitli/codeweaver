@@ -35,7 +35,22 @@ from codeweaver.core.types.enum import BaseEnum
 
 
 if TYPE_CHECKING:
+    from codeweaver.config.types import CodeWeaverSettingsDict
     from codeweaver.core.metadata import ExtLangPair
+    from codeweaver.core.types.dictview import DictView
+
+
+def _get_settings_map() -> DictView[CodeWeaverSettingsDict]:
+    from codeweaver.config.settings import get_settings_map
+
+    return get_settings_map()
+
+
+def _get_project_path() -> Path:
+    settings_map = _get_settings_map()
+    project_path = settings_map.get("project_path")
+    return project_path if isinstance(project_path, Path) else get_project_path()
+
 
 type KeyPath = tuple[LiteralStringT, ...]
 
@@ -43,7 +58,7 @@ get_ext_lang_pairs: LazyImport[Generator[ExtLangPair, None, None]] = lazy_import
     "codeweaver.core.metadata", "get_ext_lang_pairs"
 )
 
-PROJECT_ROOT = get_project_path() or Path.cwd().resolve()
+PROJECT_ROOT = _get_project_path()
 
 ConfigPathPair = NamedTuple(
     "ConfigPathPair", (("path", Path), ("language", "SemanticSearchLanguage"))

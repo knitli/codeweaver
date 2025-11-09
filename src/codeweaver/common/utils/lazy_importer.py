@@ -286,7 +286,6 @@ class LazyImport[Import: Any]:
         """
         return dir(self._resolve())
 
-    @property
     def is_resolved(self) -> bool:
         """
         Check if this lazy import has been resolved yet.
@@ -296,13 +295,13 @@ class LazyImport[Import: Any]:
 
         Examples:
             >>> lazy = lazy_import("os")
-            >>> lazy.is_resolved
+            >>> lazy.is_resolved()
             False
             >>> _ = lazy.path  # Access attribute
-            >>> lazy.is_resolved
+            >>> lazy.is_resolved()
             False  # Still not resolved! Just chained
             >>> result = lazy.path.join("a", "b")  # Call method
-            >>> lazy.is_resolved
+            >>> lazy.is_resolved()
             True  # NOW it's resolved
         """
         return object.__getattribute__(self, "_resolved") is not None

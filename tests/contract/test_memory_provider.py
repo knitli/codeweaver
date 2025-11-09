@@ -15,6 +15,7 @@ from uuid import uuid4
 
 import pytest
 
+from codeweaver.agent_api.find_code.types import StrategizedQuery
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.core.spans import Span
@@ -181,7 +182,16 @@ class TestMemoryProviderContract:
         await provider2._initialize()
 
         # Verify data was restored
-        results = await provider2.search(vector={"dense": [0.5] * 768})
+        from codeweaver.agent_api.find_code.types import SearchStrategy
+
+        results = await provider2.search(
+            StrategizedQuery(
+                query="what is the word?",
+                dense=[0.5] * 768,
+                sparse=None,
+                strategy=SearchStrategy.SEMANTIC,
+            )
+        )
         assert len(results) > 0
         assert any(
             r.chunk.chunk_id == sample_chunk.chunk_id

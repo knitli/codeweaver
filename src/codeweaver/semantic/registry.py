@@ -110,7 +110,7 @@ class ThingRegistry:
         )
 
         if isinstance(obj, Category | Token | CompositeThing):
-            return self.is_registered(obj)
+            return self.is_registered(obj.name)
         if isinstance(obj, DirectConnection | PositionalConnections):
             if isinstance(obj, DirectConnection):
                 return obj.source_thing in self._direct_connections.get(obj.language, {})

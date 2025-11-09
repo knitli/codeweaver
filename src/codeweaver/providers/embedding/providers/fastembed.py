@@ -115,9 +115,9 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
     model_name: The name of the FastEmbed model to use.
     """
 
-    _client: TextEmbedding
+    client: TextEmbedding
     _provider: Provider = Provider.FASTEMBED
-    _caps: EmbeddingModelCapabilities
+    caps: EmbeddingModelCapabilities
 
     _doc_kwargs: ClassVar[dict[str, Any]] = fastembed_all_kwargs()
     _query_kwargs: ClassVar[dict[str, Any]] = fastembed_all_kwargs()
@@ -128,16 +128,16 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
     def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """Initialize the FastEmbed client."""
         # 1. Set _caps from parameter
-        self._caps = caps
+        self.caps = caps
 
         # 2. Configure model name in kwargs if not already set
         if "model_name" not in self._doc_kwargs:
-            model = caps.name  # Use caps parameter, not self._caps
+            model = caps.name  # Use caps parameter, not self.caps
             self.doc_kwargs["model_name"] = model
             self.query_kwargs["model_name"] = model
 
         # 3. Initialize the client
-        self._client = _TextEmbedding(**self._doc_kwargs)
+        self.client = _TextEmbedding(**self._doc_kwargs)
 
     @property
     def base_url(self) -> str | None:
@@ -153,7 +153,7 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
         embeddings = await loop.run_in_executor(
             None,
             lambda: list(
-                self._client.passage_embed(texts=cast(Iterable[str], ready_documents), **kwargs)
+                self.client.passage_embed(texts=cast(Iterable[str], ready_documents), **kwargs)
             ),
         )
         partial_tokens = rpartial(self._update_token_stats, from_docs=ready_documents)
@@ -166,7 +166,7 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
         """Embed a query into a vector."""
         loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(
-            None, lambda: list(self._client.query_embed(query=query, **kwargs))
+            None, lambda: list(self.client.query_embed(query=query, **kwargs))
         )
         self._update_token_stats(from_docs=query)
         return self._process_output(embeddings)
@@ -174,7 +174,7 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
     @property
     def dimension(self) -> int:
         """Get the size of the vector for the Qdrant collection."""
-        return self._client.embedding_size
+        return self.client.embedding_size
 
 
 class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
@@ -182,7 +182,8 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
     FastEmbed implementation for sparse embeddings.
     """
 
-    _client: type[SparseTextEmbedding] | SparseTextEmbedding = _SparseTextEmbedding  # type: ignore
+    client: type[SparseTextEmbedding] | SparseTextEmbedding = _SparseTextEmbedding  # type: ignore
+    caps: SparseEmbeddingModelCapabilities
     _output_transformer: ClassVar[Callable[[Any], list[SparseEmbedding]]] = (  # type: ignore
         fastembed_sparse_output_transformer
     )  # type: ignore
@@ -191,19 +192,19 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
     def _initialize(self, caps: SparseEmbeddingModelCapabilities) -> None:  # type: ignore
         """Initialize the FastEmbed client."""
         # 1. Set _caps from parameter, not from self
-        self._caps = caps
+        self.caps = caps
 
         # 2. Configure model name in kwargs if not already set
         if "model_name" not in self._doc_kwargs:
-            model = caps.name  # Use caps parameter, not self._caps
+            model = caps.name  # Use caps parameter, not self.caps
             self.doc_kwargs["model_name"] = model
             self.query_kwargs["model_name"] = model
 
         # 3. Initialize client if it's still a class (not an instance)
         # The _client class variable is set to the class type, so we need to instantiate it
-        if isinstance(self._client, type):
+        if isinstance(self.client, type):
             client_options = self._doc_kwargs.get("client_options") or self._doc_kwargs
-            self._client = self._client(**client_options)
+            self.client = self.client(**client_options)
 
     async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Any
@@ -214,7 +215,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         embeddings = await loop.run_in_executor(
             None,
             lambda: list(
-                self._client.embed(
+                self.client.embed(
                     documents=cast(Sequence[str], ready_documents), parallel=1, **kwargs
                 )
             ),
@@ -227,7 +228,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         """Embed a query into a sparse vector."""
         loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(
-            None, lambda: list(self._client.query_embed(query=query, **kwargs))
+            None, lambda: list(self.client.query_embed(query=query, **kwargs))
         )
         tokens = sum(val.nonzero for emb in embeddings for val in emb.values)
         self._update_token_stats(token_count=tokens, sparse=True)

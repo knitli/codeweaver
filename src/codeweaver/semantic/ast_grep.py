@@ -752,6 +752,8 @@ with contextlib.suppress(Exception):
     from codeweaver.core.metadata import SemanticMetadata
 
     for model in (FileThing, AstThing, SemanticMetadata, CodeChunk):
+        if model.__pydantic_complete__:
+            continue
         if not model.model_rebuild():
             logger.warning("Model %s failed to rebuild in ast_grep.py", model.__name__)
         else:

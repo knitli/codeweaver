@@ -22,9 +22,7 @@ from codeweaver.exceptions import CodeWeaverError
 
 
 console = Console(markup=True, emoji=True)
-app = App(
-    "index", help="Index codebase for semantic search.", console=console
-)
+app = App("index", help="Index codebase for semantic search.", console=console)
 
 
 def _check_server_health() -> bool:
@@ -141,8 +139,8 @@ def index(
         console.print(f"  Files processed: [cyan]{stats.files_processed}[/cyan]")
         console.print(f"  Chunks created: [cyan]{stats.chunks_created}[/cyan]")
         console.print(f"  Chunks indexed: [cyan]{stats.chunks_indexed}[/cyan]")
-        console.print(f"  Processing rate: [cyan]{stats.processing_rate:.2f}[/cyan] files/sec")
-        console.print(f"  Time elapsed: [cyan]{stats.elapsed_time:.2f}[/cyan] seconds")
+        console.print(f"  Processing rate: [cyan]{stats.processing_rate():.2f}[/cyan] files/sec")
+        console.print(f"  Time elapsed: [cyan]{stats.elapsed_time():.2f}[/cyan] seconds")
 
         if stats.total_errors > 0:
             console.print(f"  [yellow]Files with errors: {stats.total_errors}[/yellow]")

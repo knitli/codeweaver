@@ -123,9 +123,7 @@ def mock_provider_registry(mocker) -> MagicMock:
             return embedding_provider_enum
         if provider_type == "sparse_embedding":
             return sparse_provider_enum
-        if provider_type == "reranking":
-            return reranking_provider_enum
-        return None
+        return reranking_provider_enum if provider_type == "reranking" else None
 
     registry.get_provider_enum_for.side_effect = get_provider_enum_for
 
@@ -164,9 +162,7 @@ def mock_provider_registry(mocker) -> MagicMock:
             return embedding_instance
         if provider_type == "sparse_embedding":
             return sparse_instance
-        if provider_type == "reranking":
-            return reranking_instance
-        return None
+        return reranking_instance if provider_type == "reranking" else None
 
     registry.get_provider_instance.side_effect = get_provider_instance
 
@@ -176,7 +172,24 @@ def mock_provider_registry(mocker) -> MagicMock:
 @pytest.fixture
 def session_statistics() -> SessionStatistics:
     """Create session statistics instance."""
-    return SessionStatistics()
+    from codeweaver.common.statistics import FileStatistics, TokenCounter
+
+    return SessionStatistics(
+        index_statistics=FileStatistics(),
+        query_statistics=[],
+        token_statistics=TokenCounter(),
+        semantic_statistics=[],
+        indexing_statistics=[],
+        embedding_statistics=[],
+        reranking_statistics=[],
+        sparse_embedding_statistics=[],
+        vector_store_statistics=[],
+        overall_statistics=[],
+        _successful_request_log=[],
+        _failed_request_log=[],
+        _successful_http_request_log=[],
+        _failed_http_request_log=[],
+    )
 
 
 @pytest.fixture

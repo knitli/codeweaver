@@ -49,9 +49,9 @@ def voyage_output_transformer(result: EmbeddingsObject) -> list[list[float]] | l
 class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
     """VoyageAI embedding provider."""
 
-    _client: AsyncClient
+    client: AsyncClient
     _provider: Provider = Provider.VOYAGE
-    _caps: EmbeddingModelCapabilities
+    caps: EmbeddingModelCapabilities
 
     _doc_kwargs: ClassVar[dict[str, Any]] = {"input_type": "document"}
     _query_kwargs: ClassVar[dict[str, Any]] = {"input_type": "query"}
@@ -113,7 +113,7 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
     @property
     def dimension(self) -> int:
         """Get the size of the vector for the collection."""
-        return self.doc_kwargs.get("output_dimension", self._caps.default_dimension)  # type: ignore
+        return self.doc_kwargs.get("output_dimension", self.caps.default_dimension)  # type: ignore
 
 
 __all__ = ("VoyageEmbeddingProvider",)

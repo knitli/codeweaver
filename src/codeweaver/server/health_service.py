@@ -133,9 +133,9 @@ class HealthService:
 
         # Calculate estimated completion
         estimated_completion = None
-        if state == "indexing" and stats.processing_rate > 0:
+        if state == "indexing" and stats.processing_rate() > 0:
             remaining_files = stats.files_discovered - stats.files_processed
-            eta_seconds = remaining_files / stats.processing_rate
+            eta_seconds = remaining_files / stats.processing_rate()
             estimated_timestamp = time.time() + eta_seconds
             estimated_completion = datetime.fromtimestamp(estimated_timestamp, tz=UTC).isoformat()
 

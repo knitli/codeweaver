@@ -13,6 +13,7 @@ from typing import Any
 
 import pytest
 
+from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
 from codeweaver.common.utils.utils import uuid7
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
@@ -63,18 +64,37 @@ async def test_store_hybrid_embeddings(qdrant_provider: QdrantVectorStoreProvide
     await qdrant_provider.upsert([chunk])
 
     # Verify: Search with dense vector returns result
-    dense_results = await qdrant_provider.search(vector={"dense": [0.1, 0.2, 0.3] * 256})
+    dense_results = await qdrant_provider.search(
+        StrategizedQuery(
+            query="authentication function",
+            strategy=SearchStrategy.DENSE_ONLY,
+            dense=[1.0, 0.0, 0.0] * 256,
+            sparse=None,
+        )
+    )
     assert len(dense_results) > 0, "Dense vector search should return results"
     assert dense_results[0].chunk.chunk_id == chunk.chunk_id
 
     # Verify: Search with sparse vector returns result
     sparse_results = await qdrant_provider.search(
-        vector={"sparse": {"indices": [1, 5, 10], "values": [0.8, 0.6, 0.9]}}
+        StrategizedQuery(
+            query="authentication function",
+            strategy=SearchStrategy.SPARSE_ONLY,
+            sparse={"indices": [1, 5, 10], "values": [0.8, 0.6, 0.9]},
+            dense=None,
+        )
     )
     assert len(sparse_results) > 0, "Sparse vector search should return results"
 
     # Verify: Hybrid search returns result (uses dense by default)
-    hybrid_results = await qdrant_provider.search(vector={"dense": [0.1, 0.2, 0.3] * 256})
+    hybrid_results = await qdrant_provider.search(
+        StrategizedQuery(
+            query="authentication function",
+            strategy=SearchStrategy.HYBRID,
+            dense=[1.0, 0.0, 0.0] * 256,
+            sparse={"indices": [1, 5, 10], "values": [0.8, 0.6, 0.9]},
+        )
+    )
     assert len(hybrid_results) > 0, "Hybrid search should return results"
     assert hybrid_results[0].chunk.chunk_id == chunk.chunk_id
 

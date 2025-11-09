@@ -128,7 +128,7 @@ def get_whereisai_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, 
     for cap in ALL_CAPABILITIES:
         capabilities.extend([
             EmbeddingCapabilities({**cap, "provider": provider})  # type: ignore
-            for provider in CAP_MAP[cap["name"]]
+            for provider in CAP_MAP[cap["name"]]  # ty: ignore[invalid-argument-type]
         ])
     return tuple(EmbeddingModelCapabilities.model_validate(cap) for cap in capabilities)
 

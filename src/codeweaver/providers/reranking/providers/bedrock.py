@@ -225,15 +225,92 @@ except ImportError as e:
     raise ImportError("boto3 is not installed. Please install it with `pip install boto3`.") from e
 
 
+def _to_doc_sources(documents: list[DocumentSource]) -> list[BedrockInlineDocumentSource]:
+    return [
+        BedrockInlineDocumentSource.model_validate([
+            {"inline_document_source": doc.model_dump(mode="python"), "type": "INLINE"}
+            for doc in documents
+        ])
+    ]
+
+
+def bedrock_reranking_input_transformer(
+    documents: StructuredDataInput,
+) -> list[BedrockInlineDocumentSource]:  # this is the sources field of BedrockRerankRequest
+    """Transform input documents into the format expected by the Bedrock API.
+
+    We can't actually produce the full objects we need here with just the documents. We need the query and model config to construct the full object.
+    We're going to handle that in the rerank method, and break type override law. 👮
+    """
+    from codeweaver.core.chunks import CodeChunk
+
+    # Transform the input documents into the format expected by the Bedrock API
+    if isinstance(documents, list | tuple | set):
+        docs = [
+            DocumentSource.model_validate(
+                {"json_document": doc.serialize(), "text_document": None}
+                if isinstance(doc, CodeChunk)
+                else {"text_document": {"text": str(doc)}, "json_document": None, "kind": "TEXT"}
+            )
+            for doc in documents
+        ]
+    else:
+        docs = (
+            [
+                DocumentSource.model_validate({
+                    "json_document": documents.serialize(),
+                    "text_document": None,
+                })
+            ]
+            if isinstance(documents, CodeChunk)
+            # this will never happen, but we do it to satisfy the type checker:
+            else [
+                DocumentSource.model_validate({
+                    "text_document": {"text": str(documents)},
+                    "json_document": None,
+                    "kind": "TEXT",
+                })
+            ]
+        )
+    return _to_doc_sources(docs)
+
+
+def bedrock_reranking_output_transformer(
+    response: BedrockRerankingResult, original_chunks: tuple[CodeChunk, ...] | Iterator[CodeChunk]
+) -> list[RerankingResult]:
+    """Transform the Bedrock API response into the format expected by the reranking provider."""
+    from codeweaver.core.chunks import CodeChunk
+
+    parsed_response = BedrockRerankingResult.model_validate_json(cast(bytes, response))
+    results: list[RerankingResult] = []
+    for item in parsed_response.results:
+        # pyright doesn't know that this will always be CodeChunk-as-JSON because that's what we send.
+        chunk = CodeChunk.model_validate_json(item.document.json_document)
+        results.append(
+            RerankingResult(
+                original_index=original_chunks.index(chunk)
+                if isinstance(original_chunks, tuple)
+                else tuple(original_chunks).index(chunk),
+                score=item.relevance_score,
+                batch_rank=item.index,
+                chunk=chunk,
+            )
+        )
+    return results
+
+
 class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient]):
     """Provider for Bedrock reranking."""
 
-    _client: AgentsforBedrockRuntimeClient
+    client: AgentsforBedrockRuntimeClient
     _provider = Provider.BEDROCK
-    _caps: RerankingModelCapabilities = get_amazon_reranking_capabilities()[0]
-    _model_configuration: RerankConfiguration
+    caps: RerankingModelCapabilities = get_amazon_reranking_capabilities()[0]
+    model_configuration: RerankConfiguration
 
     _kwargs: dict[str, Any] | None
+
+    _input_transformer = bedrock_reranking_input_transformer
+    _output_transformer = bedrock_reranking_output_transformer
 
     def __init__(
         self,
@@ -253,18 +330,18 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
             for k, v in bedrock_provider_settings.items()
             if v is not None
         }
-        self._model_configuration = model_config or RerankConfiguration.from_arn(
+        self.model_configuration = model_config or RerankConfiguration.from_arn(
             bedrock_provider_settings["model_arn"], kwargs.get("top_n", 40) if kwargs else top_n
         )
         _ = bedrock_provider_settings.pop("model_arn")  # ty: ignore[invalid-argument-type]  # the typed dict is mine, I do what I want
-        self._client = boto3_client(  # ty: ignore[invalid-assignment]
+        self.client = boto3_client(  # ty: ignore[invalid-assignment]
             "bedrock-agent-runtime",
             **self._bedrock_provider_settings,  # ty: ignore[invalid-argument-type]
         )  # we just popped it
-        self._capabilities = capabilities or self._caps or get_amazon_reranking_capabilities()[0]
-        if client or self._client:
+        self._capabilities = capabilities or self.caps or get_amazon_reranking_capabilities()[0]
+        if client or self.client:
             super().__init__(
-                client=client or self._client,
+                client=client or self.client,
                 capabilities=capabilities or self._capabilities,
                 top_n=top_n,
                 prompt=prompt,
@@ -272,11 +349,6 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
             )
         else:
             raise ValueError("Either a Bedrock client or provider settings must be provided.")
-
-    def _initialize(self) -> None:
-        # Our input transformer can't conform to the expected signature because we need the query and model config to construct the full object. We'll handle that in the rerank method.
-        self._input_transformer = self.bedrock_reranking_input_transformer
-        self._output_transformer = self.bedrock_reranking_output_transformer
 
     async def _execute_rerank(
         self,
@@ -290,7 +362,7 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
         Execute the reranking process.
         """
         query_obj = BedrockTextQuery.model_validate({"text_query": {"text": query}})
-        config = self._model_configuration
+        config = self.model_configuration
         request = BedrockRerankRequest.model_validate({
             "queries": [query_obj],
             "sources": documents,
@@ -298,84 +370,6 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
         })
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self.client.rerank, request)
-
-    @staticmethod
-    def _to_doc_sources(documents: list[DocumentSource]) -> list[BedrockInlineDocumentSource]:
-        return [
-            BedrockInlineDocumentSource.model_validate([
-                {"inline_document_source": doc.model_dump(mode="python"), "type": "INLINE"}
-                for doc in documents
-            ])
-        ]
-
-    def bedrock_reranking_input_transformer(
-        self, documents: StructuredDataInput
-    ) -> list[BedrockInlineDocumentSource]:  # this is the sources field of BedrockRerankRequest
-        """Transform input documents into the format expected by the Bedrock API.
-
-        We can't actually produce the full objects we need here with just the documents. We need the query and model config to construct the full object.
-        We're going to handle that in the rerank method, and break type override law. 👮
-        """
-        from codeweaver.core.chunks import CodeChunk
-
-        # Transform the input documents into the format expected by the Bedrock API
-        if isinstance(documents, list | tuple | set):
-            docs = [
-                DocumentSource.model_validate(
-                    {"json_document": doc.serialize(), "text_document": None}
-                    if isinstance(doc, CodeChunk)
-                    else {
-                        "text_document": {"text": str(doc)},
-                        "json_document": None,
-                        "kind": "TEXT",
-                    }
-                )
-                for doc in documents
-            ]
-        else:
-            docs = (
-                [
-                    DocumentSource.model_validate({
-                        "json_document": documents.serialize(),
-                        "text_document": None,
-                    })
-                ]
-                if isinstance(documents, CodeChunk)
-                # this will never happen, but we do it to satisfy the type checker:
-                else [
-                    DocumentSource.model_validate({
-                        "text_document": {"text": str(documents)},
-                        "json_document": None,
-                        "kind": "TEXT",
-                    })
-                ]
-            )
-        return self._to_doc_sources(docs)
-
-    def bedrock_reranking_output_transformer(
-        self,
-        response: BedrockRerankingResult,
-        original_chunks: tuple[CodeChunk, ...] | Iterator[CodeChunk],
-    ) -> list[RerankingResult]:
-        """Transform the Bedrock API response into the format expected by the reranking provider."""
-        from codeweaver.core.chunks import CodeChunk
-
-        parsed_response = BedrockRerankingResult.model_validate_json(cast(bytes, response))
-        results: list[RerankingResult] = []
-        for item in parsed_response.results:
-            # pyright doesn't know that this will always be CodeChunk-as-JSON because that's what we send.
-            chunk = CodeChunk.model_validate_json(item.document.json_document)
-            results.append(
-                RerankingResult(
-                    original_index=original_chunks.index(chunk)
-                    if isinstance(original_chunks, tuple)
-                    else tuple(original_chunks).index(chunk),
-                    score=item.relevance_score,
-                    batch_rank=item.index,
-                    chunk=chunk,
-                )
-            )
-        return results
 
 
 __all__ = ("BedrockRerankingProvider", "BedrockRerankingResult")

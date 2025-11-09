@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
 from codeweaver.common.utils.utils import uuid7
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
@@ -58,7 +59,14 @@ async def test_persistence_across_restarts(qdrant_test_manager):
     await provider2._initialize()
 
     # Verify: Previously stored chunk is retrievable
-    results = await provider2.search(vector={"dense": [0.5, 0.5, 0.5] * 256})
+    results = await provider2.search(
+        StrategizedQuery(
+            query="validate token",
+            strategy=SearchStrategy.SEMANTIC,
+            dense=[0.5, 0.5, 0.5] * 256,
+            sparse=None,
+        )
+    )
     assert len(results) > 0, "Should find previously stored chunks"
     assert results[0].chunk.chunk_id == original_chunk_id
     assert results[0].chunk.chunk_name == "login.py:validate"

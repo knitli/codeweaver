@@ -22,7 +22,7 @@ from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.types.aliases import LanguageNameT
 
 
-ALL_LANGUAGES = sorted(ALL_LANGUAGES)
+ALL_LANGUAGES = frozenset(ALL_LANGUAGES)
 
 CW_ROOT = Path(__file__).parent.parent.parent
 

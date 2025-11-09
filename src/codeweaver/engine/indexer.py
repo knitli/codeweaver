@@ -27,7 +27,8 @@ from typing import TYPE_CHECKING, Annotated, Any, ClassVar, TypedDict, Unpack, c
 import rignore
 import watchfiles
 
-from pydantic import Field, PrivateAttr
+from cyclopts.types import NonNegativeFloat
+from pydantic import DirectoryPath, Field, NonNegativeInt, PrivateAttr
 from pydantic.dataclasses import dataclass
 from watchfiles.main import Change, FileChange
 
@@ -142,17 +143,15 @@ class IndexingStats:
         ]
     ] = []
 
-    @property
     def elapsed_time(self) -> float:
         """Calculate elapsed time since indexing started."""
         return time.time() - self.start_time
 
-    @property
     def processing_rate(self) -> float:
         """Files processed per second."""
-        if self.elapsed_time == 0:
+        if self.elapsed_time() == 0:
             return 0.0
-        return self.files_processed / self.elapsed_time
+        return self.files_processed / self.elapsed_time()
 
     @property
     def total_errors(self) -> int:
@@ -346,19 +345,19 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
 
     @classmethod
     def from_settings(
-        cls, settings: DictView[CodeWeaverSettingsDict] | None = None
+        cls, settings: CodeWeaverSettingsDict | None = None
     ) -> IgnoreFilter[rignore.Walker]:
         """Create an IgnoreFilter instance from settings."""
         # we actually need the full object here
         from codeweaver.common.utils.git import get_project_path
         from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
-        from codeweaver.config.settings import get_settings_map
+        from codeweaver.config.settings import get_settings
 
-        settings_map = settings or get_settings_map()
+        settings = settings or get_settings()
         index_settings = (
-            IndexerSettings.model_validate(DefaultIndexerSettings)
-            if isinstance(settings_map["indexing"], Unset)
-            else settings_map["indexing"]
+            settings.indexing
+            if isinstance(settings.indexing, IndexerSettings)
+            else IndexerSettings.model_validate(DefaultIndexerSettings)
         )
         if not index_settings.inc_exc_set:
             # Check if there's already a running event loop
@@ -366,7 +365,7 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
                 asyncio.get_running_loop()
                 # If we're here, there's a running loop
                 # We can't await here since from_settings is not async, so skip for now
-                logger.info(
+                logger.debug(
                     "Cannot set inc_exc in Indexer.from_settings: already in async context. Will be set lazily when indexer is used."
                 )
             except RuntimeError:
@@ -374,14 +373,19 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
                 _ = asyncio.run(
                     index_settings.set_inc_exc(
                         get_project_path()
-                        if isinstance(settings_map["project_path"], Unset)
-                        else settings_map["project_path"]
+                        if isinstance(settings.project_path, Unset)
+                        else settings.project_path
                     )
                 )
         walker = rignore.Walker(
             **(index_settings.to_settings())  # type: ignore
         )
-        return cls(walker=walker, project_path=settings_map["project_path"])
+        return cls(
+            walker=walker,
+            project_path=get_project_path()
+            if isinstance(settings.project_path, Unset)
+            else settings.project_path,
+        )
 
     @property
     def walker(self) -> rignore.Walker:
@@ -392,13 +396,13 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
 class Indexer(BasedModel):
     """Main indexer class. Wraps a DiscoveredFilestore and chunkers."""
 
-    _store: BlakeStore[DiscoveredFile] = PrivateAttr()
-    _walker: rignore.Walker | None = PrivateAttr(default=None)
-    _project_root: Path | None = PrivateAttr(default=None)
-    _checkpoint_manager: CheckpointManager | None = PrivateAttr(default=None)
-    _checkpoint: IndexingCheckpoint | None = PrivateAttr(default=None)
-    _last_checkpoint_time: float = PrivateAttr(default=0.0)
-    _files_since_checkpoint: int = PrivateAttr(default=0)
+    _store: Annotated[BlakeStore[DiscoveredFile] | None, PrivateAttr()] = None
+    _walker: Annotated[rignore.Walker | None, PrivateAttr()] = None
+    _project_root: Annotated[DirectoryPath | None, PrivateAttr()] = None
+    _checkpoint_manager: Annotated[CheckpointManager | None, PrivateAttr()] = None
+    _checkpoint: Annotated[IndexingCheckpoint | None, PrivateAttr()] = None
+    _last_checkpoint_time: Annotated[NonNegativeFloat, PrivateAttr()] = 0.0
+    _files_since_checkpoint: Annotated[NonNegativeInt, PrivateAttr()] = 0
 
     def __init__(
         self,
@@ -898,8 +902,8 @@ class Indexer(BasedModel):
             self._stats.chunks_created,
             self._stats.chunks_indexed,
             len(self._stats.files_with_errors),
-            self._stats.elapsed_time,
-            self._stats.processing_rate,
+            self._stats.elapsed_time(),
+            self._stats.processing_rate(),
         )
 
         # Save final checkpoint

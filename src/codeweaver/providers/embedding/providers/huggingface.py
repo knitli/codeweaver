@@ -92,21 +92,21 @@ curl https://router.huggingface.co/hf-inference/models/intfloat/multilingual-e5-
 class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
     """HuggingFace embedding provider."""
 
-    _client: AsyncInferenceClient
+    client: AsyncInferenceClient
     _provider: Provider = Provider.HUGGINGFACE_INFERENCE
-    _caps: EmbeddingModelCapabilities
+    caps: EmbeddingModelCapabilities
 
     _output_transformer = staticmethod(huggingface_hub_output_transformer)
 
     def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """We don't need to do anything here."""
         self.doc_kwargs |= {
-            "model": self._caps.name,
+            "model": self.caps.name,
             **huggingface_hub_embed_kwargs(),
             "prompt_name": "passage",
         }
         self.query_kwargs |= {
-            "model": self._caps.name,
+            "model": self.caps.name,
             **huggingface_hub_query_kwargs(),
             "prompt_name": "query",
         }
@@ -122,7 +122,7 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
         """Embed a sequence of strings into vectors."""
         all_output: Sequence[Sequence[float]] | Sequence[Sequence[int]] = []
         for doc in sequence:
-            output = await self._client.feature_extraction(doc, **kwargs)  # type: ignore
+            output = await self.client.feature_extraction(doc, **kwargs)  # type: ignore
             all_output.append(output)  # type: ignore
         return all_output
 
@@ -150,7 +150,7 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
 
         While some models may support multiple dimensions, the HF Inference API does not.
         """
-        return self._caps.default_dimension or 1024
+        return self.caps.default_dimension or 1024
 
 
 __all__ = ("HuggingFaceEmbeddingProvider",)

@@ -362,10 +362,10 @@ def clean_args(
     # Handle class constructors first
     if isclass(func):
         func = get_class_constructor(func).object
-    
+
     if not isfunction(func) and not ismethod(func):
         raise TypeError("func must be a function, method, or class")
-    
+
     keywords = keyword_args(func)
     positional = [arg for arg in positional_args(func) if arg not in keywords]
     if "kwargs" in args and isinstance(args.get("kwargs"), dict) and "kwargs" not in keywords:

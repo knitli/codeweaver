@@ -59,9 +59,9 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
     model_name: The name of the SentenceTransformers model to use.
     """
 
-    _client: CrossEncoder
+    client: CrossEncoder
     _provider: Provider = Provider.SENTENCE_TRANSFORMERS
-    _caps: RerankingModelCapabilities
+    caps: RerankingModelCapabilities
 
     _rerank_kwargs: MappingProxyType[str, Any] = MappingProxyType({"trust_remote_code": True})
 
@@ -82,11 +82,11 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
             client = CrossEncoder(capabilities.name, **rerank_kwargs)
 
         # Store client before calling super().__init__()
-        self._client = client
+        self.client = client
 
         # Call super().__init__() which handles Pydantic initialization
         super().__init__(
-            client=self._client,
+            client=self.client,
             capabilities=capabilities,
             prompt=prompt,
             top_n=top_n,
@@ -99,13 +99,13 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
         """
         # Set default model path if not provided
         if "model_name" not in self.kwargs and "model_name_or_path" not in self.kwargs:
-            self.kwargs["model_name_or_path"] = self._caps.name
+            self.kwargs["model_name_or_path"] = self.caps.name
 
         # Extract model name, with fallback to capabilities name
         name = (
             self.kwargs.pop("model_name", None)
             or self.kwargs.pop("model_name_or_path", None)
-            or self._caps.name
+            or self.caps.name
         )
 
         if not isinstance(name, str):
@@ -135,15 +135,15 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
             preprocess_for_qwen(
                 query=query,
                 documents=documents,
-                instruction=self._caps.custom_prompt or "",
+                instruction=self.caps.custom_prompt or "",
                 prefix=self._query_prefix,
                 suffix=self._doc_suffix,
             )
-            if "Qwen3" in self._caps.name
+            if "Qwen3" in self.caps.name
             else [(query, doc) for doc in documents]
         )
         predict_partial = rpartial(
-            cast(Callable[..., np.ndarray], self._client.predict), convert_to_numpy=True
+            cast(Callable[..., np.ndarray], self.client.predict), convert_to_numpy=True
         )
         loop = asyncio.get_running_loop()
         scores = await loop.run_in_executor(None, predict_partial, preprocessed)
@@ -160,8 +160,8 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
         except Exception:
             has_flash_attention = None
 
-        if other := self._caps.other:
-            self._query_prefix = f"{other.get('prefix', '')}{self._caps.custom_prompt}\n<Query>:\n"
+        if other := self.caps.other:
+            self._query_prefix = f"{other.get('prefix', '')}{self.caps.custom_prompt}\n<Query>:\n"
             self._doc_suffix = other.get("suffix", "")
         self.kwargs["model_kwargs"] = {"torch_dtype": "torch.float16"}
         if has_flash_attention:

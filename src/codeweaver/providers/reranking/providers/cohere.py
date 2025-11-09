@@ -38,12 +38,12 @@ except ImportError as e:
 class CohereRerankingProvider(RerankingProvider[CohereClient]):
     """Cohere reranking provider."""
 
-    _client: CohereClient
+    client: CohereClient
     _provider = Provider.COHERE
-    _caps: RerankingModelCapabilities
+    caps: RerankingModelCapabilities
 
     def __init__(
-        self, caps: RerankingModelCapabilities, _client: CohereClient | None = None, **kwargs: Any
+        self, caps: RerankingModelCapabilities, client: CohereClient | None = None, **kwargs: Any
     ) -> None:
         """Initialize the Cohere reranking provider."""
         # Prepare client options before calling super().__init__()
@@ -65,14 +65,14 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
                 )
 
         # Initialize client if not provided
-        if _client is None:
-            _client = CohereClient(**client_options)
+        if client is None:
+            client = CohereClient(**client_options)
 
         # Store client before calling super().__init__()
-        self._client = _client
+        self.client = client
 
         # Call super().__init__() which handles Pydantic initialization
-        super().__init__(self._client, caps, **kwargs)
+        super().__init__(self.client, caps, **kwargs)
 
     def _initialize(self) -> None:
         """Initialize the Cohere reranking provider after Pydantic setup."""
@@ -87,8 +87,8 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
     async def _execute_rerank(
         self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: Any
     ) -> V2RerankResponse:
-        return await self._client.rerank(
-            model=self.model_name or self._caps.name,
+        return await self.client.rerank(
+            model=self.model_name or self.caps.name,
             query=query,
             documents=documents,
             top_n=top_n,

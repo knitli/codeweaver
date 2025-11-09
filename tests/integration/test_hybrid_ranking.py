@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
 from codeweaver.common.utils.utils import uuid7
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
@@ -86,10 +87,12 @@ async def test_hybrid_search_ranking(qdrant_test_manager):
 
     # Execute hybrid search
     results = await provider.search(
-        vector={
-            "dense": [1.0, 0.0, 0.0] * 256,
-            "sparse": {"indices": [1, 2], "values": [1.0, 0.9]},
-        },
+        StrategizedQuery(
+            query="authentication function",
+            strategy=SearchStrategy.HYBRID,
+            dense=[1.0, 0.0, 0.0] * 256,
+            sparse={"indices": [1, 2], "values": [1.0, 0.9]},
+        )
     )
 
     # Verify results are ranked by relevance

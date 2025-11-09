@@ -17,6 +17,7 @@ from enum import Enum
 from types import ModuleType
 from typing import (
     TYPE_CHECKING,
+    Annotated,
     Any,
     ClassVar,
     Literal,
@@ -29,7 +30,7 @@ from typing import (
 )
 from uuid import UUID
 
-from pydantic import UUID7, ConfigDict
+from pydantic import UUID7, ConfigDict, Field
 from pydantic.main import IncEx
 from tenacity import (
     RetryError,
@@ -150,8 +151,18 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
     model_config = BasedModel.model_config | ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
-    client: EmbeddingClient
-    caps: EmbeddingModelCapabilities
+    client: Annotated[
+        EmbeddingClient,
+        Field(
+            description="The client for the embedding provider.",
+            exclude=True,
+            validation_alias="_client",
+        ),
+    ]
+    caps: Annotated[
+        EmbeddingModelCapabilities,
+        Field(description="The capabilities of the embedding model.", validation_alias="_caps"),
+    ]
     _provider: ClassVar[Provider] = Provider.NOT_SET
     _input_transformer: ClassVar[Callable[[StructuredDataInput], Any]] = default_input_transformer
     _output_transformer: ClassVar[Callable[[Any], list[list[float]] | list[list[int]]]] = (
@@ -505,7 +516,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     ) -> list[list[float]] | list[list[int]] | list[SparseEmbedding] | EmbeddingErrorInfo:
         """Embed a query into a vector."""
         processed_kwargs: Any = self._set_kwargs(self.query_kwargs, kwargs or {})
-        queries: Sequence[str] = query if isinstance(query, list | tuple | set) else [query]
+        queries: Sequence[str] = [query] if isinstance(query, str) else list(query)
         try:
             # Use retry wrapper instead of calling _embed_query directly
             results: (
@@ -541,17 +552,17 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     @property
     def model_name(self) -> str:
         """Get the model name for the embedding provider."""
-        return self._caps.name
+        return self.caps.name
 
     @property
     def model_capabilities(self) -> EmbeddingModelCapabilities | None:
         """Get the model capabilities for the embedding provider."""
-        return self._caps
+        return self.caps
 
     def _tokenizer(self) -> Tokenizer[Any]:
         """Get the tokenizer for the embedding provider."""
-        if defined_tokenizer := self._caps.tokenizer:
-            return get_tokenizer(defined_tokenizer, self._caps.tokenizer_model or self._caps.name)
+        if defined_tokenizer := self.caps.tokenizer:
+            return get_tokenizer(defined_tokenizer, self.caps.tokenizer_model or self.caps.name)
         return get_tokenizer("tiktoken", "cl100k_base")
 
     @property

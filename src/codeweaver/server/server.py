@@ -365,7 +365,7 @@ def _initialize_app_state(
         health=get_health_info(),
         statistics=statistics or get_session_statistics._resolve()(),
         project_path=settings.project_path,
-        config_path=settings.config_file if settings else get_settings().config_file,
+        config_path=settings.config_file if settings else get_settings._resolve()().config_file,
         provider_registry=get_provider_registry._resolve()(),
         services_registry=get_services_registry._resolve()(),
         model_registry=get_model_registry._resolve()(),

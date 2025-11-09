@@ -34,9 +34,9 @@ except ImportError as e:
 class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
     """Mistral embedding provider."""
 
-    _client: Mistral
+    client: Mistral
     _provider = Provider.MISTRAL
-    _caps: EmbeddingModelCapabilities
+    caps: EmbeddingModelCapabilities
 
     def __init__(
         self, caps: EmbeddingModelCapabilities, client: Mistral | None = None, **kwargs: Any
@@ -53,7 +53,7 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
             client = Mistral(api_key=api_key, **client_options)
 
         # 2. Store client BEFORE super().__init__()
-        self._client = client
+        self.client = client
 
         # 3. Call super() with correct params (kwargs as dict, not **kwargs)
         super().__init__(client=client, caps=caps, kwargs=kwargs)
@@ -67,7 +67,7 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
         Sets up _caps and configures default kwargs for document and query embedding.
         """
         # Set _caps at start
-        self._caps = caps
+        self.caps = caps
 
         # Configure default kwargs if needed
         # Mistral uses same parameters for both documents and queries
@@ -89,7 +89,7 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
                 results = await mistral.embeddings.create_async(
                     model=self.model,
                     inputs=inputs,
-                    output_dtype=cast("EmbeddingDtype", self._caps.default_dtype),
+                    output_dtype=cast("EmbeddingDtype", self.caps.default_dtype),
                     **kwargs,
                 )
                 embeddings = [cast("list[float]", item.embedding) for item in results.data]

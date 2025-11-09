@@ -507,13 +507,10 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
                         dense_size = dense_params.size
                     else:
                         # Only call resolve_dimensions if we can't get size from collection
-                        try:
+                        with contextlib.suppress(ValueError):
                             from codeweaver.providers.vector_stores.utils import resolve_dimensions
 
                             dense_size = resolve_dimensions()
-                        except ValueError:
-                            # No embedding model configured, use default
-                            pass
                 # TODO: this should be a CollectionMetadata instance
                 collections_data[col.name] = {
                     "metadata": {"provider": "memory", "created_at": datetime.now(UTC).isoformat()},

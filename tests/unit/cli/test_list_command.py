@@ -109,7 +109,7 @@ class TestListModels:
     def test_list_models_for_provider(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test list models for specific provider."""
         with pytest.raises(SystemExit) as exc_info:
-            list_app("models", --provider, "voyage")
+            list_app("models", "--provider", "voyage")
         captured = capsys.readouterr()
         exc_info.value.code = exc_info.value.code
 

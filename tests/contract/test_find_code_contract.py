@@ -180,6 +180,11 @@ class TestFindCodeResponseSchema:
                 execution_time_ms=0,
                 search_strategy=(SearchStrategy.KEYWORD_FALLBACK,),
                 languages_found=(),
+                status="success",
+                warnings=[],
+                indexing_state="unknown",
+                index_coverage=1.0,
+                search_mode="hybrid",
             )
 
     def test_response_model_creates_valid_instance(self):
@@ -194,6 +199,11 @@ class TestFindCodeResponseSchema:
             execution_time_ms=100.5,
             search_strategy=(SearchStrategy.HYBRID_SEARCH,),
             languages_found=("python",),
+            status="success",
+            warnings=[],
+            indexing_state="unknown",
+            index_coverage=1.0,
+            search_mode="hybrid",
         )
 
         assert isinstance(response, FindCodeResponseSummary)
@@ -223,6 +233,7 @@ class TestCodeMatchSchema:
         assert not missing_fields, f"Missing required fields in CodeMatch: {missing_fields}"
 
     def test_code_match_relevance_score_range(self):
+        # sourcery skip: remove-redundant-pass
         """Verify relevance_score is constrained to 0.0-1.0."""
         schema = CodeMatch.model_json_schema()
         properties = schema.get("properties", {})
@@ -241,7 +252,7 @@ class TestCodeMatchSchema:
             ), "relevance_score must have maximum 1.0"
         else:
             # Check directly if not nested
-            pass  # Pydantic may represent this differently
+            pass  # type: ignore # Pydantic may represent this differently
 
     def test_code_match_match_type_enum(self):
         """Verify match_type uses CodeMatchType enum values."""
@@ -422,6 +433,11 @@ class TestContractExamples:
             execution_time_ms=850,
             search_strategy=(SearchStrategy.HYBRID_SEARCH, SearchStrategy.SEMANTIC_RERANK),
             languages_found=(SemanticSearchLanguage.PYTHON,),
+            status="success",
+            warnings=[],
+            indexing_state="unknown",
+            index_coverage=1.0,
+            search_mode="hybrid",
         )
 
         # Verify all fields are accessible and have expected types
@@ -459,7 +475,7 @@ class TestTypesSafety:
         # Attempting to construct with wrong types should fail
         with pytest.raises((ValidationError, TypeError)):
             FindCodeResponseSummary(
-                matches="not a list",  # Wrong type
+                matches="not a list",  # ty: ignore[invalid-argument-type]
                 summary="Test",
                 query_intent=IntentType.UNDERSTAND,
                 total_matches=0,
@@ -468,6 +484,11 @@ class TestTypesSafety:
                 execution_time_ms=0,
                 search_strategy=(SearchStrategy.KEYWORD_FALLBACK,),
                 languages_found=(),
+                status="success",
+                warnings=[],
+                indexing_state="unknown",
+                index_coverage=1.0,
+                search_mode="hybrid",
             )
 
     def test_response_schema_serialization(self):
@@ -482,6 +503,11 @@ class TestTypesSafety:
             execution_time_ms=100,
             search_strategy=(SearchStrategy.KEYWORD_FALLBACK,),
             languages_found=(),
+            status="success",
+            warnings=[],
+            indexing_state="unknown",
+            index_coverage=1.0,
+            search_mode="hybrid",
         )
 
         # Serialize to dict (JSON-compatible)
