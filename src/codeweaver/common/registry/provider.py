@@ -739,12 +739,23 @@ class ProviderRegistry(BasedModel):
             if provider == Provider.QDRANT:
                 try:
                     # Merge options, with provider_settings taking precedence
-                    merged_opts = client_options | provider_settings
+                    # But exclude provider-specific settings that aren't client parameters
+                    qdrant_client_settings = {
+                        k: v for k, v in (provider_settings or {}).items()
+                        if k not in ("collection_name", "provider")
+                    }
+                    merged_opts = (client_options or {}) | qdrant_client_settings
+                    # Also remove collection_name from client_options if present
+                    merged_opts = {k: v for k, v in merged_opts.items() if k != "collection_name"}
                     client = client_class(**merged_opts)
                 except Exception as e:
                     logger.warning("Failed to create Qdrant client: %s", e)
                     logger.info("Falling back to in-memory mode")
-                    return client_class(location=":memory:", **client_options)
+                    # Clean client_options of collection_name for fallback too
+                    clean_opts = {
+                        k: v for k, v in (client_options or {}).items() if k != "collection_name"
+                    }
+                    return client_class(location=":memory:", **clean_opts)
                 else:
                     return client
             return client_class(location=":memory:", **client_options)
