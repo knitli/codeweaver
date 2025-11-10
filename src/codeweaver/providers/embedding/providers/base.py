@@ -30,7 +30,7 @@ from typing import (
 )
 from uuid import UUID
 
-from pydantic import UUID7, ConfigDict, Field
+from pydantic import UUID7, ConfigDict, Field, SkipValidation
 from pydantic.main import IncEx
 from tenacity import (
     RetryError,
@@ -152,7 +152,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     model_config = BasedModel.model_config | ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
     client: Annotated[
-        EmbeddingClient,
+        SkipValidation[EmbeddingClient],
         Field(
             description="The client for the embedding provider.",
             exclude=True,
@@ -201,34 +201,38 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         # Determine provider - check if subclass has it set
         getattr(type(self), "_provider", None) or caps.provider
 
-        # Manually set the validated fields using object.__setattr__ to bypass Pydantic's validation
-        # This prevents the ClassVar issue while still properly initializing the fields
+        # Store values we'll need after super().__init__()
+        _doc_kwargs = type(self)._doc_kwargs.copy() or {}
+        _query_kwargs = type(self)._query_kwargs.copy() or {}
+        _user_kwargs = kwargs or {}
 
-        self._model_dump_json = super().model_dump_json
+        # Use object.__setattr__ to bypass Pydantic's validation for pre-super() initialization
+        object.__setattr__(self, '_model_dump_json', super().model_dump_json)
 
-        self.doc_kwargs = type(self)._doc_kwargs.copy() or {}
-        self.query_kwargs = type(self)._query_kwargs.copy() or {}
-        self._add_kwargs(kwargs or {})
-        """Add any user-provided kwargs to the embedding provider, after we merge the defaults together."""
-        # Note: _store is a ClassVar defined at class level (line 175), shared across all instances
-        # No need to create instance variable here
+        # Initialize circuit breaker state using object.__setattr__
+        object.__setattr__(self, '_circuit_state', CircuitBreakerState.CLOSED)
+        object.__setattr__(self, '_failure_count', 0)
+        object.__setattr__(self, '_last_failure_time', None)
 
-        # Initialize circuit breaker state
-        self._circuit_state = CircuitBreakerState.CLOSED
-        self._failure_count = 0
-        self._last_failure_time = None
-
-        # Call _initialize with caps since pydantic may not have set _caps yet
-        self._initialize(caps)
-        # Initialize pydantic model without parameters to avoid ClassVar validation issues
+        # Initialize pydantic model BEFORE calling _initialize since _initialize may set PrivateAttr fields
         super().__init__(client=client, caps=caps)
+        
+        # Now that Pydantic is initialized, set kwargs as normal attributes (will go to __pydantic_extra__)
+        self.doc_kwargs = {**_doc_kwargs, **_user_kwargs}
+        self.query_kwargs = {**_query_kwargs, **_user_kwargs}
+        
+        # Call _initialize after super().__init__() so Pydantic private attributes are set up
+        self._initialize(caps)
 
     def _add_kwargs(self, kwargs: dict[str, Any]) -> None:
         """Add keyword arguments to the embedding provider."""
         if not kwargs:
             return
-        self.doc_kwargs = {**self.doc_kwargs, **kwargs}
-        self.query_kwargs = {**self.query_kwargs, **kwargs}
+        # Access attributes directly from __dict__ to avoid Pydantic validation during initialization
+        doc_kwargs = self.__dict__.get('doc_kwargs', {})
+        query_kwargs = self.__dict__.get('query_kwargs', {})
+        object.__setattr__(self, 'doc_kwargs', {**doc_kwargs, **kwargs})
+        object.__setattr__(self, 'query_kwargs', {**query_kwargs, **kwargs})
 
     @classmethod
     @override

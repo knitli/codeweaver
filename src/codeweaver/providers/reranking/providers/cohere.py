@@ -14,6 +14,8 @@ import os
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
+from pydantic import SkipValidation
+
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult
@@ -38,7 +40,7 @@ except ImportError as e:
 class CohereRerankingProvider(RerankingProvider[CohereClient]):
     """Cohere reranking provider."""
 
-    client: CohereClient
+    client: SkipValidation[CohereClient]
     _provider = Provider.COHERE
     caps: RerankingModelCapabilities
 
