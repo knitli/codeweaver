@@ -1,0 +1,312 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+"""Unit tests for CohereEmbeddingProvider."""
+
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+from codeweaver.core.chunks import CodeChunk
+from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+from codeweaver.providers.provider import Provider
+
+
+@pytest.fixture
+def mock_cohere_client():
+    """Create a mock Cohere async client."""
+    client = AsyncMock()
+    client.embed = AsyncMock()
+    return client
+
+
+@pytest.fixture
+def cohere_capabilities():
+    """Create capabilities for Cohere embedding model."""
+    return EmbeddingModelCapabilities(
+        name="embed-english-v3.0",
+        provider=Provider.COHERE,
+        default_dimension=1024,
+        default_dtype="float",
+        tokenizer="tiktoken",
+    )
+
+
+@pytest.fixture
+def cohere_4_capabilities():
+    """Create capabilities for Cohere v4 embedding model."""
+    return EmbeddingModelCapabilities(
+        name="embed-english-v4.0",
+        provider=Provider.COHERE,
+        default_dimension=1024,
+        default_dtype="float",
+        tokenizer="tiktoken",
+    )
+
+
+class TestCohereEmbeddingProviderInitialization:
+    """Test CohereEmbeddingProvider initialization."""
+
+    @patch.dict("os.environ", {"COHERE_API_KEY": "test-api-key"})
+    def test_provider_initialization_with_env_api_key(self, cohere_capabilities):
+        """Test that provider initializes with API key from environment."""
+        from codeweaver.providers.embedding.providers.cohere import (
+            CohereEmbeddingProvider,
+        )
+
+        provider = CohereEmbeddingProvider(caps=cohere_capabilities)
+
+        assert provider.caps == cohere_capabilities
+        assert provider.client is not None
+        assert provider.name == Provider.COHERE
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_provider_initialization_without_api_key_raises_error(
+        self, cohere_capabilities
+    ):
+        """Test that provider raises error without API key."""
+        from codeweaver.exceptions import ConfigurationError
+        from codeweaver.providers.embedding.providers.cohere import (
+            CohereEmbeddingProvider,
+        )
+
+        with pytest.raises(ConfigurationError) as exc_info:
+            CohereEmbeddingProvider(caps=cohere_capabilities)
+
+        assert "API key not found" in str(exc_info.value)
+
+    def test_provider_initialization_with_client(
+        self, mock_cohere_client, cohere_capabilities
+    ):
+        """Test that provider initializes correctly with a provided client."""
+        from codeweaver.providers.embedding.providers.cohere import (
+            CohereEmbeddingProvider,
+        )
+
+        provider = CohereEmbeddingProvider(
+            caps=cohere_capabilities, _client=mock_cohere_client
+        )
+
+        assert provider.client is mock_cohere_client
+        assert provider.caps == cohere_capabilities
+
+    @patch.dict("os.environ", {"COHERE_API_KEY": "test-api-key"})
+    def test_provider_initialization_with_custom_kwargs(self, cohere_capabilities):
+        """Test that custom kwargs are stored correctly."""
+        from codeweaver.providers.embedding.providers.cohere import (
+            CohereEmbeddingProvider,
+        )
+
+        provider = CohereEmbeddingProvider(
+            caps=cohere_capabilities, custom_param="value"
+        )
+
+        assert "custom_param" in provider.doc_kwargs
+        assert provider.doc_kwargs["custom_param"] == "value"
+
+    @patch.dict("os.environ", {"COHERE_API_KEY": "test-api-key"})
+    def test_provider_base_url_cohere(self, cohere_capabilities):
+        """Test that base_url property returns correct value for Cohere."""
+        from codeweaver.providers.embedding.providers.cohere import (
+            CohereEmbeddingProvider,
+        )
+
+        provider = CohereEmbeddingProvider(caps=cohere_capabilities)
+
+        assert provider.base_url == "https://api.cohere.com"
+
+    @patch.dict("os.environ", {"AZURE_COHERE_API_KEY": "test-api-key"})
+    def test_provider_initialization_azure_provider(self):
+        """Test that Azure provider is supported."""
+        from codeweaver.providers.embedding.providers.cohere import (
+            CohereEmbeddingProvider,
+        )
+
+        caps = EmbeddingModelCapabilities(
+            name="embed-english-v3.0",
+            provider=Provider.AZURE,
+            default_dimension=1024,
+            default_dtype="float",
+            tokenizer="tiktoken",
+        )
+
+        provider = CohereEmbeddingProvider(
+            caps=caps, endpoint="test-endpoint", region_name="eastus"
+        )
+
+        assert provider.caps.provider == Provider.AZURE
+
+
+class TestCohereEmbeddingProviderEmbedding:
+    """Test CohereEmbeddingProvider embedding operations."""
+
+    @pytest.mark.asyncio
+    async def test_embed_documents_success(
+        self, mock_cohere_client, cohere_capabilities
+    ):
+        """Test successful document embedding."""
+        from codeweaver.providers.embedding.providers.cohere import (
+            CohereEmbeddingProvider,
+        )
+
+        # Setup mock response
+        mock_embeddings = MagicMock()
+        mock_embeddings.float = [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
+
+        mock_response = MagicMock()
+        mock_response.embeddings = mock_embeddings
+        mock_response.meta = MagicMock()
+        mock_response.meta.tokens = MagicMock()
+        mock_response.meta.tokens.output_tokens = 100
+        mock_response.meta.tokens.input_tokens = None
+
+        mock_cohere_client.embed.return_value = mock_response
+
+        provider = CohereEmbeddingProvider(
+            caps=cohere_capabilities, _client=mock_cohere_client
+        )
+
+        # Create test chunks
+        chunks = [
+            CodeChunk(
+                content="test content 1",
+                language="python",
+                start_line=1,
+                end_line=1,
+                file_path="/test/file.py",
+            ),
+            CodeChunk(
+                content="test content 2",
+                language="python",
+                start_line=2,
+                end_line=2,
+                file_path="/test/file.py",
+            ),
+        ]
+
+        # Call embed_documents
+        result = await provider.embed_documents(chunks)
+
+        # Verify result
+        assert len(result) == 2
+        assert result[0] == [0.1, 0.2, 0.3]
+        assert result[1] == [0.4, 0.5, 0.6]
+
+        # Verify client was called
+        mock_cohere_client.embed.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_embed_query_success(self, mock_cohere_client, cohere_capabilities):
+        """Test successful query embedding."""
+        from codeweaver.providers.embedding.providers.cohere import (
+            CohereEmbeddingProvider,
+        )
+
+        # Setup mock response
+        mock_embeddings = MagicMock()
+        mock_embeddings.float = [[0.1, 0.2, 0.3]]
+
+        mock_response = MagicMock()
+        mock_response.embeddings = mock_embeddings
+        mock_response.meta = MagicMock()
+        mock_response.meta.tokens = MagicMock()
+        mock_response.meta.tokens.output_tokens = 50
+        mock_response.meta.tokens.input_tokens = None
+
+        mock_cohere_client.embed.return_value = mock_response
+
+        provider = CohereEmbeddingProvider(
+            caps=cohere_capabilities, _client=mock_cohere_client
+        )
+
+        # Call embed_query
+        result = await provider.embed_query("test query")
+
+        # Verify result
+        assert len(result) == 1
+        assert result[0] == [0.1, 0.2, 0.3]
+
+        # Verify client was called
+        mock_cohere_client.embed.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_embed_documents_v4_model(
+        self, mock_cohere_client, cohere_4_capabilities
+    ):
+        """Test embedding with v4.0 model uses correct embedding_types."""
+        from codeweaver.providers.embedding.providers.cohere import (
+            CohereEmbeddingProvider,
+        )
+
+        # Setup mock response
+        mock_embeddings = MagicMock()
+        mock_embeddings.float = [[0.1, 0.2, 0.3]]
+
+        mock_response = MagicMock()
+        mock_response.embeddings = mock_embeddings
+        mock_response.meta = None
+
+        mock_cohere_client.embed.return_value = mock_response
+
+        provider = CohereEmbeddingProvider(
+            caps=cohere_4_capabilities, _client=mock_cohere_client
+        )
+
+        chunks = [
+            CodeChunk(
+                content="test content",
+                language="python",
+                start_line=1,
+                end_line=1,
+                file_path="/test/file.py",
+            )
+        ]
+
+        # Call embed_documents
+        result = await provider.embed_documents(chunks)
+
+        # Verify result
+        assert len(result) == 1
+
+        # Verify embedding_types was set for v4.0 model
+        call_kwargs = mock_cohere_client.embed.call_args.kwargs
+        assert "embedding_types" in call_kwargs
+        assert call_kwargs["embedding_types"] == ["float"]
+
+
+class TestCohereEmbeddingProviderErrorHandling:
+    """Test CohereEmbeddingProvider error handling."""
+
+    @pytest.mark.asyncio
+    async def test_embed_documents_handles_connection_error(
+        self, mock_cohere_client, cohere_capabilities
+    ):
+        """Test that connection errors are handled with retry logic."""
+        from codeweaver.providers.embedding.providers.cohere import (
+            CohereEmbeddingProvider,
+        )
+
+        mock_cohere_client.embed.side_effect = ConnectionError("Connection failed")
+
+        provider = CohereEmbeddingProvider(
+            caps=cohere_capabilities, _client=mock_cohere_client
+        )
+
+        chunks = [
+            CodeChunk(
+                content="test content",
+                language="python",
+                start_line=1,
+                end_line=1,
+                file_path="/test/file.py",
+            )
+        ]
+
+        # Call embed_documents - should return error info
+        result = await provider.embed_documents(chunks)
+
+        # Verify we get an error info dict
+        assert isinstance(result, dict)
+        assert "error" in result
