@@ -531,19 +531,19 @@ class Indexer(BasedModel):
                     "Initialized embedding provider: %s", type(self._embedding_provider).__name__
                 )
             except Exception as e:
-                logger.warning("No embedding provider configured: %s", e)
+                logger.warning("Could not initialize embedding provider: %s", e)
                 self._embedding_provider = None
 
             try:
                 self._sparse_provider = _get_embedding_instance(sparse=True)
                 logger.info("Initialized sparse provider: %s", type(self._sparse_provider).__name__)
             except Exception as e:
-                logger.debug("No sparse embedding provider configured: %s", e)
+                logger.debug("Could not initialize sparse embedding provider: %s", e)
                 self._sparse_provider = None
 
             if not self._embedding_provider and not self._sparse_provider:
                 logger.warning(
-                    "No embedding providers configured - indexing will proceed without embeddings"
+                    "No embedding providers initialized - indexing will proceed without embeddings"
                 )
 
             try:
@@ -562,7 +562,7 @@ class Indexer(BasedModel):
                         asyncio.run(self._vector_store._initialize())
                 logger.info("Initialized vector store: %s", type(self._vector_store).__name__)
             except Exception as e:
-                logger.warning("No vector store configured: %s", e)
+                logger.warning("Could not initialize vector store: %s", e)
                 self._vector_store = None
 
             self._chunking_service = self._chunking_service or _get_chunking_service()

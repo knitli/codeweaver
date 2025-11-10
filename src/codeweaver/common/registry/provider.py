@@ -1027,14 +1027,24 @@ class ProviderRegistry(BasedModel):
             if k not in ("provider_settings", "client_options")
         }
         
-        # For model providers, verify required parameters are present
-        # Only check if caps are present (meaning provider is configured and model is set)
-        if self._is_literal_model_kind(provider_kind) and "caps" in kwargs_for_provider:
-            if "client" not in kwargs_for_provider:
-                raise ConfigurationError(
-                    f"Provider '{provider}' (kind: {provider_kind}) requires a client but none was created. "
-                    f"Check that required API keys/credentials are configured or that the provider is properly installed."
-                )
+        # Note: We don't validate client presence here because:
+        # 1. Client creation failure is already logged as a warning above
+        # 2. The provider class will fail naturally if it needs a client but doesn't have one
+        # 3. Some providers may not need a client at all
+        # 4. Client creation can fail for valid reasons (missing API keys, optional deps not installed)
+        #    but the provider is still "configured" - the error should happen on first use, not here
+        
+        # However, for model providers that require a client, we should fail early with a clear message
+        # if client creation was attempted but failed (rather than letting __init__ fail with TypeError)
+        if (self._is_literal_model_kind(provider_kind) and 
+            "caps" in kwargs_for_provider and 
+            "client" not in kwargs_for_provider):
+            # Client was supposed to be created (caps present) but wasn't (client missing)
+            # This means client creation failed, so we can't instantiate the provider
+            raise ConfigurationError(
+                f"Provider '{provider}' (kind: {provider_kind}) requires a client, but client creation failed. "
+                f"Check the warning messages above for details on why client creation failed."
+            )
 
         # Special handling for embedding provider (has different logic)
         if provider_kind in (ProviderKind.EMBEDDING, "embedding") and self._is_any_provider_kind(
