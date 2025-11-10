@@ -19,7 +19,6 @@ import os
 import ssl
 
 from collections.abc import Awaitable, Callable
-from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Literal, NotRequired, TypedDict
 
 from fastmcp.server.middleware import Middleware
@@ -37,7 +36,6 @@ from uvicorn.config import (
     WSProtocolType,
 )
 
-from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.chunker import ChunkerSettingsDict
 from codeweaver.config.indexing import IndexerSettingsDict
 from codeweaver.config.logging import LoggingConfigDict
@@ -278,39 +276,10 @@ class UvicornServerSettingsDict(TypedDict, total=False):
     h11_max_incomplete_event_size: NotRequired[int | None]
 
 
-def default_config_file_locations(
-    *, as_yaml: bool = False, as_json: bool = False
-) -> tuple[str, ...]:
-    """Get default file locations for configuration files."""
-    # Determine base extensions
-    extensions = (
-        ["toml"] if not as_yaml and not as_json else ["yaml", "yml"] if as_yaml else ["json"]
-    )
-    # Get user config directory
-    user_config_dir = get_user_config_dir()
-
-    # Build file paths maintaining precedence order
-    base_paths = [
-        (Path.cwd(), ".codeweaver.local"),
-        (Path.cwd(), ".codeweaver"),
-        (Path(user_config_dir) / "codeweaver", "settings"),
-    ]
-
-    # Generate all file paths using list comprehension
-    file_paths = [
-        str(base_dir / f"{filename}.{ext}")
-        for base_dir, filename in base_paths
-        for ext in extensions
-    ]
-
-    return tuple(file_paths)
-
-
 __all__ = (
     "CodeWeaverSettingsDict",
     "FastMcpHttpRunArgs",
     "FastMcpServerSettingsDict",
     "UvicornServerSettings",
     "UvicornServerSettingsDict",
-    "default_config_file_locations",
 )

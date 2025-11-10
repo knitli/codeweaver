@@ -165,8 +165,8 @@ def chunk_files_parallel(
         # 'spawn' is safer for multi-threaded processes and more portable across platforms
         try:
             current_method = multiprocessing.get_start_method(allow_none=True)
-            if current_method != 'spawn':
-                multiprocessing.set_start_method('spawn', force=True)
+            if current_method != "spawn":
+                multiprocessing.set_start_method("spawn", force=True)
                 logger.debug("Set multiprocessing start method to 'spawn'")
         except RuntimeError:
             # Start method already set, which is fine

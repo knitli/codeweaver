@@ -292,7 +292,8 @@ class ThingRegistry:
         from codeweaver.semantic.grammar import Connection
 
         if isinstance(connections, Connection):
-            self.register_connection(connections)
+            for connection in connections:
+                self.register_connection(connection)
             return
         for connection in connections:
             self.register_connection(connection)

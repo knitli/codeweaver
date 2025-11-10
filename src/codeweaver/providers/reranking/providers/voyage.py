@@ -33,7 +33,7 @@ except ImportError as e:
     from codeweaver.exceptions import ConfigurationError
 
     raise ConfigurationError(
-        "Voyage AI SDK is not installed. Please install it with `pip install codeweaver[provider-voyage]`."
+        "Voyage AI SDK is not installed. Please install it with `pip install codeweaver[voyage]`."
     ) from e
 
 
@@ -67,10 +67,10 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
 
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
-    _client: AsyncClient
-    _provider: Provider = Provider.VOYAGE
+    client: AsyncClient
+    provider: Provider = Provider.VOYAGE
     _prompt: str | None = None  # custom prompts not supported
-    _caps: RerankingModelCapabilities
+    caps: RerankingModelCapabilities
 
     _rerank_kwargs: MappingProxyType[str, Any]
     _output_transformer: Callable[

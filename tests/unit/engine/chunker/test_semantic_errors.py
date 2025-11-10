@@ -167,13 +167,14 @@ class TestASTDepthErrors:
         discovered_file = DiscoveredFile.from_path(deep_file)
         with pytest.raises(ASTDepthExceededError) as exc_info:
             _ = chunker.chunk(content, file=discovered_file)
+        from typing import cast
 
         error = exc_info.value
         error_msg = str(error)
         assert "depth" in error_msg.lower(), "Error message should mention depth"
         assert "nest" in error_msg.lower(), "Error message should mention nesting"
         assert hasattr(error, "suggestions"), "Error should provide suggestions"
-        assert len(error.suggestions) > 0, "Error should include actionable guidance"
+        assert len(cast(list, error.suggestions)) > 0, "Error should include actionable guidance"
 
 
 class TestTimeoutErrors:

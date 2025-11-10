@@ -33,7 +33,7 @@ except ImportError as e:
     from codeweaver.exceptions import ConfigurationError
 
     raise ConfigurationError(
-        'Please install the `cohere` package to use the Cohere provider, \nyou can use the `cohere` optional group — `pip install "codeweaver[provider-cohere]"`'
+        'Please install the `cohere` package to use the Cohere provider, \nyou can use the `cohere` optional group — `pip install "codeweaver[cohere]"`'
     ) from e
 
 
@@ -54,6 +54,7 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
         client_options["client_name"] = "codeweaver"
 
         provider = caps.provider or Provider.COHERE
+        self.caps = caps
 
         if not client_options.get("api_key"):
             if provider == Provider.COHERE:

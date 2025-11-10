@@ -18,7 +18,7 @@ from codeweaver.tokenizers import get_tokenizer
 if TYPE_CHECKING:
     from codeweaver.core.chunks import CodeChunk
     from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
-    from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilities
+    from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilitiesDict
 
 
 def cohere_max_input(chunks: Sequence[CodeChunk], query: str) -> tuple[bool, NonNegativeInt]:
@@ -33,7 +33,7 @@ def cohere_max_input(chunks: Sequence[CodeChunk], query: str) -> tuple[bool, Non
     return False, next(i - 1 for i, size in enumerate(sizes) if size > 4096)
 
 
-def _get_common_capabilities() -> PartialRerankingCapabilities:
+def _get_common_capabilities() -> PartialRerankingCapabilitiesDict:
     """
     Get the common capabilities for Cohere models.
     """

@@ -65,28 +65,6 @@ except ImportError as e:
     raise ConfigurationError(
         'Please install the `huggingface_hub` package to use the HuggingFace provider, you can use the `huggingface` optional group — `pip install "codeweaver[huggingface]"`'
     ) from e
-"""
-import os
-from huggingface_hub import InferenceClient
-
-client = InferenceClient(
-    provider="hf-inference",
-    api_key=os.environ["HF_TOKEN"],
-)
-
-result = client.feature_extraction(
-    "Today is a sunny day and I will get some ice cream.",
-    model="intfloat/multilingual-e5-large",
-)
-
-curl https://router.huggingface.co/hf-inference/models/intfloat/multilingual-e5-large/pipeline/feature-extraction \
-    -X POST \
-    -H "Authorization: Bearer $HF_TOKEN" \
-    -H 'Content-Type: application/json' \
-    -d '{
-        "inputs": "\"Today is a sunny day and I will get some ice cream.\""
-    }'
-"""
 
 
 class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):

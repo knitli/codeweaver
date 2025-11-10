@@ -157,40 +157,25 @@ class ChunkGovernor(BasedModel):
         Returns:
             A ChunkGovernor instance.
         """
-        provider_settings = _get_
-        embedding_settings, reranking_settings = cls._get_provider_settings()
-        embedding_provider = cls._get_providers(embedding_settings)
-        reranking_provider = cls._get_providers(reranking_settings)
-        embedding_caps = cls._get_caps_for_provider(embedding_settings, embedding_provider)
-        if (
-            reranking_settings
-            and reranking_provider is not Provider.NOT_SET
-            and (
-                reranking_caps := cls._get_caps_for_provider(reranking_settings, reranking_provider)
+        from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+
+        capabilities = _get_capabilities()
+        if len(capabilities) == 2:
+            embedding_caps, reranking_caps = cast(
+                tuple[EmbeddingModelCapabilities, RerankingModelCapabilities], capabilities
             )
-        ):
-            caps = (embedding_caps, reranking_caps)
-            if not embedding_caps or not reranking_caps:
-                raise RuntimeError(
-                    "Could not determine capabilities for embedding or reranking models."
-                )
-        elif embedding_caps:
-            caps = (embedding_caps,)
-        else:
-            # When capabilities can't be determined (e.g., auto_initialize_providers=False),
-            # return a ChunkGovernor with empty capabilities and use default chunk_limit
-            logger.warning(
-                "Could not determine embedding model capabilities, using default chunk limits"
+            logger.debug(
+                "Creating ChunkGovernor with embedding caps: %s and reranking caps: %s",
+                embedding_caps,
+                reranking_caps,
             )
-            return cls(capabilities=(), settings=settings)
-        return cls(
-            capabilities=cast(
-                tuple[EmbeddingModelCapabilities, RerankingModelCapabilities]
-                | tuple[EmbeddingModelCapabilities],
-                caps,
-            ),
-            settings=settings,
-        )
+            return cls(capabilities=(embedding_caps, reranking_caps), settings=settings)
+        if len(capabilities) == 1:
+            embedding_caps = cast(EmbeddingModelCapabilities, capabilities[0])
+            logger.debug("Creating ChunkGovernor with embedding caps: %s", embedding_caps)
+            return cls(capabilities=(embedding_caps,), settings=settings)
+        logger.warning("Could not determine capabilities from settings, using default chunk limits")
+        return cls(capabilities=(), settings=settings)
 
 
 class BaseChunker(ABC):

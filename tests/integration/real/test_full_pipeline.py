@@ -256,9 +256,7 @@ async def test_pipeline_handles_file_updates(real_providers, known_test_codebase
     response_before = await find_code(
         query="authentication", cwd=str(known_test_codebase), index_if_needed=False
     )
-    [
-        r.content.content for r in response_before.results if "auth.py" in str(r.file_path)
-    ]
+    [r.content.content for r in response_before.results if "auth.py" in str(r.file_path)]
 
     # Step 3: Modify auth.py significantly
     auth_file = Path(known_test_codebase) / "auth.py"

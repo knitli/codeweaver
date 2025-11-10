@@ -19,7 +19,7 @@ import logging
 import signal
 import time
 
-from collections.abc import Callable, Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from pathlib import Path
 from time import sleep
 from typing import TYPE_CHECKING, Annotated, Any, ClassVar, TypedDict, Unpack, cast, overload
@@ -30,7 +30,7 @@ import watchfiles
 from cyclopts.types import NonNegativeFloat
 from pydantic import DirectoryPath, Field, NonNegativeInt, PrivateAttr
 from pydantic.dataclasses import dataclass
-from watchfiles.main import Change, FileChange
+from watchfiles.main import Change
 
 from codeweaver.config.chunker import ChunkerSettings
 from codeweaver.config.indexing import RignoreSettings
@@ -44,12 +44,12 @@ from codeweaver.core.file_extensions import (
 )
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.stores import BlakeStore, make_blake_store
-from codeweaver.core.types.aliases import DirectoryPath
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.sentinel import Unset
 from codeweaver.engine.checkpoint import CheckpointManager, IndexingCheckpoint
 from codeweaver.engine.chunking_service import ChunkingService
+from codeweaver.engine.types import FileChange
 
 
 logger = logging.getLogger(__name__)
@@ -1584,7 +1584,9 @@ class FileWatcher:
     def __init__(
         self,
         *paths: str | Path,
-        handler: Callable[[set[FileChange]], Any] | None = None,
+        handler: Awaitable[Callable[[set[FileChange]], Any]]
+        | Callable[[set[FileChange]], Any]
+        | None = None,
         file_filter: watchfiles.BaseFilter | None = None,
         walker: rignore.Walker | None = None,
         **kwargs: Any,
@@ -1597,17 +1599,42 @@ class FileWatcher:
         self.file_filter = file_filter
         self.paths = paths
         self.handler = handler or self._default_handler
+        from codeweaver.common.utils.checks import is_debug
+        from codeweaver.engine.types import WatchfilesArgs
+
+        watch_args = (
+            WatchfilesArgs(
+                paths=self.paths,
+                target=Indexer.keep_alive,
+                args=kwargs.pop("args", ()) if kwargs else (),
+                kwargs=kwargs.pop("kwargs", {}) if kwargs else {},
+                target_type="function",
+                callback=self.handler,
+                watch_filter=self.file_filter,
+                grace_period=20.0,
+                debounce=200_000,  # milliseconds - we want to avoid rapid re-indexing but not let things go stale, either.
+                step=15_000,  # milliseconds -- how long to wait for more changes before yielding on changes
+                debug=is_debug(),
+                recursive=True,
+                ignore_permission_denied=True,
+            )
+            | {k: v for k, v in kwargs.items() if k in WatchfilesArgs.__annotations__}
+        )
         watch_kwargs: dict[str, Any] = (
             {
                 # Keep a child process alive; do NOT perform indexing in the child process
                 # so that state remains in the main process.
                 "target": Indexer.keep_alive,
+                "args": (),
+                "kwargs": {},
                 "target_type": "function",
                 "callback": self._default_handler,
                 "watch_filter": self.file_filter,
-                "grace_period": 20,
+                "grace_period": 20.0,
                 "debounce": 200_000,  # milliseconds - we want to avoid rapid re-indexing but not let things go stale, either.
                 "step": 15_000,  # milliseconds -- how long to wait for more changes before yielding on changes
+                "debug": is_debug(),
+                "recursive": True,
                 "ignore_permission_denied": True,
             }
             | kwargs
@@ -1625,7 +1652,7 @@ class FileWatcher:
             raise
 
     async def _default_handler(self, changes: set[FileChange]) -> None:
-        """Default may be a strong characterization -- 'placeholder' handler."""
+        """Default may be misleading -- 'placeholder' handler."""
         for change in changes:
             logger.info("File change detected.", extra={"change": change})
             await self._indexer.index(change)

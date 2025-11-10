@@ -684,7 +684,7 @@ class ServerSetup(TypedDict):
 
 def build_app() -> ServerSetup:
     """Build and configure the FastMCP application without starting it."""
-    session_statistics = get_session_statistics()
+    session_statistics = get_session_statistics._resolve()()
     app_logger, level = __setup_interim_logger()
     local_logger: logging.Logger = globals()["logger"]
     local_logger.info("Initializing CodeWeaver server. Logging set up.")

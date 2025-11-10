@@ -741,7 +741,8 @@ class ProviderRegistry(BasedModel):
                     # Merge options, with provider_settings taking precedence
                     # But exclude provider-specific settings that aren't client parameters
                     qdrant_client_settings = {
-                        k: v for k, v in (provider_settings or {}).items()
+                        k: v
+                        for k, v in (provider_settings or {}).items()
                         if k not in ("collection_name", "provider")
                     }
                     merged_opts = (client_options or {}) | qdrant_client_settings
@@ -765,7 +766,7 @@ class ProviderRegistry(BasedModel):
             # Ensure lazy_load is set for fastembed to avoid blocking model downloads
             if provider == Provider.FASTEMBED:
                 client_options = {"lazy_load": True, **(client_options or {})}
-            
+
             model_name_or_path = provider_settings.get("model") if provider_settings else None
             if model_name_or_path:
                 return client_class(model_name=model_name_or_path, **client_options)
@@ -1019,26 +1020,27 @@ class ProviderRegistry(BasedModel):
                     provider_kind,
                     e,
                 )
-        
+
         # Clean up kwargs before passing to provider constructor
         # Remove provider_settings and client_options as they're only used for client creation
         kwargs_for_provider = {
-            k: v for k, v in kwargs.items() 
-            if k not in ("provider_settings", "client_options")
+            k: v for k, v in kwargs.items() if k not in ("provider_settings", "client_options")
         }
-        
+
         # Note: We don't validate client presence here because:
         # 1. Client creation failure is already logged as a warning above
         # 2. The provider class will fail naturally if it needs a client but doesn't have one
         # 3. Some providers may not need a client at all
         # 4. Client creation can fail for valid reasons (missing API keys, optional deps not installed)
         #    but the provider is still "configured" - the error should happen on first use, not here
-        
+
         # However, for model providers that require a client, we should fail early with a clear message
         # if client creation was attempted but failed (rather than letting __init__ fail with TypeError)
-        if (self._is_literal_model_kind(provider_kind) and 
-            "caps" in kwargs_for_provider and 
-            "client" not in kwargs_for_provider):
+        if (
+            self._is_literal_model_kind(provider_kind)
+            and "caps" in kwargs_for_provider
+            and "client" not in kwargs_for_provider
+        ):
             # Client was supposed to be created (caps present) but wasn't (client missing)
             # This means client creation failed, so we can't instantiate the provider
             raise ConfigurationError(
@@ -1468,10 +1470,15 @@ class ProviderRegistry(BasedModel):
         normalized_model_name = self._normalize_model_name(model_name)
 
         for cap in load_default_capabilities():
-            if self._normalize_model_name(cap.name) == normalized_model_name and cap.provider == provider:
+            if (
+                self._normalize_model_name(cap.name) == normalized_model_name
+                and cap.provider == provider
+            ):
                 logger.debug(
                     "Found capability via fuzzy match: '%s' matched '%s' for provider '%s'",
-                    model_name, cap.name, provider
+                    model_name,
+                    cap.name,
+                    provider,
                 )
                 return cap
 
@@ -1480,10 +1487,15 @@ class ProviderRegistry(BasedModel):
 
             sparse_caps = get_sparse_caps()
             for cap in sparse_caps:
-                if self._normalize_model_name(cap.name) == normalized_model_name and cap.provider == provider:
+                if (
+                    self._normalize_model_name(cap.name) == normalized_model_name
+                    and cap.provider == provider
+                ):
                     logger.debug(
                         "Found sparse capability via fuzzy match: '%s' matched '%s' for provider '%s'",
-                        model_name, cap.name, provider
+                        model_name,
+                        cap.name,
+                        provider,
                     )
                     return cap
 
@@ -1491,7 +1503,8 @@ class ProviderRegistry(BasedModel):
         # Capabilities are a convenience, not a requirement.
         logger.debug(
             "No capability found for model '%s' and provider '%s'. Provider will validate model name.",
-            model_name, provider
+            model_name,
+            provider,
         )
         return None
 

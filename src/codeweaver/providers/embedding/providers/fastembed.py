@@ -14,6 +14,7 @@ FastEmbed is a lightweight and efficient library for generating embeddings local
 from __future__ import annotations
 
 import asyncio
+import logging
 import multiprocessing
 
 from collections.abc import Callable, Iterable, Sequence
@@ -46,11 +47,14 @@ try:
     )
 except ImportError as e:
     raise ConfigurationError(
-        "FastEmbed is not installed. Please install it with `pip install codeweaver[provider-fastembed]` or `codeweaver[provider-fastembed-gpu]`."
+        "FastEmbed is not installed. Please install it with `pip install codeweaver[fastembed]` or `codeweaver[provider-fastembed-gpu]`."
     ) from e
 
 _TextEmbedding = get_text_embedder()
 _SparseTextEmbedding = get_sparse_embedder()
+
+
+logger = logging.getLogger(__name__)
 
 
 def fastembed_all_kwargs(**kwargs: Any) -> dict[str, Any]:
@@ -127,7 +131,7 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
 
     def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """Initialize the FastEmbed client."""
-        # 1. Set _caps from parameter
+        # 1. Set caps from parameter
         self.caps = caps
 
         # 2. Configure model name in kwargs if not already set
@@ -148,7 +152,16 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
         self, documents: Sequence[CodeChunk], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         """Embed a list of documents into vectors."""
+        logger.debug("Embedding documents with FastEmbed.")
+        logger.debug("Document embedding kwargs ", extra=kwargs)
+        logger.debug(
+            "`_embed_documents` called with %d documents of type %s",
+            len(documents),
+            type(documents[0]),
+        )
         ready_documents = self.chunks_to_strings(documents)
+        logger.debug("Ready documents for embedding: %s", ready_documents[:2])
+        logger.debug("Embedding documents of type %s", type(ready_documents[0]))
         loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(
             None,

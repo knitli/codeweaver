@@ -10,6 +10,7 @@ import warnings
 
 try:
     from pydantic.warnings import PydanticDeprecatedSince212
+
     warnings.simplefilter("ignore", PydanticDeprecatedSince212)
 except ImportError:
     pass

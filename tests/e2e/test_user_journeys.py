@@ -28,7 +28,6 @@ if TYPE_CHECKING:
     from pytest import MonkeyPatch
 
 
-
 @pytest.fixture
 def user_environment(tmp_path: Path, monkeypatch: MonkeyPatch) -> dict[str, Path]:
     """Set up complete user environment."""
@@ -57,9 +56,7 @@ class TestNewUserQuickStart:
     """Test: New user wants fastest setup."""
 
     def test_new_user_quick_start_journey(
-        self,
-        user_environment: dict[str, Path],
-        monkeypatch: MonkeyPatch
+        self, user_environment: dict[str, Path], monkeypatch: MonkeyPatch
     ) -> None:
         """Test complete quick start journey for new user."""
         project = user_environment["project"]
@@ -79,9 +76,7 @@ class TestNewUserQuickStart:
         # We don't assert on exit code since it's environment-dependent
 
     def test_quick_start_with_config_show(
-        self,
-        user_environment: dict[str, Path],
-        monkeypatch: MonkeyPatch
+        self, user_environment: dict[str, Path], monkeypatch: MonkeyPatch
     ) -> None:
         """Test quick start followed by viewing configuration."""
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
@@ -97,9 +92,7 @@ class TestNewUserQuickStart:
         assert config_result.value.code == 0
 
     def test_quick_start_list_capabilities(
-        self,
-        user_environment: dict[str, Path],
-        monkeypatch: MonkeyPatch
+        self, user_environment: dict[str, Path], monkeypatch: MonkeyPatch
     ) -> None:
         """Test quick start followed by listing capabilities."""
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
@@ -125,9 +118,7 @@ class TestOfflineDeveloperWorkflow:
     """Test: Developer wants offline-capable setup."""
 
     def test_offline_developer_workflow(
-        self,
-        user_environment: dict[str, Path],
-        monkeypatch: MonkeyPatch
+        self, user_environment: dict[str, Path], monkeypatch: MonkeyPatch
     ) -> None:
         """Test complete offline developer workflow."""
         project = user_environment["project"]
@@ -145,9 +136,7 @@ class TestOfflineDeveloperWorkflow:
         # Step 3: Config uses local providers (no API keys needed)
 
     def test_offline_list_local_providers(
-        self,
-        user_environment: dict[str, Path],
-        monkeypatch: MonkeyPatch
+        self, user_environment: dict[str, Path], monkeypatch: MonkeyPatch
     ) -> None:
         """Test listing local providers in offline mode."""
         # Init with local-only
@@ -160,9 +149,7 @@ class TestOfflineDeveloperWorkflow:
         assert list_result.value.code == 0
 
     def test_offline_config_modifications(
-        self,
-        user_environment: dict[str, Path],
-        monkeypatch: MonkeyPatch
+        self, user_environment: dict[str, Path], monkeypatch: MonkeyPatch
     ) -> None:
         """Test modifying config in offline mode."""
         project = user_environment["project"]
@@ -177,6 +164,7 @@ class TestOfflineDeveloperWorkflow:
         config["max_results"] = 20
 
         import tomli_w
+
         config_path.write_text(tomli_w.dumps(config))
 
         # Show modified config
@@ -191,9 +179,7 @@ class TestProductionDeploymentWorkflow:
     """Test: Team deploying to production with Qdrant Cloud."""
 
     def test_production_deployment_workflow(
-        self,
-        user_environment: dict[str, Path],
-        monkeypatch: MonkeyPatch
+        self, user_environment: dict[str, Path], monkeypatch: MonkeyPatch
     ) -> None:
         """Test complete production deployment workflow."""
         project = user_environment["project"]
@@ -218,9 +204,7 @@ url = "https://prod.cloud.qdrant.io"
         # Step 2: Config created for cloud deployment
 
     def test_production_env_var_override(
-        self,
-        user_environment: dict[str, Path],
-        monkeypatch: MonkeyPatch
+        self, user_environment: dict[str, Path], monkeypatch: MonkeyPatch
     ) -> None:
         """Test production uses env vars to override config."""
         project = user_environment["project"]
@@ -242,9 +226,7 @@ provider = "fastembed"
         assert show_result.value.code == 0
 
     def test_production_multiple_environments(
-        self,
-        user_environment: dict[str, Path],
-        monkeypatch: MonkeyPatch
+        self, user_environment: dict[str, Path], monkeypatch: MonkeyPatch
     ) -> None:
         """Test switching between dev/staging/prod environments."""
         project = user_environment["project"]
@@ -258,18 +240,12 @@ provider = "voyage"
 
         # Test different environments
         environments = {
-            "dev": {
-                "VOYAGE_API_KEY": "dev-key",
-                "QDRANT_URL": "http://localhost:6333",
-            },
+            "dev": {"VOYAGE_API_KEY": "dev-key", "QDRANT_URL": "http://localhost:6333"},
             "staging": {
                 "VOYAGE_API_KEY": "staging-key",
                 "QDRANT_URL": "https://staging.cloud.qdrant.io",
             },
-            "prod": {
-                "VOYAGE_API_KEY": "prod-key",
-                "QDRANT_URL": "https://prod.cloud.qdrant.io",
-            },
+            "prod": {"VOYAGE_API_KEY": "prod-key", "QDRANT_URL": "https://prod.cloud.qdrant.io"},
         }
 
         for env_name, env_vars in environments.items():
@@ -286,9 +262,7 @@ class TestCompleteUserJourneys:
     """Test complete end-to-end user journeys."""
 
     def test_first_time_user_complete_journey(
-        self,
-        user_environment: dict[str, Path],
-        monkeypatch: MonkeyPatch
+        self, user_environment: dict[str, Path], monkeypatch: MonkeyPatch
     ) -> None:
         """Test: First-time user from install to working setup."""
         from codeweaver.cli.commands.init import _get_client_config_path
@@ -306,9 +280,7 @@ class TestCompleteUserJourneys:
         # 2. Verify both configs created
         assert (project / ".codeweaver.toml").exists()
         mcp_config = _get_client_config_path(
-            client="claude_code",
-            config_level="user",
-            project_path=project,
+            client="claude_code", config_level="user", project_path=project
         )
         assert mcp_config.exists()
 
@@ -325,9 +297,7 @@ class TestCompleteUserJourneys:
         assert config_result.value.code == 0
 
     def test_power_user_custom_setup(
-        self,
-        user_environment: dict[str, Path],
-        monkeypatch: MonkeyPatch
+        self, user_environment: dict[str, Path], monkeypatch: MonkeyPatch
     ) -> None:
         """Test: Power user with custom configuration."""
         project = user_environment["project"]
@@ -368,9 +338,7 @@ collection = "my_code"
         assert models_result.value.code == 0
 
     def test_team_collaboration_workflow(
-        self,
-        user_environment: dict[str, Path],
-        monkeypatch: MonkeyPatch
+        self, user_environment: dict[str, Path], monkeypatch: MonkeyPatch
     ) -> None:
         """Test: Team sharing configuration via git."""
         project = user_environment["project"]

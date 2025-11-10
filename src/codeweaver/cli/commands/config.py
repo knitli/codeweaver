@@ -111,7 +111,7 @@ def _show_provider_config(provider_settings: dict) -> None:
         return
 
     # Group by provider kind - filter to only config dicts/tuples
-    valid_kinds = ('data', 'embedding', 'sparse_embedding', 'reranking', 'vector_store', 'agent')
+    valid_kinds = ("data", "embedding", "sparse_embedding", "reranking", "vector_store", "agent")
     for kind, configs in provider_settings.items():
         if kind not in valid_kinds or not configs or isinstance(configs, Unset):
             continue
@@ -120,7 +120,9 @@ def _show_provider_config(provider_settings: dict) -> None:
         config_list = configs if isinstance(configs, tuple) else (configs,)
 
         # Create table for this kind
-        table = Table(title=f"{kind.replace('_', ' ').title()}", show_header=True, header_style="bold cyan")
+        table = Table(
+            title=f"{kind.replace('_', ' ').title()}", show_header=True, header_style="bold cyan"
+        )
         table.add_column("Provider", style="cyan")
         table.add_column("Status", style="white", no_wrap=True)
         table.add_column("Details", style="white")
@@ -152,9 +154,9 @@ def _show_provider_config(provider_settings: dict) -> None:
             details_str = " | ".join(details) if details else "Default settings"
 
             table.add_row(
-                provider.as_title if hasattr(provider, 'as_title') else str(provider),
+                provider.as_title if hasattr(provider, "as_title") else str(provider),
                 status,
-                details_str
+                details_str,
             )
 
         console.print(table)

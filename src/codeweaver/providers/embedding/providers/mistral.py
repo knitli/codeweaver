@@ -26,7 +26,7 @@ try:
     from mistralai.models import EmbeddingDtype
 except ImportError as e:
     raise ConfigurationError(
-        'Please install the `mistralai` package to use the Mistral provider, \nyou can use the `mistral` optional group — `pip install "codeweaver[provider-mistral]"`'
+        'Please install the `mistralai` package to use the Mistral provider, \nyou can use the `mistral` optional group — `pip install "codeweaver[mistral]"`'
     ) from e
 
 

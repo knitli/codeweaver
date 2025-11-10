@@ -99,8 +99,12 @@ def check_python_version() -> DoctorCheck:
     return DoctorCheck.set_check(
         "Python Version",
         "success" if is_valid else "fail",
-        version_str if is_valid else f"{version_str} (requires ≥{required_version[0]}.{required_version[1]})",
-        [] if is_valid else [
+        version_str
+        if is_valid
+        else f"{version_str} (requires ≥{required_version[0]}.{required_version[1]})",
+        []
+        if is_valid
+        else [
             f"Upgrade Python to version {required_version[0]}.{required_version[1]} or higher",
             "Visit https://www.python.org/downloads/ for installation instructions",
         ],
@@ -215,7 +219,9 @@ def check_project_path(settings: CodeWeaverSettings) -> DoctorCheck:
     return DoctorCheck.set_check(
         "Project Path",
         "fail" if has_error else "success",
-        error_message if has_error else f"{project_path}" + (" (git repository)" if is_git_dir(project_path) else ""),
+        error_message
+        if has_error
+        else f"{project_path}" + (" (git repository)" if is_git_dir(project_path) else ""),
         suggestions,
     )
 

@@ -49,10 +49,7 @@ class TestInitFullWorkflow:
     """Tests for complete init workflows."""
 
     def test_full_init_creates_both_configs(
-        self,
-        test_environment: dict[str, Path],
-        monkeypatch: MonkeyPatch,
-        mock_confirm,
+        self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
     ) -> None:
         """Test init creates both CodeWeaver config and MCP config."""
         home = test_environment["home"]
@@ -67,8 +64,7 @@ class TestInitFullWorkflow:
         # Parse and execute init command
         try:
             func, bound_args, _ = init_app.parse_args(
-                ["--quick", "--client", "claude_code"],
-                exit_on_error=False,
+                ["--quick", "--client", "claude_code"], exit_on_error=False
             )
             # Execute the function
             func(**bound_args.arguments)
@@ -99,10 +95,7 @@ class TestInitFullWorkflow:
         assert "url" in cw_server or "command" in cw_server
 
     def test_http_streaming_architecture(
-        self,
-        test_environment: dict[str, Path],
-        monkeypatch: MonkeyPatch,
-        mock_confirm,
+        self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
     ) -> None:
         """Test MCP config uses HTTP streaming, not STDIO."""
         home = test_environment["home"]
@@ -114,8 +107,7 @@ class TestInitFullWorkflow:
         # Execute init
         try:
             func, bound_args, _ = init_app.parse_args(
-                ["--quick", "--client", "claude_code"],
-                exit_on_error=False,
+                ["--quick", "--client", "claude_code"], exit_on_error=False
             )
             func(**bound_args.arguments)
         except SystemExit as e:
@@ -140,10 +132,7 @@ class TestInitModes:
     """Tests for different init modes."""
 
     def test_config_only_flag(
-        self,
-        test_environment: dict[str, Path],
-        monkeypatch: MonkeyPatch,
-        mock_confirm,
+        self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
     ) -> None:
         """Test --config-only creates only CodeWeaver config."""
         home = test_environment["home"]
@@ -155,8 +144,7 @@ class TestInitModes:
         # Execute init with --config-only
         try:
             func, bound_args, _ = init_app.parse_args(
-                ["--quick", "--config-only"],
-                exit_on_error=False,
+                ["--quick", "--config-only"], exit_on_error=False
             )
             func(**bound_args.arguments)
         except SystemExit as e:
@@ -170,10 +158,7 @@ class TestInitModes:
         assert not mcp_config_path.exists()
 
     def test_mcp_only_flag(
-        self,
-        test_environment: dict[str, Path],
-        monkeypatch: MonkeyPatch,
-        mock_confirm,
+        self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
     ) -> None:
         """Test --mcp-only creates only MCP config."""
         home = test_environment["home"]
@@ -185,8 +170,7 @@ class TestInitModes:
         exit_code = None
         try:
             func, bound_args, _ = init_app.parse_args(
-                ["--mcp-only", "--client", "claude_code"],
-                exit_on_error=False,
+                ["--mcp-only", "--client", "claude_code"], exit_on_error=False
             )
             func(**bound_args.arguments)
         except SystemExit as e:
@@ -209,11 +193,7 @@ class TestInitIntegration:
     """Tests for init integration with other commands."""
 
     def test_init_then_config_show(
-        self,
-        test_environment: dict[str, Path],
-        monkeypatch: MonkeyPatch,
-        mock_confirm,
-        capsys,
+        self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm, capsys
     ) -> None:
         """Test init followed by config show."""
         from codeweaver.cli.commands.config import app as config_app
@@ -226,8 +206,7 @@ class TestInitIntegration:
         # Init
         try:
             func, bound_args, _ = init_app.parse_args(
-                ["--quick", "--config-only"],
-                exit_on_error=False,
+                ["--quick", "--config-only"], exit_on_error=False
             )
             func(**bound_args.arguments)
         except SystemExit as e:
@@ -235,10 +214,7 @@ class TestInitIntegration:
 
         # Config show should work (default command, no args needed)
         try:
-            func, bound_args, _ = config_app.parse_args(
-                [],
-                exit_on_error=False,
-            )
+            func, bound_args, _ = config_app.parse_args([], exit_on_error=False)
             func(**bound_args.arguments)
         except SystemExit as e:
             assert e.code == 0 or e.code is None
@@ -247,10 +223,7 @@ class TestInitIntegration:
         assert "project" in captured.out.lower() or "provider" in captured.out.lower()
 
     def test_init_then_doctor(
-        self,
-        test_environment: dict[str, Path],
-        monkeypatch: MonkeyPatch,
-        mock_confirm,
+        self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
     ) -> None:
         """Test init followed by doctor check."""
         from codeweaver.cli.commands.doctor import app as doctor_app
@@ -263,8 +236,7 @@ class TestInitIntegration:
         # Init
         try:
             func, bound_args, _ = init_app.parse_args(
-                ["--quick", "--config-only"],
-                exit_on_error=False,
+                ["--quick", "--config-only"], exit_on_error=False
             )
             func(**bound_args.arguments)
         except SystemExit as e:
@@ -274,10 +246,7 @@ class TestInitIntegration:
         # Exit code 1 is acceptable for warnings
         exit_code = None
         try:
-            func, bound_args, _ = doctor_app.parse_args(
-                [],
-                exit_on_error=False,
-            )
+            func, bound_args, _ = doctor_app.parse_args([], exit_on_error=False)
             func(**bound_args.arguments)
         except SystemExit as e:
             exit_code = e.code if e.code is not None else 0
@@ -286,10 +255,7 @@ class TestInitIntegration:
         assert exit_code in (0, 1, None)
 
     def test_init_respects_existing_config(
-        self,
-        test_environment: dict[str, Path],
-        monkeypatch: MonkeyPatch,
-        mock_confirm,
+        self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
     ) -> None:
         """Test init handles existing configuration."""
         project = test_environment["project"]
@@ -308,8 +274,7 @@ provider = "fastembed"
         exit_code = None
         try:
             func, bound_args, _ = init_app.parse_args(
-                ["--quick", "--config-only", "--force"],
-                exit_on_error=False,
+                ["--quick", "--config-only", "--force"], exit_on_error=False
             )
             func(**bound_args.arguments)
         except SystemExit as e:
@@ -331,10 +296,7 @@ class TestInitMultipleClients:
     """Tests for init with multiple MCP clients."""
 
     def test_init_claude_code(
-        self,
-        test_environment: dict[str, Path],
-        monkeypatch: MonkeyPatch,
-        mock_confirm,
+        self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
     ) -> None:
         """Test init for Claude Code client."""
         home = test_environment["home"]
@@ -345,8 +307,7 @@ class TestInitMultipleClients:
         exit_code = None
         try:
             func, bound_args, _ = init_app.parse_args(
-                ["--mcp-only", "--client", "claude_code"],
-                exit_on_error=False,
+                ["--mcp-only", "--client", "claude_code"], exit_on_error=False
             )
             func(**bound_args.arguments)
         except SystemExit as e:
@@ -357,10 +318,7 @@ class TestInitMultipleClients:
             assert config_path.exists()
 
     def test_init_claude_desktop(
-        self,
-        test_environment: dict[str, Path],
-        monkeypatch: MonkeyPatch,
-        mock_confirm,
+        self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
     ) -> None:
         """Test init for Claude Desktop client."""
         home = test_environment["home"]
@@ -371,8 +329,7 @@ class TestInitMultipleClients:
         exit_code = None
         try:
             func, bound_args, _ = init_app.parse_args(
-                ["--mcp-only", "--client", "claude_desktop"],
-                exit_on_error=False,
+                ["--mcp-only", "--client", "claude_desktop"], exit_on_error=False
             )
             func(**bound_args.arguments)
         except SystemExit as e:
@@ -384,10 +341,7 @@ class TestInitMultipleClients:
             assert config_path.exists()
 
     def test_init_multiple_clients_sequentially(
-        self,
-        test_environment: dict[str, Path],
-        monkeypatch: MonkeyPatch,
-        mock_confirm,
+        self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
     ) -> None:
         """Test init for multiple clients in sequence."""
         project = test_environment["project"]
@@ -400,8 +354,7 @@ class TestInitMultipleClients:
             exit_code = None
             try:
                 func, bound_args, _ = init_app.parse_args(
-                    ["--mcp-only", "--client", client],
-                    exit_on_error=False,
+                    ["--mcp-only", "--client", client], exit_on_error=False
                 )
                 func(**bound_args.arguments)
             except SystemExit as e:

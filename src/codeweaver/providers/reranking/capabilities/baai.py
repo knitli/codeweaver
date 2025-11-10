@@ -19,9 +19,9 @@ def get_baai_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
     """Get the BAAI reranking model capabilities."""
     from codeweaver.providers.provider import Provider
     from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
-    from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilities
+    from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilitiesDict
 
-    shared_capabilities: PartialRerankingCapabilities = {
+    shared_capabilities: PartialRerankingCapabilitiesDict = {
         "name": "BAAI/bge-reranking-",
         "tokenizer": "tokenizers",
         "supports_custom_prompt": False,

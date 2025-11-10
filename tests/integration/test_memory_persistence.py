@@ -67,7 +67,16 @@ async def test_inmemory_persistence():
         await provider2._initialize()
 
         # Verify: Chunk restored from disk
-        results = await provider2.search(vector={"dense": [0.7, 0.7, 0.7] * 256})
+        from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
+
+        results = await provider2.search(
+            StrategizedQuery(
+                query="test function",
+                strategy=SearchStrategy.SEMANTIC,
+                dense=[0.7, 0.7, 0.7] * 256,
+                sparse=None,
+            )
+        )
         assert len(results) > 0, "Should restore chunks from persistence file"
         assert results[0].chunk.chunk_name == "memory_test.py:func"
 

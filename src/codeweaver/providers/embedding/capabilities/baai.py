@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 
 from codeweaver.providers.embedding.capabilities.types import (
-    EmbeddingCapabilities,
+    EmbeddingCapabilitiesDict,
     PartialCapabilities,
 )
 from codeweaver.providers.provider import Provider
@@ -168,10 +168,10 @@ def get_baai_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
     """Get the capabilities for BAAI embedding models."""
     from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
-    capabilities: list[EmbeddingCapabilities] = []
+    capabilities: list[EmbeddingCapabilitiesDict] = []
     for cap in ALL_CAPABILITIES:
         capabilities.extend([
-            EmbeddingCapabilities({**cap, "provider": provider})  # type: ignore[missing-typeddict-key]
+            EmbeddingCapabilitiesDict({**cap, "provider": provider})  # type: ignore[missing-typeddict-key]
             for provider in CAP_MAP[cap["name"]]  # ty: ignore[invalid-argument-type]
         ])
     return tuple(EmbeddingModelCapabilities.model_validate(cap) for cap in capabilities)

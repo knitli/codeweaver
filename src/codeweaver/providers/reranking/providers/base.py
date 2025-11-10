@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import importlib
 import logging
 import time
@@ -50,6 +51,8 @@ from codeweaver.tokenizers import Tokenizer, get_tokenizer
 if TYPE_CHECKING:
     from codeweaver.common.statistics import SessionStatistics
     from codeweaver.core.chunks import CodeChunk, StructuredDataInput
+    from codeweaver.core.types.aliases import FilteredKeyT
+    from codeweaver.core.types.enum import AnonymityConversion
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +184,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     def __init__(
         self,
         client: RerankingClient,
-        capabilities: RerankingModelCapabilities,
+        caps: RerankingModelCapabilities,
         prompt: str | None = None,
         top_n: PositiveInt = 40,
         **kwargs: Any,
@@ -190,34 +193,31 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         # Store values we'll need after super().__init__()
         # Get _rerank_kwargs safely - it might not be defined in the subclass
         _rerank_kwargs = kwargs or {}
-        try:
+        with contextlib.suppress(AttributeError, TypeError):
             class_rerank_kwargs = type(self)._rerank_kwargs
             if class_rerank_kwargs and isinstance(class_rerank_kwargs, dict):
                 _rerank_kwargs = {**class_rerank_kwargs, **_rerank_kwargs}
-        except (AttributeError, TypeError):
-            # _rerank_kwargs might not be defined or might be a ModelPrivateAttr
-            pass
-        
+
         _top_n = cast(int, _rerank_kwargs.get("top_n", top_n))
-        
+
         # Use object.__setattr__ to bypass Pydantic's validation for pre-super() initialization
-        object.__setattr__(self, '_model_dump_json', super().model_dump_json)
-        
+        object.__setattr__(self, "_model_dump_json", super().model_dump_json)
+
         logger.debug("RerankingProvider kwargs", extra=_rerank_kwargs)
         logger.debug("Initialized RerankingProvider with top_n=%d", _top_n)
 
         # Initialize circuit breaker state using object.__setattr__
-        object.__setattr__(self, '_circuit_state', CircuitBreakerState.CLOSED)
-        object.__setattr__(self, '_failure_count', 0)
-        object.__setattr__(self, '_last_failure_time', None)
+        object.__setattr__(self, "_circuit_state", CircuitBreakerState.CLOSED)
+        object.__setattr__(self, "_failure_count", 0)
+        object.__setattr__(self, "_last_failure_time", None)
 
         # Initialize pydantic model with the proper fields BEFORE _initialize
-        super().__init__(client=client, caps=capabilities, prompt=prompt)
-        
+        super().__init__(client=client, caps=caps, prompt=prompt)
+
         # Now that Pydantic is initialized, set kwargs as normal attributes
         self.kwargs = _rerank_kwargs
         self._top_n = _top_n
-        
+
         # Call _initialize after super().__init__() so Pydantic private attributes are set up
         self._initialize()
 
@@ -520,7 +520,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         """Return telemetry keys for privacy filtering.
-        
+
         Defines which fields should be filtered/anonymized when sending telemetry data.
         """
         from codeweaver.core.types import AnonymityConversion, FilteredKey

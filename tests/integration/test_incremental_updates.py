@@ -70,7 +70,16 @@ async def test_incremental_updates(qdrant_test_manager):
     await provider.upsert([chunk_v2])
 
     # Verify: Old chunk gone, new chunk present
-    results = await provider.search(vector={"dense": [0.9] * 768})
+    from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
+
+    results = await provider.search(
+        StrategizedQuery(
+            query="def func(): return 2",
+            strategy=SearchStrategy.SEMANTIC,
+            dense=[0.9] * 768,
+            sparse=None,
+        )
+    )
     assert len(results) > 0, "Should find updated chunk"
     assert results[0].chunk.chunk_name == f"{file_path}:func_v2"
     assert "func_v1" not in [r.chunk.chunk_name for r in results]

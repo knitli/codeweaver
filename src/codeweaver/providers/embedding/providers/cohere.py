@@ -89,7 +89,7 @@ try:
 
 except ImportError as e:
     raise ConfigurationError(
-        'Please install the `cohere` package to use the Cohere provider, \nyou can use the `cohere` optional group — `pip install "codeweaver[provider-cohere]"`'
+        'Please install the `cohere` package to use the Cohere provider, \nyou can use the `cohere` optional group — `pip install "codeweaver[cohere]"`'
     ) from e
 
 
@@ -115,7 +115,7 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
             # Determine provider to get correct API key
             provider = caps.provider or Provider.COHERE
 
-            if not client_options.get("api_key"):
+            if not client_options.get("api_key") or not kwargs.get("api_key"):
                 if provider == Provider.COHERE:
                     client_options["api_key"] = config_kwargs.get("api_key") or os.getenv(
                         "COHERE_API_KEY"

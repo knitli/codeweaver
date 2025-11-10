@@ -409,11 +409,11 @@ class QdrantTestManager:
                 temp_client = AsyncQdrantClient(
                     url=f"http://{self.host}:{self.port}",
                     prefer_grpc=self.prefer_grpc,
-                    timeout=2.0,  # Quick timeout for discovery
+                    timeout=2,  # Quick timeout for discovery
                 )
 
                 # Try to get collections to verify unauthenticated access
-                _ = await asyncio.wait_for(temp_client.get_collections(), timeout=2.0)
+                _ = await asyncio.wait_for(temp_client.get_collections(), timeout=2)
 
                 # Success! This instance is accessible without auth
                 # Now create the real client (with api_key if provided for auth testing)

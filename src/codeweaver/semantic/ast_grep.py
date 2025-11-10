@@ -407,7 +407,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         if thing_name == ThingName("ERROR"):
             return None
         registry = registry_module  # Access the module, don't call it
-        if thing := registry.get_registry().get_thing_by_name(thing_name, language=self.language):
+        if thing := registry.get_registry().get_thing_by_name(thing_name, language=self.language):  # ty: ignore[unresolved-attribute]
             return cast(CompositeThing | Token | Category, thing)
         # Return None for unknown things rather than raising
         return None

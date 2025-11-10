@@ -14,6 +14,8 @@ Tests validate corrections from CLI_CORRECTIONS_PLAN.md:
 
 from __future__ import annotations
 
+import contextlib
+
 from pathlib import Path
 
 import pytest
@@ -74,10 +76,11 @@ class TestDoctorUnsetHandling:
         assert exc_info.value.code == 0
 
     def test_unset_check_pattern_correct(self) -> None:
+        # sourcery skip: remove-assert-true, remove-redundant-if
         """Test correct pattern for checking Unset values."""
         from codeweaver.core.types.sentinel import Unset
 
-        unset_value = Unset()
+        unset_value = Unset(name="UNSET", module_name=__name__)
 
         # CORRECT pattern
         if isinstance(unset_value, Unset):
@@ -160,7 +163,7 @@ class TestDoctorProviderEnvVars:
         }
 
         for provider_name in cloud_providers:
-            try:
+            with contextlib.suppress(ValueError):
                 provider = Provider.from_string(provider_name)
                 if provider and provider.other_env_vars:
                     env_vars = (
@@ -169,8 +172,6 @@ class TestDoctorProviderEnvVars:
                         else provider.other_env_vars
                     )
                     assert "api_key" in env_vars
-            except ValueError:
-                pass  # Provider not in enum
 
 
 @pytest.mark.unit

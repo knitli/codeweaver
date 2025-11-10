@@ -212,7 +212,7 @@ async def test_qdrant_delete_by_file_performance(
     num_files = 10
     all_chunks = []
     for file_idx in range(num_files):
-        file_path = f"test/file_{file_idx}.py"
+        file_path = Path(f"test/file_{file_idx}.py")
         chunks = create_test_chunks(count=chunks_per_file, files=1)
         # Update file paths
         for chunk in chunks:
@@ -225,10 +225,10 @@ async def test_qdrant_delete_by_file_performance(
     # Measure delete performance
     latencies = []
     for file_idx in range(num_files):
-        file_path = f"test/file_{file_idx}.py"
+        file_path = Path(f"test/file_{file_idx}.py")
 
         start = time.perf_counter()
-        await qdrant_store.delete_by_file(Path(file_path))
+        await qdrant_store.delete_by_file(file_path)
         latency_ms = (time.perf_counter() - start) * 1000
         latencies.append(latency_ms)
 

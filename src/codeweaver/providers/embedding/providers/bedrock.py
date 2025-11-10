@@ -436,7 +436,7 @@ except ImportError as e:
         "Failed to import boto3. Bedrock embedding provider will not work. You should install boto3."
     )
     raise ConfigurationError(
-        "Failed to import boto3. You need to install the boto3 package, you can do this by running 'pip install codeweaver[provider-bedrock]'"
+        "Failed to import boto3. You need to install the boto3 package, you can do this by running 'pip install codeweaver[bedrock]'"
     ) from e
 
 

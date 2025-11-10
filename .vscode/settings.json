@@ -1,4 +1,14 @@
 {
+  "yaml.schemas": {
+    "https://json.schemastore.org/sourcery.json": [
+      ".sourcery.yaml"
+    ]
+  },
+  "yaml.customTags": [
+    "!ENV scalar",
+    "!ENV sequence"
+  ],
+  "yaml.validate": true,
   "terminal.integrated.defaultProfile.linux": "zsh",
   "terminal.integrated.env.linux": {
     "ZDOTDIR": "${workspaceFolder}/.vscode/zsh",

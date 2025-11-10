@@ -5,11 +5,12 @@
 
 """Unit tests for VoyageEmbeddingProvider."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from codeweaver.core.chunks import CodeChunk
+from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.voyage import VoyageEmbeddingProvider
 from codeweaver.providers.provider import Provider
@@ -50,9 +51,7 @@ def voyage_context_capabilities():
 class TestVoyageEmbeddingProviderInitialization:
     """Test VoyageEmbeddingProvider initialization."""
 
-    def test_provider_initialization_with_client(
-        self, mock_voyage_client, voyage_capabilities
-    ):
+    def test_provider_initialization_with_client(self, mock_voyage_client, voyage_capabilities):
         """Test that provider initializes correctly with a client."""
         provider = VoyageEmbeddingProvider(
             client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
@@ -74,9 +73,7 @@ class TestVoyageEmbeddingProviderInitialization:
         assert provider._is_context_model
         assert "context" in provider.caps.name
 
-    def test_provider_sets_doc_and_query_kwargs(
-        self, mock_voyage_client, voyage_capabilities
-    ):
+    def test_provider_sets_doc_and_query_kwargs(self, mock_voyage_client, voyage_capabilities):
         """Test that doc_kwargs and query_kwargs are set correctly."""
         provider = VoyageEmbeddingProvider(
             client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
@@ -129,22 +126,27 @@ class TestVoyageEmbeddingProviderEmbedding:
         provider = VoyageEmbeddingProvider(
             client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
         )
+        from pathlib import Path
+
+        from codeweaver.common.utils.utils import uuid7
+        from codeweaver.core.metadata import ChunkKind, ExtKind
+        from codeweaver.core.spans import Span
 
         # Create test chunks
         chunks = [
             CodeChunk(
                 content="test content 1",
-                language="python",
-                start_line=1,
-                end_line=1,
-                file_path="/test/file.py",
+                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                language=SemanticSearchLanguage.PYTHON,
+                line_range=Span(start=1, end=1, _source_id=uuid7()),
+                file_path=Path("/test/file.py"),
             ),
             CodeChunk(
                 content="test content 2",
-                language="python",
-                start_line=2,
-                end_line=2,
-                file_path="/test/file.py",
+                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                language=SemanticSearchLanguage.PYTHON,
+                line_range=Span(start=2, end=2, _source_id=uuid7()),
+                file_path=Path("/test/file.py"),
             ),
         ]
 
@@ -192,9 +194,7 @@ class TestVoyageEmbeddingProviderEmbedding:
         assert call_kwargs["model"] == "voyage-3"
 
     @pytest.mark.asyncio
-    async def test_embed_query_with_multiple_queries(
-        self, mock_voyage_client, voyage_capabilities
-    ):
+    async def test_embed_query_with_multiple_queries(self, mock_voyage_client, voyage_capabilities):
         """Test embedding multiple queries at once."""
         # Setup mock response
         mock_response = MagicMock()
@@ -237,14 +237,28 @@ class TestVoyageEmbeddingProviderEmbedding:
             client=mock_voyage_client, caps=voyage_context_capabilities, kwargs=None
         )
 
+        from pathlib import Path
+
+        from codeweaver.common.utils.utils import uuid7
+        from codeweaver.core.metadata import ChunkKind, ExtKind
+        from codeweaver.core.spans import Span
+
+        # Create test chunks
         chunks = [
             CodeChunk(
-                content="test content",
-                language="python",
-                start_line=1,
-                end_line=1,
-                file_path="/test/file.py",
-            )
+                content="test content 1",
+                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                language=SemanticSearchLanguage.PYTHON,
+                line_range=Span(start=1, end=1, _source_id=uuid7()),
+                file_path=Path("/test/file.py"),
+            ),
+            CodeChunk(
+                content="test content 2",
+                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                language=SemanticSearchLanguage.PYTHON,
+                line_range=Span(start=2, end=2, _source_id=uuid7()),
+                file_path=Path("/test/file.py"),
+            ),
         ]
 
         # Call embed_documents
@@ -270,14 +284,28 @@ class TestVoyageEmbeddingProviderErrorHandling:
             client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
         )
 
+        from pathlib import Path
+
+        from codeweaver.common.utils.utils import uuid7
+        from codeweaver.core.metadata import ChunkKind, ExtKind
+        from codeweaver.core.spans import Span
+
+        # Create test chunks
         chunks = [
             CodeChunk(
-                content="test content",
-                language="python",
-                start_line=1,
-                end_line=1,
-                file_path="/test/file.py",
-            )
+                content="test content 1",
+                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                language=SemanticSearchLanguage.PYTHON,
+                line_range=Span(start=1, end=1, _source_id=uuid7()),
+                file_path=Path("/test/file.py"),
+            ),
+            CodeChunk(
+                content="test content 2",
+                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                language=SemanticSearchLanguage.PYTHON,
+                line_range=Span(start=2, end=2, _source_id=uuid7()),
+                file_path=Path("/test/file.py"),
+            ),
         ]
 
         # Call embed_documents - should return error info
@@ -288,9 +316,7 @@ class TestVoyageEmbeddingProviderErrorHandling:
         assert "error" in result
 
     @pytest.mark.asyncio
-    async def test_embed_query_handles_timeout_error(
-        self, mock_voyage_client, voyage_capabilities
-    ):
+    async def test_embed_query_handles_timeout_error(self, mock_voyage_client, voyage_capabilities):
         """Test that timeout errors are handled with retry logic."""
         mock_voyage_client.embed.side_effect = TimeoutError("Request timed out")
 
@@ -324,13 +350,11 @@ class TestVoyageEmbeddingProviderDimension:
         caps = EmbeddingModelCapabilities(
             name="voyage-3",
             provider=Provider.VOYAGE,
-            default_dimension=512,
-            default_dtype="float",
-            tokenizer="tiktoken",
+            default_dimension=768,
+            default_dtype="int8",
+            tokenizer="tokenizers",
         )
 
-        provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=caps, kwargs=None
-        )
+        provider = VoyageEmbeddingProvider(client=mock_voyage_client, caps=caps, kwargs=None)
 
-        assert provider.dimension == 512
+        assert provider.dimension == 768

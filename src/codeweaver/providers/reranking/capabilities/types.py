@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from codeweaver.core.chunks import CodeChunk
     from codeweaver.providers.provider import Provider
 
-type PartialRerankingCapabilities = dict[
+type PartialRerankingCapabilitiesDict = dict[
     Literal[
         "name",
         "extra",
@@ -44,7 +44,7 @@ type PartialRerankingCapabilities = dict[
 ]
 
 
-class RerankingCapabilities(TypedDict, total=False):
+class RerankingCapabilitiesDict(TypedDict, total=False):
     """Describes the capabilities of a reranking model."""
 
     name: Required[str]

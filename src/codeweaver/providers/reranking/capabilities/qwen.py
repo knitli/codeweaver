@@ -13,10 +13,10 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
-    from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilities
+    from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilitiesDict
 
 
-def _get_shared_capabilities() -> PartialRerankingCapabilities:
+def _get_shared_capabilities() -> PartialRerankingCapabilitiesDict:
     """Returns shared_capabilities across all Qwen reranking models."""
     from codeweaver.providers.provider import Provider
 

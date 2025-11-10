@@ -19,21 +19,14 @@ from typing import Any
 class CliResult:
     """Result from a CLI command execution."""
 
-    def __init__(
-        self,
-        exit_code: int,
-        output: str,
-        stderr: str = ""
-    ):
+    def __init__(self, exit_code: int, output: str, stderr: str = ""):
         self.exit_code = exit_code
         self.output = output
         self.stderr = stderr
 
 
 def run_cli_command(
-    command_args: list[str],
-    cwd: Path | None = None,
-    env: dict[str, str] | None = None
+    command_args: list[str], cwd: Path | None = None, env: dict[str, str] | None = None
 ) -> CliResult:
     """Run a CLI command and return the result.
 
@@ -50,21 +43,13 @@ def run_cli_command(
         cwd=cwd,
         env=env,
         capture_output=True,
-        text=True
+        text=True,
     )
 
-    return CliResult(
-        exit_code=result.returncode,
-        output=result.stdout,
-        stderr=result.stderr
-    )
+    return CliResult(exit_code=result.returncode, output=result.stdout, stderr=result.stderr)
 
 
-def invoke_command_function(
-    func: Any,
-    *args: Any,
-    **kwargs: Any
-) -> Any:
+def invoke_command_function(func: Any, *args: Any, **kwargs: Any) -> Any:
     """Invoke a command function directly for testing.
 
     Args:

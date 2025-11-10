@@ -60,8 +60,11 @@ type PartialCapabilities = dict[
 ]
 
 
-class EmbeddingCapabilities(TypedDict, total=False):
-    """Describes the capabilities of an embedding model, such as the default dimension."""
+class EmbeddingCapabilitiesDict(TypedDict, total=False):
+    """Describes the capabilities of an embedding model, such as the default dimension.
+
+    This is the TypedDict version of the EmbeddingModelCapabilities Pydantic model to provide type hints and IDE support for serialized capabilities data.
+    """
 
     name: Required[str]
     provider: Required[Provider]
@@ -82,4 +85,4 @@ class EmbeddingCapabilities(TypedDict, total=False):
     other: NotRequired[dict[str, Any]]
 
 
-__all__ = ("EmbeddingCapabilities", "EmbeddingSettingsDict", "PartialCapabilities")
+__all__ = ("EmbeddingCapabilitiesDict", "EmbeddingSettingsDict", "PartialCapabilities")

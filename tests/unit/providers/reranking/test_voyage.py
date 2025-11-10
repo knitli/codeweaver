@@ -27,9 +27,7 @@ def mock_voyage_rerank_client():
 def voyage_rerank_capabilities():
     """Create capabilities for Voyage reranking model."""
     return RerankingModelCapabilities(
-        name="rerank-2",
-        provider=Provider.VOYAGE,
-        tokenizer="tiktoken",
+        name="rerank-2", provider=Provider.VOYAGE, tokenizer="tiktoken"
     )
 
 
@@ -41,7 +39,7 @@ class TestVoyageRerankingProviderInitialization:
     ):
         """Test that provider initializes correctly with a client."""
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, capabilities=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities, prompt=None
         )
 
         assert provider.client is mock_voyage_rerank_client
@@ -53,7 +51,7 @@ class TestVoyageRerankingProviderInitialization:
     ):
         """Test that _initialize sets the output transformer correctly."""
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, capabilities=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
         )
 
         # Verify _output_transformer is callable
@@ -64,9 +62,7 @@ class TestVoyageRerankingProviderInitialization:
     ):
         """Test that top_n is set correctly during initialization."""
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client,
-            capabilities=voyage_rerank_capabilities,
-            top_n=20,
+            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities, top_n=20
         )
 
         assert provider.top_n == 20
@@ -76,7 +72,7 @@ class TestVoyageRerankingProviderInitialization:
     ):
         """Test that default top_n is 40."""
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, capabilities=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
         )
 
         assert provider.top_n == 40
@@ -87,7 +83,7 @@ class TestVoyageRerankingProviderInitialization:
         """Test that custom prompts are not supported (should be None)."""
         provider = VoyageRerankingProvider(
             client=mock_voyage_rerank_client,
-            capabilities=voyage_rerank_capabilities,
+            caps=voyage_rerank_capabilities,
             prompt="custom prompt",
         )
 
@@ -113,14 +109,12 @@ class TestVoyageRerankingProviderReranking:
         mock_voyage_rerank_client.rerank.return_value = mock_response
 
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, capabilities=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
         )
 
         # Execute rerank
         result = await provider._execute_rerank(
-            query="test query",
-            documents=["doc 1", "doc 2"],
-            top_n=2,
+            query="test query", documents=["doc 1", "doc 2"], top_n=2
         )
 
         # Verify result
@@ -149,24 +143,30 @@ class TestVoyageRerankingProviderReranking:
         mock_voyage_rerank_client.rerank.return_value = mock_response
 
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, capabilities=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
         )
+        from pathlib import Path
+
+        from codeweaver.common.utils.utils import uuid7
+        from codeweaver.core.language import SemanticSearchLanguage
+        from codeweaver.core.metadata import ChunkKind, ExtKind
+        from codeweaver.core.spans import Span
 
         # Create test chunks
         chunks = [
             CodeChunk(
                 content="def foo(): pass",
-                language="python",
-                start_line=1,
-                end_line=1,
-                file_path="/test/file.py",
+                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                language=SemanticSearchLanguage.PYTHON,
+                line_range=Span(start=1, end=1, _source_id=uuid7()),
+                file_path=Path("/test/file.py"),
             ),
             CodeChunk(
                 content="def bar(): pass",
-                language="python",
-                start_line=2,
-                end_line=2,
-                file_path="/test/file.py",
+                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                language=SemanticSearchLanguage.PYTHON,
+                line_range=Span(start=2, end=2, _source_id=uuid7()),
+                file_path=Path("/test/file.py"),
             ),
         ]
 
@@ -186,20 +186,16 @@ class TestVoyageRerankingProviderReranking:
         assert results[1].chunk == chunks[0]
 
     @pytest.mark.asyncio
-    async def test_rerank_with_strings(
-        self, mock_voyage_rerank_client, voyage_rerank_capabilities
-    ):
+    async def test_rerank_with_strings(self, mock_voyage_rerank_client, voyage_rerank_capabilities):
         """Test reranking with string documents."""
         # Setup mock response
         mock_response = MagicMock()
-        mock_response.results = [
-            MagicMock(index=0, relevance_score=0.95),
-        ]
+        mock_response.results = [MagicMock(index=0, relevance_score=0.95)]
         mock_response.total_tokens = 100
         mock_voyage_rerank_client.rerank.return_value = mock_response
 
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, capabilities=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
         )
 
         # Call rerank with strings
@@ -216,18 +212,14 @@ class TestVoyageRerankingProviderReranking:
     ):
         """Test that rerank limits results to top_n."""
         # Setup mock response with more results than top_n
-        mock_results = [
-            MagicMock(index=i, relevance_score=1.0 - i * 0.1) for i in range(10)
-        ]
+        mock_results = [MagicMock(index=i, relevance_score=1.0 - i * 0.1) for i in range(10)]
         mock_response = MagicMock()
         mock_response.results = mock_results
         mock_response.total_tokens = 200
         mock_voyage_rerank_client.rerank.return_value = mock_response
 
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client,
-            capabilities=voyage_rerank_capabilities,
-            top_n=5,
+            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities, top_n=5
         )
 
         chunks = [f"doc {i}" for i in range(10)]
@@ -252,14 +244,12 @@ class TestVoyageRerankingProviderErrorHandling:
         mock_voyage_rerank_client.rerank.side_effect = Exception("API error")
 
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, capabilities=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
         )
 
         # Execute rerank should raise ProviderError
         with pytest.raises(ProviderError) as exc_info:
-            await provider._execute_rerank(
-                query="test query", documents=["doc 1"], top_n=1
-            )
+            await provider._execute_rerank(query="test query", documents=["doc 1"], top_n=1)
 
         assert "Voyage AI reranking request failed" in str(exc_info.value)
 
@@ -268,12 +258,10 @@ class TestVoyageRerankingProviderErrorHandling:
         self, mock_voyage_rerank_client, voyage_rerank_capabilities
     ):
         """Test that connection errors trigger retry logic."""
-        mock_voyage_rerank_client.rerank.side_effect = ConnectionError(
-            "Connection failed"
-        )
+        mock_voyage_rerank_client.rerank.side_effect = ConnectionError("Connection failed")
 
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, capabilities=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
         )
 
         # Call rerank - should return empty list after retries
@@ -290,7 +278,7 @@ class TestVoyageRerankingProviderErrorHandling:
         mock_voyage_rerank_client.rerank.side_effect = TimeoutError("Request timed out")
 
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, capabilities=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
         )
 
         # Call rerank - should return empty list after retries
@@ -303,22 +291,18 @@ class TestVoyageRerankingProviderErrorHandling:
 class TestVoyageRerankingProviderProperties:
     """Test VoyageRerankingProvider properties."""
 
-    def test_provider_property(
-        self, mock_voyage_rerank_client, voyage_rerank_capabilities
-    ):
+    def test_provider_property(self, mock_voyage_rerank_client, voyage_rerank_capabilities):
         """Test that provider property returns correct value."""
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, capabilities=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
         )
 
         assert provider.provider == Provider.VOYAGE
 
-    def test_model_name_property(
-        self, mock_voyage_rerank_client, voyage_rerank_capabilities
-    ):
+    def test_model_name_property(self, mock_voyage_rerank_client, voyage_rerank_capabilities):
         """Test that model_name property returns correct value."""
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, capabilities=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
         )
 
         assert provider.model_name == "rerank-2"
@@ -328,7 +312,7 @@ class TestVoyageRerankingProviderProperties:
     ):
         """Test that model_capabilities property returns correct value."""
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, capabilities=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
         )
 
         assert provider.model_capabilities == voyage_rerank_capabilities
@@ -342,12 +326,10 @@ class TestVoyageRerankingProviderCircuitBreaker:
         self, mock_voyage_rerank_client, voyage_rerank_capabilities
     ):
         """Test that circuit breaker opens after repeated failures."""
-        mock_voyage_rerank_client.rerank.side_effect = ConnectionError(
-            "Connection failed"
-        )
+        mock_voyage_rerank_client.rerank.side_effect = ConnectionError("Connection failed")
 
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, capabilities=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
         )
 
         # Make multiple failed requests
@@ -362,7 +344,7 @@ class TestVoyageRerankingProviderCircuitBreaker:
     ):
         """Test that circuit breaker starts in closed state."""
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, capabilities=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
         )
 
         assert provider.circuit_breaker_state == "closed"

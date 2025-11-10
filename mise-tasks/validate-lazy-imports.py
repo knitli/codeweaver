@@ -145,7 +145,9 @@ def validate_function_calls(paths: list[Path] | None = None) -> list[FunctionCal
 
             if error_status := validate_import(module, obj):
                 line_num = line_number_from_position(content, match.span()[0])
-                errors.append(create_function_error_tuple(py_file, line_num, module, obj, error_status))
+                errors.append(
+                    create_function_error_tuple(py_file, line_num, module, obj, error_status)
+                )
 
     return errors
 
@@ -286,18 +288,14 @@ class PackageValidator:
         if not has_type_checking_import:
             self.warnings.append(
                 PackageError(
-                    module_name,
-                    "WARNING",
-                    "No TYPE_CHECKING import (IDE may not resolve types)",
+                    module_name, "WARNING", "No TYPE_CHECKING import (IDE may not resolve types)"
                 )
             )
 
         if not has_type_checking_block:
             self.warnings.append(
                 PackageError(
-                    module_name,
-                    "WARNING",
-                    "No TYPE_CHECKING block (IDE may not resolve types)",
+                    module_name, "WARNING", "No TYPE_CHECKING block (IDE may not resolve types)"
                 )
             )
 
@@ -348,19 +346,21 @@ def display_package_errors_as_panels(
             f"\n[bold yellow]Found {len(warnings)} Package-Level Lazy Import Warning{'s' if len(warnings) != 1 else ''}[/bold yellow]\n"
         )
         for warning in warnings:
-            content = f"[cyan]{warning.module_name}[/cyan]\n[yellow]WARNING:[/yellow] {warning.message}"
+            content = (
+                f"[cyan]{warning.module_name}[/cyan]\n[yellow]WARNING:[/yellow] {warning.message}"
+            )
             console.print(Panel(content, border_style="yellow", padding=(0, 1)))
 
     if info:
-        console.print(
-            f"\n[bold blue]Package-Level Lazy Import Info ({len(info)})[/bold blue]\n"
-        )
+        console.print(f"\n[bold blue]Package-Level Lazy Import Info ({len(info)})[/bold blue]\n")
         for i in info:
             content = f"[cyan]{i.module_name}[/cyan]\n[blue]INFO:[/blue] {i.message}"
             console.print(Panel(content, border_style="blue", padding=(0, 1)))
 
 
-def validate_package_level_imports() -> tuple[list[PackageError], list[PackageError], list[PackageError]]:
+def validate_package_level_imports() -> tuple[
+    list[PackageError], list[PackageError], list[PackageError]
+]:
     """Validate package-level lazy imports."""
     validator = PackageValidator()
 
@@ -382,9 +382,7 @@ def main(paths: list[Path] | None = None) -> int:
     console.print(Rule("[bold cyan]CodeWeaver Lazy Import Validator[/bold cyan]", style="cyan"))
 
     # Section 1: lazy_import() Function Calls
-    console.print(
-        "\n[bold blue]Section 1: Validating lazy_import() Function Calls[/bold blue]"
-    )
+    console.print("\n[bold blue]Section 1: Validating lazy_import() Function Calls[/bold blue]")
     console.print("[dim]Scanning for lazy_import(module, object) patterns...[/dim]\n")
 
     function_errors = validate_function_calls(paths)
@@ -404,10 +402,10 @@ def main(paths: list[Path] | None = None) -> int:
 
     # Section 2: Package-Level Lazy Imports
     console.print(Rule("", style="dim"))
+    console.print("\n[bold blue]Section 2: Validating Package-Level Lazy Imports[/bold blue]")
     console.print(
-        "\n[bold blue]Section 2: Validating Package-Level Lazy Imports[/bold blue]"
+        "[dim]Checking __init__.py lazy import patterns (__all__, _dynamic_imports, __getattr__)...[/dim]\n"
     )
-    console.print("[dim]Checking __init__.py lazy import patterns (__all__, _dynamic_imports, __getattr__)...[/dim]\n")
 
     pkg_errors, pkg_warnings, pkg_info = validate_package_level_imports()
 

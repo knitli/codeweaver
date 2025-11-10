@@ -289,8 +289,7 @@ def create_test_chunk_with_embeddings(
         from codeweaver.providers.embedding.types import SparseEmbedding
 
         sparse_emb = SparseEmbedding(
-            indices=sparse_embedding.get("indices", []),
-            values=sparse_embedding.get("values", [])
+            indices=sparse_embedding.get("indices", []), values=sparse_embedding.get("values", [])
         )
         sparse_info = EmbeddingBatchInfo.create_sparse(
             batch_id=sparse_batch_id,

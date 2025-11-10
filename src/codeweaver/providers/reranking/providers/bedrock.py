@@ -316,7 +316,7 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
         self,
         bedrock_provider_settings: AWSProviderSettings,
         model_config: RerankConfiguration | None = None,
-        capabilities: RerankingModelCapabilities | None = None,
+        caps: RerankingModelCapabilities | None = None,
         client: AgentsforBedrockRuntimeClient | None = None,
         top_n: PositiveInt = 40,
         prompt: str | None = None,
@@ -338,11 +338,11 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
             "bedrock-agent-runtime",
             **self._bedrock_provider_settings,  # ty: ignore[invalid-argument-type]
         )  # we just popped it
-        self._capabilities = capabilities or self.caps or get_amazon_reranking_capabilities()[0]
+        self.caps = caps or self.caps or get_amazon_reranking_capabilities()[0]
         if client or self.client:
             super().__init__(
                 client=client or self.client,
-                capabilities=capabilities or self._capabilities,
+                caps=caps or self.caps,
                 top_n=top_n,
                 prompt=prompt,
                 **kwargs,

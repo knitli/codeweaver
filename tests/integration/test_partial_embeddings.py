@@ -55,7 +55,16 @@ async def test_partial_embeddings(qdrant_test_manager):
     await provider.upsert([chunk])
 
     # Verify chunk is searchable with sparse vector
-    results = await provider.search(vector={"sparse": {"indices": [1, 2], "values": [0.8, 0.7]}})
+    from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
+
+    results = await provider.search(
+        StrategizedQuery(
+            query="function with failed dense embedding",
+            strategy=SearchStrategy.SEMANTIC,
+            dense=None,
+            sparse={"indices": [1, 2], "values": [0.8, 0.7]},  # ty: ignore[invalid-argument-type]
+        )
+    )
     assert len(results) > 0, "Should find chunk with sparse-only embedding"
     assert results[0].chunk.chunk_id == chunk.chunk_id
 

@@ -23,9 +23,9 @@ def get_marco_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
     """
     from codeweaver.providers.provider import Provider
     from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
-    from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilities
+    from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilitiesDict
 
-    shared_capabilities: PartialRerankingCapabilities = {
+    shared_capabilities: PartialRerankingCapabilitiesDict = {
         "name": "Xenova/ms-marco-MiniLM-",
         "max_input": 512,
         "context_window": 512,

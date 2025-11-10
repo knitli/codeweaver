@@ -42,12 +42,7 @@ class TestCleanArgs:
         def func_with_kwargs(a: int, b: str, **kwargs) -> str:
             return f"{a}: {b}, kwargs: {kwargs}"
 
-        args_dict = {
-            "a": 1,
-            "b": "hello",
-            "extra": "should_be_passed",
-            "another": "also_passed",
-        }
+        args_dict = {"a": 1, "b": "hello", "extra": "should_be_passed", "another": "also_passed"}
 
         pos_args, kwargs = clean_args(args_dict, func_with_kwargs)
 
@@ -122,11 +117,7 @@ class TestCleanArgs:
         def func_with_kwargs(a: int, b: str, **kwargs):
             pass
 
-        args_dict = {
-            "a": 1,
-            "b": "hello",
-            "kwargs": {"extra1": "value1", "extra2": "value2"},
-        }
+        args_dict = {"a": 1, "b": "hello", "kwargs": {"extra1": "value1", "extra2": "value2"}}
 
         pos_args, kwargs = clean_args(args_dict, func_with_kwargs)
 
@@ -151,22 +142,14 @@ class TestCleanArgs:
 
         # Note: self is not in the output
         assert pos_args == ()
-        assert kwargs == {
-            "api_key": "test_key_123",
-            "base_url": "https://custom.api.com",
-        }
+        assert kwargs == {"api_key": "test_key_123", "base_url": "https://custom.api.com"}
         assert "extra" not in kwargs
 
     def test_class_constructor_with_kwargs(self):
         """Test clean_args with a class constructor that accepts **kwargs."""
 
         class ComplexClient:
-            def __init__(
-                self,
-                api_key: str,
-                base_url: str = "https://api.example.com",
-                **kwargs,
-            ):
+            def __init__(self, api_key: str, base_url: str = "https://api.example.com", **kwargs):
                 self.api_key = api_key
                 self.base_url = base_url
                 self.kwargs = kwargs

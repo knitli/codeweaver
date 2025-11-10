@@ -15,7 +15,7 @@ from codeweaver.providers.provider import Provider
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.embedding.capabilities.types import EmbeddingCapabilities
+    from codeweaver.providers.embedding.capabilities.types import EmbeddingCapabilitiesDict
 
 
 class EmbeddingModelCapabilities(BasedModel):
@@ -114,7 +114,7 @@ class EmbeddingModelCapabilities(BasedModel):
         return self._version
 
     @classmethod
-    def from_capabilities(cls, capabilities: EmbeddingCapabilities) -> Self:
+    def from_capabilities(cls, capabilities: EmbeddingCapabilitiesDict) -> Self:
         """Create an instance from a dictionary of capabilities."""
         return cls.model_validate(capabilities)
 

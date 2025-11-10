@@ -24,7 +24,7 @@ except ImportError as e:
     from codeweaver.exceptions import ConfigurationError
 
     raise ConfigurationError(
-        "fastembed is not installed. Please install it with `pip install codeweaver[provider-fastembed]` or `codeweaver[provider-fastembed-gpu]`."
+        "fastembed is not installed. Please install it with `pip install codeweaver[fastembed]` or `codeweaver[provider-fastembed-gpu]`."
     ) from e
 
 """

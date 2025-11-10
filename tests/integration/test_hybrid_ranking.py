@@ -91,7 +91,7 @@ async def test_hybrid_search_ranking(qdrant_test_manager):
             query="authentication function",
             strategy=SearchStrategy.HYBRID,
             dense=[1.0, 0.0, 0.0] * 256,
-            sparse={"indices": [1, 2], "values": [1.0, 0.9]},
+            sparse={"indices": [1, 2], "values": [1.0, 0.9]},  # ty: ignore[invalid-argument-type]
         )
     )
 

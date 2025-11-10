@@ -16,7 +16,7 @@ from pydantic import NonNegativeInt
 if TYPE_CHECKING:
     from codeweaver.core.chunks import CodeChunk
     from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
-    from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilities
+    from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilitiesDict
 
 
 def _handle_too_big(token_list: Sequence[int]) -> Sequence[tuple[int, int]]:
@@ -43,7 +43,7 @@ def _voyage_max_limit(chunks: list[CodeChunk], query: str) -> tuple[bool, NonNeg
         from codeweaver.exceptions import ConfigurationError
 
         raise ConfigurationError(
-            "The `tokenizers` package is required for Voyage capabilities. Please install it with `pip install codeweaver[provider-voyage]` or `pip install tokenizers`."
+            "The `tokenizers` package is required for Voyage capabilities. Please install it with `pip install codeweaver[voyage]` or `pip install tokenizers`."
         ) from e
     tokenizer = get_tokenizer("tokenizers", "voyageai/voyage-rerank-2.5")
     stringified_chunks = [chunk.serialize_for_embedding() for chunk in chunks]
@@ -74,7 +74,7 @@ def _voyage_max_limit(chunks: list[CodeChunk], query: str) -> tuple[bool, NonNeg
     return False, 0
 
 
-def _get_voyage_capabilities() -> PartialRerankingCapabilities:
+def _get_voyage_capabilities() -> PartialRerankingCapabilitiesDict:
     """Get the common capabilities for Voyage models."""
     from codeweaver.providers.provider import Provider
 

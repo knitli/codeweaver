@@ -81,7 +81,6 @@ if TYPE_CHECKING:
         FastMcpServerSettingsDict,
         UvicornServerSettings,
         UvicornServerSettingsDict,
-        default_config_file_locations,
     )
 
 
@@ -141,7 +140,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "UvicornServerSettings": (__spec__.parent, "types"),
     "UvicornServerSettingsDict": (__spec__.parent, "types"),
     "VectorStoreProviderSettings": (__spec__.parent, "providers"),
-    "default_config_file_locations": (__spec__.parent, "types"),
     "get_settings": (__spec__.parent, "settings"),
     "get_settings_map": (__spec__.parent, "settings"),
     "update_settings": (__spec__.parent, "settings"),
@@ -220,7 +218,6 @@ __all__ = (
     "StdioCodeWeaverConfigDict",
     "UvicornServerSettings",
     "UvicornServerSettingsDict",
-    "default_config_file_locations",
     "get_settings",
     "get_settings_map",
     "update_settings",

@@ -109,9 +109,7 @@ class NodeTypeDTO(BasedModel):
     subtypes: (
         Annotated[
             list[SimpleNodeTypeDTO],
-            Field(
-                description="List of subtype objects if this is an abstract node type.",
-            ),
+            Field(description="List of subtype objects if this is an abstract node type."),
         ]
         | None
     ) = None
