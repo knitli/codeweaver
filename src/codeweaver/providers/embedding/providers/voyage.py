@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import Annotated, Any, ClassVar, cast
 
-from pydantic import PrivateAttr
+from pydantic import PrivateAttr, SkipValidation
 from voyageai.object.embeddings import EmbeddingsObject
 
 from codeweaver.core.chunks import CodeChunk
@@ -50,7 +50,7 @@ def voyage_output_transformer(result: EmbeddingsObject) -> list[list[float]] | l
 class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
     """VoyageAI embedding provider."""
 
-    client: AsyncClient
+    client: SkipValidation[AsyncClient]
     _provider: ClassVar[Provider] = Provider.VOYAGE
     caps: EmbeddingModelCapabilities
 

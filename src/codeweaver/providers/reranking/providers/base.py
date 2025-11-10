@@ -27,7 +27,7 @@ from typing import (
     override,
 )
 
-from pydantic import ConfigDict, Field, PositiveInt, PrivateAttr, TypeAdapter
+from pydantic import ConfigDict, Field, PositiveInt, PrivateAttr, SkipValidation, TypeAdapter
 from pydantic import ValidationError as PydanticValidationError
 from pydantic.main import IncEx
 from pydantic_core import from_json
@@ -138,7 +138,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     )
 
     client: Annotated[
-        RerankingClient,
+        SkipValidation[RerankingClient],
         Field(
             exclude=True,
             description="The client for the reranking provider.",
@@ -187,20 +187,38 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         **kwargs: Any,
     ) -> None:
         """Initialize the RerankingProvider."""
-        self._model_dump_json = super().model_dump_json
-        self.client = client
-        self.prompt = prompt
-        self.caps = capabilities
-        self.kwargs = {**(type(self)._rerank_kwargs or {}), **(kwargs or {})}
-        logger.debug("RerankingProvider kwargs", extra=self.kwargs)
-        self._top_n = cast(int, self.kwargs.get("top_n", top_n))
-        logger.debug("Initialized RerankingProvider with top_n=%d", self._top_n)
+        # Store values we'll need after super().__init__()
+        # Get _rerank_kwargs safely - it might not be defined in the subclass
+        _rerank_kwargs = kwargs or {}
+        try:
+            class_rerank_kwargs = type(self)._rerank_kwargs
+            if class_rerank_kwargs and isinstance(class_rerank_kwargs, dict):
+                _rerank_kwargs = {**class_rerank_kwargs, **_rerank_kwargs}
+        except (AttributeError, TypeError):
+            # _rerank_kwargs might not be defined or might be a ModelPrivateAttr
+            pass
+        
+        _top_n = cast(int, _rerank_kwargs.get("top_n", top_n))
+        
+        # Use object.__setattr__ to bypass Pydantic's validation for pre-super() initialization
+        object.__setattr__(self, '_model_dump_json', super().model_dump_json)
+        
+        logger.debug("RerankingProvider kwargs", extra=_rerank_kwargs)
+        logger.debug("Initialized RerankingProvider with top_n=%d", _top_n)
 
-        # Initialize circuit breaker state
-        self._circuit_state = CircuitBreakerState.CLOSED
-        self._failure_count = 0
-        self._last_failure_time = None
+        # Initialize circuit breaker state using object.__setattr__
+        object.__setattr__(self, '_circuit_state', CircuitBreakerState.CLOSED)
+        object.__setattr__(self, '_failure_count', 0)
+        object.__setattr__(self, '_last_failure_time', None)
 
+        # Initialize pydantic model with the proper fields BEFORE _initialize
+        super().__init__(client=client, caps=capabilities, prompt=prompt)
+        
+        # Now that Pydantic is initialized, set kwargs as normal attributes
+        self.kwargs = _rerank_kwargs
+        self._top_n = _top_n
+        
+        # Call _initialize after super().__init__() so Pydantic private attributes are set up
         self._initialize()
 
     def _initialize(self) -> None:
@@ -499,6 +517,21 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
                     "Make sure the JSON validates as JSON, and matches the expected schema for the RerankingProvider."
                 ],
             ) from e
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        """Return telemetry keys for privacy filtering.
+        
+        Defines which fields should be filtered/anonymized when sending telemetry data.
+        """
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
+
+        return {
+            FilteredKey("_client"): AnonymityConversion.FORBIDDEN,
+            FilteredKey("_input_transformer"): AnonymityConversion.FORBIDDEN,
+            FilteredKey("_output_transformer"): AnonymityConversion.FORBIDDEN,
+            FilteredKey("_rerank_kwargs"): AnonymityConversion.COUNT,
+            FilteredKey("_chunk_store"): AnonymityConversion.COUNT,
+        }
 
     @override
     def model_dump_json(  # type: ignore

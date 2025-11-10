@@ -11,6 +11,8 @@ import os
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, cast
 
+from pydantic import SkipValidation
+
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
@@ -94,7 +96,7 @@ except ImportError as e:
 class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
     """Cohere embedding provider."""
 
-    client: CohereClient
+    client: SkipValidation[CohereClient]
     _provider = Provider.COHERE  # can also be Heroku or Azure, but default to Cohere
     caps: EmbeddingModelCapabilities
 
