@@ -31,6 +31,7 @@ from codeweaver.config.chunker import ChunkerSettings
 from codeweaver.config.providers import EmbeddingProviderSettings, RerankingProviderSettings
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.models import BasedModel
+from codeweaver.exceptions import InitializationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
@@ -42,16 +43,43 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
 def _get_chunker_settings() -> ChunkerSettings:
     """Retrieve the chunker settings."""
     from codeweaver.config.settings import get_settings
-    cw_settings = get_settings()
-    return cw_settings.indexing
 
-def _get_capabilities() -> tuple[()] | tuple[EmbeddingModelCapabilities] | tuple[EmbeddingModelCapabilities, RerankingModelCapability]:
-    """Retrieve the capabilities"""
+    cw_settings = get_settings()
+    return (
+        cw_settings.chunker
+        if isinstance(cw_settings.chunker, ChunkerSettings)
+        else ChunkerSettings()
+    )
+
+
+def _get_capabilities() -> (
+    tuple[()]
+    | tuple[EmbeddingModelCapabilities]
+    | tuple[EmbeddingModelCapabilities, RerankingModelCapabilities]
+):
+    """Retrieve the capabilities."""
     from codeweaver.common.registry.models import get_model_registry
+    from codeweaver.providers.provider import ProviderKind
+
     registry = get_model_registry()
+    embedding_caps = registry.configured_models_for_kind(ProviderKind.EMBEDDING)
+    reranking_caps = registry.configured_models_for_kind(ProviderKind.RERANKING)
+    if embedding_caps and reranking_caps:
+        return (embedding_caps[0], reranking_caps[0])
+    if embedding_caps:
+        return (embedding_caps[0],)
+    raise InitializationError(
+        "Could not determine capabilities for embedding.",
+        details={"embedding_caps": embedding_caps, "reranking_caps": reranking_caps},
+        suggestions=[
+            "If you have providers configured, submit an issue. It's probably a bug -- this is an alpha release :)"
+        ],
+    )
+
 
 SAFETY_MARGIN = 0.1
 """A safety margin to apply to chunk sizes to account for metadata and tokenization variability."""
@@ -81,7 +109,11 @@ class ChunkGovernor(BasedModel):
         # Use default of 512 tokens when capabilities aren't available
         if not self.capabilities:
             return 512
-        return min(capability.context_window for capability in self.capabilities if hasattr("context_window", capability))
+        return min(
+            capability.context_window
+            for capability in self.capabilities
+            if hasattr("context_window", capability)
+        )
 
     @computed_field
     @cached_property
@@ -101,25 +133,6 @@ class ChunkGovernor(BasedModel):
         super().model_post_init(__context)
 
     @staticmethod
-    def _get_provider_settings() -> tuple[
-        EmbeddingProviderSettings, RerankingProviderSettings | None
-    ]:
-        from codeweaver.common.registry import get_provider_registry
-        from codeweaver.providers.provider import ProviderKind
-
-        registry = get_provider_registry()
-        return (
-            cast(
-                EmbeddingProviderSettings,
-                registry.get_configured_provider_settings(ProviderKind.EMBEDDING),
-            ),
-            cast(
-                RerankingProviderSettings | None,
-                registry.get_configured_provider_settings(ProviderKind.RERANKING),
-            ),
-        )
-
-    @staticmethod
     def _get_providers(
         settings: EmbeddingProviderSettings | RerankingProviderSettings | None,
     ) -> Provider:
@@ -131,34 +144,7 @@ class ChunkGovernor(BasedModel):
     def _get_caps_for_provider(
         settings: EmbeddingProviderSettings | RerankingProviderSettings, provider: Provider
     ) -> EmbeddingModelCapabilities | RerankingModelCapabilities | None:
-        from codeweaver.common.registry import get_model_registry
 
-        model_registry = get_model_registry()
-        if (
-            settings
-            and (model_settings := settings.get("model_settings"))
-            and (model_name := model_settings.get("model"))
-        ):
-            from codeweaver.common.registry import get_model_registry
-
-            model_registry = get_model_registry()
-            model_name = model_name
-            if (
-                any(
-                    item
-                    for item in ("dimension", "data_type", "model_kwargs")
-                    if item in model_settings
-                )
-                and (caps := model_registry.get_embedding_capabilities(provider, model_name))
-            ) or (
-                not any(
-                    item
-                    for item in ("dimension", "data_type", "model_kwargs")
-                    if item in model_settings
-                )
-                and (caps := model_registry.get_reranking_capabilities(provider, model_name))
-            ):
-                return caps[0]
         return None
 
     @classmethod
@@ -171,6 +157,7 @@ class ChunkGovernor(BasedModel):
         Returns:
             A ChunkGovernor instance.
         """
+        provider_settings = _get_
         embedding_settings, reranking_settings = cls._get_provider_settings()
         embedding_provider = cls._get_providers(embedding_settings)
         reranking_provider = cls._get_providers(reranking_settings)
