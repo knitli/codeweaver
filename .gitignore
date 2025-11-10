@@ -192,7 +192,7 @@ remote-debug-profile/
 .vscode/zsh/.zsh_history
 
 __pycache__/
-
+coverage.xml
 # //!SECTION  EXCEPTIONS -- Put all inverted ("!") rules at the end of the file!
 
 # but keep track of directories ending in .cache

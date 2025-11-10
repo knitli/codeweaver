@@ -315,7 +315,9 @@ class CodeChunk(BasedModel):
         self_map["version"] = self._version
         self_map["metadata"] = metadata
         ordered_self_map = {k: self_map[k] for k in self._serialization_order if self_map.get(k)}
-        return to_json({k: v for k, v in ordered_self_map.items() if v}, round_trip=True)
+        return to_json({k: v for k, v in ordered_self_map.items() if v}, round_trip=True).decode(
+            "utf-8"
+        )
 
     @property
     def _base_excludes(self) -> set[str]:

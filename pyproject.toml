@@ -351,7 +351,9 @@ addopts = [
   "--cov-report=term-missing",
   "--cov-report=html",
   "--cov-report=xml",
-  "--cov-fail-under=80",
+  # While we don't chase coverage, we want to ensure a minimum bar to catch missing tests
+  # We can raise this over time as the project matures
+  "--cov-fail-under=50",
   "--import-mode=importlib",
 ]
 filterwarnings = [

@@ -234,18 +234,12 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         object.__setattr__(self, "doc_kwargs", {**doc_kwargs, **kwargs})
         object.__setattr__(self, "query_kwargs", {**query_kwargs, **kwargs})
 
-    @classmethod
-    @override
-    def __pydantic_extra__(cls):
-        """Overcoming the same bug as in `UUIDStore` and `BlakeStore`. pydantic_extra is deprecated but something still checks for it in rare cases."""
-        return {}
-
     @abstractmethod
     def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """Initialize the embedding provider.
 
         This method is called at the end of __init__ to allow for any additional setup.
-        It should minimally set up `_doc_kwargs` and `_query_kwargs` if they are not already set.
+        It should minimally set up `doc_kwargs` and `query_kwargs` if they are not already set.
 
         Args:
             caps: The embedding model capabilities (passed since pydantic may not have set _caps yet).

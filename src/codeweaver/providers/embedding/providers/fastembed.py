@@ -153,7 +153,7 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
     ) -> list[list[float]] | list[list[int]]:
         """Embed a list of documents into vectors."""
         logger.debug("Embedding documents with FastEmbed.")
-        logger.debug("Document embedding kwargs ", extra=kwargs)
+        logger.debug("Document embedding kwargs %s", kwargs)
         logger.debug(
             "`_embed_documents` called with %d documents of type %s",
             len(documents),
@@ -161,7 +161,7 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
         )
         ready_documents = self.chunks_to_strings(documents)
         logger.debug("Ready documents for embedding: %s", ready_documents[:2])
-        logger.debug("Embedding documents of type %s", type(ready_documents[0]))
+        logger.debug("Embedding documents of type %s", type(ready_documents))
         loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(
             None,
