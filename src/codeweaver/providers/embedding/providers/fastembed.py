@@ -131,13 +131,13 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
         self.caps = caps
 
         # 2. Configure model name in kwargs if not already set
-        if "model_name" not in self._doc_kwargs:
+        if "model_name" not in type(self)._doc_kwargs:
             model = caps.name  # Use caps parameter, not self.caps
             self.doc_kwargs["model_name"] = model
             self.query_kwargs["model_name"] = model
 
         # 3. Initialize the client
-        self.client = _TextEmbedding(**self._doc_kwargs)
+        self.client = _TextEmbedding(**self.doc_kwargs)
 
     @property
     def base_url(self) -> str | None:
@@ -195,7 +195,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         self.caps = caps
 
         # 2. Configure model name in kwargs if not already set
-        if "model_name" not in self._doc_kwargs:
+        if "model_name" not in self.doc_kwargs:
             model = caps.name  # Use caps parameter, not self.caps
             self.doc_kwargs["model_name"] = model
             self.query_kwargs["model_name"] = model
@@ -203,7 +203,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         # 3. Initialize client if it's still a class (not an instance)
         # The _client class variable is set to the class type, so we need to instantiate it
         if isinstance(self.client, type):
-            client_options = self._doc_kwargs.get("client_options") or self._doc_kwargs
+            client_options = self.doc_kwargs.get("client_options") or self.doc_kwargs
             self.client = self.client(**client_options)
 
     async def _embed_documents(

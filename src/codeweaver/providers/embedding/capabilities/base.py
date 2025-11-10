@@ -195,10 +195,10 @@ def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:
             "other": {},
             "_available": HAS_FASTEMBED,
         },
-        "prithivida/Splade-PP_en_v1": {
-            "name": "prithivida/Splade-PP_en_v1",
+        "prithivida/Splade_PP_en_v1": {
+            "name": "prithivida/Splade_PP_en_v1",
             "multilingual": False,
-            "hf_name": "Qdrant/Splade-PP_en_v1",
+            "hf_name": "Qdrant/Splade_PP_en_v1",
             "other": {},
             "_available": HAS_FASTEMBED,
         },

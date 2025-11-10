@@ -226,18 +226,20 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
             ):
                 # Transition to half-open to test recovery
                 logger.info(
-                    "Circuit breaker transitioning to half-open state for %s", self._provider
+                    "Circuit breaker transitioning to half-open state for %s", type(self)._provider
                 )
                 self._circuit_state = CircuitBreakerState.HALF_OPEN
             else:
                 raise CircuitBreakerOpenError(
-                    f"Circuit breaker is open for {self._provider}. Failing fast."
+                    f"Circuit breaker is open for {type(self)._provider}. Failing fast."
                 )
 
     def _record_success(self) -> None:
         """Record successful API call and reset circuit breaker if needed."""
         if self._circuit_state in (CircuitBreakerState.HALF_OPEN, CircuitBreakerState.OPEN):
-            logger.info("Circuit breaker closing for %s after successful operation", self._provider)
+            logger.info(
+                "Circuit breaker closing for %s after successful operation", type(self)._provider
+            )
         self._circuit_state = CircuitBreakerState.CLOSED
         self._failure_count = 0
         self._last_failure_time = None
@@ -250,7 +252,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         if self._failure_count >= 3:  # 3 failures threshold as per spec FR-008a
             logger.warning(
                 "Circuit breaker opening for %s after %d consecutive failures",
-                self._provider,
+                type(self)._provider,
                 self._failure_count,
             )
             self._circuit_state = CircuitBreakerState.OPEN
@@ -284,7 +286,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
             self._record_failure()
             logger.warning(
                 "Reranking API call failed for %s: %s (attempt %d/5)",
-                self._provider,
+                type(self)._provider,
                 str(e),
                 self._failure_count,
             )
@@ -367,7 +369,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     @property
     def provider(self) -> Provider:
         """Get the provider for the reranking provider."""
-        return self._provider
+        return type(self)._provider
 
     @property
     def model_name(self) -> str:
@@ -441,7 +443,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         from codeweaver.core.chunks import CodeChunk
 
         chunks = self._chunk_store or CodeChunk.chunkify(raw_docs)
-        return self._output_transformer(results, iter(chunks))
+        return type(self)._output_transformer(results, iter(chunks))
 
     @staticmethod
     def to_code_chunk(text: StructuredDataInput) -> Sequence[CodeChunk]:

@@ -840,7 +840,7 @@ class SemanticChunker(BaseChunker):
                 continue
 
             # Check if we've seen this content before
-            if existing_batch_id := self._hash_store.get(content_hash):
+            if existing_batch_id := type(self)._hash_store.get(content_hash):
                 logger.debug(
                     "Duplicate chunk detected: %s... (existing batch: %s)",
                     content_hash[:16],
@@ -849,7 +849,7 @@ class SemanticChunker(BaseChunker):
                 continue
 
             # New unique chunk
-            self._hash_store.set(content_hash, batch_id)
+            type(self)._hash_store.set(content_hash, batch_id)
             batch_keys = BatchKeys(id=batch_id, idx=idx)
             deduplicated.append(chunk.set_batch_keys(batch_keys))
 

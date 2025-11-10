@@ -23,7 +23,6 @@ if TYPE_CHECKING:
     from codeweaver.providers.types import LiteralProvider, LiteralProviderKind
 
 # TODO: Add more vector providers as they are supported.
-# TODO: Add QDRANT-CLOUD as an embedding provider (and add support).
 
 # TODO: The vector provider capabilities aren't what they need to be.... it needs to be things like sparse vectors, quantization, etc.
 VECTOR_PROVIDER_CAPABILITIES: MappingProxyType[LiteralProvider, str] = cast(

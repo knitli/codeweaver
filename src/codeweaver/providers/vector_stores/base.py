@@ -160,7 +160,9 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
             raise ProviderError(
                 "Vector store client not initialized",
                 details={
-                    "provider": self._provider.value if hasattr(self, "_provider") else "unknown",
+                    "provider": type(self)._provider.value
+                    if hasattr(self, "_provider")
+                    else "unknown",
                     "client_type": type(self).__name__,
                 },
                 suggestions=[
@@ -176,7 +178,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         """
         The enum member representing the provider.
         """
-        return self._provider
+        return type(self)._provider
 
     @property
     @abstractmethod
@@ -216,12 +218,12 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
 
                 logger = logging.getLogger(__name__)
                 logger.info(
-                    "Circuit breaker transitioning to half-open state for %s", self._provider
+                    "Circuit breaker transitioning to half-open state for %s", type(self)._provider
                 )
                 self._circuit_state = CircuitBreakerState.HALF_OPEN
             else:
                 raise CircuitBreakerOpenError(
-                    f"Circuit breaker is open for {self._provider}. Failing fast."
+                    f"Circuit breaker is open for {type(self)._provider}. Failing fast."
                 )
 
     def _record_success(self) -> None:
@@ -230,7 +232,9 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.info("Circuit breaker closing for %s after successful operation", self._provider)
+            logger.info(
+                "Circuit breaker closing for %s after successful operation", type(self)._provider
+            )
         self._circuit_state = CircuitBreakerState.CLOSED
         self._failure_count = 0
         self._last_failure_time = None
@@ -246,7 +250,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
             logger = logging.getLogger(__name__)
             logger.warning(
                 "Circuit breaker opening for %s after %d consecutive failures",
-                self._provider,
+                type(self)._provider,
                 self._failure_count,
             )
             self._circuit_state = CircuitBreakerState.OPEN
@@ -295,7 +299,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                 "debug",
                 {
                     "msg": "Vector store search successful",
-                    "extra": {"provider": self._provider.value, "results_count": len(result)},
+                    "extra": {"provider": type(self)._provider.value, "results_count": len(result)},
                 },
             )
         except (ConnectionError, TimeoutError, OSError) as e:
@@ -307,7 +311,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                 {
                     "msg": "Vector store search failed",
                     "extra": {
-                        "provider": self._provider.value,
+                        "provider": type(self)._provider.value,
                         "error": str(e),
                         "error_type": type(e).__name__,
                         "attempt": self._failure_count,
@@ -323,7 +327,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                 {
                     "msg": "Non-retryable error in vector store search",
                     "extra": {
-                        "provider": self._provider.value,
+                        "provider": type(self)._provider.value,
                         "error": str(e),
                         "error_type": type(e).__name__,
                     },
@@ -385,7 +389,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
             "debug",
             {
                 "msg": "Starting vector store upsert",
-                "extra": {"provider": self._provider.value, "chunks_count": len(chunks)},
+                "extra": {"provider": type(self)._provider.value, "chunks_count": len(chunks)},
             },
         )
 
@@ -398,7 +402,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                 "debug",
                 {
                     "msg": "Vector store upsert successful",
-                    "extra": {"provider": self._provider.value, "chunks_count": len(chunks)},
+                    "extra": {"provider": type(self)._provider.value, "chunks_count": len(chunks)},
                 },
             )
         except (ConnectionError, TimeoutError, OSError) as e:
@@ -410,7 +414,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                 {
                     "msg": "Vector store upsert failed",
                     "extra": {
-                        "provider": self._provider.value,
+                        "provider": type(self)._provider.value,
                         "chunks_count": len(chunks),
                         "error": str(e),
                         "error_type": type(e).__name__,
@@ -427,7 +431,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                 {
                     "msg": "Non-retryable error in vector store upsert",
                     "extra": {
-                        "provider": self._provider.value,
+                        "provider": type(self)._provider.value,
                         "chunks_count": len(chunks),
                         "error": str(e),
                         "error_type": type(e).__name__,

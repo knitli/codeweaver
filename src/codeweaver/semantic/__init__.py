@@ -63,8 +63,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
 """Dynamically import submodules and classes for the semantic package.
 
 Maps class/function/type names to their respective module paths for lazy loading.
-
-TODO: We can probably refactor out the need for this, but a problem for another day.
 """
 
 

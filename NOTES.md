@@ -19,4 +19,3 @@ The main use case I thought of was for general search -- we could, for example, 
 
 
 
-TODO: Registry methods for getting complete provider information (caps, provider, client, provider name)

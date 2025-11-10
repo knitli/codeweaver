@@ -51,6 +51,8 @@ def _setup_config_logger(
             handler = get_rich_handler(**(rich_options or {}))
             logger = logging.getLogger(name)
             logger.setLevel(level)
+            # Clear existing handlers to prevent duplication
+            logger.handlers.clear()
             logger.addHandler(handler)
             return logger
         return logging.getLogger(name)
@@ -80,6 +82,8 @@ def setup_logger(
     handler = get_rich_handler(**(rich_options or {}))
     logger = logging.getLogger(name)
     logger.setLevel(level)
+    # Clear existing handlers to prevent duplication
+    logger.handlers.clear()
     logger.addHandler(handler)
     return logger
 

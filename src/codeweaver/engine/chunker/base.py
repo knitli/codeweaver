@@ -42,6 +42,17 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+def _get_chunker_settings() -> ChunkerSettings:
+    """Retrieve the chunker settings."""
+    from codeweaver.config.settings import get_settings
+    cw_settings = get_settings()
+    return cw_settings.indexing
+
+def _get_capabilities() -> tuple[()] | tuple[EmbeddingModelCapabilities] | tuple[EmbeddingModelCapabilities, RerankingModelCapability]:
+    """Retrieve the capabilities"""
+    from codeweaver.common.registry.models import get_model_registry
+    registry = get_model_registry()
+
 SAFETY_MARGIN = 0.1
 """A safety margin to apply to chunk sizes to account for metadata and tokenization variability."""
 
@@ -70,7 +81,7 @@ class ChunkGovernor(BasedModel):
         # Use default of 512 tokens when capabilities aren't available
         if not self.capabilities:
             return 512
-        return min(capability.context_window for capability in self.capabilities)
+        return min(capability.context_window for capability in self.capabilities if hasattr("context_window", capability))
 
     @computed_field
     @cached_property

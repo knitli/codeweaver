@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import ConfigDict
 
+from codeweaver.common.utils.utils import rpartial
 from codeweaver.exceptions import ProviderError
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
@@ -36,6 +37,31 @@ except ImportError as e:
     ) from e
 
 
+def voyage_reranking_output_transformer(
+    returned_result: RerankingObject,
+    _original_chunks: Iterator[CodeChunk] | tuple[CodeChunk, ...],
+    _instance: VoyageRerankingProvider,
+) -> list[RerankingResult]:
+    """Transform the output of the Voyage AI reranking model."""
+    original_chunks = (
+        tuple(_original_chunks) if isinstance(_original_chunks, Iterator) else _original_chunks
+    )
+
+    def map_result(voyage_result: VoyageRerankingResult, new_index: int) -> RerankingResult:
+        """Maps a VoyageRerankingResult to a CodeWeaver RerankingResult."""
+        return RerankingResult(
+            original_index=voyage_result.index,  # type: ignore
+            batch_rank=new_index,
+            score=voyage_result.relevance_score,  # type: ignore
+            chunk=original_chunks[voyage_result.index],  # type: ignore
+        )
+
+    results, token_count = returned_result.results, returned_result.total_tokens
+    _instance._update_token_stats(token_count=token_count)
+    results.sort(key=lambda x: cast(float, x[2]), reverse=True)
+    return [map_result(res, i) for i, res in enumerate(results, 1)]
+
+
 class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
     """Base class for reranking providers."""
 
@@ -52,7 +78,9 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
     ] = lambda x, y: x  # placeholder, actually set in _initialize()
 
     def _initialize(self) -> None:
-        self._output_transformer = self.voyage_reranking_output_transformer
+        type(self)._output_transformer = rpartial(
+            voyage_reranking_output_transformer, _instance=self
+        )
 
     async def _execute_rerank(
         self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: Any
@@ -85,30 +113,6 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
             ) from e
         else:
             return response
-
-    def voyage_reranking_output_transformer(
-        self,
-        returned_result: RerankingObject,
-        _original_chunks: Iterator[CodeChunk] | tuple[CodeChunk, ...],
-    ) -> list[RerankingResult]:
-        """Transform the output of the Voyage AI reranking model."""
-        original_chunks = (
-            tuple(_original_chunks) if isinstance(_original_chunks, Iterator) else _original_chunks
-        )
-
-        def map_result(voyage_result: VoyageRerankingResult, new_index: int) -> RerankingResult:
-            """Maps a VoyageRerankingResult to a CodeWeaver RerankingResult."""
-            return RerankingResult(
-                original_index=voyage_result.index,  # type: ignore
-                batch_rank=new_index,
-                score=voyage_result.relevance_score,  # type: ignore
-                chunk=original_chunks[voyage_result.index],  # type: ignore
-            )
-
-        results, token_count = returned_result.results, returned_result.total_tokens
-        self._update_token_stats(token_count=token_count)
-        results.sort(key=lambda x: cast(float, x[2]), reverse=True)
-        return [map_result(res, i) for i, res in enumerate(results, 1)]
 
 
 __all__ = ("VoyageRerankingProvider",)

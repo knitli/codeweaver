@@ -382,7 +382,7 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         )
         return cls(
             walker=walker,
-            project_path=get_project_path()
+            base_path=get_project_path()
             if isinstance(settings.project_path, Unset)
             else settings.project_path,
         )
@@ -548,6 +548,18 @@ class Indexer(BasedModel):
 
             try:
                 self._vector_store = _get_vector_store_instance()
+                if self._vector_store:
+                    # Initialize the vector store client (async operation)
+                    # Check if we're in an async context
+                    try:
+                        asyncio.get_running_loop()
+                        # Already in event loop - will initialize lazily on first use
+                        logger.debug(
+                            "Cannot initialize vector store in sync context. Will be initialized on first use."
+                        )
+                    except RuntimeError:
+                        # No running loop, safe to use asyncio.run()
+                        asyncio.run(self._vector_store._initialize())
                 logger.info("Initialized vector store: %s", type(self._vector_store).__name__)
             except Exception as e:
                 logger.warning("No vector store configured: %s", e)

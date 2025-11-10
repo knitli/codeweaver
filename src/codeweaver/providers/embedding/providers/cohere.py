@@ -169,7 +169,7 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
         """
         # Set _caps at the start
         self.caps = caps
-        self._provider = caps.provider or self._provider
+        type(self)._provider = caps.provider or type(self)._provider
 
         # Client options were already configured in __init__
         # Base class already copied _doc_kwargs and _query_kwargs class variables
@@ -177,7 +177,7 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
     @property
     def base_url(self) -> str:
         """Get the base URL for the current provider."""
-        return self._base_urls()[self._provider]
+        return self._base_urls()[type(self)._provider]
 
     def _base_urls(self) -> dict[Provider, str]:
         """Get the base URLs for each provider."""

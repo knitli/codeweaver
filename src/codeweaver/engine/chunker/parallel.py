@@ -161,6 +161,17 @@ def chunk_files_parallel(
         else:
             executor_type = "process"
     if executor_type == "process":
+        # Set multiprocessing start method to 'spawn' to avoid fork() deprecation in Python 3.13+
+        # 'spawn' is safer for multi-threaded processes and more portable across platforms
+        try:
+            current_method = multiprocessing.get_start_method(allow_none=True)
+            if current_method != 'spawn':
+                multiprocessing.set_start_method('spawn', force=True)
+                logger.debug("Set multiprocessing start method to 'spawn'")
+        except RuntimeError:
+            # Start method already set, which is fine
+            logger.debug("Multiprocessing start method already configured")
+
         cpu_count = multiprocessing.cpu_count()
         max_workers = min(max_workers, cpu_count)
         executor_class = ProcessPoolExecutor

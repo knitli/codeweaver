@@ -124,9 +124,9 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         """Initialize the Sentence Transformers embedding provider."""
         # Initialize client if not provided
         if client is None:
-            doc_kwargs = {**self._doc_kwargs, **(kwargs or {})}
+            self.doc_kwargs = {**type(self)._doc_kwargs, **(kwargs or {})}
             client = SentenceTransformer(
-                model_name_or_path=capabilities.name, **doc_kwargs.get("client_options", {})
+                model_name_or_path=capabilities.name, **self.doc_kwargs.get("client_options", {})
             )
 
         # Store client before calling super() so _initialize() can access it
@@ -296,7 +296,7 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
 
         # Initialize client if not provided
         if client is None:
-            doc_kwargs = {**self._doc_kwargs, **(kwargs or {})}
+            doc_kwargs = {**type(self)._doc_kwargs, **(kwargs or {})}
             client = _SparseEncoderType(  # type: ignore
                 model_name_or_path=capabilities.name, **doc_kwargs.get("client_options", {})
             )

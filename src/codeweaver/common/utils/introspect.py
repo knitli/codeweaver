@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Type and signature introspection utilities.
 
 The utilities are thin wrappers around the standard library's `inspect` module,

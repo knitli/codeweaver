@@ -285,8 +285,11 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
 
         if not chunks:
             return
+        # Ensure client is initialized (lazy initialization if needed)
         if not self._ensure_client(self._client):
-            raise ProviderError("Qdrant client not initialized")
+            await self._initialize()
+            if not self._ensure_client(self._client):
+                raise ProviderError("Qdrant client not initialized")
 
         collection_name = self.collection
         if not collection_name:

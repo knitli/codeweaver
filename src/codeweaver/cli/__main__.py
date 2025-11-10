@@ -17,14 +17,11 @@ import warnings
 
 # NOTE: google.genai emits a pydantic deprecation warning during module import
 # (before our code runs). To suppress it, set: PYTHONWARNINGS='ignore::pydantic.warnings.PydanticDeprecatedSince212'
-# We try to suppress it here for runtime warnings, but import-time warnings occur too early.
+# We suppress runtime warnings here, but import-time warnings occur too early to catch.
 with contextlib.suppress(Exception):
     from pydantic.warnings import PydanticDeprecatedSince212
 
     warnings.simplefilter("ignore", PydanticDeprecatedSince212)
-    import os
-
-    os.environ["PYTHONWARNINGS"] = "ignore::pydantic.warnings.PydanticDeprecatedSince212"
 
 from cyclopts import App, Parameter
 from rich.console import Console

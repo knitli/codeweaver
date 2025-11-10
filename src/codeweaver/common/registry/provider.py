@@ -1410,25 +1410,42 @@ class ProviderRegistry(BasedModel):
         # Just pass through user kwargs
         return user_kwargs
 
+    def _normalize_model_name(self, name: str) -> str:
+        """Normalize model name for fuzzy matching.
+
+        Handles common variations like hyphens vs underscores.
+
+        Args:
+            name: Original model name
+
+        Returns:
+            Normalized model name (lowercased with normalized separators)
+        """
+        return name.lower().replace("-", "_").replace(" ", "_")
+
     def _get_capabilities_for_model(
         self, model_name: str, provider: Provider
     ) -> SparseEmbeddingModelCapabilities | EmbeddingModelCapabilities | None:
         """Get capabilities for a specific model.
+
+        Capabilities are a convenience for validation and optimization, not a requirement.
+        If no capability is found, the model will still be passed to the provider.
 
         Args:
             model_name: The model name to look up
             provider: The provider for the model
 
         Returns:
-            EmbeddingModelCapabilities if found, None otherwise
+            EmbeddingModelCapabilities if found, None otherwise (which is OK!)
         """
         from codeweaver.providers.embedding.capabilities import load_default_capabilities
 
-        # Load all capabilities and find matching one
+        # Try exact match first
         for cap in load_default_capabilities():
             if cap.name == model_name and cap.provider == provider:
                 return cap
 
+        # Try sparse capabilities for SENTENCE_TRANSFORMERS/FASTEMBED
         if provider.name in ("SENTENCE_TRANSFORMERS", "FASTEMBED"):
             from codeweaver.providers.embedding.capabilities.base import get_sparse_caps
 
@@ -1437,18 +1454,34 @@ class ProviderRegistry(BasedModel):
                 if model_name == cap.name and cap.provider == provider:
                     return cap
 
-        # Fallback: return first capability for this provider
+        # Try fuzzy matching (handles hyphens vs underscores, case differences)
+        normalized_model_name = self._normalize_model_name(model_name)
+
         for cap in load_default_capabilities():
-            if cap.provider == provider:
-                logger.warning(
-                    "Exact model '%s' not found for provider '%s', using default capability",
-                    model_name,
-                    provider,
+            if self._normalize_model_name(cap.name) == normalized_model_name and cap.provider == provider:
+                logger.debug(
+                    "Found capability via fuzzy match: '%s' matched '%s' for provider '%s'",
+                    model_name, cap.name, provider
                 )
                 return cap
 
-        logger.warning(
-            "No capabilities found for model '%s' and provider '%s'", model_name, provider
+        if provider.name in ("SENTENCE_TRANSFORMERS", "FASTEMBED"):
+            from codeweaver.providers.embedding.capabilities.base import get_sparse_caps
+
+            sparse_caps = get_sparse_caps()
+            for cap in sparse_caps:
+                if self._normalize_model_name(cap.name) == normalized_model_name and cap.provider == provider:
+                    logger.debug(
+                        "Found sparse capability via fuzzy match: '%s' matched '%s' for provider '%s'",
+                        model_name, cap.name, provider
+                    )
+                    return cap
+
+        # No capability found - that's OK! Provider will validate the model name.
+        # Capabilities are a convenience, not a requirement.
+        logger.debug(
+            "No capability found for model '%s' and provider '%s'. Provider will validate model name.",
+            model_name, provider
         )
         return None
 

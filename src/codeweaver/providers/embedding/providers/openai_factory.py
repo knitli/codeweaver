@@ -221,7 +221,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
     @property
     def base_url(self) -> str:
         """Get the base URL for the OpenAI client."""
-        expected_url = self._base_urls()[self._provider]
+        expected_url = self._base_urls()[type(self)._provider]
         return cast(str, str(self.client.base_url) if self.client.base_url else expected_url)
 
     @property
@@ -269,7 +269,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
             raise ProviderError(
                 "OpenAI embeddings endpoint returned empty response",
                 details={
-                    "provider": str(self._provider),
+                    "provider": str(type(self)._provider),
                     "model": self.model_name,
                     "base_url": self.base_url,
                     "has_response": response is not None,

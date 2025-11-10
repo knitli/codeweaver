@@ -64,9 +64,9 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
     def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """Initialize the Mistral embedding provider.
 
-        Sets up _caps and configures default kwargs for document and query embedding.
+        Sets up caps and configures default kwargs for document and query embedding.
         """
-        # Set _caps at start
+        # Set caps at start
         self.caps = caps
 
         # Configure default kwargs if needed

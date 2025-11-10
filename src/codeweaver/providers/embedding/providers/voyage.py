@@ -7,8 +7,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Any, ClassVar, cast
+from typing import Annotated, Any, ClassVar, cast
 
+from pydantic import PrivateAttr
 from voyageai.object.embeddings import EmbeddingsObject
 
 from codeweaver.core.chunks import CodeChunk
@@ -50,7 +51,7 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
     """VoyageAI embedding provider."""
 
     client: AsyncClient
-    _provider: Provider = Provider.VOYAGE
+    _provider: ClassVar[Provider] = Provider.VOYAGE
     caps: EmbeddingModelCapabilities
 
     _doc_kwargs: ClassVar[dict[str, Any]] = {"input_type": "document"}
@@ -60,7 +61,7 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
     )
 
     # Store whether this is a context model (set during _initialize)
-    _is_context_model: bool = False
+    _is_context_model: Annotated[bool, PrivateAttr()] = False
 
     def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         # Detect if this is a context model

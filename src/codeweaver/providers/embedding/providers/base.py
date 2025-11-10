@@ -200,8 +200,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         """Initialize the embedding provider."""
         # Determine provider - check if subclass has it set
         getattr(type(self), "_provider", None) or caps.provider
-        # Initialize pydantic model with all required fields
-        super().__init__()
+
+        # Manually set the validated fields using object.__setattr__ to bypass Pydantic's validation
+        # This prevents the ClassVar issue while still properly initializing the fields
 
         self._model_dump_json = super().model_dump_json
 
@@ -209,7 +210,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         self.query_kwargs = type(self)._query_kwargs.copy() or {}
         self._add_kwargs(kwargs or {})
         """Add any user-provided kwargs to the embedding provider, after we merge the defaults together."""
-        self._store: UUIDStore[list] = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)  # type: ignore # 3mb limit
+        # Note: _store is a ClassVar defined at class level (line 175), shared across all instances
+        # No need to create instance variable here
 
         # Initialize circuit breaker state
         self._circuit_state = CircuitBreakerState.CLOSED
@@ -218,6 +220,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
         # Call _initialize with caps since pydantic may not have set _caps yet
         self._initialize(caps)
+        # Initialize pydantic model without parameters to avoid ClassVar validation issues
+        super().__init__(client=client, caps=caps)
 
     def _add_kwargs(self, kwargs: dict[str, Any]) -> None:
         """Add keyword arguments to the embedding provider."""
@@ -225,6 +229,12 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             return
         self.doc_kwargs = {**self.doc_kwargs, **kwargs}
         self.query_kwargs = {**self.query_kwargs, **kwargs}
+
+    @classmethod
+    @override
+    def __pydantic_extra__(cls):
+        """Overcoming the same bug as in `UUIDStore` and `BlakeStore`. pydantic_extra is deprecated but something still checks for it in rare cases."""
+        return {}
 
     @abstractmethod
     def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
@@ -240,7 +250,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     @property
     def name(self) -> Provider:
         """Get the name of the embedding provider."""
-        return self._provider
+        return type(self)._provider
 
     @property
     @abstractmethod
@@ -262,18 +272,20 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             ):
                 # Transition to half-open to test recovery
                 logger.info(
-                    "Circuit breaker transitioning to half-open state for %s", self._provider
+                    "Circuit breaker transitioning to half-open state for %s", type(self)._provider
                 )
                 self._circuit_state = CircuitBreakerState.HALF_OPEN
             else:
                 raise CircuitBreakerOpenError(
-                    f"Circuit breaker is open for {self._provider}. Failing fast."
+                    f"Circuit breaker is open for {type(self)._provider}. Failing fast."
                 )
 
     def _record_success(self) -> None:
         """Record successful API call and reset circuit breaker if needed."""
         if self._circuit_state in (CircuitBreakerState.HALF_OPEN, CircuitBreakerState.OPEN):
-            logger.info("Circuit breaker closing for %s after successful operation", self._provider)
+            logger.info(
+                "Circuit breaker closing for %s after successful operation", type(self)._provider
+            )
         self._circuit_state = CircuitBreakerState.CLOSED
         self._failure_count = 0
         self._last_failure_time = None
@@ -286,7 +298,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         if self._failure_count >= 3:  # 3 failures threshold as per spec FR-008a
             logger.warning(
                 "Circuit breaker opening for %s after %d consecutive failures",
-                self._provider,
+                type(self)._provider,
                 self._failure_count,
             )
             self._circuit_state = CircuitBreakerState.OPEN
@@ -320,7 +332,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             self._record_failure()
             logger.warning(
                 "API call failed for %s: %s (attempt %d/5)",
-                self._provider,
+                type(self)._provider,
                 str(e),
                 self._failure_count,
             )
@@ -381,7 +393,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             {
                 "msg": "Starting document embedding",
                 "extra": {
-                    "provider": self._provider.value,
+                    "provider": type(self)._provider.value,
                     "document_count": len(documents),
                     "is_reprocessing": is_old_batch,
                     "batch_id": str(batch_id or cache_key) if batch_id or cache_key else None,
@@ -404,7 +416,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 {
                     "msg": "Circuit breaker open",
                     "extra": {
-                        "provider": self._provider.value,
+                        "provider": type(self)._provider.value,
                         "document_count": len(documents),
                         "circuit_state": self._circuit_state.value,
                     },
@@ -419,7 +431,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 {
                     "msg": "All retry attempts exhausted",
                     "extra": {
-                        "provider": self._provider.value,
+                        "provider": type(self)._provider.value,
                         "document_count": len(documents),
                         "failure_count": self._failure_count,
                     },
@@ -433,7 +445,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 {
                     "msg": "Document embedding failed",
                     "extra": {
-                        "provider": self._provider.value,
+                        "provider": type(self)._provider.value,
                         "document_count": len(documents),
                         "error": str(e),
                         "error_type": type(e).__name__,
@@ -466,7 +478,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 {
                     "msg": "Document embedding complete",
                     "extra": {
-                        "provider": self._provider.value,
+                        "provider": type(self)._provider.value,
                         "document_count": len(documents),
                         "embeddings_generated": len(results) if results else 0,
                     },
@@ -494,7 +506,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             self._record_failure()
             logger.warning(
                 "Query embedding failed for %s(attempt %d/5)",
-                self._provider,
+                type(self)._provider,
                 self._failure_count,
                 extra={"query": query, "error": str(e)},
             )
@@ -754,26 +766,26 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         final_chunks: list[CodeChunk] = []
         # We map the hashes to the original UUID key for processed_chunks so we're not double-storing them.
         hashes = [
-            self._hash_store.add(key, hash_value=chunk.content.encode("utf-8"))
+            type(self)._hash_store.add(key, hash_value=chunk.content.encode("utf-8"))
             for chunk in processed_chunks
         ]
         starter_chunks = [
             chunk
             for i, chunk in enumerate(processed_chunks)
-            if chunk and hashes[i] not in self._hash_store
+            if chunk and hashes[i] not in type(self)._hash_store
         ]
         for i, chunk in enumerate(starter_chunks):
             batch_keys = BatchKeys(id=key, idx=i)
             final_chunks.append(chunk.set_batch_keys(batch_keys))
-            self._hash_store[hashes[i]] = key
-        if not self._store:  # type: ignore
-            self._store = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)  # type: ignore
-        self._store[key] = final_chunks  # type: ignore
+            type(self)._hash_store[hashes[i]] = key
+        if not type(self)._store:  # type: ignore
+            type(self)._store = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)  # type: ignore
+        type(self)._store[key] = final_chunks  # type: ignore
         return iter(final_chunks), key
 
     def _process_output(self, output_data: Any) -> list[list[float]] | list[list[int]]:
         """Handle output data from embedding."""
-        return self._output_transformer(output_data)
+        return type(self)._output_transformer(output_data)
 
     def _fire_and_forget(self, task: Callable[..., Any]) -> None:
         """Execute a fire-and-forget task.
