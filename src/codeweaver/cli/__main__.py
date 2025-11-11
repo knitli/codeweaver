@@ -55,10 +55,22 @@ def main() -> None:
     try:
         app()
     except KeyboardInterrupt:
-        console.print(f"\n{CODEWEAVER_PREFIX} [yellow]Operation cancelled by user[/yellow]")
-        sys.exit(0)
+        console.print(
+            f"\n{CODEWEAVER_PREFIX} [yellow]⚠️ We got a keyboard interrupt signal...⚠️[/yellow]"
+        )
+        from rich.prompt import Confirm
+
+        if Confirm.ask(
+            f"\n{CODEWEAVER_PREFIX} [bold cyan]Do you want to exit CodeWeaver?[/bold cyan] \n ... or did your cat walk across your keyboard? 🐈 [dim]([bold]Tip:[/bold] any key but 'n' will exit)[/dim]",
+            console=console,
+            default=True,
+            choices=["y", "n"],
+        ):
+            sys.exit(0)
     except Exception as e:
-        console.print(f"{CODEWEAVER_PREFIX} [red]Fatal error: {e}[/red]")
+        console.print(f"{CODEWEAVER_PREFIX} [bold red]Fatal error: {e}[/bold red]")
+        console.print("\n[red]Traceback:[/red]")
+        console.print_exception(show_locals=True, max_frames=10)
         sys.exit(1)
 
 

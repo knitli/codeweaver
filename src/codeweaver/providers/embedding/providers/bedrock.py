@@ -249,7 +249,7 @@ def shared_validator(
 
 def _handle_data_type_validation(
     mode: Literal["python", "json"],
-    data: dict[str, Any] | bytes | bytearray,
+    data: dict[str, Any] | str | bytes | bytearray,
     cls: type[
         CohereEmbeddingRequestBody
         | TitanEmbeddingV2RequestBody
@@ -427,9 +427,8 @@ class BedrockInvokeEmbeddingResponse(BaseBedrockModel):
 
 
 try:
-    from boto3 import client
+    from boto3 import client as boto3_client
 
-    bedrock_client: BedrockRuntimeClient = client("bedrock-runtime")
 
 except ImportError as e:
     logger.exception(
@@ -445,12 +444,37 @@ class BedrockEmbeddingProvider(
 ):
     """Bedrock embedding provider."""
 
-    client: BedrockRuntimeClient = bedrock_client
+    client: BedrockRuntimeClient
     _provider: Provider = Provider.BEDROCK
     caps: EmbeddingModelCapabilities
 
     _doc_kwargs: ClassVar[dict[str, Any]] = {}
     _query_kwargs: ClassVar[dict[str, Any]] = {}
+
+    def __init__(
+        self,
+        client: BedrockRuntimeClient | None = None,
+        caps: EmbeddingModelCapabilities | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize the Bedrock embedding provider."""
+        if not client:
+            client = boto3_client("bedrock-runtime", **kwargs)
+        if not caps:
+            from codeweaver.common.registry.models import get_model_registry
+
+            registry = get_model_registry()
+            caps = registry.configured_models_for_kind("embedding")  # ty: ignore[invalid-assignment]
+            if isinstance(caps, tuple) and len(caps) > 0:
+                caps = caps[0]
+        if not caps:
+            raise ConfigurationError(
+                "No embedding model capabilities provided and no default model found in registry for Bedrock embedding provider."
+            )
+        self.bedrock_client = client
+        self.doc_kwargs = type(self)._doc_kwargs | kwargs
+        self.query_kwargs = type(self)._query_kwargs | kwargs
+        super().__init__(client=client, caps=caps, **kwargs)
 
     def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         self._preprocessor = super()._input_transformer
@@ -625,7 +649,7 @@ class BedrockEmbeddingProvider(
                     "model_id": self.caps.name,
                 })
             ])
-        return [InvokeRequestDict(**dict(req.model_dump(by_alias=True))) for req in requests]
+        return [InvokeRequestDict(**dict(req.model_dump(by_alias=True))) for req in requests]  # ty: ignore[missing-typed-dict-key]
 
     def _create_request(
         self,

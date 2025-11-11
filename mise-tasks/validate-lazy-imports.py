@@ -8,7 +8,7 @@
 # sourcery skip: no-complex-if-expressions
 # ///script
 # python-version: ">=3.12"
-# dependencies: ["rich"]
+# dependencies: ["rich", "botocore"]
 # ////script
 """Validate lazy imports in the codebase.
 
@@ -24,13 +24,17 @@ This script validates two types of lazy imports:
    to ensure consistency and correctness of pydantic-style lazy imports.
 """
 
+from __future__ import annotations
+
 import ast
 import importlib
 import re
 import sys
 
 from pathlib import Path
-from typing import NamedTuple
+from typing import Literal, NamedTuple
+
+import botocore
 
 from rich.console import Console
 from rich.panel import Panel
@@ -49,8 +53,41 @@ LAZY_IMPORT_PATTERN = re.compile(
 # All mise tasks operate relative to the src/codeweaver directory
 SRC_DIR = Path("src/codeweaver")
 
+NO_LAZY_PACKAGES = [
+    "codeweaver.cli.commands",
+    "codeweaver.agent_api.find_code",
+    "codeweaver.providers.data",
+]
+
 # Modules to check for package-level lazy imports
-PACKAGE_MODULES = ["codeweaver.core", "codeweaver.config", "codeweaver.common"]
+PACKAGE_MODULES = list(SRC_DIR.rglob("**/__init__.py"))
+
+IS_EXCEPTION = (
+    "codeweaver.common.CODEWEAVER_PREFIX",
+    "codeweaver.agent_api.get_user_agent",
+    "codeweaver.common.utils.LazyImport",
+    "codeweaver.common.utils.create_lazy_getattr",
+    "codeweaver.common.utils.lazy_import",
+    "codeweaver.providers.agent.AgentProfile",
+    "codeweaver.providers.agent.AgentProfileSpec",
+    "codeweaver.providers.reranking.KnownRerankModelName",
+    "codeweaver.providers.reranking.capabilities.dependency_map",
+    "codeweaver.providers.reranking.capabilities.load_default_capabilities",
+    "codeweaver.providers.reranking.get_rerank_model_provider",
+    "codeweaver.providers.vector_stores.get_vector_store_provider",
+    "codeweaver.tokenizers.get_tokenizer",
+    "codeweaver.providers.embedding.capabilities.load_default_capabilities",
+    "codeweaver.providers.embedding.capabilities.load_sparse_capabilities",
+)
+
+PROBLEM_CHILDREN = (
+    "codeweaver.providers.embedding.providers.bedrock",
+    "codeweaver.providers.embedding.providers.sentence_transformers",
+    "SentenceTransformersSparseProvider",
+    "BedrockEmbeddingProvider",
+)
+
+"""Tuple of modules and types with known problematic lazy imports to skip during validation."""
 
 
 # ============================================================================
@@ -161,7 +198,7 @@ class PackageError(NamedTuple):
     """Tuple representing a package-level lazy import validation error."""
 
     module_name: str
-    category: str  # "ERROR", "WARNING", "INFO"
+    category: Literal["ERROR", "WARNING", "INFO"]
     message: str
 
 
@@ -176,6 +213,8 @@ class PackageValidator:
 
     def validate_module(self, module_name: str) -> None:
         """Validate __init__.py style lazy imports in a module."""
+        if module_name in NO_LAZY_PACKAGES:
+            return
         try:
             module = importlib.import_module(module_name)
         except ImportError as e:
@@ -183,8 +222,8 @@ class PackageValidator:
             return
 
         # Check for __all__
-        __all__ = getattr(module, "__all__", None)
-        if __all__ is None:
+        all_refs = getattr(module, "__all__", None)
+        if all_refs is None:
             self.warnings.append(PackageError(module_name, "WARNING", "No __all__ defined"))
             return
 
@@ -199,15 +238,15 @@ class PackageValidator:
             return
 
         # Check for __getattr__
-        __getattr__ = getattr(module, "__getattr__", None)
-        if __getattr__ is None:
+        attr_getter = getattr(module, "__getattr__", None)
+        if attr_getter is None:
             self.errors.append(
                 PackageError(module_name, "ERROR", "Has _dynamic_imports but no __getattr__")
             )
             return
 
         # Check consistency
-        self._check_consistency(module_name, __all__, _dynamic_imports)
+        self._check_consistency(module_name, all_refs, _dynamic_imports)
 
         # Check TYPE_CHECKING block
         self._check_type_checking_block(module_name, module)
@@ -222,6 +261,8 @@ class PackageValidator:
         if missing_in_dynamic := [name for name in all_ if name not in dynamic_imports]:
             module = importlib.import_module(module_name)
             for name in missing_in_dynamic:
+                if f"{module_name}.{name}" in IS_EXCEPTION:
+                    continue
                 if hasattr(module, name):
                     value = getattr(module, name)
                     if not callable(value) and not isinstance(value, type):
@@ -318,7 +359,7 @@ class PackageValidator:
                         PackageError(
                             module_name,
                             "ERROR",
-                            f"'{name}' -> {full_module}.{name} - Module exists but attribute doesn't",
+                            f"'{name}' -> {full_module}.{name} - Module exists but attribute doesn't exist",
                         )
                     )
             except ImportError as e:
@@ -327,6 +368,30 @@ class PackageValidator:
                         module_name, "ERROR", f"'{name}' -> Cannot import {full_module} - {e}"
                     )
                 )
+            except botocore.exceptions.NoRegionError:
+                if "bedrock" not in full_module or "Bedrock" not in name:
+                    self.errors.append(
+                        PackageError(
+                            module_name,
+                            "ERROR",
+                            f"'{name}' -> Error importing {full_module} - No AWS region configured",
+                        )
+                    )
+            except Exception as e:
+                if "sentence_transformers" in full_module and "SparseEncoder" in str(e):
+                    self.warnings.append(
+                        PackageError(
+                            module_name,
+                            "WARNING",
+                            f"'{name}' -> Skipping SparseEncoder import error (requires extra dependencies)",
+                        )
+                    )
+                else:
+                    self.errors.append(
+                        PackageError(
+                            module_name, "ERROR", f"'{name}' -> Error importing {full_module} - {e}"
+                        )
+                    )
 
 
 def display_package_errors_as_panels(
@@ -362,9 +427,18 @@ def validate_package_level_imports() -> tuple[
     list[PackageError], list[PackageError], list[PackageError]
 ]:
     """Validate package-level lazy imports."""
-    validator = PackageValidator()
 
-    for module_name in PACKAGE_MODULES:
+    def mod_to_name(mod: Path) -> str:
+        return str(mod.parent.relative_to(SRC_DIR)).strip().replace("/", ".")
+
+    validator = PackageValidator()
+    module_names = [
+        f"codeweaver.{mod_to_name(module)}"
+        if mod_to_name(module) and mod_to_name(module) != "."
+        else "codeweaver"
+        for module in PACKAGE_MODULES
+    ]
+    for module_name in module_names:
         validator.validate_module(module_name)
 
     return validator.errors, validator.warnings, validator.info
@@ -375,16 +449,25 @@ def validate_package_level_imports() -> tuple[
 # ============================================================================
 
 
+def _print_section_header(line1: str, style: str, header: str, msg: str):
+    """Print a styled section header."""
+    console.print(Rule(line1, style=style))
+
+    # Section 1: lazy_import() Function Calls
+    console.print(header)
+    console.print(msg)
+
+
 def main(paths: list[Path] | None = None) -> int:
     """Run all lazy import validations."""
     exit_code = 0
 
-    console.print(Rule("[bold cyan]CodeWeaver Lazy Import Validator[/bold cyan]", style="cyan"))
-
-    # Section 1: lazy_import() Function Calls
-    console.print("\n[bold blue]Section 1: Validating lazy_import() Function Calls[/bold blue]")
-    console.print("[dim]Scanning for lazy_import(module, object) patterns...[/dim]\n")
-
+    _print_section_header(
+        "[bold cyan]CodeWeaver Lazy Import Validator[/bold cyan]",
+        "cyan",
+        "\n[bold blue]Section 1: Validating lazy_import() Function Calls[/bold blue]",
+        "[dim]Scanning for lazy_import(module, object) patterns...[/dim]\n",
+    )
     function_errors = validate_function_calls(paths)
 
     if function_errors:
@@ -394,19 +477,17 @@ def main(paths: list[Path] | None = None) -> int:
             for error in function_errors:
                 console.print(" | ".join(error))
         exit_code = 1
+    elif is_tty():
+        console.print("[bold green]✓ All lazy_import() function calls are valid.[/bold green]")
     else:
-        if is_tty():
-            console.print("[bold green]✓ All lazy_import() function calls are valid.[/bold green]")
-        else:
-            console.print("All lazy_import() function calls are valid.")
+        console.print("All lazy_import() function calls are valid.")
 
-    # Section 2: Package-Level Lazy Imports
-    console.print(Rule("", style="dim"))
-    console.print("\n[bold blue]Section 2: Validating Package-Level Lazy Imports[/bold blue]")
-    console.print(
-        "[dim]Checking __init__.py lazy import patterns (__all__, _dynamic_imports, __getattr__)...[/dim]\n"
+    _print_section_header(
+        "",
+        "dim",
+        "\n[bold blue]Section 2: Validating Package-Level Lazy Imports[/bold blue]",
+        "[dim]Checking __init__.py lazy import patterns (__all__, _dynamic_imports, __getattr__)...[/dim]\n",
     )
-
     pkg_errors, pkg_warnings, pkg_info = validate_package_level_imports()
 
     if pkg_errors or pkg_warnings or pkg_info:
@@ -422,11 +503,10 @@ def main(paths: list[Path] | None = None) -> int:
 
         if pkg_errors:
             exit_code = 1
+    elif is_tty():
+        console.print("[bold green]✓ All package-level lazy imports are valid.[/bold green]")
     else:
-        if is_tty():
-            console.print("[bold green]✓ All package-level lazy imports are valid.[/bold green]")
-        else:
-            console.print("All package-level lazy imports are valid.")
+        console.print("All package-level lazy imports are valid.")
 
     # Final Summary
     console.print(Rule("", style="dim"))

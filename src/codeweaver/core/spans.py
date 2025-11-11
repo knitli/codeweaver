@@ -12,6 +12,7 @@ from typing import Annotated, Any, ClassVar, NamedTuple, Self, TypeGuard
 
 from pydantic import UUID7, Field, NonNegativeInt, PositiveInt, computed_field, model_validator
 from pydantic.dataclasses import dataclass
+from typing_extensions import TypeIs
 
 from codeweaver.common.utils import uuid7
 from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
@@ -196,7 +197,7 @@ class Span(DataclassSerializationMixin):
         return self.end - self.start + ONE_LINE
 
     @staticmethod
-    def _is_span_tuple(span: Span | SpanTuple | int) -> TypeGuard[SpanTuple]:
+    def _is_span_tuple(span: Span | SpanTuple | int) -> TypeIs[SpanTuple]:
         """Check if the given span is a SpanTuple."""
         return isinstance(span, tuple) and len(span) == 3 and hasattr(span[2], "hex")
 
@@ -224,7 +225,8 @@ class Span(DataclassSerializationMixin):
         if isinstance(span, int):
             return self._is_contained(span)
         if self._is_span_tuple(span):
-            return bool(self & Span.from_tuple(span))
+            span_tuple: SpanTuple = span
+            return bool(self & Span.from_tuple(span_tuple))
         if self._is_file_end_tuple(span):
             start, end = span[:2]
             return self._is_contained(start) or self._is_contained(end)

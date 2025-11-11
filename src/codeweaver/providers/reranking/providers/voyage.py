@@ -7,11 +7,15 @@
 
 from __future__ import annotations
 
+import logging
+import os
+
 from collections.abc import Callable, Iterator, Sequence
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, cast
+from warnings import filterwarnings
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, SecretStr
 
 from codeweaver.common.utils.utils import rpartial
 from codeweaver.exceptions import ProviderError
@@ -23,6 +27,7 @@ from codeweaver.providers.reranking.providers.base import RerankingProvider, Rer
 if TYPE_CHECKING:
     from codeweaver.core.chunks import CodeChunk
 
+logger = logging.getLogger(__name__)
 
 try:
     from voyageai.client_async import AsyncClient
@@ -35,6 +40,10 @@ except ImportError as e:
     raise ConfigurationError(
         "Voyage AI SDK is not installed. Please install it with `pip install codeweaver[voyage]`."
     ) from e
+
+
+# We need to filter UserWarning about shadowing the parent class
+filterwarnings("ignore", category=UserWarning, message='.*RerankingProvider" shadows.*')
 
 
 def voyage_reranking_output_transformer(
@@ -77,7 +86,49 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
         [Any, Iterator[CodeChunk] | tuple[CodeChunk, ...]], list[RerankingResult]
     ] = lambda x, y: x  # placeholder, actually set in _initialize()
 
+    def __init__(
+        self,
+        client: AsyncClient | None = None,
+        caps: RerankingModelCapabilities | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize the reranking provider."""
+        if caps is None:
+            from codeweaver.common.registry.model_registry import get_model_registry
+
+            registry = get_model_registry()
+            caps = registry.configured_models_for_kind("reranking")
+            if isinstance(caps, tuple) and len(caps) > 0:
+                caps = caps[0]
+        if not caps:
+            raise ConfigurationError("Reranking model capabilities must be provided.")
+        if (kwargs and "model" in kwargs) or "model_name" in kwargs:
+            model = kwargs.get("model") or kwargs.get("model_name")
+        else:
+            model = caps.name
+        if client is None:
+            if api_key := kwargs.pop("api_key", None) or os.getenv("VOYAGE_API_KEY"):
+                if isinstance(api_key, SecretStr):
+                    api_key = api_key.get_secret_value()
+                client = AsyncClient(api_key=api_key, model=model, **kwargs)
+
+            else:
+                logger.warning(
+                    "We could not find an API key for Voyage AI. In case you have other means of authentication, we're going to proceed without an explicit API key... if you get authentication errors, please set the VOYAGE_API_KEY environment variable."
+                )
+                client = AsyncClient(model=model, **kwargs)
+        self.client = client
+
+        if caps is None:
+            raise ConfigurationError("Reranking model capabilities must be provided.")
+
+        self.caps = caps
+
+        super().__init__(**kwargs)
+        self._initialize()
+
     def _initialize(self) -> None:
+
         type(self)._output_transformer = rpartial(
             voyage_reranking_output_transformer, _instance=self
         )

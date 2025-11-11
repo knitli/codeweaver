@@ -38,7 +38,6 @@ if TYPE_CHECKING:
         SessionSummaryEvent,
         TelemetryEvent,
     )
-    from codeweaver.config.telemetry import TelemetrySettings, get_telemetry_settings
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
@@ -46,9 +45,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "PostHogClient": (__spec__.parent, "client"),
     "SessionSummaryEvent": (__spec__.parent, "events"),
     "TelemetryEvent": (__spec__.parent, "events"),
-    "TelemetrySettings": (__spec__.parent, "config"),
     "get_telemetry_client": (__spec__.parent, "client"),
-    "get_telemetry_settings": (__spec__.parent, "config"),
 })
 
 
@@ -70,9 +67,7 @@ __all__ = (
     "PostHogClient",
     "SessionSummaryEvent",
     "TelemetryEvent",
-    "TelemetrySettings",
     "get_telemetry_client",
-    "get_telemetry_settings",
 )
 
 

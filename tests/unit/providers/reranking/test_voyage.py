@@ -39,7 +39,10 @@ class TestVoyageRerankingProviderInitialization:
     ):
         """Test that provider initializes correctly with a client."""
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities, prompt=None
+            client=mock_voyage_rerank_client,
+            caps=voyage_rerank_capabilities,
+            prompt=None,
+            _rerank_kwargs={},
         )
 
         assert provider.client is mock_voyage_rerank_client

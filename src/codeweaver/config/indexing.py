@@ -305,14 +305,14 @@ class IndexerSettings(BasedModel):
                 path
                 for tool in COMMON_TOOLING_PATHS
                 for path in tool[1]
-                if path.name.startswith(".")
-                or (str(path).startswith(".") and path.suffix not in file_endings)
+                if Path(path).name.startswith(".")
+                or (str(path).startswith(".") and Path(path).suffix not in file_endings)
             } | {
                 path
                 for tool in COMMON_LLM_TOOLING_PATHS
                 for path in tool[1]
-                if path.name.startswith(".")
-                or (str(path).startswith(".") and path.suffix not in file_endings)
+                if Path(path).name.startswith(".")
+                or (str(path).startswith(".") and Path(path).suffix not in file_endings)
             }
             self.forced_includes |= {f"**/{directory}/**" for directory in tooling_dirs}
 

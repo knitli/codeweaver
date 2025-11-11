@@ -18,8 +18,6 @@ if TYPE_CHECKING:
     from codeweaver.providers.embedding.capabilities.base import (
         EmbeddingModelCapabilities,
         SparseEmbeddingModelCapabilities,
-        load_default_capabilities,
-        load_sparse_capabilities,
     )
     from codeweaver.providers.embedding.fastembed_extensions import (
         get_sparse_embedder,
@@ -29,13 +27,13 @@ if TYPE_CHECKING:
         BedrockEmbeddingProvider,
         CohereEmbeddingProvider,
         FastEmbedEmbeddingProvider,
-        FastEmbedSparseEmbeddingProvider,
+        FastEmbedSparseProvider,
         GoogleEmbeddingProvider,
         HuggingFaceEmbeddingProvider,
         MistralEmbeddingProvider,
         OpenAIEmbeddingBase,
         SentenceTransformersEmbeddingProvider,
-        SentenceTransformersSparseEmbeddingProvider,
+        SentenceTransformersSparseProvider,
         VoyageEmbeddingProvider,
     )
     from codeweaver.providers.embedding.providers.base import (
@@ -60,21 +58,16 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SparseEmbeddingModelCapabilities": (__spec__.parent, "capabilities.base"),
     "EmbeddingProvider": (__spec__.parent, "providers.base"),
     "SparseEmbeddingProvider": (__spec__.parent, "providers.base"),
-    "load_default_capabilities": (__spec__.parent, "capabilities.base"),
-    "load_sparse_capabilities": (__spec__.parent, "capabilities.base"),
     "BedrockEmbeddingProvider": (__spec__.parent, "providers.bedrock"),
     "CohereEmbeddingProvider": (__spec__.parent, "providers.cohere"),
     "FastEmbedEmbeddingProvider": (__spec__.parent, "providers.fastembed"),
-    "FastEmbedSparseEmbeddingProvider": (__spec__.parent, "providers.fastembed"),
+    "FastEmbedSparseProvider": (__spec__.parent, "providers.fastembed"),
     "GoogleEmbeddingProvider": (__spec__.parent, "providers.google"),
     "HuggingFaceEmbeddingProvider": (__spec__.parent, "providers.huggingface"),
     "MistralEmbeddingProvider": (__spec__.parent, "providers.mistral"),
     "OpenAIEmbeddingBase": (__spec__.parent, "providers.openai_factory"),
     "SentenceTransformersEmbeddingProvider": (__spec__.parent, "providers.sentence_transformers"),
-    "SentenceTransformersSparseEmbeddingProvider": (
-        __spec__.parent,
-        "providers.sentence_transformers",
-    ),
+    "SentenceTransformersSparseProvider": (__spec__.parent, "providers.sentence_transformers"),
     "VoyageEmbeddingProvider": (__spec__.parent, "providers.voyage"),
     "get_sparse_embedder": (__spec__.parent, "fastembed_extensions"),
     "get_text_embedder": (__spec__.parent, "fastembed_extensions"),
@@ -114,7 +107,7 @@ __all__ = (
     "EmbeddingProvider",
     "EmbeddingRegistry",
     "FastEmbedEmbeddingProvider",
-    "FastEmbedSparseEmbeddingProvider",
+    "FastEmbedSparseProvider",
     "GoogleEmbeddingProvider",
     "HuggingFaceEmbeddingProvider",
     "InvalidEmbeddingModelError",
@@ -123,7 +116,7 @@ __all__ = (
     "QueryResult",
     "RawEmbeddingVectors",
     "SentenceTransformersEmbeddingProvider",
-    "SentenceTransformersSparseEmbeddingProvider",
+    "SentenceTransformersSparseProvider",
     "SparseEmbedding",
     "SparseEmbeddingModelCapabilities",
     "SparseEmbeddingProvider",
@@ -132,8 +125,6 @@ __all__ = (
     "get_embedding_registry",
     "get_sparse_embedder",
     "get_text_embedder",
-    "load_default_capabilities",
-    "load_sparse_capabilities",
 )
 
 

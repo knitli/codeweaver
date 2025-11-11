@@ -8,13 +8,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Annotated, Any, Literal, NotRequired, Required, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, NotRequired, Required, TypedDict
 
-from pydantic import NonNegativeInt, PositiveInt
+from pydantic import PositiveInt
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
     from codeweaver.providers.provider import Provider
 
 type PartialRerankingCapabilitiesDict = dict[
@@ -55,3 +54,6 @@ class RerankingCapabilitiesDict(TypedDict, total=False):
     tokenizer: NotRequired[Literal["tokenizers", "tiktoken"]]
     tokenizer_model: NotRequired[str]
     other: NotRequired[dict[str, Any]]
+
+
+__all__ = ("PartialRerankingCapabilitiesDict", "RerankingCapabilitiesDict")

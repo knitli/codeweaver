@@ -6,14 +6,15 @@
 
 # Suppress pydantic deprecation warnings from third-party dependencies
 # This must be at the very top before any imports
+import contextlib
 import warnings
 
-try:
+
+with contextlib.suppress(ImportError):
+    # Google's `genai` package uses outdated pydantic features that trigger deprecation warnings with our newer pydantic version.
     from pydantic.warnings import PydanticDeprecatedSince212
 
     warnings.simplefilter("ignore", PydanticDeprecatedSince212)
-except ImportError:
-    pass
 
 from codeweaver._version import __version__
 from codeweaver.exceptions import (

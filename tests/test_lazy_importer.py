@@ -557,8 +557,8 @@ class TestLazyImportIntrospection:
         get_settings_lazy = lazy_import("codeweaver.config.settings", "get_settings")
 
         @dataclass
-@pytest.mark.benchmark
-@pytest.mark.performance
+        @pytest.mark.benchmark
+        @pytest.mark.performance
         class TestModel:
             settings: object = Field(default_factory=get_settings_lazy)
 

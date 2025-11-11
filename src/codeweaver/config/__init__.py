@@ -67,6 +67,8 @@ if TYPE_CHECKING:
         ProviderSpecificSettings,
         RerankingModelSettings,
         RerankingProviderSettings,
+        SparseEmbeddingModelSettings,
+        VectorStoreProviderSettings,
     )
     from codeweaver.config.settings import (
         CodeWeaverSettings,
@@ -76,6 +78,7 @@ if TYPE_CHECKING:
         get_settings_map,
         update_settings,
     )
+    from codeweaver.config.telemetry import TelemetrySettings, get_telemetry_settings
     from codeweaver.config.types import (
         FastMcpHttpRunArgs,
         FastMcpServerSettingsDict,
@@ -113,6 +116,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "FastMcpServerSettings": (__spec__.parent, "settings"),
     "FastMcpServerSettingsDict": (__spec__.parent, "types"),
     "FastembedGPUProviderSettings": (__spec__.parent, "providers"),
+    "IndexerSettings": (__spec__.parent, "indexing"),
     "IndexerSettingsDict": (__spec__.parent, "indexing"),
     "FilterID": (__spec__.parent, "logging"),
     "FiltersDict": (__spec__.parent, "logging"),
@@ -137,6 +141,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "RignoreSettings": (__spec__.parent, "indexing"),
     "SerializableLoggingFilter": (__spec__.parent, "logging"),
     "SparseEmbeddingModelSettings": (__spec__.parent, "providers"),
+    "TelemetrySettings": (__spec__.parent, "telemetry"),
+    "get_telemetry_settings": (__spec__.parent, "telemetry"),
     "UvicornServerSettings": (__spec__.parent, "types"),
     "UvicornServerSettingsDict": (__spec__.parent, "types"),
     "VectorStoreProviderSettings": (__spec__.parent, "providers"),
@@ -214,12 +220,16 @@ __all__ = (
     "RetryMiddlewareSettings",
     "RignoreSettings",
     "SerializableLoggingFilter",
+    "SparseEmbeddingModelSettings",
     "StdioCodeWeaverConfig",
     "StdioCodeWeaverConfigDict",
+    "TelemetrySettings",
     "UvicornServerSettings",
     "UvicornServerSettingsDict",
+    "VectorStoreProviderSettings",
     "get_settings",
     "get_settings_map",
+    "get_telemetry_settings",
     "update_settings",
 )
 

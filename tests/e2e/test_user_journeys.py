@@ -19,7 +19,6 @@ import pytest
 import tomli
 
 from codeweaver.cli.commands.config import app as config_app
-from codeweaver.cli.commands.doctor import app as doctor_app
 from codeweaver.cli.commands.init import app as init_app
 from codeweaver.cli.commands.list import app as list_app
 

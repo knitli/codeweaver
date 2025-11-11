@@ -181,7 +181,8 @@ class BaseDataclassEnum(Enum):
     @classmethod
     def add_member(cls, name: str, value: BaseEnumData) -> Self:
         """Dynamically add a new member to the enum."""
-        extend_enum(cls, textcase.upper(name), value=value)
+        # The type stub signature is (cls, name, *args, **kwargs), but the function applies a tuple to single args (value -> (value,)). Bottom line: it works fine. This is much more clear.
+        extend_enum(cls, textcase.upper(name), value)  # ty: ignore[too-many-positional-arguments]
         return cls(value)
 
 

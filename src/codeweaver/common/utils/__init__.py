@@ -11,6 +11,8 @@ from importlib import import_module
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
+from codeweaver.common.utils.lazy_importer import LazyImport, create_lazy_getattr, lazy_import
+
 
 if TYPE_CHECKING:
     # Import everything for IDE and type checker support
@@ -34,7 +36,6 @@ if TYPE_CHECKING:
         set_relative_path,
         try_git_rev_parse,
     )
-    from codeweaver.common.utils.lazy_importer import LazyImport, lazy_import
     from codeweaver.common.utils.normalize import normalize_ext, sanitize_unicode
     from codeweaver.common.utils.utils import (
         ensure_iterable,
@@ -61,8 +62,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "is_git_dir": (__spec__.parent, "git"),
     "set_relative_path": (__spec__.parent, "git"),
     "try_git_rev_parse": (__spec__.parent, "git"),
-    "LazyImport": (__spec__.parent, "lazy_importer"),
-    "lazy_import": (__spec__.parent, "lazy_importer"),
     "normalize_ext": (__spec__.parent, "normalize"),
     "sanitize_unicode": (__spec__.parent, "normalize"),
     "ensure_iterable": (__spec__.parent, "utils"),
@@ -74,21 +73,11 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
 })
 
 
-def __getattr__(name: str) -> object:
-    """Dynamically import submodules and classes for the utils package."""
-    if name in _dynamic_imports:
-        module_name, submodule_name = _dynamic_imports[name]
-        module = import_module(f"{module_name}.{submodule_name}")
-        result = getattr(module, name)
-        globals()[name] = result  # Cache in globals for future access
-        return result
-    if globals().get(name) is not None:
-        return globals()[name]
-    raise AttributeError(f"module {__name__} has no attribute {name}")
-
+__getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
     "LazyImport",
+    "create_lazy_getattr",
     "ensure_iterable",
     "estimate_tokens",
     "file_is_binary",

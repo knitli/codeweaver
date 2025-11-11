@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
     from codeweaver.providers.embedding.providers.fastembed import (
         FastEmbedEmbeddingProvider,
-        FastEmbedSparseEmbeddingProvider,
+        FastEmbedSparseProvider,
     )
     from codeweaver.providers.embedding.providers.google import GoogleEmbeddingProvider
     from codeweaver.providers.embedding.providers.huggingface import HuggingFaceEmbeddingProvider
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from codeweaver.providers.embedding.providers.openai_factory import OpenAIEmbeddingBase
     from codeweaver.providers.embedding.providers.sentence_transformers import (
         SentenceTransformersEmbeddingProvider,
-        SentenceTransformersSparseEmbeddingProvider,
+        SentenceTransformersSparseProvider,
     )
     from codeweaver.providers.embedding.providers.voyage import VoyageEmbeddingProvider
 
@@ -43,13 +43,13 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "EmbeddingProvider": (__spec__.parent, "base"),
     "SparseEmbeddingProvider": (__spec__.parent, "base"),
     "FastEmbedEmbeddingProvider": (__spec__.parent, "fastembed"),
-    "FastEmbedSparseEmbeddingProvider": (__spec__.parent, "fastembed"),
+    "FastEmbedSparseProvider": (__spec__.parent, "fastembed"),
     "GoogleEmbeddingProvider": (__spec__.parent, "google"),
     "HuggingFaceEmbeddingProvider": (__spec__.parent, "huggingface"),
     "MistralEmbeddingProvider": (__spec__.parent, "mistral"),
     "OpenAIEmbeddingBase": (__spec__.parent, "openai_factory"),
     "SentenceTransformersEmbeddingProvider": (__spec__.parent, "sentence_transformers"),
-    "SentenceTransformersSparseEmbeddingProvider": (__spec__.parent, "sentence_transformers"),
+    "SentenceTransformersSparseProvider": (__spec__.parent, "sentence_transformers"),
     "VoyageEmbeddingProvider": (__spec__.parent, "voyage"),
 })
 
@@ -72,13 +72,13 @@ __all__ = (
     "CohereEmbeddingProvider",
     "EmbeddingProvider",
     "FastEmbedEmbeddingProvider",
-    "FastEmbedSparseEmbeddingProvider",
+    "FastEmbedSparseProvider",
     "GoogleEmbeddingProvider",
     "HuggingFaceEmbeddingProvider",
     "MistralEmbeddingProvider",
     "OpenAIEmbeddingBase",
     "SentenceTransformersEmbeddingProvider",
-    "SentenceTransformersSparseEmbeddingProvider",
+    "SentenceTransformersSparseProvider",
     "SparseEmbeddingProvider",
     "VoyageEmbeddingProvider",
 )

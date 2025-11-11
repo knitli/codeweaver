@@ -138,7 +138,7 @@ class SemanticChunker(BaseChunker):
             self._importance_threshold = governor.settings.semantic_importance_threshold
         else:
             self._importance_threshold = (
-                0.3  # default value  # TODO: Make configurable via governor
+                0.3  # default value  # TODO: Make importance_threshold configurable via governor
             )
 
     def chunk(

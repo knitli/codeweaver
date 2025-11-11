@@ -30,7 +30,7 @@ from codeweaver.engine.match_models import (
 )
 
 
-Metadata = dict[str, Any]
+PayloadMetadata = dict[str, Any]
 ArbitraryFilter = dict[str, Any]
 
 
@@ -57,7 +57,7 @@ class Entry(BaseModel):
     """
 
     content: str
-    metadata: Metadata | None = None
+    Metadata: PayloadMetadata | None = None
 
 
 class FilterableField(BaseModel):
@@ -317,7 +317,7 @@ __all__ = (
     "MatchAny",
     "MatchExcept",
     "MatchValue",
-    "Metadata",
+    "PayloadMetadata",
     "PayloadSchemaType",
     "Range",
     "to_qdrant_filter",

@@ -482,7 +482,14 @@ def get_semantic_or_config_lang(
 ) -> SemanticSearchLanguage | ConfigLanguage | None:
     """Get the `SemanticSearchLanguage` or `ConfigLanguage` for a given file path."""
     is_file = isinstance(test_info, Path)
-    file_path = test_info if is_file else None
+    # This is probably an unnecessary guard, but it was added while hunting a bug
+    file_path = (
+        test_info
+        if is_file
+        else Path(str(test_info))
+        if test_info and Path(str(test_info)).exists()
+        else None
+    )
     language_name = test_info if test_info and not is_file else None
     if language_name is not None:
         with contextlib.suppress(KeyError, ValueError, AttributeError):

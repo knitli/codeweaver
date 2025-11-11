@@ -39,7 +39,7 @@ def get_rich_handler(**kwargs: Any) -> RichHandler:
 def _setup_config_logger(
     name: str | None = "codeweaver",
     *,
-    level: int = logging.INFO,
+    level: int = logging.WARNING,
     rich: bool = True,
     rich_options: dict[str, Any] | None = None,
     logging_kwargs: LoggingConfigDict | None = None,
@@ -48,21 +48,26 @@ def _setup_config_logger(
     if logging_kwargs:
         dictConfig({**logging_kwargs})  # ty: ignore[missing-typed-dict-key]
         if rich:
-            handler = get_rich_handler(**(rich_options or {}))
-            logger = logging.getLogger(name)
-            logger.setLevel(level)
-            # Clear existing handlers to prevent duplication
-            logger.handlers.clear()
-            logger.addHandler(handler)
-            return logger
+            return _setup_logger_with_rich_handler(rich_options, name, level)
         return logging.getLogger(name)
     raise ValueError("No logging configuration provided")
+
+
+def _setup_logger_with_rich_handler(rich_options: dict[str, Any] | None, name: str, level: int):
+    """Set up a logger with rich handler."""
+    handler = get_rich_handler(**(rich_options or {}))
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+    # Clear existing handlers to prevent duplication
+    logger.handlers.clear()
+    logger.addHandler(handler)
+    return logger
 
 
 def setup_logger(
     name: str | None = "codeweaver",
     *,
-    level: int = logging.INFO,
+    level: int = logging.WARNING,
     rich: bool = True,
     rich_options: dict[str, Any] | None = None,
     logging_kwargs: LoggingConfigDict | None = None,

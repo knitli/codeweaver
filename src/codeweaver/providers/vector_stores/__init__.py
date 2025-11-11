@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from importlib import import_module
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
 from codeweaver.exceptions import ConfigurationError
@@ -14,6 +16,10 @@ from codeweaver.exceptions import ConfigurationError
 if TYPE_CHECKING:
     from codeweaver.config.providers import VectorStoreProviderSettings
     from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
+    from codeweaver.providers.vector_stores.metadata import CollectionMetadata, HybridVectorPayload
+    from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+    from codeweaver.providers.vector_stores.utils import resolve_dimensions
 
 
 def get_vector_store_provider(settings: VectorStoreProviderSettings) -> VectorStoreProvider[Any]:
@@ -87,4 +93,40 @@ def get_vector_store_provider(settings: VectorStoreProviderSettings) -> VectorSt
     )
 
 
-__all__ = ("VectorStoreProvider", "get_vector_store_provider")
+_dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "MemoryVectorStoreProvider": (__spec__.parent, "inmemory"),
+    "QdrantVectorStoreProvider": (__spec__.parent, "qdrant"),
+    "VectorStoreProvider": (__spec__.parent, "base"),
+    "HybridVectorPayload": (__spec__.parent, "metadata"),
+    "CollectionMetadata": (__spec__.parent, "metadata"),
+    "resolve_dimensions": (__spec__.parent, "utils"),
+})
+
+
+def __getattr__(name: str) -> object:
+    """Dynamically import submodules and classes for the vector_stores package."""
+    if name in _dynamic_imports:
+        module_name, submodule_name = _dynamic_imports[name]
+        module = import_module(f"{module_name}.{submodule_name}")
+        result = getattr(module, name)
+        globals()[name] = result  # Cache in globals for future access
+        return result
+    if globals().get(name) is not None:
+        return globals()[name]
+    raise AttributeError(f"module {__name__} has no attribute {name}")
+
+
+__all__ = (
+    "CollectionMetadata",
+    "HybridVectorPayload",
+    "MemoryVectorStoreProvider",
+    "QdrantVectorStoreProvider",
+    "VectorStoreProvider",
+    "get_vector_store_provider",
+    "resolve_dimensions",
+)
+
+
+def __dir__() -> list[str]:
+    """List available attributes for the module."""
+    return list(__all__)

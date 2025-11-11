@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import MutableMapping
 from types import MappingProxyType
-from typing import Annotated, ClassVar
+from typing import ClassVar
 
 from pydantic import ConfigDict, PrivateAttr
 

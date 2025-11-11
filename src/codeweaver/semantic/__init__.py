@@ -16,16 +16,61 @@ from __future__ import annotations
 
 from importlib import import_module
 from types import MappingProxyType
+from typing import TYPE_CHECKING
 
-from codeweaver.semantic.grammar import get_all_grammars, get_grammar
-from codeweaver.semantic.registry import get_registry
 
+if TYPE_CHECKING:
+    from codeweaver.semantic.ast_grep import (
+        AstThing,
+        CustomLang,
+        FileThing,
+        MetaVar,
+        NthChild,
+        Pattern,
+        Position,
+        PosRule,
+        Range,
+        RangeRule,
+        Relation,
+        Rule,
+        RuleWithoutNot,
+    )
+    from codeweaver.semantic.classifications import (
+        AgentTask,
+        ImportanceScores,
+        SemanticClass,
+        ThingClass,
+    )
+    from codeweaver.semantic.classifier import (
+        ClassificationMethod,
+        EvidenceKind,
+        GrammarBasedClassifier,
+        GrammarClassificationResult,
+    )
+    from codeweaver.semantic.grammar import (
+        Category,
+        CompositeThing,
+        DirectConnection,
+        Grammar,
+        PositionalConnections,
+        ThingType,
+        Token,
+        get_all_grammars,
+        get_grammar,
+    )
+    from codeweaver.semantic.registry import ThingRegistry, get_registry
+    from codeweaver.semantic.scoring import SemanticScorer
+    from codeweaver.semantic.types import (
+        ConnectionClass,
+        ConnectionConstraint,
+        ThingKind,
+        TokenPurpose,
+    )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "AgentTask": (__spec__.parent, "classifications"),
     "AstThing": (__spec__.parent, "ast_grep"),
     "Category": (__spec__.parent, "grammar"),
-    "CategoryName": (__spec__.parent, "types"),
     "ClassificationMethod": (__spec__.parent, "classifier"),
     "CompositeThing": (__spec__.parent, "grammar"),
     "ConnectionClass": (__spec__.parent, "types"),
@@ -45,7 +90,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "PosRule": (__spec__.parent, "ast_grep"),
     "PositionalConnections": (__spec__.parent, "grammar"),
     "Range": (__spec__.parent, "ast_grep"),
-    "Role": (__spec__.parent, "types"),
     "RangeRule": (__spec__.parent, "ast_grep"),
     "Relation": (__spec__.parent, "ast_grep"),
     "Rule": (__spec__.parent, "ast_grep"),
@@ -54,11 +98,13 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SemanticScorer": (__spec__.parent, "scoring"),
     "ThingClass": (__spec__.parent, "classifications"),
     "ThingKind": (__spec__.parent, "types"),
-    "ThingName": (__spec__.parent, "types"),
     "ThingRegistry": (__spec__.parent, "registry"),
     "ThingType": (__spec__.parent, "grammar"),
     "Token": (__spec__.parent, "grammar"),
     "TokenPurpose": (__spec__.parent, "types"),
+    "get_all_grammars": (__spec__.parent, "grammar"),
+    "get_grammar": (__spec__.parent, "grammar"),
+    "get_registry": (__spec__.parent, "registry"),
 })
 """Dynamically import submodules and classes for the semantic package.
 
@@ -83,11 +129,11 @@ __all__ = (
     "AgentTask",
     "AstThing",
     "Category",
-    "CategoryName",
     "ClassificationMethod",
     "CompositeThing",
     "ConnectionClass",
     "ConnectionConstraint",
+    "CustomLang",
     "DirectConnection",
     "EvidenceKind",
     "FileThing",
@@ -96,15 +142,20 @@ __all__ = (
     "GrammarClassificationResult",
     "ImportanceScores",
     "MetaVar",
+    "NthChild",
+    "Pattern",
+    "PosRule",
     "Position",
     "PositionalConnections",
     "Range",
-    "Role",
+    "RangeRule",
+    "Relation",
+    "Rule",
+    "RuleWithoutNot",
     "SemanticClass",
     "SemanticScorer",
     "ThingClass",
     "ThingKind",
-    "ThingName",
     "ThingRegistry",
     "ThingType",
     "Token",

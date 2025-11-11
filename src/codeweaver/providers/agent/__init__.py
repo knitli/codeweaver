@@ -10,9 +10,10 @@ The agent package is a thin wrapper around Pydantic AI's agent capabilities, ali
 
 from __future__ import annotations
 
-from importlib import import_module
 from types import MappingProxyType
 from typing import TYPE_CHECKING
+
+from codeweaver.common.utils import create_lazy_getattr
 
 
 if TYPE_CHECKING:
@@ -54,7 +55,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "AbstractToolset": (__spec__.parent, "agent_providers"),
     "AgentModel": (__spec__.parent, "agent_models"),
     "AgentModelSettings": (__spec__.parent, "agent_models"),
-    "AgentProfile": (__spec__.parent, "agent_providers"),
     "AgentProvider": (__spec__.parent, "agent_providers"),
     "CombinedToolset": (__spec__.parent, "agent_providers"),
     "DownloadedItem": (__spec__.parent, "agent_models"),
@@ -76,18 +76,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "override_allow_model_requests": (__spec__.parent, "agent_models"),
 })
 
-
-def __getattr__(name: str) -> object:
-    """Dynamically import submodules and classes for the agent package."""
-    if name in _dynamic_imports:
-        module_name, submodule_name = _dynamic_imports[name]
-        module = import_module(f"{module_name}.{submodule_name}")
-        result = getattr(module, name)
-        globals()[name] = result  # Cache in globals for future access
-        return result
-    if globals().get(name) is not None:
-        return globals()[name]
-    raise AttributeError(f"module {__name__} has no attribute {name}")
+__getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 
 __all__ = (

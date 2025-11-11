@@ -173,7 +173,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ChunkSequence": (__spec__.parent, "chunks"),
     "CodeChunk": (__spec__.parent, "chunks"),
     "CodeChunkDict": (__spec__.parent, "chunks"),
-    "SearchResult": (__spec__.parent, "chunks"),
     "SerializedCodeChunk": (__spec__.parent, "chunks"),
     "StructuredDataInput": (__spec__.parent, "chunks"),
     "DictView": (__spec__.parent, "types"),

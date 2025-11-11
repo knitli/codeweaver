@@ -227,7 +227,7 @@ def actual_reranking_provider() -> SentenceTransformersRerankingProvider:
         for cap in get_marco_reranking_capabilities()
         if cap.name == "Xenova/ms-marco-MiniLM-L6-v2"
     )
-    return SentenceTransformersRerankingProvider(capabilities=caps, client=CrossEncoder(caps.name))
+    return SentenceTransformersRerankingProvider(caps=caps, client=CrossEncoder(caps.name))
 
 
 # ===========================================================================

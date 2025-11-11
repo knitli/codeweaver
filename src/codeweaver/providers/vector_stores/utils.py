@@ -44,3 +44,6 @@ def resolve_dimensions() -> PositiveInt:
     ):
         return dimension
     return model_capabilities.default_dimension
+
+
+__all__ = ("resolve_dimensions",)

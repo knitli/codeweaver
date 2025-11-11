@@ -1609,8 +1609,8 @@ class FileWatcher:
                 args=kwargs.pop("args", ()) if kwargs else (),
                 kwargs=kwargs.pop("kwargs", {}) if kwargs else {},
                 target_type="function",
-                callback=self.handler,
-                watch_filter=self.file_filter,
+                callback=self.handler,  # ty: ignore[invalid-argument-type]
+                watch_filter=self.file_filter,  # ty: ignore[invalid-argument-type]
                 grace_period=20.0,
                 debounce=200_000,  # milliseconds - we want to avoid rapid re-indexing but not let things go stale, either.
                 step=15_000,  # milliseconds -- how long to wait for more changes before yielding on changes
@@ -1620,31 +1620,12 @@ class FileWatcher:
             )
             | {k: v for k, v in kwargs.items() if k in WatchfilesArgs.__annotations__}
         )
-        watch_kwargs: dict[str, Any] = (
-            {
-                # Keep a child process alive; do NOT perform indexing in the child process
-                # so that state remains in the main process.
-                "target": Indexer.keep_alive,
-                "args": (),
-                "kwargs": {},
-                "target_type": "function",
-                "callback": self._default_handler,
-                "watch_filter": self.file_filter,
-                "grace_period": 20.0,
-                "debounce": 200_000,  # milliseconds - we want to avoid rapid re-indexing but not let things go stale, either.
-                "step": 15_000,  # milliseconds -- how long to wait for more changes before yielding on changes
-                "debug": is_debug(),
-                "recursive": True,
-                "ignore_permission_denied": True,
-            }
-            | kwargs
-        )
-        watch_kwargs["recursive"] = True  # we always want recursive watching
+        watch_args["recursive"] = True  # we always want recursive watching
         try:
             # Perform a one-time initial indexing pass if we have a walker
             if initial_count := self._indexer.prime_index():
                 logger.info("Initial indexing complete: %d files indexed", initial_count)
-            self.watcher = watchfiles.arun_process(*self.paths, **watch_kwargs)
+            self.watcher = watchfiles.arun_process(*self.paths, **watch_args)
         except KeyboardInterrupt:
             logger.info("FileWatcher interrupted by user.")
         except Exception:

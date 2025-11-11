@@ -437,7 +437,7 @@ class Provider(BaseEnum):
         """Flatten a ProviderEnvVars TypedDict into a list of ProviderEnvVarInfo tuples."""
         found_vars: list[ProviderEnvVarInfo] = []
         for key, value in env_vars.items():
-            if key not in ("note", "other") and isinstance(value, tuple):
+            if key not in ("note", "other") and isinstance(value, ProviderEnvVarInfo):
                 found_vars.append(value)
             elif key == "other" and isinstance(value, dict) and value:
                 found_vars.extend(iter(value.values()))
