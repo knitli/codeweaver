@@ -66,6 +66,15 @@ class DiscoveredFile(BasedModel):
             default=True,
         ),
     ]
+    
+    # File contents (stored for convenience)
+    contents: Annotated[
+        str,
+        Field(
+            description="""The text contents of the file""",
+            default="",
+        ),
+    ]
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
@@ -74,6 +83,7 @@ class DiscoveredFile(BasedModel):
             FilteredKey("path"): AnonymityConversion.BOOLEAN,
             FilteredKey("abs_path"): AnonymityConversion.BOOLEAN,
             FilteredKey("file_hash"): AnonymityConversion.HASH,
+            FilteredKey("contents"): AnonymityConversion.TEXT_COUNT,
         }
 
     @classmethod
@@ -109,6 +119,20 @@ class DiscoveredFile(BasedModel):
             # Check if file is text
             is_text = cls._is_text_file(path, content)
             
+            # Decode contents if it's a text file
+            contents = ""
+            if is_text:
+                try:
+                    contents = content.decode("utf-8")
+                except UnicodeDecodeError:
+                    # Try other common encodings
+                    for encoding in ["latin-1", "cp1252"]:
+                        try:
+                            contents = content.decode(encoding)
+                            break
+                        except UnicodeDecodeError:
+                            continue
+            
             return cls(
                 path=abs_path,
                 abs_path=abs_path,
@@ -116,6 +140,7 @@ class DiscoveredFile(BasedModel):
                 size=size,
                 ext_kind=ext_kind,
                 is_text=is_text,
+                contents=contents,
             )
         except Exception:
             # If we can't read the file or determine its properties, return None
@@ -167,6 +192,7 @@ class DiscoveredFile(BasedModel):
         """Serialize the DiscoveredFile for CLI display.
         
         Returns a dict suitable for rendering in CLI output formats.
+        Note: Contents are excluded to keep output concise.
         """
         return {
             "path": str(self.path),
