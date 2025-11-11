@@ -51,6 +51,10 @@ def mock_governor() -> MagicMock:
     return governor
 
 
+@pytest.mark.benchmark
+@pytest.mark.mock_only
+@pytest.mark.performance
+@pytest.mark.unit
 class TestParseErrors:
     """Tests for parse error handling with malformed code."""
 
@@ -112,6 +116,10 @@ class TestParseErrors:
         assert len(error.suggestions) > 0, "ParseError should provide actionable suggestions"
 
 
+@pytest.mark.benchmark
+@pytest.mark.mock_only
+@pytest.mark.performance
+@pytest.mark.unit
 class TestASTDepthErrors:
     """Tests for AST depth limit enforcement."""
 
@@ -177,6 +185,10 @@ class TestASTDepthErrors:
         assert len(cast(list, error.suggestions)) > 0, "Error should include actionable guidance"
 
 
+@pytest.mark.benchmark
+@pytest.mark.mock_only
+@pytest.mark.performance
+@pytest.mark.unit
 class TestTimeoutErrors:
     """Tests for chunking timeout enforcement."""
 
@@ -247,6 +259,10 @@ class TestTimeoutErrors:
         )
 
 
+@pytest.mark.benchmark
+@pytest.mark.mock_only
+@pytest.mark.performance
+@pytest.mark.unit
 class TestChunkLimitErrors:
     """Tests for chunk limit enforcement."""
 
@@ -317,6 +333,10 @@ class TestChunkLimitErrors:
         ), "Suggestions should address chunk limits or code complexity"
 
 
+@pytest.mark.benchmark
+@pytest.mark.mock_only
+@pytest.mark.performance
+@pytest.mark.unit
 class TestErrorMessageQuality:
     """Tests for error message quality and descriptiveness."""
 

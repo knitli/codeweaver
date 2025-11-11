@@ -17,6 +17,8 @@ from codeweaver.common.utils.lazy_importer import LazyImport, lazy_import
 pytestmark = [pytest.mark.unit]
 
 
+@pytest.mark.benchmark
+@pytest.mark.performance
 class TestLazyImportBasics:
     """Test basic LazyImport functionality."""
 
@@ -103,6 +105,8 @@ class TestLazyImportBasics:
         assert Mapping.is_resolved()
 
 
+@pytest.mark.benchmark
+@pytest.mark.performance
 class TestLazyImportErrors:
     """Test error handling in LazyImport."""
 
@@ -136,6 +140,8 @@ class TestLazyImportErrors:
             lazy()
 
 
+@pytest.mark.benchmark
+@pytest.mark.performance
 class TestLazyImportCaching:
     """Test that LazyImport caches resolved values."""
 
@@ -165,6 +171,8 @@ class TestLazyImportCaching:
         assert lazy.is_resolved()
 
 
+@pytest.mark.benchmark
+@pytest.mark.performance
 class TestLazyImportThreadSafety:
     """Test thread safety of LazyImport."""
 
@@ -199,6 +207,8 @@ class TestLazyImportThreadSafety:
         assert lazy.is_resolved()
 
 
+@pytest.mark.benchmark
+@pytest.mark.performance
 class TestLazyImportRealWorldUseCases:
     """Test real-world use cases from codeweaver."""
 
@@ -286,6 +296,8 @@ class TestLazyImportRealWorldUseCases:
             del sys.modules["mock_tiktoken"]
 
 
+@pytest.mark.benchmark
+@pytest.mark.performance
 class TestLazyImportMagicMethods:
     """Test magic method forwarding."""
 
@@ -332,6 +344,8 @@ class TestLazyImportMagicMethods:
             del sys.modules["test_setattr_module"]
 
 
+@pytest.mark.benchmark
+@pytest.mark.performance
 class TestLazyImportComparison:
     """Compare LazyImport with old lazy_importer pattern."""
 
@@ -359,6 +373,8 @@ class TestLazyImportComparison:
         assert lazy.is_resolved()
 
 
+@pytest.mark.benchmark
+@pytest.mark.performance
 class TestEdgeCases:
     """Test edge cases and special scenarios."""
 
@@ -412,6 +428,8 @@ class TestEdgeCases:
         assert lazy1._resolve() is lazy2._resolve()
 
 
+@pytest.mark.benchmark
+@pytest.mark.performance
 class TestDocumentationExamples:
     """Test all examples from the documentation."""
 
@@ -442,6 +460,7 @@ class TestDocumentationExamples:
 
 
 @pytest.mark.benchmark
+@pytest.mark.performance
 class TestLazyImportPerformance:
     """Test performance characteristics of LazyImport."""
 
@@ -507,6 +526,8 @@ class TestLazyImportPerformance:
         )
 
 
+@pytest.mark.benchmark
+@pytest.mark.performance
 class TestLazyImportIntrospection:
     """Test LazyImport compatibility with introspection tools like inspect and pydantic."""
 
@@ -536,6 +557,8 @@ class TestLazyImportIntrospection:
         get_settings_lazy = lazy_import("codeweaver.config.settings", "get_settings")
 
         @dataclass
+@pytest.mark.benchmark
+@pytest.mark.performance
         class TestModel:
             settings: object = Field(default_factory=get_settings_lazy)
 

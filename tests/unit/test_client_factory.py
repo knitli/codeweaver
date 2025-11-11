@@ -20,6 +20,10 @@ from codeweaver.providers.provider import Provider, ProviderKind
 pytestmark = [pytest.mark.unit]
 
 
+@pytest.mark.external_api
+@pytest.mark.mock_only
+@pytest.mark.qdrant
+@pytest.mark.unit
 class TestClientMapLookup:
     """Test _create_client_from_map CLIENT_MAP lookup logic."""
 
@@ -137,6 +141,10 @@ class TestClientMapLookup:
                 )
 
 
+@pytest.mark.external_api
+@pytest.mark.mock_only
+@pytest.mark.qdrant
+@pytest.mark.unit
 class TestInstantiateClient:
     """Test _instantiate_client provider-specific instantiation logic."""
 
@@ -449,6 +457,10 @@ class TestInstantiateClient:
         mock_client_class.assert_called_once_with(timeout=30)
 
 
+@pytest.mark.external_api
+@pytest.mark.mock_only
+@pytest.mark.qdrant
+@pytest.mark.unit
 class TestClientOptionsHandling:
     """Test that client_options are properly passed through."""
 
@@ -529,6 +541,10 @@ class TestClientOptionsHandling:
         mock_client_class.assert_called_once_with(api_key="test_key")
 
 
+@pytest.mark.external_api
+@pytest.mark.mock_only
+@pytest.mark.qdrant
+@pytest.mark.unit
 class TestProviderKindNormalization:
     """Test that provider_kind strings are normalized to enums."""
 

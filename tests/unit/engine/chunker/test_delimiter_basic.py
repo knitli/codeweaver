@@ -35,6 +35,7 @@ def delimiter_chunker(chunk_governor: ChunkGovernor) -> DelimiterChunker:
     return DelimiterChunker(governor=chunk_governor)
 
 
+@pytest.mark.unit
 class TestDelimiterChunksJavaScriptNested:
     """Test delimiter chunker with JavaScript nested functions."""
 
@@ -135,6 +136,7 @@ function createDataProcessor(config) {
         assert open_braces == close_braces, "Braces should be balanced in function chunk"
 
 
+@pytest.mark.unit
 class TestDelimiterPriorityResolution:
     """Test delimiter priority resolution for overlapping boundaries."""
 
@@ -205,6 +207,7 @@ class DataProcessor:
             )
 
 
+@pytest.mark.unit
 class TestDelimiterChunksPython:
     """Test delimiter chunker with Python code."""
 
@@ -324,6 +327,7 @@ def validate_config(config: dict) -> bool:
             assert chunk.end_line - chunk.start_line >= 0, "Line range should be non-negative"
 
 
+@pytest.mark.unit
 class TestDelimiterNestingHandling:
     """Test nesting handling for nested delimiters."""
 
@@ -371,6 +375,7 @@ function processData(items) {
             assert "nesting_level" in func_chunk.metadata, "Should track nesting level"
 
 
+@pytest.mark.unit
 class TestDelimiterBoundaryDetection:
     """Test boundary detection accuracy."""
 

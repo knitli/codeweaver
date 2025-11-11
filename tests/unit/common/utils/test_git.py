@@ -97,6 +97,8 @@ def temp_non_git_dir(tmp_path: Path) -> Path:
 # ===========================================================================
 
 
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestHasGit:
     """Tests for has_git() function."""
 
@@ -128,6 +130,8 @@ class TestHasGit:
 # ===========================================================================
 
 
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestIsGitDir:
     """Tests for is_git_dir() function."""
 
@@ -171,6 +175,8 @@ class TestIsGitDir:
 # ===========================================================================
 
 
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestTryGitRevParse:
     """Tests for try_git_rev_parse() function."""
 
@@ -215,6 +221,8 @@ class TestTryGitRevParse:
 # ===========================================================================
 
 
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestWalkUpToGitRoot:
     """Tests for _walk_up_to_git_root() function."""
 
@@ -251,6 +259,8 @@ class TestWalkUpToGitRoot:
 # ===========================================================================
 
 
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestRootPathChecksOut:
     """Tests for _root_path_checks_out() function."""
 
@@ -274,6 +284,8 @@ class TestRootPathChecksOut:
 # ===========================================================================
 
 
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestGetProjectPath:
     """Tests for get_project_path() function."""
 
@@ -317,6 +329,8 @@ class TestGetProjectPath:
 # ===========================================================================
 
 
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestSetRelativePath:
     """Tests for set_relative_path() function."""
 
@@ -370,6 +384,8 @@ class TestSetRelativePath:
 # ===========================================================================
 
 
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestGetGitDir:
     """Tests for _get_git_dir() function."""
 
@@ -406,6 +422,8 @@ class TestGetGitDir:
 # ===========================================================================
 
 
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestGetGitRevision:
     """Tests for get_git_revision() function."""
 
@@ -449,6 +467,8 @@ class TestGetGitRevision:
 # ===========================================================================
 
 
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestGetBranchFromOrigin:
     """Tests for _get_branch_from_origin() function."""
 
@@ -491,6 +511,8 @@ class TestGetBranchFromOrigin:
 # ===========================================================================
 
 
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestGetGitBranch:
     """Tests for get_git_branch() function."""
 
@@ -570,6 +592,8 @@ class TestGetGitBranch:
 # ===========================================================================
 
 
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestInCodeweaverClone:
     """Tests for in_codeweaver_clone() function."""
 
@@ -612,6 +636,8 @@ class TestInCodeweaverClone:
 # ===========================================================================
 
 
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestGitUtilsIntegration:
     """Integration tests for git utilities with real scenarios."""
 

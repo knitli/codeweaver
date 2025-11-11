@@ -47,6 +47,9 @@ def cohere_4_capabilities():
     )
 
 
+@pytest.mark.async_test
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestCohereEmbeddingProviderInitialization:
     """Test CohereEmbeddingProvider initialization."""
 
@@ -120,6 +123,9 @@ class TestCohereEmbeddingProviderInitialization:
         assert provider.caps.provider == Provider.AZURE
 
 
+@pytest.mark.async_test
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestCohereEmbeddingProviderEmbedding:
     """Test CohereEmbeddingProvider embedding operations."""
 
@@ -253,6 +259,9 @@ class TestCohereEmbeddingProviderEmbedding:
         assert call_kwargs["embedding_types"] == ["float"]
 
 
+@pytest.mark.async_test
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestCohereEmbeddingProviderErrorHandling:
     """Test CohereEmbeddingProvider error handling."""
 

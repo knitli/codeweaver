@@ -97,6 +97,7 @@ def sample_chunk():
     return chunk
 
 
+@pytest.mark.async_test
 class TestMemoryProviderContract:
     """Contract tests for MemoryVectorStoreProvider implementation."""
 

@@ -30,6 +30,9 @@ def cohere_rerank_capabilities():
     )
 
 
+@pytest.mark.async_test
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestCohereRerankingProviderInitialization:
     """Test CohereRerankingProvider initialization."""
 
@@ -91,6 +94,9 @@ class TestCohereRerankingProviderInitialization:
         assert provider.base_url == "https://api.cohere.com"
 
 
+@pytest.mark.async_test
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestCohereRerankingProviderReranking:
     """Test CohereRerankingProvider reranking operations."""
 
@@ -242,6 +248,9 @@ class TestCohereRerankingProviderReranking:
         assert results[0].chunk == chunks[0]
 
 
+@pytest.mark.async_test
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestCohereRerankingProviderErrorHandling:
     """Test CohereRerankingProvider error handling."""
 
@@ -284,6 +293,9 @@ class TestCohereRerankingProviderErrorHandling:
         assert results == []
 
 
+@pytest.mark.async_test
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestCohereRerankingProviderProperties:
     """Test CohereRerankingProvider properties."""
 

@@ -17,6 +17,10 @@ from codeweaver.providers.provider import Provider, ProviderKind
 pytestmark = [pytest.mark.integration]
 
 
+@pytest.mark.external_api
+@pytest.mark.integration
+@pytest.mark.mock_only
+@pytest.mark.qdrant
 class TestProviderInstantiationWithClientFactory:
     """Test complete provider instantiation flow with client creation."""
 
@@ -185,6 +189,10 @@ class TestProviderInstantiationWithClientFactory:
                 assert "client" not in call_kwargs
 
 
+@pytest.mark.external_api
+@pytest.mark.integration
+@pytest.mark.mock_only
+@pytest.mark.qdrant
 class TestVectorStoreProviderWithClientFactory:
     """Test vector store provider instantiation with client factory."""
 
@@ -301,6 +309,10 @@ class TestVectorStoreProviderWithClientFactory:
             assert call_kwargs["api_key"] == "test_key"
 
 
+@pytest.mark.external_api
+@pytest.mark.integration
+@pytest.mark.mock_only
+@pytest.mark.qdrant
 class TestProviderKindStringHandling:
     """Test that string provider_kind values work correctly."""
 
@@ -377,6 +389,10 @@ class TestProviderKindStringHandling:
                 assert "client" in call_kwargs
 
 
+@pytest.mark.external_api
+@pytest.mark.integration
+@pytest.mark.mock_only
+@pytest.mark.qdrant
 class TestGlobalRegistryIntegration:
     """Test integration with global get_provider_registry()."""
 

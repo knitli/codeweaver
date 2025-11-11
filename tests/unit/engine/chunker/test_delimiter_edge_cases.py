@@ -29,6 +29,7 @@ def delimiter_chunker(chunk_governor: ChunkGovernor) -> DelimiterChunker:
     return DelimiterChunker(governor=chunk_governor)
 
 
+@pytest.mark.unit
 class TestGenericFallback:
     """Test generic delimiter fallback behavior."""
 
@@ -87,6 +88,7 @@ for multiple chunks if the generic patterns work correctly.
             assert len(chunks) > 1, "Generic patterns should split content into multiple chunks"
 
 
+@pytest.mark.unit
 class TestDelimiterBehavior:
     """Test inclusive vs exclusive delimiter behavior."""
 
@@ -139,6 +141,7 @@ def function_three():
                     )
 
 
+@pytest.mark.unit
 class TestLineExpansion:
     """Test line boundary expansion behavior."""
 
@@ -202,6 +205,7 @@ a, b, c = 1, 2, 3; total = a + b + c  # Another multi-statement line
             )
 
 
+@pytest.mark.unit
 class TestUnusualPatterns:
     """Test delimiter chunker with unusual patterns."""
 
@@ -281,6 +285,7 @@ class MyClass:
             assert next_start >= current_end, "Chunks should not overlap"
 
 
+@pytest.mark.unit
 class TestEdgeCaseContent:
     """Test delimiter chunker with edge case content."""
 
