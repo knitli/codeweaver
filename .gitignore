@@ -15,6 +15,9 @@ hk.local.pkl.license
 # local terminal zsh config -- can contain sensitive info
 .vscode/terminal.local.zsh
 
+# CLAUDE.md -- we symlink this file from AGENTS.md in the setup script
+CLAUDE.md
+
 # annoying generated files
 coverage.xml
 .vscode/.history/

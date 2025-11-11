@@ -150,9 +150,22 @@ run = [
   "mise -y trust &>/dev/null",
   "mise -y install &>/dev/null || true",
   "mise -y venv &>/dev/null",
-  "mise run sync &>/dev/null",
+  "mise -y run sync &>/dev/null",
   "mise env &>/dev/null || true",
+  "git config include.path .gitconfig &>/dev/null || true",
+  "ln -sf AGENTS.md CLAUDE.md",
   "eval \"$(mise activate zsh)\" &>/dev/null",
+]
+run_windows = [
+  "mise set > $null",
+  "mise -y trust > $null",
+  "mise -y install > $null || true",
+  "mise -y venv > $null",
+  "mise run sync > $null",
+  "mise env > $null || true",
+  "git config include.path .gitconfig > $null || true",
+  "New-Item -ItemType SymbolicLink -Path CLAUDE.md -Target AGENTS.md -Force",
+  "(&mise activate pwsh) | Out-String | Invoke-Expression",
 ]
 silent = "stdout"
 

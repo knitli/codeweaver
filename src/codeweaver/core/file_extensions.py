@@ -111,7 +111,7 @@ DEFAULT_EXCLUDED_EXTENSIONS: frozenset[FileExtensionT] = frozenset({
     FileExt(".coverage.xml"),
     FileExt(".dll"),
     FileExt(".dmg"),
-    FileExt(".env"),
+    FileExt(".env"),  # avoid env because api keys/secrets
     FileExt(".exe"),
     FileExt(".gif"),
     FileExt(".gz"),
@@ -164,6 +164,27 @@ DEFAULT_EXCLUDED_EXTENSIONS: frozenset[FileExtensionT] = frozenset({
     FileExt(".zip"),
 })
 
+REPO_POLICY_FILES: frozenset[FileGlobT] = frozenset({
+    FileGlob("CODE_OF_CONDUCT.*"),
+    FileGlob("CODE_OF_CONDUCT*"),
+    FileGlob("SECURITY.*"),
+    FileGlob("SECURITY*"),
+    FileGlob("CONTRIBUTING.*"),
+    FileGlob("CONTRIBUTING*"),
+    FileGlob("NOTICE.*"),
+    FileGlob("NOTICE*"),
+    FileGlob("AUTHORS.*"),
+    FileGlob("AUTHORS*"),
+    FileGlob("MAINTAINERS.*"),
+    FileGlob("MAINTAINERS*"),
+    FileGlob("CONTRIBUTORS*"),  # CLA files
+    FileGlob("CLA*"),
+    FileGlob("CODEOWNERS"),
+    FileGlob("DEVELOPERS*"),  # DCO files
+    FileGlob("DCO*"),
+})
+"""Common file name patterns for repository policy files, not including license files."""
+
 DATA_FILES_EXTENSIONS: tuple[ExtLangPair, ...] = (
     LangPair(ext=FileExt(".csv"), language=LanguageName("csv")),
     LangPair(ext=FileExt(".dat"), language=LanguageName("data")),
@@ -178,6 +199,7 @@ DATA_FILES_EXTENSIONS: tuple[ExtLangPair, ...] = (
     LangPair(ext=FileExt(".tsv"), language=LanguageName("tsv")),
     LangPair(ext=FileExt(".xlsx"), language=LanguageName("excel")),
 )
+"""Extensions for common data files. NOTE: CodeWeaver does *not* index data files by default. You must explicitly include them if desired. We have not tested our chunkers on data files, so your mileage may vary -- csv/tsv/svg/xlsx are likely to work best."""
 
 DOC_FILES_EXTENSIONS: tuple[ExtLangPair, ...] = (
     LangPair(ext=FileExt(".1"), language=LanguageName("man")),
@@ -485,7 +507,7 @@ CODE_FILES_EXTENSIONS: tuple[ExtLangPair, ...] = (
     LangPair(ext=FileExt(".vbp"), language=LanguageName("visualbasic6")),
 )
 # spellchecker:on
-"""A tuple of `ExtLangPair`."""
+"""A tuple of `ExtLangPair` for common programming languages."""
 
 TEST_DIR_NAMES: tuple[DirectoryNameT, ...] = (
     DirectoryName("__tests__"),
@@ -498,6 +520,7 @@ TEST_DIR_NAMES: tuple[DirectoryNameT, ...] = (
     DirectoryName("spec-*"),
     DirectoryName("Tests"),  # swift
 )
+"""Common directory names used for test code."""
 
 TEST_FILE_PATTERNS: tuple[FileGlobT, ...] = (
     FileGlob("*.test.*"),
@@ -505,6 +528,19 @@ TEST_FILE_PATTERNS: tuple[FileGlobT, ...] = (
     FileGlob("*_test.*"),
     FileGlob("*_spec.*"),
 )
+"""Common file name patterns used for test code."""
+
+
+def all_js_exts(stem: str) -> tuple[str, ...]:
+    """Return all common JavaScript-related extensions for a given stem.
+
+    Args:
+        stem: The file stem (name without extension).
+
+    Returns:
+        A tuple of file names with common JavaScript-related extensions. Does not include `.jsx` or `.tsx` extensions.
+    """
+    return (f"{stem}.js", f"{stem}.cjs", f"{stem}.mjs", f"{stem}.ts", f"{stem}.cts", f"{stem}.mts")
 
 
 COMMON_TOOLING_PATHS: tuple[tuple[DevToolNameT, tuple[Path, ...]], ...] = (
@@ -537,6 +573,7 @@ COMMON_TOOLING_PATHS: tuple[tuple[DevToolNameT, tuple[Path, ...]], ...] = (
             Path("CMakeFiles"),
         ),
     ),
+    (DevToolName("biome"), (Path("biome.json"), *all_js_exts("biome.config"))),
     (
         DevToolName("bun"),
         (Path("bun.lockb"), Path("bunfig.toml"), Path("bunfig.json"), Path("bun.lock")),

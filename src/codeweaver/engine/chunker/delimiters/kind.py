@@ -110,6 +110,16 @@ class DelimiterKind(str, BaseEnum):
         }
 
     @property
+    def is_generic(self) -> bool:
+        """Whether the delimiter is generic or unknown."""
+        return self in {
+            DelimiterKind.PARAGRAPH,
+            DelimiterKind.WHITESPACE,
+            DelimiterKind.GENERIC,
+            DelimiterKind.UNKNOWN,
+        }
+
+    @property
     def is_data(self) -> bool:
         """Whether the delimiter represents a data element in the code."""
         return self in {DelimiterKind.STRING, DelimiterKind.TEMPLATE_STRING}

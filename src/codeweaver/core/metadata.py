@@ -412,19 +412,26 @@ class ExtLangPair(NamedTuple):
 
 
 def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
-    """Determine the ExtKind based on validated data (`Metadata` extraction)."""
+    """Determine the ExtKind based on validated data. Validated data here is the partially validated data field dictionary for a CodeChunk during pydantic model validation (i.e. what a default_factory can optionally receive)."""
     if "file_path" in validated_data and validated_data["file_path"] is not None:
         return ExtKind.from_file(validated_data["file_path"])
-    source = (
-        validated_data.get("source")
-        or validated_data.get("metadata", {}).get("source")
-        or ChunkSource.TEXT_BLOCK
-    )
+    if (
+        source := (
+            validated_data.get("source")
+            or validated_data.get("metadata", {}).get("source")
+            or ChunkSource.TEXT_BLOCK
+        )
+    ) and source == ChunkSource.EXTERNAL:
+        return None
+    if (
+        source
+        and source == ChunkSource.TEXT_BLOCK
+        and (not (language := validated_data.get("language")))
+    ):
+        return None
     meta = validated_data.get("metadata", validated_data.get("semantic_meta", {}))
     if "semantic_meta" in meta:
         meta = meta["semantic_meta"]
-    if not meta:
-        return None
     if (language := meta.get("language") or validated_data.get("language")) and isinstance(
         language, SemanticSearchLanguage
     ):
@@ -678,6 +685,8 @@ class ExtKind(NamedTuple):
             "kind": str(self.kind.as_title),
         }
 
+
+# TODO: Add DevTool class -- probably in a separate module -- to capture common developer tooling file types, language associations, function/purpose, etc.
 
 __all__ = (
     "ChunkKind",

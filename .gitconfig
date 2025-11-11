@@ -4,6 +4,10 @@
     attributesfile = .gitattributes
     excludesfile = .gitignore
     autocrlf = false
+    symlinks = true
+
+[alias]
+    root = "rev-parse --show-toplevel"
 
 [merge "ours"]
     name = "Keep ours merge"
@@ -11,4 +15,4 @@
 
 [merge "latest_version"]
     name = "Ensures the later version of the version file (_version.py) is kept."
-    driver = ./scripts/build/git-merge-latest-version.py %O %A %B
+    driver = "./scripts/build/git-merge-latest-version.py %O %A %B"

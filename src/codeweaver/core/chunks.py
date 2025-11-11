@@ -136,13 +136,6 @@ class CodeChunk(BasedModel):
     ] = None
     language: SemanticSearchLanguage | LanguageNameT | None = None
     source: ChunkSource = ChunkSource.TEXT_BLOCK
-    ext_kind: Annotated[
-        ExtKind | None,
-        Field(
-            default_factory=determine_ext_kind,
-            description="""The extension kind of the source file""",
-        ),
-    ]
     timestamp: Annotated[
         PositiveFloat,
         Field(
@@ -155,14 +148,24 @@ class CodeChunk(BasedModel):
         UUID7,
         Field(kw_only=True, description="""Unique identifier for the code chunk""", frozen=True),
     ] = uuid7()
-    parent_id: Annotated[
-        UUID7 | None, Field(description="""Parent chunk ID, such as the file ID, if applicable""")
-    ] = None
-    metadata: Annotated[
-        Metadata | None,
-        Field(kw_only=True, description="""Additional metadata about the code chunk"""),
-    ] = None
+    metadata: Metadata = Field(
+        default_factory=lambda data: Metadata(
+            chunk_id=data["chunk_id"],
+            created_at=data["timestamp"],
+            line_start=data["line_range"].start,
+            line_end=data["line_range"].end,
+            **(data.get("metadata") or {}),
+        ),
+        description="Additional metadata for the code chunk; includes ast-derived information under the `semantic` field for supported languages.",
+    )
+    ext_kind: ExtKind | None = Field(
+        default_factory=determine_ext_kind, description="The file extension and its `ChunkKind`."
+    )
 
+    parent_id: UUID7 | None = Field(
+        default_factory=lambda data: data["line_range"]._source_id,
+        description="The source ID of the parent file or chunk.",
+    )
     # Vector storage fields
     chunk_name: Annotated[
         str | None,
