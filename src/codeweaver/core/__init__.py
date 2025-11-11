@@ -204,14 +204,14 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "make_uuid_store": (__spec__.parent, "stores"),
     "to_uuid": (__spec__.parent, "stores"),
 })
-"""Dynamically import submodules and classes for the core types package.
+"""Dynamically import submodules and classes for the core package.
 
 Maps class/function/type names to their respective module paths for lazy loading.
 """
 
 
 def __getattr__(name: str) -> object:
-    """Dynamically import submodules and classes for the semantic package."""
+    """Dynamically import submodules and classes for the core package."""
     if name in _dynamic_imports:
         module_name, submodule_name = _dynamic_imports[name]
         module = import_module(f"{module_name}.{submodule_name}")
@@ -315,5 +315,5 @@ __all__ = (
 
 
 def __dir__() -> list[str]:
-    """List available attributes for the semantic package."""
+    """List available attributes for the core package."""
     return list(__all__)

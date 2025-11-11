@@ -225,5 +225,5 @@ __all__ = (
 
 
 def __dir__() -> list[str]:
-    """List available attributes for the semantic package."""
+    """List available attributes for the config package."""
     return list(__all__)

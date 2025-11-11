@@ -189,7 +189,11 @@ class ModelRegistry(BasedModel):
     ) -> tuple[SparseEmbeddingModelCapabilities, ...] | None:
         """Get sparse embedding capabilities for a specific provider and model name."""
         prov_map = self._sparse_embedding_capabilities.get(provider)
-        return prov_map.get(_normalize_model_name(name)) if prov_map else None
+        return (
+            prov_map.get(ModelName(cast(LiteralStringT, _normalize_model_name(name))))
+            if prov_map
+            else None
+        )
 
     def list_sparse_embedding_models(
         self, provider: Provider | None = None
@@ -217,7 +221,11 @@ class ModelRegistry(BasedModel):
     ) -> tuple[RerankingModelCapabilities, ...] | None:
         """Get reranking capabilities for a specific provider and model name."""
         prov_map = self._reranking_capabilities.get(provider)
-        return prov_map.get(_normalize_model_name(name)) if prov_map else None
+        return (
+            prov_map.get(ModelName(cast(LiteralStringT, _normalize_model_name(name))))
+            if prov_map
+            else None
+        )
 
     def list_reranking_models(
         self, provider: Provider | None = None

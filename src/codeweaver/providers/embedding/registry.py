@@ -13,13 +13,12 @@ from __future__ import annotations
 
 from codeweaver.core.stores import UUIDStore
 from codeweaver.core.types.aliases import ModelNameT
-from codeweaver.exceptions import ConfigurationError
 from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
-from codeweaver.providers.embedding.types import ChunkEmbeddings, EmbeddingKind
-
-
-class InvalidEmbeddingModelError(ConfigurationError):
-    """Exception raised when an invalid embedding model is encountered."""
+from codeweaver.providers.embedding.types import (
+    ChunkEmbeddings,
+    EmbeddingKind,
+    InvalidEmbeddingModelError,
+)
 
 
 class EmbeddingRegistry(UUIDStore[ChunkEmbeddings]):

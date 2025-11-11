@@ -2,90 +2,224 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-"""The engine package contains core functionality for indexing, filtering, and searching code and documentation data, but also for other data providers 🚒."""
+"""The engine package contains core functionality for indexing, filtering, and searching code and documentation data, but also for other data providers 🚋"""
 
-from codeweaver.engine.chunker import (
-    ChunkGovernor,
-    DelimiterPattern,
-    LanguageFamily,
-    SemanticChunker,
-    SourceIdRegistry,
-    clear_store,
-    detect_language_family,
-    expand_pattern,
-    get_store,
-    source_id_for,
-)
-from codeweaver.engine.chunking_service import ChunkingService
-from codeweaver.engine.filter import (
-    ArbitraryFilter,
-    Entry,
-    FieldCondition,
-    FilterableField,
-    PayloadSchemaType,
-)
-from codeweaver.engine.filter import Metadata as FilterMetadata
-from codeweaver.engine.indexer import (
-    CodeFilter,
-    ConfigFilter,
-    DefaultFilter,
-    DocsFilter,
-    ExtensionFilter,
-    FileWatcher,
-    IgnoreFilter,
-    Indexer,
-)
-from codeweaver.engine.match_models import (
-    AnyVariants,
-    Condition,
-    DatetimeRange,
-    ExtendedPointId,
-    Filter,
-    GeoBoundingBox,
-    GeoLineString,
-    GeoPoint,
-    GeoPolygon,
-    GeoRadius,
-    HasIdCondition,
-    HasVectorCondition,
-    IsEmptyCondition,
-    IsNullCondition,
-    Match,
-    MatchAny,
-    MatchExcept,
-    MatchPhrase,
-    MatchText,
-    MatchValue,
-    MinShould,
-    Nested,
-    NestedCondition,
-    PayloadField,
-    Range,
-    ValuesCount,
-    ValueVariants,
-)
-from codeweaver.engine.textify import (
-    format_docstring,
-    format_signature,
-    format_snippet_name,
-    humanize,
-    to_lowly_lowercase,
-    to_tokens,
-)
-from codeweaver.engine.wrap_filters import make_partial_function, wrap_filters
+from __future__ import annotations
+
+from importlib import import_module
+from types import MappingProxyType
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from codeweaver.engine.chunker import (
+        ASTDepthExceededError,
+        BinaryFileError,
+        Boundary,
+        ChunkerSelector,
+        ChunkGovernor,
+        ChunkingError,
+        ChunkingTimeoutError,
+        ChunkLimitExceededError,
+        Delimiter,
+        DelimiterChunker,
+        DelimiterKind,
+        DelimiterMatch,
+        DelimiterPattern,
+        DelimiterPatternDict,
+        GracefulChunker,
+        LanguageFamily,
+        LineStrategy,
+        OversizedChunkError,
+        ParseError,
+        ResourceGovernor,
+        SemanticChunker,
+        SourceIdRegistry,
+        chunk_files_parallel,
+        chunk_files_parallel_dict,
+        clear_store,
+        detect_language_family,
+        expand_pattern,
+        get_store,
+        source_id_for,
+    )
+    from codeweaver.engine.chunking_service import ChunkingService
+    from codeweaver.engine.filter import (
+        ArbitraryFilter,
+        Entry,
+        FieldCondition,
+        FilterableField,
+        PayloadSchemaType,
+    )
+    from codeweaver.engine.filter import Metadata as FilterMetadata
+    from codeweaver.engine.indexer import (
+        CodeFilter,
+        ConfigFilter,
+        DefaultFilter,
+        DocsFilter,
+        ExtensionFilter,
+        FileWatcher,
+        IgnoreFilter,
+        Indexer,
+    )
+    from codeweaver.engine.match_models import (
+        AnyVariants,
+        Condition,
+        DatetimeRange,
+        ExtendedPointId,
+        Filter,
+        GeoBoundingBox,
+        GeoLineString,
+        GeoPoint,
+        GeoPolygon,
+        GeoRadius,
+        HasIdCondition,
+        HasVectorCondition,
+        IsEmptyCondition,
+        IsNullCondition,
+        Match,
+        MatchAny,
+        MatchExcept,
+        MatchPhrase,
+        MatchText,
+        MatchValue,
+        MinShould,
+        Nested,
+        NestedCondition,
+        PayloadField,
+        Range,
+        ValuesCount,
+        ValueVariants,
+    )
+    from codeweaver.engine.textify import (
+        format_docstring,
+        format_signature,
+        format_snippet_name,
+        humanize,
+        to_lowly_lowercase,
+        to_tokens,
+    )
+    from codeweaver.engine.wrap_filters import make_partial_function, wrap_filters
+
+_dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "ASTDepthExceededError": (f"{__spec__.parent}.chunker", "exceptions"),
+    "AnyVariants": (f"{__spec__.parent}.match_models", "match_models"),
+    "ArbitraryFilter": (f"{__spec__.parent}.filter", "filter"),
+    "BinaryFileError": (f"{__spec__.parent}.chunker", "exceptions"),
+    "Boundary": (f"{__spec__.parent}.chunker", "delimiter_model"),
+    "ChunkGovernor": (__spec__.parent + ".chunker", "base"),
+    "ChunkLimitExceededError": (__spec__.parent + ".chunker", "exceptions"),
+    "ChunkerSelector": (__spec__.parent + ".chunker", "selector"),
+    "ChunkingError": (__spec__.parent + ".chunker", "exceptions"),
+    "ChunkingService": (__spec__.parent, "chunking_service"),
+    "ChunkingTimeoutError": (__spec__.parent + ".chunker", "exceptions"),
+    "CodeFilter": (__spec__.parent + ".indexer", "indexer"),
+    "Condition": (__spec__.parent + ".match_models", "match_models"),
+    "ConfigFilter": (__spec__.parent + ".indexer", "indexer"),
+    "DatetimeRange": (__spec__.parent + ".match_models", "match_models"),
+    "DefaultFilter": (__spec__.parent + ".indexer", "indexer"),
+    "Delimiter": (__spec__.parent + ".chunker", "delimiter_model"),
+    "DelimiterChunker": (__spec__.parent + ".chunker", "delimiter"),
+    "DelimiterKind": (__spec__.parent + ".chunker.delimiters", "kind"),
+    "DelimiterMatch": (__spec__.parent + ".chunker", "delimiter_model"),
+    "DelimiterPattern": (__spec__.parent + ".chunker.delimiters", "patterns"),
+    "DelimiterPatternDict": (__spec__.parent + ".chunker.delimiters", "patterns"),
+    "DocsFilter": (__spec__.parent + ".indexer", "indexer"),
+    "Entry": (__spec__.parent + ".filter", "filter"),
+    "ExtendedPointId": (__spec__.parent + ".match_models", "match_models"),
+    "ExtensionFilter": (__spec__.parent + ".indexer", "indexer"),
+    "FieldCondition": (__spec__.parent + ".filter", "filter"),
+    "FileWatcher": (__spec__.parent + ".indexer", "indexer"),
+    "Filter": (__spec__.parent + ".match_models", "match_models"),
+    "FilterMetadata": (__spec__.parent + ".filter", "filter"),
+    "FilterableField": (__spec__.parent + ".filter", "filter"),
+    "GeoBoundingBox": (__spec__.parent + ".match_models", "match_models"),
+    "GeoLineString": (__spec__.parent + ".match_models", "match_models"),
+    "GeoPoint": (__spec__.parent + ".match_models", "match_models"),
+    "GeoPolygon": (__spec__.parent + ".match_models", "match_models"),
+    "GeoRadius": (__spec__.parent + ".match_models", "match_models"),
+    "GracefulChunker": (__spec__.parent + ".chunker", "selector"),
+    "HasIdCondition": (__spec__.parent + ".match_models", "match_models"),
+    "HasVectorCondition": (__spec__.parent + ".match_models", "match_models"),
+    "IgnoreFilter": (__spec__.parent + ".indexer", "indexer"),
+    "Indexer": (__spec__.parent + ".indexer", "indexer"),
+    "IsEmptyCondition": (__spec__.parent + ".match_models", "match_models"),
+    "IsNullCondition": (__spec__.parent + ".match_models", "match_models"),
+    "LanguageFamily": (__spec__.parent + ".chunker.delimiters", "families"),
+    "LineStrategy": (__spec__.parent + ".chunker.delimiters", "kind"),
+    "Match": (__spec__.parent + ".match_models", "match_models"),
+    "MatchAny": (__spec__.parent + ".match_models", "match_models"),
+    "MatchExcept": (__spec__.parent + ".match_models", "match_models"),
+    "MatchPhrase": (__spec__.parent + ".match_models", "match_models"),
+    "MatchText": (__spec__.parent + ".match_models", "match_models"),
+    "MatchValue": (__spec__.parent + ".match_models", "match_models"),
+    "MinShould": (__spec__.parent + ".match_models", "match_models"),
+    "Nested": (__spec__.parent + ".match_models", "match_models"),
+    "NestedCondition": (__spec__.parent + ".match_models", "match_models"),
+    "OversizedChunkError": (__spec__.parent + ".chunker", "exceptions"),
+    "ParseError": (__spec__.parent + ".chunker", "exceptions"),
+    "PayloadField": (__spec__.parent + ".match_models", "match_models"),
+    "PayloadSchemaType": (__spec__.parent + ".filter", "filter"),
+    "Range": (__spec__.parent + ".match_models", "match_models"),
+    "ResourceGovernor": (__spec__.parent + ".chunker", "governance"),
+    "SemanticChunker": (__spec__.parent + ".chunker", "semantic"),
+    "SourceIdRegistry": (__spec__.parent + ".chunker", "registry"),
+    "ValueVariants": (__spec__.parent + ".match_models", "match_models"),
+    "ValuesCount": (__spec__.parent + ".match_models", "match_models"),
+    "chunk_files_parallel": (__spec__.parent + ".chunker", "parallel"),
+    "chunk_files_parallel_dict": (__spec__.parent + ".chunker", "parallel"),
+    "clear_store": (__spec__.parent + ".chunker", "registry"),
+    "detect_language_family": (__spec__.parent + ".chunker.delimiters", "families"),
+    "expand_pattern": (__spec__.parent + ".chunker.delimiters", "patterns"),
+    "format_docstring": (__spec__.parent + ".textify", "textify"),
+    "format_signature": (__spec__.parent + ".textify", "textify"),
+    "format_snippet_name": (__spec__.parent + ".textify", "textify"),
+    "get_store": (__spec__.parent + ".chunker", "registry"),
+    "humanize": (__spec__.parent + ".textify", "textify"),
+    "make_partial_function": (__spec__.parent + ".wrap_filters", "wrap_filters"),
+    "source_id_for": (__spec__.parent + ".chunker", "registry"),
+    "to_lowly_lowercase": (__spec__.parent + ".textify", "textify"),
+    "to_tokens": (__spec__.parent + ".textify", "textify"),
+    "wrap_filters": (__spec__.parent + ".wrap_filters", "wrap_filters"),
+})
+
+
+def __getattr__(name: str) -> object:
+    """Dynamically import submodules and classes for the engine package."""
+    if name in _dynamic_imports:
+        module_name, submodule_name = _dynamic_imports[name]
+        module = import_module(f"{module_name}.{submodule_name}")
+        result = getattr(module, name)
+        globals()[name] = result  # Cache in globals for future access
+        return result
+    if globals().get(name) is not None:
+        return globals()[name]
+    raise AttributeError(f"module {__name__} has no attribute {name}")
 
 
 __all__ = (
+    "ASTDepthExceededError",
     "AnyVariants",
     "ArbitraryFilter",
+    "BinaryFileError",
+    "Boundary",
     "ChunkGovernor",
+    "ChunkLimitExceededError",
+    "ChunkerSelector",
+    "ChunkingError",
     "ChunkingService",
+    "ChunkingTimeoutError",
     "CodeFilter",
     "Condition",
     "ConfigFilter",
     "DatetimeRange",
     "DefaultFilter",
+    "Delimiter",
+    "DelimiterChunker",
+    "DelimiterKind",
+    "DelimiterMatch",
     "DelimiterPattern",
+    "DelimiterPatternDict",
     "DocsFilter",
     "Entry",
     "ExtendedPointId",
@@ -100,6 +234,7 @@ __all__ = (
     "GeoPoint",
     "GeoPolygon",
     "GeoRadius",
+    "GracefulChunker",
     "HasIdCondition",
     "HasVectorCondition",
     "IgnoreFilter",
@@ -107,6 +242,7 @@ __all__ = (
     "IsEmptyCondition",
     "IsNullCondition",
     "LanguageFamily",
+    "LineStrategy",
     "Match",
     "MatchAny",
     "MatchExcept",
@@ -116,13 +252,18 @@ __all__ = (
     "MinShould",
     "Nested",
     "NestedCondition",
+    "OversizedChunkError",
+    "ParseError",
     "PayloadField",
     "PayloadSchemaType",
     "Range",
+    "ResourceGovernor",
     "SemanticChunker",
     "SourceIdRegistry",
     "ValueVariants",
     "ValuesCount",
+    "chunk_files_parallel",
+    "chunk_files_parallel_dict",
     "clear_store",
     "detect_language_family",
     "expand_pattern",
@@ -137,3 +278,8 @@ __all__ = (
     "to_tokens",
     "wrap_filters",
 )
+
+
+def __dir__() -> list[str]:
+    """List available attributes for the engine package."""
+    return list(__all__)

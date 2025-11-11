@@ -198,3 +198,6 @@ class DelimiterKind(str, BaseEnum):
                 else LineStrategy(inclusive=False, take_whole_lines=True)
             )
         return LineStrategy(inclusive=False, take_whole_lines=False)
+
+
+__all__ = ("DelimiterKind", "LineStrategy")
