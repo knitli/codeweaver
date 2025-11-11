@@ -20,6 +20,12 @@ import threading
 
 from typing import Any, cast
 
+from codeweaver.exceptions import CodeWeaverError
+
+
+class LazyImportError(CodeWeaverError):
+    """Exception raised for errors during lazy import resolution."""
+
 
 class LazyImport[Import: Any]:
     """
@@ -221,10 +227,13 @@ class LazyImport[Import: Any]:
         """
         # Special handling for introspection attributes
         if name in self._INTROSPECTION_ATTRS:
-            resolved = self._resolve()
-            # This will raise AttributeError if the attribute doesn't exist,
-            # which is the correct behavior for introspection
-            return getattr(resolved, name)
+            try:
+                resolved = self._resolve()
+                return getattr(resolved, name)
+            except AttributeError as e:
+                raise AttributeError(
+                    f"Attribute {name!r} not found in resolved object {resolved!r}"
+                ) from e
 
         # Normal attribute chaining
         module_name = object.__getattribute__(self, "_module_name")

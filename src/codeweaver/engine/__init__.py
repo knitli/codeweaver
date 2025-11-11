@@ -17,7 +17,6 @@ from codeweaver.engine.chunker import (
     source_id_for,
 )
 from codeweaver.engine.chunking_service import ChunkingService
-from codeweaver.engine.discovery import FileDiscoveryService, get_tooling_dirs
 from codeweaver.engine.filter import (
     ArbitraryFilter,
     Entry,
@@ -92,11 +91,8 @@ __all__ = (
     "ExtendedPointId",
     "ExtensionFilter",
     "FieldCondition",
-    "FileDiscoveryService",
-    "FileWatcher",
     "FileWatcher",
     "Filter",
-    "FilterMetadata",
     "FilterMetadata",
     "FilterableField",
     "GeoBoundingBox",
@@ -134,7 +130,6 @@ __all__ = (
     "format_signature",
     "format_snippet_name",
     "get_store",
-    "get_tooling_dirs",
     "humanize",
     "make_partial_function",
     "source_id_for",

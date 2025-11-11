@@ -20,6 +20,7 @@ from typing_extensions import TypeIs
 
 from codeweaver.common.utils import lazy_import
 from codeweaver.core.types.sentinel import Unset
+from codeweaver.exceptions import InitializationError
 from codeweaver.providers.provider import Provider as Provider  # needed for pydantic models
 
 
@@ -119,6 +120,6 @@ if __name__ == "__main__":
         asyncio.run(run())
     except Exception as e:
         logging.getLogger(__name__).exception("Failed to start CodeWeaver server: ")
-        raise RuntimeError("Failed to start CodeWeaver server.") from e
+        raise InitializationError("Failed to start CodeWeaver server.") from e
 
 __all__ = ("run", "start_server")

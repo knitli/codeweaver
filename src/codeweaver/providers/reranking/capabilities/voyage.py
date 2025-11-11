@@ -82,7 +82,7 @@ def _get_voyage_capabilities() -> PartialRerankingCapabilitiesDict:
         "name": "rerank-2.5",
         "provider": Provider.VOYAGE,
         "max_query": 8_000,
-        "max_input": _voyage_max_limit,
+        "max_input": None,  # Voyage uses dynamic limit checking via _voyage_max_limit function
         "context_window": 32_000,
         "supports_custom_prompt": False,
         "tokenizer": "tokenizers",

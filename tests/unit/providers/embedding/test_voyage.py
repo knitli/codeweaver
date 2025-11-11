@@ -155,8 +155,8 @@ class TestVoyageEmbeddingProviderEmbedding:
 
         # Verify result
         assert len(result) == 2
-        assert result[0] == [0.1, 0.2, 0.3]
-        assert result[1] == [0.4, 0.5, 0.6]
+        assert result[0] == [0.1, 0.2, 0.3]  # ty: ignore[invalid-key]
+        assert result[1] == [0.4, 0.5, 0.6]  # ty: ignore[invalid-key]
 
         # Verify client was called correctly
         mock_voyage_client.embed.assert_called_once()

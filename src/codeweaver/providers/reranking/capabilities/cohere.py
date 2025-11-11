@@ -38,7 +38,7 @@ def _get_common_capabilities() -> PartialRerankingCapabilitiesDict:
     Get the common capabilities for Cohere models.
     """
     return {
-        "max_input": cohere_max_input,
+        "max_input": None,  # Cohere uses dynamic limit checking via cohere_max_input function
         "context_window": 4096,
         "supports_custom_prompt": False,
         "tokenizer": "tokenizers",

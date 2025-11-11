@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
 from pydantic import ConfigDict, Field, NonNegativeInt, PositiveInt

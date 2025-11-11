@@ -180,7 +180,9 @@ def main() -> None:
         return
 
     # Find all Python test files
-    test_files = test_files or test_files.extend(test_dir.rglob("*.py"))
+    if not (test_files := test_files or list(test_dir.rglob("*.py"))):
+        print("No test files found")
+        return
 
     # Filter out __pycache__ and other non-test files
     test_files = [

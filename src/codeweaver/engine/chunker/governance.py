@@ -20,7 +20,6 @@ from codeweaver.engine.chunker.exceptions import ChunkingTimeoutError, ChunkLimi
 
 
 if TYPE_CHECKING:
-    # NOTE: PerformanceSettings will be defined in config module per spec §10.1
     # Temporarily using Any as placeholder for type checking
     from typing import Protocol, Self
 

@@ -32,6 +32,26 @@ from codeweaver.providers.reranking.capabilities.base import RerankingModelCapab
 console = Console(markup=True, emoji=True)
 
 
+def _normalize_iterable[
+    T: EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities | RerankingModelCapabilities
+](items: Iterable[T] | Sequence[T] | T) -> tuple[T, ...]:
+    """Normalize an input that can be a single item, iterable, or sequence into a tuple.
+
+    NOTE: we need to be careful here because, as it turns out, the capabilities objects are iterable themselves, which is not what we want to treat as an iterable of capabilities!
+    """
+    if isinstance(
+        items,
+        EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities | RerankingModelCapabilities,
+    ):
+        return (cast(T, items),)
+    return tuple(items)
+
+
+def _normalize_model_name(name: str) -> ModelName:
+    """Normalize a model name for consistent storage and lookup."""
+    return ModelName(cast(LiteralStringT, name.strip().lower().replace(" ", "_").replace("-", "_")))
+
+
 class ModelResult(NamedTuple):
     """Result of a model lookup in the registry for a Provider."""
 
@@ -70,6 +90,10 @@ class ModelRegistry(BasedModel):
         # flag to allow one-time default population by caller
         self._populated_defaults: bool = False
 
+        # Register builtin models on initialization
+        self._register_builtin_models()
+        self._populated_defaults = True
+
     def _register_builtin_embedding_models(self) -> None:
         """Register built-in embedding models."""
         from codeweaver.providers.embedding.capabilities import (
@@ -92,14 +116,32 @@ class ModelRegistry(BasedModel):
         self._register_builtin_embedding_models()
         self._register_builtin_reranking_models()
 
+    def _register_capabilities[
+        Capabilities: EmbeddingModelCapabilities
+        | RerankingModelCapabilities
+        | SparseEmbeddingModelCapabilities
+    ](
+        self,
+        capabilities: Capabilities,
+        registry: MutableMapping[Provider, MutableMapping[ModelName, tuple[Capabilities, ...]]],
+        *,
+        replace: bool,
+    ) -> None:
+        """Helper to sort and register capabilities into the given registry."""
+        prov_map = registry[capabilities.provider]
+        model_name = _normalize_model_name(capabilities.name)
+        if replace or model_name not in prov_map:
+            prov_map[model_name] = (capabilities,)
+        elif prov_map.get(model_name) and capabilities not in prov_map[model_name]:
+            prov_map[model_name] += (capabilities,)
+        else:
+            prov_map[model_name] = (capabilities,)
+
     # ---------- Embedding capabilities ----------
     def register_embedding_capabilities(
-        self,
-        capabilities: EmbeddingModelCapabilities | Iterable[EmbeddingModelCapabilities],
-        *,
-        replace: bool = True,
+        self, capabilities: EmbeddingModelCapabilities, *, replace: bool = True
     ) -> None:
-        """Register one or more embedding model capabilities for a provider.
+        """Register one or more embedding model capabilities.
 
         Adds embedding model capability metadata to the registry, replacing
         existing entries for the same model name and provider if `replace` is True.
@@ -108,24 +150,7 @@ class ModelRegistry(BasedModel):
             capabilities: A single EmbeddingModelCapabilities or a sequence of them to register.
             replace: Whether to replace existing capabilities for the same model name and provider.
         """
-        caps_seq: tuple[EmbeddingModelCapabilities, ...] = (
-            (capabilities,)
-            if isinstance(capabilities, EmbeddingModelCapabilities)
-            else tuple(capabilities)
-        )
-        for cap in caps_seq:
-            prov = cap.provider
-            name_key = cap.name.strip().lower()
-            if not replace and name_key in self._embedding_capabilities.get(prov, {}):
-                continue
-            if name_key not in self._embedding_capabilities.get(prov, {}):
-                self._embedding_capabilities[prov][ModelName(cast(LiteralStringT, name_key))] = (
-                    cap,
-                )
-            else:
-                self._embedding_capabilities[prov][ModelName(cast(LiteralStringT, name_key))] += (
-                    cap,
-                )
+        self._register_capabilities(capabilities, self._embedding_capabilities, replace=replace)
 
     def get_embedding_capabilities(
         self, provider: Provider, name: str
@@ -133,7 +158,7 @@ class ModelRegistry(BasedModel):
         """Get embedding capabilities for a specific provider and model name."""
         prov_map = self._embedding_capabilities.get(provider)
         return (
-            prov_map.get(ModelName(cast(LiteralStringT, name.strip().lower())))
+            prov_map.get(ModelName(cast(LiteralStringT, _normalize_model_name(name))))
             if prov_map
             else None
         )
@@ -152,37 +177,19 @@ class ModelRegistry(BasedModel):
 
     # ---------- Sparse embedding capabilities ----------
     def register_sparse_embedding_capabilities(
-        self,
-        capabilities: SparseEmbeddingModelCapabilities
-        | Sequence[SparseEmbeddingModelCapabilities]
-        | Iterable[SparseEmbeddingModelCapabilities],
-        *,
-        replace: bool = True,
+        self, capabilities: SparseEmbeddingModelCapabilities, *, replace: bool = True
     ) -> None:
-        """Register one or more sparse embedding model capabilities for a provider."""
-        caps_seq: Sequence[SparseEmbeddingModelCapabilities] = (
-            (capabilities,)
-            if isinstance(capabilities, SparseEmbeddingModelCapabilities)
-            else tuple(capabilities)
+        """Register one or more sparse embedding model capabilities."""
+        self._register_capabilities(
+            capabilities, self._sparse_embedding_capabilities, replace=replace
         )
-        for cap in caps_seq:
-            prov = cap.provider  # type: ignore[attr-defined]
-            name_key = cap.name.strip().lower()  # type: ignore[attr-defined]
-            prov_map = self._sparse_embedding_capabilities.setdefault(prov, {})
-            if not replace and name_key in prov_map:
-                continue
-            prov_map[ModelName(cast(LiteralStringT, name_key))] = (cap,)
 
     def get_sparse_embedding_capabilities(
         self, provider: Provider, name: str
     ) -> tuple[SparseEmbeddingModelCapabilities, ...] | None:
         """Get sparse embedding capabilities for a specific provider and model name."""
         prov_map = self._sparse_embedding_capabilities.get(provider)
-        return (
-            prov_map.get(ModelName(cast(LiteralStringT, name.strip().lower())))
-            if prov_map
-            else None
-        )
+        return prov_map.get(_normalize_model_name(name)) if prov_map else None
 
     def list_sparse_embedding_models(
         self, provider: Provider | None = None
@@ -200,39 +207,17 @@ class ModelRegistry(BasedModel):
 
     # ---------- Reranking capabilities ----------
     def register_reranking_capabilities(
-        self,
-        capabilities: RerankingModelCapabilities
-        | Sequence[RerankingModelCapabilities]
-        | Iterable[RerankingModelCapabilities],
-        *,
-        replace: bool = True,
+        self, capabilities: RerankingModelCapabilities, *, replace: bool = True
     ) -> None:
-        """Register one or more reranking model capabilities for a provider."""
-        caps_seq: Sequence[RerankingModelCapabilities] = (
-            (capabilities,)
-            if isinstance(capabilities, RerankingModelCapabilities)
-            else tuple(capabilities)
-        )
-        for cap in caps_seq:
-            prov_map = self._reranking_capabilities.setdefault(cap.provider, {})
-            name_key = cap.name.strip().lower()
-            if not replace and name_key in prov_map:
-                continue
-            if name_key not in prov_map:
-                prov_map[ModelName(cast(LiteralStringT, name_key))] = (cap,)
-            else:
-                prov_map[ModelName(cast(LiteralStringT, name_key))] += (cap,)
+        """Register one or more reranking model capabilities."""
+        self._register_capabilities(capabilities, self._reranking_capabilities, replace=replace)
 
     def get_reranking_capabilities(
         self, provider: Provider, name: str
     ) -> tuple[RerankingModelCapabilities, ...] | None:
         """Get reranking capabilities for a specific provider and model name."""
         prov_map = self._reranking_capabilities.get(provider)
-        return (
-            prov_map.get(ModelName(cast(LiteralStringT, name.strip().lower())))
-            if prov_map
-            else None
-        )
+        return prov_map.get(_normalize_model_name(name)) if prov_map else None
 
     def list_reranking_models(
         self, provider: Provider | None = None
@@ -352,13 +337,15 @@ class ModelRegistry(BasedModel):
             model_name = model_settings.get("model")
             if not model_name:
                 return None
-            if kind == "embedding":
+            if kind == ProviderKind.EMBEDDING:
                 return self.get_embedding_capabilities(provider, model_name)  # type: ignore
-            if kind == "sparse_embedding":
+            if kind == ProviderKind.SPARSE_EMBEDDING:
                 return self.get_sparse_embedding_capabilities(provider, model_name)  # type: ignore
-            if kind == "reranking":
+            if kind == ProviderKind.RERANKING:
                 return self.get_reranking_capabilities(provider, model_name)  # type: ignore
-            if kind == "agent" and (profile := self.resolve_agent_profile(provider, model_name)):
+            if kind == ProviderKind.AGENT and (
+                profile := self.resolve_agent_profile(provider, model_name)
+            ):
                 return profile
         return None
 

@@ -37,9 +37,7 @@ type PartialRerankingCapabilitiesDict = dict[
     | bool
     | None
     | Provider
-    | Callable[[Sequence[CodeChunk], str], Any]
     | Callable[..., Sequence[Sequence[float]] | Sequence[Sequence[int]]]
-    | tuple[bool, NonNegativeInt]
     | dict[str, Any],
 ]
 
@@ -50,10 +48,7 @@ class RerankingCapabilitiesDict(TypedDict, total=False):
     name: Required[str]
     provider: Required[Provider]
     max_query: NotRequired[PositiveInt | None]
-    max_input: Annotated[
-        PositiveInt | Callable[[Sequence[CodeChunk], str], tuple[bool, NonNegativeInt]] | None,
-        NotRequired,
-    ]
+    max_input: NotRequired[PositiveInt | None]
     context_window: NotRequired[PositiveInt]
     supports_custom_prompt: NotRequired[bool]
     custom_prompt: NotRequired[str]

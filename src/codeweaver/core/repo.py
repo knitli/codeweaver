@@ -25,9 +25,7 @@ from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializatio
 
 if TYPE_CHECKING:
     from codeweaver.core.types import AnonymityConversion
-    from codeweaver.engine.discovery import FileDiscoveryService
 
-_discovery: FileDiscoveryService | None = None
 
 type PathOrFalse = Path | Literal[False]
 """A return type that can either be a Path or False."""
@@ -164,24 +162,6 @@ class RepoDirectory(DataclassSerializationMixin):
             FilteredKey("_files"): AnonymityConversion.COUNT,
             FilteredKey("_subdirectories"): AnonymityConversion.COUNT,
         }
-
-
-def get_discovery_service() -> FileDiscoveryService:
-    """Get the singleton instance of the FileDiscoveryService.
-
-    Returns:
-        The FileDiscoveryService instance.
-
-    Raises:
-        RuntimeError: If the service has not been initialized.
-    """
-    global _discovery
-    if _discovery is None:
-        from codeweaver.config.settings import get_settings
-        from codeweaver.engine.discovery import FileDiscoveryService
-
-        _discovery = FileDiscoveryService(get_settings().view)
-    return _discovery
 
 
 class RepoChecklistDict(TypedDict):
@@ -630,11 +610,4 @@ class RepoChecklist(DataclassSerializationMixin):
         return app_dirs
 
 
-__all__ = (
-    "DirectoryPurpose",
-    "PathOrFalse",
-    "RepoChecklist",
-    "RepoChecklistDict",
-    "RepoDirectory",
-    "get_discovery_service",
-)
+__all__ = ("DirectoryPurpose", "PathOrFalse", "RepoChecklist", "RepoChecklistDict", "RepoDirectory")

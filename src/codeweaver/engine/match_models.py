@@ -20,22 +20,6 @@ from typing import Annotated
 from pydantic import BaseModel, Field, StrictBool, StrictInt, StrictStr
 
 
-type AnyVariants = Sequence[StrictStr] | Sequence[StrictInt]
-type Condition = (
-    FieldCondition
-    | IsEmptyCondition
-    | IsNullCondition
-    | HasIdCondition
-    | HasVectorCondition
-    | NestedCondition
-    | Filter
-)
-type ExtendedPointId = StrictInt | StrictStr
-type ValueVariants = StrictBool | StrictInt | StrictStr
-type Match = MatchValue | MatchText | MatchPhrase | MatchAny | MatchExcept
-type RangeInterface = Range | DatetimeRange
-
-
 class PayloadField(BaseModel, extra="forbid"):
     """
     Payload field.
@@ -373,6 +357,22 @@ class FieldCondition(BaseModel, extra="forbid"):
     ] = None
 
 
+type AnyVariants = Sequence[StrictStr] | Sequence[StrictInt]
+type Condition = (
+    FieldCondition
+    | IsEmptyCondition
+    | IsNullCondition
+    | HasIdCondition
+    | HasVectorCondition
+    | NestedCondition
+    | Filter
+)
+type ExtendedPointId = StrictInt | StrictStr
+type ValueVariants = StrictBool | StrictInt | StrictStr
+type Match = MatchValue | MatchText | MatchPhrase | MatchAny | MatchExcept
+type RangeInterface = Range | DatetimeRange
+
+
 __all__ = (
     "AnyVariants",
     "Condition",
@@ -402,3 +402,13 @@ __all__ = (
     "ValueVariants",
     "ValuesCount",
 )
+
+
+for _model in __all__:
+    if (
+        (resolved := globals().get(_model))
+        and isinstance(resolved, type)
+        and issubclass(resolved, BaseModel)
+        and not resolved.__pydantic_complete__
+    ):
+        resolved.model_rebuild()

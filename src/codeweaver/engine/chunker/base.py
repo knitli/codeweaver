@@ -24,16 +24,14 @@ from abc import ABC, abstractmethod
 from functools import cached_property
 from typing import TYPE_CHECKING, Annotated, Any, cast
 
-from pydantic import ConfigDict, Field, PositiveInt, computed_field
+from pydantic import ConfigDict, Field, PositiveInt, PrivateAttr, computed_field
 
 # Import ChunkerSettings at runtime for model rebuild to work
 from codeweaver.config.chunker import ChunkerSettings
-from codeweaver.config.providers import EmbeddingProviderSettings, RerankingProviderSettings
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.models import BasedModel
 from codeweaver.exceptions import InitializationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
@@ -102,18 +100,23 @@ class ChunkGovernor(BasedModel):
         Field(default=None, description="""Chunker configuration settings."""),
     ] = None
 
+    _limit: Annotated[PositiveInt, PrivateAttr()] = 512
+
+    _limit_established: Annotated[bool, PrivateAttr()] = False
+
     @computed_field
-    @cached_property
+    @property
     def chunk_limit(self) -> PositiveInt:
         """The absolute maximum chunk size in tokens."""
         # Use default of 512 tokens when capabilities aren't available
-        if not self.capabilities:
-            return 512
-        return min(
-            capability.context_window
-            for capability in self.capabilities
-            if hasattr("context_window", capability)
-        )
+        if not self._limit_established and self.capabilities:
+            self._limit_established = True
+            self._limit = min(
+                capability.context_window
+                for capability in self.capabilities
+                if hasattr(capability, "context_window")
+            )
+        return self._limit
 
     @computed_field
     @cached_property
@@ -133,19 +136,26 @@ class ChunkGovernor(BasedModel):
         super().model_post_init(__context)
 
     @staticmethod
-    def _get_providers(
-        settings: EmbeddingProviderSettings | RerankingProviderSettings | None,
-    ) -> Provider:
-        from codeweaver.providers.provider import Provider
-
-        return Provider.NOT_SET if settings is None else settings["provider"]
-
-    @staticmethod
-    def _get_caps_for_provider(
-        settings: EmbeddingProviderSettings | RerankingProviderSettings, provider: Provider
-    ) -> EmbeddingModelCapabilities | RerankingModelCapabilities | None:
-
-        return None
+    def _get_caps() -> (
+        tuple[()]
+        | tuple[EmbeddingModelCapabilities]
+        | tuple[EmbeddingModelCapabilities, RerankingModelCapabilities]
+    ):
+        """Retrieve capabilities from provider settings."""
+        capabilities = _get_capabilities()
+        embedding_caps = next(
+            (cap for cap in capabilities if isinstance(cap, EmbeddingModelCapabilities)), None
+        )
+        reranking_caps = next(
+            (cap for cap in capabilities if isinstance(cap, RerankingModelCapabilities)), None
+        )
+        return (
+            (embedding_caps, reranking_caps)
+            if embedding_caps and reranking_caps
+            else (embedding_caps,)
+            if embedding_caps
+            else ()
+        )
 
     @classmethod
     def from_settings(cls, settings: ChunkerSettings) -> ChunkGovernor:
@@ -171,7 +181,7 @@ class ChunkGovernor(BasedModel):
             )
             return cls(capabilities=(embedding_caps, reranking_caps), settings=settings)
         if len(capabilities) == 1:
-            embedding_caps = cast(EmbeddingModelCapabilities, capabilities[0])
+            embedding_caps = cast(EmbeddingModelCapabilities, capabilities[0])  # ty: ignore[index-out-of-bounds]
             logger.debug("Creating ChunkGovernor with embedding caps: %s", embedding_caps)
             return cls(capabilities=(embedding_caps,), settings=settings)
         logger.warning("Could not determine capabilities from settings, using default chunk limits")
@@ -245,13 +255,17 @@ def _rebuild_models() -> None:
             # Import ChunkerSettings to ensure it's available for rebuild
             # The import is safe here because ChunkerSettings imports are already resolved
             from codeweaver.config.chunker import ChunkerSettings as _ChunkerSettings
+            from codeweaver.engine.chunker.delimiters.families import LanguageFamily
+            from codeweaver.engine.chunker.delimiters.patterns import DelimiterPattern
 
             # Build namespace for model rebuild with all required types
             # ChunkGovernor needs ChunkerSettings, and BaseChunker methods use CodeChunk
             namespace = {
                 "ChunkerSettings": _ChunkerSettings,
                 "CodeChunk": CodeChunk,
+                "DelimiterPattern": DelimiterPattern,
                 "EmbeddingModelCapabilities": EmbeddingModelCapabilities,
+                "LanguageFamily": LanguageFamily,
                 "RerankingModelCapabilities": RerankingModelCapabilities,
             }
             _ = ChunkGovernor.model_rebuild(_types_namespace=namespace)
