@@ -259,7 +259,7 @@ class Indexer(BasedModel):
                 )
             )
         self._file_manifest = None
-        self._manifest_lock = asyncio.Lock()
+        self._manifest_lock = None  # Initialize as None, created lazily in async context
 
         if auto_initialize_providers:
             self._initialize_providers()
@@ -378,6 +378,10 @@ class Indexer(BasedModel):
             path: Path to the file to index
             context: Optional FastMCP context for structured logging
         """
+        # Ensure manifest lock is initialized in async context
+        if self._manifest_lock is None:
+            self._manifest_lock = asyncio.Lock()
+
         try:
             # 1. Discover and store file metadata
             discovered_file = DiscoveredFile.from_path(path)
@@ -608,6 +612,10 @@ class Indexer(BasedModel):
         Args:
             path: Path to the file to remove
         """
+        # Ensure manifest lock is initialized in async context
+        if self._manifest_lock is None:
+            self._manifest_lock = asyncio.Lock()
+
         try:
             if removed := self._remove_path(path):
                 logger.debug("Removed %d entries from store for: %s", removed, path)
@@ -821,8 +829,12 @@ class Indexer(BasedModel):
         if deleted_files:
             logger.info("Detected %d deleted files to clean up", len(deleted_files))
             # Schedule cleanup (will be done in separate phase)
-            # Convert back to absolute paths for cleanup
-            self._deleted_files = list(deleted_files)
+            # Convert relative paths from manifest to absolute paths for cleanup
+            if self._project_root:
+                self._deleted_files = [self._project_root / rel_path for rel_path in deleted_files]
+            else:
+                logger.warning("No project root set, cannot resolve deleted file paths")
+                self._deleted_files = []
 
         logger.info(
             "Incremental indexing: %d new/modified, %d unchanged, %d deleted",
