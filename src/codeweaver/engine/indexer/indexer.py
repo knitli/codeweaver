@@ -36,6 +36,7 @@ from pydantic.dataclasses import dataclass
 from watchfiles.main import Change
 
 from codeweaver.common.logging import log_to_client_or_fallback
+from codeweaver.common.utils.git import set_relative_path
 from codeweaver.config.chunker import ChunkerSettings
 from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
@@ -173,6 +174,7 @@ class Indexer(BasedModel):
     _checkpoint: Annotated[IndexingCheckpoint | None, PrivateAttr()] = None
     _manifest_manager: Annotated[FileManifestManager | None, PrivateAttr()] = None
     _file_manifest: Annotated[IndexFileManifest | None, PrivateAttr()] = None
+    _manifest_lock: Annotated[asyncio.Lock | None, PrivateAttr()] = None
     _deleted_files: Annotated[list[Path], PrivateAttr()] = PrivateAttr(default_factory=list)
     _last_checkpoint_time: Annotated[NonNegativeFloat, PrivateAttr()] = 0.0
     _files_since_checkpoint: Annotated[NonNegativeInt, PrivateAttr()] = 0
@@ -257,6 +259,7 @@ class Indexer(BasedModel):
                 )
             )
         self._file_manifest = None
+        self._manifest_lock = asyncio.Lock()
 
         if auto_initialize_providers:
             self._initialize_providers()
@@ -513,12 +516,21 @@ class Indexer(BasedModel):
             self._stats.files_processed += 1
 
             # 6. Update file manifest with successful indexing
-            if self._file_manifest and updated_chunks:
+            # Only update if all critical operations succeeded and we have chunks
+            if self._file_manifest and updated_chunks and self._manifest_lock:
                 chunk_ids = [str(chunk.chunk_id) for chunk in updated_chunks]
-                self._file_manifest.add_file(
-                    path=path, content_hash=discovered_file.file_hash, chunk_ids=chunk_ids
-                )
-                logger.debug("Updated manifest for file: %s (%d chunks)", path, len(chunk_ids))
+                # Use relative path for portability
+                relative_path = set_relative_path(path)
+                if relative_path:
+                    async with self._manifest_lock:
+                        self._file_manifest.add_file(
+                            path=relative_path,
+                            content_hash=discovered_file.file_hash,
+                            chunk_ids=chunk_ids,
+                        )
+                    logger.debug(
+                        "Updated manifest for file: %s (%d chunks)", relative_path, len(chunk_ids)
+                    )
 
             await log_to_client_or_fallback(
                 context,
@@ -603,13 +615,18 @@ class Indexer(BasedModel):
                 except Exception:
                     logger.exception("Failed to remove from vector store")
 
-            # Remove from file manifest
-            if self._file_manifest:
-                entry = self._file_manifest.remove_file(path)
-                if entry:
-                    logger.debug(
-                        "Removed file from manifest: %s (%d chunks)", path, entry["chunk_count"]
-                    )
+            # Remove from file manifest (use relative path)
+            if self._file_manifest and self._manifest_lock:
+                relative_path = set_relative_path(path)
+                if relative_path:
+                    async with self._manifest_lock:
+                        entry = self._file_manifest.remove_file(relative_path)
+                    if entry:
+                        logger.debug(
+                            "Removed file from manifest: %s (%d chunks)",
+                            relative_path,
+                            entry["chunk_count"],
+                        )
         except Exception:
             logger.exception("Failed to delete file %s", path)
 
@@ -671,6 +688,16 @@ class Indexer(BasedModel):
 
         manifest = self._manifest_manager.load()
         if manifest:
+            # Validate that loaded manifest matches current project path
+            if manifest.project_path.resolve() != self._manifest_manager.project_path.resolve():
+                logger.warning(
+                    "Loaded manifest project path mismatch (expected %s, got %s). Creating new manifest.",
+                    self._manifest_manager.project_path,
+                    manifest.project_path,
+                )
+                self._file_manifest = self._manifest_manager.create_new()
+                return False
+
             self._file_manifest = manifest
             logger.info(
                 "File manifest loaded: %d files, %d chunks",
@@ -683,17 +710,17 @@ class Indexer(BasedModel):
         logger.info("Created new file manifest")
         return False
 
-    def _save_file_manifest(self) -> None:
-        """Save current file manifest to disk."""
+    def _save_file_manifest(self) -> bool:
+        """Save current file manifest to disk.
+
+        Returns:
+            True if save was successful, False otherwise
+        """
         if not self._manifest_manager or not self._file_manifest:
             logger.warning("No manifest manager or manifest to save")
-            return
+            return False
 
-        try:
-            self._manifest_manager.save(self._file_manifest)
-            logger.debug("File manifest saved successfully")
-        except Exception:
-            logger.exception("Failed to save file manifest")
+        return self._manifest_manager.save(self._file_manifest)
 
     def _try_restore_from_checkpoint(self, *, force_reindex: bool) -> bool:
         """Attempt to restore indexing state from checkpoint.
@@ -751,11 +778,18 @@ class Indexer(BasedModel):
 
         for path in all_files:
             try:
-                # Compute current hash
+                # Compute current hash (path is absolute from walker)
                 current_hash = get_blake_hash(path.read_bytes())
 
+                # Convert to relative path for manifest lookup
+                relative_path = set_relative_path(path)
+                if not relative_path:
+                    # If can't convert to relative, treat as new file
+                    files_to_index.append(path)
+                    continue
+
                 # Check if file is new or changed
-                if self._file_manifest.file_changed(path, current_hash):
+                if self._file_manifest.file_changed(relative_path, current_hash):
                     files_to_index.append(path)
                 else:
                     unchanged_count += 1
@@ -764,13 +798,15 @@ class Indexer(BasedModel):
                 files_to_index.append(path)
 
         # Detect deleted files (in manifest but not on disk)
+        # Convert all discovered files to relative paths for comparison
         manifest_files = self._file_manifest.get_all_file_paths()
-        all_files_set = set(all_files)
-        deleted_files = manifest_files - all_files_set
+        all_files_relative = {set_relative_path(p) for p in all_files if set_relative_path(p)}
+        deleted_files = manifest_files - all_files_relative
 
         if deleted_files:
             logger.info("Detected %d deleted files to clean up", len(deleted_files))
             # Schedule cleanup (will be done in separate phase)
+            # Convert back to absolute paths for cleanup
             self._deleted_files = list(deleted_files)
 
         logger.info(

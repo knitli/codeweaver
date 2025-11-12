@@ -203,17 +203,27 @@ class FileManifestManager:
             project_path: Path to indexed codebase
             manifest_dir: Directory for manifest files (default: .codeweaver/)
         """
+        from codeweaver.core.stores import get_blake_hash
+
         self.project_path = project_path.resolve()
         self.manifest_dir = (manifest_dir or get_user_config_dir()).resolve()
-        self.manifest_file = self.manifest_dir / f"file_manifest_{self.project_path.name}.json"
 
-    def save(self, manifest: IndexFileManifest) -> None:
+        # Add path hash to filename to avoid collisions between projects with same name
+        path_hash = get_blake_hash(str(self.project_path))[:16]
+        self.manifest_file = (
+            self.manifest_dir / f"file_manifest_{self.project_path.name}_{path_hash}.json"
+        )
+
+    def save(self, manifest: IndexFileManifest) -> bool:
         """Save manifest to disk.
 
         Creates manifest directory if needed. Updates last_updated timestamp.
 
         Args:
             manifest: Manifest state to save
+
+        Returns:
+            True if save was successful, False otherwise
         """
         # Update timestamp
         manifest.last_updated = datetime.now(UTC)
@@ -229,8 +239,10 @@ class FileManifestManager:
                 manifest.total_files,
                 manifest.total_chunks,
             )
+            return True
         except OSError:
             logger.exception("Failed to save file manifest")
+            return False
 
     def load(self) -> IndexFileManifest | None:
         """Load manifest from disk if available.
