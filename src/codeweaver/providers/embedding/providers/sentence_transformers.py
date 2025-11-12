@@ -40,7 +40,7 @@ except ImportError as e:
 # SparseEncoder is not available in all versions of sentence-transformers
 # Import it conditionally for sparse embedding support
 try:
-    from sentence_transformers.sparse_encoder import SparseEncoder
+    from sentence_transformers.sparse_encoder import SparseEncoder  # ty: ignore[unresolved-import]
 
     HAS_SPARSE_ENCODER = True
 except ImportError:

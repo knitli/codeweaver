@@ -6,7 +6,7 @@
 """
 Indexing configuration settings for CodeWeaver.
 
-Settings for `codeweaver.engine.indexer.Indexer`, `codeweaver.engine.indexer.FileWatcher`, and related components.
+Settings for `codeweaver.engine.indexer.indexer.Indexer`, `codeweaver.engine.watcher.watcher.FileWatcher`, and related components.
 """
 
 from __future__ import annotations

@@ -219,6 +219,10 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
             client_options = self.doc_kwargs.get("client_options") or self.doc_kwargs
             self.client = self.client(**client_options)
 
+    def base_url(self) -> str | None:
+        """FastEmbed does not use a base URL."""
+        return None
+
     async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Any
     ) -> list[SparseEmbedding]:

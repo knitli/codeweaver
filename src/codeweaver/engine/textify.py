@@ -5,7 +5,7 @@
 
 """Text processing utilities for code snippets."""
 
-# TODO: Once we have better code parsing implementations, we need to define a pipeline for processing.
+# TODO: Integrate into the delimiter based chunker.
 from __future__ import annotations
 
 import re

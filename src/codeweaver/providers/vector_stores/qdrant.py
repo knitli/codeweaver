@@ -15,7 +15,7 @@ from typing_extensions import TypeIs
 
 from codeweaver.config.providers import QdrantConfig
 from codeweaver.core.chunks import CodeChunk
-from codeweaver.engine.filter import Filter
+from codeweaver.engine.search import Filter
 from codeweaver.exceptions import ProviderError
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.vector_stores.base import VectorStoreProvider

@@ -251,8 +251,12 @@ class AppState(DataclassSerializationMixin):
         tuple[Middleware, ...],
         Field(description="Tuple of FastMCP middleware instances applied to the server"),
     ] = ()
-    indexer: Indexer | None = None
-    health_service: HealthService | None = None
+    indexer: Annotated[
+        Indexer | None, Field(default=None, description="Indexer instance for background indexing")
+    ] = None
+    health_service: Annotated[
+        HealthService | None, Field(description="Health service instance")
+    ] = None
 
     telemetry: PostHogClient | None = None
 
@@ -331,7 +335,7 @@ async def _run_background_indexing(
         # Start file watcher for real-time updates
         console.print(f"{CODEWEAVER_PREFIX} [blue]Starting file watcher...[/blue]")
         from codeweaver.common.utils import get_project_path
-        from codeweaver.engine.indexer import FileWatcher, IgnoreFilter
+        from codeweaver.engine.watcher import FileWatcher, IgnoreFilter
 
         watcher = FileWatcher(
             get_project_path()

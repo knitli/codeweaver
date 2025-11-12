@@ -27,7 +27,6 @@ from pydantic import HttpUrl
 from codeweaver.core.types.sentinel import Unset
 
 
-Posthog: Any
 NO_HOG = find_spec("posthog") is None
 
 if NO_HOG:
@@ -99,8 +98,6 @@ class PostHogClient:
 
         if self.enabled and api_key:
             try:
-                from posthog import Posthog
-
                 self._client = Posthog(
                     project_api_key=api_key,
                     host=host,

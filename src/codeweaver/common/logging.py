@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING, Any, Literal
 from fastmcp import Context
 from pydantic_core import to_json
 
+from codeweaver.cli.utils import is_tty
+from codeweaver.common.utils.checks import is_ci, is_debug
 from codeweaver.common.utils.lazy_importer import lazy_import
 from codeweaver.config.logging import LoggingConfigDict
 
@@ -28,6 +30,11 @@ else:
     RichHandler: LazyImport[RichHandler] = lazy_import("rich.logging", "RichHandler")
 
 
+IS_CI = is_ci()
+IS_TTY = is_tty()
+DEFAULT_LOG_LEVEL = logging.DEBUG if is_debug() else logging.WARNING
+
+
 def get_rich_handler(**kwargs: Any) -> RichHandler:
     console = import_module("rich.console").Console
     global RichHandler
@@ -37,7 +44,7 @@ def get_rich_handler(**kwargs: Any) -> RichHandler:
 
 
 def _setup_config_logger(
-    name: str | None = "codeweaver",
+    name: str = "codeweaver",
     *,
     level: int = logging.WARNING,
     rich: bool = True,
@@ -47,7 +54,7 @@ def _setup_config_logger(
     """Set up a logger with optional rich formatting."""
     if logging_kwargs:
         dictConfig({**logging_kwargs})  # ty: ignore[missing-typed-dict-key]
-        if rich:
+        if rich and IS_TTY and not IS_CI:
             return _setup_logger_with_rich_handler(rich_options, name, level)
         return logging.getLogger(name)
     raise ValueError("No logging configuration provided")
@@ -65,7 +72,7 @@ def _setup_logger_with_rich_handler(rich_options: dict[str, Any] | None, name: s
 
 
 def setup_logger(
-    name: str | None = "codeweaver",
+    name: str = "codeweaver",
     *,
     level: int = logging.WARNING,
     rich: bool = True,
@@ -97,6 +104,9 @@ async def log_to_client_or_fallback(
     context: Context | None,
     level: Literal["debug", "info", "warning", "error"],
     log_data: dict[str, Any],
+    *,
+    name: str = "codeweaver",
+    logger: logging.Logger | None = None,
 ) -> None:
     """Log structured data to the client or fallback to standard logging.
 
@@ -116,7 +126,7 @@ async def log_to_client_or_fallback(
             log_obj(msg)
     else:
         # Fallback to standard logging
-        logger = logging.getLogger("codeweaver")
+        logger = logger or logging.getLogger(name)
         match level:
             case "debug":
                 int_level: int = logging.DEBUG

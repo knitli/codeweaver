@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NoReturn
 
 from codeweaver.server.health_models import (
     EmbeddingProviderServiceInfo,
@@ -36,7 +36,6 @@ async def get_health() -> HealthResponse | Any:
     - Service health for vector store, embedding providers, reranking
     - Statistics on indexed content and query performance
 
-    Implements FR-010-Enhanced schema for operational visibility.
 
     Args:
         ctx: FastMCP context with AppState
@@ -44,11 +43,16 @@ async def get_health() -> HealthResponse | Any:
     Returns:
         HealthResponse with complete system health information
     """
+
+    def raise_runtime_error() -> NoReturn:
+        raise RuntimeError("Health service not initialized")
+
     try:
         ctx = get_state()
         # Get health service from app state
         if ctx.health_service is None:
-            raise RuntimeError("Health service not initialized")
+            raise_runtime_error()
+            return None  # for the type checker -- it's unreachable
         health_service: HealthService = ctx.health_service
 
         # Collect health information from all components

@@ -143,20 +143,25 @@ async def find_code_tool(
 # -------------------------
 # Plain route handlers
 # -------------------------
-@timed_http("statistics")
+@timed_http("metrics")
 async def stats_info(_request: Request) -> PlainTextResponse:
     """Return current session statistics as JSON."""
     global statistics
-    stats: SessionStatistics = statistics()
-    try:
-        return PlainTextResponse(content=stats.report(), media_type="application/json")
-    except Exception as e:
-        _logger.exception("Failed to serialize session statistics")
-        return PlainTextResponse(
-            content=to_json({"error": f"Failed to serialize session statistics: {e}"}),
-            status_code=500,
-            media_type="application/json",
-        )
+    if stats := statistics():
+        try:
+            return PlainTextResponse(content=stats.report(), media_type="application/json")
+        except Exception as e:
+            _logger.exception("Failed to serialize session statistics")
+            return PlainTextResponse(
+                content=to_json({"error": f"Failed to serialize session statistics: {e}"}),
+                status_code=500,
+                media_type="application/json",
+            )
+    return PlainTextResponse(
+        content=to_json({"error": "No metrics available"}),
+        status_code=500,
+        media_type="application/json",
+    )
 
 
 @timed_http("settings")

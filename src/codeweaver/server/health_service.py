@@ -13,6 +13,7 @@ import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal, NoReturn, cast
 
+from codeweaver.exceptions import ConfigurationError
 from codeweaver.server.health_models import (
     EmbeddingProviderServiceInfo,
     HealthResponse,
@@ -60,6 +61,8 @@ class HealthService:
         self._startup_time = startup_time
         self._last_indexed: str | None = None
         self._indexed_languages: set[str] = set()
+
+        self._tasks: list[asyncio.Task[Any]] = []
 
     def set_indexer(self, indexer: Indexer) -> None:
         """Set the indexer instance after initialization."""
@@ -182,7 +185,19 @@ class HealthService:
         def raise_error() -> NoReturn:
             """Helper to raise error for missing provider."""
             logger.error("No vector store provider configured")
-            raise RuntimeError("No vector store provider configured")
+            raise ConfigurationError(
+                "No vector store provider configured. Either you don't have a vector store configured, your settings are misconfigured, or the provider is not available.",
+                details={
+                    "vector_provider_settings": self._provider_registry.get_configured_provider_settings(
+                        provider_kind=ProviderKind.VECTOR_STORE
+                    )
+                },
+                suggestions=[
+                    "Ensure a vector store provider is configured in your settings.",
+                    "Check that the provider settings are correct and the provider is reachable.",
+                    "If the issue persists, please submit an issue: https://github.com/knitli/codeweaver-mcp/issues/new",
+                ],
+            )
 
         try:
             vector_provider = self._provider_registry.get_configured_provider_settings(
@@ -375,6 +390,23 @@ class HealthService:
             return "degraded"
 
         return "degraded" if indexing.progress.errors >= 25 else "healthy"
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert HealthService to dictionary for serialization.
+
+        In practice, HealthService isn't serialized -- we serialize HealthResponse.
+        """
+        try:
+            loop = asyncio.get_running_loop()
+            self._tasks.append(loop.create_task(self.get_health_response()))
+            health_response = loop.run_until_complete(self._tasks[-1])
+            self._tasks.pop()
+        except RuntimeError:
+            # No event loop, run synchronously
+            health_response = asyncio.run(self.get_health_response())
+        else:
+            return health_response.model_dump(round_trip=True)
+        return {}
 
 
 __all__ = ("HealthService",)

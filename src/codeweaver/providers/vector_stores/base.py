@@ -22,7 +22,7 @@ from typing_extensions import TypeIs
 from codeweaver.agent_api.find_code.types import StrategizedQuery
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.models import BasedModel
-from codeweaver.engine.filter import Filter
+from codeweaver.engine.search import Filter
 from codeweaver.exceptions import ProviderError
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,

@@ -14,70 +14,16 @@ Nearly all of this file and its contents were adapted from Qdrant's example MCP 
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, Literal
-
-from pydantic import BaseModel, Field
+from typing import Any
 
 from codeweaver.core.file_extensions import METADATA_PATH
-from codeweaver.core.types.enum import BaseEnum
-from codeweaver.engine.match_models import (
-    FieldCondition,
-    Filter,
-    MatchAny,
-    MatchExcept,
-    MatchValue,
-    Range,
-)
+from codeweaver.engine.search.condition import FieldCondition, Filter, FilterableField
+from codeweaver.engine.search.match import MatchAny, MatchExcept, MatchValue
+from codeweaver.engine.search.payload import PayloadSchemaType
+from codeweaver.engine.search.range import Range
 
 
-PayloadMetadata = dict[str, Any]
 ArbitraryFilter = dict[str, Any]
-
-
-class PayloadSchemaType(str, BaseEnum):
-    """
-    The types of payload fields that can be indexed.
-    """
-
-    KEYWORD = "keyword"
-    INTEGER = "integer"
-    FLOAT = "float"
-    GEO = "geo"
-    TEXT = "text"
-    BOOL = "bool"
-    DATETIME = "datetime"
-    UUID = "uuid"
-
-    __slots__ = ()
-
-
-class Entry(BaseModel):
-    """
-    A single entry in the Qdrant collection.
-    """
-
-    content: str
-    Metadata: PayloadMetadata | None = None
-
-
-class FilterableField(BaseModel):
-    """Represents a field that can be filtered."""
-
-    name: str = Field(description="""The name of the payload field to filter on""")
-    description: str = Field(
-        description="""A description for the field used in the tool description"""
-    )
-    field_type: PayloadSchemaType = Field(description="""The type of the field""")
-    condition: Literal["==", "!=", ">", ">=", "<", "<=", "any", "except"] | None = Field(
-        default=None,
-        description=(
-            "The condition to use for the filter. If not provided, the field will be indexed, but no "
-            "filter argument will be exposed to MCP tool."
-        ),
-    )
-    required: bool = Field(
-        default=False, description="""Whether the field is required for the filter."""
-    )
 
 
 def _validate_field_value(raw_field_name: str, field: FilterableField, field_value: Any) -> None:
@@ -266,12 +212,12 @@ def to_qdrant_filter(filter_obj: Filter | None) -> Filter | None:
 
     Note:
         The current implementation passes through the Filter object as-is since
-        CodeWeaver's Filter model (from engine.match_models) is already compatible
+        CodeWeaver's Filter model (from engine.search.condition) is already compatible
         with Qdrant's filter format. This function serves as an integration point
         for future filter transformations or field mapping customizations.
 
     Examples:
-        >>> from codeweaver.engine.match_models import Filter, FieldCondition, MatchAny
+        >>> from codeweaver.engine.search import Filter, FieldCondition, MatchAny
         >>> # Filter by file paths
         >>> filter_obj = Filter(
         ...     must=[
@@ -295,7 +241,7 @@ def to_qdrant_filter(filter_obj: Filter | None) -> Filter | None:
         >>> assert qdrant_filter is not None
 
         >>> # Filter by line range
-        >>> from codeweaver.engine.match_models import Range
+        >>> from codeweaver.engine.search import Range
         >>> filter_obj = Filter(
         ...     must=[FieldCondition(key="line_start", range=Range(gte=10, lte=100))]
         ... )
@@ -308,17 +254,4 @@ def to_qdrant_filter(filter_obj: Filter | None) -> Filter | None:
     return None if filter_obj is None else filter_obj
 
 
-__all__ = (
-    "ArbitraryFilter",
-    "Entry",
-    "FieldCondition",
-    "Filter",
-    "FilterableField",
-    "MatchAny",
-    "MatchExcept",
-    "MatchValue",
-    "PayloadMetadata",
-    "PayloadSchemaType",
-    "Range",
-    "to_qdrant_filter",
-)
+__all__ = ("ArbitraryFilter", "make_filter", "to_qdrant_filter")

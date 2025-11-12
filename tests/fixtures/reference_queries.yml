@@ -127,8 +127,8 @@ queries:
     intent: DEBUG
     precision_target: 3
     expected_files:
-      - src/codeweaver/engine/checkpoint.py
-      - src/codeweaver/engine/indexer.py
+      - src/codeweaver/engine/indexer/checkpoint.py
+      - src/codeweaver/engine/indexer/indexer.py
       - src/codeweaver/core/stores.py
     description: Debugging checkpoint restoration
   - query: error in AST node classification
@@ -236,10 +236,11 @@ queries:
     intent: DOCUMENT
     precision_target: 5
     expected_files:
-      - src/codeweaver/engine/indexer.py
+      - src/codeweaver/engine/indexer/indexer.py
       - src/codeweaver/engine/chunking_service.py
       - src/codeweaver/engine/chunker/base.py
-      - src/codeweaver/engine/checkpoint.py
+      - src/codeweaver/engine/indexer/checkpoint.py
+      - src/codeweaver/engine/watcher/watcher.py
     description: Documenting indexing system flow
   - query: document MCP server endpoints
     intent: DOCUMENT

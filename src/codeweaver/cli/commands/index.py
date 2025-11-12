@@ -39,7 +39,7 @@ def _check_server_health() -> bool:
         return response.status_code == 200
 
 
-def _trigger_server_reindex(force: bool) -> bool:
+def _trigger_server_reindex(*, force: bool) -> bool:
     """Trigger re-index on running server.
 
     Args:
@@ -83,8 +83,7 @@ def index(
         standalone: If True, run indexing without checking for server
     """
     from codeweaver.config.settings import get_settings
-    from codeweaver.engine.indexer import Indexer
-    from codeweaver.engine.progress import IndexingProgressTracker
+    from codeweaver.engine.indexer import Indexer, IndexingProgressTracker
 
     # Check if server is running (unless --standalone)
     if not standalone:
@@ -128,7 +127,8 @@ def index(
         console.print(f"{CODEWEAVER_PREFIX} [green]Starting indexing process...[/green]")
 
         _ = indexer.prime_index(
-            force_reindex=force_reindex, progress_callback=progress_tracker.update
+            force_reindex=force_reindex,
+            progress_callback=lambda stats, phase: progress_tracker.update(stats, phase),
         )
 
         # Display final summary

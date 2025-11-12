@@ -94,29 +94,25 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
     ) -> None:
         """Initialize the reranking provider."""
         if caps is None:
-            from codeweaver.common.registry.model_registry import get_model_registry
+            from codeweaver.common.registry.models import get_model_registry
 
             registry = get_model_registry()
-            caps = registry.configured_models_for_kind("reranking")
+            caps = registry.configured_models_for_kind("reranking")  # ty: ignore[invalid-assignment]
             if isinstance(caps, tuple) and len(caps) > 0:
                 caps = caps[0]
         if not caps:
             raise ConfigurationError("Reranking model capabilities must be provided.")
-        if (kwargs and "model" in kwargs) or "model_name" in kwargs:
-            model = kwargs.get("model") or kwargs.get("model_name")
-        else:
-            model = caps.name
         if client is None:
             if api_key := kwargs.pop("api_key", None) or os.getenv("VOYAGE_API_KEY"):
                 if isinstance(api_key, SecretStr):
                     api_key = api_key.get_secret_value()
-                client = AsyncClient(api_key=api_key, model=model, **kwargs)
+                client = AsyncClient(api_key=api_key)
 
             else:
                 logger.warning(
                     "We could not find an API key for Voyage AI. In case you have other means of authentication, we're going to proceed without an explicit API key... if you get authentication errors, please set the VOYAGE_API_KEY environment variable."
                 )
-                client = AsyncClient(model=model, **kwargs)
+                client = AsyncClient()
         self.client = client
 
         if caps is None:

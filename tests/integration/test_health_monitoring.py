@@ -644,11 +644,11 @@ async def test_health_json_serialization(health_service: HealthService):
     response = await health_service.get_health_response()
 
     # Serialize to JSON
-    json_str = response.model_dump_json()
-    assert json_str is not None
+    serialized = response.model_dump_json()
+    assert serialized is not None
 
     # Parse back and validate structure
-    json_data = json.loads(json_str)
+    json_data = json.loads(serialized)
 
     assert "status" in json_data
     assert "timestamp" in json_data

@@ -23,7 +23,7 @@ from codeweaver.agent_api.find_code.types import StrategizedQuery
 from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.providers import MemoryConfig
 from codeweaver.core.chunks import CodeChunk
-from codeweaver.engine.filter import Filter
+from codeweaver.engine.search import Filter
 from codeweaver.exceptions import PersistenceError, ProviderError
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.vector_stores.base import MixedQueryInput, VectorStoreProvider

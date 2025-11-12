@@ -206,6 +206,7 @@ class IndexingCheckpoint(BasedModel):
     ] = None
 
     def __init__(self, **data: Any):
+        """Initialize checkpoint, resolving paths and computing settings hash if needed."""
         super().__init__(**data)
         if self.project_path:
             self.project_path = self.project_path.resolve()

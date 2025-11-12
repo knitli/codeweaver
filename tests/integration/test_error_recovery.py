@@ -1,3 +1,4 @@
+# sourcery skip: lambdas-should-be-short, no-complex-if-expressions
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -435,9 +436,8 @@ async def test_health_shows_degraded_status(initialize_test_settings):
         # Note: Exact status depends on health service implementation
 
         # Circuit breaker state should be exposed
-        if hasattr(response, "services"):
-            if hasattr(response.services, "embedding_provider"):
-                assert response.services.embedding_provider.circuit_breaker_state == "open"
+        if hasattr(response, "services") and hasattr(response.services, "embedding_provider"):
+            assert response.services.embedding_provider.circuit_breaker_state == "open"
 
 
 @pytest.mark.integration
@@ -502,8 +502,7 @@ async def test_graceful_shutdown_with_checkpoint(initialize_test_settings):
     # Create test project
     import tempfile
 
-    from codeweaver.engine.checkpoint import CheckpointManager
-    from codeweaver.engine.indexer import Indexer
+    from codeweaver.engine.indexer import CheckpointManager, Indexer
 
     with tempfile.TemporaryDirectory() as tmpdir:
         project_root = Path(tmpdir)
@@ -517,7 +516,7 @@ async def test_graceful_shutdown_with_checkpoint(initialize_test_settings):
         # Simulate SIGTERM by calling signal handler
         # Note: Actual signal testing requires special setup
         if hasattr(indexer, "_handle_shutdown") and callable(indexer._handle_shutdown):
-            indexer._handle_shutdown(None, None)
+            indexer._handle_shutdown()
 
         # Verify checkpoint exists
         checkpoint_mgr = CheckpointManager(project_root)

@@ -119,10 +119,10 @@ def check_required_dependencies() -> DoctorCheck:
     package_to_module_map = {"uuid7": "uuid_extensions"}
 
     missing: list[str] = []
-    installed: list[tuple[str, str]] = []
+    _installed: list[tuple[str, str]] = []
 
     if our_dependencies := metadata.metadata("codeweaver-mcp").get_all("Requires-Dist") or []:
-        missing, installed = _check_required_dependencies(
+        missing, _installed = _check_required_dependencies(
             our_dependencies, package_to_module_map, metadata
         )
     return DoctorCheck.set_check(
@@ -182,7 +182,7 @@ def _identify_missing_dependencies(
 
     for display_name, module_name, _version in required_packages:
         if find_spec(module_name):
-            pkg_version = metadata.version(display_name)
+            pkg_version = metadata.version(display_name)  # ty: ignore[unresolved-attribute]
             installed.append((display_name, pkg_version))
         else:
             missing.append(display_name)

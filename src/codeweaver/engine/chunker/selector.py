@@ -186,6 +186,9 @@ class ChunkerSelector:
             if isinstance(language, SemanticSearchLanguage | ConfigLanguage)
             else language
         )
+        # Ensure language_repr is always a string
+        if isinstance(language_repr, ConfigLanguage):
+            language_repr = language_repr.variable
         logger.info(
             "Using DelimiterChunker for %s (detected language: %s)",
             file.path,

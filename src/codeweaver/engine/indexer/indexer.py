@@ -1,13 +1,18 @@
+# sourcery skip: no-complex-if-expressions
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
-"""The indexer service for managing and querying indexed data."""
-# import contextlib
+"""The indexer service for managing and querying indexed data.
 
-# with contextlib.suppress(ImportError):
-# from watchfiles import watch
+The indexer orchestrates file discovery, chunking, embedding generation, and storage
+in vector databases. It supports checkpointing for resuming interrupted indexing
+operations, and integrates with CodeWeaver's provider registry for embedding and
+vector store services.
+
+It is the backend service that powers CodeWeaver's code search and retrieval capabilities.
+"""
 # TODO: register with providers registry
 
 from __future__ import annotations
@@ -19,37 +24,28 @@ import logging
 import signal
 import time
 
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Callable
 from pathlib import Path
 from time import sleep
-from typing import TYPE_CHECKING, Annotated, Any, ClassVar, TypedDict, Unpack, cast, overload
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, TypedDict, cast
 
 import rignore
-import watchfiles
 
-from cyclopts.types import NonNegativeFloat
-from pydantic import DirectoryPath, Field, NonNegativeInt, PrivateAttr
+from pydantic import DirectoryPath, Field, NonNegativeFloat, NonNegativeInt, PrivateAttr
 from pydantic.dataclasses import dataclass
 from watchfiles.main import Change
 
+from codeweaver.common.logging import log_to_client_or_fallback
 from codeweaver.config.chunker import ChunkerSettings
-from codeweaver.config.indexing import RignoreSettings
 from codeweaver.core.discovery import DiscoveredFile
-from codeweaver.core.file_extensions import (
-    CODE_FILES_EXTENSIONS,
-    CONFIG_FILE_LANGUAGES,
-    DEFAULT_EXCLUDED_DIRS,
-    DEFAULT_EXCLUDED_EXTENSIONS,
-    DOC_FILES_EXTENSIONS,
-)
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.stores import BlakeStore, make_blake_store
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.sentinel import Unset
-from codeweaver.engine.checkpoint import CheckpointManager, IndexingCheckpoint
 from codeweaver.engine.chunking_service import ChunkingService
-from codeweaver.engine.types import FileChange
+from codeweaver.engine.indexer.checkpoint import CheckpointManager, IndexingCheckpoint
+from codeweaver.engine.watcher.types import FileChange
 
 
 logger = logging.getLogger(__name__)
@@ -68,6 +64,8 @@ if TYPE_CHECKING:
 
 
 class UserProviderSelectionDict(TypedDict):
+    """User-selected provider configuration dictionary."""
+
     embedding: DictView[EmbeddingProviderSettings[Any]] | None
     sparse_embedding: DictView[SparseEmbeddingProviderSettings[Any]] | None
     vector_store: DictView[VectorStoreProviderSettings] | None
@@ -164,235 +162,6 @@ class IndexingStats:
         return self.files_discovered
 
 
-class DefaultFilter(watchfiles.DefaultFilter):
-    """A default filter that ignores common unwanted files and directories."""
-
-    def __init__(
-        self,
-        *,
-        ignore_dirs: Sequence[str | Path] = cast(Sequence[str], DEFAULT_EXCLUDED_DIRS),
-        ignore_entity_patterns: Sequence[str] | None = None,
-        ignore_paths: Sequence[str | Path] | None = None,
-    ) -> None:
-        """A default filter that ignores common unwanted files and directories."""
-        super().__init__(
-            ignore_dirs=ignore_dirs,  # type: ignore
-            ignore_entity_patterns=ignore_entity_patterns,
-            ignore_paths=ignore_paths,
-        )
-
-
-class ExtensionFilter(DefaultFilter):
-    """Filter files by extension on top of the default directory/path ignores."""
-
-    __slots__ = ("extensions",)
-
-    def __init__(
-        self,
-        extensions: Sequence[str],
-        ignore_paths: Sequence[str | Path] = cast(Sequence[str], set(DEFAULT_EXCLUDED_DIRS)),
-    ) -> None:
-        """Initialize the extension filter.
-
-        Args:
-            extensions: Extensions (with dot) to include.
-            ignore_paths: Additional paths/directories to exclude.
-        """
-        self._ignore_paths = ignore_paths
-        self.extensions: tuple[str, ...] = (
-            extensions if isinstance(extensions, tuple) else tuple(extensions)
-        )
-        super().__init__()
-
-    def __call__(self, change: Change, path: str) -> bool:
-        """Return True when path ends with allowed extensions and passes base filter."""
-        return path.endswith(self.extensions) and super().__call__(change, path)
-
-
-class DefaultExtensionFilter(ExtensionFilter):
-    """Filter with a default excluded extension set augmented by provided ones."""
-
-    __slots__ = ("_ignore_paths",)
-
-    def __init__(
-        self,
-        extensions: Sequence[str] = cast(Sequence[str], DEFAULT_EXCLUDED_EXTENSIONS),
-        ignore_paths: Sequence[str | Path] = cast(Sequence[str], set(DEFAULT_EXCLUDED_DIRS)),
-    ) -> None:
-        """Initialize the default extension filter with sensible defaults."""
-        self._ignore_paths = ignore_paths
-        self.extensions: tuple[str, ...] = (
-            extensions if isinstance(extensions, tuple) else tuple(extensions)
-        )
-        super().__init__(extensions=extensions, ignore_paths=ignore_paths)
-
-    def __call__(self, change: Change, path: str) -> bool:
-        """Return True when path ends with allowed extensions and passes base filter."""
-        return path.endswith(self.extensions) and super().__call__(change, path)
-
-
-CodeFilter = DefaultExtensionFilter(
-    tuple(pair.ext for pair in CODE_FILES_EXTENSIONS if pair.language not in CONFIG_FILE_LANGUAGES)
-    + tuple(SemanticSearchLanguage.code_extensions())
-)
-
-ConfigFilter = DefaultExtensionFilter(
-    cast(
-        Sequence[str],
-        {pair.ext for pair in CODE_FILES_EXTENSIONS if pair.language in CONFIG_FILE_LANGUAGES}
-        | set(iter(ConfigLanguage.all_extensions())),
-    )
-)
-
-DocsFilter = DefaultExtensionFilter(tuple(pair.ext for pair in DOC_FILES_EXTENSIONS))
-
-
-class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
-    """
-    A filter that uses rignore to exclude files based on .gitignore and other rules.
-
-    `IgnoreFilter` can be initialized with either:
-    - An `rignore.Walker` instance, which is a pre-configured walker that
-      applies ignore rules.
-    - A `base_path` and `settings` dictionary to create a new `rignore.Walker`.
-
-    The filter checks if a file should be included based on the rules defined
-    in the walker. It caches results to avoid redundant checks for previously
-    seen paths.
-    """
-
-    __slots__: ClassVar[tuple[str, ...]] = (
-        *watchfiles.DefaultFilter.__slots__,
-        "_walker",
-        "_allowed_complete",
-        "_allowed",
-    )
-
-    _walker: Walker
-    _allowed: set[Path]
-    _allowed_complete: bool
-
-    @overload
-    def __init__(self, *, base_path: None, settings: None, walker: rignore.Walker) -> None: ...
-    @overload
-    def __init__(
-        self, *, base_path: Path, walker: None = None, **settings: Unpack[RignoreSettings]
-    ) -> None: ...
-    def __init__(  # type: ignore
-        self,
-        *,
-        base_path: Path | None = None,
-        walker: Walker | None = None,
-        settings: RignoreSettings | None = None,
-    ) -> None:
-        """Initialize the IgnoreFilter with either rignore settings or a pre-configured walker."""
-        if not walker and not (settings and base_path):
-            self = type(self).from_settings()
-            return
-        if walker and settings:
-            # favor walker if both are provided
-            logger.warning("Both settings and walker provided; using walker.")
-        if walker:
-            self._walker = walker
-        else:
-            if settings is None:
-                raise ValueError("You must provide either settings or a walker.")
-            if base_path is None:
-                raise ValueError("Base path must be provided if walker is not.")
-            self._walker = rignore.walk(path=base_path, **cast(dict[str, Any], settings))  # type: ignore
-        self._allowed = set()
-        self._allowed_complete = False
-        super().__init__()
-
-    def __call__(self, change: Change, path: str) -> bool:
-        """Determine if a file should be included based on rignore rules."""
-        p = Path(path)
-        match change:
-            case Change.deleted:
-                return self._walkable(p, is_new=False, delete=True)
-            case Change.added:
-                return self._walkable(p, is_new=True, delete=False)
-            case Change.modified:
-                return self._walkable(p, is_new=False, delete=False)
-
-    def _walkable(self, path: Path, *, is_new: bool = False, delete: bool = False) -> bool:
-        """Check if a path is walkable (not ignored) using the rignore walker.
-
-        Stores previously seen paths to avoid redundant checks.
-
-        This method still returns True for deleted files to allow cleanup of indexed data.
-        """
-        if self._allowed_complete and (not is_new or path in self._allowed):
-            if delete and path in self._allowed:
-                self._allowed.remove(path)
-                return True
-            return False if delete else path in self._allowed
-        if delete:
-            with contextlib.suppress(KeyError):
-                self._allowed.remove(path)
-                return True
-            # It's either not in allowed or it doesn't matter because we're deleting
-            return False
-        try:
-            for p in self._walker:
-                # it's a set, so we add regardless of whether it's already there
-                self._allowed.add(p)
-                if p and p.samefile(str(path)):
-                    return True
-        except StopIteration:
-            self._allowed_complete = True
-        return False
-
-    @classmethod
-    def from_settings(
-        cls, settings: CodeWeaverSettingsDict | None = None
-    ) -> IgnoreFilter[rignore.Walker]:
-        """Create an IgnoreFilter instance from settings."""
-        # we actually need the full object here
-        from codeweaver.common.utils.git import get_project_path
-        from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
-        from codeweaver.config.settings import get_settings
-
-        settings = settings or get_settings()
-        index_settings = (
-            settings.indexing
-            if isinstance(settings.indexing, IndexerSettings)
-            else IndexerSettings.model_validate(DefaultIndexerSettings)
-        )
-        if not index_settings.inc_exc_set:
-            # Check if there's already a running event loop
-            try:
-                asyncio.get_running_loop()
-                # If we're here, there's a running loop
-                # We can't await here since from_settings is not async, so skip for now
-                logger.debug(
-                    "Cannot set inc_exc in Indexer.from_settings: already in async context. Will be set lazily when indexer is used."
-                )
-            except RuntimeError:
-                # No running loop, safe to use asyncio.run()
-                _ = asyncio.run(
-                    index_settings.set_inc_exc(
-                        get_project_path()
-                        if isinstance(settings.project_path, Unset)
-                        else settings.project_path
-                    )
-                )
-        walker = rignore.Walker(
-            **(index_settings.to_settings())  # type: ignore
-        )
-        return cls(
-            walker=walker,
-            base_path=get_project_path()
-            if isinstance(settings.project_path, Unset)
-            else settings.project_path,
-        )
-
-    @property
-    def walker(self) -> rignore.Walker:
-        """Return the underlying rignore walker used by this filter."""
-        return self._walker
-
-
 class Indexer(BasedModel):
     """Main indexer class. Wraps a DiscoveredFilestore and chunkers."""
 
@@ -474,6 +243,15 @@ class Indexer(BasedModel):
 
         # Register signal handlers for graceful shutdown
         self._register_signal_handlers()
+
+        logger.info("Indexer initialized")
+        logger.info("Using project path: %s", self._checkpoint_manager.project_path)
+        logger.info(
+            "Starting indexing with configured providers: %s, %s, %s",
+            self._embedding_provider,
+            self._sparse_provider,
+            self._vector_store,
+        )
 
     def _register_signal_handlers(self) -> None:
         """Register signal handlers for graceful shutdown with checkpoint saving."""
@@ -577,8 +355,6 @@ class Indexer(BasedModel):
             path: Path to the file to index
             context: Optional FastMCP context for structured logging
         """
-        from codeweaver.common.logging import log_to_client_or_fallback
-
         try:
             # 1. Discover and store file metadata
             discovered_file = DiscoveredFile.from_path(path)
@@ -808,12 +584,12 @@ class Indexer(BasedModel):
         Handles added, modified, and deleted file events.
         """
         try:
-            change_type, path_str = change
+            change_type, raw_path = change
         except Exception:
             logger.exception("Invalid FileChange tuple received: %r", change)
             return
 
-        path = Path(path_str)
+        path = Path(raw_path)
 
         match change_type:
             case Change.added | Change.modified:
@@ -1169,8 +945,6 @@ class Indexer(BasedModel):
         context: Any,
     ) -> None:
         """Execute embedding and indexing phases if providers are initialized."""
-        from codeweaver.common.logging import log_to_client_or_fallback
-
         if not (self._embedding_provider or self._sparse_provider or self._vector_store):
             await log_to_client_or_fallback(
                 context,
@@ -1255,8 +1029,6 @@ class Indexer(BasedModel):
         context: Any,
     ) -> list[DiscoveredFile]:
         """Execute discovery phase and return discovered files."""
-        from codeweaver.common.logging import log_to_client_or_fallback
-
         await log_to_client_or_fallback(
             context,
             "info",
@@ -1284,8 +1056,6 @@ class Indexer(BasedModel):
         context: Any,
     ) -> list[CodeChunk]:
         """Execute chunking phase and return chunks."""
-        from codeweaver.common.logging import log_to_client_or_fallback
-
         await log_to_client_or_fallback(
             context,
             "info",
@@ -1341,8 +1111,6 @@ class Indexer(BasedModel):
             progress_callback: Optional callback to report progress (receives stats and phase)
             context: Optional FastMCP context for structured logging
         """
-        from codeweaver.common.logging import log_to_client_or_fallback
-
         if not files:
             return
 
@@ -1576,80 +1344,4 @@ class Indexer(BasedModel):
         return True
 
 
-class FileWatcher:
-    """Main file watcher class. Wraps watchfiles.awatch."""
-
-    _indexer: Indexer
-
-    def __init__(
-        self,
-        *paths: str | Path,
-        handler: Awaitable[Callable[[set[FileChange]], Any]]
-        | Callable[[set[FileChange]], Any]
-        | None = None,
-        file_filter: watchfiles.BaseFilter | None = None,
-        walker: rignore.Walker | None = None,
-        **kwargs: Any,
-    ) -> None:
-        """Initialize the FileWatcher with a path and an optional filter."""
-        # If an IgnoreFilter is provided, extract its rignore walker for initial indexing.
-        if walker is None and isinstance(file_filter, IgnoreFilter):
-            walker = file_filter.walker
-        self._indexer = Indexer(walker=walker)
-        self.file_filter = file_filter
-        self.paths = paths
-        self.handler = handler or self._default_handler
-        from codeweaver.common.utils.checks import is_debug
-        from codeweaver.engine.types import WatchfilesArgs
-
-        watch_args = (
-            WatchfilesArgs(
-                paths=self.paths,
-                target=Indexer.keep_alive,
-                args=kwargs.pop("args", ()) if kwargs else (),
-                kwargs=kwargs.pop("kwargs", {}) if kwargs else {},
-                target_type="function",
-                callback=self.handler,  # ty: ignore[invalid-argument-type]
-                watch_filter=self.file_filter,  # ty: ignore[invalid-argument-type]
-                grace_period=20.0,
-                debounce=200_000,  # milliseconds - we want to avoid rapid re-indexing but not let things go stale, either.
-                step=15_000,  # milliseconds -- how long to wait for more changes before yielding on changes
-                debug=is_debug(),
-                recursive=True,
-                ignore_permission_denied=True,
-            )
-            | {k: v for k, v in kwargs.items() if k in WatchfilesArgs.__annotations__}
-        )
-        watch_args["recursive"] = True  # we always want recursive watching
-        try:
-            # Perform a one-time initial indexing pass if we have a walker
-            if initial_count := self._indexer.prime_index():
-                logger.info("Initial indexing complete: %d files indexed", initial_count)
-            self.watcher = watchfiles.arun_process(*self.paths, **watch_args)
-        except KeyboardInterrupt:
-            logger.info("FileWatcher interrupted by user.")
-        except Exception:
-            logger.exception("Something happened...")
-            raise
-
-    async def _default_handler(self, changes: set[FileChange]) -> None:
-        """Default may be misleading -- 'placeholder' handler."""
-        for change in changes:
-            logger.info("File change detected.", extra={"change": change})
-            await self._indexer.index(change)
-
-    async def run(self) -> int:
-        """Run the file watcher until cancelled. Returns the reload count from arun_process."""
-        return await self.watcher  # type: ignore[no-any-return]
-
-
-__all__ = (
-    "CodeFilter",
-    "ConfigFilter",
-    "DefaultFilter",
-    "DocsFilter",
-    "ExtensionFilter",
-    "FileWatcher",
-    "IgnoreFilter",
-    "Indexer",
-)
+__all__ = ("Indexer",)

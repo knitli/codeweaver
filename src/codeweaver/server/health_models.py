@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from typing import Annotated, Literal
 
 from pydantic import Field, NonNegativeInt
+from pydantic.types import NonNegativeFloat
 
 from codeweaver.core.types import BasedModel
 from codeweaver.core.types.aliases import FilteredKey
@@ -19,19 +20,19 @@ from codeweaver.core.types.enum import AnonymityConversion
 class IndexingProgressInfo(BasedModel):
     """Indexing progress details."""
 
-    files_discovered: Annotated[NonNegativeInt, Field(description="Total files discovered")]
-    files_processed: Annotated[NonNegativeInt, Field(description="Files processed so far")]
-    chunks_created: Annotated[NonNegativeInt, Field(description="Total chunks created")]
-    errors: Annotated[NonNegativeInt, Field(description="Number of errors during indexing")]
+    files_discovered: Annotated[NonNegativeInt, Field(description="Total files discovered")] = 0
+    files_processed: Annotated[NonNegativeInt, Field(description="Files processed so far")] = 0
+    chunks_created: Annotated[NonNegativeInt, Field(description="Total chunks created")] = 0
+    errors: Annotated[NonNegativeInt, Field(description="Number of errors during indexing")] = 0
     current_file: Annotated[
-        str | None, Field(default=None, description="Currently processing file (if indexing)")
-    ]
-    start_time: Annotated[
-        str | None, Field(default=None, description="Indexing start timestamp (ISO8601)")
-    ]
+        str | None, Field(description="Currently processing file (if indexing)")
+    ] = None
+    start_time: Annotated[str | None, Field(description="Indexing start timestamp (ISO8601)")] = (
+        None
+    )
     estimated_completion: Annotated[
-        str | None, Field(default=None, description="Estimated completion time (ISO8601)")
-    ]
+        str | None, Field(description="Estimated completion time (ISO8601)")
+    ] = None
 
     def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
         return {FilteredKey("current_file"): AnonymityConversion.HASH}
@@ -45,8 +46,8 @@ class IndexingInfo(BasedModel):
     ]
     progress: Annotated[IndexingProgressInfo, Field(description="Indexing progress details")]
     last_indexed: Annotated[
-        str | None, Field(default=None, description="Last successful indexing completion (ISO8601)")
-    ]
+        str | None, Field(description="Last successful indexing completion (ISO8601)")
+    ] = None
 
     def _telemetry_keys(self) -> None:
         return None
@@ -56,7 +57,7 @@ class VectorStoreServiceInfo(BasedModel):
     """Vector store service health information."""
 
     status: Annotated[Literal["up", "down", "degraded"], Field(description="Vector store status")]
-    latency_ms: Annotated[float, Field(ge=0, description="Latency in milliseconds")]
+    latency_ms: Annotated[NonNegativeFloat, Field(ge=0, description="Latency in milliseconds")]
 
     def _telemetry_keys(self) -> None:
         return None
@@ -134,7 +135,7 @@ class StatisticsInfo(BasedModel):
 
 
 class HealthResponse(BasedModel):
-    """Complete health response matching FR-010-Enhanced schema."""
+    """Represents the health of CodeWeaver and its components."""
 
     status: Annotated[
         Literal["healthy", "degraded", "unhealthy"], Field(description="Overall system health")
