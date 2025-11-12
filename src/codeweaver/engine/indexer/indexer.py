@@ -522,15 +522,20 @@ class Indexer(BasedModel):
                 # Use relative path for portability
                 relative_path = set_relative_path(path)
                 if relative_path:
-                    async with self._manifest_lock:
-                        self._file_manifest.add_file(
-                            path=relative_path,
-                            content_hash=discovered_file.file_hash,
-                            chunk_ids=chunk_ids,
+                    try:
+                        async with self._manifest_lock:
+                            self._file_manifest.add_file(
+                                path=relative_path,
+                                content_hash=discovered_file.file_hash,
+                                chunk_ids=chunk_ids,
+                            )
+                        logger.debug(
+                            "Updated manifest for file: %s (%d chunks)",
+                            relative_path,
+                            len(chunk_ids),
                         )
-                    logger.debug(
-                        "Updated manifest for file: %s (%d chunks)", relative_path, len(chunk_ids)
-                    )
+                    except ValueError as e:
+                        logger.warning("Failed to add file to manifest: %s - %s", relative_path, e)
 
             await log_to_client_or_fallback(
                 context,
@@ -619,13 +624,18 @@ class Indexer(BasedModel):
             if self._file_manifest and self._manifest_lock:
                 relative_path = set_relative_path(path)
                 if relative_path:
-                    async with self._manifest_lock:
-                        entry = self._file_manifest.remove_file(relative_path)
-                    if entry:
-                        logger.debug(
-                            "Removed file from manifest: %s (%d chunks)",
-                            relative_path,
-                            entry["chunk_count"],
+                    try:
+                        async with self._manifest_lock:
+                            entry = self._file_manifest.remove_file(relative_path)
+                        if entry:
+                            logger.debug(
+                                "Removed file from manifest: %s (%d chunks)",
+                                relative_path,
+                                entry["chunk_count"],
+                            )
+                    except ValueError as e:
+                        logger.warning(
+                            "Failed to remove file from manifest: %s - %s", relative_path, e
                         )
         except Exception:
             logger.exception("Failed to delete file %s", path)
@@ -788,11 +798,16 @@ class Indexer(BasedModel):
                     files_to_index.append(path)
                     continue
 
-                # Check if file is new or changed
-                if self._file_manifest.file_changed(relative_path, current_hash):
+                try:
+                    # Check if file is new or changed
+                    if self._file_manifest.file_changed(relative_path, current_hash):
+                        files_to_index.append(path)
+                    else:
+                        unchanged_count += 1
+                except ValueError as e:
+                    # Invalid path in manifest operations
+                    logger.warning("Invalid path %s: %s, will index it", relative_path, e)
                     files_to_index.append(path)
-                else:
-                    unchanged_count += 1
             except Exception:
                 logger.exception("Error checking file %s, will index it", path)
                 files_to_index.append(path)

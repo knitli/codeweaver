@@ -80,7 +80,20 @@ class IndexFileManifest(BasedModel):
             path: Relative path from project root
             content_hash: Blake3 hash of file content
             chunk_ids: List of chunk UUID strings for this file
+
+        Raises:
+            ValueError: If path is None, empty, absolute, or contains path traversal
         """
+        # Validate path
+        if path is None:
+            raise ValueError("Path cannot be None")
+        if not path or str(path) == "" or str(path) == ".":
+            raise ValueError(f"Path cannot be empty: {path!r}")
+        if path.is_absolute():
+            raise ValueError(f"Path must be relative, got absolute path: {path}")
+        if ".." in path.parts:
+            raise ValueError(f"Path cannot contain path traversal (..), got: {path}")
+
         path_str = str(path)
 
         # Remove old entry if exists
@@ -109,7 +122,13 @@ class IndexFileManifest(BasedModel):
 
         Returns:
             Removed entry if it existed, None otherwise
+
+        Raises:
+            ValueError: If path is None or invalid
         """
+        if path is None:
+            raise ValueError("Path cannot be None")
+
         path_str = str(path)
         if path_str in self.files:
             entry = self.files.pop(path_str)
@@ -127,7 +146,12 @@ class IndexFileManifest(BasedModel):
 
         Returns:
             Manifest entry if file exists in manifest, None otherwise
+
+        Raises:
+            ValueError: If path is None
         """
+        if path is None:
+            raise ValueError("Path cannot be None")
         return self.files.get(str(path))
 
     def has_file(self, path: Path) -> bool:
@@ -138,7 +162,12 @@ class IndexFileManifest(BasedModel):
 
         Returns:
             True if file is in manifest
+
+        Raises:
+            ValueError: If path is None
         """
+        if path is None:
+            raise ValueError("Path cannot be None")
         return str(path) in self.files
 
     def file_changed(self, path: Path, current_hash: BlakeHashKey) -> bool:
@@ -150,7 +179,13 @@ class IndexFileManifest(BasedModel):
 
         Returns:
             True if file is new or content has changed
+
+        Raises:
+            ValueError: If path is None
         """
+        if path is None:
+            raise ValueError("Path cannot be None")
+
         entry = self.get_file(path)
         if entry is None:
             return True  # New file
@@ -164,7 +199,13 @@ class IndexFileManifest(BasedModel):
 
         Returns:
             List of chunk UUID strings, empty list if file not in manifest
+
+        Raises:
+            ValueError: If path is None
         """
+        if path is None:
+            raise ValueError("Path cannot be None")
+
         entry = self.get_file(path)
         return entry["chunk_ids"] if entry else []
 
