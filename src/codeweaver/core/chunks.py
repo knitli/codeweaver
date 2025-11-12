@@ -62,6 +62,7 @@ if TYPE_CHECKING:
 # *                    Code Search and Chunks
 # ---------------------------------------------------------------------------
 
+type SerializedStrOnlyCodeChunk[CodeChunk] = str
 type SerializedCodeChunk[CodeChunk] = str | bytes | bytearray
 type ChunkSequence = (
     Sequence[CodeChunk]
@@ -490,6 +491,7 @@ __all__ = (
     "CodeChunk",
     "CodeChunkDict",
     "SerializedCodeChunk",
+    "SerializedStrOnlyCodeChunk",
     "StructuredDataInput",
 )
 

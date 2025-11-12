@@ -12,9 +12,10 @@ import logging
 
 from pathlib import Path
 from types import EllipsisType
-from typing import TYPE_CHECKING, Any, is_typeddict
+from typing import TYPE_CHECKING, Any, cast, is_typeddict
 
 from fastmcp import FastMCP
+from fastmcp.server.middleware import Middleware
 from pydantic import FilePath
 from typing_extensions import TypeIs
 
@@ -106,9 +107,13 @@ async def run(
             **server_setup["settings"].model_dump(),
             "project_path": project_path,
         })
+
+    # Explicitly type the middleware to satisfy type checker
+    middleware: set[Middleware] = server_setup.get("middleware", set())  # type: ignore[assignment]
+
     server_setup["app"], server_setup["middleware"] = await register_app_bindings(  # type: ignore
         server_setup["app"],
-        server_setup.get("middleware", set()),
+        cast(set[Middleware], middleware),
         server_setup.get("middleware_settings", {}),
     )
     server_setup["app"] = register_tool(server_setup["app"])

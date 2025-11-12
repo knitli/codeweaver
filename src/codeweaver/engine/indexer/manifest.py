@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, TypedDict
 
-from pydantic import Field, NonNegativeInt
+from pydantic import Field, NonNegativeInt, computed_field
 from pydantic_core import from_json
 
 from codeweaver.common.utils.utils import get_user_config_dir
@@ -44,6 +44,14 @@ class FileManifestEntry(TypedDict):
     chunk_ids: list[str]  # UUIDs of chunks in vector store
 
 
+class FileManifestStats(TypedDict):
+    """Statistics about the file manifest."""
+
+    total_files: int
+    total_chunks: int
+    manifest_version: str
+
+
 class IndexFileManifest(BasedModel):
     """Persistent manifest of indexed files for incremental indexing.
 
@@ -52,26 +60,20 @@ class IndexFileManifest(BasedModel):
     """
 
     project_path: Annotated[Path, Field(description="Path to the indexed codebase")]
-    manifest_version: Annotated[int, Field(description="Manifest format version")] = 1
-    last_updated: Annotated[
-        datetime,
-        Field(
-            description="When manifest was last updated", default_factory=lambda: datetime.now(UTC)
-        ),
-    ]
+    last_updated: datetime = Field(
+        description="When manifest was last updated", default_factory=lambda: datetime.now(UTC)
+    )
 
     # Map of relative file path -> FileManifestEntry
-    files: Annotated[
-        dict[str, FileManifestEntry],
-        Field(default_factory=dict, description="Map of file paths to their manifest entries"),
-    ]
+    files: dict[str, FileManifestEntry] = Field(
+        default_factory=dict, description="Map of file paths to their manifest entries"
+    )
 
-    total_files: Annotated[
-        NonNegativeInt, Field(ge=0, description="Total files in manifest", default=0)
-    ]
+    total_files: Annotated[NonNegativeInt, Field(ge=0, description="Total files in manifest")] = 0
     total_chunks: Annotated[
-        NonNegativeInt, Field(ge=0, description="Total chunks across all files", default=0)
-    ]
+        NonNegativeInt, Field(ge=0, description="Total chunks across all files")
+    ] = 0
+    manifest_version: Annotated[str, Field(description="Manifest format version")] = "1.0.0"
 
     def add_file(self, path: Path, content_hash: BlakeHashKey, chunk_ids: list[str]) -> None:
         """Add or update a file in the manifest.
@@ -79,7 +81,7 @@ class IndexFileManifest(BasedModel):
         Args:
             path: Relative path from project root
             content_hash: Blake3 hash of file content
-            chunk_ids: List of chunk UUID strings for this file
+            chunk_ids: List of chunk UUID7 strings for this file
 
         Raises:
             ValueError: If path is None, empty, absolute, or contains path traversal
@@ -87,24 +89,24 @@ class IndexFileManifest(BasedModel):
         # Validate path
         if path is None:
             raise ValueError("Path cannot be None")
-        if not path or str(path) == "" or str(path) == ".":
+        if not path or not str(path) or str(path) == ".":
             raise ValueError(f"Path cannot be empty: {path!r}")
         if path.is_absolute():
             raise ValueError(f"Path must be relative, got absolute path: {path}")
         if ".." in path.parts:
             raise ValueError(f"Path cannot contain path traversal (..), got: {path}")
 
-        path_str = str(path)
+        raw_path = str(path)
 
         # Remove old entry if exists
-        if path_str in self.files:
-            old_entry = self.files[path_str]
+        if raw_path in self.files:
+            old_entry = self.files[raw_path]
             self.total_chunks -= old_entry["chunk_count"]
             self.total_files -= 1
 
         # Add new entry
-        self.files[path_str] = FileManifestEntry(
-            path=path_str,
+        self.files[raw_path] = FileManifestEntry(
+            path=raw_path,
             content_hash=str(content_hash),
             indexed_at=datetime.now(UTC).isoformat(),
             chunk_count=len(chunk_ids),
@@ -129,9 +131,9 @@ class IndexFileManifest(BasedModel):
         if path is None:
             raise ValueError("Path cannot be None")
 
-        path_str = str(path)
-        if path_str in self.files:
-            entry = self.files.pop(path_str)
+        raw_path = str(path)
+        if raw_path in self.files:
+            entry = self.files.pop(raw_path)
             self.total_files -= 1
             self.total_chunks -= entry["chunk_count"]
             self.last_updated = datetime.now(UTC)
@@ -187,9 +189,7 @@ class IndexFileManifest(BasedModel):
             raise ValueError("Path cannot be None")
 
         entry = self.get_file(path)
-        if entry is None:
-            return True  # New file
-        return entry["content_hash"] != str(current_hash)
+        return True if entry is None else entry["content_hash"] != str(current_hash)
 
     def get_chunk_ids_for_file(self, path: Path) -> list[str]:
         """Get list of chunk IDs associated with a file.
@@ -215,19 +215,20 @@ class IndexFileManifest(BasedModel):
         Returns:
             Set of Path objects for all files in manifest
         """
-        return {Path(path_str) for path_str in self.files}
+        return {Path(raw_path) for raw_path in self.files}
 
-    def get_stats(self) -> dict[str, int]:
+    @computed_field
+    def get_stats(self) -> FileManifestStats:
         """Get manifest statistics.
 
         Returns:
             Dictionary with file and chunk counts
         """
-        return {
-            "total_files": self.total_files,
-            "total_chunks": self.total_chunks,
-            "manifest_version": self.manifest_version,
-        }
+        return FileManifestStats(
+            total_files=self.total_files,
+            total_chunks=self.total_chunks,
+            manifest_version=self.manifest_version,
+        )
 
     def _telemetry_keys(self) -> None:
         """Telemetry keys for the manifest (none needed)."""
@@ -280,10 +281,11 @@ class FileManifestManager:
                 manifest.total_files,
                 manifest.total_chunks,
             )
-            return True
         except OSError:
             logger.exception("Failed to save file manifest")
             return False
+        else:
+            return True
 
     def load(self) -> IndexFileManifest | None:
         """Load manifest from disk if available.
@@ -302,10 +304,11 @@ class FileManifestManager:
                 manifest.total_files,
                 manifest.total_chunks,
             )
-            return manifest
         except (OSError, ValueError):
             logger.warning("Failed to load file manifest, will create new one")
             return None
+        else:
+            return manifest
 
     def delete(self) -> None:
         """Delete manifest file (e.g., after full reindex)."""

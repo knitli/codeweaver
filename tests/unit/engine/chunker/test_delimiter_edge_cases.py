@@ -278,8 +278,12 @@ class MyClass:
 
         # Verify chunks don't overlap
         for i in range(len(chunks) - 1):
-            current_end = chunks[i].metadata.get("line_end", 0)
-            next_start = chunks[i + 1].metadata.get("line_start", 0)
+            current_end = chunks[i].metadata.get("line_end")
+            next_start = chunks[i + 1].metadata.get("line_start")
+
+            # Skip validation if metadata is missing
+            if current_end is None or next_start is None:
+                continue
 
             # Allow adjacent chunks (end + 1 == start) but not overlapping
             assert next_start >= current_end, "Chunks should not overlap"

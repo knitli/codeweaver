@@ -16,7 +16,10 @@ import pytest
 from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
 from codeweaver.common.utils.utils import uuid7
 from codeweaver.core.language import SemanticSearchLanguage as Language
+from codeweaver.providers.embedding.types import SparseEmbedding
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+
+# sourcery skip: dont-import-test-modules
 from tests.conftest import create_test_chunk_with_embeddings
 
 
@@ -80,7 +83,7 @@ async def test_store_hybrid_embeddings(qdrant_provider: QdrantVectorStoreProvide
         StrategizedQuery(
             query="authentication function",
             strategy=SearchStrategy.SPARSE_ONLY,
-            sparse={"indices": [1, 5, 10], "values": [0.8, 0.6, 0.9]},
+            sparse=SparseEmbedding({"indices": [1, 5, 10], "values": [0.8, 0.6, 0.9]}),
             dense=None,
         )
     )
@@ -92,7 +95,7 @@ async def test_store_hybrid_embeddings(qdrant_provider: QdrantVectorStoreProvide
             query="authentication function",
             strategy=SearchStrategy.HYBRID,
             dense=[1.0, 0.0, 0.0] * 256,
-            sparse={"indices": [1, 5, 10], "values": [0.8, 0.6, 0.9]},
+            sparse=SparseEmbedding({"indices": [1, 5, 10], "values": [0.8, 0.6, 0.9]}),
         )
     )
     assert len(hybrid_results) > 0, "Hybrid search should return results"

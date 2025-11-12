@@ -50,7 +50,7 @@ warnings.filterwarnings("error", category=Warning, message=".*default_factory.*"
 try:
     from codeweaver.cli import __main__ as main
 
-    main.main()
+    main.main()  # ty: ignore[unresolved-attribute]
 except Warning as w:
     if "UnsupportedFieldAttributeWarning" not in str(type(w)):
         raise

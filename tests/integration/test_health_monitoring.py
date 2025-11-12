@@ -33,8 +33,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from codeweaver.common.statistics import SessionStatistics
+import codeweaver.providers.provider
+
+from codeweaver.common.statistics import Identifier, SessionStatistics
 from codeweaver.engine.indexer import Indexer, IndexingStats
+from codeweaver.providers.provider import ProviderKind
 from codeweaver.server.health_models import (
     HealthResponse,
     IndexingInfo,
@@ -374,19 +377,25 @@ async def test_health_status_unhealthy(health_service: HealthService, mocker):
     """
 
     # Mock vector store as down using unified API
-    def failing_get_provider_instance(enum_value, provider_type: str, singleton: bool = True):
-        if provider_type == "vector_store":
+    def failing_get_provider_instance(
+        provider: codeweaver.providers.provider.Provider,
+        provider_kind: ProviderKind,
+        *,
+        singleton: bool = False,
+        **kwargs,
+    ):
+        if provider_kind == ProviderKind.VECTOR_STORE:
             raise RuntimeError("Vector store unavailable")
         # Return other providers normally
-        if provider_type == "embedding":
+        if provider_kind == ProviderKind.EMBEDDING:
             return health_service._provider_registry.get_embedding_provider_instance()
-        if provider_type == "sparse_embedding":
+        if provider_kind == ProviderKind.SPARSE_EMBEDDING:
             return health_service._provider_registry.get_sparse_embedding_provider_instance()
-        if provider_type == "reranking":
+        if provider_kind == ProviderKind.RERANKING:
             return health_service._provider_registry.get_reranking_provider_instance()
         return None
 
-    health_service._provider_registry.get_provider_instance.side_effect = (
+    health_service._provider_registry.get_provider_instance.side_effect = (  # ty: ignore[invalid-assignment]
         failing_get_provider_instance
     )
 
@@ -539,7 +548,11 @@ async def test_health_statistics(
     health_service.add_indexed_language("typescript")
 
     # Simulate some queries
-    session_statistics._successful_request_log = ["req1", "req2", "req3"]
+    session_statistics._successful_request_log = [
+        Identifier("req1"),
+        Identifier("req2"),
+        Identifier("req3"),
+    ]
 
     response = await health_service.get_health_response()
 

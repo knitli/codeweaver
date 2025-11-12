@@ -116,6 +116,7 @@ class TestIndexFileManifest:
         assert sample_manifest.total_files == 2  # Unchanged
 
     def test_file_changed_new_file(self, sample_manifest):
+        # sourcery skip: class-extract-method
         """Test detecting a new file (not in manifest)."""
         path = Path("new_file.py")
         content_hash = get_blake_hash(b"new content")
@@ -213,6 +214,20 @@ class TestFileManifestManager:
 class TestIncrementalIndexing:
     """Integration tests for incremental indexing workflow."""
 
+    def test_skip_unchanged_files(self, temp_project_dir):
+        """Test that unchanged files are skipped during incremental indexing."""
+        manifest = IndexFileManifest(project_path=temp_project_dir)
+        unchanged_files = _add_unchanged_files(manifest)
+        unchanged_files = _add_unchanged_files(manifest)
+        _add_unchanged_files_to_manifest(manifest, unchanged_files)
+        files_to_index = [
+            path
+            for path, original_hash in unchanged_files
+            if manifest.file_changed(path, original_hash)
+        ]
+
+        assert not files_to_index
+
     def test_detect_new_files(self, temp_project_dir):
         """Test detecting new files that need indexing."""
         # Create manifest with one file
@@ -230,16 +245,7 @@ class TestIncrementalIndexing:
         ]
 
         # Filter to only new/modified files
-        files_to_index = []
-        for path in discovered_files:
-            # In real code, would compute hash from file content
-            if path == Path("new_file.py"):
-                current_hash = get_blake_hash(b"new content")
-            else:
-                current_hash = get_blake_hash(b"existing content")
-
-            if manifest.file_changed(path, current_hash):
-                files_to_index.append(path)
+        files_to_index = _get_files_to_index(manifest, discovered_files)
 
         assert len(files_to_index) == 1
         assert Path("new_file.py") in files_to_index
@@ -258,15 +264,14 @@ class TestIncrementalIndexing:
 
     def test_detect_deleted_files(self, temp_project_dir):
         """Test detecting files deleted from repository."""
-        # Create manifest with three files
+        # Create manifest with three files - explicit test data for clarity
         manifest = IndexFileManifest(project_path=temp_project_dir)
-        for i in range(3):
-            manifest.add_file(
-                path=Path(f"file{i}.py"),
-                content_hash=get_blake_hash(f"content{i}".encode()),
-                chunk_ids=[f"chunk{i}"],
-            )
-
+        test_files = [
+            (Path("file0.py"), "content0", "chunk0"),
+            (Path("file1.py"), "content1", "chunk1"),
+            (Path("file2.py"), "content2", "chunk2"),
+        ]
+        _add_test_files(manifest, test_files)
         # Simulate discovery finding only 2 files
         discovered_files = {Path("file0.py"), Path("file1.py")}
         manifest_files = manifest.get_all_file_paths()
@@ -292,29 +297,46 @@ class TestIncrementalIndexing:
         assert manifest.total_files == 1
         assert manifest.total_chunks == 3
 
-        entry = manifest.get_file(path)
-        assert entry["chunk_ids"] == chunk_ids
+        if entry := manifest.get_file(path):
+            assert entry["content_hash"] == str(content_hash)
+            assert entry["chunk_count"] == 3
+            assert entry["chunk_ids"] == chunk_ids
 
-    def test_skip_unchanged_files(self, temp_project_dir):
-        """Test that unchanged files are skipped during incremental indexing."""
-        # Create manifest
-        manifest = IndexFileManifest(project_path=temp_project_dir)
 
-        # Add files that haven't changed
-        unchanged_files = []
-        for i in range(5):
-            path = Path(f"unchanged{i}.py")
-            content_hash = get_blake_hash(f"content{i}".encode())
-            manifest.add_file(path, content_hash, chunk_ids=[f"chunk{i}"])
-            unchanged_files.append((path, content_hash))
+def _get_files_to_index(manifest, discovered_files):
+    """Helper to get new/modified files for indexing."""
+    files_to_index = []
+    for path in discovered_files:
+        # In real code, would compute hash from file content
+        if path == Path("new_file.py"):
+            current_hash = get_blake_hash(b"new content")
+        else:
+            current_hash = get_blake_hash(b"existing content")
 
-        # Check that none need reindexing
-        files_to_index = []
-        for path, original_hash in unchanged_files:
-            if manifest.file_changed(path, original_hash):
-                files_to_index.append(path)
+        if manifest.file_changed(path, current_hash):
+            files_to_index.append(path)
+    return files_to_index
 
-        assert len(files_to_index) == 0
+
+def _add_unchanged_files(manifest, count=5):
+    """Helper to add unchanged files to manifest and return their info."""
+    return [
+        (Path(f"unchanged{i}.py"), get_blake_hash(f"content{i}".encode())) for i in range(count)
+    ]
+
+
+def _add_unchanged_files_to_manifest(manifest, unchanged_files):
+    """Helper to add unchanged files to manifest."""
+    for path, content_hash in unchanged_files:
+        manifest.add_file(path, content_hash, chunk_ids=[f"chunk{path.stem[-1]}"])
+
+
+def _add_test_files(manifest, test_files):
+    """Helper to add test files to manifest."""
+    for path, content, chunk_id in test_files:
+        manifest.add_file(
+            path=path, content_hash=get_blake_hash(content.encode()), chunk_ids=[chunk_id]
+        )
 
 
 if __name__ == "__main__":

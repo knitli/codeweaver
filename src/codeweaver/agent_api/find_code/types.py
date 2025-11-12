@@ -405,9 +405,9 @@ class StrategizedQuery(NamedTuple):
 
         if self.has_dense():
             # Use NamedVector for named vector collections
-            dense_vector = NamedVector(name="dense", vector=self.dense)
+            assert self.dense is not None  # noqa: S101
+            dense_vector = NamedVector(name="dense", vector=list(self.dense))
             return {"query_vector": dense_vector, **kwargs}
-
         # Convert sparse dict to SparseVector and wrap in NamedSparseVector
         assert self.sparse is not None  # noqa: S101
         sparse_vector = SparseVector(

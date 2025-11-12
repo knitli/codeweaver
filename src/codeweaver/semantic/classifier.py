@@ -668,15 +668,16 @@ class GrammarBasedClassifier:
         thing_name = str(thing.name)
         return {
             SemanticSearchLanguage.RUBY: lambda: self._classify_ruby_primary(thing_name)
-            if CategoryName("primary") in thing
+            # ty seems to think this is not ok -- it's explicitly defined on `Thing` as `__contains__`
+            if CategoryName("primary") in thing  # ty: ignore[unsupported-operator]
             else None,
             SemanticSearchLanguage.RUST: lambda: self._classify_rust_declaration_statement(
                 thing_name
             )
-            if CategoryName("declaration_statement") in thing
+            if CategoryName("declaration_statement") in thing  # ty: ignore[unsupported-operator]
             else None,
             SemanticSearchLanguage.SCALA: lambda: self._classify_scala_definition(thing_name)
-            if CategoryName("definition") in thing
+            if CategoryName("definition") in thing  # ty: ignore[unsupported-operator]
             else None,
         }.get(language, lambda: None)()
 

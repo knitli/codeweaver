@@ -122,7 +122,7 @@ def get_storage_path() -> Path:
     """Get the default storage path for index data."""
     from codeweaver.common.utils import get_user_config_dir
 
-    return Path(get_user_config_dir()) / f"{_get_project_name()}_index.json"
+    return Path(get_user_config_dir()) / f"{_get_project_name()}_index.json"  # ty: ignore[missing-argument]
 
 
 def _resolve_globs(path_string: str, repo_root: Path) -> set[Path]:

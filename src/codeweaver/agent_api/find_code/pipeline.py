@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any, NoReturn
 
 from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
 from codeweaver.exceptions import ConfigurationError, QueryError
-from codeweaver.providers.embedding.types import QueryResult
+from codeweaver.providers.embedding.types import QueryResult, RawEmbeddingVectors, SparseEmbedding
 
 
 if TYPE_CHECKING:
@@ -49,7 +49,7 @@ def raise_value_error(message: str) -> NoReturn:
 
 async def _embed_dense(
     query: str, dense_provider_enum: Any, context: Any
-) -> list[list[float]] | list[list[int]] | None:
+) -> RawEmbeddingVectors | None:
     """Attempt dense embedding, return None on failure."""
     from codeweaver.common.logging import log_to_client_or_fallback
     from codeweaver.common.registry import get_provider_registry
@@ -107,11 +107,13 @@ async def _embed_dense(
         if not result:
             return None
         if isinstance(result, list) and len(result) > 0 and isinstance(result[0], list):
-            return result  # ty: ignore[invalid-return-type]
-        return [result]  # ty: ignore[invalid-return-type]
+            return result  # type: ignore[return-value]
+        return [result]  # type: ignore[return-value]
 
 
-async def _embed_sparse(query: str, sparse_provider_enum: Any, context: Any) -> Any | None:
+async def _embed_sparse(
+    query: str, sparse_provider_enum: Any, context: Any
+) -> SparseEmbedding | None:
     """Attempt sparse embedding, return None on failure."""
     from codeweaver.common.logging import log_to_client_or_fallback
     from codeweaver.common.registry import get_provider_registry
@@ -162,7 +164,20 @@ async def _embed_sparse(query: str, sparse_provider_enum: Any, context: Any) -> 
         )
         return None
     else:
-        return result
+        if isinstance(result, SparseEmbedding):
+            return result
+        if isinstance(result, dict) and "indices" in result and "values" in result:
+            return SparseEmbedding(**result)
+        if isinstance(result, list) and len(result) > 0 and isinstance(result[0], dict):
+            return SparseEmbedding(**result[0])
+        if (
+            isinstance(result, list)
+            and len(result) == 2
+            and isinstance(result[0], list)
+            and isinstance(result[1], list)
+        ):
+            return SparseEmbedding(indices=result[0], values=result[1])  # ty: ignore[invalid-argument-type]
+    return None
 
 
 async def embed_query(query: str, context: Any = None) -> QueryResult:

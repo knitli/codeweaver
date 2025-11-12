@@ -1,4 +1,4 @@
-# sourcery skip: lambdas-should-be-short
+# sourcery skip: lambdas-should-be-short, no-complex-if-expressions
 # SPDX=FileCopyrightText: 2024-2025 (c) Qdrant Solutions GmBh
 # SPDX-LicenseIdentifier: Apache-2.0
 # This file is partly derived from code in the `mcp-server-qdrant` project
@@ -105,7 +105,9 @@ def fastembed_sparse_output_transformer(
         return cast(list[SparseEmbedding], output)
 
     return [
-        SparseEmbedding(emb.indices.tolist(), emb.values.tolist())
+        SparseEmbedding(
+            cast(np.ndarray, emb.indices).tolist(), cast(np.ndarray, emb.values).tolist()
+        )
         if isinstance(emb, np.ndarray)
         else SparseEmbedding(emb.indices, emb.values)
         for emb in output

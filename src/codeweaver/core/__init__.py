@@ -22,6 +22,7 @@ if TYPE_CHECKING:
         CodeChunk,
         CodeChunkDict,
         SerializedCodeChunk,
+        SerializedStrOnlyCodeChunk,
         StructuredDataInput,
     )
     from codeweaver.core.discovery import DiscoveredFile
@@ -191,6 +192,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ChunkSource": (__spec__.parent, "metadata"),
     "ExtKind": (__spec__.parent, "metadata"),
     "SemanticMetadata": (__spec__.parent, "metadata"),
+    "SerializedStrOnlyCodeChunk": (__spec__.parent, "chunks"),
     "Span": (__spec__.parent, "spans"),
     "SpanGroup": (__spec__.parent, "spans"),
     "SpanTuple": (__spec__.parent, "spans"),
@@ -289,6 +291,7 @@ __all__ = (
     "SentinelNameT",
     "SerializationKwargs",
     "SerializedCodeChunk",
+    "SerializedStrOnlyCodeChunk",
     "Span",
     "SpanGroup",
     "SpanTuple",

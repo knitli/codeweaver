@@ -83,14 +83,15 @@ def create_flaky_provider_mock() -> MagicMock:
 
     Tracks attempt times for exponential backoff validation.
     """
-    attempt_data = {"count": 0, "times": []}
+    attempt_count = {"value": 0}
+    attempt_times: list[float] = []
 
     async def mock_embed_query(*args, **kwargs):
-        attempt_data["count"] += 1
-        attempt_data["times"].append(time.time())
+        attempt_count["value"] += 1
+        attempt_times.append(time.time())
 
-        if attempt_data["count"] <= 2:
-            raise ConnectionError(f"Transient error (attempt {attempt_data['count']})")
+        if attempt_count["value"] <= 2:
+            raise ConnectionError(f"Transient error (attempt {attempt_count['value']})")
 
         return [[0.1, 0.2, 0.3]]
 
@@ -105,9 +106,9 @@ def create_flaky_provider_mock() -> MagicMock:
     mock_provider._failure_count = 0
     mock_provider._last_failure_time = None
     mock_provider._provider = Provider.OPENAI
-    mock_provider.attempt_count = attempt_data["count"]
-    mock_provider.attempt_times = attempt_data["times"]
-    mock_provider._attempt_data = attempt_data  # Store reference for test access
+    mock_provider.attempt_count = attempt_count["value"]
+    mock_provider.attempt_times = attempt_times
+    mock_provider._attempt_data = {"count": attempt_count, "times": attempt_times}
     return mock_provider
 
 
@@ -175,9 +176,7 @@ async def test_sparse_only_fallback(initialize_test_settings):
                 return mock_dense_provider
             if kind == "sparse_embedding":
                 return mock_sparse_provider
-            if kind == "vector_store":
-                return mock_vector_store
-            return None
+            return mock_vector_store if kind == "vector_store" else None
 
         mock_reg.get_provider_instance.side_effect = get_provider_instance_side_effect
 
@@ -343,6 +342,7 @@ async def test_indexing_continues_on_file_errors(initialize_test_settings, test_
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_warning_at_25_errors(initialize_test_settings, tmp_path: Path):
+    # sourcery skip: remove-assert-true, remove-redundant-if
     """T013: Warning displayed when ≥25 file processing errors occur.
 
     Given: Project with 30 problematic files

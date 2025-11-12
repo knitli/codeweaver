@@ -551,7 +551,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         serialize_as_any: bool = False,
     ) -> str:
         """Serialize the model to JSON, excluding certain fields."""
-        return self._model_dump_json(
+        return self._model_dump_json(  # ty: ignore[unresolved-attribute]
             indent=indent,
             include=include,
             exclude={"_client", "_input_transformer", "_output_transformer"},

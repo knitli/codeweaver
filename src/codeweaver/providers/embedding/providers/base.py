@@ -57,7 +57,7 @@ statistics_module: LazyImport[ModuleType] = lazy_import("codeweaver.common.stati
 
 if TYPE_CHECKING:
     from codeweaver.common.statistics import SessionStatistics
-    from codeweaver.core.chunks import CodeChunk, SerializedCodeChunk, StructuredDataInput
+    from codeweaver.core.chunks import CodeChunk, SerializedStrOnlyCodeChunk, StructuredDataInput
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
 
@@ -680,9 +680,17 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         return bool(np.isclose(norm, 1.0, atol=tol, rtol=0.0))
 
     @staticmethod
-    def chunks_to_strings(chunks: Sequence[CodeChunk]) -> Sequence[SerializedCodeChunk[CodeChunk]]:
+    def chunks_to_strings(
+        chunks: Sequence[CodeChunk],
+    ) -> Sequence[SerializedStrOnlyCodeChunk[CodeChunk]]:
         """Convert a sequence of CodeChunk objects to their string representations."""
-        return [chunk.serialize_for_embedding() for chunk in chunks if chunk]
+        return [
+            serialized
+            if (serialized := chunk.serialize_for_embedding()) and isinstance(serialized, str)
+            else serialized.decode("utf-8")
+            for chunk in chunks
+            if chunk
+        ]
 
     @staticmethod
     def _set_kwargs(instance_kwargs: Any, passed_kwargs: Any) -> Mapping[str, Any]:

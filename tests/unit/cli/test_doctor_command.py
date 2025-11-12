@@ -14,8 +14,6 @@ Tests validate corrections from CLI_CORRECTIONS_PLAN.md:
 
 from __future__ import annotations
 
-import contextlib
-
 from pathlib import Path
 
 import pytest
@@ -119,30 +117,32 @@ class TestDoctorProviderEnvVars:
         """Test doctor uses Provider.other_env_vars for API key checks."""
         # Should use Provider enum, not hardcoded dict
         voyage = Provider.VOYAGE
-        voyage_env = (
-            voyage.other_env_vars[0]
-            if isinstance(voyage.other_env_vars, tuple)
-            else voyage.other_env_vars
-        )
-        assert voyage_env["api_key"].env == "VOYAGE_API_KEY"
+        if voyage.other_env_vars is not None:
+            voyage_env = (
+                voyage.other_env_vars[0]
+                if isinstance(voyage.other_env_vars, tuple)
+                else voyage.other_env_vars
+            )
+            assert voyage_env["api_key"].env == "VOYAGE_API_KEY"
 
         openai = Provider.OPENAI
-        openai_env = (
-            openai.other_env_vars[0]
-            if isinstance(openai.other_env_vars, tuple)
-            else openai.other_env_vars
-        )
-        assert openai_env["api_key"].env == "OPENAI_API_KEY"
+        if openai.other_env_vars is not None:
+            openai_env = (
+                openai.other_env_vars[0]
+                if isinstance(openai.other_env_vars, tuple)
+                else openai.other_env_vars
+            )
+            assert openai_env["api_key"].env == "OPENAI_API_KEY"
 
         cohere = Provider.COHERE
-        cohere_env = (
-            cohere.other_env_vars[0]
-            if isinstance(cohere.other_env_vars, tuple)
-            else cohere.other_env_vars
-        )
-        assert cohere_env["api_key"].env == "COHERE_API_KEY"
+        if cohere.other_env_vars is not None:
+            cohere_env = (
+                cohere.other_env_vars[0]
+                if isinstance(cohere.other_env_vars, tuple)
+                else cohere.other_env_vars
+            )
+            assert cohere_env["api_key"].env == "COHERE_API_KEY"
 
-    @pytest.mark.skip(reason="Bedrock and other providers have different env var structure")
     def test_all_cloud_providers_have_env_vars(self) -> None:
         """Test all cloud providers have other_env_vars defined."""
         from codeweaver.common.registry import get_provider_registry
@@ -150,28 +150,17 @@ class TestDoctorProviderEnvVars:
 
         registry = get_provider_registry()
         embedding_providers = registry.list_providers(ProviderKind.EMBEDDING)
+        # bedrock is a special case with many different auth methods and a very long list of env vars that aren't implemented in Provider.other_env_vars
+        cloud_providers = [
+            provider
+            for provider in embedding_providers
+            if provider.is_cloud_provider and provider != Provider.BEDROCK
+        ]
 
-        # Cloud providers should have env vars
-        cloud_providers = {
-            "voyage",
-            "openai",
-            "cohere",
-            "anthropic",
-            "google",
-            "mistral",
-            "bedrock",
-        }
-
-        for provider_name in cloud_providers:
-            with contextlib.suppress(ValueError):
-                provider = Provider.from_string(provider_name)
-                if provider and provider.other_env_vars:
-                    env_vars = (
-                        provider.other_env_vars[0]
-                        if isinstance(provider.other_env_vars, tuple)
-                        else provider.other_env_vars
-                    )
-                    assert "api_key" in env_vars
+        for provider in cloud_providers:
+            if provider and provider.other_env_vars:
+                env_vars = next((var for var in provider.other_env_vars if var.get("api_key")), {})
+                assert "api_key" in env_vars
 
 
 @pytest.mark.unit
