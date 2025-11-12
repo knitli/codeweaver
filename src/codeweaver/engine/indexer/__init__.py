@@ -20,6 +20,11 @@ if TYPE_CHECKING:
         IndexingCheckpoint,
     )
     from codeweaver.engine.indexer.indexer import Indexer
+    from codeweaver.engine.indexer.manifest import (
+        FileManifestEntry,
+        FileManifestManager,
+        IndexFileManifest,
+    )
     from codeweaver.engine.indexer.progress import (
         IndexingPhase,
         IndexingProgressTracker,
@@ -33,6 +38,9 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "CheckpointManager": (parent, "checkpoint"),
     "CheckpointSettingsFingerprint": (parent, "checkpoint"),
     "IndexingCheckpoint": (parent, "checkpoint"),
+    "FileManifestManager": (parent, "manifest"),
+    "IndexFileManifest": (parent, "manifest"),
+    "FileManifestEntry": (parent, "manifest"),
     "IndexingStats": (parent, "progress"),
     "IndexingPhase": (parent, "progress"),
     "IndexingProgressTracker": (parent, "progress"),
@@ -43,7 +51,10 @@ __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 __all__ = (
     "CheckpointManager",
     "CheckpointSettingsFingerprint",
+    "FileManifestEntry",
+    "FileManifestManager",
     "Indexer",
+    "IndexFileManifest",
     "IndexingCheckpoint",
     "IndexingPhase",
     "IndexingProgressTracker",

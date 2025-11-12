@@ -205,6 +205,19 @@ class IndexingCheckpoint(BasedModel):
         Field(description="Blake3 hash of indexing settings (detect config changes)"),
     ] = None
 
+    # File manifest tracking (added for incremental indexing)
+    has_file_manifest: Annotated[
+        bool,
+        Field(
+            default=False,
+            description="Whether a file manifest exists for incremental indexing",
+        ),
+    ] = False
+    manifest_file_count: Annotated[
+        NonNegativeInt,
+        Field(ge=0, default=0, description="Number of files in manifest (for validation)"),
+    ] = 0
+
     def __init__(self, **data: Any):
         """Initialize checkpoint, resolving paths and computing settings hash if needed."""
         super().__init__(**data)

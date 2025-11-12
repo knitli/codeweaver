@@ -39,12 +39,13 @@ from codeweaver.common.logging import log_to_client_or_fallback
 from codeweaver.config.chunker import ChunkerSettings
 from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
-from codeweaver.core.stores import BlakeStore, make_blake_store
+from codeweaver.core.stores import BlakeStore, get_blake_hash, make_blake_store
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.sentinel import Unset
 from codeweaver.engine.chunking_service import ChunkingService
 from codeweaver.engine.indexer.checkpoint import CheckpointManager, IndexingCheckpoint
+from codeweaver.engine.indexer.manifest import FileManifestManager, IndexFileManifest
 from codeweaver.engine.watcher.types import FileChange
 
 
@@ -170,6 +171,9 @@ class Indexer(BasedModel):
     _project_root: Annotated[DirectoryPath | None, PrivateAttr()] = None
     _checkpoint_manager: Annotated[CheckpointManager | None, PrivateAttr()] = None
     _checkpoint: Annotated[IndexingCheckpoint | None, PrivateAttr()] = None
+    _manifest_manager: Annotated[FileManifestManager | None, PrivateAttr()] = None
+    _file_manifest: Annotated[IndexFileManifest | None, PrivateAttr()] = None
+    _deleted_files: Annotated[list[Path], PrivateAttr(default_factory=list)] = []
     _last_checkpoint_time: Annotated[NonNegativeFloat, PrivateAttr()] = 0.0
     _files_since_checkpoint: Annotated[NonNegativeInt, PrivateAttr()] = 0
 
@@ -237,6 +241,22 @@ class Indexer(BasedModel):
         self._shutdown_requested = False
         self._original_sigterm_handler = None
         self._original_sigint_handler = None
+
+        # Initialize file manifest manager
+        if project_path and not isinstance(project_path, Unset):
+            self._manifest_manager = FileManifestManager(project_path=project_path)
+        else:
+            from codeweaver.config.settings import get_settings
+
+            self._manifest_manager = FileManifestManager(
+                project_path=cast(
+                    Path,
+                    get_project_path()
+                    if isinstance(get_settings().project_path, Unset)
+                    else get_settings().project_path,
+                )
+            )
+        self._file_manifest = None
 
         if auto_initialize_providers:
             self._initialize_providers()
@@ -492,6 +512,16 @@ class Indexer(BasedModel):
 
             self._stats.files_processed += 1
 
+            # 6. Update file manifest with successful indexing
+            if self._file_manifest and updated_chunks:
+                chunk_ids = [str(chunk.chunk_id) for chunk in updated_chunks]
+                self._file_manifest.add_file(
+                    path=path,
+                    content_hash=discovered_file.file_hash,
+                    chunk_ids=chunk_ids,
+                )
+                logger.debug("Updated manifest for file: %s (%d chunks)", path, len(chunk_ids))
+
             await log_to_client_or_fallback(
                 context,
                 "info",
@@ -574,8 +604,32 @@ class Indexer(BasedModel):
                     logger.debug("Removed chunks from vector store for: %s", path)
                 except Exception:
                     logger.exception("Failed to remove from vector store")
+
+            # Remove from file manifest
+            if self._file_manifest:
+                entry = self._file_manifest.remove_file(path)
+                if entry:
+                    logger.debug(
+                        "Removed file from manifest: %s (%d chunks)", path, entry["chunk_count"]
+                    )
         except Exception:
             logger.exception("Failed to delete file %s", path)
+
+    async def _cleanup_deleted_files(self) -> None:
+        """Clean up files that were deleted from the repository.
+        
+        Removes chunks from vector store and entries from manifest.
+        """
+        if not self._deleted_files:
+            return
+
+        logger.info("Cleaning up %d deleted files", len(self._deleted_files))
+        
+        for path in self._deleted_files:
+            await self._delete_file(path)
+
+        self._deleted_files.clear()
+        logger.info("Deleted file cleanup complete")
 
     async def index(self, change: FileChange) -> None:
         """Index a single file based on a watchfiles change event.
@@ -607,6 +661,43 @@ class Indexer(BasedModel):
                 logger.debug("Unhandled change type %s for %s", change_type, path)
 
     # ---- public helpers ----
+    def _load_file_manifest(self) -> bool:
+        """Load file manifest for incremental indexing.
+
+        Returns:
+            True if manifest was loaded successfully
+        """
+        if not self._manifest_manager:
+            logger.debug("No manifest manager configured")
+            return False
+
+        manifest = self._manifest_manager.load()
+        if manifest:
+            self._file_manifest = manifest
+            logger.info(
+                "File manifest loaded: %d files, %d chunks",
+                manifest.total_files,
+                manifest.total_chunks,
+            )
+            return True
+        else:
+            # Create new manifest
+            self._file_manifest = self._manifest_manager.create_new()
+            logger.info("Created new file manifest")
+            return False
+
+    def _save_file_manifest(self) -> None:
+        """Save current file manifest to disk."""
+        if not self._manifest_manager or not self._file_manifest:
+            logger.warning("No manifest manager or manifest to save")
+            return
+
+        try:
+            self._manifest_manager.save(self._file_manifest)
+            logger.debug("File manifest saved successfully")
+        except Exception:
+            logger.exception("Failed to save file manifest")
+
     def _try_restore_from_checkpoint(self, *, force_reindex: bool) -> bool:
         """Attempt to restore indexing state from checkpoint.
 
@@ -630,6 +721,8 @@ class Indexer(BasedModel):
     def _discover_files_to_index(self) -> list[Path]:
         """Discover files to index using the configured walker.
 
+        With incremental indexing, only returns files that are new or modified.
+
         Returns:
             List of file paths to index
         """
@@ -637,19 +730,59 @@ class Indexer(BasedModel):
             logger.warning("No walker configured, cannot prime index")
             return []
 
-        files_to_index: list[Path] = []
+        all_files: list[Path] = []
         try:
             with contextlib.suppress(StopIteration):
-                files_to_index.extend(p for p in self._walker if p and p.is_file())
+                all_files.extend(p for p in self._walker if p and p.is_file())
         except Exception:
             logger.exception("Failure during file discovery")
             return []
 
-        if not files_to_index:
+        if not all_files:
             logger.info("No files found to index")
             return []
 
-        logger.info("Discovered %d files to index", len(files_to_index))
+        # If no manifest, index all files
+        if not self._file_manifest:
+            logger.info("No file manifest - will index all %d discovered files", len(all_files))
+            self._stats.files_discovered = len(all_files)
+            return all_files
+
+        # Filter to only new or modified files
+        files_to_index: list[Path] = []
+        unchanged_count = 0
+        
+        for path in all_files:
+            try:
+                # Compute current hash
+                current_hash = get_blake_hash(path.read_bytes())
+                
+                # Check if file is new or changed
+                if self._file_manifest.file_changed(path, current_hash):
+                    files_to_index.append(path)
+                else:
+                    unchanged_count += 1
+            except Exception:
+                logger.exception("Error checking file %s, will index it", path)
+                files_to_index.append(path)
+
+        # Detect deleted files (in manifest but not on disk)
+        manifest_files = self._file_manifest.get_all_file_paths()
+        all_files_set = set(all_files)
+        deleted_files = manifest_files - all_files_set
+        
+        if deleted_files:
+            logger.info("Detected %d deleted files to clean up", len(deleted_files))
+            # Schedule cleanup (will be done in separate phase)
+            self._deleted_files = list(deleted_files)
+
+        logger.info(
+            "Incremental indexing: %d new/modified, %d unchanged, %d deleted",
+            len(files_to_index),
+            unchanged_count,
+            len(deleted_files) if deleted_files else 0,
+        )
+
         self._stats.files_discovered = len(files_to_index)
         return files_to_index
 
@@ -683,7 +816,7 @@ class Indexer(BasedModel):
             logger.exception("Failure during batch indexing")
 
     def _finalize_indexing(self) -> None:
-        """Log final statistics, save checkpoint, and cleanup."""
+        """Log final statistics, save checkpoint and manifest, and cleanup."""
         logger.info(
             "Indexing complete: %d files processed, %d chunks created, %d indexed, %d errors in %.2fs (%.2f files/sec)",
             self._stats.files_processed,
@@ -693,6 +826,9 @@ class Indexer(BasedModel):
             self._stats.elapsed_time(),
             self._stats.processing_rate(),
         )
+
+        # Save file manifest
+        self._save_file_manifest()
 
         # Save final checkpoint
         self.save_checkpoint()
@@ -711,7 +847,7 @@ class Indexer(BasedModel):
     ) -> int:
         """Perform an initial indexing pass using the configured rignore walker.
 
-        Enhanced version with persistence support and batch processing.
+        Enhanced version with persistence support, incremental indexing, and batch processing.
 
         Args:
             force_reindex: If True, skip persistence checks and reindex everything
@@ -720,18 +856,46 @@ class Indexer(BasedModel):
         Returns:
             Number of files indexed
         """
-        # Try to restore from persistence (unless force_reindex)
+        # Load file manifest for incremental indexing (unless force_reindex)
+        if not force_reindex:
+            self._load_file_manifest()
+        else:
+            # Force reindex - create new manifest
+            if self._manifest_manager:
+                self._file_manifest = self._manifest_manager.create_new()
+                logger.info("Force reindex - created new file manifest")
+
+        # Try to restore from checkpoint (unless force_reindex)
         if self._try_restore_from_checkpoint(force_reindex=force_reindex):
-            # Note: In v0.1, we still need to reindex discovered files
-            # In v0.2, we'll implement true resumption with file tracking
+            # Note: In current version, we still reindex discovered files
+            # Full resumption would require storing processed file list in checkpoint
             pass
 
         # Reset stats for new indexing run
         self._stats = IndexingStats()
+        self._deleted_files = []
 
-        # Discover files to index
+        # Discover files to index (with incremental filtering if manifest exists)
         files_to_index = self._discover_files_to_index()
+        
+        # Clean up deleted files first (before indexing new/modified files)
+        if self._deleted_files:
+            try:
+                # Check if we're already in an event loop
+                try:
+                    asyncio.get_running_loop()
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                        future = executor.submit(asyncio.run, self._cleanup_deleted_files())
+                        future.result()
+                except RuntimeError:
+                    asyncio.run(self._cleanup_deleted_files())
+            except Exception:
+                logger.exception("Failed to clean up deleted files")
+
         if not files_to_index:
+            logger.info("No files to index (all up to date)")
+            self._finalize_indexing()
             return 0
 
         # Report discovery phase complete
@@ -1251,6 +1415,7 @@ class Indexer(BasedModel):
         - Chunks created/embedded/indexed counts
         - Error list with file paths
         - Settings hash for invalidation detection
+        - File manifest status for incremental indexing
 
         Args:
             checkpoint_path: Optional custom checkpoint file path (primarily for testing)
@@ -1281,6 +1446,14 @@ class Indexer(BasedModel):
         self._checkpoint.chunks_indexed = self._stats.chunks_indexed
         self._checkpoint.files_with_errors = [str(p) for p in self._stats.files_with_errors]
         self._checkpoint.settings_hash = settings_hash
+
+        # Update manifest info
+        if self._file_manifest:
+            self._checkpoint.has_file_manifest = True
+            self._checkpoint.manifest_file_count = self._file_manifest.total_files
+        else:
+            self._checkpoint.has_file_manifest = False
+            self._checkpoint.manifest_file_count = 0
 
         # Save to disk
         self._checkpoint_manager.save(self._checkpoint)
