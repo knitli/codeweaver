@@ -62,8 +62,6 @@ class HealthService:
         self._last_indexed: str | None = None
         self._indexed_languages: set[str] = set()
 
-        self._tasks: list[asyncio.Task[Any]] = []
-
     def set_indexer(self, indexer: Indexer) -> None:
         """Set the indexer instance after initialization."""
         self._indexer = indexer
@@ -395,18 +393,14 @@ class HealthService:
         """Convert HealthService to dictionary for serialization.
 
         In practice, HealthService isn't serialized -- we serialize HealthResponse.
+
+        Warning: This method uses asyncio.run() and CANNOT be called from async context.
+        If you need to get health information from async code, use get_health_response() instead.
         """
-        try:
-            loop = asyncio.get_running_loop()
-            self._tasks.append(loop.create_task(self.get_health_response()))
-            health_response = loop.run_until_complete(self._tasks[-1])
-            self._tasks.pop()
-        except RuntimeError:
-            # No event loop, run synchronously
-            health_response = asyncio.run(self.get_health_response())
-        else:
-            return health_response.model_dump(round_trip=True)
-        return {}
+        # Get health response synchronously using asyncio.run()
+        # This will raise RuntimeError if called from async context
+        health_response = asyncio.run(self.get_health_response())
+        return health_response.model_dump(round_trip=True)
 
 
 __all__ = ("HealthService",)

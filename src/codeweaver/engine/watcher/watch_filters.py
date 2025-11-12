@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import logging
 
@@ -224,8 +223,18 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
     def from_settings(
         cls, settings: CodeWeaverSettingsDict | None = None
     ) -> IgnoreFilter[rignore.Walker]:
-        """Create an IgnoreFilter instance from settings."""
-        # we actually need the full object here
+        """Create an IgnoreFilter instance from settings (sync version).
+
+        Note: This method cannot set inc_exc patterns asynchronously.
+        Use from_settings_async() for proper async initialization, or
+        manually configure the walker's inc_exc patterns after creation.
+
+        Args:
+            settings: Optional settings dictionary
+
+        Returns:
+            Configured IgnoreFilter instance (may need async initialization)
+        """
         from codeweaver.common.utils.git import get_project_path
         from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
         from codeweaver.config.settings import get_settings
@@ -236,24 +245,62 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
             if isinstance(settings.indexing, IndexerSettings)
             else IndexerSettings.model_validate(DefaultIndexerSettings)
         )
+
+        # Note: inc_exc setting is skipped in sync version
+        # The walker will be created with default settings
+        # For proper inc_exc patterns, use from_settings_async()
         if not index_settings.inc_exc_set:
-            # Check if there's already a running event loop
-            try:
-                asyncio.get_running_loop()
-                # If we're here, there's a running loop
-                # We can't await here since from_settings is not async, so skip for now
-                logger.debug(
-                    "Cannot set inc_exc in Indexer.from_settings: already in async context. Will be set lazily when indexer is used."
-                )
-            except RuntimeError:
-                # No running loop, safe to use asyncio.run()
-                _ = asyncio.run(
-                    index_settings.set_inc_exc(
-                        get_project_path()
-                        if isinstance(settings.project_path, Unset)
-                        else settings.project_path
-                    )
-                )
+            logger.debug(
+                "inc_exc patterns not set (async operation required). "
+                "Use from_settings_async() for full initialization."
+            )
+
+        walker = rignore.Walker(
+            **(index_settings.to_settings())  # type: ignore
+        )
+        return cls(
+            walker=walker,
+            base_path=get_project_path()
+            if isinstance(settings.project_path, Unset)
+            else settings.project_path,
+        )
+
+    @classmethod
+    async def from_settings_async(
+        cls, settings: CodeWeaverSettingsDict | None = None
+    ) -> IgnoreFilter[rignore.Walker]:
+        """Create an IgnoreFilter instance from settings with full async initialization.
+
+        This method properly awaits all async operations including inc_exc pattern setting.
+        Recommended over from_settings() for production use.
+
+        Args:
+            settings: Optional settings dictionary
+
+        Returns:
+            Fully initialized IgnoreFilter instance
+        """
+        from codeweaver.common.utils.git import get_project_path
+        from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
+        from codeweaver.config.settings import get_settings
+
+        settings = settings or get_settings()
+        index_settings = (
+            settings.indexing
+            if isinstance(settings.indexing, IndexerSettings)
+            else IndexerSettings.model_validate(DefaultIndexerSettings)
+        )
+
+        # Properly await inc_exc initialization
+        if not index_settings.inc_exc_set:
+            project_path = (
+                get_project_path()
+                if isinstance(settings.project_path, Unset)
+                else settings.project_path
+            )
+            await index_settings.set_inc_exc(project_path)
+            logger.debug("inc_exc patterns initialized for project: %s", project_path)
+
         walker = rignore.Walker(
             **(index_settings.to_settings())  # type: ignore
         )

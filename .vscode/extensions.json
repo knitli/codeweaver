@@ -1,10 +1,10 @@
 {
-    "recommendations": [
-        "astral-sh.ty",
-        "tekumara.typos-vscode",
-        "charliermarsh.ruff",
-        "hverlin.mise-vscode",
-        "exodiusstudios.comment-anchors",
-        "aaron-bond.better-comments"
-    ]
+  "recommendations": [
+    "astral-sh.ty",
+    "tekumara.typos-vscode",
+    "charliermarsh.ruff",
+    "hverlin.mise-vscode",
+    "exodiusstudios.comment-anchors",
+    "aaron-bond.better-comments"
+  ]
 }

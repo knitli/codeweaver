@@ -217,10 +217,11 @@ class Indexer(BasedModel):
         self._chunking_service = chunking_service or _get_chunking_service()
         self._stats = IndexingStats()
 
-        # Pipeline provider Fields (initialized below or lazily)
+        # Pipeline provider Fields (initialized lazily on first use)
         self._embedding_provider: Any | None = None
         self._sparse_provider: Any | None = None
         self._vector_store: Any | None = None
+        self._providers_initialized: bool = False
 
         # Initialize checkpoint manager
         if project_path and not isinstance(project_path, Unset):
@@ -261,20 +262,19 @@ class Indexer(BasedModel):
         self._file_manifest = None
         self._manifest_lock = None  # Initialize as None, created lazily in async context
 
+        # Note: Provider initialization is now deferred to first async operation
+        # auto_initialize_providers parameter is deprecated but kept for compatibility
         if auto_initialize_providers:
-            self._initialize_providers()
+            logger.debug(
+                "auto_initialize_providers=True: providers will be initialized on first async operation"
+            )
 
         # Register signal handlers for graceful shutdown
         self._register_signal_handlers()
 
         logger.info("Indexer initialized")
         logger.info("Using project path: %s", self._checkpoint_manager.project_path)
-        logger.info(
-            "Starting indexing with configured providers: %s, %s, %s",
-            self._embedding_provider,
-            self._sparse_provider,
-            self._vector_store,
-        )
+        logger.debug("Providers will be initialized lazily on first use")
 
     def _register_signal_handlers(self) -> None:
         """Register signal handlers for graceful shutdown with checkpoint saving."""
@@ -323,53 +323,54 @@ class Indexer(BasedModel):
         except (ValueError, OSError) as e:
             logger.debug("Could not restore signal handlers: %s", e)
 
-    def _initialize_providers(self) -> None:
-        """Initialize pipeline providers from global registry."""
+    async def _initialize_providers_async(self) -> None:
+        """Initialize pipeline providers asynchronously from global registry.
+
+        This is idempotent and can be safely called multiple times.
+        Providers that fail to initialize will be set to None with appropriate logging.
+        """
+        if self._providers_initialized:
+            return
+
+        # Initialize embedding provider (dense)
         try:
-            try:
-                self._embedding_provider = _get_embedding_instance(sparse=False)
-                logger.info(
-                    "Initialized embedding provider: %s", type(self._embedding_provider).__name__
-                )
-            except Exception as e:
-                logger.warning("Could not initialize embedding provider: %s", e)
-                self._embedding_provider = None
+            self._embedding_provider = _get_embedding_instance(sparse=False)
+            logger.info(
+                "Initialized embedding provider: %s", type(self._embedding_provider).__name__
+            )
+        except Exception as e:
+            logger.warning("Could not initialize embedding provider: %s", e)
+            self._embedding_provider = None
 
-            try:
-                self._sparse_provider = _get_embedding_instance(sparse=True)
-                logger.info("Initialized sparse provider: %s", type(self._sparse_provider).__name__)
-            except Exception as e:
-                logger.debug("Could not initialize sparse embedding provider: %s", e)
-                self._sparse_provider = None
+        # Initialize sparse embedding provider
+        try:
+            self._sparse_provider = _get_embedding_instance(sparse=True)
+            logger.info("Initialized sparse provider: %s", type(self._sparse_provider).__name__)
+        except Exception as e:
+            logger.debug("Could not initialize sparse embedding provider: %s", e)
+            self._sparse_provider = None
 
-            if not self._embedding_provider and not self._sparse_provider:
-                logger.warning(
-                    "No embedding providers initialized - indexing will proceed without embeddings"
-                )
+        # Warn if no embedding providers available
+        if not self._embedding_provider and not self._sparse_provider:
+            logger.warning(
+                "⚠️  No embedding providers initialized - indexing will proceed without embeddings"
+            )
 
-            try:
-                self._vector_store = _get_vector_store_instance()
-                if self._vector_store:
-                    # Initialize the vector store client (async operation)
-                    # Check if we're in an async context
-                    try:
-                        asyncio.get_running_loop()
-                        # Already in event loop - will initialize lazily on first use
-                        logger.debug(
-                            "Cannot initialize vector store in sync context. Will be initialized on first use."
-                        )
-                    except RuntimeError:
-                        # No running loop, safe to use asyncio.run()
-                        asyncio.run(self._vector_store._initialize())
-                logger.info("Initialized vector store: %s", type(self._vector_store).__name__)
-            except Exception as e:
-                logger.warning("Could not initialize vector store: %s", e)
-                self._vector_store = None
+        # Initialize vector store (async operation)
+        try:
+            self._vector_store = _get_vector_store_instance()
+            if self._vector_store:
+                # Initialize the vector store client (now we can use native await)
+                await self._vector_store._initialize()
+            logger.info("Initialized vector store: %s", type(self._vector_store).__name__)
+        except Exception as e:
+            logger.warning("Could not initialize vector store: %s", e)
+            self._vector_store = None
 
-            self._chunking_service = self._chunking_service or _get_chunking_service()
+        # Ensure chunking service is initialized
+        self._chunking_service = self._chunking_service or _get_chunking_service()
 
-        except ImportError:
-            logger.warning("Provider registry not available, providers not initialized")
+        self._providers_initialized = True
 
     async def _index_file(self, path: Path, context: Any = None) -> None:
         """Execute full pipeline for a single file: discover → chunk → embed → index.
@@ -523,9 +524,7 @@ class Indexer(BasedModel):
             # Only update if all critical operations succeeded and we have chunks
             if self._file_manifest and updated_chunks and self._manifest_lock:
                 chunk_ids = [str(chunk.chunk_id) for chunk in updated_chunks]
-                # Use relative path for portability
-                relative_path = set_relative_path(path)
-                if relative_path:
+                if relative_path := set_relative_path(path):
                     try:
                         async with self._manifest_lock:
                             self._file_manifest.add_file(
@@ -629,22 +628,22 @@ class Indexer(BasedModel):
                     logger.exception("Failed to remove from vector store")
 
             # Remove from file manifest (use relative path)
-            if self._file_manifest and self._manifest_lock:
-                relative_path = set_relative_path(path)
-                if relative_path:
-                    try:
-                        async with self._manifest_lock:
-                            entry = self._file_manifest.remove_file(relative_path)
-                        if entry:
-                            logger.debug(
-                                "Removed file from manifest: %s (%d chunks)",
-                                relative_path,
-                                entry["chunk_count"],
-                            )
-                    except ValueError as e:
-                        logger.warning(
-                            "Failed to remove file from manifest: %s - %s", relative_path, e
+            if (
+                self._file_manifest
+                and self._manifest_lock
+                and (relative_path := set_relative_path(path))
+            ):
+                try:
+                    async with self._manifest_lock:
+                        entry = self._file_manifest.remove_file(relative_path)
+                    if entry:
+                        logger.debug(
+                            "Removed file from manifest: %s (%d chunks)",
+                            relative_path,
+                            entry["chunk_count"],
                         )
+                except ValueError as e:
+                    logger.warning("Failed to remove file from manifest: %s - %s", relative_path, e)
         except Exception:
             logger.exception("Failed to delete file %s", path)
 
@@ -704,8 +703,7 @@ class Indexer(BasedModel):
             logger.debug("No manifest manager configured")
             return False
 
-        manifest = self._manifest_manager.load()
-        if manifest:
+        if manifest := self._manifest_manager.load():
             # Validate that loaded manifest matches current project path
             if manifest.project_path.resolve() != self._manifest_manager.project_path.resolve():
                 logger.warning(
@@ -846,7 +844,7 @@ class Indexer(BasedModel):
         self._stats.files_discovered = len(files_to_index)
         return files_to_index
 
-    def _perform_batch_indexing(
+    async def _perform_batch_indexing_async(
         self,
         files_to_index: list[Path],
         progress_callback: Callable[[IndexingStats, str | None], None] | None,
@@ -858,20 +856,7 @@ class Indexer(BasedModel):
             progress_callback: Optional progress reporting callback
         """
         try:
-            # Check if we're already in an event loop
-            try:
-                asyncio.get_running_loop()
-                # Already in event loop - run in thread to avoid blocking
-                import concurrent.futures
-
-                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                    future = executor.submit(
-                        asyncio.run, self._index_files_batch(files_to_index, progress_callback)
-                    )
-                    future.result()  # Wait for completion and propagate exceptions
-            except RuntimeError:
-                # No event loop running, use asyncio.run()
-                asyncio.run(self._index_files_batch(files_to_index, progress_callback))
+            await self._index_files_batch(files_to_index, progress_callback)
         except Exception:
             logger.exception("Failure during batch indexing")
 
@@ -899,7 +884,7 @@ class Indexer(BasedModel):
             self._checkpoint_manager.delete()
             logger.info("Checkpoint file deleted after successful completion")
 
-    def prime_index(
+    async def prime_index(
         self,
         *,
         force_reindex: bool = False,
@@ -916,6 +901,9 @@ class Indexer(BasedModel):
         Returns:
             Number of files indexed
         """
+        # Initialize providers asynchronously (idempotent)
+        await self._initialize_providers_async()
+
         # Load file manifest for incremental indexing (unless force_reindex)
         if not force_reindex:
             self._load_file_manifest()
@@ -941,16 +929,7 @@ class Indexer(BasedModel):
         # Clean up deleted files first (before indexing new/modified files)
         if self._deleted_files:
             try:
-                # Check if we're already in an event loop
-                try:
-                    asyncio.get_running_loop()
-                    import concurrent.futures
-
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                        future = executor.submit(asyncio.run, self._cleanup_deleted_files())
-                        future.result()
-                except RuntimeError:
-                    asyncio.run(self._cleanup_deleted_files())
+                await self._cleanup_deleted_files()
             except Exception:
                 logger.exception("Failed to clean up deleted files")
 
@@ -964,7 +943,7 @@ class Indexer(BasedModel):
             progress_callback(self._stats, "discovery")
 
         # Index files in batch
-        self._perform_batch_indexing(files_to_index, progress_callback)
+        await self._perform_batch_indexing_async(files_to_index, progress_callback)
 
         # Finalize and report
         self._finalize_indexing()
@@ -973,13 +952,66 @@ class Indexer(BasedModel):
 
     @classmethod
     def from_settings(cls, settings: DictView[CodeWeaverSettingsDict] | None = None) -> Indexer:
-        """Create an Indexer instance from settings.
+        """Create an Indexer instance from settings (sync version).
+
+        Note: This method cannot set inc_exc patterns asynchronously.
+        Use from_settings_async() for proper async initialization, or
+        manually configure the walker's inc_exc patterns after creation.
 
         Args:
             settings: Optional settings dictionary view
 
         Returns:
-            Configured Indexer instance
+            Configured Indexer instance (may need async initialization via prime_index)
+        """
+        from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
+        from codeweaver.config.settings import get_settings_map
+
+        settings_map = settings or get_settings_map()
+        indexing_data = settings_map["indexing"]
+
+        # Handle different types of indexing_data
+        if isinstance(indexing_data, Unset):
+            index_settings = IndexerSettings.model_validate(DefaultIndexerSettings)
+        elif isinstance(indexing_data, IndexerSettings):
+            # Use the existing IndexerSettings instance directly
+            index_settings = indexing_data
+        else:
+            # If it's a dict or something else, try to validate it
+            index_settings = IndexerSettings.model_validate(
+                DefaultIndexerSettings | indexing_data
+                if isinstance(indexing_data, dict)
+                else DefaultIndexerSettings
+            )
+
+        # Note: inc_exc setting is skipped in sync version
+        # The walker will be created with default settings
+        # For proper inc_exc patterns, use from_settings_async()
+        if not index_settings.inc_exc_set:
+            logger.debug(
+                "inc_exc patterns not set (async operation required). "
+                "Use from_settings_async() for full initialization."
+            )
+
+        walker = rignore.Walker(
+            **(index_settings.to_settings())  # type: ignore
+        )
+        return cls(walker=walker, project_path=settings_map["project_path"])
+
+    @classmethod
+    async def from_settings_async(
+        cls, settings: DictView[CodeWeaverSettingsDict] | None = None
+    ) -> Indexer:
+        """Create an Indexer instance from settings with full async initialization.
+
+        This method properly awaits all async operations including inc_exc pattern setting.
+        Recommended over from_settings() for production use.
+
+        Args:
+            settings: Optional settings dictionary view
+
+        Returns:
+            Fully initialized Indexer instance
         """
         from codeweaver.common.utils.git import get_project_path
         from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
@@ -1002,71 +1034,25 @@ class Indexer(BasedModel):
                 else DefaultIndexerSettings
             )
 
+        # Properly await inc_exc initialization
         if not index_settings.inc_exc_set:
-            # Check if there's already a running event loop
-            try:
-                asyncio.get_running_loop()
-                # If we're here, there's a running loop
-                # We can't await here since from_settings is not async, so skip for now
-                logger.warning(
-                    "Cannot set inc_exc in Indexer.from_settings: already in async context. Will be set lazily when indexer is used."
-                )
-            except RuntimeError:
-                # No running loop, safe to use asyncio.run()
-                _ = asyncio.run(
-                    index_settings.set_inc_exc(
-                        get_project_path()
-                        if isinstance(settings_map["project_path"], Unset)
-                        else settings_map["project_path"]
-                    )
-                )
+            project_path_value = (
+                get_project_path()
+                if isinstance(settings_map["project_path"], Unset)
+                else settings_map["project_path"]
+            )
+            await index_settings.set_inc_exc(project_path_value)
+            logger.debug("inc_exc patterns initialized for project: %s", project_path_value)
+
         walker = rignore.Walker(
             **(index_settings.to_settings())  # type: ignore
         )
-        return cls(walker=walker, project_path=settings_map["project_path"])
+        indexer = cls(walker=walker, project_path=settings_map["project_path"])
 
-    @classmethod
-    def from_config(
-        cls,
-        project_path: Path | None = None,
-        settings: DictView[CodeWeaverSettingsDict] | None = None,
-    ) -> Indexer:
-        """Create a new `Indexer` from configuration settings."""
-        from codeweaver.common.utils.git import get_project_path
-        from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
-        from codeweaver.config.settings import get_settings_map
-        from codeweaver.core.types.sentinel import Unset
+        # Initialize providers asynchronously
+        await indexer._initialize_providers_async()
 
-        settings_map = settings or get_settings_map()
-        index_settings = (
-            IndexerSettings.model_validate(DefaultIndexerSettings)
-            if isinstance(settings_map["indexing"], Unset)
-            else settings_map["indexing"]
-        )
-        if not index_settings.inc_exc_set:
-            # Check if there's already a running event loop
-            try:
-                asyncio.get_running_loop()
-                # If we're here, there's a running loop
-                # We can't await here since from_config is not async, so skip for now
-                logger.warning(
-                    "Cannot set inc_exc in Indexer.from_config: already in async context. Will be set lazily when indexer is used."
-                )
-            except RuntimeError:
-                # No running loop, safe to use asyncio.run()
-                _ = asyncio.run(
-                    index_settings.set_inc_exc(
-                        get_project_path()
-                        if isinstance(settings_map["project_path"], Unset)
-                        else settings_map["project_path"]
-                    )
-                )
-        indexing = index_settings.to_settings()
-        return cls(
-            base_path=settings_map["project_path"],
-            settings=None,
-            walker=rignore.walk(**indexing),  # type: ignore
-        )
+        return indexer
 
     def _discover_files_for_batch(self, files: list[Path]) -> list[DiscoveredFile]:
         """Convert file paths to DiscoveredFile objects.

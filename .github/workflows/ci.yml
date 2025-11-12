@@ -81,7 +81,7 @@ jobs:
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           mise run check
-        continue-on-error: true  # Allow reuse lint failures to be warnings
+        continue-on-error: true # Allow reuse lint failures to be warnings
         # Note: Testing with coverage is more about seeing where we might have *important* gaps. We're not striving for high coverage rates just to meet a number. [See](https://github.com/knitli/codeweaver-mcp/tree/main/CODE_STYLE.md#testing-philosophy)
       - name: ensure qdrant ready
         run: ""

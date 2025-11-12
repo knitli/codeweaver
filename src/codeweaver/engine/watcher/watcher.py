@@ -10,6 +10,7 @@ CodeWeaver's default file filter directly integrates with `rignore` to respect
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 
@@ -111,7 +112,7 @@ class FileWatcher:
         watch_args["recursive"] = True  # we always want recursive watching
         try:
             # Perform a one-time initial indexing pass if we have a walker
-            if initial_count := self._indexer.prime_index():
+            if initial_count := asyncio.run(self._indexer.prime_index()):
                 logger.info("Initial indexing complete: %d files indexed", initial_count)
             self.watcher = watchfiles.arun_process(*(watch_args.pop("paths", ())), **watch_args)  # ty: ignore[no-matching-overload]
         except KeyboardInterrupt:

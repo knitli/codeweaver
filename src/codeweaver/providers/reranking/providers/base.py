@@ -447,16 +447,9 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         """
         # voyage and cohere return token count, others do not
         if self.provider not in [Provider.VOYAGE, Provider.COHERE]:
-            try:
-                loop = asyncio.get_running_loop()
-                _ = loop.run_in_executor(None, lambda: self._update_token_stats(from_docs=raw_docs))
-            except RuntimeError:
-                # No running loop - shouldn't happen in normal usage
-                logger.warning(
-                    "Attempted to schedule token stats update outside async context. "
-                    "Running synchronously (may cause blocking)."
-                )
-                self._update_token_stats(from_docs=raw_docs)
+            # We're always called from async context (rerank method), so we can safely get the loop
+            loop = asyncio.get_running_loop()
+            _ = loop.run_in_executor(None, lambda: self._update_token_stats(from_docs=raw_docs))
 
         from codeweaver.core.chunks import CodeChunk
 

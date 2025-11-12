@@ -40,10 +40,7 @@ from codeweaver.common.utils import create_lazy_getattr
 if TYPE_CHECKING:
     from codeweaver.engine.chunker.delimiters.families import LanguageFamily, detect_language_family
     from codeweaver.engine.chunker.delimiters.kind import DelimiterKind, LineStrategy
-    from codeweaver.engine.chunker.delimiters.patterns import (
-        DelimiterPattern,
-        expand_pattern,
-    )
+    from codeweaver.engine.chunker.delimiters.patterns import DelimiterPattern, expand_pattern
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({

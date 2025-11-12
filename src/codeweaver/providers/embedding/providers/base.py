@@ -794,24 +794,16 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         return type(self)._output_transformer(output_data)
 
     def _fire_and_forget(self, task: Callable[..., Any]) -> None:
-        """Execute a fire-and-forget task.
+        """Execute a fire-and-forget task in a thread pool executor.
 
-        This method should only be called from within async contexts.
-        It schedules the task to run in a thread pool executor to avoid blocking.
+        This method must be called from async context (all embedding methods are async).
+        Schedules the task to run in a thread pool executor to avoid blocking the event loop.
+
+        Used for non-time-sensitive tasks like token statistics updates that don't need
+        to block the main embedding workflow.
         """
-        try:
-            loop = asyncio.get_running_loop()
-            _ = loop.run_in_executor(None, task)
-        except RuntimeError:
-            # No running loop - this shouldn't happen in normal usage
-            # since this is only called from async methods
-            logger.warning(
-                "Attempted to fire-and-forget task outside async context. "
-                "Running synchronously (may cause blocking)."
-            )
-            task()
-        except Exception:
-            logger.exception("Error occurred while executing fire-and-forget task.")
+        loop = asyncio.get_running_loop()  # Will raise RuntimeError if not in async context
+        _ = loop.run_in_executor(None, task)
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey

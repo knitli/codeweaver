@@ -341,7 +341,7 @@ async def _run_background_indexing(
             get_project_path()
             if isinstance(settings.project_path, Unset)
             else settings.project_path,
-            file_filter=IgnoreFilter.from_settings(),  # Uses default filter
+            file_filter=await IgnoreFilter.from_settings_async(),  # Full async initialization
             walker=state.indexer._walker,
         )
 

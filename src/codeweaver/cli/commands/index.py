@@ -5,6 +5,7 @@
 
 """CodeWeaver indexing command-line interface."""
 
+import asyncio
 import sys
 
 from pathlib import Path
@@ -126,9 +127,11 @@ def index(
         # Perform indexing with progress indicators
         console.print(f"{CODEWEAVER_PREFIX} [green]Starting indexing process...[/green]")
 
-        _ = indexer.prime_index(
-            force_reindex=force_reindex,
-            progress_callback=lambda stats, phase: progress_tracker.update(stats, phase),
+        _ = asyncio.run(
+            indexer.prime_index(
+                force_reindex=force_reindex,
+                progress_callback=lambda stats, phase: progress_tracker.update(stats, phase),
+            )
         )
 
         # Display final summary

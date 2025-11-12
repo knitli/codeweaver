@@ -83,7 +83,7 @@ async def test_store_hybrid_embeddings(qdrant_provider: QdrantVectorStoreProvide
         StrategizedQuery(
             query="authentication function",
             strategy=SearchStrategy.SPARSE_ONLY,
-            sparse=SparseEmbedding({"indices": [1, 5, 10], "values": [0.8, 0.6, 0.9]}),
+            sparse=SparseEmbedding(indices=[1, 5, 10], values=[0.8, 0.6, 0.9]),
             dense=None,
         )
     )
@@ -95,7 +95,7 @@ async def test_store_hybrid_embeddings(qdrant_provider: QdrantVectorStoreProvide
             query="authentication function",
             strategy=SearchStrategy.HYBRID,
             dense=[1.0, 0.0, 0.0] * 256,
-            sparse=SparseEmbedding({"indices": [1, 5, 10], "values": [0.8, 0.6, 0.9]}),
+            sparse=SparseEmbedding(indices=[1, 5, 10], values=[0.8, 0.6, 0.9]),
         )
     )
     assert len(hybrid_results) > 0, "Hybrid search should return results"

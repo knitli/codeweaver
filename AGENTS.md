@@ -577,3 +577,42 @@ Bridge the gap between human expectations and AI agent capabilities through "exq
 
 **Vision**: AI tools accessible to everyone, enhancing (not replacing) human creativity
 **Success**: User empowerment, accessibility, reduced complexity, workflow integration
+
+## Privacy and Telemetry
+
+The default installation includes Posthog telemetry, enabled by default. The *only* purpose for this data collection is to improve CodeWeaver. We have a strong focus on privacy-first collection.
+
+Practically speaking, data collection is handled through pydantic serialization. **All pydantic BaseModel (`BasedModel`) and dataclasses _must_ implement the `_telemetry_keys` method, which has this signature:
+
+```python
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from codeweaver.core.types.models import BasedModel
+
+if TYPE_CHECKING:
+    from codeweaver.core.types import FilteredKeyT, AnonymityConversion
+
+class MyModel(BasedModel)
+
+    identifying_info: str
+    project_path: Path
+
+    ...
+
+    # if a class has fields that should be anonymized, those must be identified by this method
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
+        # note the type is FilteredKeyT, the object, a NewType, is FilteredKey
+        from codeweaver.core.types import FilteredKey, AnonymityConversion
+        return {
+          FilteredKey("identifying_info"): AnonymityConversion.FORBIDDEN, # returns None
+          FilteredKey("project_path"): AnonymityConversion.HASH, # hashes the value
+          # can also be one of BOOLEAN (present/not), COUNT, DISTRIBUTION, AGGREGATE, and TEXT_COUNT
+        }
+      
+    # NOTE: For more complex handling, classes may additionally implement the `_telemetry_handler` method
+    # See `codeweaver.core.types.models.BasedModel` for the API signature. 
+
+```
+
+The Telemetry implementation calls the `serialize_for_telemetry` method on the principal class, which cascades similar calls down the nested data hierarchy. Each class is therefore only responsible for policing itself and any types it contains that aren't BasedModel or dataclass.

@@ -18,14 +18,20 @@ import logging
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated, TypedDict
+from typing import TYPE_CHECKING, Annotated, TypedDict
 
 from pydantic import Field, NonNegativeInt, computed_field
 from pydantic_core import from_json
 
 from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.core.stores import BlakeHashKey
+from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BasedModel
+
+
+if TYPE_CHECKING:
+    from codeweaver.core.types.aliases import FilteredKeyT
+    from codeweaver.core.types.enum import AnonymityConversion
 
 
 logger = logging.getLogger(__name__)
@@ -230,9 +236,12 @@ class IndexFileManifest(BasedModel):
             manifest_version=self.manifest_version,
         )
 
-    def _telemetry_keys(self) -> None:
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         """Telemetry keys for the manifest (none needed)."""
-        return
+        from codeweaver.core.types.aliases import FilteredKey
+        from codeweaver.core.types.enum import AnonymityConversion
+
+        return {FilteredKey("project_path"): AnonymityConversion.HASH}
 
 
 class FileManifestManager:

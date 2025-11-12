@@ -162,7 +162,7 @@ async def test_auto_indexing_on_startup(indexer: Indexer, test_project_path: Pat
     Then: Files discovered, chunking begins
     """
     # Prime index to discover files
-    discovered_count = indexer.prime_index(force_reindex=True)
+    discovered_count = await indexer.prime_index(force_reindex=True)
 
     # Should discover 5 files (auth.py, database.py, test_auth.py, README.md, .gitignore)
     # Note: .gitignore itself might be indexed depending on filtering rules
@@ -183,7 +183,7 @@ async def test_indexing_progress_via_health(indexer: Indexer):
     Then: Progress information is accurate
     """
     # Start indexing
-    indexer.prime_index(force_reindex=True)
+    await indexer.prime_index(force_reindex=True)
 
     # Check stats
     stats = indexer.stats
@@ -212,7 +212,7 @@ async def test_indexing_completes_successfully(indexer: Indexer, test_project_pa
     Then: All files processed, chunks created, no errors
     """
     # Run indexing
-    discovered_count = indexer.prime_index(force_reindex=True)
+    discovered_count = await indexer.prime_index(force_reindex=True)
 
     # Allow time for async indexing to complete
     await asyncio.sleep(2)
@@ -252,7 +252,7 @@ async def test_indexing_error_recovery(test_project_path: Path):
     indexer = Indexer(project_root=test_project_path, auto_initialize_providers=True)
 
     # Run indexing
-    indexer.prime_index(force_reindex=True)
+    await indexer.prime_index(force_reindex=True)
 
     # Allow indexing to complete
     await asyncio.sleep(2)
@@ -283,7 +283,7 @@ async def test_file_change_indexing(indexer: Indexer, test_project_path: Path):
     Then: Modified file reindexed automatically
     """
     # Initial indexing
-    indexer.prime_index(force_reindex=True)
+    await indexer.prime_index(force_reindex=True)
     await asyncio.sleep(1)
 
     initial_stats = indexer.stats
@@ -325,7 +325,7 @@ async def test_indexing_performance(indexer: Indexer):
     # Note: 5 files is too small for meaningful performance test
     # This test validates the timing mechanism works
 
-    indexer.prime_index(force_reindex=True)
+    await indexer.prime_index(force_reindex=True)
     await asyncio.sleep(1)
 
     stats = indexer.stats

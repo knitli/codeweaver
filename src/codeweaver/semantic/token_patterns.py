@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import re
 
@@ -644,28 +643,32 @@ def _get_keyword_pattern() -> re.Pattern[str]:
     return re.compile(IS_KEYWORD, re.VERBOSE)
 
 
-async def _get_token_patterns() -> TokenPatternCacheDict:
-    """Lazily compile and return all token classification patterns."""
-    # Run the pattern-compilation helpers concurrently in threadpool,
-    # await the gather of those awaitables, then return a mapping.
+def get_token_patterns_sync() -> TokenPatternCacheDict:
+    """Get token patterns with lazy initialization.
+
+    Patterns are compiled synchronously on first call and cached thereafter.
+    This is typically called during module initialization before async operations begin.
+
+    The compilation is a one-time operation (~10-50ms) that happens on first access.
+    All subsequent calls return the cached patterns immediately.
+
+    Returns:
+        TokenPatternCacheDict: Compiled regex patterns for token classification
+    """
     global _token_pattern_cache
+
+    # Fast path: return cached patterns
     if _token_pattern_cache.get("operator") is not None:
         return _token_pattern_cache
-    (
-        operator_pat,
-        literal_pat,
-        identifier_pat,
-        annotation_pat,
-        keyword_pat,
-        not_symbol_pat,
-    ) = await asyncio.gather(
-        asyncio.to_thread(_get_operator_pattern),
-        asyncio.to_thread(_get_literal_pattern),
-        asyncio.to_thread(_get_identifier_pattern),
-        asyncio.to_thread(_get_annotation_pattern),
-        asyncio.to_thread(_get_keyword_pattern),
-        asyncio.to_thread(_get_not_symbol_pattern),
-    )
+
+    # Slow path: compile patterns synchronously (one-time only)
+    operator_pat = _get_operator_pattern()
+    literal_pat = _get_literal_pattern()
+    identifier_pat = _get_identifier_pattern()
+    annotation_pat = _get_annotation_pattern()
+    keyword_pat = _get_keyword_pattern()
+    not_symbol_pat = _get_not_symbol_pattern()
+
     _token_pattern_cache = TokenPatternCacheDict(
         operator=operator_pat,
         literal=literal_pat,
@@ -674,50 +677,6 @@ async def _get_token_patterns() -> TokenPatternCacheDict:
         keyword=keyword_pat,
         not_symbol=not_symbol_pat,
     )
-    return _token_pattern_cache
-
-
-def get_token_patterns_sync() -> TokenPatternCacheDict:
-    """Synchronous wrapper to get token patterns.
-
-    Handles both async and sync contexts:
-    - If patterns are cached, returns immediately
-    - If in async context, compiles synchronously (blocking but one-time)
-    - If not in async context, uses optimal async thread pool offloading
-    """
-    global _token_pattern_cache
-
-    # Fast path: return cached patterns
-    if _token_pattern_cache.get("operator") is not None:
-        return _token_pattern_cache
-
-    # Need to compile patterns - check for running event loop
-    try:
-        _ = asyncio.get_running_loop()
-        # We're in an async context - compile synchronously to avoid nested event loop
-        logger.warning(
-            "Compiling token patterns synchronously from async context. This is a one-time operation but may cause brief blocking."
-        )
-
-        # Compile each pattern synchronously (no thread pool offloading)
-        operator_pat = _get_operator_pattern()
-        literal_pat = _get_literal_pattern()
-        identifier_pat = _get_identifier_pattern()
-        annotation_pat = _get_annotation_pattern()
-        keyword_pat = _get_keyword_pattern()
-        not_symbol_pat = _get_not_symbol_pattern()
-
-        _token_pattern_cache = TokenPatternCacheDict(
-            operator=operator_pat,
-            literal=literal_pat,
-            identifier=identifier_pat,
-            annotation=annotation_pat,
-            keyword=keyword_pat,
-            not_symbol=not_symbol_pat,
-        )
-    except RuntimeError:
-        # No running loop - use optimal async version with thread pool offloading
-        return asyncio.run(_get_token_patterns())
     return _token_pattern_cache
 
 
