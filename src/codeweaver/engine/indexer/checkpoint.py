@@ -208,10 +208,7 @@ class IndexingCheckpoint(BasedModel):
     # File manifest tracking (added for incremental indexing)
     has_file_manifest: Annotated[
         bool,
-        Field(
-            default=False,
-            description="Whether a file manifest exists for incremental indexing",
-        ),
+        Field(default=False, description="Whether a file manifest exists for incremental indexing"),
     ] = False
     manifest_file_count: Annotated[
         NonNegativeInt,

@@ -173,7 +173,7 @@ class Indexer(BasedModel):
     _checkpoint: Annotated[IndexingCheckpoint | None, PrivateAttr()] = None
     _manifest_manager: Annotated[FileManifestManager | None, PrivateAttr()] = None
     _file_manifest: Annotated[IndexFileManifest | None, PrivateAttr()] = None
-    _deleted_files: Annotated[list[Path], PrivateAttr(default_factory=list)] = []
+    _deleted_files: Annotated[list[Path], PrivateAttr()] = PrivateAttr(default_factory=list)
     _last_checkpoint_time: Annotated[NonNegativeFloat, PrivateAttr()] = 0.0
     _files_since_checkpoint: Annotated[NonNegativeInt, PrivateAttr()] = 0
 
@@ -516,9 +516,7 @@ class Indexer(BasedModel):
             if self._file_manifest and updated_chunks:
                 chunk_ids = [str(chunk.chunk_id) for chunk in updated_chunks]
                 self._file_manifest.add_file(
-                    path=path,
-                    content_hash=discovered_file.file_hash,
-                    chunk_ids=chunk_ids,
+                    path=path, content_hash=discovered_file.file_hash, chunk_ids=chunk_ids
                 )
                 logger.debug("Updated manifest for file: %s (%d chunks)", path, len(chunk_ids))
 
@@ -617,14 +615,14 @@ class Indexer(BasedModel):
 
     async def _cleanup_deleted_files(self) -> None:
         """Clean up files that were deleted from the repository.
-        
+
         Removes chunks from vector store and entries from manifest.
         """
         if not self._deleted_files:
             return
 
         logger.info("Cleaning up %d deleted files", len(self._deleted_files))
-        
+
         for path in self._deleted_files:
             await self._delete_file(path)
 
@@ -680,11 +678,10 @@ class Indexer(BasedModel):
                 manifest.total_chunks,
             )
             return True
-        else:
-            # Create new manifest
-            self._file_manifest = self._manifest_manager.create_new()
-            logger.info("Created new file manifest")
-            return False
+        # Create new manifest
+        self._file_manifest = self._manifest_manager.create_new()
+        logger.info("Created new file manifest")
+        return False
 
     def _save_file_manifest(self) -> None:
         """Save current file manifest to disk."""
@@ -751,12 +748,12 @@ class Indexer(BasedModel):
         # Filter to only new or modified files
         files_to_index: list[Path] = []
         unchanged_count = 0
-        
+
         for path in all_files:
             try:
                 # Compute current hash
                 current_hash = get_blake_hash(path.read_bytes())
-                
+
                 # Check if file is new or changed
                 if self._file_manifest.file_changed(path, current_hash):
                     files_to_index.append(path)
@@ -770,7 +767,7 @@ class Indexer(BasedModel):
         manifest_files = self._file_manifest.get_all_file_paths()
         all_files_set = set(all_files)
         deleted_files = manifest_files - all_files_set
-        
+
         if deleted_files:
             logger.info("Detected %d deleted files to clean up", len(deleted_files))
             # Schedule cleanup (will be done in separate phase)
@@ -877,7 +874,7 @@ class Indexer(BasedModel):
 
         # Discover files to index (with incremental filtering if manifest exists)
         files_to_index = self._discover_files_to_index()
-        
+
         # Clean up deleted files first (before indexing new/modified files)
         if self._deleted_files:
             try:
@@ -885,6 +882,7 @@ class Indexer(BasedModel):
                 try:
                     asyncio.get_running_loop()
                     import concurrent.futures
+
                     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                         future = executor.submit(asyncio.run, self._cleanup_deleted_files())
                         future.result()

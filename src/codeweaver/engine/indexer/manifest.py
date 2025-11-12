@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Annotated, TypedDict
 
 from pydantic import Field, NonNegativeInt
-from pydantic_core import from_json, to_json
+from pydantic_core import from_json
 
 from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.core.stores import BlakeHashKey
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 class FileManifestEntry(TypedDict):
     """Single file entry in the manifest.
-    
+
     Tracks file path, content hash, and indexing metadata.
     """
 
@@ -54,16 +54,16 @@ class IndexFileManifest(BasedModel):
     project_path: Annotated[Path, Field(description="Path to the indexed codebase")]
     manifest_version: Annotated[int, Field(description="Manifest format version")] = 1
     last_updated: Annotated[
-        datetime, Field(description="When manifest was last updated", default_factory=lambda: datetime.now(UTC))
+        datetime,
+        Field(
+            description="When manifest was last updated", default_factory=lambda: datetime.now(UTC)
+        ),
     ]
 
     # Map of relative file path -> FileManifestEntry
     files: Annotated[
         dict[str, FileManifestEntry],
-        Field(
-            default_factory=dict,
-            description="Map of file paths to their manifest entries",
-        ),
+        Field(default_factory=dict, description="Map of file paths to their manifest entries"),
     ]
 
     total_files: Annotated[
@@ -73,12 +73,7 @@ class IndexFileManifest(BasedModel):
         NonNegativeInt, Field(ge=0, description="Total chunks across all files", default=0)
     ]
 
-    def add_file(
-        self,
-        path: Path,
-        content_hash: BlakeHashKey,
-        chunk_ids: list[str],
-    ) -> None:
+    def add_file(self, path: Path, content_hash: BlakeHashKey, chunk_ids: list[str]) -> None:
         """Add or update a file in the manifest.
 
         Args:
@@ -87,7 +82,7 @@ class IndexFileManifest(BasedModel):
             chunk_ids: List of chunk UUID strings for this file
         """
         path_str = str(path)
-        
+
         # Remove old entry if exists
         if path_str in self.files:
             old_entry = self.files[path_str]
@@ -179,7 +174,7 @@ class IndexFileManifest(BasedModel):
         Returns:
             Set of Path objects for all files in manifest
         """
-        return {Path(path_str) for path_str in self.files.keys()}
+        return {Path(path_str) for path_str in self.files}
 
     def get_stats(self) -> dict[str, int]:
         """Get manifest statistics.
@@ -192,6 +187,10 @@ class IndexFileManifest(BasedModel):
             "total_chunks": self.total_chunks,
             "manifest_version": self.manifest_version,
         }
+
+    def _telemetry_keys(self) -> None:
+        """Telemetry keys for the manifest (none needed)."""
+        return
 
 
 class FileManifestManager:

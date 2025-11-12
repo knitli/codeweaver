@@ -12,10 +12,7 @@ from pathlib import Path
 import pytest
 
 from codeweaver.core.stores import get_blake_hash
-from codeweaver.engine.indexer.manifest import (
-    FileManifestManager,
-    IndexFileManifest,
-)
+from codeweaver.engine.indexer.manifest import FileManifestManager, IndexFileManifest
 
 
 @pytest.fixture
@@ -35,7 +32,7 @@ def manifest_manager(temp_project_dir):
 def sample_manifest(temp_project_dir):
     """Create a sample manifest with some files."""
     manifest = IndexFileManifest(project_path=temp_project_dir)
-    
+
     # Add some sample files
     manifest.add_file(
         path=Path("src/main.py"),
@@ -47,7 +44,7 @@ def sample_manifest(temp_project_dir):
         content_hash=get_blake_hash(b"def helper(): pass"),
         chunk_ids=["chunk3"],
     )
-    
+
     return manifest
 
 
@@ -57,17 +54,17 @@ class TestIndexFileManifest:
     def test_add_file_new(self, temp_project_dir):
         """Test adding a new file to manifest."""
         manifest = IndexFileManifest(project_path=temp_project_dir)
-        
+
         path = Path("test.py")
         content_hash = get_blake_hash(b"print('hello')")
         chunk_ids = ["chunk1", "chunk2"]
-        
+
         manifest.add_file(path, content_hash, chunk_ids)
-        
+
         assert manifest.total_files == 1
         assert manifest.total_chunks == 2
         assert manifest.has_file(path)
-        
+
         entry = manifest.get_file(path)
         assert entry is not None
         assert entry["path"] == str(path)
@@ -80,15 +77,17 @@ class TestIndexFileManifest:
         path = Path("src/main.py")
         new_hash = get_blake_hash(b"def main(): print('updated')")
         new_chunks = ["chunk1_v2", "chunk2_v2", "chunk3_v2"]
-        
+
         initial_total = sample_manifest.total_files
         initial_chunks = sample_manifest.total_chunks
-        
+
         sample_manifest.add_file(path, new_hash, new_chunks)
-        
+
         assert sample_manifest.total_files == initial_total  # Same file count
-        assert sample_manifest.total_chunks == initial_chunks - 2 + 3  # 2 old chunks removed, 3 new added
-        
+        assert (
+            sample_manifest.total_chunks == initial_chunks - 2 + 3
+        )  # 2 old chunks removed, 3 new added
+
         entry = sample_manifest.get_file(path)
         assert entry["content_hash"] == str(new_hash)
         assert entry["chunk_count"] == 3
@@ -97,9 +96,9 @@ class TestIndexFileManifest:
     def test_remove_file(self, sample_manifest):
         """Test removing a file from manifest."""
         path = Path("src/main.py")
-        
+
         entry = sample_manifest.remove_file(path)
-        
+
         assert entry is not None
         assert entry["path"] == str(path)
         assert entry["chunk_count"] == 2
@@ -110,9 +109,9 @@ class TestIndexFileManifest:
     def test_remove_nonexistent_file(self, sample_manifest):
         """Test removing a file that doesn't exist."""
         path = Path("nonexistent.py")
-        
+
         entry = sample_manifest.remove_file(path)
-        
+
         assert entry is None
         assert sample_manifest.total_files == 2  # Unchanged
 
@@ -120,43 +119,43 @@ class TestIndexFileManifest:
         """Test detecting a new file (not in manifest)."""
         path = Path("new_file.py")
         content_hash = get_blake_hash(b"new content")
-        
+
         assert sample_manifest.file_changed(path, content_hash)
 
     def test_file_changed_modified_content(self, sample_manifest):
         """Test detecting file content change."""
         path = Path("src/main.py")
         new_hash = get_blake_hash(b"modified content")
-        
+
         assert sample_manifest.file_changed(path, new_hash)
 
     def test_file_unchanged(self, sample_manifest):
         """Test detecting unchanged file."""
         path = Path("src/main.py")
         original_hash = get_blake_hash(b"def main(): pass")
-        
+
         assert not sample_manifest.file_changed(path, original_hash)
 
     def test_get_chunk_ids_for_file(self, sample_manifest):
         """Test retrieving chunk IDs for a file."""
         path = Path("src/main.py")
-        
+
         chunk_ids = sample_manifest.get_chunk_ids_for_file(path)
-        
+
         assert chunk_ids == ["chunk1", "chunk2"]
 
     def test_get_chunk_ids_for_nonexistent_file(self, sample_manifest):
         """Test retrieving chunk IDs for nonexistent file."""
         path = Path("nonexistent.py")
-        
+
         chunk_ids = sample_manifest.get_chunk_ids_for_file(path)
-        
+
         assert chunk_ids == []
 
     def test_get_all_file_paths(self, sample_manifest):
         """Test getting all file paths in manifest."""
         paths = sample_manifest.get_all_file_paths()
-        
+
         assert len(paths) == 2
         assert Path("src/main.py") in paths
         assert Path("src/utils.py") in paths
@@ -164,7 +163,7 @@ class TestIndexFileManifest:
     def test_get_stats(self, sample_manifest):
         """Test getting manifest statistics."""
         stats = sample_manifest.get_stats()
-        
+
         assert stats["total_files"] == 2
         assert stats["total_chunks"] == 3
         assert stats["manifest_version"] == 1
@@ -178,7 +177,7 @@ class TestFileManifestManager:
         # Save
         manifest_manager.save(sample_manifest)
         assert manifest_manager.manifest_file.exists()
-        
+
         # Load
         loaded = manifest_manager.load()
         assert loaded is not None
@@ -196,7 +195,7 @@ class TestFileManifestManager:
         # Save first
         manifest_manager.save(sample_manifest)
         assert manifest_manager.manifest_file.exists()
-        
+
         # Delete
         manifest_manager.delete()
         assert not manifest_manager.manifest_file.exists()
@@ -204,7 +203,7 @@ class TestFileManifestManager:
     def test_create_new(self, manifest_manager, temp_project_dir):
         """Test creating a new manifest."""
         manifest = manifest_manager.create_new()
-        
+
         assert manifest.project_path == temp_project_dir
         assert manifest.total_files == 0
         assert manifest.total_chunks == 0
@@ -223,13 +222,13 @@ class TestIncrementalIndexing:
             content_hash=get_blake_hash(b"existing content"),
             chunk_ids=["chunk1"],
         )
-        
+
         # Simulate file discovery
         discovered_files = [
             Path("existing.py"),  # Already in manifest
             Path("new_file.py"),  # New file
         ]
-        
+
         # Filter to only new/modified files
         files_to_index = []
         for path in discovered_files:
@@ -238,10 +237,10 @@ class TestIncrementalIndexing:
                 current_hash = get_blake_hash(b"new content")
             else:
                 current_hash = get_blake_hash(b"existing content")
-            
+
             if manifest.file_changed(path, current_hash):
                 files_to_index.append(path)
-        
+
         assert len(files_to_index) == 1
         assert Path("new_file.py") in files_to_index
 
@@ -250,15 +249,11 @@ class TestIncrementalIndexing:
         # Create manifest with original content
         manifest = IndexFileManifest(project_path=temp_project_dir)
         original_hash = get_blake_hash(b"original content")
-        manifest.add_file(
-            path=Path("file.py"),
-            content_hash=original_hash,
-            chunk_ids=["chunk1"],
-        )
-        
+        manifest.add_file(path=Path("file.py"), content_hash=original_hash, chunk_ids=["chunk1"])
+
         # Simulate file with modified content
         modified_hash = get_blake_hash(b"modified content")
-        
+
         assert manifest.file_changed(Path("file.py"), modified_hash)
 
     def test_detect_deleted_files(self, temp_project_dir):
@@ -271,32 +266,32 @@ class TestIncrementalIndexing:
                 content_hash=get_blake_hash(f"content{i}".encode()),
                 chunk_ids=[f"chunk{i}"],
             )
-        
+
         # Simulate discovery finding only 2 files
         discovered_files = {Path("file0.py"), Path("file1.py")}
         manifest_files = manifest.get_all_file_paths()
-        
+
         deleted_files = manifest_files - discovered_files
-        
+
         assert len(deleted_files) == 1
         assert Path("file2.py") in deleted_files
 
     def test_update_manifest_after_indexing(self, temp_project_dir):
         """Test updating manifest after successfully indexing a file."""
         manifest = IndexFileManifest(project_path=temp_project_dir)
-        
+
         # Simulate successful indexing
         path = Path("indexed_file.py")
         content_hash = get_blake_hash(b"file content")
         chunk_ids = ["chunk1", "chunk2", "chunk3"]
-        
+
         manifest.add_file(path, content_hash, chunk_ids)
-        
+
         # Verify manifest updated
         assert manifest.has_file(path)
         assert manifest.total_files == 1
         assert manifest.total_chunks == 3
-        
+
         entry = manifest.get_file(path)
         assert entry["chunk_ids"] == chunk_ids
 
@@ -304,7 +299,7 @@ class TestIncrementalIndexing:
         """Test that unchanged files are skipped during incremental indexing."""
         # Create manifest
         manifest = IndexFileManifest(project_path=temp_project_dir)
-        
+
         # Add files that haven't changed
         unchanged_files = []
         for i in range(5):
@@ -312,13 +307,13 @@ class TestIncrementalIndexing:
             content_hash = get_blake_hash(f"content{i}".encode())
             manifest.add_file(path, content_hash, chunk_ids=[f"chunk{i}"])
             unchanged_files.append((path, content_hash))
-        
+
         # Check that none need reindexing
         files_to_index = []
         for path, original_hash in unchanged_files:
             if manifest.file_changed(path, original_hash):
                 files_to_index.append(path)
-        
+
         assert len(files_to_index) == 0
 
 
