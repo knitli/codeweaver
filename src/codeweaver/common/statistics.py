@@ -51,11 +51,14 @@ from codeweaver.common.types import (
 from codeweaver.common.utils import uuid7
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.metadata import ChunkKind, ExtKind
+from codeweaver.core.types.aliases import LanguageName, LanguageNameT
 from codeweaver.core.types.enum import AnonymityConversion, BaseEnum
 from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
 
 
 if TYPE_CHECKING:
+    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core.discovery import DiscoveredFile
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
 
@@ -63,90 +66,53 @@ if TYPE_CHECKING:
 class TimingStatistics(DataclassSerializationMixin):
     """By-operation timing statistics for CodeWeaver operations."""
 
-    on_call_tool_requests: Annotated[
-        dict[ToolOrPromptName, list[PositiveFloat]],
-        Field(
-            default_factory=dict,
-            description="""Time taken for on_call_tool requests in milliseconds.""",
-        ),
-    ]
-    on_read_resource_requests: Annotated[
-        dict[ResourceUri, list[PositiveFloat]],
-        Field(
-            default_factory=dict,
-            description="""Time taken for on_read_resource requests in milliseconds.""",
-        ),
-    ]
-    on_get_prompt_requests: Annotated[
-        dict[ToolOrPromptName, list[PositiveFloat]],
-        Field(
-            default_factory=dict,
-            description="""Time taken for on_get_prompt requests in milliseconds.""",
-        ),
-    ]
-    on_list_tools_requests: Annotated[
-        list[PositiveFloat],
-        Field(
-            default_factory=list,
-            description="""Time taken for on_list_tools requests in milliseconds.""",
-        ),
-    ]
-    on_list_resources_requests: Annotated[
-        list[PositiveFloat],
-        Field(
-            default_factory=list,
-            description="""Time taken for on_list_resources requests in milliseconds.""",
-        ),
-    ]
-    on_list_resource_templates_requests: Annotated[
-        list[PositiveFloat],
-        Field(
-            default_factory=list,
-            description="""Time taken for on_list_resource_templates requests in milliseconds.""",
-        ),
-    ]
-    on_list_prompts_requests: Annotated[
-        list[PositiveFloat],
-        Field(
-            default_factory=list,
-            description="""Time taken for on_list_prompts requests in milliseconds.""",
-        ),
-    ]
-    health_http: Annotated[
-        list[PositiveFloat],
-        Field(
-            default_factory=list,
-            description="""Time taken for health status http requests in milliseconds.""",
-        ),
-    ]
-    version_http: Annotated[
-        list[PositiveFloat],
-        Field(
-            default_factory=list,
-            description="""Time taken for version check http requests in milliseconds.""",
-        ),
-    ]
-    state_http: Annotated[
-        list[PositiveFloat],
-        Field(
-            default_factory=list,
-            description="""Time taken for state http requests in milliseconds.""",
-        ),
-    ]
-    statistics_http: Annotated[
-        list[PositiveFloat],
-        Field(
-            default_factory=list,
-            description="""Time taken for statistics http requests in milliseconds.""",
-        ),
-    ]
-    settings_http: Annotated[
-        list[PositiveFloat],
-        Field(
-            default_factory=list,
-            description="""Time taken for settings http requests in milliseconds.""",
-        ),
-    ]
+    on_call_tool_requests: dict[ToolOrPromptName, list[PositiveFloat]] = Field(
+        default_factory=dict,
+        description="""Time taken for on_call_tool requests in milliseconds.""",
+    )
+    on_read_resource_requests: dict[ResourceUri, list[PositiveFloat]] = Field(
+        default_factory=dict,
+        description="""Time taken for on_read_resource requests in milliseconds.""",
+    )
+    on_get_prompt_requests: dict[ToolOrPromptName, list[PositiveFloat]] = Field(
+        default_factory=dict,
+        description="""Time taken for on_get_prompt requests in milliseconds.""",
+    )
+    on_list_tools_requests: list[PositiveFloat] = Field(
+        default_factory=list,
+        description="""Time taken for on_list_tools requests in milliseconds.""",
+    )
+    on_list_resources_requests: list[PositiveFloat] = Field(
+        default_factory=list,
+        description="""Time taken for on_list_resources requests in milliseconds.""",
+    )
+    on_list_resource_templates_requests: list[PositiveFloat] = Field(
+        default_factory=list,
+        description="""Time taken for on_list_resource_templates requests in milliseconds.""",
+    )
+    on_list_prompts_requests: list[PositiveFloat] = Field(
+        default_factory=list,
+        description="""Time taken for on_list_prompts requests in milliseconds.""",
+    )
+    health_http: list[PositiveFloat] = Field(
+        default_factory=list,
+        description="""Time taken for health status http requests in milliseconds.""",
+    )
+    version_http: list[PositiveFloat] = Field(
+        default_factory=list,
+        description="""Time taken for version http requests in milliseconds.""",
+    )
+    state_http: list[PositiveFloat] = Field(
+        default_factory=list, description="""Time taken for state http requests in milliseconds."""
+    )
+    statistics_http: list[PositiveFloat] = Field(
+        default_factory=list,
+        description="""Time taken for statistics http requests in milliseconds.""",
+    )
+    settings_http: list[PositiveFloat] = Field(
+        default_factory=list,
+        description="""Time taken for settings http requests in milliseconds.""",
+    )
 
     def _telemetry_keys(self) -> None:
         return None
@@ -363,10 +329,34 @@ class _LanguageStatistics(DataclassSerializationMixin):
         set()
     )
 
+    # Chunk tracking fields
+    chunks_created: Annotated[
+        NonNegativeInt, Field(description="""Total number of chunks created for this language.""")
+    ] = 0
+    semantic_chunks: Annotated[
+        NonNegativeInt,
+        Field(description="""Number of semantic/AST-based chunks created for this language."""),
+    ] = 0
+    delimiter_chunks: Annotated[
+        NonNegativeInt,
+        Field(description="""Number of delimiter/text-block chunks created for this language."""),
+    ] = 0
+    file_chunks: Annotated[
+        NonNegativeInt,
+        Field(description="""Number of whole-file chunks created for this language."""),
+    ] = 0
+    chunk_sizes: list[int] = Field(
+        default_factory=list,
+        description="""List of chunk content sizes (character counts) for statistics.""",
+    )
+
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
-        return {FilteredKey("unique_files"): AnonymityConversion.FORBIDDEN}
+        return {
+            FilteredKey("unique_files"): AnonymityConversion.FORBIDDEN,
+            FilteredKey("chunk_sizes"): AnonymityConversion.DISTRIBUTION,
+        }
 
     @computed_field
     @property
@@ -379,6 +369,18 @@ class _LanguageStatistics(DataclassSerializationMixin):
     def total_operations(self) -> NonNegativeInt:
         """Get the total number of operations for this language."""
         return self.indexed + self.retrieved + self.processed + self.reindexed + self.skipped
+
+    @computed_field
+    @property
+    def avg_chunk_size(self) -> float:
+        """Get the average chunk size in characters."""
+        return statistics.mean(self.chunk_sizes) if self.chunk_sizes else 0.0
+
+    @computed_field
+    @property
+    def total_chunk_content_size(self) -> NonNegativeInt:
+        """Get the total size of all chunk content in characters."""
+        return sum(self.chunk_sizes)
 
     def add_operation(self, operation: OperationsKey, path: Path | None = None) -> None:
         """Add an operation count and optionally track the file."""
@@ -397,18 +399,45 @@ class _LanguageStatistics(DataclassSerializationMixin):
         if path and path.is_file() and operation != "skipped":
             self.unique_files.add(path)
 
+    def add_chunk(self, chunk: CodeChunk, operation: OperationsKey = "processed") -> None:  # type: ignore[name-defined]
+        """Track a chunk creation, including its source type and size.
+
+        Args:
+            chunk: The CodeChunk to track
+            operation: The operation type (usually "processed" for chunk creation)
+        """
+        from codeweaver.core.metadata import ChunkSource
+
+        # Track overall chunk count
+        self.chunks_created += 1
+
+        # Track by chunk source type
+        if chunk.source == ChunkSource.SEMANTIC:
+            self.semantic_chunks += 1
+        elif chunk.source == ChunkSource.FILE:
+            self.file_chunks += 1
+        else:  # TEXT_BLOCK or other delimiter-based
+            self.delimiter_chunks += 1
+
+        # Track chunk size
+        self.chunk_sizes.append(len(chunk.content))
+
+        # Also track the file-level operation if path is available
+        if chunk.file_path:
+            self.add_operation(operation, chunk.file_path)
+
 
 LanguageSummary = dict[OperationsKey | SummaryKey, NonNegativeInt]
 
 
 @cache
-def normalize_language(language: str) -> str | SemanticSearchLanguage | ConfigLanguage:
+def normalize_language(language: str) -> LanguageNameT | SemanticSearchLanguage | ConfigLanguage:
     """Normalize a language string to a SemanticSearchLanguage or ConfigLanguage."""
     if language in SemanticSearchLanguage.values():
         return SemanticSearchLanguage.from_string(language)
     if language in ConfigLanguage.values():
         return ConfigLanguage.from_string(language)
-    return language
+    return LanguageName(language)
 
 
 @dataclass(config=DATACLASS_CONFIG | ConfigDict(extra="forbid", defer_build=True))
@@ -433,7 +462,7 @@ class _CategoryStatistics(DataclassSerializationMixin):
         return None
 
     def get_language_stats(
-        self, language: str | SemanticSearchLanguage | ConfigLanguage
+        self, language: LanguageNameT | SemanticSearchLanguage | ConfigLanguage
     ) -> _LanguageStatistics:
         """Get or create language statistics for this category."""
         if isinstance(language, str) and not isinstance(
@@ -534,7 +563,7 @@ class _CategoryStatistics(DataclassSerializationMixin):
 
     def add_operation(
         self,
-        language: str | SemanticSearchLanguage | ConfigLanguage,
+        language: LanguageNameT | SemanticSearchLanguage | ConfigLanguage,
         operation: OperationsKey,
         path: Path | None = None,
     ) -> None:
@@ -588,6 +617,68 @@ class FileStatistics(DataclassSerializationMixin):
             # Handle explicitly added "other" files
             language_name = f".{path.stem}" if "." in path.name else path.name
             self.categories[ChunkKind.OTHER].add_operation(language_name, operation, path)
+
+    def add_file_from_discovered(
+        self,
+        discovered_file: DiscoveredFile,  # type: ignore[name-defined]
+        operation: OperationsKey,
+    ) -> None:
+        """Add a file operation using a DiscoveredFile (more efficient).
+
+        This method is more efficient than add_file() when you already have a
+        DiscoveredFile object, as it avoids redundant ExtKind.from_file() calls.
+
+        Args:
+            discovered_file: DiscoveredFile with pre-computed ext_kind
+            operation: Type of operation performed (indexed, retrieved, etc.)
+        """
+        # Skip non-text files
+        if not discovered_file.is_text:
+            return
+
+        # Use the already-computed ext_kind from DiscoveredFile
+        if ext_kind := discovered_file.ext_kind:
+            category = ext_kind.kind
+            language = ext_kind.language
+            self.categories[category].add_operation(language, operation, discovered_file.path)
+        elif self._other_files and discovered_file.path in self._other_files:
+            # Handle explicitly added "other" files
+            language_name = (
+                f".{discovered_file.path.stem}"
+                if "." in discovered_file.path.name
+                else discovered_file.path.name
+            )
+            self.categories[ChunkKind.OTHER].add_operation(
+                language_name, operation, discovered_file.path
+            )
+
+    def add_chunk_from_codechunk(
+        self,
+        chunk: CodeChunk,  # type: ignore[name-defined]
+        operation: OperationsKey = "processed",
+    ) -> None:
+        """Add chunk statistics using a CodeChunk object (efficient).
+
+        This method tracks chunk creation statistics including chunk type
+        (semantic vs delimiter), size, and language. It uses pre-computed
+        information from the CodeChunk to avoid redundant operations.
+
+        Args:
+            chunk: CodeChunk with pre-computed ext_kind and metadata
+            operation: Type of operation performed (usually "processed" for chunks)
+        """
+        # Skip chunks without language/category information
+        if not chunk.ext_kind:
+            return
+
+        category = chunk.ext_kind.kind
+        language = chunk.ext_kind.language
+
+        # Get or create language stats for this category
+        lang_stats = self.categories[category].get_language_stats(language)
+
+        # Track the chunk
+        lang_stats.add_chunk(chunk, operation)
 
     def add_other_files(self, *files: Path) -> None:
         """Add files to the 'other' category."""
@@ -1100,6 +1191,42 @@ class SessionStatistics(DataclassSerializationMixin):
         if not self.index_statistics:
             self.index_statistics = FileStatistics()
         self.index_statistics.add_file(path, operation)
+
+    def add_file_from_discovered(
+        self,
+        discovered_file: DiscoveredFile,  # type: ignore[name-defined]
+        operation: OperationsKey,
+    ) -> None:
+        """Add a file operation using a DiscoveredFile (more efficient).
+
+        This method is more efficient than add_file() when you already have a
+        DiscoveredFile object, as it avoids redundant ExtKind.from_file() calls.
+
+        Args:
+            discovered_file: DiscoveredFile with pre-computed ext_kind
+            operation: Type of operation performed (indexed, retrieved, etc.)
+        """
+        if not self.index_statistics:
+            self.index_statistics = FileStatistics()
+        self.index_statistics.add_file_from_discovered(discovered_file, operation)
+
+    def add_chunk_from_codechunk(
+        self,
+        chunk: CodeChunk,  # type: ignore[name-defined]
+        operation: OperationsKey = "processed",
+    ) -> None:
+        """Add chunk statistics using a CodeChunk object (efficient).
+
+        This method tracks chunk creation statistics at the session level,
+        including chunk type, size, and language distribution.
+
+        Args:
+            chunk: CodeChunk with pre-computed ext_kind and metadata
+            operation: Type of operation performed (usually "processed" for chunks)
+        """
+        if not self.index_statistics:
+            self.index_statistics = FileStatistics()
+        self.index_statistics.add_chunk_from_codechunk(chunk, operation)
 
     def add_file_operations_by_extkind(
         self, operations: Sequence[tuple[Path, ExtKind, OperationsKey]]

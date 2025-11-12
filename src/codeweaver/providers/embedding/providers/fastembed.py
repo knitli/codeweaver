@@ -101,6 +101,9 @@ def fastembed_sparse_output_transformer(
     """
     from codeweaver.providers.embedding.types import SparseEmbedding
 
+    if not output:
+        return [SparseEmbedding(indices=[], values=[])]
+
     if isinstance(output[0], SparseEmbedding):
         return cast(list[SparseEmbedding], output)
 
@@ -239,7 +242,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
                 )
             ),
         )
-        tokens = sum(val.nonzero for emb in embeddings for val in emb.values)
+        tokens = sum(np.atleast_1d(val).nonzero() for emb in embeddings for val in emb.values)
         self._update_token_stats(token_count=tokens, sparse=True)
         return await loop.run_in_executor(None, lambda: self._process_output(embeddings))  # type: ignore
 
@@ -249,7 +252,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         embeddings = await loop.run_in_executor(
             None, lambda: list(self.client.query_embed(query=query, **kwargs))
         )
-        tokens = sum(val.nonzero for emb in embeddings for val in emb.values)
+        tokens = sum(val.nonzero() for emb in embeddings for val in emb.values)
         self._update_token_stats(token_count=tokens, sparse=True)
         return await loop.run_in_executor(None, lambda: self._process_output(embeddings))  # type: ignore
 

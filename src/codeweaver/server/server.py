@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import re
 import time
 
@@ -314,45 +313,79 @@ def _get_health_service() -> HealthService:
 
 
 async def _run_background_indexing(
-    state: AppState, settings: CodeWeaverSettings, console: Any
+    state: AppState, settings: CodeWeaverSettings, status_display: Any, *, verbose: bool = False
 ) -> None:
-    """Background task for indexing and file watching."""
-    from codeweaver.common import CODEWEAVER_PREFIX
+    """Background task for indexing and file watching.
 
+    Args:
+        state: Application state
+        settings: Configuration settings
+        status_display: StatusDisplay instance for user-facing output
+        verbose: Whether to show verbose output
+    """
     try:
-        console.print(f"{CODEWEAVER_PREFIX} [blue]Starting background indexing...[/blue]")
+        if verbose:
+            logger.info("Starting background indexing...")
 
         if not state.indexer:
-            console.print(
-                f"{CODEWEAVER_PREFIX} [yellow]No indexer configured, skipping background indexing[/yellow]"
-            )
+            if verbose:
+                logger.warning("No indexer configured, skipping background indexing")
             return
 
-        # Prime index (initial indexing) - run in thread since it's sync
-        await asyncio.to_thread(state.indexer.prime_index, force_reindex=False)
-        console.print(f"{CODEWEAVER_PREFIX} [green]Initial indexing complete[/green]")
+        # Show discovery step to user
+        status_display.print_step("Discovering files...")
+
+        # Prime index (initial indexing)
+        start_time = time.time()
+        await state.indexer.prime_index(force_reindex=False)
+        duration = time.time() - start_time
+
+        # Get statistics from indexer
+        stats = state.indexer.stats
+        files_processed = stats.files_processed
+        chunks_created = stats.chunks_created
+        files_discovered = stats.files_discovered
+        files_per_second = stats.processing_rate()
+
+        # Show context: X of Y files
+        if files_discovered > 0:
+            status_display.print_step(
+                f"Found {files_processed} changed files of {files_discovered} watched"
+            )
+
+        # Show indexing results
+        status_display.print_step("Indexing...")
+        status_display.print_indexing_stats(
+            files_indexed=files_processed,
+            chunks_created=chunks_created,
+            duration_seconds=duration,
+            files_per_second=files_per_second,
+        )
 
         # Start file watcher for real-time updates
-        console.print(f"{CODEWEAVER_PREFIX} [blue]Starting file watcher...[/blue]")
+        if verbose:
+            logger.info("Starting file watcher...")
         from codeweaver.common.utils import get_project_path
         from codeweaver.engine.watcher import FileWatcher, IgnoreFilter
 
-        watcher = FileWatcher(
+        watcher = await FileWatcher.create(
             get_project_path()
             if isinstance(settings.project_path, Unset)
             else settings.project_path,
-            file_filter=await IgnoreFilter.from_settings_async(),  # Full async initialization
+            file_filter=await IgnoreFilter.from_settings_async(),
             walker=state.indexer._walker,
+            indexer=state.indexer,
         )
 
         # Run watcher (this will block until cancelled)
         await watcher.run()
 
     except asyncio.CancelledError:
-        console.print(f"{CODEWEAVER_PREFIX} [yellow]Background indexing cancelled[/yellow]")
+        if verbose:
+            logger.info("Background indexing cancelled")
         raise
     except Exception as e:
-        console.print(f"{CODEWEAVER_PREFIX} [red]Background indexing error: {e}[/red]")
+        status_display.print_error("Background indexing error", details=str(e))
         logger.exception("Background indexing error")
 
 
@@ -384,9 +417,23 @@ def _initialize_app_state(
     return state
 
 
-async def _cleanup_state(state: AppState, indexing_task: asyncio.Task | None, console: Any) -> None:
-    """Clean up application state and shutdown services."""
-    from codeweaver.common import CODEWEAVER_PREFIX
+async def _cleanup_state(
+    state: AppState,
+    indexing_task: asyncio.Task | None,
+    status_display: Any,
+    *,
+    verbose: bool = False,
+) -> None:
+    """Clean up application state and shutdown services.
+
+    Args:
+        state: Application state
+        indexing_task: Background indexing task to cancel
+        status_display: StatusDisplay instance for user-facing output
+        verbose: Whether to show verbose output
+    """
+    # Show clean shutdown message
+    status_display.print_shutdown_start()
 
     # Cancel background indexing
     if indexing_task:
@@ -394,7 +441,8 @@ async def _cleanup_state(state: AppState, indexing_task: asyncio.Task | None, co
         try:
             await indexing_task
         except asyncio.CancelledError:
-            console.print(f"{CODEWEAVER_PREFIX} [yellow]Background indexing stopped[/yellow]")
+            if verbose:
+                logger.info("Background indexing stopped")
 
     # Shutdown telemetry client to flush pending events
     if state.telemetry:
@@ -403,9 +451,10 @@ async def _cleanup_state(state: AppState, indexing_task: asyncio.Task | None, co
         except Exception:
             logging.getLogger(__name__).exception("Error shutting down telemetry client")
 
-    console.print(
-        f"{CODEWEAVER_PREFIX} [bold red]Exiting CodeWeaver lifespan context manager...[/bold red]"
-    )
+    if verbose:
+        logger.info("Exiting CodeWeaver lifespan context manager...")
+
+    status_display.print_shutdown_complete()
     state.initialized = False
 
 
@@ -414,14 +463,31 @@ async def lifespan(
     app: FastMCP[AppState],
     settings: CodeWeaverSettings | None,
     statistics: SessionStatistics | None = None,
+    *,
+    verbose: bool = False,
+    debug: bool = False,
 ) -> AsyncIterator[AppState]:
-    """Context manager for application lifespan with proper initialization."""
-    from rich.console import Console
+    """Context manager for application lifespan with proper initialization.
 
-    from codeweaver.common import CODEWEAVER_PREFIX
+    Args:
+        app: FastMCP application instance
+        settings: Configuration settings
+        statistics: Session statistics instance
+        verbose: Enable verbose logging
+        debug: Enable debug logging
+    """
+    from codeweaver.ui import StatusDisplay
 
-    console = Console(markup=True)
-    console.print("[bold red]Entering lifespan context manager...[/bold red]")
+    # Create StatusDisplay for clean user-facing output
+    status_display = StatusDisplay()
+
+    # Print clean header (not in verbose mode, as this is always shown)
+    server_host = getattr(app, "host", "127.0.0.1") if hasattr(app, "host") else "127.0.0.1"
+    server_port = getattr(app, "port", 9328) if hasattr(app, "port") else 9328
+    status_display.print_header(host=server_host, port=server_port)
+
+    if verbose or debug:
+        logger.info("Entering lifespan context manager...")
 
     if settings is None:
         settings = get_settings._resolve()()
@@ -439,25 +505,50 @@ async def lifespan(
     indexing_task = None
 
     try:
-        console.print(f"{CODEWEAVER_PREFIX} [bold green]Ensuring services set up...[/bold green]")
+        if verbose or debug:
+            logger.info("Ensuring services set up...")
         if not state.health:
             state.health.initialize()
 
         # Start background indexing task
-        indexing_task = asyncio.create_task(_run_background_indexing(state, settings, console))
-
-        console.print(
-            f"{CODEWEAVER_PREFIX} [bold aqua]Lifespan start actions complete, server initialized.[/bold aqua]"
+        indexing_task = asyncio.create_task(
+            _run_background_indexing(state, settings, status_display, verbose=verbose or debug)
         )
+
+        # Perform health checks and display results
+        status_display.print_step("")
+        status_display.print_step("Health checks...")
+
+        if state.health_service:
+            health_response = await state.health_service.get_health_response()
+
+            # Display service health
+            status_display.print_health_check(
+                "Vector store (Qdrant)", health_response.services.vector_store.status
+            )
+            status_display.print_health_check(
+                "Embeddings (Voyage AI)",
+                health_response.services.embedding_provider.status,
+                model=health_response.services.embedding_provider.model,
+            )
+            status_display.print_health_check(
+                f"Sparse embeddings ({health_response.services.sparse_embedding.provider})",
+                health_response.services.sparse_embedding.status,
+            )
+
+        status_display.print_ready()
+
+        if verbose or debug:
+            logger.info("Lifespan start actions complete, server initialized.")
         state.initialized = True
         yield state
     except Exception as e:
         state.health.status = HealthStatus.UNHEALTHY
-        state.health.error = to_json({"error": e})
+        state.health.error = to_json({"error": str(e)})
         state.initialized = False
         raise
     finally:
-        await _cleanup_state(state, indexing_task, console)
+        await _cleanup_state(state, indexing_task, status_display, verbose=verbose or debug)
 
 
 def get_default_middleware_settings(
@@ -489,30 +580,52 @@ def resolve_globs(path_string: str, repo_root: Path) -> set[Path]:
     return set()
 
 
-def setup_local_logger(level: int = logging.INFO) -> None:
+def setup_local_logger(level: int = logging.WARNING) -> None:
     """Set up a local logger for the current module."""
     global logger
     logger = logging.getLogger(__name__)
     logger.setLevel(level)
 
 
-def __setup_interim_logger() -> tuple[logging.Logger, int]:
+def __setup_interim_logger(
+    *, verbose: bool = False, debug: bool = False
+) -> tuple[logging.Logger, int]:
     """Set up the initial logger for the application.
 
     Because we need to fully resolve settings before we can set up logging properly,
     we set up a basic logger first, then reconfigure it later.
 
+    Args:
+        verbose: Enable verbose logging (INFO level with console output)
+        debug: Enable debug logging (DEBUG level with console output)
+
     Returns:
         tuple of (logger, log_level)
     """
-    level = int(os.environ.get("CODEWEAVER_LOG_LEVEL", "20"))
+    # Determine log level based on flags
+    if debug:
+        level = logging.DEBUG
+    elif verbose:
+        level = logging.INFO
+    else:
+        level = logging.WARNING
+
     setup_local_logger(level)
-    return (
-        setup_logger(
-            name="codeweaver", level=level, rich=True, rich_options={}, logging_kwargs=None
-        ),
-        level,
-    )
+
+    # Only set up rich console handler if verbose or debug mode
+    if verbose or debug:
+        return (
+            setup_logger(
+                name="codeweaver", level=level, rich=True, rich_options={}, logging_kwargs=None
+            ),
+            level,
+        )
+    # No console output - just set up basic logging
+    logger = logging.getLogger("codeweaver")
+    logger.setLevel(level)
+    # Clear any existing handlers
+    logger.handlers.clear()
+    return (logger, level)
 
 
 LEVEL_MAP: dict[
@@ -637,18 +750,24 @@ def _integrate_user_settings(
 
 
 def _setup_file_filters_and_lifespan(
-    settings: CodeWeaverSettings, session_statistics: SessionStatistics
+    settings: CodeWeaverSettings,
+    session_statistics: SessionStatistics,
+    *,
+    verbose: bool = False,
+    debug: bool = False,
 ) -> Any:
     """Set up file filters and create lifespan function.
 
     Args:
         settings: CodeWeaver settings
         session_statistics: Session statistics instance
+        verbose: Enable verbose logging
+        debug: Enable debug logging
 
     Returns:
         Configured lifespan function
     """
-    return rpartial(lifespan, settings, session_statistics)
+    return rpartial(lifespan, settings, session_statistics, verbose=verbose, debug=debug)
 
 
 def _filter_server_settings(server_settings: FastMcpServerSettings) -> FastMcpServerSettingsDict:
@@ -684,14 +803,25 @@ class ServerSetup(TypedDict):
     streamable_http_path: NotRequired[str | None]
     log_level: NotRequired[Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]]
     middleware: NotRequired[set[Middleware] | set[type[Middleware]]]
+    verbose: NotRequired[bool]
+    debug: NotRequired[bool]
 
 
-def build_app() -> ServerSetup:
-    """Build and configure the FastMCP application without starting it."""
+def build_app(*, verbose: bool = False, debug: bool = False) -> ServerSetup:
+    """Build and configure the FastMCP application without starting it.
+
+    Args:
+        verbose: Enable verbose logging (INFO level)
+        debug: Enable debug logging (DEBUG level)
+    """
     session_statistics = get_session_statistics._resolve()()
-    app_logger, level = __setup_interim_logger()
+
+    # Set up logger with appropriate level based on flags
+    app_logger, level = __setup_interim_logger(verbose=verbose, debug=debug)
+
     local_logger: logging.Logger = globals()["logger"]
-    local_logger.info("Initializing CodeWeaver server. Logging set up.")
+    if verbose or debug:
+        local_logger.info("Initializing CodeWeaver server. Logging set up.")
     settings_view = get_settings_map()
     if not settings_view:
         try:
@@ -723,9 +853,12 @@ def build_app() -> ServerSetup:
     )
     from codeweaver.config.settings import get_settings
 
-    local_logger.info("Base FastMCP settings created and merged with user settings.")
-    local_logger.debug("Base FastMCP settings dump \n", extra=base_fast_mcp_settings)
-    lifespan_fn = _setup_file_filters_and_lifespan(get_settings(), session_statistics)
+    if verbose or debug:
+        local_logger.info("Base FastMCP settings created and merged with user settings.")
+        local_logger.debug("Base FastMCP settings dump \n", extra=base_fast_mcp_settings)
+    lifespan_fn = _setup_file_filters_and_lifespan(
+        get_settings(), session_statistics, verbose=verbose, debug=debug
+    )
     base_fast_mcp_settings["lifespan"] = lifespan_fn
     _ = base_fast_mcp_settings.pop("transport", "http")
     final_app_logger, _final_level = _setup_logger(settings_view)
@@ -741,7 +874,8 @@ def build_app() -> ServerSetup:
     port = base_fast_mcp_settings.pop("port", 9328)
     http_path = "/codeweaver"
     server = FastMCP[AppState](name="CodeWeaver", **base_fast_mcp_settings)  # type: ignore
-    local_logger.info("FastMCP application initialized successfully.")
+    if verbose or debug:
+        local_logger.info("FastMCP application initialized successfully.")
     return ServerSetup(
         app=server,
         settings=get_settings(),
@@ -751,6 +885,8 @@ def build_app() -> ServerSetup:
         streamable_http_path=cast(str, http_path or "/codeweaver"),
         log_level=_final_level or "INFO",
         middleware={*middleware},
+        verbose=verbose,
+        debug=debug,
     )
 
 

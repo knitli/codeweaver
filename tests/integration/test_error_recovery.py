@@ -323,7 +323,7 @@ async def test_indexing_continues_on_file_errors(initialize_test_settings, test_
     )
 
     # Run indexing
-    discovered_count = indexer.prime_index(force_reindex=True)
+    discovered_count = await indexer.prime_index(force_reindex=True)
 
     # Should discover the 2 Python files (.bin files are filtered out during discovery)
     assert discovered_count >= 2

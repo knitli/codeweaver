@@ -85,12 +85,16 @@ async def run(
     project_path: Path | None = None,
     host: str = "127.0.0.1",
     port: int = 9328,
+    verbose: bool = False,
+    debug: bool = False,
 ) -> None:
     """Run the CodeWeaver server."""
     from codeweaver.server import build_app
     from codeweaver.server.app_bindings import register_app_bindings, register_tool
 
-    server_setup = build_app()
+    server_setup = build_app(verbose=verbose, debug=debug)
+    server_setup["verbose"] = verbose
+    server_setup["debug"] = debug
     if host:
         server_setup["host"] = host
     if port:

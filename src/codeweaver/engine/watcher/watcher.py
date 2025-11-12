@@ -1,3 +1,4 @@
+# sourcery skip: no-complex-if-expressions
 """File watcher implementation using watchfiles.
 
 The `FileWatcher` class wraps `watchfiles.awatch` to monitor file system changes
@@ -10,7 +11,6 @@ CodeWeaver's default file filter directly integrates with `rignore` to respect
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import re
 
@@ -23,10 +23,14 @@ import watchfiles
 
 from fastmcp import Context
 
+from codeweaver.cli.utils import is_tty
+from codeweaver.common.utils.checks import is_ci
 from codeweaver.engine.indexer.indexer import Indexer
 from codeweaver.engine.watcher.logging import WatchfilesLogManager
 from codeweaver.engine.watcher.types import FileChange
 
+
+USE_RICH = not is_ci() and is_tty()
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +49,10 @@ class FileWatcher:
         | None = None,
         file_filter: watchfiles.BaseFilter | None = None,
         walker: rignore.Walker | None = None,
-        capture_watchfiles_output: bool = False,
+        indexer: Indexer | None = None,  # NEW: Accept optional indexer
+        capture_watchfiles_output: bool = True,
         watchfiles_log_level: int = logging.WARNING,
-        watchfiles_use_rich: bool = True,
+        watchfiles_use_rich: bool = USE_RICH,
         watchfiles_include_pattern: str | re.Pattern[str] | None = None,
         watchfiles_exclude_pattern: str | re.Pattern[str] | None = None,
         context: Context | None = None,
@@ -61,6 +66,7 @@ class FileWatcher:
             handler: Optional callback for file changes
             file_filter: Optional filter for file changes
             walker: Optional rignore walker for initial indexing
+            indexer: Optional indexer instance to use (if None, creates new one)
             capture_watchfiles_output: Enable watchfiles logging capture
             watchfiles_log_level: Minimum log level (default: WARNING)
             watchfiles_use_rich: Use Rich handler for pretty output
@@ -75,7 +81,6 @@ class FileWatcher:
         self.paths = paths
         self.handler = handler or self._default_handler
         self.context = context
-
         # Initialize log manager if capture enabled
         self._log_manager = None
         if capture_watchfiles_output:
@@ -88,7 +93,9 @@ class FileWatcher:
                 route_to_context=route_logs_to_context,
             )
 
-        from codeweaver.common.utils.checks import is_debug
+        from codeweaver.config.settings import get_settings_map
+        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core.stores import make_blake_store
         from codeweaver.engine.watcher.types import WatchfilesArgs
 
         watch_args = (
@@ -103,23 +110,94 @@ class FileWatcher:
                 grace_period=20.0,
                 debounce=200_000,  # milliseconds - we want to avoid rapid re-indexing but not let things go stale, either.
                 step=15_000,  # milliseconds -- how long to wait for more changes before yielding on changes
-                debug=is_debug(),
+                debug=False,
                 recursive=True,
                 ignore_permission_denied=True,
             )
             | {k: v for k, v in kwargs.items() if k in WatchfilesArgs.__annotations__}
         )
         watch_args["recursive"] = True  # we always want recursive watching
+
+        # Use provided indexer or create new one
+        self._indexer = (
+            indexer
+            or getattr(self, "_indexer", None)
+            or (
+                Indexer(
+                    walker=walker,
+                    store=make_blake_store(value_type=DiscoveredFile),
+                    project_path=get_settings_map()["project_path"],
+                )
+                if walker
+                else Indexer.from_settings(get_settings_map())
+            )
+        )
+        self._watch_args = watch_args
+        self.watcher = None
+        # Note: Call initialize() to perform initial indexing and start watching
+
+    @classmethod
+    async def create(
+        cls,
+        *paths: Path | str,
+        handler: Callable[[set[FileChange]], Awaitable[None]]
+        | Callable[[set[FileChange]], Any]
+        | None = None,
+        file_filter: watchfiles.BaseFilter | None = None,
+        walker: rignore.Walker | None = None,
+        indexer: Indexer | None = None,  # NEW: Accept optional indexer
+        capture_watchfiles_output: bool = True,
+        watchfiles_log_level: int = logging.WARNING,
+        watchfiles_use_rich: bool = USE_RICH,
+        watchfiles_include_pattern: str | re.Pattern[str] | None = None,
+        watchfiles_exclude_pattern: str | re.Pattern[str] | None = None,
+        context: Context | None = None,
+        route_logs_to_context: bool = True,
+        **kwargs: Any,
+    ) -> FileWatcher:
+        """Create and initialize a FileWatcher asynchronously.
+
+        This factory method properly awaits the initial indexing and is the
+        recommended way to create a FileWatcher from async contexts.
+
+        Args:
+            Same as __init__
+
+        Returns:
+            Fully initialized FileWatcher instance
+        """
+        # Create instance (sync construction)
+        instance = cls(
+            *paths,
+            handler=handler,
+            file_filter=file_filter,
+            walker=walker,
+            indexer=indexer,  # Pass through indexer
+            capture_watchfiles_output=capture_watchfiles_output,
+            watchfiles_log_level=watchfiles_log_level,
+            watchfiles_use_rich=watchfiles_use_rich,
+            watchfiles_include_pattern=watchfiles_include_pattern,
+            watchfiles_exclude_pattern=watchfiles_exclude_pattern,
+            context=context,
+            route_logs_to_context=route_logs_to_context,
+            **kwargs,
+        )
+
+        # Perform async initialization
         try:
-            # Perform a one-time initial indexing pass if we have a walker
-            if initial_count := asyncio.run(self._indexer.prime_index()):
+            # Perform a one-time initial indexing pass if we have an indexer
+            if initial_count := await instance._indexer.prime_index():
                 logger.info("Initial indexing complete: %d files indexed", initial_count)
-            self.watcher = watchfiles.arun_process(*(watch_args.pop("paths", ())), **watch_args)  # ty: ignore[no-matching-overload]
+            instance.watcher = watchfiles.arun_process(
+                *(instance._watch_args.pop("paths", ())), **instance._watch_args
+            )  # ty: ignore[no-matching-overload]
         except KeyboardInterrupt:
             logger.info("FileWatcher interrupted by user.")
         except Exception:
             logger.exception("Something happened...")
             raise
+
+        return instance
 
     def update_logging(
         self,

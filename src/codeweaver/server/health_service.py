@@ -333,10 +333,39 @@ class HealthService:
         # Calculate total chunks and files indexed
         total_chunks = 0
         total_files = 0
+        semantic_chunks = 0
+        delimiter_chunks = 0
+        file_chunks = 0
+        avg_chunk_size = 0.0
+
         if self._indexer:
-            indexer_stats = self._indexer.stats
-            total_chunks = indexer_stats.chunks_indexed
-            total_files = indexer_stats.files_processed
+            # Use session statistics from indexer for comprehensive tracking
+            session_stats = self._indexer.session_statistics
+
+            # Get file statistics from session stats if available
+            if session_stats.index_statistics:
+                total_files = session_stats.index_statistics.total_unique_files
+
+                # Aggregate chunk statistics across all categories and languages
+                all_chunk_sizes = []
+                for category_stats in session_stats.index_statistics.categories.values():
+                    for lang_stats in category_stats.languages.values():
+                        semantic_chunks += lang_stats.semantic_chunks
+                        delimiter_chunks += lang_stats.delimiter_chunks
+                        file_chunks += lang_stats.file_chunks
+                        all_chunk_sizes.extend(lang_stats.chunk_sizes)
+
+                # Calculate totals and averages
+                total_chunks = semantic_chunks + delimiter_chunks + file_chunks
+                if all_chunk_sizes:
+                    import statistics as stats_module
+
+                    avg_chunk_size = stats_module.mean(all_chunk_sizes)
+            else:
+                # Fallback to indexer stats (no detailed chunk breakdown)
+                indexer_stats = self._indexer.stats
+                total_chunks = indexer_stats.chunks_indexed
+                total_files = indexer_stats.files_processed
 
         # Calculate average query latency from timing statistics
         timing_stats = stats.get_timing_statistics()
@@ -351,8 +380,20 @@ class HealthService:
         # Get total queries processed
         total_queries = stats.total_requests
 
-        # Get indexed languages
-        languages = sorted(self._indexed_languages)
+        # Get indexed languages from session statistics
+        languages = []
+        if self._indexer and self._indexer.session_statistics.index_statistics:
+            file_stats = self._indexer.session_statistics.index_statistics
+            # Extract language names from all categories
+            for category_stats in file_stats.categories.values():
+                for lang in category_stats.languages:
+                    if isinstance(lang, str):
+                        languages.append(lang)
+                    else:
+                        languages.append(
+                            lang.as_variable if hasattr(lang, "as_variable") else str(lang)
+                        )
+        languages = sorted(set(languages))  # Deduplicate and sort
 
         # Estimate index size (rough estimate: ~1KB per chunk)
         index_size_mb = int((total_chunks * 1024) / (1024 * 1024))
@@ -364,6 +405,10 @@ class HealthService:
             index_size_mb=index_size_mb,
             queries_processed=total_queries,
             avg_query_latency_ms=avg_latency,
+            semantic_chunks=semantic_chunks,
+            delimiter_chunks=delimiter_chunks,
+            file_chunks=file_chunks,
+            avg_chunk_size=avg_chunk_size,
         )
 
     def _determine_status(

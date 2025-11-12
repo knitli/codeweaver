@@ -58,7 +58,7 @@ class Sentinel(BasedModel):
             """Serialize Sentinel to string."""
             return str(value.name)
 
-        assert source_type is cls, "Sentinel can only validate its own instances."
+        assert source_type is cls, "Sentinel can only validate its own instances."  # noqa: S101
         # Use is_instance schema with custom serialization
         # Sentinels are only set internally,
         # spellchecker:off

@@ -27,7 +27,6 @@ from typing import (
 from pydantic import BeforeValidator, Field, FieldSerializationInfo, PrivateAttr, field_serializer
 
 from codeweaver.cli.utils import is_tty
-from codeweaver.common.utils.checks import is_debug
 from codeweaver.common.utils.normalize import validate_regex_pattern
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BasedModel
@@ -244,7 +243,7 @@ DefaultLoggingSettings: LoggingSettings = {
         "show_time": True,
         "show_level": True,
         "show_path": True,
-        "rich_tracebacks": is_debug() and is_tty(),
+        "rich_tracebacks": False,
     }
     if is_tty()
     else {},

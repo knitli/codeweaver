@@ -17,7 +17,7 @@ from fastmcp import Context
 from pydantic_core import to_json
 
 from codeweaver.cli.utils import is_tty
-from codeweaver.common.utils.checks import is_ci, is_debug
+from codeweaver.common.utils.checks import is_ci
 from codeweaver.common.utils.lazy_importer import lazy_import
 from codeweaver.config.logging import LoggingConfigDict
 
@@ -32,7 +32,6 @@ else:
 
 IS_CI = is_ci()
 IS_TTY = is_tty()
-DEFAULT_LOG_LEVEL = logging.DEBUG if is_debug() else logging.WARNING
 
 
 def get_rich_handler(**kwargs: Any) -> RichHandler:

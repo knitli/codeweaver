@@ -130,6 +130,21 @@ class StatisticsInfo(BasedModel):
         float, Field(ge=0, description="Average query latency in milliseconds")
     ]
 
+    # Chunk statistics
+    semantic_chunks: Annotated[
+        NonNegativeInt, Field(default=0, description="Number of AST/semantic chunks created")
+    ]
+    delimiter_chunks: Annotated[
+        NonNegativeInt,
+        Field(default=0, description="Number of delimiter/text-block chunks created"),
+    ]
+    file_chunks: Annotated[
+        NonNegativeInt, Field(default=0, description="Number of whole-file chunks created")
+    ]
+    avg_chunk_size: Annotated[
+        float, Field(ge=0, default=0.0, description="Average chunk size in characters")
+    ]
+
     def _telemetry_keys(self) -> None:
         return None
 

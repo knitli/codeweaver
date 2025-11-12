@@ -103,7 +103,7 @@ class WatchfilesLogManager:
                     "show_time": True,
                     "show_level": True,
                     "show_path": False,
-                    "rich_tracebacks": self.log_level <= logging.DEBUG,
+                    "rich_tracebacks": False,
                 },
             )
             # Logger is already configured, just return

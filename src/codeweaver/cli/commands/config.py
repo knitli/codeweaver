@@ -136,10 +136,10 @@ def _show_provider_config(provider_settings: dict) -> None:
 
             # Build details string
             details = []
-            if model_settings := config.get("model_settings"):
-                if model := model_settings.get("model"):
-                    details.append(f"Model: {model}")
-
+            if (model_settings := config.get("model_settings")) and (
+                model := model_settings.get("model")
+            ):
+                details.append(f"Model: {model}")
             if provider_settings_dict := config.get("provider_settings"):
                 # Show key provider-specific settings
                 if url := provider_settings_dict.get("url"):

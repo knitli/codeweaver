@@ -26,24 +26,24 @@ import time
 
 from collections.abc import Callable
 from pathlib import Path
-from time import sleep
 from typing import TYPE_CHECKING, Annotated, Any, ClassVar, TypedDict, cast
 
 import rignore
 
 from pydantic import DirectoryPath, Field, NonNegativeFloat, NonNegativeInt, PrivateAttr
 from pydantic.dataclasses import dataclass
-from watchfiles.main import Change
+from watchfiles import Change
 
 from codeweaver.common.logging import log_to_client_or_fallback
+from codeweaver.common.statistics import SessionStatistics, get_session_statistics
 from codeweaver.common.utils.git import set_relative_path
 from codeweaver.config.chunker import ChunkerSettings
+from codeweaver.config.settings import Unset
 from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.stores import BlakeStore, get_blake_hash, make_blake_store
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.models import BasedModel
-from codeweaver.core.types.sentinel import Unset
 from codeweaver.engine.chunking_service import ChunkingService
 from codeweaver.engine.indexer.checkpoint import CheckpointManager, IndexingCheckpoint
 from codeweaver.engine.indexer.manifest import FileManifestManager, IndexFileManifest
@@ -176,6 +176,9 @@ class Indexer(BasedModel):
     _file_manifest: Annotated[IndexFileManifest | None, PrivateAttr()] = None
     _manifest_lock: Annotated[asyncio.Lock | None, PrivateAttr()] = None
     _deleted_files: Annotated[list[Path], PrivateAttr()] = PrivateAttr(default_factory=list)
+    _session_statistics: Annotated[SessionStatistics, PrivateAttr()] = PrivateAttr(
+        default_factory=get_session_statistics
+    )
     _last_checkpoint_time: Annotated[NonNegativeFloat, PrivateAttr()] = 0.0
     _files_since_checkpoint: Annotated[NonNegativeInt, PrivateAttr()] = 0
 
@@ -216,7 +219,9 @@ class Indexer(BasedModel):
         self._project_root = project_path
         self._chunking_service = chunking_service or _get_chunking_service()
         self._stats = IndexingStats()
+        from codeweaver.common.statistics import get_session_statistics
 
+        self._session_statistics = get_session_statistics()
         # Pipeline provider Fields (initialized lazily on first use)
         self._embedding_provider: Any | None = None
         self._sparse_provider: Any | None = None
@@ -335,7 +340,7 @@ class Indexer(BasedModel):
         # Initialize embedding provider (dense)
         try:
             self._embedding_provider = _get_embedding_instance(sparse=False)
-            logger.info(
+            logger.debug(
                 "Initialized embedding provider: %s", type(self._embedding_provider).__name__
             )
         except Exception as e:
@@ -345,7 +350,7 @@ class Indexer(BasedModel):
         # Initialize sparse embedding provider
         try:
             self._sparse_provider = _get_embedding_instance(sparse=True)
-            logger.info("Initialized sparse provider: %s", type(self._sparse_provider).__name__)
+            logger.debug("Initialized sparse provider: %s", type(self._sparse_provider).__name__)
         except Exception as e:
             logger.debug("Could not initialize sparse embedding provider: %s", e)
             self._sparse_provider = None
@@ -362,7 +367,7 @@ class Indexer(BasedModel):
             if self._vector_store:
                 # Initialize the vector store client (now we can use native await)
                 await self._vector_store._initialize()
-            logger.info("Initialized vector store: %s", type(self._vector_store).__name__)
+            logger.debug("Initialized vector store: %s", type(self._vector_store).__name__)
         except Exception as e:
             logger.warning("Could not initialize vector store: %s", e)
             self._vector_store = None
@@ -392,6 +397,9 @@ class Indexer(BasedModel):
 
             self._store.set(discovered_file.file_hash, discovered_file)
             self._stats.files_discovered += 1
+
+            # Track file discovery in session statistics
+            self._session_statistics.add_file_from_discovered(discovered_file, "processed")
 
             await log_to_client_or_fallback(
                 context,
@@ -423,6 +431,10 @@ class Indexer(BasedModel):
 
             chunks = self._chunking_service.chunk_file(discovered_file)
             self._stats.chunks_created += len(chunks)
+
+            # Track chunk creation in session statistics
+            for chunk in chunks:
+                self._session_statistics.add_chunk_from_codechunk(chunk, "processed")
 
             await log_to_client_or_fallback(
                 context,
@@ -519,6 +531,9 @@ class Indexer(BasedModel):
                 )
 
             self._stats.files_processed += 1
+
+            # Track successful indexing in session statistics
+            self._session_statistics.add_file_from_discovered(discovered_file, "indexed")
 
             # 6. Update file manifest with successful indexing
             # Only update if all critical operations succeeded and we have chunks
@@ -907,11 +922,9 @@ class Indexer(BasedModel):
         # Load file manifest for incremental indexing (unless force_reindex)
         if not force_reindex:
             self._load_file_manifest()
-        else:
-            # Force reindex - create new manifest
-            if self._manifest_manager:
-                self._file_manifest = self._manifest_manager.create_new()
-                logger.info("Force reindex - created new file manifest")
+        elif self._manifest_manager:
+            self._file_manifest = self._manifest_manager.create_new()
+            logger.info("Force reindex - created new file manifest")
 
         # Try to restore from checkpoint (unless force_reindex)
         if self._try_restore_from_checkpoint(force_reindex=force_reindex):
@@ -1128,8 +1141,22 @@ class Indexer(BasedModel):
         ]
 
         if not updated_chunks:
-            logger.warning("No chunks were embedded, using original chunks")
+            logger.info(
+                "No chunks found in embedding registry. This typically means all chunks were filtered as duplicates during deduplication. "
+                "Using original chunks for indexing. Total chunks: %d, Registry size: %d",
+                len(chunks),
+                len(registry),
+            )
             return chunks
+
+        if len(updated_chunks) < len(chunks):
+            logger.info(
+                "Retrieved %d/%d chunks from registry. %d chunks were deduplicated.",
+                len(updated_chunks),
+                len(chunks),
+                len(chunks) - len(updated_chunks),
+            )
+
         return updated_chunks
 
     async def _index_chunks_to_store(self, chunks: list[CodeChunk]) -> None:
@@ -1188,12 +1215,25 @@ class Indexer(BasedModel):
 
         await self._embed_chunks_in_batches(all_chunks)
 
+        # Get registry to check actual embeddings created
+        from codeweaver.providers.embedding.registry import get_embedding_registry
+
+        registry = get_embedding_registry()
+        embedded_count = len(registry)
+        dedup_count = len(all_chunks) - embedded_count if embedded_count < len(all_chunks) else 0
+
         await log_to_client_or_fallback(
             context,
             "info",
             {
                 "msg": "Embedding complete",
-                "extra": {"phase": "embedding", "chunks_embedded": self._stats.chunks_embedded},
+                "extra": {
+                    "phase": "embedding",
+                    "chunks_submitted": len(all_chunks),
+                    "chunks_embedded": embedded_count,
+                    "chunks_deduplicated": dedup_count,
+                    "registry_size": len(registry),
+                },
             },
         )
 
@@ -1409,9 +1449,17 @@ class Indexer(BasedModel):
         """Get current indexing statistics."""
         return self._stats
 
-    # ---- internal helpers ----
+    @property
+    def session_statistics(self) -> SessionStatistics:
+        """Get session statistics for comprehensive tracking."""
+        return self._session_statistics
+
     def _remove_path(self, path: Path) -> int:
-        """Remove any entries in the store that match the given path. Returns number removed."""
+        """Remove a path from the store.
+
+        Returns:
+            Number of entries removed
+        """
         to_delete: list[Any] = []
         for key, discovered_file in list(self._store.items()):
             try:
@@ -1432,6 +1480,8 @@ class Indexer(BasedModel):
         We keep the child process alive so arun_process can signal and restart it,
         but all indexing happens in the callback on the main process.
         """
+        from time import sleep
+
         try:
             while True:
                 sleep(alive_time)

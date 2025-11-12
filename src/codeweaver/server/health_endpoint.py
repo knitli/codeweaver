@@ -106,6 +106,10 @@ async def get_health() -> HealthResponse | Any:
                 index_size_mb=0,
                 queries_processed=0,
                 avg_query_latency_ms=0,
+                semantic_chunks=0,
+                delimiter_chunks=0,
+                file_chunks=0,
+                avg_chunk_size=0,
             ),
         )
     else:

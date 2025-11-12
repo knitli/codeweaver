@@ -381,7 +381,6 @@ async def test_hybrid_search_performance(qdrant_store: QdrantVectorStoreProvider
         dense_latencies.append(latency_ms)
 
     # Hybrid search
-    hybrid_query = {"dense": dense_vector, "sparse": sparse_vector}
     hybrid_latencies = []
     for _ in range(num_queries):
         start = time.perf_counter()
@@ -459,13 +458,13 @@ async def test_performance_regression_check(qdrant_store: QdrantVectorStoreProvi
         baseline = json.loads(baseline_path.read_text())
 
         # Compare against baseline
-        search_regression = (metrics["search"]["p95_ms"] - baseline["search"]["p95_ms"]) / baseline[
+        search_regression = (metrics["search"]["p95_ms"] - baseline["search"]["p95_ms"]) / baseline[  # ty: ignore[non-subscriptable]
             "search"
         ]["p95_ms"]
 
         print("\nPerformance comparison vs baseline:")
         print(
-            f"  Search P95: {metrics['search']['p95_ms']:.2f}ms (baseline: {baseline['search']['p95_ms']:.2f}ms)"
+            f"  Search P95: {metrics['search']['p95_ms']:.2f}ms (baseline: {baseline['search']['p95_ms']:.2f}ms)"  # ty: ignore[non-subscriptable]
         )
         print(f"  Regression: {search_regression * 100:+.1f}%")
 
@@ -476,5 +475,5 @@ async def test_performance_regression_check(qdrant_store: QdrantVectorStoreProvi
             )
 
     print("\nCurrent performance metrics:")
-    print(f"  Search P95: {metrics['search']['p95_ms']:.2f}ms")
-    print(f"  Delete: {metrics['delete']['latency_ms']:.2f}ms")
+    print(f"  Search P95: {metrics['search']['p95_ms']:.2f}ms")  # ty: ignore[non-subscriptable]
+    print(f"  Delete: {metrics['delete']['latency_ms']:.2f}ms")  # ty: ignore[non-subscriptable]

@@ -52,7 +52,6 @@ if TYPE_CHECKING:
         EmbeddingBatchInfo,
         EmbeddingModelCapabilities,
         EmbeddingProvider,
-        EmbeddingRegistry,
         FastEmbedEmbeddingProvider,
         FastEmbedSparseProvider,
         GoogleEmbeddingProvider,

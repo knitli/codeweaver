@@ -382,8 +382,28 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         is_old_batch = False
         if batch_id and self._store and batch_id in self._store:
             documents: Sequence[CodeChunk] = self._store[batch_id]  # type: ignore
-        is_old_batch = True
-        chunks, cache_key = self._process_input(documents, is_old_batch=is_old_batch)  # type: ignore
+            is_old_batch = True
+        chunks_iter, cache_key = self._process_input(documents, is_old_batch=is_old_batch)  # type: ignore
+
+        # Convert iterator to tuple once to avoid exhaustion issues
+        chunks = tuple(chunks_iter)
+
+        # Early return if no chunks to embed (all filtered as duplicates)
+        if not chunks:
+            await log_to_client_or_fallback(
+                context,
+                "debug",
+                {
+                    "msg": "No chunks to embed after deduplication",
+                    "extra": {
+                        "provider": type(self)._provider.value,
+                        "document_count": len(documents),
+                        "is_reprocessing": is_old_batch,
+                        "batch_id": str(batch_id or cache_key) if batch_id or cache_key else None,
+                    },
+                },
+            )
+            return []
 
         await log_to_client_or_fallback(
             context,
@@ -393,6 +413,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 "extra": {
                     "provider": type(self)._provider.value,
                     "document_count": len(documents),
+                    "chunk_count": len(chunks),
                     "is_reprocessing": is_old_batch,
                     "batch_id": str(batch_id or cache_key) if batch_id or cache_key else None,
                 },
@@ -405,7 +426,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 Sequence[Sequence[float]]
                 | Sequence[Sequence[int]]
                 | Sequence[dict[str, list[int] | list[float]]]
-            ) = await self._embed_documents_with_retry(tuple(chunks), **kwargs)
+            ) = await self._embed_documents_with_retry(chunks, **kwargs)
         except CircuitBreakerOpenError as e:
             # Circuit breaker open - return error immediately
             await log_to_client_or_fallback(
@@ -465,7 +486,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 ]
             if not is_old_batch:
                 self._register_chunks(
-                    chunks=tuple(chunks),
+                    chunks=chunks,  # Already a tuple, no need to convert again
                     batch_id=cast(UUID7, batch_id or cache_key),
                     embeddings=results,
                 )
@@ -769,21 +790,31 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         from codeweaver.core.chunks import BatchKeys
 
         key = uuid7()
+        # Convert iterator to list to avoid exhaustion when used multiple times
+        chunk_list = list(processed_chunks)
         final_chunks: list[CodeChunk] = []
-        # We map the hashes to the original UUID key for processed_chunks so we're not double-storing them.
-        hashes = [
-            type(self)._hash_store.add(key, hash_value=chunk.content.encode("utf-8"))
-            for chunk in processed_chunks
-        ]
+
+        # FIXED: Compute hashes first WITHOUT adding to store
+        from codeweaver.core.stores import get_blake_hash
+
+        hashes = [get_blake_hash(chunk.content.encode("utf-8")) for chunk in chunk_list]
+
+        # Check which chunks are NEW (hash not in store)
         starter_chunks = [
             chunk
-            for i, chunk in enumerate(processed_chunks)
+            for i, chunk in enumerate(chunk_list)
             if chunk and hashes[i] not in type(self)._hash_store
         ]
+
+        # Add NEW chunks with batch keys and add their hashes to store
         for i, chunk in enumerate(starter_chunks):
+            # Find the original index in chunk_list to get correct hash
+            original_idx = chunk_list.index(chunk)
             batch_keys = BatchKeys(id=key, idx=i)
             final_chunks.append(chunk.set_batch_keys(batch_keys))
-            type(self)._hash_store[hashes[i]] = key
+            # Now add the hash to store, mapping it to this batch key
+            type(self)._hash_store[hashes[original_idx]] = key
+
         if not type(self)._store:  # type: ignore
             type(self)._store = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)  # type: ignore
         type(self)._store[key] = final_chunks  # type: ignore

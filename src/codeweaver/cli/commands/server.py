@@ -31,11 +31,21 @@ async def _run_server(
     port: int = 9328,
     *,
     debug: bool = False,
+    verbose: bool = False,
 ) -> None:
     from codeweaver.main import run
 
-    console.print(f"{CODEWEAVER_PREFIX} [blue]Starting CodeWeaver MCP server...[/blue]")
-    return await run(config_file=config_file, project_path=project_path, host=host, port=port)
+    # Only print startup message in verbose/debug mode
+    if verbose or debug:
+        console.print(f"{CODEWEAVER_PREFIX} [blue]Starting CodeWeaver MCP server...[/blue]")
+    return await run(
+        config_file=config_file,
+        project_path=project_path,
+        host=host,
+        port=port,
+        debug=debug,
+        verbose=verbose,
+    )
 
 
 @app.default
@@ -45,25 +55,43 @@ async def server(
     project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
     host: str = "127.0.0.1",
     port: int = 9328,
-    debug: bool = False,
+    verbose: Annotated[
+        bool,
+        cyclopts.Parameter(name=["--verbose", "-v"], help="Enable verbose logging with timestamps"),
+    ] = False,
+    debug: Annotated[
+        bool, cyclopts.Parameter(name=["--debug", "-d"], help="Enable debug logging")
+    ] = False,
 ) -> None:
     """Start CodeWeaver MCP server."""
     try:
         await _run_server(
-            config_file=config_file, project_path=project_path, host=host, port=port, debug=debug
+            config_file=config_file,
+            project_path=project_path,
+            host=host,
+            port=port,
+            debug=debug,
+            verbose=verbose,
         )
 
     except CodeWeaverError as e:
-        console.print_exception(show_locals=True)
+        if verbose or debug:
+            console.print_exception(show_locals=True)
+        else:
+            console.print(f"✗ Error: {e}", style="bold red")
         if e.suggestions:
             console.print(f"{CODEWEAVER_PREFIX} [yellow]Suggestions:[/yellow]")
             for suggestion in e.suggestions:
                 console.print(f"  • {suggestion}")
         sys.exit(1)
     except KeyboardInterrupt:
-        console.print_exception(show_locals=False, word_wrap=True)
-    except Exception:
-        console.print_exception(show_locals=True, word_wrap=True)
+        # Clean shutdown message handled in server shutdown
+        pass
+    except Exception as e:
+        if verbose or debug:
+            console.print_exception(show_locals=True, word_wrap=True)
+        else:
+            console.print(f"✗ Unexpected error: {e}", style="bold red")
         sys.exit(1)
 
 
