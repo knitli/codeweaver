@@ -109,7 +109,17 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
 
         # Initialize client if not provided
         if _client is None:
-            client_options = config_kwargs.get("client_options", {}) or config_kwargs
+            # Extract client_options if explicitly provided, otherwise use only known client params
+            if "client_options" in config_kwargs:
+                client_options = config_kwargs["client_options"].copy()
+            else:
+                # Only extract known Cohere client options from kwargs
+                known_client_options = {
+                    "api_key", "base_url", "timeout", "max_retries", "httpx_client"
+                }
+                client_options = {
+                    k: v for k, v in config_kwargs.items() if k in known_client_options
+                }
             client_options["client_name"] = "codeweaver"
 
             # Determine provider to get correct API key
