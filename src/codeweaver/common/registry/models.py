@@ -171,9 +171,14 @@ class ModelRegistry(BasedModel):
             return tuple(
                 cap
                 for prov_map in self._embedding_capabilities.values()
-                for cap in prov_map.values()
+                for cap_tuple in prov_map.values()
+                for cap in cap_tuple
             )  # type: ignore
-        return tuple(self._embedding_capabilities.get(provider, {}).values())  # type: ignore
+        return tuple(
+            cap
+            for cap_tuple in self._embedding_capabilities.get(provider, {}).values()
+            for cap in cap_tuple
+        )  # type: ignore
 
     # ---------- Sparse embedding capabilities ----------
     def register_sparse_embedding_capabilities(
