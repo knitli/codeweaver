@@ -406,7 +406,7 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
             line_start=chunk.line_range.start,
             line_end=chunk.line_range.end,
             indexed_at=datetime.now(UTC).isoformat(),
-            hash=chunk.blake_hash.hexdigest(),
+            hash=chunk.blake_hash,
             provider="memory",
             embedding_complete=bool(chunk.dense_batch_key and chunk.sparse_batch_key),
         )

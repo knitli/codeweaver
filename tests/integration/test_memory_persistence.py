@@ -72,7 +72,7 @@ async def test_inmemory_persistence():
         results = await provider2.search(
             StrategizedQuery(
                 query="test function",
-                strategy=SearchStrategy.SEMANTIC,
+                strategy=SearchStrategy.DENSE_ONLY,
                 dense=[0.7, 0.7, 0.7] * 256,
                 sparse=None,
             )
