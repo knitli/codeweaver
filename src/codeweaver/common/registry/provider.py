@@ -1049,35 +1049,15 @@ class ProviderRegistry(BasedModel):
             )
 
         # Special handling for embedding provider (has different logic)
-        if provider_kind in (ProviderKind.EMBEDDING, "embedding") and self._is_any_provider_kind(
-            provider_kind
+        if (
+            provider_kind in (ProviderKind.EMBEDDING, "embedding")
+            and self._is_any_provider_kind(provider_kind)
+            and retrieved_cls is not None
+            and not isinstance(retrieved_cls, tuple)
         ):
-            # Check if this is an OpenAI factory that needs construction
-            if self._is_openai_factory(provider, provider_kind):
-                retrieved_cls = self._construct_openai_provider_class(
-                    provider, retrieved_cls, **kwargs_for_provider
-                )
-
-            # Resolve LazyImport if needed before accessing __name__
-            if isinstance(retrieved_cls, LazyImport):
-                resolved_cls = retrieved_cls._resolve()
-                return cast(EmbeddingProvider[Any], resolved_cls(**kwargs_for_provider))
-
-            # Handle tuple types (shouldn't happen for embedding, but guard against it)
-            if isinstance(retrieved_cls, tuple) or retrieved_cls is None:
-                raise ConfigurationError(
-                    f"Embedding provider '{provider}' returned invalid type: {type(retrieved_cls)}"
-                )
-
-            # we need to access a property to execute the import and ensure it exists
-            name = None
-            with contextlib.suppress(Exception):
-                name = retrieved_cls.__name__
-            if not name:
-                logger.warning("Embedding provider '%s' could not be imported.", provider)
-                raise ConfigurationError(f"Embedding provider '{provider}' could not be imported.")
-            return cast(EmbeddingProvider[Any], retrieved_cls(**kwargs_for_provider))
-
+            return self._build_embedding_provider(
+                provider, provider_kind, retrieved_cls, kwargs_for_provider
+            )
         # Standard handling for other providers
         # Handle None case
         if retrieved_cls is None:
@@ -1098,6 +1078,44 @@ class ProviderRegistry(BasedModel):
             return resolved_cls(**kwargs_for_provider)
 
         return retrieved_cls(**kwargs_for_provider)
+
+    def _build_embedding_provider(
+        self,
+        provider: Provider,
+        provider_kind: LiteralProviderKind,
+        retrieved_cls: EmbeddingProvider[Any] | LazyImport[EmbeddingProvider[Any]],
+        kwargs_for_provider: Any,
+    ):
+        # Check if this is an OpenAI factory that needs construction
+        if self._is_openai_factory(provider, provider_kind):
+            retrieved_cls = self._construct_openai_provider_class(
+                provider, retrieved_cls, **kwargs_for_provider
+            )
+        was_lazy = False
+        # Resolve LazyImport if needed before accessing __name__
+        if isinstance(retrieved_cls, LazyImport):
+            was_lazy = True
+            retrieved_cls = retrieved_cls._resolve()
+
+        # we need to access a property to execute the import and ensure it exists
+        name = None
+        with contextlib.suppress(ImportError, AttributeError):
+            name = retrieved_cls.__name__
+        if not name:
+            logger.warning("Embedding provider '%s' could not be imported.", provider)
+            raise ConfigurationError(
+                f"We were unable to import the class for provider '{provider}'.",
+                details={
+                    "provider": provider,
+                    "retrieved_cls": retrieved_cls,
+                    "lazy_class_import": was_lazy,
+                },
+                suggestions=[
+                    "Ensure the required package for this provider is installed.",
+                    "Check for typos in provider registration.",
+                ],
+            )
+        return cast(EmbeddingProvider[Any], retrieved_cls(**kwargs_for_provider))  # ty: ignore[call-non-callable]  # I promise it is
 
     @overload
     def get_provider_instance(

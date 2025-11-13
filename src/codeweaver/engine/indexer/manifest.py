@@ -18,7 +18,7 @@ import logging
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, TypedDict
 
 from pydantic import Field, NonNegativeInt, computed_field
 from pydantic_core import from_json
@@ -236,6 +236,17 @@ class IndexFileManifest(BasedModel):
             manifest_version=self.manifest_version,
         )
 
+    def _telemetry_handler(self, _serialized_self: dict[str, Any], /) -> dict[str, Any]:
+        """Telemetry handler for the manifest."""
+        return {
+            "files": {
+                hash(path): {
+                    key: value for key, value in entry.items() if key not in {"path", "chunk_ids"}
+                }
+                for path, entry in _serialized_self.get("files", {}).items()
+            }
+        }
+
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         """Telemetry keys for the manifest (none needed)."""
         from codeweaver.core.types.aliases import FilteredKey
@@ -257,7 +268,7 @@ class FileManifestManager:
         from codeweaver.core.stores import get_blake_hash
 
         self.project_path = project_path.resolve()
-        self.manifest_dir = (manifest_dir or get_user_config_dir()).resolve()
+        self.manifest_dir = (manifest_dir or get_user_config_dir()).resolve() / "manifests"
 
         # Add path hash to filename to avoid collisions between projects with same name
         path_hash = get_blake_hash(str(self.project_path))[:16]

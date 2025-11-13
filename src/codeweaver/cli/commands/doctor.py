@@ -25,7 +25,6 @@ from rich.table import Table
 
 from codeweaver.common import CODEWEAVER_PREFIX
 from codeweaver.common.utils.git import get_project_path, is_git_dir
-from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.core.types.sentinel import Unset
 from codeweaver.providers.provider import ProviderKind
 
@@ -348,7 +347,8 @@ def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
     ):
         if "qdrant.io" in url:
             deployment_type = "cloud"
-        elif url not in {"localhost", "127.0.0.1"}:
+        # if they have port in the path we need to check for inclusion, not membership or equality
+        elif "localhost" not in url and "127.0.0.1" not in url:
             deployment_type = "remote"
         else:
             deployment_type = (
@@ -382,23 +382,27 @@ def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
                 f"  [green]✓[/green] {'Docker' if deployment_type == 'local docker' else 'Local Qdrant'} is running at {url!s}"
             )
         case "unknown":
+            user_os = sys.platform
             console.print("  [yellow]⚠[/yellow] Docker may not be running")
             check.status = "⚠️"
             check.message = f"We didn't find a running local Qdrant instance at {url!s}"
             check.suggestions = [
                 "The quickest way to fix this is with docker",
+                f"If you don't have docker, you should probably start with docker desktop: https://docs.docker.com/desktop/setup/install/{'linux' if user_os.startswith('linux') else 'windows-install' if user_os.startswith('win') else 'macos-install'}/",
                 "Start Docker",
                 "Run: docker run -p 6333:6333 qdrant/qdrant",
+                "or use the desktop gui to find and start Qdrant",
+                "more info: https://qdrant.tech/documentation/guides/installation/",
             ]
 
         case "in-memory":
             console.print(
-                "  [yellow]⚠[/yellow] You're using in-memory Qdrant. While we do try to persist data to json, this isn't suitable for any serious use. We recommend using local or cloud Qdrant for any use beyond testing."
+                "  [yellow]⚠[/yellow] You're using in-memory Qdrant. While we do try to persist data to json, this isn't suitable for any serious use. If you're testing or playing around, cool. If not, consider switching to a more robust solution."
             )
             _set_warning_status(
                 check,
                 "In-memory Qdrant detected",
-                f"Use local or cloud Qdrant for non-testing purposes json persistence will be saved to {vector_provider_config.get('persistence_path', get_user_config_dir())}",
+                "We don't recommend the in-memory store for general use. Use local or cloud Qdrant instead.",
             )
         case "remote":
             if _has_auth_configured(provider, settings):

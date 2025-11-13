@@ -5,6 +5,8 @@
 
 """CodeWeaver indexing command-line interface."""
 
+from __future__ import annotations
+
 import asyncio
 import sys
 
@@ -56,7 +58,7 @@ def _trigger_server_reindex(*, force: bool) -> bool:
 
 
 @app.default
-def index(
+async def index(
     *,
     config_file: Annotated[FilePath | None, cyclopts.Parameter(name=["--config", "-c"])] = None,
     project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
@@ -65,6 +67,19 @@ def index(
     ] = False,
     standalone: Annotated[
         bool, cyclopts.Parameter(name=["--standalone", "-s"], help="Run indexing without server")
+    ] = False,
+    clear: Annotated[
+        bool,
+        cyclopts.Parameter(
+            name=["--clear"],
+            help="Clear vector store and checkpoints before indexing (requires confirmation)",
+        ),
+    ] = False,
+    yes: Annotated[
+        bool,
+        cyclopts.Parameter(
+            name=["--yes", "-y"], help="Skip confirmation prompts (use with --clear)"
+        ),
     ] = False,
 ) -> None:
     """Index or re-index a codebase.
@@ -76,15 +91,98 @@ def index(
         codeweaver index                  # Check server status
         codeweaver index --force          # Force full re-index in standalone mode
         codeweaver index --standalone     # Standalone indexing
+        codeweaver index --clear          # Clear vector store and re-index (with confirmation)
+        codeweaver index --clear --yes    # Clear and re-index without confirmation
 
     Args:
         config_file: Optional path to CodeWeaver configuration file
         project_path: Optional path to project root directory
         force_reindex: If True, skip persistence checks and reindex everything
         standalone: If True, run indexing without checking for server
+        clear: If True, clear vector store and checkpoints before indexing
+        yes: If True, skip confirmation prompts
     """
     from codeweaver.config.settings import get_settings
     from codeweaver.engine.indexer import Indexer, IndexingProgressTracker
+
+    # Handle --clear flag
+    if clear:
+        if not yes:
+            console.print(
+                f"{CODEWEAVER_PREFIX} [yellow bold]⚠ Warning: Destructive Operation[/yellow bold]\n"
+            )
+            console.print("This will [red]permanently delete[/red]:")
+            console.print("  • Vector store collection and all indexed data")
+            console.print("  • All indexing checkpoints")
+            console.print("  • File manifest state\n")
+
+            response = console.input(
+                "[yellow]Are you sure you want to continue? (yes/no):[/yellow] "
+            )
+            if response.lower() not in ["yes", "y"]:
+                console.print(f"{CODEWEAVER_PREFIX} [blue]Operation cancelled[/blue]")
+                sys.exit(0)
+
+        # Perform the clear operation
+        try:
+            console.print(f"{CODEWEAVER_PREFIX} [blue]Loading configuration...[/blue]")
+            settings = get_settings(config_file=config_file)
+
+            if project_path:
+                from codeweaver.config.settings import update_settings
+
+                settings = update_settings(**{
+                    **settings.model_dump(),
+                    "project_path": project_path,
+                })
+
+            console.print(
+                f"{CODEWEAVER_PREFIX} [yellow]Clearing vector store and checkpoints...[/yellow]"
+            )
+
+            # Clear vector store
+            from codeweaver.common.registry.provider import get_provider_registry
+            from codeweaver.config.providers import ProviderSettings, VectorStoreProviderSettings
+
+            registry = get_provider_registry()
+            store = registry.create_provider("vector_store")  # type: ignore
+            if (
+                (provider_settings := settings.provider)
+                and isinstance(provider_settings, ProviderSettings)
+                and (vector_settings := provider_settings.vector_store)
+                and isinstance(vector_settings, VectorStoreProviderSettings)
+            ):
+                collection_name = vector_settings.get("provider_settings", {}).get(
+                    "collection_name", "codeweaver_vectors"
+                )
+            await_result = await store.delete_collection(collection_name)
+
+            if await_result:
+                console.print("  ✓ [green]Vector store collection deleted[/green]")
+            else:
+                console.print("  • [dim]Vector store collection did not exist[/dim]")
+
+            # Clear checkpoints and manifest
+            from codeweaver.engine.indexer.checkpoint import CheckpointManager
+            from codeweaver.engine.indexer.manifest import FileManifest
+
+            checkpoint_mgr = CheckpointManager(settings.indexing.checkpoint_dir)
+            checkpoint_mgr.delete()
+            console.print("  ✓ [green]Checkpoints cleared[/green]")
+
+            manifest = FileManifest(settings.indexing.checkpoint_dir)
+            manifest.delete()
+            console.print("  ✓ [green]File manifest cleared[/green]")
+
+            console.print(f"{CODEWEAVER_PREFIX} [green]Clear operation complete[/green]\n")
+
+            # Continue to reindex after clearing
+            force_reindex = True
+
+        except Exception as e:
+            console.print(f"{CODEWEAVER_PREFIX} [red]Error during clear operation:[/red] {e}")
+            console.print_exception(show_locals=True)
+            sys.exit(1)
 
     # Check if server is running (unless --standalone)
     if not standalone:

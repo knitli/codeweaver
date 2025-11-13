@@ -118,11 +118,11 @@ def _get_project_name() -> str:
     return "your_project_name"
 
 
-def get_storage_path() -> Path:
-    """Get the default storage path for index data."""
+def get_storage_path() -> DirectoryPath:
+    """Get the default storage directory for index and checkpoint data."""
     from codeweaver.common.utils import get_user_config_dir
 
-    return Path(get_user_config_dir()) / f"{_get_project_name()}_index.json"  # ty: ignore[missing-argument]
+    return Path(get_user_config_dir()) / "indexes"
 
 
 def _resolve_globs(path_string: str, repo_root: Path) -> set[Path]:
@@ -263,8 +263,8 @@ class IndexerSettings(BasedModel):
     _index_cache_dir: Annotated[
         Path | None,
         Field(
-            description=rf"""\
-            Path to store index data locally. The default is in your user configuration directory (like ~/.config/codeweaver/{_get_project_name()}_index.json or c:\Users\your_username\AppData\Roaming\codeweaver\your_project_name_index.json).  If not set, CodeWeaver will use the default path.
+            description=r"""\
+            Path to store index data locally. The default is in your user configuration directory (like ~/.config/codeweaver/indexes or c:\Users\your_username\AppData\Roaming\codeweaver\indexes\).  If not set, CodeWeaver will use the default path.
 
             Developer Note: We set the default lazily after initialization to avoid circular import issues. Internally, we use the `cache_dir` property to get the effective storage path. We recommend you do too if you need to programmatically access this value. We only keep this field public for user configuration.
             """,
@@ -320,22 +320,23 @@ class IndexerSettings(BasedModel):
     @property
     def cache_dir(self) -> DirectoryPath:
         """Effective storage directory for index data."""
-        path = self._index_cache_dir or get_storage_path()
-        # Get the parent directory (cache_dir should be a directory, not a file)
-        dir_path = path.parent
-        if not dir_path.exists():
-            dir_path.mkdir(parents=True, exist_ok=True)
-        return dir_path
+        if not self._index_cache_dir:
+            path = self._index_cache_dir
+            # Get the parent directory (cache_dir should be a directory, not a file)
+            dir_path = path.parent if path and path.is_file() else path or get_storage_path()
+            if not dir_path.exists():
+                dir_path.mkdir(parents=True, exist_ok=True)
+            self._index_cache_dir = dir_path
+        return self._index_cache_dir
 
     @computed_field
     @property
     def storage_file(self) -> FilePath:
         """Effective storage file path for index data."""
-        if self._index_cache_dir:
-            return self._index_cache_dir
         project_name = _get_project_name()
-        self._index_cache_dir = self.cache_dir / f"{project_name}_index.json"
-        return self._index_cache_dir
+        if self._index_cache_dir:
+            return self._index_cache_dir / f"{project_name}_index.json"
+        return self.cache_dir / f"{project_name}_index.json"
 
     @computed_field
     @property

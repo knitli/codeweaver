@@ -13,6 +13,7 @@ from __future__ import annotations
 import importlib.util as util
 import logging
 
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Annotated,
@@ -30,6 +31,7 @@ from pydantic import Field, PositiveFloat, PositiveInt, SecretStr, computed_fiel
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
 from pydantic_ai.settings import merge_model_settings
 
+from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.core.types import DictView
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.sentinel import Unset
@@ -41,6 +43,9 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+# TODO: Convert provider TypedDicts to Pydantic models. That gives us: 1) automatic env variables for free (pydantic-settings), 2) better validation, 3) Flexibility to put more validation, default, and other logic in the models.
+# We chose TypedDicts originally for speed. They can be substantially faster than Pydantic models (according to Pydantic: https://docs.pydantic.dev/2.12/concepts/performance/#use-typeddict-over-nested-models) But we lose a lot of benefits of Pydantic models.
 
 # ===========================================================================
 # *            Provider Connection and Rate Limit Settings
@@ -225,8 +230,8 @@ class QdrantConfig(TypedDict, total=False):
 class MemoryConfig(TypedDict, total=False):
     """Configuration for in-memory vector store provider."""
 
-    persist_path: NotRequired[str]
-    """Path for JSON persistence file. Defaults to {system_user_config}/codeweaver/{project_name}_vector_store.json."""
+    persist_path: NotRequired[Path]
+    f"""Path for JSON persistence file. Defaults to {get_user_config_dir()}/codeweaver/vectors/[your_project_name]_vector_store.json."""
     auto_persist: NotRequired[bool]
     """Automatically save after operations. Defaults to True."""
     persist_interval: NotRequired[PositiveInt | None]

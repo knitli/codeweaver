@@ -607,11 +607,11 @@ def init(
     Use --config-only or --mcp-only to create just one.
 
     ARCHITECTURE NOTE:
-    CodeWeaver uses HTTP streaming (not STDIO) for the MCP protocol by default.
+    CodeWeaver uses HTTP streaming (not STDIO) for the MCP protocol *by default*.
     This means:
     - Single server instance shared across all clients
     - Background indexing persists between client sessions
-    - Server must be started separately: codeweaver server
+    - Server must be started separately: `codeweaver server`
 
     You can use --transport stdio if you prefer per-session server instances.
 

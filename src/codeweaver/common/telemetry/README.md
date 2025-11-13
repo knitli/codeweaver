@@ -21,13 +21,12 @@ The telemetry module provides:
 
 ## Privacy Guarantees
 
-### What We NEVER Collect
+### What We NEVER Collect (unless you explicitly opt-in with the `tools-before-privacy` config option)
 
 - ❌ Query content or search terms
 - ❌ Code snippets or file contents
 - ❌ File paths or repository names
 - ❌ User identifiers (usernames, emails, IPs)
-- ❌ Individual query timing (could fingerprint projects)
 
 ### What We DO Collect (Aggregated & Anonymized)
 
@@ -35,6 +34,7 @@ The telemetry module provides:
 - ✅ Token usage and cost savings estimates
 - ✅ Language distribution (counts only, no file names)
 - ✅ Semantic category usage frequencies
+- ✅ Config settings used (True/False, not the content)
 
 ## Quick Start
 
@@ -54,7 +54,7 @@ uv pip install "codeweaver-mcp[recommended-no-telemetry]"
 
 ### Configuration
 
-Set PostHog API key (if sending telemetry):
+Users can choose to divert telemetry to their own Posthog instance:
 
 ```bash
 export CODEWEAVER_POSTHOG_API_KEY="phc_your_key_here"
@@ -151,7 +151,7 @@ telemetry_data = model.serialize_for_telemetry()
 ### Anonymity Conversion Methods
 
 - **FORBIDDEN**: Completely exclude field from telemetry
-- **BOOLEAN**: Convert to boolean presence/absence  
+- **BOOLEAN**: Convert to boolean presence/absence
 - **COUNT**: Convert to count (e.g., list length)
 - **HASH**: Hash the value for anonymity
 - **DISTRIBUTION**: Convert to distribution of values

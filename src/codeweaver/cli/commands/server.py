@@ -75,23 +75,48 @@ async def server(
         )
 
     except CodeWeaverError as e:
-        if verbose or debug:
-            console.print_exception(show_locals=True)
-        else:
-            console.print(f"✗ Error: {e}", style="bold red")
+        # When we're exiting due to an error, show full details regardless of verbosity
+        console.print(
+            f"\n{CODEWEAVER_PREFIX} [bold red]✗ Server failed to start[/bold red]\n", style="bold"
+        )
+        console.print(f"[red]Error:[/red] {e}\n")
+
+        # Show details if available
+        if hasattr(e, "details") and e.details:
+            console.print("[yellow]Details:[/yellow]")
+            import json
+
+            console.print(json.dumps(e.details, indent=2))
+            console.print()
+
+        # Show suggestions if available
         if e.suggestions:
-            console.print(f"{CODEWEAVER_PREFIX} [yellow]Suggestions:[/yellow]")
+            console.print("[yellow]Suggestions:[/yellow]")
             for suggestion in e.suggestions:
                 console.print(f"  • {suggestion}")
+            console.print()
+
+        # Show full traceback in verbose/debug mode
+        if verbose or debug:
+            console.print("[dim]Full traceback:[/dim]")
+            console.print_exception(show_locals=True)
+
         sys.exit(1)
+
     except KeyboardInterrupt:
         # Clean shutdown message handled in server shutdown
         pass
+
     except Exception as e:
-        if verbose or debug:
-            console.print_exception(show_locals=True, word_wrap=True)
-        else:
-            console.print(f"✗ Unexpected error: {e}", style="bold red")
+        # When we're exiting due to an unexpected error, always show full details
+        console.print(
+            f"\n{CODEWEAVER_PREFIX} [bold red]✗ Server crashed unexpectedly[/bold red]\n",
+            style="bold",
+        )
+        console.print(f"[red]Error:[/red] {type(e).__name__}: {e}\n")
+        console.print("[yellow]Full traceback:[/yellow]")
+        console.print_exception(show_locals=True, word_wrap=True)
+        console.print("\n[dim]Tip: Please report this error with the traceback above[/dim]\n")
         sys.exit(1)
 
 

@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import contextlib
+
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -403,7 +405,7 @@ async def real_vector_store(tmp_path: Path):
 
     # Create config for the vector store
     config = MemoryConfig(
-        persist_path=str(tmp_path / "vector_store"), collection_name="test_real_collection"
+        persist_path=tmp_path / "vector_store", collection_name="test_real_collection"
     )
 
     # Create the vector store provider
@@ -415,10 +417,8 @@ async def real_vector_store(tmp_path: Path):
     yield provider
 
     # Cleanup: Delete collection after test
-    try:
+    with contextlib.suppress(Exception):
         await client.delete_collection(config.collection_name)
-    except Exception:
-        pass  # Already deleted or doesn't exist
 
 
 @pytest.fixture
@@ -764,7 +764,6 @@ def real_provider_registry(
     from enum import Enum
     from unittest.mock import MagicMock
 
-    # Create simple mock enums for providers
     class RealProviderEnum(Enum):
         SENTENCE_TRANSFORMERS = "sentence_transformers"
         OPENSEARCH = "opensearch"
@@ -781,9 +780,7 @@ def real_provider_registry(
             return RealProviderEnum.OPENSEARCH
         if kind == "vector_store":
             return RealProviderEnum.QDRANT_MEMORY
-        if kind == "reranking":
-            return RealProviderEnum.MS_MARCO
-        return None
+        return RealProviderEnum.MS_MARCO if kind == "reranking" else None
 
     mock_registry.get_provider_enum_for = MagicMock(side_effect=get_provider_enum_for)
 
@@ -795,9 +792,7 @@ def real_provider_registry(
             return real_sparse_provider
         if kind == "vector_store":
             return real_vector_store
-        if kind == "reranking":
-            return real_reranking_provider
-        return None
+        return real_reranking_provider if kind == "reranking" else None
 
     mock_registry.get_provider_instance = MagicMock(side_effect=get_provider_instance)
 

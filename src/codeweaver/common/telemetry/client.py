@@ -23,11 +23,17 @@ from types import TracebackType
 from typing import Any, Self
 
 from pydantic import HttpUrl
+from pydantic.types import SecretStr
 
+from codeweaver.common.utils.utils import uuid7
+from codeweaver.config._project import CODEWEAVER_POSTHOG_PROJECT_KEY
+from codeweaver.core.types.aliases import UUID7HexT
 from codeweaver.core.types.sentinel import Unset
 
 
 NO_HOG = find_spec("posthog") is None
+
+SESSION_ID = uuid7().hex
 
 if NO_HOG:
 
@@ -63,14 +69,9 @@ class PostHogClient:
         ...     client.capture("session_summary", {"searches": 10})
     """
 
-    # ---------------------------------------------------------------------------
-    #!         THIS IS NOT AN API_KEY!! This key is a write-only project key.
-    #!         It is safe to include in public repositories. It cannot be used to
-    #!         read data or access CodeWeaver's PostHog project.
-    # ---------------------------------------------------------------------------
     def __init__(
         self,
-        api_key: str | None = None,
+        api_key: SecretStr | str | None = None,
         host: str = "https://us.i.posthog.com",
         *,
         enabled: bool = True,
@@ -87,9 +88,7 @@ class PostHogClient:
 
         # Prefer environment variable, fallback to hardcoded key if not provided
         if api_key is None:
-            api_key = os.environ.get(
-                "CODEWEAVER_POSTHOG_API_KEY", "phc_XKWSirBXZdxYEYRl98cJQzqvTcvQ7U1KWZYygLghhJg"
-            )
+            api_key = os.environ.get("CODEWEAVER_POSTHOG_API_KEY", CODEWEAVER_POSTHOG_PROJECT_KEY)
 
         self.enabled = enabled and api_key
         self.logger = logging.getLogger(__name__)
@@ -99,7 +98,9 @@ class PostHogClient:
         if self.enabled and api_key:
             try:
                 self._client = Posthog(
-                    project_api_key=api_key,
+                    project_api_key=api_key
+                    if isinstance(api_key, str)
+                    else api_key.get_secret_value(),
                     host=host,
                     # Disable debug mode in production
                     debug=False,
@@ -155,7 +156,7 @@ class PostHogClient:
         )
 
     def capture(
-        self, event: str, properties: dict[str, Any], *, distinct_id: str = "anonymous"
+        self, event: str, properties: dict[str, Any], *, distinct_id: UUID7HexT = SESSION_ID
     ) -> None:
         """
         Send event to PostHog.
@@ -201,7 +202,7 @@ class PostHogClient:
             self.logger.exception("Failed to capture event from object")
 
     def capture_with_serialization(
-        self, event: str, data_obj: Any, *, distinct_id: str = "anonymous"
+        self, event: str, data_obj: Any, *, distinct_id: UUID7HexT = SESSION_ID
     ) -> None:
         """
         Send event with automatic privacy serialization.
@@ -209,7 +210,7 @@ class PostHogClient:
         Args:
             event: Event name
             data_obj: Object with serialize_for_telemetry() method (BasedModel or DataclassSerializationMixin)
-            distinct_id: User identifier (default: "anonymous" for privacy)
+            distinct_id: we generate a session_id
 
         Note:
             This method automatically calls serialize_for_telemetry() on the data object

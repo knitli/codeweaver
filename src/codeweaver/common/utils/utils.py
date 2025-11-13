@@ -62,7 +62,10 @@ def dict_set_to_tuple(d: DictInputTypesT) -> DictOutputTypesT:
 
 
 def estimate_tokens(text: str | bytes, encoder: str = "cl100k_base") -> int:
-    """Estimate the number of tokens in a text."""
+    """Estimate the number of tokens in a text using tiktoken. Defaults to cl100k_base encoding.
+
+    Most embedding and reranking models *don't* use this encoding, but it's fast and a reasonable estimate for most texts.
+    """
     import tiktoken
 
     encoding = tiktoken.get_encoding(encoder)

@@ -117,7 +117,7 @@ async def memory_store() -> AsyncGenerator[MemoryVectorStoreProvider, None]:
 
     with tempfile.TemporaryDirectory() as tmpdir:
         config = MemoryConfig(
-            persist_path=str(Path(tmpdir) / "test_store.json"),
+            persist_path=Path(tmpdir) / "test_store.json",
             auto_persist=False,
             collection_name=f"perf_test_{uuid7().hex[:8]}",
         )

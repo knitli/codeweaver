@@ -7,8 +7,10 @@
 
 from __future__ import annotations
 
+import logging
+
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import UUID4
 from typing_extensions import TypeIs
@@ -26,6 +28,8 @@ if TYPE_CHECKING:
     from codeweaver.agent_api.find_code.types import StrategizedQuery
     from codeweaver.providers.vector_stores.base import MixedQueryInput
 
+
+logger = logging.getLogger(__name__)
 
 QdrantClient = None
 try:
@@ -121,6 +125,44 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
                 sparse_vectors_config={"sparse": {}},
             )
 
+    async def delete_collection(self, collection_name: str | None = None) -> bool:
+        """Delete a vector store collection.
+
+        Args:
+            collection_name: Name of collection to delete. If None, uses configured collection.
+
+        Returns:
+            bool: True if collection was deleted, False if it didn't exist.
+
+        Raises:
+            ProviderError: If client is not initialized or operation fails.
+        """
+        if not self._client:
+            raise ProviderError("Qdrant client is not initialized")
+
+        target_collection = collection_name or self.collection
+        if not target_collection:
+            raise ProviderError("No collection specified for deletion")
+
+        try:
+            collections = await self._client.get_collections()
+            collection_names = [col.name for col in collections.collections]
+
+            if target_collection not in collection_names:
+                logger.info("Collection '%s' does not exist, nothing to delete", target_collection)
+                return False
+
+            await self._client.delete_collection(collection_name=target_collection)
+            logger.info("Successfully deleted collection '%s'", target_collection)
+
+        except Exception as e:
+            raise ProviderError(
+                f"Failed to delete collection '{target_collection}': {e}",
+                details={"collection": target_collection, "error": str(e)},
+            ) from e
+        else:
+            return True
+
     async def list_collections(self) -> list[str] | None:
         """List all collections in the Qdrant instance.
 
@@ -185,28 +227,12 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
                     sparse = sparse_data  # type: ignore
             elif isinstance(vector, dict) and "dense" in vector:
                 dense = vector["dense"]
-                # Also check for sparse in the same dict
-                if "sparse" in vector:
-                    sparse_data = vector["sparse"]
-                    # Handle SparseVector model objects
-                    if isinstance(sparse_data, SparseVector):
-                        sparse = SparseEmbedding(
-                            indices=sparse_data.indices, values=sparse_data.values
-                        )
-                    elif isinstance(sparse_data, dict):
-                        sparse = SparseEmbedding(
-                            indices=sparse_data.get("indices", []),
-                            values=sparse_data.get("values", []),
-                        )
-                    else:
-                        # Assume it's a SparseEmbedding already
-                        sparse = sparse_data  # type: ignore
-            elif isinstance(vector, (list, tuple)):
+            elif isinstance(vector, list | tuple):
                 sparse = None
                 dense = vector
             vector = StrategizedQuery(
                 query="unavailable",
-                dense=dense,
+                dense=cast(list[int | float], dense),
                 sparse=sparse,
                 strategy=SearchStrategy.HYBRID_SEARCH
                 if dense and sparse
@@ -297,6 +323,21 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
 
         # Ensure collection exists
         await self._ensure_collection(collection_name)
+
+        # Get collection info to validate dimensions
+        try:
+            collection_info = await self._client.get_collection(collection_name)
+            expected_dense_dim = None
+            if hasattr(collection_info.config, "params") and hasattr(
+                collection_info.config.params, "vectors"
+            ):
+                vectors_config = collection_info.config.params.vectors
+                if isinstance(vectors_config, dict) and "dense" in vectors_config:
+                    expected_dense_dim = vectors_config["dense"].size
+        except Exception as e:
+            logger.warning("Could not get collection info for dimension validation: %s", e)
+            expected_dense_dim = None
+
         points: list[PointStruct] = []
         for chunk in chunks:
             # Prepare vectors dict for named vectors
@@ -304,12 +345,42 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
 
             # Try to get embeddings from proper embedding batch info
             if chunk.dense_embeddings:
-                vectors["dense"] = list(chunk.dense_embeddings.embeddings)
+                dense_vector = list(chunk.dense_embeddings.embeddings)
+
+                # Validate dimension if we know the expected dimension
+                if expected_dense_dim is not None and len(dense_vector) != expected_dense_dim:
+                    from codeweaver.exceptions import DimensionMismatchError
+
+                    raise DimensionMismatchError(
+                        "Embedding dimension mismatch detected.\n\n"
+                        f"Vector store collection '{collection_name}' expects {expected_dense_dim}-dimensional embeddings, "
+                        f"but the embedding model produced {len(dense_vector)} dimensions.\n\n"
+                        "This typically happens when:\n"
+                        "  • The embedding model changed (e.g., switched providers or model versions)\n"
+                        "  • The embedding model configuration changed (e.g., output dimension settings)\n"
+                        "  • The collection was created with different model settings\n\n"
+                        "To resolve this issue, you have two choices:"
+                        "   A. Clear and rebuild the vector store"
+                        "   B. Revert to the previous embedding model/configuration that matches the collection\n\n"
+                        "To clear and rebuild the collection, run the following command:\n\n"
+                        "  codeweaver index --clear\n\n"
+                        "This will delete the existing collection and checkpoints, then rebuild from scratch "
+                        "with the current embedding model configuration.",
+                        details={
+                            "collection": collection_name,
+                            "expected_dimension": expected_dense_dim,
+                            "actual_dimension": len(dense_vector),
+                            "chunk_id": chunk.chunk_id.hex,
+                            "resolution_command": "codeweaver index --clear",
+                        },
+                    )
+
+                vectors["dense"] = dense_vector
             elif hasattr(chunk, "__dict__") and "embeddings" in chunk.__dict__:
                 # Fallback for test chunks created with model_construct(embeddings={...})
-                emb_dict = chunk.__dict__["embeddings"]
-                if isinstance(emb_dict, dict) and "dense" in emb_dict:
-                    vectors["dense"] = list(emb_dict["dense"])
+                chunk_embeddings = chunk.__dict__["embeddings"]
+                if isinstance(chunk_embeddings, dict) and "dense" in chunk_embeddings:
+                    vectors["dense"] = list(chunk_embeddings["dense"])
 
             if chunk.sparse_embeddings:
                 # Qdrant sparse vector format requires indices and values
@@ -328,9 +399,9 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
                     vectors["sparse"] = list(sparse.embeddings)
             elif hasattr(chunk, "__dict__") and "embeddings" in chunk.__dict__:
                 # Fallback for test chunks created with model_construct(embeddings={...})
-                emb_dict = chunk.__dict__["embeddings"]
-                if isinstance(emb_dict, dict) and "sparse" in emb_dict:
-                    sparse_data = emb_dict["sparse"]
+                chunk_embeddings = chunk.__dict__["embeddings"]
+                if isinstance(chunk_embeddings, dict) and "sparse" in chunk_embeddings:
+                    sparse_data = chunk_embeddings["sparse"]
                     from qdrant_client.http.models import SparseVector
 
                     if isinstance(sparse_data, dict):

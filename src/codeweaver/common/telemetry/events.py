@@ -11,7 +11,7 @@ All events use only aggregated, anonymized data.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, Protocol
+from typing import TYPE_CHECKING, Annotated, Any, Protocol, Self
 
 from pydantic import Field, NonNegativeFloat, NonNegativeInt
 from pydantic.dataclasses import dataclass
@@ -20,12 +20,38 @@ from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializatio
 
 
 if TYPE_CHECKING:
+    from codeweaver.common.statistics import SessionStatistics
     from codeweaver.core.types.aliases import FilteredKeyT
     from codeweaver.core.types.enum import AnonymityConversion
+    from codeweaver.server.server import AppState
+
+
+def _get_statistics() -> SessionStatistics:
+    """Helper to get current session statistics."""
+    from codeweaver.common.statistics import get_session_statistics
+
+    return get_session_statistics()
+
+
+def _get_state() -> AppState:
+    """Helper to get current application state."""
+    from codeweaver.server.server import get_state
+
+    return get_state()
 
 
 class TelemetryEvent(Protocol):
     """Protocol for telemetry events."""
+
+    @classmethod
+    def generate_payload(cls, **kwargs: Any) -> Self:
+        """
+        Generate telemetry payload.
+
+        Returns:
+            Tuple of (event_name, properties_dict)
+        """
+        ...
 
     def to_posthog_event(self) -> tuple[str, dict]:
         """
@@ -110,6 +136,16 @@ class SessionSummaryEvent(DataclassSerializationMixin):
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
         """All fields in SessionSummaryEvent are already aggregated and safe for telemetry."""
         return None
+
+    @classmethod
+    def generate_payload(cls, **kwargs: Any) -> Self:
+        """
+        Generate telemetry payload.
+
+        Returns:
+            Instance of SessionSummaryEvent
+        """
+        return cls(**kwargs)
 
     def to_posthog_event(self) -> tuple[str, dict]:
         """Convert to PostHog event format."""

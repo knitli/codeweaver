@@ -604,19 +604,64 @@ class Indexer(BasedModel):
         if not chunks:
             return
 
+        # Get embedding registry to check which chunks already have embeddings
+        from codeweaver.providers.embedding.registry import get_embedding_registry
+
+        registry = get_embedding_registry()
+
         # Dense embeddings
         if self._embedding_provider:
             try:
-                await self._embedding_provider.embed_documents(chunks)
-                logger.debug("Generated dense embeddings for %d chunks", len(chunks))
+                # Filter out chunks that already have dense embeddings
+                chunks_needing_dense = [
+                    chunk
+                    for chunk in chunks
+                    if chunk.chunk_id not in registry or not registry[chunk.chunk_id].has_dense
+                ]
+
+                if chunks_needing_dense:
+                    await self._embedding_provider.embed_documents(chunks_needing_dense)
+                    logger.debug(
+                        "Generated dense embeddings for %d chunks", len(chunks_needing_dense)
+                    )
+                else:
+                    logger.debug(
+                        "All %d chunks already have dense embeddings, skipping", len(chunks)
+                    )
+            except ValueError as e:
+                # Handle duplicate embedding errors gracefully
+                if "already set" in str(e):
+                    logger.warning("Some chunks already embedded (dense), skipping: %s", e)
+                else:
+                    raise
             except Exception:
                 logger.exception("Dense embedding failed")
 
         # Sparse embeddings
         if self._sparse_provider:
             try:
-                await self._sparse_provider.embed_documents(chunks)
-                logger.debug("Generated sparse embeddings for %d chunks", len(chunks))
+                # Filter out chunks that already have sparse embeddings
+                chunks_needing_sparse = [
+                    chunk
+                    for chunk in chunks
+                    if chunk.chunk_id not in registry or not registry[chunk.chunk_id].has_sparse
+                ]
+
+                if chunks_needing_sparse:
+                    await self._sparse_provider.embed_documents(chunks_needing_sparse)
+                    logger.debug(
+                        "Generated sparse embeddings for %d chunks", len(chunks_needing_sparse)
+                    )
+                else:
+                    logger.debug(
+                        "All %d chunks already have sparse embeddings, skipping", len(chunks)
+                    )
+            except ValueError as e:
+                # Handle duplicate embedding errors gracefully
+                if "already set" in str(e):
+                    logger.warning("Some chunks already embedded (sparse), skipping: %s", e)
+                else:
+                    raise
             except Exception:
                 logger.exception("Sparse embedding failed")
 
