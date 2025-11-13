@@ -164,13 +164,17 @@ async def index(
 
             # Clear checkpoints and manifest
             from codeweaver.engine.indexer.checkpoint import CheckpointManager
-            from codeweaver.engine.indexer.manifest import FileManifest
+            from codeweaver.engine.indexer.manifest import FileManifestManager
 
-            checkpoint_mgr = CheckpointManager(settings.indexing.checkpoint_dir)
+            checkpoint_mgr = CheckpointManager(
+                project_path=settings.project_path, checkpoint_dir=settings.indexing.cache_dir
+            )
             checkpoint_mgr.delete()
             console.print("  ✓ [green]Checkpoints cleared[/green]")
 
-            manifest = FileManifest(settings.indexing.checkpoint_dir)
+            manifest = FileManifestManager(
+                project_path=settings.project_path, manifest_dir=settings.indexing.cache_dir
+            )
             manifest.delete()
             console.print("  ✓ [green]File manifest cleared[/green]")
 
