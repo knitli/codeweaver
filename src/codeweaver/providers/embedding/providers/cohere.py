@@ -145,24 +145,26 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
                 Provider.HEROKU: try_for_heroku_endpoint(client_options),
             }
             client_options["base_url"] = client_options.get("base_url") or base_urls[provider]
-            client_options["model"] = caps.name
+            # Store model separately - it's not a client option but an embed() parameter
+            model = caps.name
 
             _client = CohereClient(**client_options)
-            # Store client_options for later use
-            self.client_options = client_options
+            # Store client_options for later use (will be set after super().__init__)
+            client_opts_to_store = client_options | {"model": model}
         else:
             # Client was provided - extract or use default client_options
-            self.client_options = (
+            client_opts_to_store = (
                 config_kwargs.get("client_options", {})
                 or config_kwargs
                 or {"model": caps.name, "client_name": "codeweaver"}
             )
 
-        # Store client BEFORE super().__init__()
-        self.client = _client
-
         # Call super with correct signature (client, caps, kwargs as dict)
+        # This initializes the Pydantic model and sets up all the attributes
         super().__init__(client=_client, caps=caps, kwargs=config_kwargs)
+        
+        # Now set client_options after super().__init__()
+        self.client_options = client_opts_to_store
 
     def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """Initialize the Cohere embedding provider.
