@@ -60,7 +60,7 @@ async def test_partial_embeddings(qdrant_test_manager):
     results = await provider.search(
         StrategizedQuery(
             query="function with failed dense embedding",
-            strategy=SearchStrategy.SEMANTIC,
+            strategy=SearchStrategy.SPARSE_ONLY,
             dense=None,
             sparse={"indices": [1, 2], "values": [0.8, 0.7]},  # ty: ignore[invalid-argument-type]
         )

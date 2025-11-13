@@ -190,7 +190,7 @@ class TestMemoryProviderContract:
                 query="what is the word?",
                 dense=[0.5] * 768,
                 sparse=None,
-                strategy=SearchStrategy.SEMANTIC,
+                strategy=SearchStrategy.DENSE_ONLY,
             )
         )
         assert len(results) > 0

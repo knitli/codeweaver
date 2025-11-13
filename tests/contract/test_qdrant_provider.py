@@ -267,7 +267,7 @@ class TestQdrantProviderContract:
 
         results = await qdrant_provider.search(
             StrategizedQuery(
-                query="test", dense=[0.5] * 768, sparse=None, strategy=SearchStrategy.SEMANTIC
+                query="test", dense=[0.5] * 768, sparse=None, strategy=SearchStrategy.DENSE_ONLY
             )
         )
         assert len(results) > 0

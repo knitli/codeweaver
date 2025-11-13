@@ -75,7 +75,7 @@ async def test_incremental_updates(qdrant_test_manager):
     results = await provider.search(
         StrategizedQuery(
             query="def func(): return 2",
-            strategy=SearchStrategy.SEMANTIC,
+            strategy=SearchStrategy.DENSE_ONLY,
             dense=[0.9] * 768,
             sparse=None,
         )

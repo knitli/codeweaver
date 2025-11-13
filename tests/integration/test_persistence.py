@@ -62,7 +62,7 @@ async def test_persistence_across_restarts(qdrant_test_manager):
     results = await provider2.search(
         StrategizedQuery(
             query="validate token",
-            strategy=SearchStrategy.SEMANTIC,
+            strategy=SearchStrategy.DENSE_ONLY,
             dense=[0.5, 0.5, 0.5] * 256,
             sparse=None,
         )
