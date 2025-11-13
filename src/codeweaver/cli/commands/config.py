@@ -41,7 +41,11 @@ class ConfigProfile(BaseEnum):
 
 @app.default()
 def config(
-    *, project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None
+    *,
+    project_path: Annotated[
+        Path | None,
+        cyclopts.Parameter(name=["--project", "-p"], help="Path to project directory"),
+    ] = None,
 ) -> None:
     """Manage CodeWeaver configuration."""
     from codeweaver.config.settings import get_settings_map
