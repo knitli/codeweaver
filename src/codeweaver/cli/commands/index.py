@@ -21,6 +21,8 @@ from pydantic import FilePath
 from rich.console import Console
 
 from codeweaver.common import CODEWEAVER_PREFIX
+from codeweaver.common.utils.git import get_project_path
+from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.exceptions import CodeWeaverError
 
 
@@ -139,6 +141,11 @@ async def index(
             console.print(
                 f"{CODEWEAVER_PREFIX} [yellow]Clearing vector store and checkpoints...[/yellow]"
             )
+            project_path = (
+                project_path or settings.project_path
+                if isinstance(settings.project_path, Path)
+                else get_project_path()
+            )
 
             # Clear vector store
             from codeweaver.common.registry.provider import get_provider_registry
@@ -153,21 +160,25 @@ async def index(
                 and isinstance(vector_settings, VectorStoreProviderSettings)
             ):
                 collection_name = vector_settings.get("provider_settings", {}).get(
-                    "collection_name", "codeweaver_vectors"
+                    "collection_name",
+                    settings.project_name
+                    if isinstance(settings.project_name, str)
+                    else project_path.name,
                 )
             await_result = await store.delete_collection(collection_name)
 
             if await_result:
-                console.print("  ✓ [green]Vector store collection deleted[/green]")
+                console.print(f"  ✓ [green]Vector store collection, {collection_name} deleted[/green]")
             else:
-                console.print("  • [dim]Vector store collection did not exist[/dim]")
+                console.print(f"  • [dim]Vector store collection, {collection_name} did not exist[/dim]")
 
             # Clear checkpoints and manifest
+            from codeweaver.config.indexing import IndexingSettings
             from codeweaver.engine.indexer.checkpoint import CheckpointManager
             from codeweaver.engine.indexer.manifest import FileManifestManager
 
             checkpoint_mgr = CheckpointManager(
-                project_path=settings.project_path, checkpoint_dir=settings.indexing.cache_dir
+                project_path=project_path, checkpoint_dir=settings.indexing.cache_dir if isinstance(settings.indexing, IndexingSettings) else get_user_config_dir() / ""
             )
             checkpoint_mgr.delete()
             console.print("  ✓ [green]Checkpoints cleared[/green]")

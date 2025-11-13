@@ -122,7 +122,7 @@ def get_storage_path() -> DirectoryPath:
     """Get the default storage directory for index and checkpoint data."""
     from codeweaver.common.utils import get_user_config_dir
 
-    return Path(get_user_config_dir()) / "indexes"
+    return Path(get_user_config_dir()) / ".indexes"
 
 
 def _resolve_globs(path_string: str, repo_root: Path) -> set[Path]:
