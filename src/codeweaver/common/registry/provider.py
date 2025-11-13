@@ -583,6 +583,7 @@ class ProviderRegistry(BasedModel):
                     values: list[ProviderEnvVarInfo] = list(other_vars.values())
                     for info in values:
                         if (var_present := os.getenv(info.env)) and info.env not in (
+                            # these are httpx env variables that can be used for providers with httpx backends but shouldn't get passed
                             "HTTPS_PROXY",
                             "SSL_CERT_FILE",
                         ):
@@ -590,7 +591,17 @@ class ProviderRegistry(BasedModel):
                 if isinstance(var_info, ProviderEnvVarInfo) and (
                     var_present := os.getenv(var_info.env)
                 ):
-                    assembled_vars[var_info.variable_name or role] = var_present
+                    if (
+                        (name := var_info.variable_name or role) == "host"
+                        and provider == Provider.QDRANT
+                        and "http" in var_present.lower()
+                        and var_present.lower() not in ("localhost", "127.0.0.1")
+                    ):
+                        # Qdrant is particular about what attribute gets the URL
+                        # you'd think host + port is equivalent to URL.... but apparently not
+                        # ... and it likes to fail in a way that tells you nothing about the issue
+                        assembled_vars["url"] = var_present
+                    assembled_vars[name] = var_present
 
         return assembled_vars
 

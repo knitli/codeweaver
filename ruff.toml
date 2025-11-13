@@ -151,6 +151,7 @@ exclude = [
   "setuptools/_distutils",
   "setuptools/config/_validate_pyproject",
   "typings",
+  "tests/fixtures/malformed.py",
 ]
 
 [lint.pydocstyle]

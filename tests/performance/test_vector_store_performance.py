@@ -258,7 +258,7 @@ async def test_memory_persistence_performance(chunk_count: int) -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         persist_path = Path(tmpdir) / "test_store.json"
         config = MemoryConfig(
-            persist_path=str(persist_path), auto_persist=False, collection_name="perf_test"
+            persist_path=persist_path, auto_persist=False, collection_name="perf_test"
         )
 
         # Create store and populate

@@ -153,7 +153,7 @@ class Provider(BaseEnum):
                         ),
                         host=ProviderEnvVarInfo(
                             env="QDRANT__SERVICE__HOST",
-                            description="Hostname or URL of the Qdrant service",
+                            description="Hostname of the Qdrant service; do not use for URLs with schemes (e.g. 'http://')",
                         ),
                         port=ProviderEnvVarInfo(
                             env="QDRANT__SERVICE__HTTP_PORT",

@@ -268,9 +268,10 @@ class FileManifestManager:
         from codeweaver.core.stores import get_blake_hash
 
         self.project_path = project_path.resolve()
-        self.manifest_dir = (
-            manifest_dir.resolve() or get_user_config_dir().resolve() / ".indexes/manifests"
-        )
+        manifest_dir = manifest_dir or get_user_config_dir() / ".indexes/manifests"
+        if not manifest_dir.exists():
+            manifest_dir.mkdir(parents=True, exist_ok=True)
+        self.manifest_dir = manifest_dir.resolve()
 
         # Add path hash to filename to avoid collisions between projects with same name
         path_hash = get_blake_hash(str(self.project_path))[:16]

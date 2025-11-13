@@ -25,6 +25,7 @@ from pydantic import UUID7, DirectoryPath, Field, NonNegativeInt
 from pydantic_core import from_json, to_json
 from uuid_extensions import uuid7
 
+from codeweaver.common.utils.git import get_project_path
 from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.indexing import IndexerSettings
 from codeweaver.config.providers import (
@@ -40,6 +41,7 @@ from codeweaver.core.types.sentinel import Unset
 
 
 if TYPE_CHECKING:
+    from codeweaver.config.types import CodeWeaverSettingsDict
     from codeweaver.core.types.aliases import FilteredKeyT
     from codeweaver.core.types.enum import AnonymityConversion
 
@@ -300,17 +302,28 @@ class CheckpointManager:
             project_path: Path to indexed codebase
             checkpoint_dir: Directory for checkpoint files (default: .codeweaver/)
         """
-        settings = _get_settings_map()
+        settings: DictView[CodeWeaverSettingsDict] = _get_settings_map()
 
-        self.project_path = (project_path or settings.get("project_path") or Path.cwd()).resolve()
+        self.project_path: Path = (
+            project_path or settings.get("project_path") or get_project_path()
+        ).resolve()
 
-        self.checkpoint_dir = (
+        self.checkpoint_dir: Path = (
             (checkpoint_dir or get_user_config_dir()).resolve() / ".indexes" / "checkpoints"
         )
-        self.checkpoint_file = (
+        self.checkpoint_file: Path = (
             self.checkpoint_dir
-            / f"checkpoint_{self.project_path.name}-{self.compute_settings_hash(self.get_relevant_settings())[:8]}.json"
+            / f"checkpoint_{settings['project_name'] if isinstance(settings['project_name'], str) else self.project_path.name}-{get_blake_hash(str(self.project_path).encode('utf-8')[:8])}.json"
         )
+
+    @property
+    def checkpoint_path(self) -> Path:
+        """Get full path to checkpoint file.
+
+        Returns:
+            Path to checkpoint JSON file
+        """
+        return self.checkpoint_file.resolve()
 
     def compute_settings_hash(self, settings_dict: CheckpointSettingsFingerprint) -> BlakeHashKey:
         """Compute Blake3 hash of settings for change detection.

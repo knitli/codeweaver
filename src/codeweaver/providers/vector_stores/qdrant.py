@@ -96,12 +96,21 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
         prefer_grpc = self.config.get("prefer_grpc", False)
         grpc_port = self.config.get("grpc_port", 6334)
 
-        self._client = AsyncQdrantClient(
-            url=url,
-            api_key=str(api_key) if api_key else None,
-            prefer_grpc=prefer_grpc,
-            grpc_port=grpc_port,
-        )
+        # Build client kwargs based on connection type
+        # For cloud instances (https://), don't use gRPC parameters to avoid conflicts
+        is_https = url.startswith("https://")
+        client_kwargs: dict[str, Any] = {
+            "url": url,
+            "api_key": str(api_key) if api_key else None,
+        }
+
+        # Only add gRPC parameters for local instances or when explicitly requested
+        if not is_https:
+            client_kwargs["prefer_grpc"] = prefer_grpc
+            if prefer_grpc:
+                client_kwargs["grpc_port"] = grpc_port
+
+        self._client = AsyncQdrantClient(**client_kwargs)
         if collection_name := self.collection:
             await self._ensure_collection(collection_name)
 

@@ -27,7 +27,7 @@ from typing import (
     is_typeddict,
 )
 
-from pydantic import Field, PositiveFloat, PositiveInt, SecretStr, computed_field
+from pydantic import Field, PositiveFloat, PositiveInt, SecretStr, computed_field, model_validator
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
 from pydantic_ai.settings import merge_model_settings
 
@@ -541,6 +541,88 @@ class ProviderSettings(BasedModel):
         tuple[AgentProviderSettings, ...] | AgentProviderSettings | Unset,
         Field(description="""Agent provider configuration"""),
     ] = DefaultAgentProviderSettings
+
+    def _validate_qdrant(
+        self, settings: VectorStoreProviderSettings
+    ) -> VectorStoreProviderSettings:
+        """Setup Qdrant vector store settings with defaults."""
+        provider_settings = settings.get("provider_settings", {})
+        new_settings = {}
+        if (qdrant_config := provider_settings.get("qdrant", {})) and sum(
+            bool(qdrant_config.get(key)) for key in ("location", "url", "host", "path")
+        ) > 1:
+            from codeweaver.exceptions import ConfigurationError
+
+            raise ConfigurationError(
+                "Qdrant provider_settings cannot have more than one of `location`, `url`, `host`, or `path` set.",
+                details={"provider_settings": qdrant_config},
+                suggestions=[
+                    "Remove all but one of `location`, `url`, `host`, or `path` from your Qdrant provider_settings.",
+                    "Local instances: use `path` if your instance is at a file path. Use `host=localhost` for local network instances (docker). Provide a port if not default (6333 for http, 6334 for grpc).",
+                    "Remote instances: use `url`. Provide a port if not standard (usually not necessary).",
+                ],
+            )
+        if connection := settings.get("connection"):
+            if (
+                host := connection.get("host")
+                and not provider_settings.get("host")
+                and not provider_settings.get("url")
+            ):
+                new_settings["provider_settings"]["host"] = host
+            if port := connection.get("port") and not provider_settings.get("port"):
+                new_settings["provider_settings"]["port"] = port
+        if headers := settings.get("connection", {}).get("headers"):
+            new_settings["client_options"] = (settings.get("client_options") or {}) | {
+                "metadata": headers
+            }
+        if api_key := settings.get("api_key"):
+            new_settings["provider_settings"]["api_key"] = api_key
+        return new_settings
+
+    def _validate_vector_stores(self) -> tuple[VectorStoreProviderSettings, ...]:
+        """Validate vector store settings."""
+        if self.vector_store is Unset or (
+            isinstance(self.vector_store, dict)
+            and self.vector_store.get("provider") == Provider.NOT_SET
+        ):
+            from codeweaver.exceptions import ConfigurationError
+
+            raise ConfigurationError(
+                "CodeWeaver requires a vector store provider.",
+                details={"vector_store": self.vector_store},
+                suggestions=[
+                    "Configure a vector store in your CodeWeaver settings.",
+                    "If you got this error and *don't have blank settings in your config* (meaning they're provided and literally blank or None), please open an issue at https://github.com/knitli/codeweaver-mcp/issues/new",
+                ],
+            )
+        vectors = (
+            self.vector_store if isinstance(self.vector_store, tuple) else (self.vector_store,)
+        )
+        new_vector_store: list[VectorStoreProviderSettings] = []
+        for vector in vectors:
+            if isinstance(vector, Unset):
+                continue
+            if vector["provider"] == Provider.MEMORY:
+                new_vector = vector.copy() | {"client_options": {}}
+            else:
+                new_vector = self._setup_qdrant(vector)
+            new_vector_store.append(new_vector)
+        return tuple(new_vector_store)
+
+    @model_validator(mode="after")
+    def validate_and_normalize_providers(self) -> ProviderSettings:
+        """Validate and normalize provider settings after initialization."""
+        self.vector_store = self._validate_vector_stores()
+        for key in "vector_store", "embedding", "sparse_embedding", "reranking", "agent":
+            value = getattr(self, key)
+            if value is not Unset and not isinstance(value, tuple):
+                setattr(self, key, (value,))
+            if len(getattr(self, key)) > 1:
+                logger.warning(
+                    "Multiple providers configured for '%s'. We hope to support this in the future, but for now we'll only use the first one.",
+                    key,
+                )
+        return self
 
     def _telemetry_keys(self) -> None:
         return None
