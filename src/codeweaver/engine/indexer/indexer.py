@@ -612,14 +612,11 @@ class Indexer(BasedModel):
         # Dense embeddings
         if self._embedding_provider:
             try:
-                # Filter out chunks that already have dense embeddings
-                chunks_needing_dense = [
+                if chunks_needing_dense := [
                     chunk
                     for chunk in chunks
                     if chunk.chunk_id not in registry or not registry[chunk.chunk_id].has_dense
-                ]
-
-                if chunks_needing_dense:
+                ]:
                     await self._embedding_provider.embed_documents(chunks_needing_dense)
                     logger.debug(
                         "Generated dense embeddings for %d chunks", len(chunks_needing_dense)
@@ -640,14 +637,11 @@ class Indexer(BasedModel):
         # Sparse embeddings
         if self._sparse_provider:
             try:
-                # Filter out chunks that already have sparse embeddings
-                chunks_needing_sparse = [
+                if chunks_needing_sparse := [
                     chunk
                     for chunk in chunks
                     if chunk.chunk_id not in registry or not registry[chunk.chunk_id].has_sparse
-                ]
-
-                if chunks_needing_sparse:
+                ]:
                     await self._sparse_provider.embed_documents(chunks_needing_sparse)
                     logger.debug(
                         "Generated sparse embeddings for %d chunks", len(chunks_needing_sparse)
@@ -726,7 +720,7 @@ class Indexer(BasedModel):
     async def index(self, change: FileChange) -> None:
         """Index a single file based on a watchfiles change event.
 
-        Enhanced version that executes full pipeline: file → chunks → embeddings → vector store.
+        Executes full pipeline: file → chunks → embeddings → vector store.
         Handles added, modified, and deleted file events.
         """
         try:

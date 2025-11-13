@@ -93,6 +93,11 @@ class IndexingPhase(str, BaseEnum):
 
     __slots__ = ()
 
+    @property
+    def is_complete(self) -> bool:
+        """Check if the phase is complete."""
+        return self == IndexingPhase.COMPLETE
+
 
 class IndexingProgressTracker:
     """Progress tracker for indexing operations with Rich visualizations.

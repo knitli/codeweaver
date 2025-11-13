@@ -304,9 +304,12 @@ class CheckpointManager:
 
         self.project_path = (project_path or settings.get("project_path") or Path.cwd()).resolve()
 
-        self.checkpoint_dir = (checkpoint_dir or get_user_config_dir()).resolve()
+        self.checkpoint_dir = (
+            (checkpoint_dir or get_user_config_dir()).resolve() / ".indexes" / "checkpoints"
+        )
         self.checkpoint_file = (
-            self.checkpoint_dir / f"index_checkpoint_{self.project_path.name}.json"
+            self.checkpoint_dir
+            / f"checkpoint_{self.project_path.name}-{self.compute_settings_hash(self.get_relevant_settings())[:8]}.json"
         )
 
     def compute_settings_hash(self, settings_dict: CheckpointSettingsFingerprint) -> BlakeHashKey:
