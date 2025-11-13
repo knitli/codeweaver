@@ -5,6 +5,7 @@
     "charliermarsh.ruff",
     "hverlin.mise-vscode",
     "exodiusstudios.comment-anchors",
-    "aaron-bond.better-comments"
+    "aaron-bond.better-comments",
+    "tombi-toml.tombi"
   ]
 }
