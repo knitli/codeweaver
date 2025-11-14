@@ -223,8 +223,6 @@ class QdrantConfig(TypedDict, total=False):
     """Named vector for dense embeddings. Defaults to 'dense'."""
     sparse_vector_name: NotRequired[str]
     """Named vector for sparse embeddings. Defaults to 'sparse'."""
-    client_options: NotRequired[dict[str, Any] | None]
-    """Additional keyword arguments to pass to the Qdrant client."""
 
 
 class MemoryConfig(TypedDict, total=False):
@@ -361,28 +359,28 @@ def _get_default_embedding_settings() -> DeterminedDefaults:
             # all three of the top defaults are extremely capable
             if lib == "voyageai":
                 return DeterminedDefaults(
-                    provider=Provider.VOYAGE, model="voyage:voyage-code-3", enabled=True
+                    provider=Provider.VOYAGE, model="voyage-code-3", enabled=True
                 )
             if lib == "mistral":
                 return DeterminedDefaults(
-                    provider=Provider.MISTRAL, model="mistral:codestral-embed", enabled=True
+                    provider=Provider.MISTRAL, model="codestral-embed", enabled=True
                 )
             if lib == "google":
                 return DeterminedDefaults(
-                    provider=Provider.GOOGLE, model="google/gemini-embedding-001", enabled=True
+                    provider=Provider.GOOGLE, model="gemini-embedding-001", enabled=True
                 )
             if lib in {"fastembed_gpu", "fastembed"}:
                 return DeterminedDefaults(
                     # showing its age but it's still a solid lightweight option
                     provider=Provider.FASTEMBED,
-                    model="fastembed:BAAI/bge-small-en-v1.5",
+                    model="BAAI/bge-small-en-v1.5",
                     enabled=True,
                 )
             if lib == "sentence_transformers":
                 return DeterminedDefaults(
                     provider=Provider.SENTENCE_TRANSFORMERS,
                     # embedding-small-english-r2 is *very lightweight* and quite capable with a good context window (8192 tokens)
-                    model="sentence-transformers:ibm-granite/granite-embedding-small-english-r2",
+                    model="ibm-granite/granite-embedding-small-english-r2",
                     enabled=True,
                 )
     logger.warning(
@@ -407,12 +405,12 @@ def _get_default_sparse_embedding_settings() -> DeterminedDefaults:
             if lib == "sentence_transformers":
                 return DeterminedDefaults(
                     provider=Provider.SENTENCE_TRANSFORMERS,
-                    model="opensearch:opensearch-neural-sparse-encoding-doc-v3-gte",
+                    model="opensearch/opensearch-neural-sparse-encoding-doc-v3-gte",
                     enabled=True,
                 )
             if lib in {"fastembed_gpu", "fastembed"}:
                 return DeterminedDefaults(
-                    provider=Provider.FASTEMBED, model="prithivida/Splade_PP_en_v2", enabled=True
+                    provider=Provider.FASTEMBED, model="prithivida/Splade_PP_en_v1", enabled=True
                 )
     # Sentence-Transformers and Fastembed are the *only* sparse embedding options we support
     logger.warning(
@@ -733,7 +731,13 @@ class ProviderSettings(BasedModel):
                 else:
                     all_settings.append(setting)
 
-        return all_settings[0] if len(all_settings) == 1 else tuple(all_settings) if all_settings else None
+        return (
+            all_settings[0]
+            if len(all_settings) == 1
+            else tuple(all_settings)
+            if all_settings
+            else None
+        )
 
     def has_auth_configured(self, provider: Provider) -> bool:
         """Check if API key or TLS certs are set for the provider through settings or environment."""

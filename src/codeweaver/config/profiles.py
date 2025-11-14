@@ -15,8 +15,14 @@ The recommended flag gives you access to:
 
 """
 
+import contextlib
+
+from importlib import util
+from typing import Literal, overload
+
+from pydantic import AnyHttpUrl
+
 from codeweaver.config.providers import (
-    AgentModelSettings,
     AgentProviderSettings,
     DataProviderSettings,
     EmbeddingModelSettings,
@@ -25,14 +31,87 @@ from codeweaver.config.providers import (
     QdrantConfig,
     RerankingModelSettings,
     RerankingProviderSettings,
+    SparseEmbeddingModelSettings,
+    SparseEmbeddingProviderSettings,
     VectorStoreProviderSettings,
 )
 
 
-def recommended_default() -> ProviderSettingsDict:
+def _default_local_vector_config() -> QdrantConfig:
+    """Default local vector store configuration for Qdrant."""
+    return QdrantConfig(prefer_grpc=True, url="http://localhost:6334")
+
+
+def _default_remote_vector_config(url: AnyHttpUrl) -> QdrantConfig:
+    """Default remote vector store configuration for Qdrant."""
+    return QdrantConfig(prefer_grpc=True, url=url)
+
+
+def _get_vector_config(
+    vector_deployment: Literal["cloud", "local"], *, url: AnyHttpUrl | None = None
+) -> QdrantConfig:
+    if vector_deployment != "cloud":
+        return _default_local_vector_config()
+    if url is None:
+        raise ValueError("You must provide a URL for cloud vector store deployment.")
+    return _default_remote_vector_config(url)
+
+
+@overload
+def get_profile(
+    profile: Literal["recommended", "quickstart"],
+    vector_deployment: Literal["local"],
+    *,
+    url: AnyHttpUrl | None = None,
+) -> ProviderSettingsDict: ...
+@overload
+def get_profile(
+    profile: Literal["recommended", "quickstart"],
+    vector_deployment: Literal["cloud"],
+    *,
+    url: AnyHttpUrl,
+) -> ProviderSettingsDict: ...
+def get_profile(
+    profile: Literal["recommended", "quickstart"],
+    vector_deployment: Literal["cloud", "local"],
+    *,
+    url: AnyHttpUrl | None = None,
+) -> ProviderSettingsDict:
+    """Get the default provider settings profile.
+
+    Args:
+        profile: The profile name, either "recommended" or "quickstart".
+        vector_deployment: The vector store deployment type, either "cloud" or "local".
+        url: The URL for the vector store if using cloud deployment.
+
+    Returns:
+        The provider settings dictionary for the specified profile.
+    """
+    if profile == "recommended":
+        return _recommended_default(vector_deployment, url=url)
+    if profile == "quickstart":
+        return _quickstart_default(vector_deployment, url=url)
+    raise ValueError(f"Unknown profile: {profile}")
+
+
+def _vector_client_opts(*, remote: bool) -> dict[str, object]:
+    """Get vector client options based on deployment type."""
+    if remote:
+        grpc = None
+        with contextlib.suppress(ImportError):
+            import grpc
+        if compression := getattr(grpc, "Compression", None):
+            compression = compression.Gzip
+        return {"grpc_compression": compression}
+    return {}
+
+
+def _recommended_default(
+    vector_deployment: Literal["cloud", "local"], *, url: AnyHttpUrl | None = None
+) -> ProviderSettingsDict:
     """Recommended default settings profile.
 
-    This profile leans towards high-quality providers, but without excessive cost or setup.
+    This profile leans towards high-quality providers, but without excessive cost or setup. Voyage AI used for embeddings and reranking, which has a generous free tier and class-leading performance. Qdrant can be deployed locally for free or as a cloud service with a generous free tier. Anthropic Claude Haiku is used for agents, which has a strong balance of cost and performance.
     """
     from codeweaver.providers.provider import Provider
 
@@ -53,19 +132,82 @@ def recommended_default() -> ProviderSettingsDict:
         ),
         agent=(
             AgentProviderSettings(
-                provider=Provider.ANTHROPIC,
-                enabled=True,
-                model_settings=AgentModelSettings(),
-                model="claude-haiku-4.5",
+                provider=Provider.ANTHROPIC, enabled=True, model="claude-haiku-4.5"
             ),
         ),
         data=(
             DataProviderSettings(provider=Provider.TAVILY, enabled=True),
             DataProviderSettings(provider=Provider.DUCKDUCKGO, enabled=True),
         ),
-        vector_store=(
-            VectorStoreProviderSettings(
-                provider=Provider.QDRANT, enabled=True, provider_settings=QdrantConfig()
-            ),
+        vector_store=VectorStoreProviderSettings(
+            provider=Provider.QDRANT,
+            enabled=True,
+            provider_settings=_get_vector_config(vector_deployment, url=url),
         ),
     )
+
+
+HAS_ST = util.find_spec("sentence_transformers") is not None
+
+
+def _quickstart_default(
+    vector_deployment: Literal["local", "cloud"], *, url: AnyHttpUrl | None = None
+) -> ProviderSettingsDict:
+    """Quickstart default settings profile.
+
+    This profile uses free-tier or open-source providers to allow for immediate use without cost.
+    """
+    from codeweaver.providers.provider import Provider
+
+    return ProviderSettingsDict(
+        embedding=(
+            EmbeddingProviderSettings(
+                model_settings=EmbeddingModelSettings(
+                    model="ibm-granite/granite-embedding-small-english-r2"
+                    if HAS_ST
+                    else "BAAI/bge-small-en-v1.5"
+                ),
+                provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
+                enabled=True,
+            ),
+        ),
+        sparse_embedding=(
+            SparseEmbeddingProviderSettings(
+                provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
+                enabled=True,
+                model_settings=SparseEmbeddingModelSettings(
+                    model="opensearch/openensearch-neural-sparse-encoding-doc-v3-gte"
+                    if HAS_ST
+                    else "prithivida/Splade_PP_en_v1"
+                ),
+            ),
+        ),
+        reranking=(
+            RerankingProviderSettings(
+                provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
+                enabled=True,
+                model_settings=RerankingModelSettings(
+                    model="BAAI/bge-reranking-v2-m3"
+                    if HAS_ST
+                    else "jinaai/jina-reranking-v2-base-multilingual"
+                ),
+            ),
+        ),
+        agent=(
+            AgentProviderSettings(
+                provider=Provider.ANTHROPIC, enabled=True, model="claude-haiku-4.5"
+            ),
+        ),
+        data=(
+            DataProviderSettings(provider=Provider.TAVILY, enabled=True),
+            DataProviderSettings(provider=Provider.DUCKDUCKGO, enabled=True),
+        ),
+        vector_store=VectorStoreProviderSettings(
+            provider=Provider.QDRANT,
+            enabled=True,
+            provider_settings=_get_vector_config(vector_deployment, url=url),
+        ),
+    )
+
+
+__all__ = ("get_profile",)

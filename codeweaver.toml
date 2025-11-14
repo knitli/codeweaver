@@ -29,4 +29,5 @@ model_settings = { model = "voyage-rerank-2.5" }
 [provider.vector_store]
 provider = "qdrant"
 enabled = true
-provider_settings = { url = "https://f3b7755c-ee6e-4605-8786-c4218f9e148b.us-east-1-1.aws.cloud.qdrant.io", collection_name = "codeweaver-dev", prefer_grpc = true }
+provider_settings = { url = "http://127.0.0.1:6337", collection_name = "codeweaver-test", prefer_grpc = true }
+# provider_settings = { url = "https://f3b7755c-ee6e-4605-8786-c4218f9e148b.us-east-1-1.aws.cloud.qdrant.io", collection_name = "codeweaver-dev", prefer_grpc = true }
