@@ -50,7 +50,7 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
         """Initialize the Cohere reranking provider."""
         # Prepare client options before calling super().__init__()
         kwargs = kwargs or {}
-        
+
         provider = caps.provider or Provider.COHERE
 
         # Initialize client if not provided
@@ -71,7 +71,7 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
                     raise ConfigurationError(
                         f"API key not found for {provider.value} provider. Please set the API key in the client kwargs or as an environment variable."
                     )
-            
+
             client = CohereClient(**client_options)
 
         # Call super().__init__() first with client and caps to initialize Pydantic model

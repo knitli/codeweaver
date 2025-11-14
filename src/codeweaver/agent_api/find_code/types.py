@@ -372,11 +372,15 @@ class StrategizedQuery(NamedTuple):
             indices=list(self.sparse.indices), values=list(self.sparse.values)
         )
 
+        # Extract Prefetch-specific parameters (limit, score_threshold, filter, params)
+        # Exclude top-level query parameters (with_payload, with_vectors, query_filter)
+        prefetch_params = {k: v for k, v in query_kwargs.items() if k in ("limit", "score_threshold", "filter", "params")}
+
         return {
             "query": FusionQuery(fusion=Fusion.RRF),
             "prefetch": [
-                Prefetch(query=self.dense, using="dense", **query_kwargs),
-                Prefetch(query=sparse_vector, using="sparse", **query_kwargs),
+                Prefetch(query=self.dense, using="dense", **prefetch_params),
+                Prefetch(query=sparse_vector, using="sparse", **prefetch_params),
             ],
             **kwargs,
         }

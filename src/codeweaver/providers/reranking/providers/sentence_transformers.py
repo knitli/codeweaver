@@ -12,7 +12,6 @@ import asyncio
 import logging
 
 from collections.abc import Callable, Sequence
-from types import MappingProxyType
 from typing import Any, cast
 
 import numpy as np
@@ -63,7 +62,8 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
     _provider: Provider = Provider.SENTENCE_TRANSFORMERS
     caps: RerankingModelCapabilities
 
-    _rerank_kwargs: MappingProxyType[str, Any] = MappingProxyType({"trust_remote_code": True})
+    # Use regular dict instead of MappingProxyType to avoid pickle errors
+    _rerank_kwargs: dict[str, Any] = {"trust_remote_code": True}
 
     def __init__(
         self,
@@ -74,15 +74,15 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
         **kwargs: Any,
     ) -> None:
         """Initialize the SentenceTransformersRerankingProvider."""
-        # Prepare kwargs before calling super().__init__()
-        rerank_kwargs = {**type(self)._rerank_kwargs, **kwargs}
+        # Call super().__init__() FIRST which handles all Pydantic initialization
+        # This ensures _rerank_kwargs and other private attrs are properly initialized
+        super().__init__(client=client, caps=caps, prompt=prompt, top_n=top_n, **kwargs)
 
+        # Now we can safely access _rerank_kwargs after Pydantic initialization
         # Initialize client if not provided
         if client is None:
-            client = CrossEncoder(caps.name, **rerank_kwargs)
-
-        # Call super().__init__() FIRST which handles all Pydantic initialization
-        super().__init__(client=client, caps=caps, prompt=prompt, top_n=top_n, **rerank_kwargs)
+            rerank_kwargs = {**self._rerank_kwargs, **kwargs}
+            self.client = CrossEncoder(caps.name, **rerank_kwargs)
 
     def _initialize(self) -> None:
         """

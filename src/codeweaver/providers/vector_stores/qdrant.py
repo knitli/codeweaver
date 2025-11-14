@@ -146,12 +146,14 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
                 datatype = Datatype.UINT8
             _ = await self._client.create_collection(
                 collection_name=collection_name,
-                vectors_config=VectorParams(
-                    size=dense_dim or self.dense_dimension or 768,
-                    distance=distance,
-                    quantization_config=quantization_config,
-                    datatype=datatype,
-                ),
+                vectors_config={
+                    "dense": VectorParams(
+                        size=dense_dim or self.dense_dimension or 768,
+                        distance=distance,
+                        quantization_config=quantization_config,
+                        datatype=datatype,
+                    )
+                },
                 sparse_vectors_config={
                     "sparse": SparseVectorParams(index=SparseIndexParams(datatype=Datatype.FLOAT16))
                 },

@@ -170,7 +170,7 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
         # Call super with correct signature (client, caps, kwargs as dict)
         # This initializes the Pydantic model and sets up all the attributes
         super().__init__(client=_client, caps=caps, kwargs=config_kwargs)
-        
+
         # Now set client_options after super().__init__()
         self.client_options = client_opts_to_store
 

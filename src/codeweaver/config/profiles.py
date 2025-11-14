@@ -213,6 +213,8 @@ def _quickstart_default(
 
 
 def _backup_profile() -> ProviderSettingsDict:
+    from codeweaver.providers.provider import Provider
+
     return ProviderSettingsDict(
         **(
             _quickstart_default("local")

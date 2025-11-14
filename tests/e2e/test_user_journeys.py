@@ -122,9 +122,9 @@ class TestOfflineDeveloperWorkflow:
         """Test complete offline developer workflow."""
         project = user_environment["project"]
 
-        # Step 1: Local-only profile
+        # Step 1: Quickstart profile (free/offline providers)
         with pytest.raises(SystemExit) as init_result:
-            init_app(["--profile", "local-only", "--config-only"])
+            init_app(["--profile", "quickstart", "--config-only"])
 
         # Should succeed even without API keys
         assert init_result.value.code == 0
@@ -138,9 +138,9 @@ class TestOfflineDeveloperWorkflow:
         self, user_environment: dict[str, Path], monkeypatch: MonkeyPatch
     ) -> None:
         """Test listing local providers in offline mode."""
-        # Init with local-only
+        # Init with quickstart (free/offline)
         with pytest.raises(SystemExit):
-            init_app(["--profile", "local-only", "--config-only"])
+            init_app(["--profile", "quickstart", "--config-only"])
 
         # List local providers
         with pytest.raises(SystemExit) as list_result:
@@ -155,7 +155,7 @@ class TestOfflineDeveloperWorkflow:
 
         # Init
         with pytest.raises(SystemExit):
-            init_app(["--profile", "local-only", "--config-only"])
+            init_app(["--profile", "quickstart", "--config-only"])
 
         # Modify config
         config_path = project / ".codeweaver.toml"
@@ -279,7 +279,7 @@ class TestCompleteUserJourneys:
         # 2. Verify both configs created
         assert (project / ".codeweaver.toml").exists()
         mcp_config = _get_client_config_path(
-            client="claude_code", config_level="user", project_path=project
+            client="claude_code", config_level="project", project_path=project
         )
         assert mcp_config.exists()
 

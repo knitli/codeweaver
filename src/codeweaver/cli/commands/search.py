@@ -7,11 +7,12 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 from __future__ import annotations
 
+import logging
 import sys
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 import cyclopts
 
@@ -27,8 +28,106 @@ from codeweaver.config.settings import get_settings_map
 from codeweaver.exceptions import CodeWeaverError
 
 
+if TYPE_CHECKING:
+    from codeweaver.config.settings import CodeWeaverSettings
+    from codeweaver.config.types import CodeWeaverSettingsDict
+    from codeweaver.core.types.dictview import DictView
+
+
+logger = logging.getLogger(__name__)
 console = Console(markup=True, emoji=True)
 app = App(help="Search codebase from command line.", console=console)
+
+
+async def _index_exists(settings: dict[str, Any] | CodeWeaverSettings) -> bool:
+    """Check if an index exists for this project.
+
+    Args:
+        settings: Settings dictionary or CodeWeaverSettings object
+
+    Returns:
+        True if a valid index exists with indexed files
+    """
+    try:
+        from codeweaver.common.utils.utils import get_user_config_dir
+        from codeweaver.config.indexer import IndexerSettings
+        from codeweaver.engine.indexer.manifest import FileManifestManager
+
+        # Get project path
+        if isinstance(settings, dict):
+            project_path = settings.get("project_path")
+        else:
+            project_path = settings.project_path
+
+        if not project_path:
+            return False
+
+        # Get manifest directory (same logic as indexer)
+        if isinstance(settings, dict):
+            indexer_config = settings.get("indexer", {})
+            cache_dir = (
+                indexer_config.get("cache_dir") if isinstance(indexer_config, dict) else None
+            )
+        else:
+            cache_dir = (
+                settings.indexer.cache_dir
+                if isinstance(settings.indexer, IndexerSettings)
+                else None
+            )
+
+        manifest_dir = (
+            cache_dir / "manifests" if cache_dir else get_user_config_dir() / ".indexes/manifests"
+        )
+
+        # Check manifest
+        manifest_manager = FileManifestManager(Path(project_path), manifest_dir)
+        manifest = manifest_manager.load()
+
+    except Exception as e:
+        logger.debug("Error checking index existence: %s", e)
+        return False
+    else:
+        # Index exists if manifest has files
+        return manifest is not None and manifest.total_files > 0
+
+
+async def _run_search_indexing(
+    settings: CodeWeaverSettings | DictView[CodeWeaverSettingsDict],
+) -> None:
+    """Run indexing for search command (standalone, no server).
+
+    Args:
+        settings: Settings object containing configuration
+
+    Raises:
+        Exception: On indexing failure
+    """
+    from codeweaver.core.types.dictview import DictView
+    from codeweaver.engine.indexer import Indexer
+
+    console.print(f"{CODEWEAVER_PREFIX} [yellow]No index found. Indexing project...[/yellow]")
+
+    try:
+        # Convert to DictView if needed (same as index.py pattern)
+        settings_view = (
+            settings if isinstance(settings, DictView) else DictView(settings.model_dump())
+        )
+
+        # Create and run indexer
+        indexer = await Indexer.from_settings_async(settings=settings_view)
+        await indexer.prime_index(force_reindex=False)
+
+        # Show quick summary
+        stats = indexer.stats
+        console.print(
+            f"{CODEWEAVER_PREFIX} [green]Indexing complete![/green] "
+            f"({stats.files_processed} files, {stats.chunks_indexed} chunks)"
+        )
+
+    except Exception as e:
+        console.print(f"{CODEWEAVER_PREFIX} [yellow]Warning: Indexing failed: {e}[/yellow]")
+        console.print(f"{CODEWEAVER_PREFIX} [yellow]Attempting search anyway...[/yellow]")
+        # Don't exit - let search try anyway in case there's a partial index
 
 
 @app.default
@@ -50,6 +149,15 @@ async def search(
             from codeweaver.config.settings import update_settings
 
             settings = update_settings(project_path=project_path)  # type: ignore
+
+        # Check if index exists, auto-index if needed
+        if not await _index_exists(settings):
+            from codeweaver.config.settings import get_settings
+
+            settings_obj = get_settings()
+            await _run_search_indexing(settings_obj)
+            # Reload settings after indexing
+            settings = get_settings_map()
 
         console.print(f"{CODEWEAVER_PREFIX} [blue]Searching in: {settings['project_path']}[/blue]")
         console.print(f"{CODEWEAVER_PREFIX} [blue]Query: {query}[/blue]")

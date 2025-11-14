@@ -193,7 +193,6 @@ src/codeweaver/
 ├── engine/              # Core indexing and search engine
 │   ├── __init__.py
 │   ├── chunking_service.py # Chunking service coordination
-│   ├── textify.py       # Text extraction from code
 │   ├── chunker/         # Code chunking implementations
 │   │   ├── __init__.py
 │   │   ├── base.py      # Base chunker interface

@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal
 import cyclopts
 import httpx
 
+from pydantic import AnyHttpUrl
 from pydantic_core import from_json as from_json
 from pydantic_core import to_json as to_json
 from rich.console import Console
@@ -59,27 +60,57 @@ def _backup_config(path: Path) -> Path:
     return backup_path
 
 
-def _create_codeweaver_config(project_path: Path, *, quick: bool = False) -> Path:
-    """Create CodeWeaver configuration file with defaults.
+def _create_codeweaver_config(
+    project_path: Path,
+    *,
+    profile: Literal["recommended", "quickstart", "backup"] | None = None,
+    vector_deployment: Literal["local", "cloud"] = "local",
+    vector_url: AnyHttpUrl | None = None,
+    config_path: Path | None = None,
+) -> Path:
+    """Create CodeWeaver configuration file with defaults or from profile.
 
     Args:
         project_path: Path to project directory
-        quick: Use recommended defaults without prompting (currently ignored)
+        profile: Profile name to use ("recommended", "quickstart", "backup")
+        vector_deployment: Vector store deployment type ("local" or "cloud")
+        vector_url: URL for cloud vector deployment (required if vector_deployment="cloud")
+        config_path: Custom config file path (defaults to .codeweaver.toml in project)
 
     Returns:
         Path to created configuration file
     """
     from codeweaver.config.settings import CodeWeaverSettings
 
-    config_path = project_path / ".codeweaver.toml"
+    # Determine config file path - default to .codeweaver.toml but allow override
+    if config_path is None:
+        config_path = project_path / ".codeweaver.toml"
 
-    # Create settings with defaults for this project
-    settings = CodeWeaverSettings(project_path=project_path)
+    # Ensure parent directory exists
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Create settings with profile if specified
+    if profile:
+        from codeweaver.config.profiles import get_profile
+
+        # Get profile provider settings dict and pass as kwargs
+        profile_dict = get_profile(profile, vector_deployment, url=vector_url)
+
+        # Create settings with profile by passing dict as kwargs
+        settings = CodeWeaverSettings(
+            project_path=project_path,
+            **profile_dict
+        )
+    else:
+        # Create settings with defaults for this project
+        settings = CodeWeaverSettings(project_path=project_path)
 
     # Save to TOML file
     settings.save_to_file(config_path)
 
     console.print(f"[green]✓[/green] Created configuration file: {config_path}")
+    if profile:
+        console.print(f"[dim]Profile:[/dim] {profile}")
 
     return config_path
 
@@ -88,17 +119,55 @@ def _create_codeweaver_config(project_path: Path, *, quick: bool = False) -> Pat
 def config(
     *,
     project: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
-    quick: Annotated[bool, cyclopts.Parameter(name=["--quick", "-q"])] = False,
+    profile: Annotated[
+        Literal["recommended", "quickstart", "backup"] | None,
+        cyclopts.Parameter(
+            name=["--profile"],
+            help="Configuration profile to use (recommended, quickstart, or backup)"
+        ),
+    ] = None,
+    vector_deployment: Annotated[
+        Literal["local", "cloud"],
+        cyclopts.Parameter(
+            name=["--vector-deployment"],
+            help="Vector store deployment type"
+        ),
+    ] = "local",
+    vector_url: Annotated[
+        str | None,
+        cyclopts.Parameter(
+            name=["--vector-url"],
+            help="URL for cloud vector deployment (required if --vector-deployment=cloud)"
+        ),
+    ] = None,
+    config_path: Annotated[
+        Path | None,
+        cyclopts.Parameter(
+            name=["--config-path"],
+            help="Custom path for configuration file (defaults to .codeweaver.toml in project root)"
+        ),
+    ] = None,
     force: Annotated[bool, cyclopts.Parameter(name=["--force", "-f"])] = False,
 ) -> None:
     """Set up CodeWeaver configuration file.
 
     Args:
         project: Path to project directory (defaults to current directory)
-        quick: Use recommended defaults without prompting
+        profile: Configuration profile to use (recommended, quickstart, or backup)
+        vector_deployment: Vector store deployment type (local or cloud)
+        vector_url: URL for cloud vector deployment
+        config_path: Custom path for configuration file
         force: Overwrite existing configuration file
     """
     console.print("\n[bold cyan]CodeWeaver Configuration Setup[/bold cyan]\n")
+
+    # Validate vector_url if cloud deployment
+    parsed_vector_url: AnyHttpUrl | None = None
+    if vector_deployment == "cloud":
+        if not vector_url:
+            console.print("[red]✗[/red] --vector-url is required when --vector-deployment=cloud")
+            sys.exit(1)
+        parsed_vector_url = AnyHttpUrl(vector_url)
 
     # Determine project path
     project_path = (project or Path.cwd()).resolve()
@@ -112,20 +181,33 @@ def config(
 
     console.print(f"[dim]Project:[/dim] {project_path}\n")
 
-    config_path = project_path / ".codeweaver.toml"
+    # Determine final config path
+    final_config_path = config_path or project_path / ".codeweaver.toml"
 
-    if config_path.exists() and not force:
+    if final_config_path.exists() and not force:
         if Confirm.ask(
-            f"[yellow]Configuration file already exists at {config_path}. Overwrite?[/yellow]",
+            f"[yellow]Configuration file already exists at {final_config_path}. Overwrite?[/yellow]",
             default=False,
         ):
-            config_path = _create_codeweaver_config(project_path, quick=quick)
-            console.print(f"[green]✓[/green] Config created: {config_path}\n")
+            created_path = _create_codeweaver_config(
+                project_path,
+                profile=profile,
+                vector_deployment=vector_deployment,
+                vector_url=parsed_vector_url,
+                config_path=final_config_path,
+            )
+            console.print(f"[green]✓[/green] Config created: {created_path}\n")
         else:
             console.print("[yellow]Skipping CodeWeaver config creation.[/yellow]\n")
     else:
-        config_path = _create_codeweaver_config(project_path, quick=quick)
-        console.print(f"[green]✓[/green] Config created: {config_path}\n")
+        created_path = _create_codeweaver_config(
+            project_path,
+            profile=profile,
+            vector_deployment=vector_deployment,
+            vector_url=parsed_vector_url,
+            config_path=final_config_path,
+        )
+        console.print(f"[green]✓[/green] Config created: {created_path}\n")
 
 
 def _get_client_config_path(
@@ -587,6 +669,27 @@ def init(
     config_only: Annotated[bool, cyclopts.Parameter(name=["--config-only"])] = False,
     mcp_only: Annotated[bool, cyclopts.Parameter(name=["--mcp-only"])] = False,
     quick: Annotated[bool, cyclopts.Parameter(name=["--quick", "-q"])] = False,
+    profile: Annotated[
+        Literal["recommended", "quickstart", "backup"] | None,
+        cyclopts.Parameter(
+            name=["--profile"],
+            help="Configuration profile to use (recommended, quickstart, or backup). Defaults to 'recommended' with --quick."
+        ),
+    ] = None,
+    vector_deployment: Annotated[
+        Literal["local", "cloud"],
+        cyclopts.Parameter(
+            name=["--vector-deployment"],
+            help="Vector store deployment type"
+        ),
+    ] = "local",
+    vector_url: Annotated[
+        str | None,
+        cyclopts.Parameter(
+            name=["--vector-url"],
+            help="URL for cloud vector deployment (required if --vector-deployment=cloud)"
+        ),
+    ] = None,
     client: Annotated[
         Literal["claude_code", "claude_desktop", "cursor", "vscode", "mcpjson"],
         cyclopts.Parameter(name=["--client", "-c"]),
@@ -619,7 +722,10 @@ def init(
         project: Path to project directory (defaults to current directory)
         config_only: Only create CodeWeaver config file
         mcp_only: Only create MCP client config
-        quick: Use recommended defaults without prompting
+        quick: Use recommended profile with defaults
+        profile: Configuration profile to use (recommended, quickstart, or backup)
+        vector_deployment: Vector store deployment type (local or cloud)
+        vector_url: URL for cloud vector deployment
         client: MCP client to configure (claude_code, claude_desktop, cursor, vscode, mcpjson)
         host: Server host address for MCP config (default: 127.0.0.1)
         port: Server port for MCP config (default: 9328)
@@ -628,13 +734,27 @@ def init(
         force: Overwrite existing configurations
 
     Examples:
-        codeweaver init --quick              # Full setup with defaults
+        codeweaver init --quick              # Full setup with recommended profile
+        codeweaver init --profile quickstart # Use quickstart profile (free/offline)
         codeweaver init --config-only        # Just config file
         codeweaver init --mcp-only           # Just MCP client config
         codeweaver init --client cursor      # Setup for Cursor
         codeweaver init --transport stdio    # Use stdio transport
     """
     console.print("\n[bold cyan]CodeWeaver Initialization[/bold cyan]\n")
+
+    # Validate vector_url if cloud deployment
+    parsed_vector_url: AnyHttpUrl | None = None
+    if vector_deployment == "cloud":
+        if not vector_url:
+            console.print("[red]✗[/red] --vector-url is required when --vector-deployment=cloud")
+            sys.exit(1)
+        parsed_vector_url = AnyHttpUrl(vector_url)
+
+    # If --quick and no profile specified, use recommended
+    if quick and profile is None:
+        profile = "recommended"
+
     # Determine project path
     project_path = (project or Path.cwd()).resolve()
     if not project_path.exists():
@@ -662,12 +782,22 @@ def init(
                 f"[yellow]Configuration file already exists at {config_path}. Overwrite?[/yellow]",
                 default=False,
             ):
-                config_path = _create_codeweaver_config(project_path, quick=quick)
+                config_path = _create_codeweaver_config(
+                    project_path,
+                    profile=profile,
+                    vector_deployment=vector_deployment,
+                    vector_url=parsed_vector_url,
+                )
                 console.print(f"[green]✓[/green] Config created: {config_path}\n")
             else:
                 console.print("[yellow]Skipping CodeWeaver config creation.[/yellow]\n")
         else:
-            config_path = _create_codeweaver_config(project_path, quick=quick)
+            config_path = _create_codeweaver_config(
+                project_path,
+                profile=profile,
+                vector_deployment=vector_deployment,
+                vector_url=parsed_vector_url,
+            )
             console.print(f"[green]✓[/green] Config created: {config_path}\n")
 
     # Part 2: MCP Client Configuration

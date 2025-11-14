@@ -89,7 +89,7 @@ def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
     table.add_row(
         "Background Indexing",
         "❌"
-        if settings["indexing"].get("only_index_on_command")
+        if settings["indexer"].get("only_index_on_command")
         and not isinstance(settings["indexer"].get("only_index_on_command"), Unset)
         else "✅",
     )

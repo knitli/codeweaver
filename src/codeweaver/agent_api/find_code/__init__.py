@@ -87,6 +87,122 @@ class MatchedSection(NamedTuple):
     chunk_number: PositiveInt | None = None
 
 
+def _get_settings(context: Any | None) -> Any:
+    """Get settings from MCP context or load fresh.
+
+    Args:
+        context: Optional MCP context containing settings
+
+    Returns:
+        CodeWeaverSettings instance
+    """
+    if context and hasattr(context, 'settings'):
+        return context.settings
+
+    # Load fresh (CLI usage)
+    from codeweaver.config.settings import get_settings
+    return get_settings()
+
+
+async def _check_index_status(context: Any | None) -> tuple[bool, int]:
+    """Check if index exists and get chunk count.
+
+    Args:
+        context: Optional MCP context
+
+    Returns:
+        Tuple of (index_exists, chunk_count) where:
+        - index_exists: True if collection exists in vector store
+        - chunk_count: Number of chunks in collection (0 if doesn't exist)
+    """
+    from codeweaver.common.registry import get_provider_registry
+
+    try:
+        _ = _get_settings(context)  # Ensure settings loaded
+        registry = get_provider_registry()
+
+        # Get vector store provider
+        provider_enum = registry.get_provider_enum_for("vector_store")
+        if not provider_enum:
+            logger.warning("No vector store provider configured")
+            return False, 0
+
+        vector_store = registry.get_provider_instance(provider_enum, "vector_store", singleton=True)
+        if not vector_store:
+            logger.warning("Could not get vector store instance")
+            return False, 0
+
+        # Initialize vector store if needed
+        await vector_store._initialize()
+
+        # Check if collection exists
+        collection_name = vector_store.collection
+        if not collection_name:
+            logger.warning("No collection name configured")
+            return False, 0
+
+        # Use qdrant client directly to check existence and count
+        client = vector_store.client
+        collection_exists = await client.collection_exists(collection_name)
+
+        if not collection_exists:
+            logger.info("Collection %s does not exist", collection_name)
+            return False, 0
+
+        # Get count
+        count_result = await client.count(collection_name)
+        chunk_count = count_result.count if hasattr(count_result, 'count') else 0
+
+        logger.info("Collection %s exists with %d chunks", collection_name, chunk_count)
+    except Exception as e:
+        logger.warning("Failed to check index status: %s", e)
+        return False, 0
+    else:
+        return True, chunk_count
+
+
+async def _ensure_index_ready(context: Any | None) -> None:
+    """Ensure index is ready by running indexer if needed.
+
+    This function blocks until initial indexing is complete. It uses the
+    direct Indexer pattern from cli.commands.index (no server needed).
+
+    Args:
+        context: Optional MCP context
+
+    Raises:
+        Does not raise - logs warnings and continues on failure
+    """
+    from codeweaver.core.types.dictview import DictView
+    from codeweaver.engine.indexer import Indexer
+
+    try:
+        logger.info("Auto-indexing: Starting initial indexing...")
+
+        # Get settings (from context or load)
+        settings = _get_settings(context)
+
+        # Create indexer (pattern from cli.commands.index)
+        settings_dict = settings.model_dump() if hasattr(settings, 'model_dump') else settings
+        indexer = await Indexer.from_settings_async(DictView(settings_dict))
+
+        # Run initial indexing (blocks until complete)
+        await indexer.prime_index()
+
+        # Log success
+        stats = indexer.stats
+        logger.info(
+            "Auto-indexing complete: %d files, %d chunks in %.2fs",
+            stats.files_processed,
+            stats.chunks_indexed,
+            stats.elapsed_time()
+        )
+
+    except Exception as e:
+        logger.warning("Auto-indexing failed: %s", e)
+        # Don't fail find_code - let it try to search anyway
+
+
 async def find_code(
     query: str,
     *,
@@ -100,6 +216,7 @@ async def find_code(
     """Find relevant code based on semantic search with intent-driven ranking.
 
     This is the main entry point for the CodeWeaver search pipeline:
+    0. Auto-index if needed (blocks if empty, background if incremental)
     1. Intent detection (keyword-based for v0.1)
     2. Query embedding (dense + sparse)
     3. Hybrid vector search
@@ -133,6 +250,16 @@ async def find_code(
     strategies_used: list[SearchStrategy] = []
 
     try:
+        # Step 0: Auto-index if needed
+        index_exists, chunk_count = await _check_index_status(context)
+
+        if not index_exists or chunk_count == 0:
+            # Full indexing needed - BLOCK and wait
+            logger.info("Index not ready, triggering auto-indexing...")
+            await _ensure_index_ready(context)
+        # If index exists with chunks, proceed to search
+        # (incremental updates handled by background watcher if server running)
+
         # Step 1: Intent detection
         if intent is not None:
             query_intent_obj = None
@@ -222,3 +349,4 @@ async def find_code(
 
 
 __all__ = ("MatchedSection", "find_code")
+
