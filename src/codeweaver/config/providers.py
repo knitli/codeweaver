@@ -569,7 +569,7 @@ class ProviderSettings(BasedModel):
                 and not provider_settings.get("url")
             ):
                 new_settings["provider_settings"] = {"host": host}
-            if port := connection.get("port") and not provider_settings.get("port"):
+            if (port := connection.get("port")) and not provider_settings.get("port"):
                 if "provider_settings" not in new_settings:
                     new_settings["provider_settings"] = {}
                 new_settings["provider_settings"]["port"] = port
