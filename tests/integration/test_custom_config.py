@@ -41,12 +41,8 @@ pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
 
 @pytest.mark.skipif(
-    not os.environ.get("VOYAGE_API_KEY"),
-    reason="VOYAGE_API_KEY environment variable not set"
-)
-@pytest.mark.skipif(
-    not os.environ.get("QDRANT__SERVICE__API_KEY"),
-    reason="QDRANT__SERVICE__API_KEY environment variable not set"
+    not os.environ.get("VOYAGE_API_KEY") or not os.environ.get("QDRANT__SERVICE__API_KEY"),
+    reason="VOYAGE_API_KEY and QDRANT__SERVICE__API_KEY environment variables required"
 )
 async def test_custom_configuration():
     """
