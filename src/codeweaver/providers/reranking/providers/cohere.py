@@ -55,7 +55,10 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
 
         # Initialize client if not provided
         if client is None:
-            client_options = kwargs.get("client_options", {}) or kwargs
+            if "client_options" in kwargs:
+                client_options = kwargs["client_options"]
+            else:
+                client_options = kwargs.copy()
             client_options["client_name"] = "codeweaver"
 
             if not client_options.get("api_key"):
