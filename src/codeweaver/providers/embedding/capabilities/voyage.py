@@ -38,7 +38,7 @@ def _get_shared_capabilities() -> PartialCapabilities:
         "provider": Provider.VOYAGE,
         "default_dimension": 1024,
         "output_dimensions": (256, 512, 1024, 2048),
-        "default_dtype": "int8",
+        "default_dtype": "uint8",
         "output_dtypes": ("float", "uint8", "int8", "ubinary", "binary"),
         "is_normalized": True,
         "context_window": 32_000,

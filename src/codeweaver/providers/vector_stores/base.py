@@ -20,6 +20,7 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 from typing_extensions import TypeIs
 
 from codeweaver.agent_api.find_code.types import StrategizedQuery
+from codeweaver.config.providers import EmbeddingModelSettings, SparseEmbeddingModelSettings
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.models import BasedModel
 from codeweaver.engine.search import Filter
@@ -47,6 +48,11 @@ class EmbeddingCapsDict(TypedDict):
     sparse: SparseEmbeddingModelCapabilities | None
 
 
+class EmbeddingSettingsDict(TypedDict):
+    dense: EmbeddingModelSettings | None
+    sparse: SparseEmbeddingModelSettings | None
+
+
 # Lock for thread-safe initialization of class-level embedding capabilities
 _embedding_caps_lock = threading.Lock()
 
@@ -63,14 +69,24 @@ class CircuitBreakerOpenError(Exception):
     """Raised when circuit breaker is open and rejecting requests."""
 
 
+def _get_embedding_settings() -> EmbeddingSettingsDict:
+    """Get embedding model settings for in-memory provider.
+
+    Returns:
+        Embedding model settings dictionary.
+    """
+    from codeweaver.common.registry.provider import get_provider_config_for
+
+    return EmbeddingSettingsDict(
+        dense=get_provider_config_for("embedding"),
+        sparse=get_provider_config_for("sparse_embedding"),
+    )
+
+
 @overload
 def _get_caps(*, sparse: Literal[False] = False) -> EmbeddingModelCapabilities | None: ...
-
-
 @overload
 def _get_caps(*, sparse: Literal[True]) -> SparseEmbeddingModelCapabilities | None: ...
-
-
 def _get_caps(
     *, sparse: bool = False
 ) -> EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities | None:
@@ -105,6 +121,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
     config: Any = None  # Provider-specific configuration object
     _client: VectorStoreClient | None
     _embedding_caps: EmbeddingCapsDict = PrivateAttr(default_factory=_default_embedding_caps)
+    _settings: EmbeddingSettingsDict = PrivateAttr(default_factory=_get_embedding_settings)
 
     _provider: ClassVar[Provider] = Provider.NOT_SET
 
@@ -200,6 +217,72 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         """
         return None
 
+    @property
+    def embedding_capabilities(self) -> EmbeddingCapsDict:
+        """Get the embedding capabilities for this vector store provider.
+
+        Returns:
+            Embedding capabilities dictionary with 'dense' and 'sparse' keys.
+        """
+        return self._embedding_caps
+
+    @property
+    def embedding_settings(self) -> EmbeddingSettingsDict:
+        """Get the embedding model settings for this vector store provider.
+
+        Returns:
+            Embedding model settings dictionary with 'dense' and 'sparse' keys.
+        """
+        return self._settings
+
+    @property
+    def dense_dimension(self) -> int | None:
+        """Get the dimension of dense embeddings for this vector store provider.
+
+        Returns:
+            Dimension of dense embeddings, or None if dense embeddings not supported.
+        """
+        default_dim = (
+            self.embedding_capabilities.get("dense", {}).get("default_dimension")
+            if self.embedding_capabilities.get("dense")
+            else None
+        )
+        set_dim = (
+            self.embedding_settings.get("dense", {}).get("dimension")
+            if self.embedding_settings.get("dense")
+            else None
+        )
+        return set_dim or default_dim
+
+    @property
+    def dense_dtype(self) -> Literal["float32", "float16", "int8", "binary"]:
+        """Get the data type of dense embeddings for this vector store provider.
+
+        Returns:
+            Data type of dense embeddings.
+        """
+        default_dtype = (
+            self.embedding_capabilities.get("dense", {}).get("default_dtype")
+            if self.embedding_capabilities.get("dense")
+            else "float16"
+        )
+        set_dtype = (
+            self.embedding_settings.get("dense", {}).get("data_type")
+            if self.embedding_settings.get("dense")
+            else None
+        )
+        return set_dtype or default_dtype
+
+    @property
+    def distance_metric(self) -> Literal["cosine", "dot", "euclidean"]:
+        """Get the distance metric used for similarity search.
+
+        Returns:
+            Distance metric as a string.
+        """
+        return self.embedding_capabilities.get("dense", {}).get("preferred_metrics", ("cosine",))[0]
+
+    @property
     def _check_circuit_breaker(self) -> None:
         """Check circuit breaker state before making API calls.
 

@@ -29,6 +29,7 @@ uv_venv_create_args = [
 "pipx:mteb" = "latest"
 "pipx:reuse" = "latest"
 "pipx:tombi" = "latest"
+"pipx:ty" = "latest"
 ast-grep = "latest"
 gh = "latest"
 gitsign = "latest"
@@ -43,8 +44,6 @@ shfmt = "latest"
 typos = "latest"
 usage = "latest"
 uv = "latest"
-yamlfmt = "latest"
-"pipx:ty" = "latest"
 
 [env]
 GH_REPO = "{{config_root}}"
@@ -206,7 +205,6 @@ run_windows = [
 silent = "stdout"
 
 [tasks.fix-python]
-tools.uv = "latest"
 usage = '''
 arg "[dir]" help="directories to fix" var=#true default="."
 '''
@@ -218,11 +216,10 @@ run_windows = [
   "uvx ruff format \"$env:usage_dir\"",
   "uvx ruff check --fix --unsafe-fixes \"$env:usage_dir\"",
 ]
-file = "scripts/code-quality/fix-ruff-patterns.sh "
+file = "scripts/code-quality/fix-ruff-patterns.sh"
 sources = ["{src,scripts,tests}/*.py"]
 
 [tasks.fix-other]
-tools.hk = "latest"
 run = "hk fix"
 run_windows = "hk fix"
 
@@ -309,8 +306,8 @@ if ($files) {
 usage = '''
 arg "[dir]" help="python directory to generate a graph for" default="src"
 '''
-run = '''mise x -- ruff analyze "${usage_dir:-src}"'''
-run_windows = '''mise x -- ruff analyze "$env:usage_dir"'''
+run = '''mise x -- ruff analyze graph --target-version py312 --python .venv/bin/python "${usage_dir:-src/}"'''
+run_windows = '''mise x -- ruff analyze graph --target-version py312 --python .venv\Scripts\python.exe "$env:usage_dir"'''
 
 [tasks.venv]
 shell = "zsh -c"

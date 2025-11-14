@@ -242,8 +242,8 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
                 )
             ),
         )
-        tokens = sum(np.atleast_1d(val).nonzero() for emb in embeddings for val in emb.values)
-        self._update_token_stats(token_count=tokens, sparse=True)
+        features = sum(len(emb.indices) for emb in embeddings)
+        self._update_token_stats(token_count=features, sparse=True)
         return await loop.run_in_executor(None, lambda: self._process_output(embeddings))  # type: ignore
 
     async def _embed_query(self, query: Sequence[str], **kwargs: Any) -> list[SparseEmbedding]:
@@ -252,8 +252,8 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         embeddings = await loop.run_in_executor(
             None, lambda: list(self.client.query_embed(query=query, **kwargs))
         )
-        tokens = sum(val.nonzero() for emb in embeddings for val in emb.values)
-        self._update_token_stats(token_count=tokens, sparse=True)
+        features = sum(len(emb.indices) for emb in embeddings)
+        self._update_token_stats(token_count=features, sparse=True)
         return await loop.run_in_executor(None, lambda: self._process_output(embeddings))  # type: ignore
 
 

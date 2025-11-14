@@ -11,8 +11,9 @@ import logging
 
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
+from urllib import parse
 
-from pydantic import UUID4
+from pydantic import UUID4, SecretStr
 from typing_extensions import TypeIs
 
 from codeweaver.config.providers import QdrantConfig
@@ -92,46 +93,68 @@ class QdrantVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
             ProviderError: Client initialization failed.
         """
         url = self.config.get("url", "http://localhost:6333")
-        api_key = self.config.get("api_key")
-        prefer_grpc = self.config.get("prefer_grpc", False)
-        grpc_port = self.config.get("grpc_port", 6334)
+        parsed_url = parse.urlparse(url)
+        if api_key := self.config.get("api_key") or self.config.get("client_options", {}).get(
+            "api_key"
+        ):
+            api_key = api_key.get_secret_value() if isinstance(api_key, SecretStr) else api_key
 
         # Build client kwargs based on connection type
-        # For cloud instances (https://), don't use gRPC parameters to avoid conflicts
-        is_https = url.startswith("https://")
-        client_kwargs: dict[str, Any] = {
-            "url": url,
-            "api_key": str(api_key) if api_key else None,
-        }
-
-        # Only add gRPC parameters for local instances or when explicitly requested
-        if not is_https:
-            client_kwargs["prefer_grpc"] = prefer_grpc
-            if prefer_grpc:
-                client_kwargs["grpc_port"] = grpc_port
+        client_kwargs: dict[str, Any] = {"url": url, "api_key": api_key}
 
         self._client = AsyncQdrantClient(**client_kwargs)
         if collection_name := self.collection:
             await self._ensure_collection(collection_name)
 
-    async def _ensure_collection(self, collection_name: str, dense_dim: int = 768) -> None:
+    async def _ensure_collection(self, collection_name: str, dense_dim: int | None = None) -> None:
         """Ensure collection exists, creating it if necessary.
 
         Args:
             collection_name: Name of the collection to ensure exists.
-            dense_dim: Dimension of dense vectors (default 768).
+            dense_dim: Dimension of dense vectors.
         """
-        from qdrant_client.models import Distance, VectorParams
+        from qdrant_client.models import (
+            BinaryQuantization,
+            Datatype,
+            Distance,
+            SparseIndexParams,
+            SparseVectorParams,
+            VectorParams,
+        )
 
         if not self._client:
             raise ProviderError("Qdrant client is not initialized")
         collections = await self._client.get_collections()
         collection_names = [col.name for col in collections.collections]
         if collection_name not in collection_names:
+            distance = (
+                Distance.COSINE
+                if self.distance_metric == "cosine"
+                else Distance.DOT
+                if self.distance_metric == "dot"
+                else Distance.EUCLID
+            )
+            datatype = (
+                Datatype.FLOAT32
+                if self.dense_dtype == "float32"
+                else Datatype.FLOAT16
+                if self.dense_dtype == "float16"
+                else Datatype.UINT8
+            )
+            quantization_config = BinaryQuantization() if self.dense_dtype == "binary" else None
+            if self.dense_dtype in ("binary", "int8"):
+                datatype = Datatype.UINT8
             _ = await self._client.create_collection(
                 collection_name=collection_name,
-                vectors_config={"dense": VectorParams(size=dense_dim, distance=Distance.COSINE)},
-                sparse_vectors_config={"sparse": {}},
+                vectors_config=VectorParams(
+                    size=dense_dim or self.dense_dimension or 768,
+                    distance=distance,
+                    quantization_config=quantization_config,
+                    datatype=datatype,
+                ),
+                sparse_vectors_config={
+                    "sparse": SparseVectorParams(index=SparseIndexParams(datatype=Datatype.FLOAT16))
+                },
             )
 
     async def delete_collection(self, collection_name: str | None = None) -> bool:

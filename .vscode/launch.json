@@ -15,10 +15,7 @@
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/src/codeweaver/cli/__main__.py",
-      "args": [
-        "index",
-        "--clear"
-      ],
+      "args": "${command:pickArgs}",
       "console": "integratedTerminal",
       "justMyCode": false
     },

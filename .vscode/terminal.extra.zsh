@@ -9,11 +9,6 @@
 # The workspace zshrc (.vscode/zsh/.zshrc) sources the main dev shell init script, and runs this file afterwards.
 # This file can be customized per workspace for additional setup.
 
-setup_env() {
-  zsh -c "mise -q -y run update-tools &> /dev/null &" &
-  print -P "%F{209}[codeweaver]%f %F{148}All done on our end!%f We're going to re-init your local environment, so it may take a moment depending on your setup. You're good to go once you get your terminal back. Happy coding!"
-}
-
 full_setup() {
   mise -q -y trust || {
     print -P "%F{209}[codeweaver]%f %F{red}Failed to trust the Mise environment!%f"
@@ -32,7 +27,7 @@ cd "$REPO_ROOT" || {
 }
 if command -v mise >/dev/null 2>&1; then
   # We have Mise installed, check if it's initialized for this workspace
-  setup_env
+  print -P "%F{209}[codeweaver]%f You're all set!"
 else
   # Mise is not installed, run the install script
     chmod -R +x "${REPO_ROOT}/scripts" || {
