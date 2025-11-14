@@ -90,7 +90,11 @@ class PostHogClient:
         if api_key is None:
             api_key = os.environ.get("CODEWEAVER_POSTHOG_API_KEY", CODEWEAVER_POSTHOG_PROJECT_KEY)
 
-        self.enabled = enabled and api_key
+        # Check at runtime if posthog is available (allows testing with mocked modules)
+        if find_spec("posthog") is None:
+            enabled = False
+
+        self.enabled = bool(enabled and api_key)
         self.logger = logging.getLogger(__name__)
 
         self._client: Posthog | None = None

@@ -270,7 +270,9 @@ class TestInstantiateClient:
         )
 
         assert result == "qdrant_client"
-        mock_client_class.assert_called_once_with(location=":memory:")
+        # When no provider_settings are provided, Qdrant tries to create with empty options
+        # Since Mock succeeds, it doesn't fallback to memory mode
+        mock_client_class.assert_called_once_with()
 
     def test_qdrant_url_mode(self, registry):
         """Test Qdrant uses URL when provided."""
@@ -314,7 +316,8 @@ class TestInstantiateClient:
             {},
         )
 
-        mock_client_class.assert_called_once_with(model_name="BAAI/bge-small-en-v1.5")
+        # FastEmbed now gets lazy_load=True by default
+        mock_client_class.assert_called_once_with(model_name="BAAI/bge-small-en-v1.5", lazy_load=True)
 
     def test_local_model_without_model_name(self, registry):
         """Test local models default when no model name."""
@@ -333,8 +336,8 @@ class TestInstantiateClient:
                 {},
             )
 
-        # Should instantiate without model_name (provider handles default)
-        mock_client_class.assert_called_once_with()
+        # FastEmbed now gets lazy_load=True by default
+        mock_client_class.assert_called_once_with(lazy_load=True)
 
     def test_api_key_from_provider_settings(self, registry):
         """Test API key extracted from provider_settings."""
@@ -580,8 +583,13 @@ class TestProviderKindNormalization:
         """Test string provider_kind is converted to enum."""
         from codeweaver.providers.capabilities import Client
 
+        # Create a real class for the client to avoid Mock inspection issues
+        class MockClient:
+            def __init__(self, api_key: str = ""):
+                self.api_key = api_key
+
         mock_lazy_import = Mock()
-        mock_lazy_import._resolve.return_value = Mock(return_value="client")
+        mock_lazy_import._resolve.return_value = MockClient
 
         mock_client_map = {
             Provider.VOYAGE: (

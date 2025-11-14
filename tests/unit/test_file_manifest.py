@@ -163,11 +163,12 @@ class TestIndexFileManifest:
 
     def test_get_stats(self, sample_manifest):
         """Test getting manifest statistics."""
-        stats = sample_manifest.get_stats()
+        # get_stats is a @computed_field, so access it as a property, not method
+        stats = sample_manifest.get_stats
 
         assert stats["total_files"] == 2
         assert stats["total_chunks"] == 3
-        assert stats["manifest_version"] == 1
+        assert stats["manifest_version"] == "1.0.0"  # It's a string
 
 
 class TestFileManifestManager:

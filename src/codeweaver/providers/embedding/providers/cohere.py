@@ -109,7 +109,17 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
 
         # Initialize client if not provided
         if _client is None:
-            client_options = config_kwargs.get("client_options", {}) or config_kwargs
+            # Extract client_options if explicitly provided, otherwise use only known client params
+            if "client_options" in config_kwargs:
+                client_options = config_kwargs["client_options"].copy()
+            else:
+                # Only extract known Cohere client options from kwargs
+                known_client_options = {
+                    "api_key", "base_url", "timeout", "max_retries", "httpx_client"
+                }
+                client_options = {
+                    k: v for k, v in config_kwargs.items() if k in known_client_options
+                }
             client_options["client_name"] = "codeweaver"
 
             # Determine provider to get correct API key
@@ -145,24 +155,24 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
                 Provider.HEROKU: try_for_heroku_endpoint(client_options),
             }
             client_options["base_url"] = client_options.get("base_url") or base_urls[provider]
-            client_options["model"] = caps.name
+            # Store model separately - it's not a client option but an embed() parameter
+            model = caps.name
 
             _client = CohereClient(**client_options)
-            # Store client_options for later use
-            self.client_options = client_options
+            # Store client_options for later use (will be set after super().__init__)
+            client_opts_to_store = client_options | {"model": model}
         else:
             # Client was provided - extract or use default client_options
-            self.client_options = (
-                config_kwargs.get("client_options", {})
-                or config_kwargs
-                or {"model": caps.name, "client_name": "codeweaver"}
+            client_opts_to_store = config_kwargs.get(
+                "client_options", {"model": caps.name, "client_name": "codeweaver"}
             )
 
-        # Store client BEFORE super().__init__()
-        self.client = _client
-
         # Call super with correct signature (client, caps, kwargs as dict)
+        # This initializes the Pydantic model and sets up all the attributes
         super().__init__(client=_client, caps=caps, kwargs=config_kwargs)
+        
+        # Now set client_options after super().__init__()
+        self.client_options = client_opts_to_store
 
     def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
         """Initialize the Cohere embedding provider.

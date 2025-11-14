@@ -15,7 +15,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, cast
 from warnings import filterwarnings
 
-from pydantic import ConfigDict, SecretStr
+from pydantic import ConfigDict, SecretStr, SkipValidation
 
 from codeweaver.common.utils.utils import rpartial
 from codeweaver.exceptions import ProviderError
@@ -76,7 +76,7 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
 
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
-    client: AsyncClient
+    client: SkipValidation[AsyncClient]
     provider: Provider = Provider.VOYAGE
     _prompt: str | None = None  # custom prompts not supported
     caps: RerankingModelCapabilities
@@ -113,14 +113,11 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
                     "We could not find an API key for Voyage AI. In case you have other means of authentication, we're going to proceed without an explicit API key... if you get authentication errors, please set the VOYAGE_API_KEY environment variable."
                 )
                 client = AsyncClient()
-        self.client = client
 
-        if caps is None:
-            raise ConfigurationError("Reranking model capabilities must be provided.")
 
-        self.caps = caps
-
-        super().__init__(**kwargs)
+        # Call super().__init__() with client and caps
+        super().__init__(client=client, caps=caps, **kwargs)
+        
         self._initialize()
 
     def _initialize(self) -> None:

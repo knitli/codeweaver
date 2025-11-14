@@ -26,16 +26,24 @@ embedding_caps = next(
     cap for cap in get_voyage_embedding_capabilities() if cap.name == "voyage-code-3"
 )
 
-embedding_provider = VoyageEmbeddingProvider(
-    client=AsyncClient(api_key=os.environ["VOYAGE_API_KEY"]),  # type: ignore
-    caps=embedding_caps,  # type: ignore
-    kwargs=None,  # type: ignore
-)
+# Only create the provider if the API key is available
+# This prevents collection errors when the environment variable is not set
+embedding_provider = None
+if os.environ.get("VOYAGE_API_KEY"):
+    embedding_provider = VoyageEmbeddingProvider(
+        client=AsyncClient(api_key=os.environ["VOYAGE_API_KEY"]),  # type: ignore
+        caps=embedding_caps,  # type: ignore
+        kwargs=None,  # type: ignore
+    )
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
 
+@pytest.mark.skipif(
+    not os.environ.get("VOYAGE_API_KEY") or not os.environ.get("QDRANT__SERVICE__API_KEY"),
+    reason="VOYAGE_API_KEY and QDRANT__SERVICE__API_KEY environment variables required"
+)
 async def test_custom_configuration():
     """
     User Story: Customize provider settings like collection names.

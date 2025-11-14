@@ -568,16 +568,20 @@ class ProviderSettings(BasedModel):
                 and not provider_settings.get("host")
                 and not provider_settings.get("url")
             ):
-                new_settings["provider_settings"]["host"] = host
-            if port := connection.get("port") and not provider_settings.get("port"):
+                new_settings["provider_settings"] = {"host": host}
+            if (port := connection.get("port")) and not provider_settings.get("port"):
+                if "provider_settings" not in new_settings:
+                    new_settings["provider_settings"] = {}
                 new_settings["provider_settings"]["port"] = port
         if headers := settings.get("connection", {}).get("headers"):
             new_settings["client_options"] = (settings.get("client_options") or {}) | {
                 "metadata": headers
             }
         if api_key := settings.get("api_key"):
+            if "provider_settings" not in new_settings:
+                new_settings["provider_settings"] = {}
             new_settings["provider_settings"]["api_key"] = api_key
-        return new_settings
+        return settings.copy() | new_settings
 
     def _validate_vector_stores(self) -> tuple[VectorStoreProviderSettings, ...]:
         """Validate vector store settings."""
@@ -605,7 +609,7 @@ class ProviderSettings(BasedModel):
             if vector["provider"] == Provider.MEMORY:
                 new_vector = vector.copy() | {"client_options": {}}
             else:
-                new_vector = self._setup_qdrant(vector)
+                new_vector = self._validate_qdrant(vector)
             new_vector_store.append(new_vector)
         return tuple(new_vector_store)
 
