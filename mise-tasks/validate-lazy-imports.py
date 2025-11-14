@@ -368,7 +368,8 @@ class PackageValidator:
                         module_name, "ERROR", f"'{name}' -> Cannot import {full_module} - {e}"
                     )
                 )
-            except botocore.exceptions.NoRegionError:
+            # I'm not sure why it insists this doesn't exist when it does...
+            except botocore.exceptions.NoRegionError:  # ty: ignore[unresolved-attribute]
                 if "bedrock" not in full_module or "Bedrock" not in name:
                     self.errors.append(
                         PackageError(

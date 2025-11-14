@@ -84,13 +84,15 @@ def _load_and_configure_settings(
     if project_path:
         settings = update_settings(**{**settings.model_dump(), "project_path": project_path})
 
+    new_settings = get_settings()
+
     resolved_path = (
-        project_path or settings.project_path
-        if isinstance(settings.project_path, Path)
+        project_path or new_settings.project_path
+        if isinstance(new_settings.project_path, Path)
         else get_project_path()
     )
 
-    return settings, resolved_path
+    return new_settings, resolved_path
 
 
 def _derive_collection_name(

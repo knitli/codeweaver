@@ -712,43 +712,28 @@ class ProviderSettings(BasedModel):
         if provider == Provider.NOT_SET:
             return None
 
-        # Check if provider exists in any config
-        found = False
-        for config_value in self.provider_configs.values():
+        # Collect all fields containing this provider in a single pass
+        matching_fields = []
+        for field_name, config_value in self.provider_configs.items():
             if isinstance(config_value, tuple):
-                # Multiple configs for this kind
                 if any(cfg.get("provider") == provider for cfg in config_value):
-                    found = True
-                    break
+                    matching_fields.append(field_name)
             elif isinstance(config_value, dict) and config_value.get("provider") == provider:
-                # Single config for this kind
-                found = True
-                break
+                matching_fields.append(field_name)
 
-        if not found:
+        if not matching_fields:
             return None
 
-        # Find which kinds (fields) contain this provider
-        fields = []
-        for k, v in self.provider_configs.items():
-            if isinstance(v, tuple):
-                if any(cfg.get("provider") == provider for cfg in v):
-                    fields.append(k)
-            elif isinstance(v, dict) and v.get("provider") == provider:
-                fields.append(k)
+        # Retrieve and flatten settings for matching fields
+        all_settings: list[BaseProviderSettings] = []
+        for field in matching_fields:
+            if setting := self.settings_for_kind(field):
+                if isinstance(setting, tuple):
+                    all_settings.extend(setting)
+                else:
+                    all_settings.append(setting)
 
-        if settings := [
-            self.settings_for_kind(field) for field in fields if self.settings_for_kind(field)
-        ]:
-            flattened_settings: list[BaseProviderSettings] = [
-                s if isinstance(setting, tuple) else setting
-                for setting in settings
-                for s in (setting if isinstance(setting, tuple) else (setting,))
-            ]  # type: ignore
-            return (
-                flattened_settings[0] if len(flattened_settings) == 1 else tuple(flattened_settings)
-            )
-        return None
+        return all_settings[0] if len(all_settings) == 1 else tuple(all_settings) if all_settings else None
 
     def has_auth_configured(self, provider: Provider) -> bool:
         """Check if API key or TLS certs are set for the provider through settings or environment."""

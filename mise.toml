@@ -75,40 +75,31 @@ script = "mise run enter"
 [tasks.enter]
 shell = "zsh -c"
 silent = "stdout"
-run = [
-  '''
+run = '''
 case "$python_path" in
 *.venv/bin/python*)
     # Already in venv, do nothing
     ;;
 *)
     # Not in venv or python not found, source it
-    mise run source 2>/dev/null || true
+    source .venv/bin/activate 2>/dev/null || true
     ;;
 esac
-''',
-  "mise run activate 2>/dev/null || true",
-  "git config alias.root 'rev-parse --show-toplevel'",
-  '''if [ -z "$VOYAGE_API_KEY" ]; then
-    mise --silent set 2>/dev/null || true
-fi''',
-]
-run_windows = [
-  '''
-if ($env:python_path -like "*.venv*") {
-    # Already in venv, do nothing
-} else {
+'''
+run_windows = '''
+$pythonPath = $env:python_path
+if ($pythonPath -notlike "*.venv\Scripts\python*") {
     # Not in venv or python not found, source it
-    mise run source 2>$null
+    if (Test-Path .venv\Scripts\Activate.ps1) {
+        .venv\Scripts\Activate.ps1 2>$null
+    }
 }
-''',
-  "mise run activate 2>$null",
-  "git config alias.root 'rev-parse --show-toplevel'",
-  '''if (-not $env:VOYAGE_API_KEY) {
-    mise --silent set 2>$null
-}''',
-]
-env = { GH_REPO = '''{{ env.GH_REPO | default(value=config_root) }}''', ACTIVE_SHELL = '''{{ exec(command='sh -c "ps -p $$ -o ppid=" | xargs -I "{}" readlink -f "/proc/{}/exe" | xargs basename') }}''', python_path = '''{{ exec(command='command -v python') }}''' }
+'''
+
+[tasks.enter.env]
+GH_REPO = '''{{ env.GH_REPO | default(value=config_root) }}'''
+ACTIVE_SHELL = '''{{ exec(command='basename "$SHELL" 2>/dev/null || echo zsh') }}'''
+python_path = '''{{ exec(command='command -v python 2>/dev/null || echo ""') }}'''
 
 [tasks.info]
 description = "Print project information"
