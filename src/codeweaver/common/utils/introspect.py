@@ -368,7 +368,8 @@ def clean_args(
     if isclass(func):
         func = get_class_constructor(func).object
 
-    if not isfunction(func) and not ismethod(func):
+    # Allow objects with __signature__ (e.g., Mock objects in tests)
+    if not (isfunction(func) or ismethod(func) or hasattr(func, "__signature__")):
         raise TypeError("func must be a function, method, or class")
 
     keywords = keyword_args(func)
