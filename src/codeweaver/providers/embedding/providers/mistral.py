@@ -44,7 +44,7 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
         """Initialize the Mistral embedding provider."""
         kwargs = kwargs or {}
 
-        # 1. Initialize client FIRST if not provided (before setting any instance attributes)
+        # Initialize client if not provided
         if not client:
             client_options = kwargs.get("client_options", {})
             api_key = os.environ.get(
@@ -52,13 +52,10 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
             ) or client_options.get("api_key")
             client = Mistral(api_key=api_key, **client_options)
 
-        # 2. Store client BEFORE super().__init__()
-        self.client = client
-
-        # 3. Call super() with correct params (kwargs as dict, not **kwargs)
+        # Call super().__init__() FIRST which handles all Pydantic initialization
         super().__init__(client=client, caps=caps, kwargs=kwargs)
 
-        # 4. Set model attribute after Pydantic initialization completes
+        # Set model attribute after Pydantic initialization completes
         self.model = caps.name
 
     def _initialize(self, caps: EmbeddingModelCapabilities) -> None:

@@ -325,30 +325,41 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
         """Override base init to set up Bedrock-specific client and configuration."""
         from pydantic import SecretStr
 
-        self._bedrock_provider_settings = {
+        # Prepare all values BEFORE calling super().__init__()
+        bedrock_settings = {
             k: v.get_secret_value() if isinstance(v, SecretStr) else v
             for k, v in bedrock_provider_settings.items()
             if v is not None
         }
-        self.model_configuration = model_config or RerankConfiguration.from_arn(
+        model_configuration = model_config or RerankConfiguration.from_arn(
             bedrock_provider_settings["model_arn"], kwargs.get("top_n", 40) if kwargs else top_n
         )
         _ = bedrock_provider_settings.pop("model_arn")  # ty: ignore[invalid-argument-type]  # the typed dict is mine, I do what I want
-        self.client = boto3_client(  # ty: ignore[invalid-assignment]
-            "bedrock-agent-runtime",
-            **self._bedrock_provider_settings,  # ty: ignore[invalid-argument-type]
-        )  # we just popped it
-        self.caps = caps or self.caps or get_amazon_reranking_capabilities()[0]
-        if client or self.client:
-            super().__init__(
-                client=client or self.client,
-                caps=caps or self.caps,
-                top_n=top_n,
-                prompt=prompt,
-                **kwargs,
+
+        # Initialize client if not provided
+        if client is None:
+            client = boto3_client(  # ty: ignore[invalid-assignment]
+                "bedrock-agent-runtime",
+                **bedrock_settings,  # ty: ignore[invalid-argument-type]
             )
-        else:
+
+        final_caps = caps or get_amazon_reranking_capabilities()[0]
+
+        if not client:
             raise ValueError("Either a Bedrock client or provider settings must be provided.")
+
+        # Call super().__init__() FIRST which handles all Pydantic initialization
+        super().__init__(
+            client=client,
+            caps=final_caps,
+            top_n=top_n,
+            prompt=prompt,
+            **kwargs,
+        )
+
+        # Set instance attributes AFTER Pydantic initialization
+        self._bedrock_provider_settings = bedrock_settings
+        self.model_configuration = model_configuration
 
     async def _execute_rerank(
         self,

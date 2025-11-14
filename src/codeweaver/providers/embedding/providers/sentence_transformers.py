@@ -124,15 +124,12 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         """Initialize the Sentence Transformers embedding provider."""
         # Initialize client if not provided
         if client is None:
-            self.doc_kwargs = {**type(self)._doc_kwargs, **(kwargs or {})}
+            doc_kwargs = {**type(self)._doc_kwargs, **(kwargs or {})}
             client = SentenceTransformer(
-                model_name_or_path=capabilities.name, **self.doc_kwargs.get("client_options", {})
+                model_name_or_path=capabilities.name, **doc_kwargs.get("client_options", {})
             )
 
-        # Store client before calling super() so _initialize() can access it
-        self.client = client
-
-        # Call super().__init__() which handles all initialization
+        # Call super().__init__() FIRST which handles all Pydantic initialization
         # The base class will set doc_kwargs, query_kwargs, and call _initialize()
         super().__init__(client=client, caps=capabilities, kwargs=kwargs)
 
@@ -301,10 +298,7 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
                 model_name_or_path=capabilities.name, **doc_kwargs.get("client_options", {})
             )
 
-        # Store client before calling super() so _initialize() can access it
-        self.client = client
-
-        # Call super().__init__() which handles all initialization
+        # Call super().__init__() FIRST which handles all Pydantic initialization
         # The base class will set doc_kwargs, query_kwargs, and call _initialize()
         super().__init__(client=client, caps=capabilities, kwargs=kwargs)  # type: ignore
 

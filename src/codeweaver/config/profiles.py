@@ -59,20 +59,20 @@ def _get_vector_config(
 
 @overload
 def get_profile(
-    profile: Literal["recommended", "quickstart"],
+    profile: Literal["recommended", "quickstart", "backup"],
     vector_deployment: Literal["local"],
     *,
     url: AnyHttpUrl | None = None,
 ) -> ProviderSettingsDict: ...
 @overload
 def get_profile(
-    profile: Literal["recommended", "quickstart"],
+    profile: Literal["recommended", "quickstart", "backup"],
     vector_deployment: Literal["cloud"],
     *,
     url: AnyHttpUrl,
 ) -> ProviderSettingsDict: ...
 def get_profile(
-    profile: Literal["recommended", "quickstart"],
+    profile: Literal["recommended", "quickstart", "backup"],
     vector_deployment: Literal["cloud", "local"],
     *,
     url: AnyHttpUrl | None = None,
@@ -87,6 +87,8 @@ def get_profile(
     Returns:
         The provider settings dictionary for the specified profile.
     """
+    if profile == "backup":
+        return _backup_profile()
     if profile == "recommended":
         return _recommended_default(vector_deployment, url=url)
     if profile == "quickstart":
@@ -207,6 +209,15 @@ def _quickstart_default(
             enabled=True,
             provider_settings=_get_vector_config(vector_deployment, url=url),
         ),
+    )
+
+
+def _backup_profile() -> ProviderSettingsDict:
+    return ProviderSettingsDict(
+        **(
+            _quickstart_default("local")
+            | {"vector_store": VectorStoreProviderSettings(provider=Provider.MEMORY, enabled=True)}
+        )
     )
 
 
