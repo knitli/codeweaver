@@ -163,10 +163,8 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
             client_opts_to_store = client_options | {"model": model}
         else:
             # Client was provided - extract or use default client_options
-            client_opts_to_store = (
-                config_kwargs.get("client_options", {})
-                or config_kwargs
-                or {"model": caps.name, "client_name": "codeweaver"}
+            client_opts_to_store = config_kwargs.get(
+                "client_options", {"model": caps.name, "client_name": "codeweaver"}
             )
 
         # Call super with correct signature (client, caps, kwargs as dict)
