@@ -253,15 +253,9 @@ __all__ = (
     "clear_store",
     "detect_language_family",
     "expand_pattern",
-    "format_docstring",
-    "format_signature",
-    "format_snippet_name",
     "get_store",
-    "humanize",
     "make_partial_function",
     "source_id_for",
-    "to_lowly_lowercase",
-    "to_tokens",
     "wrap_filters",
 )
 
