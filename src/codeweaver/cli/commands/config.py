@@ -43,8 +43,7 @@ class ConfigProfile(BaseEnum):
 def config(
     *,
     project_path: Annotated[
-        Path | None,
-        cyclopts.Parameter(name=["--project", "-p"], help="Path to project directory"),
+        Path | None, cyclopts.Parameter(name=["--project", "-p"], help="Path to project directory")
     ] = None,
 ) -> None:
     """Manage CodeWeaver configuration."""
@@ -91,7 +90,7 @@ def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
         "Background Indexing",
         "❌"
         if settings["indexing"].get("only_index_on_command")
-        and not isinstance(settings["indexing"].get("only_index_on_command"), Unset)
+        and not isinstance(settings["indexer"].get("only_index_on_command"), Unset)
         else "✅",
     )
     table.add_row("Telemetry", "❌" if settings["telemetry"].get("disable_telemetry") else "✅")

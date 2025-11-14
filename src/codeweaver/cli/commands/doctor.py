@@ -482,12 +482,12 @@ def _set_warning_status(check: DoctorCheck, message: str, suggestion: str) -> No
 
 def check_indexer_config(settings: CodeWeaverSettings) -> DoctorCheck:
     """Check if the indexer is properly configured and cache directory is writable."""
-    from codeweaver.config.indexing import IndexerSettings
+    from codeweaver.config.indexer import IndexerSettings
 
     check = DoctorCheck("Indexer Configuration")
 
     try:
-        if not isinstance(settings.indexing, IndexerSettings):
+        if not isinstance(settings.indexer, IndexerSettings):
             return DoctorCheck.set_check(
                 check.name,
                 "warn",
@@ -496,7 +496,7 @@ def check_indexer_config(settings: CodeWeaverSettings) -> DoctorCheck:
             )
         # the cache_dir is created on access if it doesn't exist
         # so it should always exist here unless there's a permission issue
-        cache_dir = settings.indexing.cache_dir
+        cache_dir = settings.indexer.cache_dir
         # cache dir will exist or there's an exception so we won't get here
         if not os.access(cache_dir, os.W_OK):
             check.status = "❌"

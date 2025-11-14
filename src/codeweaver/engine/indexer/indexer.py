@@ -1016,23 +1016,23 @@ class Indexer(BasedModel):
         Returns:
             Configured Indexer instance (may need async initialization via prime_index)
         """
-        from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
+        from codeweaver.config.indexer import DefaultIndexerSettings, IndexerSettings
         from codeweaver.config.settings import get_settings_map
 
         settings_map = settings or get_settings_map()
-        indexing_data = settings_map["indexing"]
+        indexer_data = settings_map["indexer"]
 
-        # Handle different types of indexing_data
-        if isinstance(indexing_data, Unset):
+        # Handle different types of indexer_data
+        if isinstance(indexer_data, Unset):
             index_settings = IndexerSettings.model_validate(DefaultIndexerSettings)
-        elif isinstance(indexing_data, IndexerSettings):
+        elif isinstance(indexer_data, IndexerSettings):
             # Use the existing IndexerSettings instance directly
-            index_settings = indexing_data
+            index_settings = indexer_data
         else:
             # If it's a dict or something else, try to validate it
             index_settings = IndexerSettings.model_validate(
-                DefaultIndexerSettings | indexing_data
-                if isinstance(indexing_data, dict)
+                DefaultIndexerSettings | indexer_data
+                if isinstance(indexer_data, dict)
                 else DefaultIndexerSettings
             )
 
@@ -1066,23 +1066,23 @@ class Indexer(BasedModel):
             Fully initialized Indexer instance
         """
         from codeweaver.common.utils.git import get_project_path
-        from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
+        from codeweaver.config.indexer import DefaultIndexerSettings, IndexerSettings
         from codeweaver.config.settings import get_settings_map
 
         settings_map = settings or get_settings_map()
-        indexing_data = settings_map["indexing"]
+        indexer_data = settings_map["indexer"]
 
-        # Handle different types of indexing_data
-        if isinstance(indexing_data, Unset):
+        # Handle different types of indexer_data
+        if isinstance(indexer_data, Unset):
             index_settings = IndexerSettings.model_validate(DefaultIndexerSettings)
-        elif isinstance(indexing_data, IndexerSettings):
+        elif isinstance(indexer_data, IndexerSettings):
             # Use the existing IndexerSettings instance directly
-            index_settings = indexing_data
+            index_settings = indexer_data
         else:
             # If it's a dict or something else, try to validate it
             index_settings = IndexerSettings.model_validate(
-                DefaultIndexerSettings | indexing_data
-                if isinstance(indexing_data, dict)
+                DefaultIndexerSettings | indexer_data
+                if isinstance(indexer_data, dict)
                 else DefaultIndexerSettings
             )
 

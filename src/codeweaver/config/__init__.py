@@ -19,7 +19,7 @@ if TYPE_CHECKING:
         CustomDelimiter,
         CustomLanguage,
     )
-    from codeweaver.config.indexing import IndexerSettings, IndexerSettingsDict, RignoreSettings
+    from codeweaver.config.indexer import IndexerSettings, IndexerSettingsDict, RignoreSettings
     from codeweaver.config.logging import (
         FilterID,
         FiltersDict,

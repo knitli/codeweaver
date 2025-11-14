@@ -94,11 +94,11 @@ from pydantic import (
 )
 
 from codeweaver.common.utils import LazyImport, lazy_import, uuid7
+from codeweaver.common.utils.textify import humanize
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.types.aliases import FileExt, LiteralStringT, ThingName, ThingNameT
 from codeweaver.core.types.enum import AnonymityConversion, BaseEnum
 from codeweaver.core.types.models import BasedModel
-from codeweaver.engine import humanize
 
 # Runtime imports needed for cast operations and type checking
 from codeweaver.semantic.grammar import Category, CompositeThing, Token

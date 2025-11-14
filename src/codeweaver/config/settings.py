@@ -58,7 +58,7 @@ from pydantic_settings import (
 from codeweaver.common.utils.lazy_importer import lazy_import
 from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.chunker import ChunkerSettings, DefaultChunkerSettings
-from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
+from codeweaver.config.indexer import DefaultIndexerSettings, IndexerSettings
 from codeweaver.config.logging import DefaultLoggingSettings, LoggingSettings
 from codeweaver.config.mcp import CodeWeaverMCPConfig, MCPServerConfig
 from codeweaver.config.middleware import (
@@ -405,7 +405,7 @@ class CodeWeaverSettings(BaseSettings):
         Field(description="""Middleware settings""", validate_default=False),
     ] = UNSET
 
-    indexing: Annotated[
+    indexer: Annotated[
         IndexerSettings | Unset,
         Field(description="""File filtering settings""", validate_default=False),
     ] = UNSET
@@ -488,7 +488,7 @@ class CodeWeaverSettings(BaseSettings):
         )
         self.logging = DefaultLoggingSettings if isinstance(self.logging, Unset) else self.logging
         # by default, IndexerSettings has `rignore_options` UNSET, but that needs to be deferred until after CodeWeaverSettings is initialized
-        self.indexing = IndexerSettings() if isinstance(self.indexing, Unset) else self.indexing
+        self.indexer = IndexerSettings() if isinstance(self.indexer, Unset) else self.indexer
         self.chunker = ChunkerSettings() if isinstance(self.chunker, Unset) else self.chunker
         self.telemetry = (
             TelemetrySettings._default()  # type: ignore
@@ -547,7 +547,7 @@ class CodeWeaverSettings(BaseSettings):
             max_file_size=1 * 1024 * 1024,
             max_results=75,
             server=DefaultFastMcpServerSettings,
-            indexing=DefaultIndexerSettings,
+            indexer=DefaultIndexerSettings,
             chunker=DefaultChunkerSettings,
             telemetry=DefaultTelemetrySettings,
             uvicorn=DefaultUvicornSettings,
@@ -896,7 +896,7 @@ def get_settings(config_file: FilePath | None = None) -> CodeWeaverSettings:
 
     This should not be your first choice for getting settings. For most needs, you should. Use get_settings_map() to get a read-only mapping view of the settings. This map is a *live view*, meaning it will update if the settings are updated.
 
-    If you **really** need to get the mutable settings instance, you can use this function. It will create the global instance if it doesn't exist, optionally loading from a configuration file (like, .codeweaver.toml) if you provide a path.
+    If you **really** need to get the mutable settings instance, you can use this function. It will create the global instance if it doesn't exist, optionally loading from a configuration file (like, codeweaver.toml) if you provide a path.
     """
     global _settings
     # Ensure chunker models are rebuilt before creating settings

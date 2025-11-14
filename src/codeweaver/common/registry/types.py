@@ -98,8 +98,8 @@ class Feature(IntFlag, BaseEnum):
     STATISTICS = auto()
 
     # Indexing
-    SPARSE_INDEXING = auto()
-    VECTOR_INDEXING = auto()
+    SPARSE_EMBEDDING = auto()
+    DENSE_EMBEDDING = auto()
     AUTOMATIC_INDEXING = auto()
 
     # Search
@@ -123,8 +123,8 @@ class Feature(IntFlag, BaseEnum):
         deps = {
             cls.BASIC_SEARCH: {cls.FILE_DISCOVERY},
             cls.SEMANTIC_SEARCH: {cls.BASIC_SEARCH},
-            cls.VECTOR_SEARCH: {cls.BASIC_SEARCH, cls.VECTOR_INDEXING},
-            cls.HYBRID_SEARCH: {cls.SPARSE_INDEXING, cls.VECTOR_INDEXING, cls.BASIC_SEARCH},
+            cls.VECTOR_SEARCH: {cls.BASIC_SEARCH, cls.DENSE_EMBEDDING},
+            cls.HYBRID_SEARCH: {cls.SPARSE_EMBEDDING, cls.DENSE_EMBEDDING, cls.BASIC_SEARCH},
             cls.RERANKING: {cls.BASIC_SEARCH, cls.VECTOR_SEARCH},
             cls.AUTOMATIC_INDEXING: {cls.FILE_DISCOVERY, cls.FILE_WATCHER},
             cls.FILE_WATCHER: {cls.FILE_DISCOVERY, cls.FILE_FILTER},
@@ -193,9 +193,9 @@ class ServiceCardDict(TypedDict, total=False):
             "rate limiting",
             "reranking",
             "semantic search",
-            "sparse indexing",
+            "sparse embedding",
             "statistics",
-            "vector indexing",
+            "vector embedding",
             "vector search",
             "web search",
         ]

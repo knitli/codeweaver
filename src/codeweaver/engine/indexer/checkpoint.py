@@ -27,7 +27,7 @@ from uuid_extensions import uuid7
 
 from codeweaver.common.utils.git import get_project_path
 from codeweaver.common.utils.utils import get_user_config_dir
-from codeweaver.config.indexing import IndexerSettings
+from codeweaver.config.indexer import IndexerSettings
 from codeweaver.config.providers import (
     EmbeddingProviderSettings,
     RerankingProviderSettings,
@@ -76,7 +76,7 @@ def _get_settings_map() -> DictView[CheckpointSettingsFingerprint]:
     We don't want to cache this -- we want the latest settings each time. DictView always reflects changes, but we're creating a new instance here.
     """
     from codeweaver.common.utils.git import get_project_path
-    from codeweaver.config.indexing import DefaultIndexerSettings
+    from codeweaver.config.indexer import DefaultIndexerSettings
     from codeweaver.config.providers import (
         DefaultEmbeddingProviderSettings,
         DefaultRerankingProviderSettings,
@@ -90,10 +90,10 @@ def _get_settings_map() -> DictView[CheckpointSettingsFingerprint]:
         from codeweaver.config.providers import AllDefaultProviderSettings, ProviderSettings
 
         settings.provider = ProviderSettings.model_validate(AllDefaultProviderSettings)
-    settings.indexing = (
+    settings.indexer = (
         IndexerSettings.model_validate(DefaultIndexerSettings)
-        if isinstance(settings.indexing, Unset) or settings.indexing is None
-        else settings.indexing
+        if isinstance(settings.indexer, Unset) or settings.indexer is None
+        else settings.indexer
     )
     settings.provider.embedding = (
         DefaultEmbeddingProviderSettings
@@ -125,7 +125,7 @@ def _get_settings_map() -> DictView[CheckpointSettingsFingerprint]:
     )
     # Convert IndexerSettings to dict to avoid circular reference from computed fields
     # The filter property creates a partial function containing self, causing circular ref
-    indexer_map = settings.indexing.model_dump(
+    indexer_map = settings.indexer.model_dump(
         mode="json", exclude_computed_fields=True, exclude_none=True
     )
 

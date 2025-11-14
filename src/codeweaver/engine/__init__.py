@@ -81,14 +81,6 @@ if TYPE_CHECKING:
         make_partial_function,
         wrap_filters,
     )
-    from codeweaver.engine.textify import (
-        format_docstring,
-        format_signature,
-        format_snippet_name,
-        humanize,
-        to_lowly_lowercase,
-        to_tokens,
-    )
     from codeweaver.engine.watcher import (
         CodeFilter,
         ConfigFilter,
@@ -171,15 +163,9 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "clear_store": (f"{parent}.chunker", "registry"),
     "detect_language_family": (f"{parent}.chunker.delimiters", "families"),
     "expand_pattern": (f"{parent}.chunker.delimiters", "patterns"),
-    "format_docstring": (parent, "textify"),
-    "format_signature": (parent, "textify"),
-    "format_snippet_name": (parent, "textify"),
     "get_store": (f"{parent}.chunker", "registry"),
-    "humanize": (parent, "textify"),
     "make_partial_function": (parent, "search"),
     "source_id_for": (f"{parent}.chunker", "registry"),
-    "to_lowly_lowercase": (parent, "textify"),
-    "to_tokens": (parent, "textify"),
     "wrap_filters": (parent, "search"),
 })
 

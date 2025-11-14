@@ -53,8 +53,6 @@
    │  ├─ line 11: TODO : register with providers registry
    │  ├─ line 117: TODO : This should probably come from the services registry but that's not fully implemented yet
    │  └─ line 1468: TODO : Implement in T007/T008
-   ├─ textify.py
-   │  └─ line 8: TODO : Once we have better code parsing implementations, we need to define a pipeline for processing.
    ├─ capabilities.py
    │  ├─ line 25: TODO : Add more vector providers as they are supported.
    │  ├─ line 26: TODO : Add QDRANT-CLOUD as an embedding provider (and add support).

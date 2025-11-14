@@ -14,7 +14,7 @@ import watchfiles
 
 from watchfiles import Change, DefaultFilter
 
-from codeweaver.config.indexing import RignoreSettings
+from codeweaver.config.indexer import RignoreSettings
 from codeweaver.config.types import CodeWeaverSettingsDict
 from codeweaver.core.file_extensions import (
     CODE_FILES_EXTENSIONS,
@@ -236,13 +236,13 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
             Configured IgnoreFilter instance (may need async initialization)
         """
         from codeweaver.common.utils.git import get_project_path
-        from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
+        from codeweaver.config.indexer import DefaultIndexerSettings, IndexerSettings
         from codeweaver.config.settings import get_settings
 
         settings = settings or get_settings()
         index_settings = (
-            settings.indexing
-            if isinstance(settings.indexing, IndexerSettings)
+            settings.indexer
+            if isinstance(settings.indexer, IndexerSettings)
             else IndexerSettings.model_validate(DefaultIndexerSettings)
         )
 
@@ -281,13 +281,13 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
             Fully initialized IgnoreFilter instance
         """
         from codeweaver.common.utils.git import get_project_path
-        from codeweaver.config.indexing import DefaultIndexerSettings, IndexerSettings
+        from codeweaver.config.indexer import DefaultIndexerSettings, IndexerSettings
         from codeweaver.config.settings import get_settings
 
         settings = settings or get_settings()
         index_settings = (
-            settings.indexing
-            if isinstance(settings.indexing, IndexerSettings)
+            settings.indexer
+            if isinstance(settings.indexer, IndexerSettings)
             else IndexerSettings.model_validate(DefaultIndexerSettings)
         )
 

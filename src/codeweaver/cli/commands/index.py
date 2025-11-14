@@ -150,7 +150,7 @@ async def _perform_clear_operation(
         SystemExit: If user cancels operation or error occurs
     """
     from codeweaver.common.registry.provider import get_provider_registry
-    from codeweaver.config.indexing import IndexerSettings
+    from codeweaver.config.indexer import IndexerSettings
     from codeweaver.engine.indexer.checkpoint import CheckpointManager
     from codeweaver.engine.indexer.manifest import FileManifestManager
 
@@ -175,8 +175,8 @@ async def _perform_clear_operation(
 
         # Setup paths and managers
         indexes_dir = (
-            settings.indexing.cache_dir
-            if isinstance(settings.indexing, IndexerSettings)
+            settings.indexer.cache_dir
+            if isinstance(settings.indexer, IndexerSettings)
             else get_user_config_dir() / ".indexes"
         )
 

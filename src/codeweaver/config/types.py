@@ -37,7 +37,7 @@ from uvicorn.config import (
 )
 
 from codeweaver.config.chunker import ChunkerSettingsDict
-from codeweaver.config.indexing import IndexerSettingsDict
+from codeweaver.config.indexer import IndexerSettingsDict
 from codeweaver.config.logging import LoggingConfigDict
 from codeweaver.config.telemetry import TelemetrySettingsDict
 from codeweaver.core.types.enum import AnonymityConversion
@@ -127,7 +127,7 @@ class CodeWeaverSettingsDict(TypedDict, total=False):
     middleware: NotRequired[MiddlewareOptions | Unset]
     chunker: NotRequired[ChunkerSettingsDict | Unset]
     uvicorn: NotRequired[UvicornServerSettingsDict | Unset]
-    indexing: NotRequired[IndexerSettingsDict | Unset]
+    indexer: NotRequired[IndexerSettingsDict | Unset]
     telemetry: NotRequired[TelemetrySettingsDict | Unset]
     endpoints: NotRequired[EndpointSettingsDict | Unset]
 
