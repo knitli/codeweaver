@@ -17,7 +17,11 @@ from codeweaver.providers.provider import Provider
 
 
 type AlibabaNlpProvider = Literal[
-    Provider.GROQ, Provider.HUGGINGFACE_INFERENCE, Provider.SENTENCE_TRANSFORMERS, Provider.TOGETHER
+    Provider.GROQ,
+    Provider.HUGGINGFACE_INFERENCE,
+    Provider.SENTENCE_TRANSFORMERS,
+    Provider.TOGETHER,
+    Provider.FASTEMBED,
 ]
 
 CAP_MAP: dict[
@@ -29,6 +33,7 @@ CAP_MAP: dict[
         Provider.HUGGINGFACE_INFERENCE,
         Provider.SENTENCE_TRANSFORMERS,
         Provider.TOGETHER,
+        Provider.FASTEMBED,
     ),
     "Alibaba-NLP/gte-multilingual-base": (Provider.SENTENCE_TRANSFORMERS,),
 }

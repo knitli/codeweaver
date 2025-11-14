@@ -63,7 +63,7 @@ def _backup_config(path: Path) -> Path:
 def _create_codeweaver_config(
     project_path: Path,
     *,
-    profile: Literal["recommended", "quickstart", "backup"] | None = None,
+    profile: Literal["recommended", "quickstart", "test"] | None = None,
     vector_deployment: Literal["local", "cloud"] = "local",
     vector_url: AnyHttpUrl | None = None,
     config_path: Path | None = None,
@@ -72,7 +72,7 @@ def _create_codeweaver_config(
 
     Args:
         project_path: Path to project directory
-        profile: Profile name to use ("recommended", "quickstart", "backup")
+        profile: Profile name to use ("recommended", "quickstart", "test")
         vector_deployment: Vector store deployment type ("local" or "cloud")
         vector_url: URL for cloud vector deployment (required if vector_deployment="cloud")
         config_path: Custom config file path (defaults to .codeweaver.toml in project)
@@ -94,13 +94,12 @@ def _create_codeweaver_config(
         from codeweaver.config.profiles import get_profile
 
         # Get profile provider settings dict and pass as kwargs
-        profile_dict = get_profile(profile, vector_deployment, url=vector_url)
+        profile_dict = get_profile(
+            profile if profile != "test" else "backup", vector_deployment, url=vector_url
+        )
 
         # Create settings with profile by passing dict as kwargs
-        settings = CodeWeaverSettings(
-            project_path=project_path,
-            **profile_dict
-        )
+        settings = CodeWeaverSettings(project_path=project_path, **profile_dict)
     else:
         # Create settings with defaults for this project
         settings = CodeWeaverSettings(project_path=project_path)
@@ -123,28 +122,25 @@ def config(
         Literal["recommended", "quickstart", "backup"] | None,
         cyclopts.Parameter(
             name=["--profile"],
-            help="Configuration profile to use (recommended, quickstart, or backup)"
+            help="Configuration profile to use (recommended, quickstart, or backup)",
         ),
     ] = None,
     vector_deployment: Annotated[
         Literal["local", "cloud"],
-        cyclopts.Parameter(
-            name=["--vector-deployment"],
-            help="Vector store deployment type"
-        ),
+        cyclopts.Parameter(name=["--vector-deployment"], help="Vector store deployment type"),
     ] = "local",
     vector_url: Annotated[
         str | None,
         cyclopts.Parameter(
             name=["--vector-url"],
-            help="URL for cloud vector deployment (required if --vector-deployment=cloud)"
+            help="URL for cloud vector deployment (required if --vector-deployment=cloud)",
         ),
     ] = None,
     config_path: Annotated[
         Path | None,
         cyclopts.Parameter(
             name=["--config-path"],
-            help="Custom path for configuration file (defaults to .codeweaver.toml in project root)"
+            help="Custom path for configuration file (defaults to .codeweaver.toml in project root)",
         ),
     ] = None,
     force: Annotated[bool, cyclopts.Parameter(name=["--force", "-f"])] = False,
@@ -673,21 +669,18 @@ def init(
         Literal["recommended", "quickstart", "backup"] | None,
         cyclopts.Parameter(
             name=["--profile"],
-            help="Configuration profile to use (recommended, quickstart, or backup). Defaults to 'recommended' with --quick."
+            help="Configuration profile to use (recommended, quickstart, or backup). Defaults to 'recommended' with --quick.",
         ),
     ] = None,
     vector_deployment: Annotated[
         Literal["local", "cloud"],
-        cyclopts.Parameter(
-            name=["--vector-deployment"],
-            help="Vector store deployment type"
-        ),
+        cyclopts.Parameter(name=["--vector-deployment"], help="Vector store deployment type"),
     ] = "local",
     vector_url: Annotated[
         str | None,
         cyclopts.Parameter(
             name=["--vector-url"],
-            help="URL for cloud vector deployment (required if --vector-deployment=cloud)"
+            help="URL for cloud vector deployment (required if --vector-deployment=cloud)",
         ),
     ] = None,
     client: Annotated[

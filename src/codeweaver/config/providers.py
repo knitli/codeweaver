@@ -373,7 +373,7 @@ def _get_default_embedding_settings() -> DeterminedDefaults:
                 return DeterminedDefaults(
                     # showing its age but it's still a solid lightweight option
                     provider=Provider.FASTEMBED,
-                    model="BAAI/bge-small-en-v1.5",
+                    model="Alibaba-NLP/gte-modernbert-base",
                     enabled=True,
                 )
             if lib == "sentence_transformers":

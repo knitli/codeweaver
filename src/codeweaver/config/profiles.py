@@ -23,10 +23,12 @@ from typing import Literal, overload
 from pydantic import AnyHttpUrl
 
 from codeweaver.config.providers import (
+    AgentModelSettings,
     AgentProviderSettings,
     DataProviderSettings,
     EmbeddingModelSettings,
     EmbeddingProviderSettings,
+    MemoryConfig,
     ProviderSettingsDict,
     QdrantConfig,
     RerankingModelSettings,
@@ -134,7 +136,10 @@ def _recommended_default(
         ),
         agent=(
             AgentProviderSettings(
-                provider=Provider.ANTHROPIC, enabled=True, model="claude-haiku-4.5"
+                provider=Provider.ANTHROPIC,
+                enabled=True,
+                model="claude-haiku-4.5",
+                model_settings=AgentModelSettings(),
             ),
         ),
         data=(
@@ -167,7 +172,7 @@ def _quickstart_default(
                 model_settings=EmbeddingModelSettings(
                     model="ibm-granite/granite-embedding-small-english-r2"
                     if HAS_ST
-                    else "BAAI/bge-small-en-v1.5"
+                    else "Alibaba-NLP/gte-modernbert-base"
                 ),
                 provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
                 enabled=True,
@@ -197,7 +202,10 @@ def _quickstart_default(
         ),
         agent=(
             AgentProviderSettings(
-                provider=Provider.ANTHROPIC, enabled=True, model="claude-haiku-4.5"
+                provider=Provider.ANTHROPIC,
+                enabled=True,
+                model="claude-haiku-4.5",
+                model_settings=AgentModelSettings(),
             ),
         ),
         data=(
@@ -218,7 +226,11 @@ def _backup_profile() -> ProviderSettingsDict:
     return ProviderSettingsDict(
         **(
             _quickstart_default("local")
-            | {"vector_store": VectorStoreProviderSettings(provider=Provider.MEMORY, enabled=True)}
+            | {
+                "vector_store": VectorStoreProviderSettings(
+                    provider=Provider.MEMORY, enabled=True, provider_settings=MemoryConfig()
+                )
+            }
         )
     )
 

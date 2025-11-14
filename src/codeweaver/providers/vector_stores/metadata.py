@@ -9,9 +9,10 @@ from __future__ import annotations
 import logging
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
-from pydantic import Field, PositiveInt
+from pydantic import Field
+from qdrant_client.http.models import SparseParams, VectorParams
 
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.models import BasedModel
@@ -70,21 +71,41 @@ class CollectionMetadata(BasedModel):
     provider: Annotated[str, Field(description="Provider name that created collection")]
     created_at: Annotated[datetime, Field(default_factory=lambda: datetime.now(UTC))]
     project_name: Annotated[str, Field(description="Project/repository name")]
-    vector_config: Annotated[dict[str, Any], Field(description="Vector configuration snapshot")]
-    embedding_dtype_dense: Annotated[
-        str, Field(description="Data type of dense embeddings, e.g., 'float32'")
-    ] = "float32"
-    embedding_dim_dense: Annotated[
-        PositiveInt | None, Field(description="Expected dense embedding dimension")
-    ] = None
+    vector_config: Annotated[
+        dict[Literal["dense"], VectorParams],
+        Field(description="Vector configuration snapshot", serialization_alias="vectors_config"),
+    ]
+    sparse_config: Annotated[
+        dict[Literal["sparse"], SparseParams],
+        Field(
+            description="Sparse embedding configuration snapshot",
+            serialization_alias="sparse_vectors_config",
+        ),
+    ]
 
-    embedding_model: Annotated[str | None, Field(description="Embedding model name used")] = None
-    sparse_embedding_model: Annotated[
-        str | None, Field(description="Sparse embedding model name used")
-    ] = None
+    dense_model: Annotated[str | None, Field(description="Embedding model name used")] = None
+    sparse_model: Annotated[str | None, Field(description="Sparse embedding model name used")] = (
+        None
+    )
     collection_name: Annotated[str, Field(description="Name of the collection")] = ""
 
     version: Annotated[str, Field(description="Metadata schema version")] = "1.0.0"
+
+    def to_collection(self) -> dict[str, Any]:
+        """Convert to a dictionary that is the argument for collection creation."""
+        return self.model_dump(
+            exclude_none=True,
+            by_alias=True,
+            round_trip=True,
+            exclude={
+                "created_at",
+                "project_name",
+                "version",
+                "provider",
+                "dense_model",
+                "sparse_model",
+            },
+        ) | {"metadata": self.model_dump(exclude_none=True, by_alias=True, round_trip=True)}
 
     def validate_compatibility(self, other: CollectionMetadata) -> None:
         """Validate collection metadata against current provider configuration.
