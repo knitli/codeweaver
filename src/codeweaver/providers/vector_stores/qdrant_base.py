@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import UUID7
-from qdrant_client.async_client import AsyncQdrantClient
+from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.models import (
     BinaryQuantization,
     Datatype,
@@ -23,17 +23,14 @@ from qdrant_client.http.models import (
 from typing_extensions import TypeIs
 
 from codeweaver.agent_api.find_code.results import SearchResult
-from codeweaver.agent_api.find_code.types import MixedQueryInput, StrategizedQuery
+from codeweaver.agent_api.find_code.types import StrategizedQuery
+from codeweaver.config.providers import VectorStoreProviderSettings
+from codeweaver.core.chunks import CodeChunk
+from codeweaver.engine.search import Filter
 from codeweaver.exceptions import ProviderError
 from codeweaver.providers.provider import Provider
-from codeweaver.providers.vector_stores.base import VectorStoreProvider
+from codeweaver.providers.vector_stores.base import MixedQueryInput, VectorStoreProvider
 from codeweaver.providers.vector_stores.metadata import CollectionMetadata, HybridVectorPayload
-
-
-if TYPE_CHECKING:
-    from codeweaver.common.config.providers.vector_store import VectorStoreProviderSettings
-    from codeweaver.core.chunks import CodeChunk
-    from codeweaver.engine.search import Filter
 
 
 logger = logging.getLogger(__name__)
@@ -46,7 +43,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
     _collection: str | None = None
     _auto_persist: bool | None = None  # only for memory provider
     _client: AsyncQdrantClient | None = None  # Placeholder for Qdrant client instance
-    _provider: Literal[Provider.QDRANT | Provider.MEMORY]
+    _provider: Literal[Provider.QDRANT, Provider.MEMORY]
 
     @property
     def base_url(self) -> str | None:
@@ -91,13 +88,12 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         """
         return client is not None and isinstance(client, AsyncQdrantClient)
 
-    def _generate_metadata(
-        self,
-        vector_config: dict[Literal["dense"], VectorParams],
-        sparse_config: dict[Literal["sparse"], SparseVectorParams],
-        quantization: Any | None = None,
-    ) -> CollectionMetadata:
-        """Generate collection metadata for validation."""
+    def _generate_metadata(self) -> CollectionMetadata:
+        """Generate collection metadata from current provider configuration.
+        
+        Returns:
+            CollectionMetadata configured according to provider settings.
+        """
         from codeweaver.common.utils.git import get_project_path
         from codeweaver.config.settings import get_settings_map
 
@@ -245,14 +241,83 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
 
         Args:
             collection_name: Name of the collection to ensure exists.
-            dense_dim: Dimension of dense vectors.
+            dense_dim: Dimension of dense vectors (deprecated - config is source of truth).
         """
         if not self._client:
             raise ProviderError("Qdrant client is not initialized")
         collections = await self._client.get_collections()
         collection_names = [col.name for col in collections.collections]
         if collection_name not in collection_names:
+            # Create new collection from config
             _ = await self._client.create_collection(**self._generate_metadata().to_collection())
+        else:
+            # Validate existing collection matches current config
+            await self._validate_collection_config(collection_name)
+
+    async def _validate_collection_config(self, collection_name: str) -> None:
+        """Validate that existing collection configuration matches current provider settings.
+        
+        Checks for dimension mismatches (critical) and configuration drift (warnings).
+        
+        Args:
+            collection_name: Name of the collection to validate.
+            
+        Raises:
+            DimensionMismatchError: Collection dimension doesn't match configured dimension.
+        """
+        try:
+            collection_info = await self._client.get_collection(collection_name)
+            expected_metadata = self._generate_metadata()
+            
+            # Get actual vector config from collection
+            actual_vectors = collection_info.config.params.vectors
+            if isinstance(actual_vectors, dict) and "dense" in actual_vectors:
+                actual_dense = actual_vectors["dense"]
+                expected_dense = expected_metadata.vector_config["dense"]
+                
+                # Check dimension mismatch (CRITICAL)
+                if actual_dense.size != expected_dense.size:
+                    from codeweaver.exceptions import DimensionMismatchError
+                    
+                    raise DimensionMismatchError(
+                        f"Collection '{collection_name}' has {actual_dense.size}-dimensional vectors "
+                        f"but current configuration specifies {expected_dense.size} dimensions.\n\n"
+                        f"This typically happens when:\n"
+                        f"  • The embedding model changed (e.g., switched providers or model versions)\n"
+                        f"  • The embedding configuration changed\n"
+                        f"  • The collection was created with different settings\n\n"
+                        f"To resolve:\n"
+                        f"  1. Rebuild the collection: codeweaver index --clear\n"
+                        f"  2. Or revert to the embedding model that created this collection\n",
+                        details={
+                            "collection": collection_name,
+                            "actual_dimension": actual_dense.size,
+                            "expected_dimension": expected_dense.size,
+                            "resolution_command": "codeweaver index --clear",
+                        },
+                    )
+                
+                # Check distance metric (WARNING)
+                if actual_dense.distance != expected_dense.distance:
+                    logger.warning(
+                        f"Collection '{collection_name}' uses {actual_dense.distance.value} distance metric "
+                        f"but current configuration specifies {expected_dense.distance.value}. "
+                        f"Search results may differ from expectations. "
+                        f"Consider rebuilding: codeweaver index --clear"
+                    )
+                
+                # Check datatype (WARNING)
+                if hasattr(actual_dense, 'datatype') and hasattr(expected_dense, 'datatype'):
+                    if actual_dense.datatype != expected_dense.datatype:
+                        logger.warning(
+                            f"Collection '{collection_name}' datatype mismatch: "
+                            f"{actual_dense.datatype.value} (actual) vs {expected_dense.datatype.value} (expected). "
+                            f"This may affect storage efficiency and precision."
+                        )
+                        
+        except Exception as e:
+            # Don't fail on validation errors - just log them
+            logger.debug(f"Could not validate collection config for '{collection_name}': {e}")
 
     async def _execute_search_query(
         self, vector: StrategizedQuery, collection_name: str
@@ -312,7 +377,6 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
         from codeweaver.providers.embedding.types import SparseEmbedding
 
-        await self._ensure_collection()
         if isinstance(vector, StrategizedQuery):
             return vector
 

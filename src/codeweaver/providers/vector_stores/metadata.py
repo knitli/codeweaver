@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from pydantic import Field
-from qdrant_client.http.models import SparseParams, VectorParams
+from qdrant_client.http.models import SparseVectorParams, VectorParams
 
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.models import BasedModel

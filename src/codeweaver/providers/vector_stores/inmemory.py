@@ -86,7 +86,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         object.__setattr__(self, "_shutdown", False)
 
         # Create in-memory Qdrant client
-        client = AsyncQdrantClient(location=":memory:", **(self.config.get("client_options", {})))
+        client = await self._build_client()
         object.__setattr__(self, "_client", client)
 
         # Restore from disk if persistence file exists
@@ -97,6 +97,14 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         if auto_persist:
             periodic_task = asyncio.create_task(self._periodic_persist_task())
             object.__setattr__(self, "_periodic_task", periodic_task)
+
+    async def _build_client(self) -> AsyncQdrantClient:
+        """Build the Qdrant Async client in in-memory mode.
+
+        Returns:
+            An initialized AsyncQdrantClient.
+        """
+        return AsyncQdrantClient(location=":memory:", **(self.config.get("client_options", {})))
 
     async def _persist_to_disk(self) -> None:
         """Persist in-memory state to JSON file.
@@ -187,6 +195,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
             ValidationError: Persistence file format invalid.
         """
         from pydantic_core import from_json
+        from qdrant_client.models import Datatype, Distance, VectorParams
 
         def _raise_persistence_error(msg: str) -> None:
             raise PersistenceError(msg)
@@ -208,15 +217,38 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
                     _ = await self._client.get_collection(collection_name=collection_name)
                     # Collection exists, delete it first to ensure clean restore
                     _ = await self._client.delete_collection(collection_name=collection_name)
+
                 # Create collection with vector configuration
                 vectors_config = collection_data["vectors_config"]
                 dense_config = vectors_config.get("dense", {})
+
+                # Map distance from persisted data
+                distance_str = dense_config.get("distance", "Cosine")
+                distance_map = {
+                    "Cosine": Distance.COSINE,
+                    "Dot": Distance.DOT,
+                    "Euclid": Distance.EUCLID,
+                    "Euclidean": Distance.EUCLID,
+                }
+                distance = distance_map.get(distance_str, Distance.COSINE)
+
+                # Map datatype from persisted data
+                datatype_str = dense_config.get("datatype", "Float32")
+                datatype_map = {
+                    "Float32": Datatype.FLOAT32,
+                    "Float16": Datatype.FLOAT16,
+                    "Uint8": Datatype.UINT8,
+                }
+                datatype = datatype_map.get(datatype_str, Datatype.FLOAT32)
 
                 await self._client.create_collection(
                     collection_name=collection_name,
                     vectors_config={
                         "dense": VectorParams(
-                            size=dense_config.get("size", 768), distance=Distance.COSINE
+                            size=dense_config.get("size", 768),
+                            distance=distance,
+                            datatype=datatype,
+                            # quantization_config restored if present in future
                         )
                     },
                     sparse_vectors_config={"sparse": {}},  # type: ignore
