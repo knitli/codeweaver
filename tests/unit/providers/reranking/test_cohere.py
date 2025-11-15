@@ -222,7 +222,7 @@ class TestCohereRerankingProviderReranking:
         )
         from pathlib import Path
 
-        from codeweacver.core.metadata import ChunkKind, ExtKind
+        from codeweaver.core.metadata import ChunkKind, ExtKind
 
         from codeweaver.common.utils.utils import uuid7
         from codeweaver.core.language import SemanticSearchLanguage

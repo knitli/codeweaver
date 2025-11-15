@@ -233,6 +233,7 @@ class TestCohereEmbeddingProviderEmbedding:
 
         from pathlib import Path
 
+        from codeweaver.common.utils.utils import uuid7
         from codeweaver.core.language import SemanticSearchLanguage
         from codeweaver.core.metadata import ChunkKind, ExtKind
         from codeweaver.core.spans import Span
@@ -242,10 +243,11 @@ class TestCohereEmbeddingProviderEmbedding:
                 content="test content",
                 ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
                 language=SemanticSearchLanguage.PYTHON,
-                line_range=Span(start=1, end=1, _source_id="test"),
+                line_range=Span(start=1, end=1, _source_id=uuid7()),
                 start_line=1,
                 end_line=1,
                 file_path=Path("/test/file.py"),
+                chunk_id=uuid7(),
             )
         ]
 
@@ -279,6 +281,7 @@ class TestCohereEmbeddingProviderErrorHandling:
         provider = CohereEmbeddingProvider(caps=cohere_capabilities, _client=mock_cohere_client)
         from pathlib import Path
 
+        from codeweaver.common.utils.utils import uuid7
         from codeweaver.core.language import SemanticSearchLanguage
         from codeweaver.core.metadata import ChunkKind, ExtKind
         from codeweaver.core.spans import Span
@@ -288,10 +291,11 @@ class TestCohereEmbeddingProviderErrorHandling:
                 content="test content",
                 ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
                 language=SemanticSearchLanguage.PYTHON,
-                line_range=Span(start=1, end=1, _source_id="test"),
+                line_range=Span(start=1, end=1, _source_id=uuid7()),
                 start_line=1,
                 end_line=1,
                 file_path=Path("/test/file.py"),
+                chunk_id=uuid7(),
             )
         ]
 
