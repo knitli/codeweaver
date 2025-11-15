@@ -46,16 +46,15 @@ class TestConfigInit:
     def test_quick_flag_creates_config(
         self, temp_project: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Test --quick flag creates config with recommended defaults."""
+        """Test --profile recommended creates config with recommended defaults."""
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["config", "--quick"])
+            init_app(["config", "--profile", "recommended"])
         capsys.readouterr()  # Clear output
 
         assert exc_info.value.code == 0
         config_path = temp_project / ".codeweaver.toml"
         assert config_path.exists()
 
-    @pytest.mark.skip(reason="Profile feature not yet implemented in init config command")
     def test_profile_recommended(
         self, temp_project: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
@@ -68,25 +67,24 @@ class TestConfigInit:
         config_path = temp_project / ".codeweaver.toml"
         config = tomli.loads(config_path.read_text())
 
-        assert config["embedding"]["provider"] == "voyage"
-        assert config["vector_store"]["type"] == "qdrant"
+        assert config["embedding"][0]["provider"] == "voyage"
+        assert config["vector_store"]["provider"] == "qdrant"
 
-    @pytest.mark.skip(reason="Profile feature not yet implemented in init config command")
     def test_profile_local_only(
         self, temp_project: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Test --profile local-only creates offline-capable config."""
+        """Test --profile quickstart creates offline-capable config."""
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["config", "--profile", ConfigProfile.LOCAL_ONLY.value])
+            init_app(["config", "--profile", "quickstart"])
         capsys.readouterr()
 
         assert exc_info.value.code == 0
         config_path = temp_project / ".codeweaver.toml"
         config = tomli.loads(config_path.read_text())
 
-        # Should use local providers
-        assert config["embedding"]["provider"] == "fastembed"
-        assert config["vector_store"]["location"] == "memory"
+        # Should use local providers (fastembed or sentence-transformers)
+        assert config["embedding"][0]["provider"] in ["fastembed", "sentence-transformers"]
+        assert config["vector_store"]["provider"] == "qdrant"
 
     @pytest.mark.skip(reason="User flag not yet implemented in init config command")
     def test_user_flag_creates_user_config(

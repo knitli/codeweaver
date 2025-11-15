@@ -11,7 +11,7 @@ import logging
 
 from typing import Any
 
-from codeweave.providers.vector_stores.qdrant_base import QdrantBaseProvider
+from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
 from pydantic import SecretStr
 
 from codeweaver.config.providers import QdrantConfig
