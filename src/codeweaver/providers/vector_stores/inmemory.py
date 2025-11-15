@@ -311,5 +311,13 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         if self._client:
             await self._client.close()
 
+    async def handle_persistence(self) -> None:
+        """Trigger persistence if auto_persist is enabled.
+        
+        Called after upsert and delete operations to persist changes.
+        """
+        if self._auto_persist:  # type: ignore
+            await self._persist_to_disk()
+
 
 __all__ = ("MemoryVectorStoreProvider",)

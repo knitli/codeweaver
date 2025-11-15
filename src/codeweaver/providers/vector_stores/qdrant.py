@@ -53,6 +53,8 @@ class QdrantVectorStoreProvider(QdrantBaseProvider):
         client_kwargs: dict[str, Any] = {"url": url, "api_key": api_key}
 
         client = AsyncQdrantClient(**client_kwargs)
+        # Store client before calling _ensure_collection (which needs self._client)
+        self._client = client
         if collection_name := self.collection:
             await self._ensure_collection(collection_name)
         return client

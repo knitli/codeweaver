@@ -44,9 +44,24 @@ async def memory_config(temp_persist_path):
 
 
 @pytest.fixture
-async def memory_provider(memory_config):
+async def test_embedding_caps():
+    """Provide test embedding capabilities with 768 dimensions."""
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    
+    dense_caps = EmbeddingModelCapabilities(
+        name="test-dense-model",
+        default_dimension=768,
+        default_dtype="float32",
+        preferred_metrics=["cosine"],
+    )
+    
+    return {"dense": dense_caps, "sparse": None}
+
+
+@pytest.fixture
+async def memory_provider(memory_config, test_embedding_caps):
     """Create a MemoryVectorStoreProvider instance for testing."""
-    provider = MemoryVectorStoreProvider(config=memory_config)
+    provider = MemoryVectorStoreProvider(config=memory_config, embedding_caps=test_embedding_caps)
     await provider._initialize()
     return provider
     # Cleanup handled by temp directory
@@ -170,16 +185,16 @@ class TestMemoryProviderContract:
         assert persist_path.exists(), "Persistence file should be created"
         assert persist_path.stat().st_size > 0, "Persistence file should not be empty"
 
-    async def test_restore_from_disk(self, memory_config, sample_chunk, temp_persist_path):
+    async def test_restore_from_disk(self, memory_config, sample_chunk, temp_persist_path, test_embedding_caps):
         """Test _restore_from_disk loads data from JSON."""
         # Create and persist data
-        provider1 = MemoryVectorStoreProvider(config=memory_config)
+        provider1 = MemoryVectorStoreProvider(config=memory_config, embedding_caps=test_embedding_caps)
         await provider1._initialize()
         await provider1.upsert([sample_chunk])
         await provider1._persist_to_disk()
 
         # Create new provider and restore
-        provider2 = MemoryVectorStoreProvider(config=memory_config)
+        provider2 = MemoryVectorStoreProvider(config=memory_config, embedding_caps=test_embedding_caps)
         await provider2._initialize()
 
         # Verify data was restored
@@ -215,12 +230,12 @@ class TestMemoryProviderContract:
         assert "collections" in data or "metadata" in data
         assert data["version"] == "1.0"
 
-    async def test_auto_persist_on_upsert(self, memory_config, sample_chunk, temp_persist_path):
+    async def test_auto_persist_on_upsert(self, memory_config, sample_chunk, temp_persist_path, test_embedding_caps):
         """Test auto_persist triggers persistence on upsert."""
         config_with_auto = memory_config.copy()
         config_with_auto["auto_persist"] = True
 
-        provider = MemoryVectorStoreProvider(config=config_with_auto)
+        provider = MemoryVectorStoreProvider(config=config_with_auto, embedding_caps=test_embedding_caps)
         await provider._initialize()
         await provider.upsert([sample_chunk])
 

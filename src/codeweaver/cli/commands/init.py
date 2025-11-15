@@ -80,29 +80,27 @@ def _create_codeweaver_config(
     Returns:
         Path to created configuration file
     """
-    from codeweaver.config.settings import CodeWeaverSettings
-
     # Determine config file path - default to .codeweaver.toml but allow override
     if config_path is None:
         config_path = project_path / ".codeweaver.toml"
 
     # Ensure parent directory exists
     config_path.parent.mkdir(parents=True, exist_ok=True)
+    from codeweaver.config.profiles import get_profile
 
-    # Create settings with profile if specified
-    if profile:
-        from codeweaver.config.profiles import get_profile
+    deployment_profile = (
+        get_profile(profile if profile != "test" else "backup", vector_deployment, url=vector_url)
+        if profile
+        else None
+    )  # ty: ignore[no-matching-overload]
+    from codeweaver.config.settings import get_settings, update_settings
 
-        # Get profile provider settings dict and pass as kwargs
-        profile_dict = get_profile(
-            profile if profile != "test" else "backup", vector_deployment, url=vector_url
-        )
-
-        # Create settings with profile by passing dict as kwargs
-        settings = CodeWeaverSettings(project_path=project_path, **profile_dict)
-    else:
-        # Create settings with defaults for this project
-        settings = CodeWeaverSettings(project_path=project_path)
+    settings = get_settings()
+    _settings_view = update_settings(
+        **({"project_path": project_path, "config_file": config_path} | (deployment_profile or {}))
+    )
+    # The reference should reflect the updated settings, but we'll refetch to be sure
+    settings = get_settings()
 
     # Save to TOML file
     settings.save_to_file(config_path)
@@ -140,9 +138,19 @@ def config(
         Path | None,
         cyclopts.Parameter(
             name=["--config-path"],
-            help="Custom path for configuration file (defaults to .codeweaver.toml in project root)",
+            help="Custom path for configuration file (defaults to codeweaver.toml in project root)",
         ),
     ] = None,
+    config_extension: Annotated[
+        Literal["toml", "yaml", "yml", "json"], cyclopts.Parameter(name=["--config-extension"])
+    ] = "toml",
+    config_level: Annotated[
+        Literal["local", "project", "user"],
+        cyclopts.Parameter(
+            name=["--config-level"],
+            help="Configuration level. Local configs (which end in 'local') should be gitignored and are for personal use. Project-level are for shared configuration in a repository and should not be gitignored. User-level are for personal configurations across multiple projects.",
+        ),
+    ] = "project",
     force: Annotated[bool, cyclopts.Parameter(name=["--force", "-f"])] = False,
 ) -> None:
     """Set up CodeWeaver configuration file.
@@ -159,11 +167,10 @@ def config(
 
     # Validate vector_url if cloud deployment
     parsed_vector_url: AnyHttpUrl | None = None
-    if vector_deployment == "cloud":
-        if not vector_url:
-            console.print("[red]✗[/red] --vector-url is required when --vector-deployment=cloud")
-            sys.exit(1)
-        parsed_vector_url = AnyHttpUrl(vector_url)
+    if vector_deployment == "cloud" and not vector_url:
+        console.print("[red]✗[/red] --vector-url is required when --vector-deployment=cloud")
+        sys.exit(1)
+    # TODO finish this up with the config_extension and config_level options using cli.utils.get_codeweaver_config_paths
 
     # Determine project path
     project_path = (project or Path.cwd()).resolve()

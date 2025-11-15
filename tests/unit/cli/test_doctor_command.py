@@ -39,15 +39,14 @@ def temp_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 class TestDoctorUnsetHandling:
     """Tests for Unset sentinel handling."""
 
-    @pytest.mark.skip(reason="Settings now auto-detects project_path from git root")
-    def test_unset_handling_correct(self) -> None:
-        """Test Unset sentinel is handled correctly."""
+    def test_project_path_auto_detection(self) -> None:
+        """Test project_path is auto-detected from git root."""
         settings = CodeWeaverSettings()
 
-        # Should use isinstance(x, Unset), not isinstance(x, Path)
-        assert isinstance(settings.project_path, Unset)
-
-        assert isinstance(settings.project_path, Unset)
+        # Settings should auto-detect project_path, not leave it as Unset
+        assert not isinstance(settings.project_path, Unset)
+        assert isinstance(settings.project_path, Path)
+        assert settings.project_path.exists()
 
     def test_unset_vs_none_distinction(self) -> None:
         """Test Unset is correctly distinguished from None."""
@@ -57,18 +56,18 @@ class TestDoctorUnsetHandling:
         assert isinstance(unset_value, Unset)
         assert not isinstance(None, Unset)
 
-    @pytest.mark.skip(reason="Settings now auto-detects project_path from git root")
-    def test_settings_with_unset_fields(
+    @pytest.mark.skip(reason="Doctor command may fail if no providers configured - test needs provider setup")
+    def test_doctor_handles_auto_detected_settings(
         self, temp_project: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Test doctor handles settings with Unset fields correctly."""
+        """Test doctor handles settings with auto-detected fields correctly."""
         # Create minimal settings
         settings = CodeWeaverSettings()
 
-        # Many fields should be Unset
-        assert isinstance(settings.project_path, Unset)
+        # project_path should be auto-detected
+        assert not isinstance(settings.project_path, Unset)
 
-        # Doctor should not crash on Unset checks
+        # Doctor should not crash on auto-detected settings
         with pytest.raises(SystemExit) as exc_info:
             doctor_app()
         assert exc_info.value.code == 0
@@ -101,11 +100,13 @@ class TestDoctorImports:
         config_dir = get_user_config_dir()
         assert config_dir.exists() or config_dir.parent.exists()
 
-    @pytest.mark.skip(reason="Import now succeeds due to __init__.py exports")
-    def test_import_from_wrong_module_fails(self) -> None:
-        """Test importing from wrong module raises ImportError."""
-        with pytest.raises(ImportError):
-            from codeweaver.common.utils import get_user_config_dir  # noqa: F401
+    def test_import_from_common_utils_succeeds(self) -> None:
+        """Test importing from common.utils now works via __init__.py exports."""
+        # Should not raise ImportError due to __init__.py exports
+        from codeweaver.common.utils import get_user_config_dir  # noqa: F401
+
+        config_dir = get_user_config_dir()
+        assert config_dir is not None
 
 
 @pytest.mark.unit

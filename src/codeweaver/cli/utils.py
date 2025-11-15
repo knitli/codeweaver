@@ -98,10 +98,49 @@ def format_file_link(file_path: str | Path, line: NonNegativeInt | None = None) 
     return f"{path.absolute()!s}:{line!s}" if line is not None else f"{path.absolute()!s}"
 
 
+def get_codeweaver_config_paths() -> tuple[Path, ...]:
+    """Get all possible CodeWeaver configuration file paths."""
+    from codeweaver.common.utils import get_project_path, get_user_config_dir
+    from codeweaver.config.settings import get_settings_map
+
+    settings_map = get_settings_map()
+    project_path = (
+        settings_map["project_path"]
+        if isinstance(settings_map["project_path"], Path)
+        else get_project_path()
+    )
+    user_config_dir = get_user_config_dir()
+    repo_paths = [
+        project_path / f"{config_path}.{ext}"
+        for config_path in (
+            "codeweaver",
+            ".codeweaver",
+            ".codeweaver.local",
+            "codeweaver.local",
+            ".codeweaver/codeweaver",
+            ".codeweaver/codeweaver.local",
+        )
+        for ext in ("toml", "yaml", "yml", "json")
+    ]
+    repo_paths.extend([
+        user_config_dir / f"codeweaver.{ext}" for ext in ("toml", "yaml", "yml", "json")
+    ])
+    if env_path := os.environ.get("CODEWEAVER_CONFIG_FILE"):
+        repo_paths.append(Path(env_path))
+    return tuple(repo_paths)
+
+
+def is_codeweaver_config_path(path: Path) -> bool:
+    """Check if the given path is a CodeWeaver configuration file path."""
+    return any(path.samefile(config_path) for config_path in get_codeweaver_config_paths())
+
+
 __all__ = (
     "format_file_link",
+    "get_codeweaver_config_paths",
     "get_terminal_width",
     "in_ide",
+    "is_codeweaver_config_path",
     "is_tty",
     "resolve_project_root",
     "we_are_in_jetbrains",

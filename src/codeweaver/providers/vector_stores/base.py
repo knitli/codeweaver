@@ -145,9 +145,15 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
             init_data["config"] = config
         if client is not None:
             init_data["_client"] = client
-        if embedding_caps is not None:
-            init_data["_embedding_caps"] = embedding_caps
+        # Note: Don't pass _embedding_caps here - PrivateAttr with default_factory 
+        # will always call the factory. Set it after super().__init__() instead.
+        
         super().__init__(**init_data)
+
+        # Override _embedding_caps if explicitly provided (after super().__init__)
+        # This is required because PrivateAttr with default_factory always calls the factory
+        if embedding_caps is not None:
+            object.__setattr__(self, "_embedding_caps", embedding_caps)
 
         # Initialize circuit breaker state
         self._circuit_state = CircuitBreakerState.CLOSED
@@ -242,16 +248,12 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         Returns:
             Dimension of dense embeddings, or None if dense embeddings not supported.
         """
-        default_dim = (
-            self.embedding_capabilities.get("dense", {}).get("default_dimension")
-            if self.embedding_capabilities.get("dense")
-            else None
-        )
-        set_dim = (
-            self.embedding_settings.get("dense", {}).get("dimension")
-            if self.embedding_settings.get("dense")
-            else None
-        )
+        dense_caps = self.embedding_capabilities.get("dense")
+        default_dim = dense_caps.default_dimension if dense_caps else None
+        
+        dense_settings = self.embedding_settings.get("dense")
+        set_dim = dense_settings.get("dimension") if dense_settings else None
+        
         return set_dim or default_dim
 
     @property
@@ -261,16 +263,12 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         Returns:
             Data type of dense embeddings.
         """
-        default_dtype = (
-            self.embedding_capabilities.get("dense", {}).get("default_dtype")
-            if self.embedding_capabilities.get("dense")
-            else "float16"
-        )
-        set_dtype = (
-            self.embedding_settings.get("dense", {}).get("data_type")
-            if self.embedding_settings.get("dense")
-            else None
-        )
+        dense_caps = self.embedding_capabilities.get("dense")
+        default_dtype = dense_caps.default_dtype if dense_caps else "float16"
+        
+        dense_settings = self.embedding_settings.get("dense")
+        set_dtype = dense_settings.get("data_type") if dense_settings else None
+        
         return set_dtype or default_dtype
 
     @property
@@ -280,7 +278,30 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         Returns:
             Distance metric as a string.
         """
-        return self.embedding_capabilities.get("dense", {}).get("preferred_metrics", ("cosine",))[0]
+        dense_caps = self.embedding_capabilities.get("dense")
+        if dense_caps and dense_caps.preferred_metrics:
+            return dense_caps.preferred_metrics[0]
+        return "cosine"
+
+    @property
+    def dense_model(self) -> str | None:
+        """Get the name of the dense embedding model.
+
+        Returns:
+            Dense model name, or None if not configured.
+        """
+        dense_caps = self.embedding_capabilities.get("dense")
+        return dense_caps.name if dense_caps else None
+
+    @property
+    def sparse_model(self) -> str | None:
+        """Get the name of the sparse embedding model.
+
+        Returns:
+            Sparse model name, or None if not configured.
+        """
+        sparse_caps = self.embedding_capabilities.get("sparse")
+        return sparse_caps.name if sparse_caps else None
 
     @property
     def _check_circuit_breaker(self) -> None:

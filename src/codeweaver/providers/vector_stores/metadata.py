@@ -76,7 +76,7 @@ class CollectionMetadata(BasedModel):
         Field(description="Vector configuration snapshot", serialization_alias="vectors_config"),
     ]
     sparse_config: Annotated[
-        dict[Literal["sparse"], SparseParams],
+        dict[Literal["sparse"], SparseVectorParams],
         Field(
             description="Sparse embedding configuration snapshot",
             serialization_alias="sparse_vectors_config",
@@ -105,7 +105,7 @@ class CollectionMetadata(BasedModel):
                 "dense_model",
                 "sparse_model",
             },
-        ) | {"metadata": self.model_dump(exclude_none=True, by_alias=True, round_trip=True)}
+        )
 
     def validate_compatibility(self, other: CollectionMetadata) -> None:
         """Validate collection metadata against current provider configuration.

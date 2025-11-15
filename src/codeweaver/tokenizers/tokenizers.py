@@ -54,7 +54,7 @@ class Tokenizers(Tokenizer[TokenizersTokenizer]):
 
     def encode_batch(self, texts: Sequence[str | bytes], **kwargs: Any) -> Sequence[Sequence[int]]:
         """Encode a batch of texts into a list of token ID lists."""
-        return self._encoder.encode_batch((self._to_string(txt) for txt in texts), **kwargs)
+        return self._encoder.encode_batch([self._to_string(txt) for txt in texts], **kwargs)
 
     def decode(self, tokens: Sequence[int], **kwargs: Any) -> str:
         """Decode a list of token IDs back into text."""

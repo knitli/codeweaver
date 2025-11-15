@@ -159,18 +159,22 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
 
     async def _initialize(self) -> None:
         """Initialize the Qdrant provider with configurations."""
-        config = self._fetch_config()
-        qdrant_config = config["provider_settings"]
-        object.__setattr__(
-            self,
-            "_collection",
-            qdrant_config.get("collection_name") or self._default_collection_name(),
-        )
-        object.__setattr__(
-            self,
-            "_base_url",
-            qdrant_config.get("url") if self._provider == Provider.QDRANT else ":memory:",
-        )
+        # Use explicitly provided config if available, otherwise fetch from registry
+        if self.config is not None:
+            # Config was provided (e.g., in tests) - use it directly
+            qdrant_config = self.config
+            collection_name = qdrant_config.get("collection_name") or self._default_collection_name()
+            base_url = qdrant_config.get("url") if self._provider == Provider.QDRANT else ":memory:"
+        else:
+            # No config provided - fetch from global registry (production path)
+            config = self._fetch_config()
+            qdrant_config = config["provider_settings"]
+            collection_name = qdrant_config.get("collection_name") or self._default_collection_name()
+            base_url = qdrant_config.get("url") if self._provider == Provider.QDRANT else ":memory:"
+        
+        object.__setattr__(self, "_collection", collection_name)
+        object.__setattr__(self, "_base_url", base_url)
+        
         client = await self._build_client()
         object.__setattr__(self, "_client", client)
 
