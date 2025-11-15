@@ -153,7 +153,7 @@ class TestCohereEmbeddingProviderEmbedding:
         from codeweaver.core.metadata import ChunkKind, ExtKind
         from codeweaver.core.spans import Span
 
-        # Create test chunks
+        # Create test chunks with explicit chunk_ids
         chunks = [
             CodeChunk(
                 content="test content 1",
@@ -161,6 +161,7 @@ class TestCohereEmbeddingProviderEmbedding:
                 language=SemanticSearchLanguage.PYTHON,
                 line_range=Span(start=1, end=1, _source_id=uuid7()),
                 file_path=Path("/test/file.py"),
+                chunk_id=uuid7(),
             ),
             CodeChunk(
                 content="test content 2",
@@ -168,6 +169,7 @@ class TestCohereEmbeddingProviderEmbedding:
                 language=SemanticSearchLanguage.PYTHON,
                 line_range=Span(start=2, end=2, _source_id=uuid7()),
                 file_path=Path("/test/file.py"),
+                chunk_id=uuid7(),
             ),
         ]
 

@@ -215,8 +215,11 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
             attr = "float"
         else:
             attr = self.client_options.get("output_dtype") or self.caps.default_dtype or "float"
+        
+        # Extract model from embed_kwargs to avoid passing it twice
+        model = embed_kwargs.pop("model", self.model_name)
         response = await self.client.embed(
-            texts=texts, model=self.client_options["model"], **embed_kwargs
+            texts=texts, model=model, **embed_kwargs
         )
         embed_obj = response.embeddings
         embeddings = getattr(embed_obj, attr, None)
