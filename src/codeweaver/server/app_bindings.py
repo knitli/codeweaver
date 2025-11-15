@@ -33,9 +33,6 @@ from codeweaver.config.settings import CodeWeaverSettingsDict, get_settings_map
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.types.dictview import DictView
 from codeweaver.middleware.statistics import StatisticsMiddleware
-from codeweaver.server.server import AppState, get_state
-
-
 _logger = logging.getLogger(__name__)
 
 type PydanticType = type[BaseModel | TypeAdapter[Any]] | BaseModel | TypeAdapter[Any]
