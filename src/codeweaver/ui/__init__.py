@@ -4,7 +4,8 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """User interface components for clean status display."""
 
+from codeweaver.ui.error_handler import CLIErrorHandler
 from codeweaver.ui.status_display import StatusDisplay
 
 
-__all__ = ("StatusDisplay",)
+__all__ = ("CLIErrorHandler", "StatusDisplay")

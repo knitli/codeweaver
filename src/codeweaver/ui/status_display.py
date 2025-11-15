@@ -13,7 +13,9 @@ from typing import TYPE_CHECKING, Literal
 
 from rich.console import Console
 from rich.live import Live
+from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.spinner import Spinner
+from rich.table import Table
 from rich.text import Text
 
 from codeweaver import __version__
@@ -160,6 +162,86 @@ class StatusDisplay:
             message: Warning message
         """
         self.console.print(f"⚠️  {message}", style="yellow")
+
+    def print_command_header(self, command: str, description: str | None = None) -> None:
+        """Print command header with CodeWeaver prefix.
+
+        Args:
+            command: Command name (e.g., "index", "search")
+            description: Optional command description
+        """
+        from codeweaver.common import CODEWEAVER_PREFIX
+
+        self.console.print(f"{CODEWEAVER_PREFIX} {command}", style="bold")
+        if description:
+            self.console.print(f"  {description}")
+        self.console.print()
+
+    def print_section(self, title: str) -> None:
+        """Print a section header.
+
+        Args:
+            title: Section title
+        """
+        self.console.print(f"\n{title}", style="bold cyan")
+
+    def print_info(self, message: str, *, prefix: str = "ℹ️") -> None:
+        """Print an informational message.
+
+        Args:
+            message: Information message
+            prefix: Optional prefix icon (default: ℹ️)
+        """
+        self.console.print(f"{prefix}  {message}", style="blue")
+
+    def print_success(self, message: str, *, details: str | None = None) -> None:
+        """Print a success message with optional details.
+
+        Args:
+            message: Success message
+            details: Optional details to display
+        """
+        full_message = f"✅ {message}"
+        if details:
+            full_message += f" {details}"
+        self.console.print(full_message, style="green")
+
+    def print_table(self, table: Table) -> None:
+        """Print a rich table.
+
+        Args:
+            table: Rich Table object to display
+        """
+        self.console.print(table)
+
+    def print_progress(self, current: int, total: int, message: str) -> None:
+        """Print progress information.
+
+        Args:
+            current: Current progress value
+            total: Total value
+            message: Progress message
+        """
+        percentage = (current / total * 100) if total > 0 else 0
+        self.console.print(f"  [{current}/{total}] ({percentage:.0f}%) {message}")
+
+    @contextmanager
+    def live_progress(self, description: str) -> Generator[Progress, None, None]:
+        """Context manager for live progress display.
+
+        Args:
+            description: Description to show with progress
+
+        Yields:
+            Rich Progress object for tracking tasks
+        """
+        progress = Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=self.console,
+        )
+        with progress:
+            yield progress
 
 
 __all__ = ("StatusDisplay",)

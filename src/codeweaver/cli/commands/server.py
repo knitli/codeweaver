@@ -5,8 +5,6 @@
 
 """CodeWeaver MCP server command-line interface."""
 
-import sys
-
 from pathlib import Path
 from typing import Annotated
 
@@ -14,14 +12,12 @@ import cyclopts
 
 from cyclopts import App
 from pydantic import FilePath
-from rich.console import Console
 
-from codeweaver.common import CODEWEAVER_PREFIX
 from codeweaver.exceptions import CodeWeaverError
+from codeweaver.ui import CLIErrorHandler, StatusDisplay
 
 
-console = Console(markup=True, emoji=True)
-app = App("server", help="Start CodeWeaver MCP server.", console=console)
+app = App("server", help="Start CodeWeaver MCP server.")
 
 
 async def _run_server(
@@ -37,7 +33,8 @@ async def _run_server(
 
     # Only print startup message in verbose/debug mode
     if verbose or debug:
-        console.print(f"{CODEWEAVER_PREFIX} [blue]Starting CodeWeaver MCP server...[/blue]")
+        display = StatusDisplay()
+        display.print_info("Starting CodeWeaver MCP server...")
     return await run(
         config_file=config_file,
         project_path=project_path,
@@ -64,6 +61,9 @@ async def server(
     ] = False,
 ) -> None:
     """Start CodeWeaver MCP server."""
+    display = StatusDisplay()
+    error_handler = CLIErrorHandler(display, verbose=verbose, debug=debug)
+
     try:
         await _run_server(
             config_file=config_file,
@@ -75,58 +75,25 @@ async def server(
         )
 
     except CodeWeaverError as e:
-        # When we're exiting due to an error, show full details regardless of verbosity
-        console.print(
-            f"\n{CODEWEAVER_PREFIX} [bold red]✗ Server failed to start[/bold red]\n", style="bold"
-        )
-        console.print(f"[red]Error:[/red] {e}\n")
-
-        # Show details if available
-        if hasattr(e, "details") and e.details:
-            console.print("[yellow]Details:[/yellow]")
-            import json
-
-            console.print(json.dumps(e.details, indent=2))
-            console.print()
-
-        # Show suggestions if available
-        if e.suggestions:
-            console.print("[yellow]Suggestions:[/yellow]")
-            for suggestion in e.suggestions:
-                console.print(f"  • {suggestion}")
-            console.print()
-
-        # Show full traceback in verbose/debug mode
-        if verbose or debug:
-            console.print("[dim]Full traceback:[/dim]")
-            console.print_exception(show_locals=True)
-
-        sys.exit(1)
+        error_handler.handle_error(e, "Server startup", exit_code=1)
 
     except KeyboardInterrupt:
         # Clean shutdown message handled in server shutdown
         pass
 
     except Exception as e:
-        # When we're exiting due to an unexpected error, always show full details
-        console.print(
-            f"\n{CODEWEAVER_PREFIX} [bold red]✗ Server crashed unexpectedly[/bold red]\n",
-            style="bold",
-        )
-        console.print(f"[red]Error:[/red] {type(e).__name__}: {e}\n")
-        console.print("[yellow]Full traceback:[/yellow]")
-        console.print_exception(show_locals=True, word_wrap=True)
-        console.print("\n[dim]Tip: Please report this error with the traceback above[/dim]\n")
-        sys.exit(1)
+        error_handler.handle_error(e, "Server", exit_code=1)
 
 
 def main() -> None:
     """Entry point for the CodeWeaver server CLI."""
+    display = StatusDisplay()
+    error_handler = CLIErrorHandler(display, verbose=True, debug=True)
+
     try:
         app()
-    except Exception:
-        console.print_exception(show_locals=True)
-        sys.exit(1)
+    except Exception as e:
+        error_handler.handle_error(e, "CLI", exit_code=1)
 
 
 if __name__ == "__main__":
