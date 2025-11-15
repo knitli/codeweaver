@@ -103,100 +103,6 @@ BRACKET_PATTERN: re.Pattern[str] = re.compile("\\[.+\\]")
 # ================================================
 
 
-class HealthStatus(BaseEnum):
-    """Enum for health status of the CodeWeaver server."""
-
-    HEALTHY = "healthy"
-    UNHEALTHY = "unhealthy"
-    DEGRADED = "degraded"
-
-
-def _get_available_features_and_services() -> Iterator[tuple[Feature, ServiceCard]]:
-    """Get the list of features supported by the CodeWeaver server."""
-    from codeweaver.common.registry import get_services_registry
-
-    services_instance = get_services_registry()
-    yield from (
-        (feature, card)
-        for feature, cards in services_instance.list_available_services().items()
-        for card in cards
-    )
-
-
-@dataclass(order=True, kw_only=True, config=DATACLASS_CONFIG | ConfigDict(extra="forbid"))
-class HealthInfo(DataclassSerializationMixin):
-    """Health information for the CodeWeaver server.
-
-    TODO: Expand to be more dynamic, computing health based on service status, etc.
-    """
-
-    from codeweaver.common.registry import Feature, ServiceCard
-
-    status: Annotated[HealthStatus, Field(description="Health status of the server")] = (
-        HealthStatus.HEALTHY
-    )
-    version: Annotated[str, Field(description="Version of the CodeWeaver server")] = version
-    startup_time: Annotated[float, Field(description="Startup time of the server")] = time.time()
-    error: Annotated[str | bytes | None, Field(description="Error message if any")] = None
-
-    def _telemetry_keys(self) -> None:
-        return None
-
-    @classmethod
-    def initialize(cls) -> HealthInfo:
-        """Initialize health information with default values."""
-        return cls()
-
-    @computed_field
-    @property
-    def available_features(self) -> frozenset[Feature]:
-        """Computed field for available features based on the services registry."""
-        return frozenset((feature for feature, _ in _get_available_features_and_services()))
-
-    @computed_field
-    @property
-    def available_services(self) -> tuple[ServiceCard, ...]:
-        """Computed field for available services based on the services registry."""
-        return tuple((card for _, card in _get_available_features_and_services()))
-
-    @computed_field
-    @property
-    def available_features_and_services(self) -> tuple[tuple[Feature, ServiceCard], ...]:
-        """Computed field for available service features based on the services registry."""
-        return tuple(((feature, card) for feature, card in _get_available_features_and_services()))
-
-    def update_status(
-        self,
-        new_status: HealthStatus | Literal["healthy", "unhealthy", "degraded"],
-        error: str | None = None,
-    ) -> Self:
-        """Update the health status of the server."""
-        if not isinstance(new_status, HealthStatus):
-            new_status = HealthStatus.from_string(new_status)
-        self.status = new_status
-        self.error = error
-        return self
-
-    def report(self) -> bytes:
-        """Generate a health report in JSON format."""
-        return self.dump_json(
-            exclude_none=True,
-            exclude_unset=True,
-            exclude={"_module", "_adapter", "available_features_and_services"},
-        )
-
-
-_health_info: HealthInfo | None = None
-
-
-def get_health_info() -> HealthInfo:
-    """Get the current health information."""
-    global _health_info
-    if _health_info is None:
-        _health_info = HealthInfo.initialize()
-    return _health_info
-
-
 @dataclass(order=True, kw_only=True, config=DATACLASS_CONFIG | ConfigDict(extra="forbid"))
 class AppState(DataclassSerializationMixin):
     """Application state for CodeWeaver server."""
@@ -243,9 +149,6 @@ class AppState(DataclassSerializationMixin):
             description="Session statistics and performance tracking",
         ),
     ]
-    health: Annotated[
-        HealthInfo, Field(default_factory=get_health_info, description="Health status information")
-    ]
     middleware_stack: Annotated[
         tuple[Middleware, ...],
         Field(description="Tuple of FastMCP middleware instances applied to the server"),
@@ -256,6 +159,9 @@ class AppState(DataclassSerializationMixin):
     health_service: Annotated[
         HealthService | None, Field(description="Health service instance")
     ] = None
+    startup_time: Annotated[
+        float, Field(default_factory=time.time, description="Server startup timestamp")
+    ] = time.time()
 
     telemetry: PostHogClient | None = None
 
@@ -308,7 +214,7 @@ def _get_health_service() -> HealthService:
         provider_registry=state.provider_registry,
         statistics=state.statistics,
         indexer=state.indexer,
-        startup_time=state.health.startup_time,
+        startup_time=state.startup_time,
     )
 
 
@@ -399,7 +305,6 @@ def _initialize_app_state(
     state = AppState(  # type: ignore
         initialized=False,
         settings=settings,
-        health=get_health_info(),
         statistics=statistics or get_session_statistics._resolve()(),
         project_path=settings.project_path,
         config_path=settings.config_file if settings else get_settings._resolve()().config_file,
@@ -410,6 +315,7 @@ def _initialize_app_state(
         health_service=None,  # Initialize as None, will be set after AppState construction
         telemetry=PostHogClient.from_settings(),
         indexer=Indexer.from_settings(),
+        startup_time=time.time(),
     )
     object.__setattr__(app, "state", state)
     # Now that AppState is constructed and _state is set, create the HealthService
@@ -507,8 +413,6 @@ async def lifespan(
     try:
         if verbose or debug:
             logger.info("Ensuring services set up...")
-        if not state.health:
-            state.health.initialize()
 
         # Start background indexing task
         indexing_task = asyncio.create_task(
@@ -543,8 +447,6 @@ async def lifespan(
         state.initialized = True
         yield state
     except Exception as e:
-        state.health.status = HealthStatus.UNHEALTHY
-        state.health.error = to_json({"error": str(e)})
         state.initialized = False
         raise
     finally:
@@ -892,11 +794,8 @@ def build_app(*, verbose: bool = False, debug: bool = False) -> ServerSetup:
 
 __all__ = (
     "AppState",
-    "HealthInfo",
-    "HealthStatus",
     "ServerSetup",
     "build_app",
-    "get_health_info",
     "get_state",
     "lifespan",
 )

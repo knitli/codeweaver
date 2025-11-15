@@ -29,10 +29,8 @@ if TYPE_CHECKING:
     from codeweaver.server.health_service import HealthService
     from codeweaver.server.server import (
         AppState,
-        HealthInfo,
         ServerSetup,
         build_app,
-        get_health_info,
         get_state,
         lifespan,
     )
@@ -41,7 +39,6 @@ if TYPE_CHECKING:
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "AppState": (__spec__.parent, "server"),
     "EmbeddingProviderServiceInfo": (__spec__.parent, "health_models"),
-    "HealthInfo": (__spec__.parent, "server"),
     "HealthResponse": (__spec__.parent, "health_models"),
     "HealthService": (__spec__.parent, "health_service"),
     "IndexingInfo": (__spec__.parent, "health_models"),
@@ -55,7 +52,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "build_app": (__spec__.parent, "server"),
     "find_code_tool": (__spec__.parent, "app_bindings"),
     "get_health": (__spec__.parent, "health_endpoint"),
-    "get_health_info": (__spec__.parent, "server"),
     "get_state": (__spec__.parent, "server"),
     "lifespan": (__spec__.parent, "server"),
     "register_app_bindings": (__spec__.parent, "app_bindings"),
@@ -68,7 +64,6 @@ __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 __all__ = (
     "AppState",
     "EmbeddingProviderServiceInfo",
-    "HealthInfo",
     "HealthResponse",
     "HealthService",
     "IndexingInfo",
@@ -82,7 +77,6 @@ __all__ = (
     "build_app",
     "find_code_tool",
     "get_health",
-    "get_health_info",
     "get_state",
     "lifespan",
     "register_app_bindings",

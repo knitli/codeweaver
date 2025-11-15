@@ -33,7 +33,7 @@ from codeweaver.config.settings import CodeWeaverSettingsDict, get_settings_map
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.types.dictview import DictView
 from codeweaver.middleware.statistics import StatisticsMiddleware
-from codeweaver.server.server import AppState, HealthInfo, get_health_info
+from codeweaver.server.server import AppState, get_state
 
 
 _logger = logging.getLogger(__name__)
@@ -54,11 +54,6 @@ def statistics() -> SessionStatistics:
 def settings() -> DictView[CodeWeaverSettingsDict]:
     """Get the current settings."""
     return get_settings_map()
-
-
-def health_info() -> HealthInfo:
-    """Get the current health information."""
-    return get_health_info()
 
 
 # -------------------------
@@ -223,16 +218,68 @@ async def health(_request: Request) -> PlainTextResponse:
     try:
         state = get_state()
         if state.health_service is None:
-            _logger.warning("Health service not initialized, returning basic health info")
-            # Fallback to basic health if service not initialized
-            info = health_info()
-            return PlainTextResponse(content=info.report(), media_type="application/json")
-        # Get health response from health Service
-        if state.health_service:
-            health_response = await state.health_service.get_health_response()
-            return PlainTextResponse(
-                content=health_response.model_dump_json(), media_type="application/json"
+            _logger.warning("Health service not initialized, returning error response")
+            # Health service not initialized - create error response
+            from codeweaver.server.health_models import (
+                EmbeddingProviderServiceInfo,
+                HealthResponse,
+                IndexingInfo,
+                IndexingProgressInfo,
+                RerankingServiceInfo,
+                ServicesInfo,
+                SparseEmbeddingServiceInfo,
+                StatisticsInfo,
+                VectorStoreServiceInfo,
             )
+
+            error_response = HealthResponse.create_with_current_timestamp(
+                status="unhealthy",
+                uptime_seconds=0,
+                indexing=IndexingInfo(
+                    state="error",
+                    last_indexed=None,
+                    progress=IndexingProgressInfo(
+                        files_discovered=0,
+                        files_processed=0,
+                        chunks_created=0,
+                        errors=0,
+                        current_file=None,
+                        start_time=None,
+                        estimated_completion=None,
+                    ),
+                ),
+                services=ServicesInfo(
+                    vector_store=VectorStoreServiceInfo(status="down", latency_ms=0),
+                    embedding_provider=EmbeddingProviderServiceInfo(
+                        status="down", model="unknown", latency_ms=0, circuit_breaker_state="open"
+                    ),
+                    sparse_embedding=SparseEmbeddingServiceInfo(status="down", provider="unknown"),
+                    reranking=RerankingServiceInfo(status="down", model="unknown", latency_ms=0),
+                ),
+                statistics=StatisticsInfo(
+                    total_chunks_indexed=0,
+                    total_files_indexed=0,
+                    languages_indexed=[],
+                    index_size_mb=0,
+                    queries_processed=0,
+                    avg_query_latency_ms=0,
+                    semantic_chunks=0,
+                    delimiter_chunks=0,
+                    file_chunks=0,
+                    avg_chunk_size=0,
+                ),
+            )
+            return PlainTextResponse(
+                content=error_response.model_dump_json(),
+                status_code=503,
+                media_type="application/json",
+            )
+
+        # Get health response from health service
+        health_response = await state.health_service.get_health_response()
+        return PlainTextResponse(
+            content=health_response.model_dump_json(), media_type="application/json"
+        )
     except Exception:
         _logger.exception("Failed to get health status")
         # Return unhealthy status on error
@@ -289,7 +336,6 @@ async def health(_request: Request) -> PlainTextResponse:
         return PlainTextResponse(
             content=error_response.model_dump_json(), status_code=503, media_type="application/json"
         )
-    raise RuntimeError("Unreachable code in health endpoint")
 
 
 def setup_middleware(
