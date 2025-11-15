@@ -123,7 +123,7 @@ async def _run_search_indexing(
 
     except Exception as e:
         display.print_warning(f"Indexing failed: {e}")
-        console.print(f"{CODEWEAVER_PREFIX} [yellow]Attempting search anyway...[/yellow]")
+        display.print_warning("Attempting search anyway...")
         # Don't exit - let search try anyway in case there's a partial index
 
 
@@ -139,6 +139,9 @@ async def search(
 ) -> None:
     """Search your codebase from the command line with plain language."""
     from codeweaver.exceptions import ConfigurationError
+
+    display = StatusDisplay()
+    error_handler = CLIErrorHandler(display, verbose=False, debug=False)
 
     try:
         settings = get_settings_map()
@@ -156,8 +159,9 @@ async def search(
             # Reload settings after indexing
             settings = get_settings_map()
 
-        console.print(f"{CODEWEAVER_PREFIX} [blue]Searching in: {settings['project_path']}[/blue]")
-        console.print(f"{CODEWEAVER_PREFIX} [blue]Query: {query}[/blue]")
+        display.print_info(f"Searching in: {settings['project_path']}")
+        display.print_info(f"Query: {query}")
+        display.console.print()
 
         # Use stub find_code_tool during refactor
         from codeweaver.server.app_bindings import find_code_tool
@@ -173,24 +177,25 @@ async def search(
 
         # Check for error status in response
         if response.status.lower() == "error":
-            console.print(
-                f"\n{CODEWEAVER_PREFIX} [red bold]Configuration Error:[/red bold] {response.summary}\n"
-            )
+            display.console.print()
+            display.print_error(f"Configuration Error: {response.summary}")
+            display.console.print()
 
             # Check if error is about missing embedding providers
             if "embedding providers" in response.summary.lower():
-                console.print(f"{CODEWEAVER_PREFIX} [yellow]To fix this:[/yellow]")
-                console.print(
+                display.console.print("[yellow]To fix this:[/yellow]")
+                display.console.print(
                     "  [yellow]•[/yellow] Set VOYAGE_API_KEY environment variable for cloud embeddings"
                 )
-                console.print(
+                display.console.print(
                     "  [yellow]•[/yellow] Or install local provider: pip install codeweaver-mcp[provider-fastembed]"
                 )
-                console.print("  [yellow]•[/yellow] Or configure fastembed in .codeweaver.toml")
-                console.print(
+                display.console.print("  [yellow]•[/yellow] Or configure fastembed in .codeweaver.toml")
+                display.console.print(
                     "  [yellow]•[/yellow] See docs: https://github.com/knitli/codeweaver-mcp#configuration"
                 )
-            console.print()  # Add blank line
+            display.console.print()
+            import sys
             sys.exit(1)
 
         # Limit results for CLI display
@@ -201,52 +206,39 @@ async def search(
             rich_print(response.model_dump_json(indent=2))
 
         elif output_format == "table":
-            _display_table_results(query, response, limited_matches)
+            _display_table_results(query, response, limited_matches, display)
 
         elif output_format == "markdown":
-            _display_markdown_results(query, response, limited_matches)
+            _display_markdown_results(query, response, limited_matches, display)
 
     except ConfigurationError as e:
-        console.print(
-            f"\n{CODEWEAVER_PREFIX} [red bold]Configuration Error:[/red bold] {e.message}\n"
-        )
-        if e.suggestions:
-            console.print(f"{CODEWEAVER_PREFIX} [yellow]To fix this:[/yellow]")
-            for suggestion in e.suggestions:
-                console.print(f"  [yellow]•[/yellow] {suggestion}")
-        console.print()  # Add blank line
-        sys.exit(1)
+        error_handler.handle_error(e, "Search configuration", exit_code=1)
     except CodeWeaverError as e:
-        console.print(f"{CODEWEAVER_PREFIX} [red]Error: {e.message}[/red]")
-        if e.suggestions:
-            console.print(f"{CODEWEAVER_PREFIX} [yellow]Suggestions:[/yellow]")
-            for suggestion in e.suggestions:
-                console.print(f"  • {suggestion}")
-        sys.exit(1)
+        error_handler.handle_error(e, "Search", exit_code=1)
     except Exception as e:
-        console.print(f"{CODEWEAVER_PREFIX} [red]Unexpected error: {e}[/red]")
-        sys.exit(1)
+        error_handler.handle_error(e, "Search", exit_code=1)
 
 
 def _display_table_results(
-    query: str, response: FindCodeResponseSummary, matches: Sequence[CodeMatch]
+    query: str, response: FindCodeResponseSummary, matches: Sequence[CodeMatch], display: StatusDisplay
 ) -> None:
     """Display search results as a table using serialize_for_cli."""
-    console.print(f"\n{CODEWEAVER_PREFIX} [bold green]Search Results for: '{query}'[/bold green]")
+    display.console.print()
+    display.console.print(f"[bold green]Search Results for: '{query}'[/bold green]")
 
     # Use the built-in CLI summary from FindCodeResponseSummary
     summary_table = response.assemble_cli_summary()
-    console.print(summary_table)
+    display.print_table(summary_table)
 
     # If there are matches, display them in a detailed table
     if matches:
-        _display_match_details(matches)
+        _display_match_details(matches, display)
     else:
-        console.print("\n[yellow]No matches found[/yellow]")
+        display.console.print("\n[yellow]No matches found[/yellow]")
 
 
-def _display_match_details(matches: Sequence[CodeMatch]) -> None:
-    console.print("\n[bold blue]Match Details:[/bold blue]\n")
+def _display_match_details(matches: Sequence[CodeMatch], display: StatusDisplay) -> None:
+    display.console.print("\n[bold blue]Match Details:[/bold blue]\n")
 
     table = Table(show_header=True, header_style="bold blue")
     table.add_column("File", style="cyan", no_wrap=True, min_width=30)
@@ -271,20 +263,20 @@ def _display_match_details(matches: Sequence[CodeMatch]) -> None:
                 preview,
             )
 
-    console.print(table)
+    display.print_table(table)
 
 
 def _display_markdown_results(
-    query: str, response: FindCodeResponseSummary, matches: Sequence[CodeMatch]
+    query: str, response: FindCodeResponseSummary, matches: Sequence[CodeMatch], display: StatusDisplay
 ) -> None:
     """Display search results as markdown using serialize_for_cli."""
-    console.print(f"{CODEWEAVER_PREFIX} # Search Results for: '{query}'\n")
-    console.print(
-        f"{CODEWEAVER_PREFIX} Found {response.total_matches} matches in {response.execution_time_ms:.1f}ms\n"
+    display.console.print(f"# Search Results for: '{query}'\n")
+    display.console.print(
+        f"Found {response.total_matches} matches in {response.execution_time_ms:.1f}ms\n"
     )
 
     if not matches:
-        console.print(f"{CODEWEAVER_PREFIX} *No matches found*")
+        display.console.print("*No matches found*")
         return
 
     for i, match in enumerate(matches, 1):
@@ -294,22 +286,24 @@ def _display_markdown_results(
         file_path = match_data.get("file", {}).get("path", "unknown")
         language = match_data.get("file", {}).get("ext_kind", {}).get("language", "unknown")
 
-        console.print(f"## {i}. {file_path}")
-        console.print(
+        display.console.print(f"## {i}. {file_path}")
+        display.console.print(
             f"**Language:** {language} | **Score:** {match.relevance_score:.2f} | {match.span!s}"
         )
-        console.print(f"```{language}")
-        console.print(str(match.content) if match.content else "")
-        console.print("```\n")
+        display.console.print(f"```{language}")
+        display.console.print(str(match.content) if match.content else "")
+        display.console.print("```\n")
 
 
 def main() -> None:
     """Entry point for the search CLI command."""
+    display = StatusDisplay()
+    error_handler = CLIErrorHandler(display, verbose=True, debug=True)
+
     try:
         app()
     except Exception as e:
-        console.print(f"{CODEWEAVER_PREFIX} [red]Unexpected error: {e}[/red]")
-        sys.exit(1)
+        error_handler.handle_error(e, "Search CLI", exit_code=1)
 
 
 if __name__ == "__main__":
