@@ -17,13 +17,12 @@ import httpx
 
 from cyclopts import App
 from pydantic import FilePath
-from rich.console import Console
 
-from codeweaver.common import CODEWEAVER_PREFIX
 from codeweaver.common.utils.git import get_project_path
 from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.core.types.dictview import DictView
 from codeweaver.exceptions import CodeWeaverError
+from codeweaver.ui import CLIErrorHandler, StatusDisplay
 
 
 if TYPE_CHECKING:
@@ -32,8 +31,7 @@ if TYPE_CHECKING:
     from codeweaver.engine.indexer.checkpoint import CheckpointManager
 
 
-console = Console(markup=True, emoji=True)
-app = App("index", help="Index codebase for semantic search.", console=console)
+app = App("index", help="Index codebase for semantic search.")
 
 
 def _check_server_health() -> bool:
@@ -137,7 +135,7 @@ def _derive_collection_name(
 
 
 async def _perform_clear_operation(
-    settings: CodeWeaverSettings, project_path: Path, *, yes: bool
+    settings: CodeWeaverSettings, project_path: Path, *, yes: bool, display: StatusDisplay
 ) -> None:
     """Clear vector store and checkpoints.
 
@@ -145,6 +143,7 @@ async def _perform_clear_operation(
         settings: Settings object containing configuration
         project_path: Path to project root
         yes: If True, skip confirmation prompt
+        display: StatusDisplay for output
 
     Raises:
         SystemExit: If user cancels operation or error occurs
@@ -155,23 +154,21 @@ async def _perform_clear_operation(
     from codeweaver.engine.indexer.manifest import FileManifestManager
 
     if not yes:
-        console.print(
-            f"{CODEWEAVER_PREFIX} [yellow bold]⚠ Warning: Destructive Operation[/yellow bold]\n"
-        )
-        console.print("This will [red]permanently delete[/red]:")
-        console.print("  • Vector store collection and all indexed data")
-        console.print("  • All indexing checkpoints")
-        console.print("  • File manifest state\n")
+        display.print_warning("⚠ Warning: Destructive Operation")
+        display.console.print()
+        display.console.print("This will [red]permanently delete[/red]:")
+        display.console.print("  • Vector store collection and all indexed data")
+        display.console.print("  • All indexing checkpoints")
+        display.console.print("  • File manifest state")
+        display.console.print()
 
-        response = console.input("[yellow]Are you sure you want to continue? (yes/no):[/yellow] ")
+        response = display.console.input("[yellow]Are you sure you want to continue? (yes/no):[/yellow] ")
         if response.lower() not in ["yes", "y"]:
-            console.print(f"{CODEWEAVER_PREFIX} [blue]Operation cancelled[/blue]")
+            display.print_info("Operation cancelled")
             sys.exit(0)
 
     try:
-        console.print(
-            f"{CODEWEAVER_PREFIX} [yellow]Clearing vector store and checkpoints...[/yellow]"
-        )
+        display.print_info("Clearing vector store and checkpoints...")
 
         # Setup paths and managers
         indexes_dir = (
@@ -217,31 +214,30 @@ async def _perform_clear_operation(
         await_result = await store.delete_collection(collection_name)
 
         if await_result:
-            console.print(f"  ✓ [green]Vector store collection, {collection_name} deleted[/green]")
+            display.print_success(f"Vector store collection '{collection_name}' deleted")
         else:
-            console.print(
-                f"  • [dim]Vector store collection, {collection_name} did not exist[/dim]"
-            )
+            display.print_info(f"Vector store collection '{collection_name}' did not exist")
 
         # Clear checkpoints and manifests
         checkpoint_mgr.delete()
-        console.print("  ✓ [green]Checkpoints cleared[/green]")
+        display.print_success("Checkpoints cleared")
         manifest.delete()
-        console.print("  ✓ [green]File manifest cleared[/green]")
+        display.print_success("File manifest cleared")
 
-        console.print(f"{CODEWEAVER_PREFIX} [green]Clear operation complete[/green]\n")
+        display.print_success("Clear operation complete")
+        display.console.print()
 
     except Exception as e:
-        console.print(f"{CODEWEAVER_PREFIX} [red]Error during clear operation:[/red] {e}")
-        console.print_exception(show_locals=True)
-        sys.exit(1)
+        display.print_error(f"Error during clear operation: {e}")
+        raise
 
 
-def _handle_server_status(*, standalone: bool) -> bool:
+def _handle_server_status(*, standalone: bool, display: StatusDisplay) -> bool:
     """Check server status and inform user.
 
     Args:
         standalone: If True, skip server check
+        display: StatusDisplay for output
 
     Returns:
         True if should proceed with standalone indexing, False to exit
@@ -250,56 +246,51 @@ def _handle_server_status(*, standalone: bool) -> bool:
         return True
 
     if _check_server_health():
-        return _check_and_print_server_status()
-    _print_server_status(
-        " [yellow]⚠ Server not running[/yellow]",
-        "[blue]Info:[/blue] Running standalone indexing",
-        "[dim]Tip: Start server with 'codeweaver server' for automatic indexing[/dim]\n",
-    )
+        return _check_and_print_server_status(display)
+    display.print_warning("Server not running")
+    display.print_info("Running standalone indexing")
+    display.console.print("[dim]Tip: Start server with 'codeweaver server' for automatic indexing[/dim]")
+    display.console.print()
     return True
 
 
-def _check_and_print_server_status():
-    _print_server_status(
-        " [bold green]✓ Server is running[/bold green]\n",
-        "[yellow]Info:[/yellow] The CodeWeaver server automatically indexes your codebase",
-        "  • Initial indexing runs on server startup",
-    )
-    console.print("  • File watcher monitors for changes in real-time")
-    console.print("\n[cyan]To check indexing status:[/cyan]")
-    console.print("  curl http://localhost:9328/health/ | jq '.indexing'")
-    console.print("\n[dim]Tip: Use --standalone to run indexing without the server[/dim]")
+def _check_and_print_server_status(display: StatusDisplay):
+    display.print_success("Server is running")
+    display.console.print()
+    display.print_info("The CodeWeaver server automatically indexes your codebase")
+    display.console.print("  • Initial indexing runs on server startup")
+    display.console.print("  • File watcher monitors for changes in real-time")
+    display.console.print()
+    display.console.print("[cyan]To check indexing status:[/cyan]")
+    display.console.print("  curl http://localhost:9328/health/ | jq '.indexing'")
+    display.console.print()
+    display.console.print("[dim]Tip: Use --standalone to run indexing without the server[/dim]")
     return False
 
 
-def _print_server_status(running_msg: str, mode: str, info: str) -> None:
-    console.print(f"{CODEWEAVER_PREFIX}{running_msg}")
-    console.print(mode)
-    console.print(info)
-
-
 async def _run_standalone_indexing(
-    settings: CodeWeaverSettings | DictView[CodeWeaverSettingsDict], *, force_reindex: bool
+    settings: CodeWeaverSettings | DictView[CodeWeaverSettingsDict], *, force_reindex: bool, display: StatusDisplay
 ) -> None:
     """Run standalone indexing operation.
 
     Args:
         settings: Settings object containing configuration
         force_reindex: If True, force full reindex
+        display: StatusDisplay for output
 
     Raises:
         SystemExit: On completion or error
     """
     from codeweaver.engine.indexer import Indexer, IndexingProgressTracker
 
-    console.print(f"{CODEWEAVER_PREFIX} [blue]Initializing indexer...[/blue]")
+    display.print_info("Initializing indexer...")
     indexer = await Indexer.from_settings_async(
         settings=settings if isinstance(settings, DictView) else DictView(settings.model_dump())
     )
 
-    progress_tracker = IndexingProgressTracker(console=console)
+    progress_tracker = IndexingProgressTracker(console=display.console)
 
-    console.print(f"{CODEWEAVER_PREFIX} [green]Starting indexing process...[/green]")
+    display.print_success("Starting indexing process...")
 
     _ = await indexer.prime_index(
         force_reindex=force_reindex,
@@ -308,17 +299,17 @@ async def _run_standalone_indexing(
 
     # Display final summary
     stats = indexer.stats
-    console.print()
-    console.print(f"{CODEWEAVER_PREFIX} [green bold]Indexing Complete![/green bold]")
-    console.print()
-    console.print(f"  Files processed: [cyan]{stats.files_processed}[/cyan]")
-    console.print(f"  Chunks created: [cyan]{stats.chunks_created}[/cyan]")
-    console.print(f"  Chunks indexed: [cyan]{stats.chunks_indexed}[/cyan]")
-    console.print(f"  Processing rate: [cyan]{stats.processing_rate():.2f}[/cyan] files/sec")
-    console.print(f"  Time elapsed: [cyan]{stats.elapsed_time():.2f}[/cyan] seconds")
+    display.console.print()
+    display.print_success("Indexing Complete!")
+    display.console.print()
+    display.console.print(f"  Files processed: [cyan]{stats.files_processed}[/cyan]")
+    display.console.print(f"  Chunks created: [cyan]{stats.chunks_created}[/cyan]")
+    display.console.print(f"  Chunks indexed: [cyan]{stats.chunks_indexed}[/cyan]")
+    display.console.print(f"  Processing rate: [cyan]{stats.processing_rate():.2f}[/cyan] files/sec")
+    display.console.print(f"  Time elapsed: [cyan]{stats.elapsed_time():.2f}[/cyan] seconds")
 
     if stats.total_errors > 0:
-        console.print(f"  [yellow]Files with errors: {stats.total_errors}[/yellow]")
+        display.console.print(f"  [yellow]Files with errors: {stats.total_errors}[/yellow]")
 
     sys.exit(0)
 
@@ -368,45 +359,45 @@ async def index(
         clear: If True, clear vector store and checkpoints before indexing
         yes: If True, skip confirmation prompts
     """
-    # Handle --clear flag
-    if clear:
-        console.print(f"{CODEWEAVER_PREFIX} [blue]Loading configuration...[/blue]")
-        settings, resolved_path = _load_and_configure_settings(config_file, project_path)
-        await _perform_clear_operation(settings, resolved_path, yes=yes)
-        force_reindex = True  # Continue to reindex after clearing
+    display = StatusDisplay()
+    error_handler = CLIErrorHandler(display, verbose=False, debug=False)
 
-    # Check server status and decide whether to proceed
-    if not _handle_server_status(standalone=standalone):
-        return  # Server is running, exit early
-
-    # Standalone indexing
     try:
-        console.print(f"{CODEWEAVER_PREFIX} [blue]Loading configuration...[/blue]")
+        # Handle --clear flag
+        if clear:
+            display.print_info("Loading configuration...")
+            settings, resolved_path = _load_and_configure_settings(config_file, project_path)
+            await _perform_clear_operation(settings, resolved_path, yes=yes, display=display)
+            force_reindex = True  # Continue to reindex after clearing
+
+        # Check server status and decide whether to proceed
+        if not _handle_server_status(standalone=standalone, display=display):
+            return  # Server is running, exit early
+
+        # Standalone indexing
+        display.print_info("Loading configuration...")
         settings, _ = _load_and_configure_settings(config_file, project_path)
-        await _run_standalone_indexing(settings, force_reindex=force_reindex)
+        await _run_standalone_indexing(settings, force_reindex=force_reindex, display=display)
 
     except CodeWeaverError as e:
-        console.print_exception(show_locals=True)
-        if e.suggestions:
-            console.print(f"{CODEWEAVER_PREFIX} [yellow]Suggestions:[/yellow]")
-            for suggestion in e.suggestions:
-                console.print(f"  • {suggestion}")
-        sys.exit(1)
+        error_handler.handle_error(e, "Indexing", exit_code=1)
     except KeyboardInterrupt:
-        console.print(f"\n{CODEWEAVER_PREFIX} [yellow]Indexing cancelled by user[/yellow]")
+        display.console.print()
+        display.print_warning("Indexing cancelled by user")
         sys.exit(130)
-    except Exception:
-        console.print_exception(show_locals=True, word_wrap=True)
-        sys.exit(1)
+    except Exception as e:
+        error_handler.handle_error(e, "Indexing", exit_code=1)
 
 
 def main() -> None:
     """Entry point for the CodeWeaver index CLI."""
+    display = StatusDisplay()
+    error_handler = CLIErrorHandler(display, verbose=True, debug=True)
+
     try:
         app()
-    except Exception:
-        console.print_exception(show_locals=True)
-        sys.exit(1)
+    except Exception as e:
+        error_handler.handle_error(e, "Index CLI", exit_code=1)
 
 
 if __name__ == "__main__":
