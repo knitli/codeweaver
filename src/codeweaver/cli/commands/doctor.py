@@ -11,7 +11,6 @@ to help diagnose issues with CodeWeaver installations.
 from __future__ import annotations
 
 import os
-import sys
 
 from importlib.util import find_spec
 from pathlib import Path
@@ -20,13 +19,12 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 
 from cyclopts import App
 from pydantic import ValidationError
-from rich.console import Console
 from rich.table import Table
 
-from codeweaver.common import CODEWEAVER_PREFIX
 from codeweaver.common.utils.git import get_project_path, is_git_dir
 from codeweaver.core.types.sentinel import Unset
 from codeweaver.providers.provider import ProviderKind
+from codeweaver.ui import CLIErrorHandler, StatusDisplay
 
 
 if TYPE_CHECKING:
@@ -35,9 +33,25 @@ if TYPE_CHECKING:
     from codeweaver.providers.provider import Provider
 
 
-console = Console(markup=True, emoji=True)
+# Module-level display for check functions
+# This allows existing check functions to work without refactoring all of them
+_display: StatusDisplay | None = None
+
+
+def _get_display() -> StatusDisplay:
+    """Get the module-level display instance."""
+    global _display
+    if _display is None:
+        _display = StatusDisplay()
+    return _display
+
+
+# For backward compatibility with check functions
+console = _get_display().console
+
+
 app = App(
-    "doctor", help="Validate prerequisites and configuration for CodeWeaver.", console=console
+    "doctor", help="Validate prerequisites and configuration for CodeWeaver."
 )
 
 
@@ -648,12 +662,14 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
 def _print_check_suggestions(
     checks: list[DoctorCheck],
     verbose: bool,  # noqa: FBT001
+    display: StatusDisplay,
 ) -> tuple[bool, bool]:
     """Print suggestions for failed/warning checks.
 
     Args:
         checks: List of doctor checks
         verbose: Whether to show warnings
+        display: StatusDisplay for output
 
     Returns:
         Tuple of (has_failures, has_warnings)
@@ -665,42 +681,46 @@ def _print_check_suggestions(
         if check.status == "❌":
             has_failures = True
             if check.suggestions:
-                console.print(f"\n[red]✗[/red] [bold]{check.name}[/bold]")
+                display.console.print(f"\n[red]✗[/red] [bold]{check.name}[/bold]")
                 for suggestion in check.suggestions:
-                    console.print(f"  • {suggestion}")
+                    display.console.print(f"  • {suggestion}")
         elif check.status == "⚠️" and verbose:
             has_warnings = True
             if check.suggestions:
-                console.print(f"\n[yellow]⚠[/yellow] [bold]{check.name}[/bold]")
+                display.console.print(f"\n[yellow]⚠[/yellow] [bold]{check.name}[/bold]")
                 for suggestion in check.suggestions:
-                    console.print(f"  • {suggestion}")
+                    display.console.print(f"  • {suggestion}")
 
     return has_failures, has_warnings
 
 
-def _print_summary(has_failures: bool, has_warnings: bool) -> None:  # noqa: FBT001
+def _print_summary(has_failures: bool, has_warnings: bool, display: StatusDisplay) -> None:  # noqa: FBT001
     """Print summary and exit with appropriate code.
 
     Args:
         has_failures: Whether any checks failed
         has_warnings: Whether any checks have warnings
+        display: StatusDisplay for output
     """
-    console.print()
+    import sys
+    
+    display.console.print()
     if not has_failures and not has_warnings:
-        console.print(f"{CODEWEAVER_PREFIX} [green]✓ All checks passed[/green]")
+        display.print_success("All checks passed")
         sys.exit(0)
     elif not has_failures:
-        console.print(
-            f"{CODEWEAVER_PREFIX} [yellow]⚠ Some checks have warnings (use --verbose for details)[/yellow]"
-        )
+        display.print_warning("Some checks have warnings (use --verbose for details)")
         sys.exit(0)
     else:
-        console.print(f"{CODEWEAVER_PREFIX} [red]✗ Some checks failed[/red]")
+        display.print_error("Some checks failed")
         sys.exit(1)
 
 
-def process_checks() -> list[DoctorCheck]:
+def process_checks(display: StatusDisplay) -> list[DoctorCheck]:
     """Process all doctor checks and return the results.
+
+    Args:
+        display: StatusDisplay for output
 
     Returns:
         List of DoctorCheck results
@@ -784,15 +804,23 @@ def process_checks() -> list[DoctorCheck]:
 
 
 @app.default
-def doctor(*, verbose: bool = False) -> None:
+def doctor(*, verbose: bool = False, display: StatusDisplay | None = None) -> None:
     """Validate prerequisites and configuration.
 
     Args:
         verbose: Show detailed information for all checks
+        display: StatusDisplay instance for output
     """
-    console.print(f"\n{CODEWEAVER_PREFIX} [bold blue]Running diagnostic checks...[/bold blue]\n")
+    global _display
+    if display is None:
+        display = StatusDisplay()
+    _display = display  # Set module-level display for check functions
+        
+    display.console.print()
+    display.print_section("Running diagnostic checks...")
+    display.console.print()
 
-    checks: list[DoctorCheck] = process_checks()
+    checks: list[DoctorCheck] = process_checks(display)
     # Display results table
     table = Table(show_header=True, header_style="bold blue", box=None)
     table.add_column("Status", style="white", no_wrap=True, width=6)
@@ -802,25 +830,29 @@ def doctor(*, verbose: bool = False) -> None:
     for check in checks:
         table.add_row(check.status, check.name, check.message)
 
-    console.print(table)
+    display.print_table(table)
 
     # Show suggestions for failed/warning checks
-    has_failures, has_warnings = _print_check_suggestions(checks, verbose)
+    has_failures, has_warnings = _print_check_suggestions(checks, verbose, display)
 
     # Print summary and exit with appropriate code
-    _print_summary(has_failures, has_warnings)
+    _print_summary(has_failures, has_warnings, display)
 
 
 def main() -> None:
     """Entry point for the doctor CLI command."""
+    display = StatusDisplay()
+    error_handler = CLIErrorHandler(display, verbose=True, debug=True)
+
     try:
         app()
     except KeyboardInterrupt:
-        console.print("\n[red]Operation cancelled by user.[/red]")
+        display.console.print()
+        display.print_warning("Operation cancelled by user")
+        import sys
         sys.exit(1)
-    except Exception:
-        console.print_exception()
-        sys.exit(1)
+    except Exception as e:
+        error_handler.handle_error(e, "Doctor", exit_code=1)
 
 
 if __name__ == "__main__":
