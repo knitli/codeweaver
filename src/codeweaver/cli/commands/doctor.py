@@ -11,6 +11,7 @@ to help diagnose issues with CodeWeaver installations.
 from __future__ import annotations
 
 import os
+import sys
 
 from importlib.util import find_spec
 from pathlib import Path
@@ -19,6 +20,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 
 from cyclopts import App
 from pydantic import ValidationError
+from rich.console import Console
 from rich.table import Table
 
 from codeweaver.common.utils.git import get_project_path, is_git_dir
@@ -46,8 +48,29 @@ def _get_display() -> StatusDisplay:
     return _display
 
 
+class _ConsoleProxy:
+    """Proxy class that dynamically retrieves the current console.
+    
+    This ensures check functions always use the current display's console,
+    even when _display is reassigned in the doctor() function.
+    """
+    
+    @property
+    def _current_console(self) -> Console:
+        """Get the current display console."""
+        return _get_display().console
+    
+    def print(self, *args, **kwargs):
+        """Proxy print to current console."""
+        return self._current_console.print(*args, **kwargs)
+    
+    def input(self, *args, **kwargs):
+        """Proxy input to current console."""
+        return self._current_console.input(*args, **kwargs)
+
+
 # For backward compatibility with check functions
-console = _get_display().console
+console = _ConsoleProxy()
 
 
 app = App(
@@ -702,8 +725,6 @@ def _print_summary(has_failures: bool, has_warnings: bool, display: StatusDispla
         has_warnings: Whether any checks have warnings
         display: StatusDisplay for output
     """
-    import sys
-    
     display.console.print()
     if not has_failures and not has_warnings:
         display.print_success("All checks passed")
@@ -849,7 +870,6 @@ def main() -> None:
     except KeyboardInterrupt:
         display.console.print()
         display.print_warning("Operation cancelled by user")
-        import sys
         sys.exit(1)
     except Exception as e:
         error_handler.handle_error(e, "Doctor", exit_code=1)

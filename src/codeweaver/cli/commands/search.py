@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 
 from collections.abc import Sequence
 from pathlib import Path
@@ -195,7 +196,6 @@ async def search(
                     "  [yellow]•[/yellow] See docs: https://github.com/knitli/codeweaver-mcp#configuration"
                 )
             display.console.print()
-            import sys
             sys.exit(1)
 
         # Limit results for CLI display

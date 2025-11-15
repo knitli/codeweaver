@@ -211,3 +211,46 @@ class TestUnifiedUXIntegration:
         # Verify handler has access to display
         assert handler.display is display
         assert handler.display.console is console
+
+
+@pytest.mark.unit
+class TestDoctorConsoleProxy:
+    """Tests for doctor.py console proxy functionality."""
+
+    def test_console_proxy_delegates_to_current_display(self) -> None:
+        """Test that doctor console proxy always uses current display."""
+        # Import here to avoid circular dependencies
+        from codeweaver.cli.commands import doctor
+        
+        # Get initial display
+        initial_display = doctor._get_display()
+        initial_console_id = id(initial_display.console)
+        
+        # Create a new display and reassign module display
+        from io import StringIO
+        from rich.console import Console
+        
+        buffer = StringIO()
+        new_console = Console(file=buffer, markup=False, emoji=False, width=120)
+        new_display = StatusDisplay(console=new_console)
+        doctor._display = new_display
+        
+        # Now console.print should use the new display's console
+        doctor.console.print("Test message")
+        output = buffer.getvalue()
+        
+        assert "Test message" in output, "Console proxy should use new display's console"
+        
+        # Verify the proxy is dynamic
+        assert id(doctor._get_display().console) != initial_console_id
+        assert id(doctor._get_display().console) == id(new_console)
+
+    def test_console_proxy_has_required_methods(self) -> None:
+        """Test that console proxy has all required methods."""
+        from codeweaver.cli.commands import doctor
+        
+        # Verify proxy has the methods check functions use
+        assert hasattr(doctor.console, 'print'), "Console proxy should have print method"
+        assert hasattr(doctor.console, 'input'), "Console proxy should have input method"
+        assert callable(doctor.console.print), "Console print should be callable"
+        assert callable(doctor.console.input), "Console input should be callable"

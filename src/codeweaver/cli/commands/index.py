@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import sys
+
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
@@ -163,7 +165,6 @@ async def _perform_clear_operation(
         response = display.console.input("[yellow]Are you sure you want to continue? (yes/no):[/yellow] ")
         if response.lower() not in ["yes", "y"]:
             display.print_info("Operation cancelled")
-            import sys
             sys.exit(0)
 
     try:
@@ -310,7 +311,6 @@ async def _run_standalone_indexing(
     if stats.total_errors > 0:
         display.console.print(f"  [yellow]Files with errors: {stats.total_errors}[/yellow]")
 
-    import sys
     sys.exit(0)
 
 
@@ -384,7 +384,6 @@ async def index(
     except KeyboardInterrupt:
         display.console.print()
         display.print_warning("Indexing cancelled by user")
-        import sys
         sys.exit(130)
     except Exception as e:
         error_handler.handle_error(e, "Indexing", exit_code=1)
