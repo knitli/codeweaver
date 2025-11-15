@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 import logging
-import sys
 
 from collections.abc import Sequence
 from pathlib import Path
@@ -18,14 +17,13 @@ import cyclopts
 
 from cyclopts import App
 from rich import print as rich_print
-from rich.console import Console
 from rich.table import Table
 
 from codeweaver.agent_api.find_code.intent import IntentType
 from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
-from codeweaver.common import CODEWEAVER_PREFIX
 from codeweaver.config.settings import get_settings_map
 from codeweaver.exceptions import CodeWeaverError
+from codeweaver.ui import CLIErrorHandler, StatusDisplay
 
 
 if TYPE_CHECKING:
@@ -35,8 +33,7 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
-console = Console(markup=True, emoji=True)
-app = App(help="Search codebase from command line.", console=console)
+app = App(help="Search codebase from command line.")
 
 
 async def _index_exists(settings: dict[str, Any] | CodeWeaverSettings) -> bool:
@@ -105,7 +102,8 @@ async def _run_search_indexing(
     from codeweaver.core.types.dictview import DictView
     from codeweaver.engine.indexer import Indexer
 
-    console.print(f"{CODEWEAVER_PREFIX} [yellow]No index found. Indexing project...[/yellow]")
+    display = StatusDisplay()
+    display.print_warning("No index found. Indexing project...")
 
     try:
         # Convert to DictView if needed (same as index.py pattern)
@@ -119,13 +117,12 @@ async def _run_search_indexing(
 
         # Show quick summary
         stats = indexer.stats
-        console.print(
-            f"{CODEWEAVER_PREFIX} [green]Indexing complete![/green] "
-            f"({stats.files_processed} files, {stats.chunks_indexed} chunks)"
+        display.print_success(
+            f"Indexing complete! ({stats.files_processed} files, {stats.chunks_indexed} chunks)"
         )
 
     except Exception as e:
-        console.print(f"{CODEWEAVER_PREFIX} [yellow]Warning: Indexing failed: {e}[/yellow]")
+        display.print_warning(f"Indexing failed: {e}")
         console.print(f"{CODEWEAVER_PREFIX} [yellow]Attempting search anyway...[/yellow]")
         # Don't exit - let search try anyway in case there's a partial index
 
