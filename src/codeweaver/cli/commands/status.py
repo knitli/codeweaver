@@ -12,15 +12,17 @@ from __future__ import annotations
 
 import asyncio
 
-from typing import Any
-
-import httpx
+from typing import TYPE_CHECKING, Any
 
 from cyclopts import App
 from pydantic_core import from_json
 from rich.table import Table
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
+
+
+if TYPE_CHECKING:
+    pass
 
 
 _display: StatusDisplay = get_display()
@@ -103,6 +105,8 @@ async def _query_server_status(server_url: str) -> dict[str, Any] | None:
     Returns:
         Status data dict if server is running, None if offline
     """
+    import httpx
+
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(f"{server_url}/status")

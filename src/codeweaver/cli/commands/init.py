@@ -20,7 +20,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 import cyclopts
-import httpx
 
 from pydantic import AnyHttpUrl
 from pydantic_core import from_json as from_json
@@ -356,7 +355,7 @@ def _create_stdio_config(
 def _create_remote_config(
     host: str = "127.0.0.1",
     port: int = 9328,
-    auth: str | Literal["oauth"] | httpx.Auth | None = None,
+    auth: str | Literal["oauth"] | Any | None = None,  # httpx.Auth at runtime
     timeout: int = 120,
     authentication: dict[str, Any] | None = None,
     transport: Literal["streamable-http"] = "streamable-http",
@@ -584,7 +583,7 @@ def mcp(
         ),
     ] = 120,
     auth: Annotated[
-        str | Literal["oauth"] | httpx.Auth | None,
+        str | Literal["oauth"] | Any | None,  # httpx.Auth at runtime
         cyclopts.Parameter(
             name=["--auth"],
             help="Authentication method for MCP client (bearer token, 'oauth', an httpx.Auth object, or None)",
