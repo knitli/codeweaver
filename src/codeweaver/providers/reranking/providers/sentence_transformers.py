@@ -12,7 +12,7 @@ import asyncio
 import logging
 
 from collections.abc import Callable, Sequence
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 import numpy as np
 
@@ -63,7 +63,7 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
     caps: RerankingModelCapabilities
 
     # Use regular dict instead of MappingProxyType to avoid pickle errors
-    _rerank_kwargs: dict[str, Any] = {"trust_remote_code": True}
+    _rerank_kwargs: ClassVar[dict[str, Any]] = {"trust_remote_code": True}
 
     def __init__(
         self,
