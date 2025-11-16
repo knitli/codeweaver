@@ -302,6 +302,18 @@ class FastMcpServerSettings(BasedModel):
 _ = ProviderSettings.model_rebuild()
 
 
+def _resolve_config_file() -> FilePath | None:
+    """Resolve the configuration file path from environment variable, if set."""
+    if (
+        (env_var := os.environ.get("CODEWEAVER_CONFIG_FILE"))
+        and (env_config := Path(env_var))
+        and env_config.exists()
+        and env_config.is_file()
+    ):
+        return env_config
+    return None
+
+
 class CodeWeaverSettings(BaseSettings):
     """Main configuration model following pydantic-settings patterns.
 
@@ -370,13 +382,7 @@ class CodeWeaverSettings(BaseSettings):
     config_file: Annotated[
         FilePath | None,
         Field(description="""Path to the configuration file, if any""", exclude=True),
-    ] = (
-        env_config
-        if (env_config := Path(os.environ.get("CODEWEAVER_CONFIG_FILE")))
-        and env_config.exists()
-        and env_config.is_file()
-        else None
-    )
+    ] = _resolve_config_file()
 
     # Performance settings
     token_limit: Annotated[

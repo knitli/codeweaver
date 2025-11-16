@@ -79,7 +79,7 @@ def main() -> None:
     except Exception as e:
         console.print(f"{CODEWEAVER_PREFIX} [bold red]Fatal error: {e}[/bold red]")
         console.print("\n[red]Traceback:[/red]")
-        console.print_exception(show_locals=True, max_frames=10)
+        console.print_exception(max_frames=10)
         sys.exit(1)
 
 

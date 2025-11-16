@@ -10,7 +10,7 @@ failover status, and active operations.
 
 from __future__ import annotations
 
-import time
+import asyncio
 
 from typing import Any
 
@@ -38,7 +38,7 @@ def get_url() -> str:
 
 
 @app.default
-def status(*, verbose: bool = False, watch: bool = False, watch_interval: int = 5) -> None:
+async def status(*, verbose: bool = False, watch: bool = False, watch_interval: int = 5) -> None:
     """Show CodeWeaver runtime status.
 
     Args:
@@ -49,17 +49,17 @@ def status(*, verbose: bool = False, watch: bool = False, watch_interval: int = 
     display = _display
 
     if watch:
-        _watch_status(display, verbose=verbose, interval=watch_interval)
+        await _watch_status(display, verbose=verbose, interval=watch_interval)
     else:
-        _show_status_once(display, verbose=verbose)
+        await _show_status_once(display, verbose=verbose)
 
 
-def _show_status_once(display: StatusDisplay, *, verbose: bool) -> None:
+async def _show_status_once(display: StatusDisplay, *, verbose: bool) -> None:
     """Show status one time."""
     display.print_command_header("status", "CodeWeaver Runtime Status")
     server_url = get_url()
 
-    status_data = _query_server_status(server_url)
+    status_data = await _query_server_status(server_url)
 
     if status_data is None:
         _display_server_offline(display, server_url)
@@ -67,7 +67,7 @@ def _show_status_once(display: StatusDisplay, *, verbose: bool) -> None:
         _display_full_status(display, status_data, verbose=verbose)
 
 
-def _watch_status(display: StatusDisplay, *, verbose: bool, interval: int) -> None:
+async def _watch_status(display: StatusDisplay, *, verbose: bool, interval: int) -> None:
     """Continuously watch and display status."""
     display.print_command_header("status", "CodeWeaver Runtime Status (Watch Mode)")
     display.print_info(f"Refreshing every {interval} seconds. Press Ctrl+C to exit.")
@@ -82,19 +82,19 @@ def _watch_status(display: StatusDisplay, *, verbose: bool, interval: int) -> No
                 f"Refreshing every {interval} seconds. Press Ctrl+C to exit.", prefix="⏱️"
             )
 
-            status_data = _query_server_status(server_url)
+            status_data = await _query_server_status(server_url)
 
             if status_data is None:
                 _display_server_offline(display, server_url)
             else:
                 _display_full_status(display, status_data, verbose=verbose)
 
-            time.sleep(interval)
+            await asyncio.sleep(interval)
     except KeyboardInterrupt:
         display.print_info("Watch mode stopped.", prefix="✋")
 
 
-def _query_server_status(server_url: str) -> dict[str, Any] | None:
+async def _query_server_status(server_url: str) -> dict[str, Any] | None:
     """Query the server /status endpoint.
 
     Args:
@@ -104,8 +104,8 @@ def _query_server_status(server_url: str) -> dict[str, Any] | None:
         Status data dict if server is running, None if offline
     """
     try:
-        with httpx.Client(timeout=5.0) as client:
-            response = client.get(f"{server_url}/status")
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{server_url}/status")
             response.raise_for_status()
             return from_json(response.content)  # type: ignore[no-any-return]
     except (httpx.ConnectError, httpx.TimeoutException):

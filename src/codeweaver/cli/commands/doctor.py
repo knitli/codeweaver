@@ -290,14 +290,17 @@ def _docker_is_running() -> bool:
         return result.returncode == 0
 
 
-def _qdrant_running_at_url(url: Any | None = None) -> bool:
+async def _qdrant_running_at_url(url: Any | None = None) -> bool:
     """Check if Qdrant is running at the given URL."""
     import re
 
     import httpx
 
     try:
-        response = httpx.get(f"{str(url) or 'http://127.0.0.1:6333'}/metrics", timeout=2.0)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{str(url) or 'http://127.0.0.1:6333'}/metrics", timeout=2.0
+            )
     except (httpx.ConnectError, httpx.TimeoutException):
         return False
     else:
@@ -309,7 +312,7 @@ def _qdrant_running_at_url(url: Any | None = None) -> bool:
 type DeploymentType = Literal["local docker", "cloud", "local", "remote", "in-memory", "unknown"]
 
 
-def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
+async def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
     """Check vector store configuration with Docker/Cloud detection."""
     from codeweaver.providers.provider import Provider
 
@@ -347,11 +350,11 @@ def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
                 "local docker"
                 if _docker_is_running()
                 else "local"
-                if _qdrant_running_at_url(url)
+                if await _qdrant_running_at_url(url)
                 else "unknown"
             )
     elif provider == Provider.QDRANT:
-        deployment_type = "local" if _qdrant_running_at_url() else "unknown"
+        deployment_type = "local" if await _qdrant_running_at_url() else "unknown"
     elif provider == Provider.MEMORY:
         deployment_type = "in-memory"
 
@@ -692,7 +695,7 @@ def _print_summary(has_failures: bool, has_warnings: bool, display: StatusDispla
         sys.exit(1)
 
 
-def process_checks(display: StatusDisplay) -> list[DoctorCheck]:
+async def process_checks(display: StatusDisplay) -> list[DoctorCheck]:
     """Process all doctor checks and return the results.
 
     Args:
@@ -748,7 +751,7 @@ def process_checks(display: StatusDisplay) -> list[DoctorCheck]:
         )
         return checks
     checks.extend((
-        check_vector_store_config(provider_settings),
+        await check_vector_store_config(provider_settings),
         *check_provider_availability(provider_settings),
     ))
     if remote_providers := {
@@ -780,7 +783,7 @@ def process_checks(display: StatusDisplay) -> list[DoctorCheck]:
 
 
 @app.default
-def doctor(*, verbose: bool = False, display: StatusDisplay | None = None) -> None:
+async def doctor(*, verbose: bool = False, display: StatusDisplay | None = None) -> None:
     """Validate prerequisites and configuration.
 
     Args:
@@ -796,7 +799,7 @@ def doctor(*, verbose: bool = False, display: StatusDisplay | None = None) -> No
     display.print_section("Running diagnostic checks...")
     display.console.print()
 
-    checks: list[DoctorCheck] = process_checks(display)
+    checks: list[DoctorCheck] = await process_checks(display)
     # Display results table
     table = Table(show_header=True, header_style="bold blue", box=None)
     table.add_column("Status", style="white", no_wrap=True, width=6)

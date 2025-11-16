@@ -36,14 +36,15 @@ _display: StatusDisplay = get_display()
 app = App("index", help="Index codebase for semantic search.", console=_display.console)
 
 
-def _check_server_health() -> bool:
+async def _check_server_health() -> bool:
     """Check if CodeWeaver server is running.
 
     Returns:
         True if server is running and healthy
     """
     try:
-        response = httpx.get("http://localhost:9328/health/", timeout=2.0)
+        async with httpx.AsyncClient() as client:
+            response = await client.get("http://localhost:9328/health/", timeout=2.0)
     except (httpx.ConnectError, httpx.TimeoutException):
         return False
     else:
@@ -233,7 +234,7 @@ async def _perform_clear_operation(
     display.console.print()
 
 
-def _handle_server_status(*, standalone: bool, display: StatusDisplay) -> bool:
+async def _handle_server_status(*, standalone: bool, display: StatusDisplay) -> bool:
     """Check server status and inform user.
 
     Args:
@@ -246,7 +247,7 @@ def _handle_server_status(*, standalone: bool, display: StatusDisplay) -> bool:
     if standalone:
         return True
 
-    if _check_server_health():
+    if await _check_server_health():
         return _check_and_print_server_status(display)
     display.print_warning("Server not running")
     display.print_info("Running standalone indexing")
@@ -379,7 +380,7 @@ async def index(
             force_reindex = True  # Continue to reindex after clearing
 
         # Check server status and decide whether to proceed
-        if not _handle_server_status(standalone=standalone, display=display):
+        if not await _handle_server_status(standalone=standalone, display=display):
             return  # Server is running, exit early
 
         # Standalone indexing
