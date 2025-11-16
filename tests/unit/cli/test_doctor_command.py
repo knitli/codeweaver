@@ -103,7 +103,7 @@ class TestDoctorImports:
     def test_import_from_common_utils_succeeds(self) -> None:
         """Test importing from common.utils now works via __init__.py exports."""
         # Should not raise ImportError due to __init__.py exports
-        from codeweaver.common.utils import get_user_config_dir  # noqa: F401
+        from codeweaver.common.utils import get_user_config_dir
 
         config_dir = get_user_config_dir()
         assert config_dir is not None

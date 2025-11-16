@@ -115,7 +115,11 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
             else:
                 # Only extract known Cohere client options from kwargs
                 known_client_options = {
-                    "api_key", "base_url", "timeout", "max_retries", "httpx_client"
+                    "api_key",
+                    "base_url",
+                    "timeout",
+                    "max_retries",
+                    "httpx_client",
                 }
                 client_options = {
                     k: v for k, v in config_kwargs.items() if k in known_client_options
@@ -215,12 +219,10 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
             attr = "float"
         else:
             attr = self.client_options.get("output_dtype") or self.caps.default_dtype or "float"
-        
+
         # Extract model from embed_kwargs to avoid passing it twice
         model = embed_kwargs.pop("model", self.model_name)
-        response = await self.client.embed(
-            texts=texts, model=model, **embed_kwargs
-        )
+        response = await self.client.embed(texts=texts, model=model, **embed_kwargs)
         embed_obj = response.embeddings
         embeddings = getattr(embed_obj, attr, None)
         tokens = (

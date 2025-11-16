@@ -40,7 +40,7 @@ def run_cli_command(
         CliResult with exit code and output
     """
     result = subprocess.run(
-        [sys.executable, "-m", "codeweaver.cli"] + command_args[1:],
+        [sys.executable, "-m", "codeweaver.cli", *command_args[1:]],
         cwd=cwd,
         env=env,
         capture_output=True,

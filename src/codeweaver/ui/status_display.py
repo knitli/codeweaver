@@ -185,13 +185,13 @@ class StatusDisplay:
         """
         self.console.print(f"\n{title}", style="bold cyan")
 
-    def print_info(self, message: str, *, prefix: str = "ℹ️") -> None:
+    def print_info(self, message: str, *, prefix: str = "ℹ️") -> None:  # noqa: RUF001
         """Print an informational message.
 
         Args:
             message: Information message
             prefix: Optional prefix icon (default: ℹ️)
-        """
+        """  # noqa: RUF002
         self.console.print(f"{prefix}  {message}", style="blue")
 
     def print_success(self, message: str, *, details: str | None = None) -> None:

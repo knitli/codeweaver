@@ -11,20 +11,10 @@ import logging
 import re
 import time
 
-from collections.abc import AsyncIterator, Callable, Iterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Annotated,
-    Any,
-    Literal,
-    NotRequired,
-    Required,
-    Self,
-    TypedDict,
-    cast,
-)
+from typing import TYPE_CHECKING, Annotated, Any, Literal, NotRequired, Required, TypedDict, cast
 
 from fastmcp import FastMCP
 from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware, RetryMiddleware
@@ -33,17 +23,10 @@ from fastmcp.server.middleware.middleware import Middleware
 from fastmcp.server.middleware.rate_limiting import RateLimitingMiddleware
 from pydantic import ConfigDict, DirectoryPath, Field, NonNegativeInt, computed_field
 from pydantic.dataclasses import dataclass
-from pydantic_core import to_json
 
 from codeweaver import __version__ as version
 from codeweaver.common.logging import setup_logger
-from codeweaver.common.registry import (
-    Feature,
-    ModelRegistry,
-    ProviderRegistry,
-    ServiceCard,
-    ServicesRegistry,
-)
+from codeweaver.common.registry import ModelRegistry, ProviderRegistry, ServicesRegistry
 from codeweaver.common.statistics import SessionStatistics
 from codeweaver.common.telemetry.client import PostHogClient
 from codeweaver.common.utils import get_project_path, lazy_import, rpartial
@@ -63,7 +46,7 @@ from codeweaver.config.settings import (
 )
 from codeweaver.config.types import FastMcpServerSettingsDict
 from codeweaver.core.types.dictview import DictView
-from codeweaver.core.types.enum import AnonymityConversion, BaseEnum
+from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
 from codeweaver.core.types.sentinel import Unset
 from codeweaver.engine.indexer import Indexer
@@ -446,7 +429,7 @@ async def lifespan(
             logger.info("Lifespan start actions complete, server initialized.")
         state.initialized = True
         yield state
-    except Exception as e:
+    except Exception:
         state.initialized = False
         raise
     finally:
@@ -792,10 +775,4 @@ def build_app(*, verbose: bool = False, debug: bool = False) -> ServerSetup:
     )
 
 
-__all__ = (
-    "AppState",
-    "ServerSetup",
-    "build_app",
-    "get_state",
-    "lifespan",
-)
+__all__ = ("AppState", "ServerSetup", "build_app", "get_state", "lifespan")

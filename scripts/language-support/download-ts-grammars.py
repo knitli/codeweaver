@@ -895,7 +895,7 @@ async def fetch_grammars(  # noqa: C901
         if normalize:
             normalize_grammars()
         try:
-            grammars.serialize(save_dir=save_dir)  # pyright: ignore[reportOptionalMemberAccess]
+            grammars.serialize(save_dir=save_dir)
         except Exception as e:
             console.print(f"[red]Failed to serialize grammars:[/red] {e}")
         if grammars:

@@ -58,7 +58,7 @@ class TestInitCommand:
 
         with pytest.raises(SystemExit) as exc_info:
             init_app(["--quick", "--client", "claude_code"])
-        captured = capsys.readouterr()
+        capsys.readouterr()
 
         # Should succeed
         assert exc_info.value.code == 0
@@ -80,7 +80,7 @@ class TestInitCommand:
 
         with pytest.raises(SystemExit) as exc_info:
             init_app(["--quick", "--config-only"])
-        captured = capsys.readouterr()
+        capsys.readouterr()
 
         assert exc_info.value.code == 0
 
@@ -101,7 +101,7 @@ class TestInitCommand:
 
         with pytest.raises(SystemExit) as exc_info:
             init_app(["--mcp-only", "--client", "claude_code"])
-        captured = capsys.readouterr()
+        capsys.readouterr()
 
         # Should succeed
         assert exc_info.value.code == 0
@@ -126,7 +126,7 @@ class TestHttpStreamingArchitecture:
 
         with pytest.raises(SystemExit) as exc_info:
             init_app(["--mcp-only", "--client", "claude_code", "--transport", "streamable-http"])
-        captured = capsys.readouterr()
+        capsys.readouterr()
 
         # If succeeded, check config
         if exc_info.value.code == 0:
@@ -150,7 +150,7 @@ class TestHttpStreamingArchitecture:
 
         with pytest.raises(SystemExit) as exc_info:
             init_app(["--mcp-only", "--client", "claude_code", "--transport", "streamable-http"])
-        captured = capsys.readouterr()
+        capsys.readouterr()
 
         if exc_info.value.code == 0:
             mcp_config_path = _get_client_config_path(
@@ -174,7 +174,7 @@ class TestHttpStreamingArchitecture:
 
         with pytest.raises(SystemExit) as exc_info:
             init_app(["--mcp-only", "--client", "claude_code"])
-        captured = capsys.readouterr()
+        capsys.readouterr()
 
         if exc_info.value.code == 0:
             mcp_config_path = _get_client_config_path(
@@ -256,7 +256,7 @@ class TestInitIntegration:
         # Init should create valid config
         with pytest.raises(SystemExit) as exc_info:
             init_app(["--quick"])
-        captured = capsys.readouterr()
+        capsys.readouterr()
 
         # Only test config integration if init succeeded
         if exc_info.value.code != 0:
@@ -284,7 +284,7 @@ provider = "fastembed"
         # Init should detect and handle existing config
         with pytest.raises(SystemExit) as exc_info:
             init_app(["--quick"])
-        captured = capsys.readouterr()
+        capsys.readouterr()
 
         # Should either merge or prompt
         assert exc_info.value.code in (0, 1)
@@ -436,7 +436,6 @@ class TestHelperFunctions:
         """Test _handle_write_output backs up existing config."""
         # Skipping - backup is created but the merge behavior makes testing complex
         # The function _backup_config is called at line 415 in init.py
-        pass
 
     def test_mcp_command_stdio_transport(self, temp_project: Path) -> None:
         """Test mcp command creates stdio transport config."""

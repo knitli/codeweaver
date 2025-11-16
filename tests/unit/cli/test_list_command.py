@@ -216,13 +216,11 @@ class TestListModelRegistry:
     def test_uses_model_registry(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test list command uses ModelRegistry."""
         # Skipping - requires internal model registry API
-        pass
 
     @pytest.mark.skip(reason="Test needs access to internal model registry API which may not be public")
     def test_model_registry_has_sparse_models(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test ModelRegistry includes sparse embedding models."""
         # Skipping - requires internal model registry API
-        pass
 
 
 @pytest.mark.unit

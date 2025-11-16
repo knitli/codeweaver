@@ -76,13 +76,16 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
         """Initialize the SentenceTransformersRerankingProvider."""
         # Call super().__init__() FIRST which handles all Pydantic initialization
         # This ensures _rerank_kwargs and other private attrs are properly initialized
+        if client is None:
+            client = CrossEncoder(caps.name, **kwargs)
         super().__init__(client=client, caps=caps, prompt=prompt, top_n=top_n, **kwargs)
 
         # Now we can safely access _rerank_kwargs after Pydantic initialization
         # Initialize client if not provided
-        if client is None:
-            rerank_kwargs = {**self._rerank_kwargs, **kwargs}
-            self.client = CrossEncoder(caps.name, **rerank_kwargs)
+        if self._rerank_kwargs:
+            object.__setattr__(
+                self, "client", CrossEncoder(caps.name, **(self._rerank_kwargs | kwargs))
+            )
 
     def _initialize(self) -> None:
         """

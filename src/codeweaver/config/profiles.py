@@ -22,6 +22,8 @@ from typing import Literal, overload
 
 from pydantic import AnyHttpUrl
 
+from codeweaver.common.utils.git import get_project_path
+from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.providers import (
     AgentModelSettings,
     AgentProviderSettings,
@@ -37,6 +39,7 @@ from codeweaver.config.providers import (
     SparseEmbeddingProviderSettings,
     VectorStoreProviderSettings,
 )
+from codeweaver.core.stores import get_blake_hash
 
 
 def _default_local_vector_config() -> QdrantConfig:
@@ -46,7 +49,7 @@ def _default_local_vector_config() -> QdrantConfig:
 
 def _default_remote_vector_config(url: AnyHttpUrl) -> QdrantConfig:
     """Default remote vector store configuration for Qdrant."""
-    return QdrantConfig(prefer_grpc=True, url=url)
+    return QdrantConfig(prefer_grpc=True, url=str(url))
 
 
 def _get_vector_config(
@@ -227,8 +230,26 @@ def _backup_profile() -> ProviderSettingsDict:
         **(
             _quickstart_default("local")
             | {
+                "embedding": EmbeddingProviderSettings(
+                    provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
+                    enabled=True,
+                    model_settings=EmbeddingModelSettings(
+                        model="BAAI/ibm-granite/granite-embedding-small-english-r2"
+                        if HAS_ST
+                        else "Alibaba-NLP/gte-modernbert-base",
+                        dimension=384 if HAS_ST else 768,
+                        data_type="int8",
+                    ),
+                )
+            }
+            | {
                 "vector_store": VectorStoreProviderSettings(
-                    provider=Provider.MEMORY, enabled=True, provider_settings=MemoryConfig()
+                    provider=Provider.MEMORY,
+                    enabled=True,
+                    provider_settings=MemoryConfig(
+                        persist_path=get_user_config_dir() / "vectors/backup",
+                        collection_name=f"{get_project_path().name}-{get_blake_hash(str(get_project_path()).encode('utf-8'))[:8]}-backup",
+                    ),
                 )
             }
         )

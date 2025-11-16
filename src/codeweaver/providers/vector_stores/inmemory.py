@@ -14,7 +14,7 @@ import logging
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import ClassVar, cast
+from typing import ClassVar, Literal, cast
 
 from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.providers import MemoryConfig
@@ -25,7 +25,6 @@ from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
 
 try:
     from qdrant_client import AsyncQdrantClient
-    from qdrant_client.models import Distance, PointStruct, VectorParams
 except ImportError as e:
     raise ProviderError(
         "Qdrant client is required for MemoryVectorStoreProvider. Install it with: pip install qdrant-client"
@@ -60,7 +59,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
     config: MemoryConfig = MemoryConfig()
     _client: AsyncQdrantClient | None = None
 
-    _provider: ClassVar[Provider] = Provider.MEMORY
+    _provider: ClassVar[Literal[Provider.MEMORY]] = Provider.MEMORY
 
     async def _init_provider(self) -> None:  # type: ignore
         """Initialize in-memory Qdrant client and restore from disk.
@@ -112,6 +111,8 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         Raises:
             PersistenceError: Failed to write persistence file.
         """
+        from qdrant_client.http.models import PointStruct
+
         if not self._ensure_client(self._client):
             raise ProviderError("Qdrant client not initialized")
         try:
@@ -195,7 +196,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
             ValidationError: Persistence file format invalid.
         """
         from pydantic_core import from_json
-        from qdrant_client.models import Datatype, Distance, VectorParams
+        from qdrant_client.models import Datatype, Distance, PointStruct, VectorParams
 
         def _raise_persistence_error(msg: str) -> None:
             raise PersistenceError(msg)
@@ -223,23 +224,23 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
                 dense_config = vectors_config.get("dense", {})
 
                 # Map distance from persisted data
-                distance_str = dense_config.get("distance", "Cosine")
+                distance_repr = dense_config.get("distance", "Cosine")
                 distance_map = {
                     "Cosine": Distance.COSINE,
                     "Dot": Distance.DOT,
                     "Euclid": Distance.EUCLID,
                     "Euclidean": Distance.EUCLID,
                 }
-                distance = distance_map.get(distance_str, Distance.COSINE)
+                distance = distance_map.get(distance_repr, Distance.COSINE)
 
                 # Map datatype from persisted data
-                datatype_str = dense_config.get("datatype", "Float32")
+                datatype_repr = dense_config.get("datatype", "Float32")
                 datatype_map = {
                     "Float32": Datatype.FLOAT32,
                     "Float16": Datatype.FLOAT16,
                     "Uint8": Datatype.UINT8,
                 }
-                datatype = datatype_map.get(datatype_str, Datatype.FLOAT32)
+                datatype = datatype_map.get(datatype_repr, Datatype.FLOAT32)
 
                 await self._client.create_collection(
                     collection_name=collection_name,
@@ -313,7 +314,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
 
     async def handle_persistence(self) -> None:
         """Trigger persistence if auto_persist is enabled.
-        
+
         Called after upsert and delete operations to persist changes.
         """
         if self._auto_persist:  # type: ignore

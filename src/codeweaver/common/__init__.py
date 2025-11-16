@@ -1,4 +1,3 @@
-# pyright: reportUnsupportedDunderAll=none
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #

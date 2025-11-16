@@ -35,7 +35,7 @@ class TestStatusDisplay:
         buffer = StringIO()
         custom_console = Console(file=buffer, markup=False, emoji=False)
         display = StatusDisplay(console=custom_console)
-        
+
         assert display.console is custom_console
 
     def test_print_info(self) -> None:
@@ -43,10 +43,10 @@ class TestStatusDisplay:
         buffer = StringIO()
         console = Console(file=buffer, markup=False, emoji=False, width=120)
         display = StatusDisplay(console=console)
-        
+
         display.print_info("Test message")
         output = buffer.getvalue()
-        
+
         assert "Test message" in output
 
     def test_print_success(self) -> None:
@@ -54,10 +54,10 @@ class TestStatusDisplay:
         buffer = StringIO()
         console = Console(file=buffer, markup=False, emoji=False, width=120)
         display = StatusDisplay(console=console)
-        
+
         display.print_success("Operation successful")
         output = buffer.getvalue()
-        
+
         assert "Operation successful" in output
 
     def test_print_error(self) -> None:
@@ -65,10 +65,10 @@ class TestStatusDisplay:
         buffer = StringIO()
         console = Console(file=buffer, markup=False, emoji=False, width=120)
         display = StatusDisplay(console=console)
-        
+
         display.print_error("An error occurred")
         output = buffer.getvalue()
-        
+
         assert "An error occurred" in output
 
     def test_print_warning(self) -> None:
@@ -76,10 +76,10 @@ class TestStatusDisplay:
         buffer = StringIO()
         console = Console(file=buffer, markup=False, emoji=False, width=120)
         display = StatusDisplay(console=console)
-        
+
         display.print_warning("Warning message")
         output = buffer.getvalue()
-        
+
         assert "Warning message" in output
 
     def test_print_section(self) -> None:
@@ -87,10 +87,10 @@ class TestStatusDisplay:
         buffer = StringIO()
         console = Console(file=buffer, markup=False, emoji=False, width=120)
         display = StatusDisplay(console=console)
-        
+
         display.print_section("Section Title")
         output = buffer.getvalue()
-        
+
         assert "Section Title" in output
 
     def test_print_table(self) -> None:
@@ -98,15 +98,15 @@ class TestStatusDisplay:
         buffer = StringIO()
         console = Console(file=buffer, markup=False, emoji=False, width=120)
         display = StatusDisplay(console=console)
-        
+
         table = Table()
         table.add_column("Name")
         table.add_column("Value")
         table.add_row("test", "123")
-        
+
         display.print_table(table)
         output = buffer.getvalue()
-        
+
         assert "test" in output
         assert "123" in output
 
@@ -115,10 +115,10 @@ class TestStatusDisplay:
         buffer = StringIO()
         console = Console(file=buffer, markup=False, emoji=False, width=120)
         display = StatusDisplay(console=console)
-        
+
         display.print_progress(50, 100, "Processing files")
         output = buffer.getvalue()
-        
+
         assert "50" in output
         assert "100" in output
         assert "Processing files" in output
@@ -132,7 +132,7 @@ class TestCLIErrorHandler:
         """Test CLIErrorHandler can be initialized."""
         display = StatusDisplay()
         handler = CLIErrorHandler(display)
-        
+
         assert handler.display is display
         assert handler.verbose is False
         assert handler.debug is False
@@ -141,7 +141,7 @@ class TestCLIErrorHandler:
         """Test CLIErrorHandler with verbose mode."""
         display = StatusDisplay()
         handler = CLIErrorHandler(display, verbose=True)
-        
+
         assert handler.verbose is True
         assert handler.debug is False
 
@@ -149,7 +149,7 @@ class TestCLIErrorHandler:
         """Test CLIErrorHandler with debug mode."""
         display = StatusDisplay()
         handler = CLIErrorHandler(display, debug=True)
-        
+
         assert handler.verbose is False
         assert handler.debug is True
 
@@ -159,13 +159,13 @@ class TestCLIErrorHandler:
         console = Console(file=buffer, markup=False, emoji=False, width=120)
         display = StatusDisplay(console=console)
         handler = CLIErrorHandler(display, verbose=False, debug=False)
-        
+
         error = CodeWeaverError("Test error message")
-        
+
         # This will exit, so we catch it
         with pytest.raises(SystemExit) as exc_info:
             handler.handle_error(error, "Test operation")
-        
+
         assert exc_info.value.code == 1
         output = buffer.getvalue()
         assert "Test error message" in output
@@ -177,13 +177,13 @@ class TestCLIErrorHandler:
         console = Console(file=buffer, markup=False, emoji=False, width=120)
         display = StatusDisplay(console=console)
         handler = CLIErrorHandler(display, verbose=False, debug=False)
-        
+
         error = ValueError("Unexpected error")
-        
+
         # This will exit, so we catch it
         with pytest.raises(SystemExit) as exc_info:
             handler.handle_error(error, "Test operation")
-        
+
         assert exc_info.value.code == 1
         output = buffer.getvalue()
         assert "Unexpected error" in output
@@ -199,15 +199,15 @@ class TestUnifiedUXIntegration:
         console = Console(file=buffer, markup=False, emoji=False, width=120)
         display = StatusDisplay(console=console)
         handler = CLIErrorHandler(display, verbose=False, debug=False)
-        
+
         # Test normal output
         display.print_info("Starting operation")
         display.print_success("Operation completed")
-        
+
         output = buffer.getvalue()
         assert "Starting operation" in output
         assert "Operation completed" in output
-        
+
         # Verify handler has access to display
         assert handler.display is display
         assert handler.display.console is console
@@ -221,26 +221,27 @@ class TestDoctorConsoleProxy:
         """Test that doctor console proxy always uses current display."""
         # Import here to avoid circular dependencies
         from codeweaver.cli.commands import doctor
-        
+
         # Get initial display
         initial_display = doctor._get_display()
         initial_console_id = id(initial_display.console)
-        
+
         # Create a new display and reassign module display
         from io import StringIO
+
         from rich.console import Console
-        
+
         buffer = StringIO()
         new_console = Console(file=buffer, markup=False, emoji=False, width=120)
         new_display = StatusDisplay(console=new_console)
         doctor._display = new_display
-        
+
         # Now console.print should use the new display's console
         doctor.console.print("Test message")
         output = buffer.getvalue()
-        
+
         assert "Test message" in output, "Console proxy should use new display's console"
-        
+
         # Verify the proxy is dynamic
         assert id(doctor._get_display().console) != initial_console_id
         assert id(doctor._get_display().console) == id(new_console)
@@ -248,7 +249,7 @@ class TestDoctorConsoleProxy:
     def test_console_proxy_has_required_methods(self) -> None:
         """Test that console proxy has all required methods."""
         from codeweaver.cli.commands import doctor
-        
+
         # Verify proxy has the methods check functions use
         assert hasattr(doctor.console, 'print'), "Console proxy should have print method"
         assert hasattr(doctor.console, 'input'), "Console proxy should have input method"

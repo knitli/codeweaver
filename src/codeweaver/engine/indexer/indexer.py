@@ -181,6 +181,7 @@ class Indexer(BasedModel):
     )
     _last_checkpoint_time: Annotated[NonNegativeFloat, PrivateAttr()] = 0.0
     _files_since_checkpoint: Annotated[NonNegativeInt, PrivateAttr()] = 0
+    _failover_manager: Annotated[Any | None, PrivateAttr()] = None  # VectorStoreFailoverManager
 
     def __init__(
         self,
@@ -361,16 +362,38 @@ class Indexer(BasedModel):
                 "⚠️  No embedding providers initialized - indexing will proceed without embeddings"
             )
 
-        # Initialize vector store (async operation)
+        # Initialize vector store with failover support
         try:
-            self._vector_store = _get_vector_store_instance()
+            from codeweaver.engine.failover import VectorStoreFailoverManager
+
+            # Get primary vector store instance
+            primary_store = _get_vector_store_instance()
+            if primary_store:
+                await primary_store._initialize()
+
+            # Create and initialize failover manager
+            self._failover_manager = VectorStoreFailoverManager()
+            await self._failover_manager.initialize(
+                primary_store=primary_store,
+                project_path=self._checkpoint_manager.project_path,
+                indexer=self,
+            )
+
+            # Use the active store (initially primary, switches to backup on failure)
+            self._vector_store = self._failover_manager.active_store
+
             if self._vector_store:
-                # Initialize the vector store client (now we can use native await)
-                await self._vector_store._initialize()
-            logger.debug("Initialized vector store: %s", type(self._vector_store).__name__)
+                logger.info(
+                    "Vector store initialized with backup failover support: %s",
+                    type(self._vector_store).__name__,
+                )
+            else:
+                logger.warning("No vector store available (primary failed to initialize)")
+
         except Exception as e:
-            logger.warning("Could not initialize vector store: %s", e)
+            logger.warning("Could not initialize vector store with failover: %s", e)
             self._vector_store = None
+            self._failover_manager = None
 
         # Ensure chunking service is initialized
         self._chunking_service = self._chunking_service or _get_chunking_service()

@@ -247,7 +247,7 @@ provider = "voyage"
             "prod": {"VOYAGE_API_KEY": "prod-key", "QDRANT_URL": "https://prod.cloud.qdrant.io"},
         }
 
-        for env_name, env_vars in environments.items():
+        for env_vars in environments.values():
             # Set environment
             for key, value in env_vars.items():
                 monkeypatch.setenv(key, value)
@@ -267,7 +267,7 @@ class TestCompleteUserJourneys:
         from codeweaver.cli.commands.init import _get_client_config_path
 
         project = user_environment["project"]
-        home = user_environment["home"]
+        user_environment["home"]
 
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
 

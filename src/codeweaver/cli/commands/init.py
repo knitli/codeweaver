@@ -1,3 +1,4 @@
+# sourcery skip: no-complex-if-expressions
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -27,6 +28,7 @@ from pydantic_core import to_json as to_json
 from rich.console import Console
 from rich.prompt import Confirm
 
+from codeweaver.common.utils.git import get_project_path
 from codeweaver.common.utils.utils import get_user_config_dir
 
 
@@ -89,7 +91,7 @@ def _create_codeweaver_config(
     from codeweaver.config.profiles import get_profile
 
     deployment_profile = (
-        get_profile(profile if profile != "test" else "backup", vector_deployment, url=vector_url)
+        get_profile("backup" if profile == "test" else profile, vector_deployment, url=vector_url)  # ty: ignore[no-matching-overload]
         if profile
         else None
     )  # ty: ignore[no-matching-overload]
@@ -117,10 +119,10 @@ def config(
     *,
     project: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
     profile: Annotated[
-        Literal["recommended", "quickstart", "backup"] | None,
+        Literal["recommended", "quickstart", "test"] | None,
         cyclopts.Parameter(
             name=["--profile"],
-            help="Configuration profile to use (recommended, quickstart, or backup)",
+            help="Configuration profile to use (recommended, quickstart, or test)",
         ),
     ] = None,
     vector_deployment: Annotated[
@@ -166,11 +168,18 @@ def config(
     console.print("\n[bold cyan]CodeWeaver Configuration Setup[/bold cyan]\n")
 
     # Validate vector_url if cloud deployment
+    project_path = project or get_project_path()
     parsed_vector_url: AnyHttpUrl | None = None
     if vector_deployment == "cloud" and not vector_url:
         console.print("[red]✗[/red] --vector-url is required when --vector-deployment=cloud")
         sys.exit(1)
-    # TODO finish this up with the config_extension and config_level options using cli.utils.get_codeweaver_config_paths
+    if not config_path:
+        if config_level == "local":
+            config_path = project_path / f"codeweaver_local.{config_extension}"
+        elif config_level == "project":
+            config_path = project_path / f"codeweaver_project.{config_extension}"
+        else:
+            config_path = get_user_config_dir() / f"codeweaver.{config_extension}"
 
     # Determine project path
     project_path = (project or Path.cwd()).resolve()
@@ -248,20 +257,7 @@ def _get_client_config_path(
         case "claude_code":
             if config_level == "project":
                 return project_path / ".claude" / "mcp.json"
-            # User-level config paths
-            if sys.platform == "win32":
-                return Path(Path.home(), "AppData", "Roaming", "claude-code", "mcp.json")
-            if sys.platform == "darwin":
-                return Path(
-                    Path.home(), "Library", "Application Support", "claude-code", "mcp.json"
-                )
-            # Linux
-            return Path(
-                os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"),
-                "claude-code",
-                "mcp.json",
-            )
-
+            return _get_user_config_path(sys, "claude-code", "mcp.json", os)
         case "cursor":
             if config_level == "project":
                 return project_path / ".cursor" / "mcp.json"
@@ -281,25 +277,18 @@ def _get_client_config_path(
                 raise ValueError(
                     "Claude Desktop does not support project-level configuration. Use user-level or switch to claude_code."
                 )
-            # User-level Claude Desktop config
-            if sys.platform == "win32":
-                return Path(
-                    Path.home(), "AppData", "Roaming", "Claude", "claude_desktop_config.json"
-                )
-            if sys.platform == "darwin":
-                return Path(
-                    Path.home(),
-                    "Library",
-                    "Application Support",
-                    "Claude",
-                    "claude_desktop_config.json",
-                )
-            # Linux
-            return Path(
-                os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"),
-                "Claude",
-                "claude_desktop_config.json",
-            )
+            return _get_user_config_path(sys, "Claude", "claude_desktop_config.json", os)
+
+
+# TODO Rename this here and in `_get_client_config_path`
+def _get_user_config_path(sys, provider: str, file_name: str, os):
+    # User-level config paths
+    if sys.platform == "win32":
+        return Path(Path.home(), "AppData", "Roaming", provider, file_name)
+    if sys.platform == "darwin":
+        return Path(Path.home(), "Library", "Application Support", provider, file_name)
+    # Linux
+    return Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"), provider, file_name)
 
 
 def _create_stdio_config(
@@ -673,10 +662,10 @@ def init(
     mcp_only: Annotated[bool, cyclopts.Parameter(name=["--mcp-only"])] = False,
     quick: Annotated[bool, cyclopts.Parameter(name=["--quick", "-q"])] = False,
     profile: Annotated[
-        Literal["recommended", "quickstart", "backup"] | None,
+        Literal["recommended", "quickstart", "test"] | None,
         cyclopts.Parameter(
             name=["--profile"],
-            help="Configuration profile to use (recommended, quickstart, or backup). Defaults to 'recommended' with --quick.",
+            help="Configuration profile to use (recommended, quickstart, or test). Defaults to 'recommended' with --quick.",
         ),
     ] = None,
     vector_deployment: Annotated[
@@ -723,7 +712,7 @@ def init(
         config_only: Only create CodeWeaver config file
         mcp_only: Only create MCP client config
         quick: Use recommended profile with defaults
-        profile: Configuration profile to use (recommended, quickstart, or backup)
+        profile: Configuration profile to use (recommended, quickstart, or test)
         vector_deployment: Vector store deployment type (local or cloud)
         vector_url: URL for cloud vector deployment
         client: MCP client to configure (claude_code, claude_desktop, cursor, vscode, mcpjson)
@@ -749,7 +738,7 @@ def init(
         if not vector_url:
             console.print("[red]✗[/red] --vector-url is required when --vector-deployment=cloud")
             sys.exit(1)
-        parsed_vector_url = AnyHttpUrl(vector_url)
+        parsed_vector_url = AnyHttpUrl(vector_url) if vector_url else None
 
     # If --quick and no profile specified, use recommended
     if quick and profile is None:

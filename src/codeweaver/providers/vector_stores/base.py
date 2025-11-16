@@ -145,9 +145,9 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
             init_data["config"] = config
         if client is not None:
             init_data["_client"] = client
-        # Note: Don't pass _embedding_caps here - PrivateAttr with default_factory 
+        # Note: Don't pass _embedding_caps here - PrivateAttr with default_factory
         # will always call the factory. Set it after super().__init__() instead.
-        
+
         super().__init__(**init_data)
 
         # Override _embedding_caps if explicitly provided (after super().__init__)
@@ -250,10 +250,10 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         """
         dense_caps = self.embedding_capabilities.get("dense")
         default_dim = dense_caps.default_dimension if dense_caps else None
-        
+
         dense_settings = self.embedding_settings.get("dense")
         set_dim = dense_settings.get("dimension") if dense_settings else None
-        
+
         return set_dim or default_dim
 
     @property
@@ -265,10 +265,10 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         """
         dense_caps = self.embedding_capabilities.get("dense")
         default_dtype = dense_caps.default_dtype if dense_caps else "float16"
-        
+
         dense_settings = self.embedding_settings.get("dense")
         set_dtype = dense_settings.get("data_type") if dense_settings else None
-        
+
         return set_dtype or default_dtype
 
     @property

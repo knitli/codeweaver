@@ -11,12 +11,12 @@ import logging
 
 from typing import Any
 
-from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
 from pydantic import SecretStr
 
 from codeweaver.config.providers import QdrantConfig
 from codeweaver.exceptions import ProviderError
 from codeweaver.providers.provider import Provider
+from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
 
 
 logger = logging.getLogger(__name__)

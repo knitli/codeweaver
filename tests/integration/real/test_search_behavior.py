@@ -21,7 +21,6 @@ Performance: ~2-10s per test due to real embedding generation.
 
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -35,34 +34,34 @@ import pytest
 @pytest.fixture
 async def indexed_test_project(known_test_codebase, real_provider_registry):
     """Create pre-indexed test project with configured settings.
-    
+
     This fixture:
     1. Configures CodeWeaverSettings with project path
     2. Patches the provider registry with real providers
     3. Creates and initializes the Indexer
     4. Indexes the test codebase
     5. Yields the project path for tests
-    
+
     Tests using this fixture can call find_code() without worrying about
     indexing - the project is already indexed and settings are configured.
     """
     from codeweaver.config.settings import CodeWeaverSettings
     from codeweaver.engine.indexer.indexer import Indexer
-    
+
     # Configure settings with project path
     settings = CodeWeaverSettings(project_path=known_test_codebase)
     settings_dict = settings.model_dump()
-    
+
     # Patch provider registry and settings
     call_count = [0]
-    
+
     def mock_time() -> float:
         call_count[0] += 1
         return 1000000.0 + call_count[0] * 0.001
-    
+
     with (
         patch(
-            "codeweaver.common.registry.get_provider_registry", 
+            "codeweaver.common.registry.get_provider_registry",
             return_value=real_provider_registry
         ),
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
@@ -71,7 +70,7 @@ async def indexed_test_project(known_test_codebase, real_provider_registry):
         # Create and initialize indexer
         indexer = await Indexer.from_settings_async(settings_dict)
         await indexer.prime_index()
-        
+
         yield known_test_codebase
 
 
@@ -210,7 +209,7 @@ async def test_search_distinguishes_different_concepts(indexed_test_project):
 
     # Query 1: Authentication
     auth_response = await find_code(
-        query="user authentication login", 
+        query="user authentication login",
         intent=IntentType.UNDERSTAND,
     )
     auth_files = {r.file_path.name for r in auth_response.matches[:3]}
@@ -253,7 +252,7 @@ async def test_search_returns_relevant_code_chunks(indexed_test_project):
     from codeweaver.agent_api.find_code.intent import IntentType
 
     response = await find_code(
-        query="password hashing", 
+        query="password hashing",
         intent=IntentType.UNDERSTAND,
     )
 
@@ -296,7 +295,7 @@ async def test_search_respects_file_types(indexed_test_project):
     from codeweaver.agent_api.find_code.intent import IntentType
 
     response = await find_code(
-        query="function definition", 
+        query="function definition",
         intent=IntentType.UNDERSTAND,
     )
 
@@ -376,14 +375,14 @@ async def test_search_handles_empty_codebase(tmp_path, real_provider_registry):
 
     # Index and search with patched provider registry
     call_count = [0]
-    
+
     def mock_time() -> float:
         call_count[0] += 1
         return 1000000.0 + call_count[0] * 0.001
-    
+
     with (
         patch(
-            "codeweaver.common.registry.get_provider_registry", 
+            "codeweaver.common.registry.get_provider_registry",
             return_value=real_provider_registry
         ),
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
@@ -393,7 +392,7 @@ async def test_search_handles_empty_codebase(tmp_path, real_provider_registry):
         await indexer.prime_index()
 
         response = await find_code(
-            query="any query", 
+            query="any query",
             intent=IntentType.UNDERSTAND,
         )
 
@@ -425,7 +424,7 @@ async def test_search_with_very_long_query(indexed_test_project):
 
     # Should handle long query without crashing
     response = await find_code(
-        query=long_query, 
+        query=long_query,
         intent=IntentType.UNDERSTAND,
     )
 

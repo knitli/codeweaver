@@ -27,13 +27,7 @@ if TYPE_CHECKING:
         VectorStoreServiceInfo,
     )
     from codeweaver.server.health_service import HealthService
-    from codeweaver.server.server import (
-        AppState,
-        ServerSetup,
-        build_app,
-        get_state,
-        lifespan,
-    )
+    from codeweaver.server.server import AppState, ServerSetup, build_app, get_state, lifespan
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({

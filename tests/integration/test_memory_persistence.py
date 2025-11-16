@@ -8,7 +8,7 @@ From quickstart.md:228-284
 Validates acceptance criteria spec.md:78
 """
 
-import tempfile
+import tempfile  # noqa: I001
 
 from pathlib import Path
 
@@ -17,7 +17,10 @@ import pytest
 from codeweaver.common.utils.utils import uuid7
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
+
+# sourcery skip: dont-import-test-modules
 from tests.conftest import create_test_chunk_with_embeddings
+from codeweaver.providers.provider import Provider
 
 
 pytestmark = pytest.mark.integration
@@ -40,7 +43,7 @@ async def test_inmemory_persistence():
         }
 
         # Phase 1: Create and populate
-        provider1 = MemoryVectorStoreProvider(config=config)
+        provider1 = MemoryVectorStoreProvider(_provider=Provider.MEMORY, config=config)
         await provider1._initialize()
 
         chunk = create_test_chunk_with_embeddings(
@@ -63,7 +66,7 @@ async def test_inmemory_persistence():
         assert temp_path.exists(), "Persistence file should be created"
 
         # Phase 2: Restore from disk
-        provider2 = MemoryVectorStoreProvider(config=config)
+        provider2 = MemoryVectorStoreProvider(_provider=Provider.MEMORY, config=config)
         await provider2._initialize()
 
         # Verify: Chunk restored from disk

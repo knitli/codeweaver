@@ -141,7 +141,7 @@ ignore = [
   "ISC001",
   "ISC002",
   "D212",
-  "SLF001",  # Private member accessed
+  "SLF001",  # Private member accessed... it's not private for us.
   "TRY003",
   "UP015",  # redundant-open-modes, explicit is preferred
 ]

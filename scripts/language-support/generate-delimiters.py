@@ -164,13 +164,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Generate language delimiter definitions")
     parser.add_argument(
         "--output", "-o", type=Path, help="Output file (prints to stdout if not specified)"
-    )  # pyright: ignore[reportUnusedCallResult]
-    parser.add_argument("--language", "-l", help="Generate for specific language only")  # pyright: ignore[reportUnusedCallResult]
+    )
+    parser.add_argument("--language", "-l", help="Generate for specific language only")
     parser.add_argument(
         "--list-families",
         action="store_true",
         help="List all language families and their languages",
-    )  # pyright: ignore[reportUnusedCallResult]
+    )
 
     args = parser.parse_args()
 

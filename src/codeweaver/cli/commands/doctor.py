@@ -50,20 +50,20 @@ def _get_display() -> StatusDisplay:
 
 class _ConsoleProxy:
     """Proxy class that dynamically retrieves the current console.
-    
+
     This ensures check functions always use the current display's console,
     even when _display is reassigned in the doctor() function.
     """
-    
+
     @property
     def _current_console(self) -> Console:
         """Get the current display console."""
         return _get_display().console
-    
+
     def print(self, *args, **kwargs):
         """Proxy print to current console."""
         return self._current_console.print(*args, **kwargs)
-    
+
     def input(self, *args, **kwargs):
         """Proxy input to current console."""
         return self._current_console.input(*args, **kwargs)
@@ -73,9 +73,7 @@ class _ConsoleProxy:
 console = _ConsoleProxy()
 
 
-app = App(
-    "doctor", help="Validate prerequisites and configuration for CodeWeaver."
-)
+app = App("doctor", help="Validate prerequisites and configuration for CodeWeaver.")
 
 
 class DoctorCheck:
@@ -836,7 +834,7 @@ def doctor(*, verbose: bool = False, display: StatusDisplay | None = None) -> No
     if display is None:
         display = StatusDisplay()
     _display = display  # Set module-level display for check functions
-        
+
     display.console.print()
     display.print_section("Running diagnostic checks...")
     display.console.print()

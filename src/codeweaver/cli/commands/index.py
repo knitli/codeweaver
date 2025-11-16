@@ -162,7 +162,9 @@ async def _perform_clear_operation(
         display.console.print("  • File manifest state")
         display.console.print()
 
-        response = display.console.input("[yellow]Are you sure you want to continue? (yes/no):[/yellow] ")
+        response = display.console.input(
+            "[yellow]Are you sure you want to continue? (yes/no):[/yellow] "
+        )
         if response.lower() not in ["yes", "y"]:
             display.print_info("Operation cancelled")
             sys.exit(0)
@@ -249,7 +251,9 @@ def _handle_server_status(*, standalone: bool, display: StatusDisplay) -> bool:
         return _check_and_print_server_status(display)
     display.print_warning("Server not running")
     display.print_info("Running standalone indexing")
-    display.console.print("[dim]Tip: Start server with 'codeweaver server' for automatic indexing[/dim]")
+    display.console.print(
+        "[dim]Tip: Start server with 'codeweaver server' for automatic indexing[/dim]"
+    )
     display.console.print()
     return True
 
@@ -269,7 +273,10 @@ def _check_and_print_server_status(display: StatusDisplay):
 
 
 async def _run_standalone_indexing(
-    settings: CodeWeaverSettings | DictView[CodeWeaverSettingsDict], *, force_reindex: bool, display: StatusDisplay
+    settings: CodeWeaverSettings | DictView[CodeWeaverSettingsDict],
+    *,
+    force_reindex: bool,
+    display: StatusDisplay,
 ) -> None:
     """Run standalone indexing operation.
 
@@ -305,7 +312,9 @@ async def _run_standalone_indexing(
     display.console.print(f"  Files processed: [cyan]{stats.files_processed}[/cyan]")
     display.console.print(f"  Chunks created: [cyan]{stats.chunks_created}[/cyan]")
     display.console.print(f"  Chunks indexed: [cyan]{stats.chunks_indexed}[/cyan]")
-    display.console.print(f"  Processing rate: [cyan]{stats.processing_rate():.2f}[/cyan] files/sec")
+    display.console.print(
+        f"  Processing rate: [cyan]{stats.processing_rate():.2f}[/cyan] files/sec"
+    )
     display.console.print(f"  Time elapsed: [cyan]{stats.elapsed_time():.2f}[/cyan] seconds")
 
     if stats.total_errors > 0:

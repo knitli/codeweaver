@@ -96,11 +96,12 @@ def _get_settings(context: Any | None) -> Any:
     Returns:
         CodeWeaverSettings instance
     """
-    if context and hasattr(context, 'settings'):
+    if context and hasattr(context, "settings"):
         return context.settings
 
     # Load fresh (CLI usage)
     from codeweaver.config.settings import get_settings
+
     return get_settings()
 
 
@@ -151,7 +152,7 @@ async def _check_index_status(context: Any | None) -> tuple[bool, int]:
 
         # Get count
         count_result = await client.count(collection_name)
-        chunk_count = count_result.count if hasattr(count_result, 'count') else 0
+        chunk_count = count_result.count if hasattr(count_result, "count") else 0
 
         logger.info("Collection %s exists with %d chunks", collection_name, chunk_count)
     except Exception as e:
@@ -183,7 +184,7 @@ async def _ensure_index_ready(context: Any | None) -> None:
         settings = _get_settings(context)
 
         # Create indexer (pattern from cli.commands.index)
-        settings_dict = settings.model_dump() if hasattr(settings, 'model_dump') else settings
+        settings_dict = settings.model_dump() if hasattr(settings, "model_dump") else settings
         indexer = await Indexer.from_settings_async(DictView(settings_dict))
 
         # Run initial indexing (blocks until complete)
@@ -195,7 +196,7 @@ async def _ensure_index_ready(context: Any | None) -> None:
             "Auto-indexing complete: %d files, %d chunks in %.2fs",
             stats.files_processed,
             stats.chunks_indexed,
-            stats.elapsed_time()
+            stats.elapsed_time(),
         )
 
     except Exception as e:
@@ -349,4 +350,3 @@ async def find_code(
 
 
 __all__ = ("MatchedSection", "find_code")
-

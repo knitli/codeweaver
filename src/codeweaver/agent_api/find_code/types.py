@@ -374,7 +374,11 @@ class StrategizedQuery(NamedTuple):
 
         # Extract Prefetch-specific parameters (limit, score_threshold, filter, params)
         # Exclude top-level query parameters (with_payload, with_vectors, query_filter)
-        prefetch_params = {k: v for k, v in query_kwargs.items() if k in ("limit", "score_threshold", "filter", "params")}
+        prefetch_params = {
+            k: v
+            for k, v in query_kwargs.items()
+            if k in ("limit", "score_threshold", "filter", "params")
+        }
 
         return {
             "query": FusionQuery(fusion=Fusion.RRF),

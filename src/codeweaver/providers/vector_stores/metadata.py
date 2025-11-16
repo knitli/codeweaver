@@ -142,13 +142,9 @@ class CollectionMetadata(BasedModel):
 
         # Error on model switch - this corrupts search results
         # Only raise if both have models and they differ (allow None for backwards compatibility)
-        if (
-            self.embedding_model
-            and other.embedding_model
-            and self.embedding_model != other.embedding_model
-        ):
+        if self.dense_model and other.dense_model and self.dense_model != other.dense_model:
             raise ModelSwitchError(
-                f"Your existing embedding collection was created with model '{other.embedding_model}', but the current model is '{self.embedding_model}'. You can't use different embedding models for the same collection.",
+                f"Your existing embedding collection was created with model '{other.dense_model}', but the current model is '{self.dense_model}'. You can't use different embedding models for the same collection.",
                 suggestions=[
                     "Option 1: Re-index your codebase with the new provider",
                     "Option 2: Revert provider setting to match the collection",
@@ -158,38 +154,42 @@ class CollectionMetadata(BasedModel):
                 details={
                     "collection_provider": self.provider,
                     "current_provider": other.provider,
-                    "collection_model": other.embedding_model,
-                    "current_model": self.embedding_model,
+                    "collection_model": other.dense_model,
+                    "current_model": self.dense_model,
                     "collection": self.project_name,
                 },
             )
 
         if (
-            self.embedding_dim_dense
-            and other.embedding_dim_dense
-            and self.embedding_dim_dense != other.embedding_dim_dense
+            (dense_dim := self.vector_config["dense"].size) is not None
+            and (other_dense_dim := other.vector_config["dense"].size) is not None
+            and dense_dim != other_dense_dim
         ):
             raise DimensionMismatchError(
-                f"Embedding dimension mismatch: collection expects {other.embedding_dim_dense}, but current embedder produces {self.embedding_dim_dense}.",
+                f"Embedding dimension mismatch: collection expects {other_dense_dim}, but current embedder produces {dense_dim}.",
                 suggestions=[
                     "Option 1: Use an embedding model with matching dimensions",
                     "Option 2: Re-index with the current embedding model",
                     "Option 3: Check your embedding provider configuration",
                 ],
                 details={
-                    "expected_dimension": self.embedding_dim_dense,
-                    "actual_dimension": other.embedding_dim_dense,
+                    "expected_dimension": dense_dim,
+                    "actual_dimension": other_dense_dim,
                     "collection": self.project_name,
                 },
             )
-        if self.embedding_dtype_dense != other.embedding_dtype_dense:
+        if (
+            (dtype := self.vector_config["dense"].datatype)
+            and (other_dtype := other.vector_config["dense"].datatype)
+            and dtype != other_dtype
+        ):
             logger.warning(
                 "Embedding data type mismatch: collection was created with '%s', but current embedder produces '%s'. This can produce unexpected results.",
-                other.embedding_dtype_dense,
-                self.embedding_dtype_dense,
+                other_dtype,
+                dtype,
                 extra={
-                    "expected_dtype": other.embedding_dtype_dense,
-                    "actual_dtype": self.embedding_dtype_dense,
+                    "expected_dtype": other_dtype,
+                    "actual_dtype": dtype,
                     "collection": self.project_name,
                 },
             )

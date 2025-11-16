@@ -13,6 +13,9 @@ from datetime import UTC, datetime
 
 import pytest
 
+from qdrant_client.http.models import VectorParams
+from qdrant_client.http.models.models import SparseVectorParams
+
 from codeweaver.exceptions import ModelSwitchError
 from codeweaver.providers.vector_stores.metadata import CollectionMetadata
 
@@ -33,7 +36,8 @@ def test_model_switch_detection():
         project_name="test-project",
         embedding_model="voyage-code-3",
         embedding_dim_dense=1536,
-        vector_config={},
+        vector_config={"dense": VectorParams()},
+        sparse_config={"sparse": SparseVectorParams()},
         created_at=datetime.now(UTC),
     )
 
@@ -42,7 +46,8 @@ def test_model_switch_detection():
         project_name="test-project",
         embedding_model="text-embedding-ada-002",  # Different model is NOT OK
         embedding_dim_dense=1536,
-        vector_config={},
+        vector_config={"dense": VectorParams()},
+        sparse_config={"sparse": SparseVectorParams()},
         created_at=datetime.now(UTC),
     )
 
@@ -89,7 +94,8 @@ def test_provider_switch_warning(caplog):
         project_name="test-project",
         embedding_model="voyage-code-3",
         embedding_dim_dense=1536,
-        vector_config={},
+        vector_config={"dense": VectorParams()},
+        sparse_config={"sparse": SparseVectorParams()},
         created_at=datetime.now(UTC),
     )
 
@@ -98,7 +104,8 @@ def test_provider_switch_warning(caplog):
         project_name="test-project",
         embedding_model="voyage-code-3",  # Same model is OK
         embedding_dim_dense=1536,
-        vector_config={},
+        vector_config={"dense": VectorParams()},
+        sparse_config={"sparse": SparseVectorParams()},
         created_at=datetime.now(UTC),
     )
 
@@ -132,7 +139,8 @@ def test_dimension_mismatch_detection():
         project_name="test-project",
         embedding_model="voyage-code-3",
         embedding_dim_dense=1536,
-        vector_config={},
+        vector_config={"dense": VectorParams()},
+        sparse_config={"sparse": SparseVectorParams()},
         created_at=datetime.now(UTC),
     )
 
@@ -141,7 +149,8 @@ def test_dimension_mismatch_detection():
         project_name="test-project",
         embedding_model="voyage-code-3",  # Same model
         embedding_dim_dense=768,  # Different dimension - NOT OK
-        vector_config={},
+        vector_config={"dense": VectorParams()},
+        sparse_config={"sparse": SparseVectorParams()},
         created_at=datetime.now(UTC),
     )
 
@@ -169,7 +178,8 @@ def test_compatible_metadata_no_error():
         project_name="test-project",
         embedding_model="voyage-code-3",
         embedding_dim_dense=1536,
-        vector_config={},
+        vector_config={"dense": VectorParams()},
+        sparse_config={"sparse": SparseVectorParams()},
         created_at=datetime.now(UTC),
     )
 
@@ -178,7 +188,8 @@ def test_compatible_metadata_no_error():
         project_name="test-project",
         embedding_model="voyage-code-3",
         embedding_dim_dense=1536,
-        vector_config={},
+        vector_config={"dense": VectorParams()},
+        sparse_config={"sparse": SparseVectorParams()},
         created_at=datetime.now(UTC),
     )
 
@@ -201,7 +212,8 @@ def test_model_switch_with_none_embedding():
         project_name="test-project",
         embedding_model=None,  # Old collection without model tracking
         embedding_dim_dense=1536,
-        vector_config={},
+        vector_config={"dense": VectorParams()},
+        sparse_config={"sparse": SparseVectorParams()},
         created_at=datetime.now(UTC),
     )
 
@@ -210,7 +222,8 @@ def test_model_switch_with_none_embedding():
         project_name="test-project",
         embedding_model="voyage-code-3",  # New has model
         embedding_dim_dense=1536,
-        vector_config={},
+        vector_config={"dense": VectorParams()},
+        sparse_config={"sparse": SparseVectorParams()},
         created_at=datetime.now(UTC),
     )
 

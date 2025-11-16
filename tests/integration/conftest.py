@@ -1,3 +1,4 @@
+# sourcery skip: docstrings-for-classes
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -9,13 +10,16 @@ from __future__ import annotations
 
 import contextlib
 
+from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from pytest import MonkeyPatch
+from codeweaver.common.registry.provider import ProviderRegistry
+from codeweaver.providers.provider import Provider
+from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
 
 
 if TYPE_CHECKING:
@@ -34,7 +38,7 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture
-def mock_confirm(monkeypatch: MonkeyPatch):
+def mock_confirm(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     """Mock rich.prompt.Confirm for CLI tests.
 
     Returns a mock Confirm object that automatically returns True for all confirmations.
@@ -52,7 +56,7 @@ def mock_confirm(monkeypatch: MonkeyPatch):
 
 
 @pytest.fixture
-def mock_embedding_provider():
+def mock_embedding_provider() -> AsyncMock:
     """Provide a mock embedding provider that returns test embeddings."""
     mock_provider = AsyncMock()
     # Return batch of embeddings (list of lists)
@@ -92,7 +96,7 @@ def actual_dense_embedding_provider() -> SentenceTransformersEmbeddingProvider:
 
 
 @pytest.fixture
-def mock_sparse_provider():
+def mock_sparse_provider() -> AsyncMock:
     """Provide a mock sparse embedding provider."""
     mock_provider = AsyncMock()
     # Sparse embeddings in new format with indices and values
@@ -134,7 +138,7 @@ def actual_sparse_embedding_provider() -> SentenceTransformersSparseProvider:
 
 
 @pytest.fixture
-def mock_vector_store():
+def mock_vector_store() -> AsyncMock:
     """Provide a mock vector store that returns search results."""
     from codeweaver.agent_api.find_code.results import SearchResult
     from codeweaver.common.utils.utils import uuid7
@@ -187,12 +191,14 @@ def mock_vector_store():
 
 
 @pytest.fixture
-def mock_reranking_provider():
+def mock_reranking_provider() -> AsyncMock:
     """Provide a mock reranking provider."""
     from typing import NamedTuple
 
     # Define a simple RerankResult structure for testing
     class RerankResult(NamedTuple):
+        """Mock result"""
+
         chunk: CodeChunk
         score: float
         original_index: int
@@ -229,15 +235,19 @@ def actual_reranking_provider() -> SentenceTransformersRerankingProvider:
 
     # Find or create the capability for this model
     caps = next(
-        (cap for cap in get_marco_reranking_capabilities()
-         if "L6-v2" in cap.name or "L-6-v2" in cap.name),
-        None
+        (
+            cap
+            for cap in get_marco_reranking_capabilities()
+            if "L6-v2" in cap.name or "L-6-v2" in cap.name
+        ),
+        None,
     )
 
     if caps is None:
         # Create a basic capability if not found
         from codeweaver.providers.provider import Provider
         from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+
         caps = RerankingModelCapabilities(
             name=model_name,
             max_input=512,
@@ -258,8 +268,11 @@ def actual_reranking_provider() -> SentenceTransformersRerankingProvider:
 
 @pytest.fixture
 def mock_provider_registry(
-    mock_embedding_provider, mock_sparse_provider, mock_vector_store, mock_reranking_provider
-):
+    mock_embedding_provider: MagicMock,
+    mock_sparse_provider: MagicMock,
+    mock_vector_store: MagicMock,
+    mock_reranking_provider: MagicMock,
+) -> MagicMock:
     """Configure mock provider registry with all providers."""
     from enum import Enum
 
@@ -271,7 +284,7 @@ def mock_provider_registry(
     mock_registry = MagicMock()
 
     # Configure get_provider_enum_for to return mock provider enums
-    def get_provider_enum_for(kind: str):
+    def get_provider_enum_for(kind: str) -> MockProviderEnum | None:
         if kind == "embedding":
             return MockProviderEnum.VOYAGE
         if kind == "sparse_embedding":
@@ -283,7 +296,9 @@ def mock_provider_registry(
     mock_registry.get_provider_enum_for = MagicMock(side_effect=get_provider_enum_for)
 
     # Configure get_provider_instance to return mock providers
-    def get_provider_instance(enum_value, kind: str, singleton: bool = True):
+    def get_provider_instance(
+        enum_value: MockProviderEnum, kind: str, singleton: bool = True
+    ) -> AsyncMock | None:
         if kind == "embedding":
             return mock_embedding_provider
         if kind == "sparse_embedding":
@@ -298,7 +313,7 @@ def mock_provider_registry(
 
 
 @pytest.fixture
-def configured_providers(mock_provider_registry):
+def configured_providers(mock_provider_registry: MagicMock) -> Generator[MagicMock, None, None]:
     """Fixture that patches the provider registry with mock providers.
 
     This fixture automatically configures the provider registry for tests
@@ -334,16 +349,16 @@ def configured_providers(mock_provider_registry):
 
 
 @pytest.fixture
-def mock_settings_with_providers():
+def mock_settings_with_providers() -> MagicMock:
     """Provide mock settings with provider configuration."""
     from codeweaver.config.settings import CodeWeaverSettings as Settings
 
     mock_settings = MagicMock(spec=Settings)
     mock_settings.providers = {
-        "embedding": {"provider": "voyage", "model": "voyage-code-2"},
+        "embedding": {"provider": "voyage", "model": "voyage-code-3"},
         "sparse_embedding": {"provider": "fastembed", "model": "prithivida/Splade_PP_en_v1"},
         "vector_store": {"provider": "qdrant", "collection": "test_collection"},
-        "reranking": {"provider": "voyage", "model": "voyage-rerank-2"},
+        "reranking": {"provider": "voyage", "model": "voyage-rerank-2.5"},
     }
     return mock_settings
 
@@ -355,7 +370,7 @@ def mock_settings_with_providers():
 
 @pytest.fixture
 def real_embedding_provider(
-    actual_dense_embedding_provider,
+    actual_dense_embedding_provider: SentenceTransformersEmbeddingProvider,
 ) -> SentenceTransformersEmbeddingProvider:
     """Provide a REAL embedding provider for behavior validation.
 
@@ -375,16 +390,16 @@ def real_embedding_provider(
 
 
 @pytest.fixture
-def real_sparse_provider(mock_sparse_provider):
+def real_sparse_provider(mock_sparse_provider: MagicMock) -> SentenceTransformersSparseProvider:
     """Provide a sparse embedding provider - real if available, mock otherwise.
 
     **SparseEncoder Availability:**
     SparseEncoder is not available in current sentence-transformers version.
     Falls back to mock provider to allow tests to run without sparse encoding.
-    
+
     This is expected for Alpha 1 release - sparse encoding is optional.
     Tests will use dense embeddings only when sparse is unavailable.
-    
+
     Model (when available): OpenSearch neural sparse encoding
     Fallback: Mock provider with sparse format compatibility
     """
@@ -410,7 +425,9 @@ def real_sparse_provider(mock_sparse_provider):
 
 
 @pytest.fixture
-def real_reranking_provider(actual_reranking_provider) -> SentenceTransformersRerankingProvider:
+def real_reranking_provider(
+    actual_reranking_provider: SentenceTransformersRerankingProvider,
+) -> SentenceTransformersRerankingProvider:
     """Provide a REAL reranking provider for relevance scoring validation.
 
     Uses the existing actual_reranking_provider fixture.
@@ -422,7 +439,7 @@ def real_reranking_provider(actual_reranking_provider) -> SentenceTransformersRe
 
 
 @pytest.fixture
-async def real_vector_store(tmp_path: Path):
+async def real_vector_store(tmp_path: Path) -> AsyncGenerator[MemoryVectorStoreProvider]:
     """Provide a REAL Qdrant vector store in memory mode for behavior validation.
 
     Creates an actual in-memory Qdrant instance that:
@@ -440,7 +457,6 @@ async def real_vector_store(tmp_path: Path):
     from qdrant_client import AsyncQdrantClient
 
     from codeweaver.config.providers import MemoryConfig
-    from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
 
     # Create in-memory Qdrant client
     client = AsyncQdrantClient(location=":memory:")
@@ -451,7 +467,7 @@ async def real_vector_store(tmp_path: Path):
     )
 
     # Create the vector store provider
-    provider = MemoryVectorStoreProvider(client=client, config=config)
+    provider = MemoryVectorStoreProvider(_provider=Provider.MEMORY, client=client, config=config)
 
     # Initialize (creates collection if needed)
     await provider._initialize()
@@ -789,8 +805,11 @@ def sanitize_input(user_input: str) -> str:
 
 @pytest.fixture
 def real_provider_registry(
-    real_embedding_provider, real_sparse_provider, real_vector_store, real_reranking_provider
-):
+    real_embedding_provider: SentenceTransformersEmbeddingProvider,
+    real_sparse_provider: SentenceTransformersSparseProvider,
+    real_vector_store: MemoryVectorStoreProvider,
+    real_reranking_provider: SentenceTransformersRerankingProvider,
+) -> MagicMock:
     """Configure provider registry with REAL providers for behavior validation.
 
     This fixture creates a complete provider ecosystem using actual implementations:
@@ -802,7 +821,7 @@ def real_provider_registry(
     Tests using this fixture validate actual search behavior, not just structure.
 
     Use for tests marked with @pytest.mark.real_providers.
-    
+
     **Note on Sparse Encoding:**
     If SparseEncoder is unavailable, uses mock sparse provider. This is expected
     for Alpha 1 and allows dense-only search validation.
@@ -819,7 +838,7 @@ def real_provider_registry(
     mock_registry = MagicMock()
 
     # Configure get_provider_enum_for to return real provider enums
-    def get_provider_enum_for(kind: str):
+    def get_provider_enum_for(kind: str) -> RealProviderEnum | None:
         if kind == "embedding":
             return RealProviderEnum.SENTENCE_TRANSFORMERS
         if kind == "sparse_embedding":
@@ -831,7 +850,9 @@ def real_provider_registry(
     mock_registry.get_provider_enum_for = MagicMock(side_effect=get_provider_enum_for)
 
     # Configure get_provider_instance to return real providers
-    def get_provider_instance(enum_value, kind: str, singleton: bool = True):
+    def get_provider_instance(
+        enum_value: RealProviderEnum, kind: str, singleton: bool = True
+    ) -> Any | MagicMock:
         if kind == "embedding":
             return real_embedding_provider
         if kind == "sparse_embedding":
@@ -846,7 +867,7 @@ def real_provider_registry(
 
 
 @pytest.fixture
-def real_providers(real_provider_registry):
+def real_providers(real_provider_registry: MagicMock) -> Generator[ProviderRegistry, None, None]:
     """Fixture that patches the provider registry with REAL providers.
 
     This is the main fixture for Tier 2 tests. It provides actual provider

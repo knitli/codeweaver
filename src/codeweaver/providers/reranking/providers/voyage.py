@@ -114,7 +114,6 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
                 )
                 client = AsyncClient()
 
-
         # Call super().__init__() with client and caps
         super().__init__(client=client, caps=caps, **kwargs)
 

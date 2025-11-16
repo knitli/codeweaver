@@ -12,7 +12,7 @@ import sys
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 
 import cyclopts
 
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 app = App(help="Search codebase from command line.")
 
 
-async def _index_exists(settings: dict[str, Any] | CodeWeaverSettings) -> bool:
+async def _index_exists(settings: DictView[CodeWeaverSettingsDict]) -> bool:
     """Check if an index exists for this project.
 
     Args:
@@ -47,16 +47,14 @@ async def _index_exists(settings: dict[str, Any] | CodeWeaverSettings) -> bool:
         True if a valid index exists with indexed files
     """
     try:
-        from codeweaver.common.utils.utils import get_user_config_dir
-        from codeweaver.config.indexer import IndexerSettings
+        from codeweaver.common.utils import get_project_path, get_user_config_dir
         from codeweaver.engine.indexer.manifest import FileManifestManager
 
-        # Get project path
-        if isinstance(settings, dict):
-            project_path = settings.get("project_path")
-        else:
-            project_path = settings.project_path
-
+        project_path = (
+            settings.get("project_path")
+            if isinstance(settings.get("project_path"), Path)
+            else get_project_path()
+        )
         if not project_path:
             return False
 
@@ -64,13 +62,13 @@ async def _index_exists(settings: dict[str, Any] | CodeWeaverSettings) -> bool:
         if isinstance(settings, dict):
             indexer_config = settings.get("indexer", {})
             cache_dir = (
-                indexer_config.get("cache_dir") if isinstance(indexer_config, dict) else None
+                indexer_config.get("cache_dir")
+                if isinstance(indexer_config, dict | DictView)
+                else None
             )
         else:
             cache_dir = (
-                settings.indexer.cache_dir
-                if isinstance(settings.indexer, IndexerSettings)
-                else None
+                settings["indexer"]["cache_dir"] if isinstance(settings["indexer"], dict) else None
             )
 
         manifest_dir = (
@@ -191,7 +189,9 @@ async def search(
                 display.console.print(
                     "  [yellow]•[/yellow] Or install local provider: pip install codeweaver-mcp[provider-fastembed]"
                 )
-                display.console.print("  [yellow]•[/yellow] Or configure fastembed in .codeweaver.toml")
+                display.console.print(
+                    "  [yellow]•[/yellow] Or configure fastembed in .codeweaver.toml"
+                )
                 display.console.print(
                     "  [yellow]•[/yellow] See docs: https://github.com/knitli/codeweaver-mcp#configuration"
                 )
@@ -220,7 +220,10 @@ async def search(
 
 
 def _display_table_results(
-    query: str, response: FindCodeResponseSummary, matches: Sequence[CodeMatch], display: StatusDisplay
+    query: str,
+    response: FindCodeResponseSummary,
+    matches: Sequence[CodeMatch],
+    display: StatusDisplay,
 ) -> None:
     """Display search results as a table using serialize_for_cli."""
     display.console.print()
@@ -267,7 +270,10 @@ def _display_match_details(matches: Sequence[CodeMatch], display: StatusDisplay)
 
 
 def _display_markdown_results(
-    query: str, response: FindCodeResponseSummary, matches: Sequence[CodeMatch], display: StatusDisplay
+    query: str,
+    response: FindCodeResponseSummary,
+    matches: Sequence[CodeMatch],
+    display: StatusDisplay,
 ) -> None:
     """Display search results as markdown using serialize_for_cli."""
     display.console.print(f"# Search Results for: '{query}'\n")

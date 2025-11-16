@@ -39,9 +39,7 @@ class CLIErrorHandler:
         self.verbose = verbose
         self.debug = debug
 
-    def handle_error(
-        self, error: Exception, context: str, *, exit_code: int = 1
-    ) -> None:
+    def handle_error(self, error: Exception, context: str, *, exit_code: int = 1) -> None:
         """Handle and display errors appropriately.
 
         Args:
@@ -111,9 +109,7 @@ class CLIErrorHandler:
         )
 
         # Print error type and message
-        self.display.console.print(
-            f"[red]Error:[/red] {type(error).__name__}: {error}\n"
-        )
+        self.display.console.print(f"[red]Error:[/red] {type(error).__name__}: {error}\n")
 
         # Always show full traceback for unexpected errors
         self.display.console.print("[yellow]Full traceback:[/yellow]")

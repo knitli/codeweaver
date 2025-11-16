@@ -10,11 +10,11 @@ status.show_env = true
 uv_venv_auto = true
 compile = true
 uv_venv_create_args = [
-    "--seed",
-    "--keyring-provider",
-    "subprocess",
-    "--python",
-    "3.13",
+  "--seed",
+  "--keyring-provider",
+  "subprocess",
+  "--python",
+  "3.13",
 ]
 
 [tools]
@@ -54,13 +54,13 @@ CODEWEAVER_PROJECT_PATH = '''{{ config_root }}'''
 CODEWEAVER_VERSION = '''{{ read_file(path='src/codeweaver/_version.py') | split(pat=' = "') | nth(n=1) | split(pat='"') | nth(n=0) | trim }}'''
 CI = '''{{ exec(command='sh -c "if [ -z \"$GITHUB_ACTIONS\" ]; then echo \"false\"; else echo \"true\"; fi"') }}'''
 _.path = [
-    "scripts/dev-env",
-    "scripts/code-quality",
-    "scripts/build",
-    "scripts/language-support",
-    "scripts/testing",
-    "scripts/utils",
-    ".venv/bin",
+  "scripts/dev-env",
+  "scripts/code-quality",
+  "scripts/build",
+  "scripts/language-support",
+  "scripts/testing",
+  "scripts/utils",
+  ".venv/bin",
 ]
 
 [hooks]
@@ -155,52 +155,52 @@ silent = "stdout"
 alias = "update-tools"
 shell = "zsh -c"
 run = [
-    "print -P \"%F{209}[codeweaver]%f Updating tools...\"",
-    "mise -y upgrade",
-    "mise -y self-update",
-    "mise -y reshim",
-    "mise -y prune",
-    "print -P \"%F{209}[codeweaver]%f ✅ Tools updated! 🧰\"",
+  "print -P \"%F{209}[codeweaver]%f Updating tools...\"",
+  "mise -y upgrade",
+  "mise -y self-update",
+  "mise -y reshim",
+  "mise -y prune",
+  "print -P \"%F{209}[codeweaver]%f ✅ Tools updated! 🧰\"",
 ]
 run_windows = [
-    "Write-Host '[codeweaver] Updating tools...' -ForegroundColor DarkYellow",
-    "mise -y upgrade",
-    "mise -y self-update",
-    "mise -y reshim",
-    "mise -y prune",
-    "Write-Host '[codeweaver] ✅ Tools updated! 🧰' -ForegroundColor DarkYellow",
+  "Write-Host '[codeweaver] Updating tools...' -ForegroundColor DarkYellow",
+  "mise -y upgrade",
+  "mise -y self-update",
+  "mise -y reshim",
+  "mise -y prune",
+  "Write-Host '[codeweaver] ✅ Tools updated! 🧰' -ForegroundColor DarkYellow",
 ]
 
 [tasks.setup]
 # Development setup
 shell = "zsh -c"
 run = [
-    "print -P \"%F{209}[codeweaver]%f Setting up development environment for the first time...\"",
-    "mise set &>/dev/null",
-    "mise -y trust &>/dev/null",
-    "mise -y install &>/dev/null || true",
-    "mise -y venv &>/dev/null",
-    "mise -y run sync &>/dev/null",
-    "mise env &>/dev/null || true",
-    "git config include.path .gitconfig &>/dev/null || true",
-    "echo 'src/codeweaver/_version.py' >> .git/info/exclude",
-    "echo 'coverage.xml' >> .git/info/exclude",
-    "ln -sf AGENTS.md CLAUDE.md",
-    "eval \"$(mise activate zsh)\" &>/dev/null",
+  "print -P \"%F{209}[codeweaver]%f Setting up development environment for the first time...\"",
+  "mise set &>/dev/null",
+  "mise -y trust &>/dev/null",
+  "mise -y install &>/dev/null || true",
+  "mise -y venv &>/dev/null",
+  "mise -y run sync &>/dev/null",
+  "mise env &>/dev/null || true",
+  "git config include.path .gitconfig &>/dev/null || true",
+  "echo 'src/codeweaver/_version.py' >> .git/info/exclude",
+  "echo 'coverage.xml' >> .git/info/exclude",
+  "ln -sf AGENTS.md CLAUDE.md",
+  "eval \"$(mise activate zsh)\" &>/dev/null",
 ]
 run_windows = [
-    "Write-Host '[codeweaver] Setting up development environment for the first time...' -ForegroundColor DarkYellow",
-    "mise set > $null",
-    "mise -y trust > $null",
-    "mise -y install > $null",
-    "mise -y venv > $null",
-    "mise run sync > $null",
-    "mise env > $null",
-    "git config include.path .gitconfig > $null",
-    "Add-Content -Path .git/info/exclude -Value 'src/codeweaver/_version.py'",
-    "Add-Content -Path .git/info/exclude -Value 'coverage.xml'",
-    "New-Item -ItemType SymbolicLink -Path CLAUDE.md -Target AGENTS.md -Force > $null",
-    "(&mise activate pwsh) | Out-String | Invoke-Expression",
+  "Write-Host '[codeweaver] Setting up development environment for the first time...' -ForegroundColor DarkYellow",
+  "mise set > $null",
+  "mise -y trust > $null",
+  "mise -y install > $null",
+  "mise -y venv > $null",
+  "mise run sync > $null",
+  "mise env > $null",
+  "git config include.path .gitconfig > $null",
+  "Add-Content -Path .git/info/exclude -Value 'src/codeweaver/_version.py'",
+  "Add-Content -Path .git/info/exclude -Value 'coverage.xml'",
+  "New-Item -ItemType SymbolicLink -Path CLAUDE.md -Target AGENTS.md -Force > $null",
+  "(&mise activate pwsh) | Out-String | Invoke-Expression",
 ]
 silent = "stdout"
 
@@ -209,12 +209,12 @@ usage = '''
 arg "[dir]" help="directories to fix" var=#true default="."
 '''
 run = [
-    "uvx ruff format \"${usage_dir}\"",
-    "uvx ruff check --fix --unsafe-fixes \"${usage_dir}\"",
+  "uvx ruff format \"${usage_dir}\"",
+  "uvx ruff check --fix --unsafe-fixes \"${usage_dir}\"",
 ]
 run_windows = [
-    "uvx ruff format \"$env:usage_dir\"",
-    "uvx ruff check --fix --unsafe-fixes \"$env:usage_dir\"",
+  "uvx ruff format \"$env:usage_dir\"",
+  "uvx ruff check --fix --unsafe-fixes \"$env:usage_dir\"",
 ]
 file = "scripts/code-quality/fix-ruff-patterns.sh"
 sources = ["{src,scripts,tests}/*.py"]
@@ -308,6 +308,9 @@ arg "[dir]" help="python directory to generate a graph for" default="src"
 '''
 run = '''mise x -- ruff analyze graph --target-version py312 --python .venv/bin/python "${usage_dir:-src/}"'''
 run_windows = '''mise x -- ruff analyze graph --target-version py312 --python .venv\Scripts\python.exe "$env:usage_dir"'''
+
+[tasks.tree]
+run = '''uv tree --no-dev --group full'''
 
 [tasks.venv]
 shell = "zsh -c"
@@ -461,22 +464,22 @@ npm exec changeset version
 # Combined workflows
 [tasks.ci]
 run = [
-    "mise run check",
-    "mise run lint",
-    "mise run format",
-    "mise run test-cov",
-    "mise run build",
+  "mise run check",
+  "mise run lint",
+  "mise run format",
+  "mise run test-cov",
+  "mise run build",
 ]
 description = "Run all CI checks."
 
 [tasks.pre-commit]
 shell = "zsh -c"
 run = [
-    "print -P \"%F{209}[codeweaver]%f Running %F{209}CodeWeaver%f pre-commit checks 🪝... %F{38} Thanks for your contributions! You're pretty cool.%f 🚀\" || true",
-    "hk fix || print -P \"%F{209}[codeweaver]%f ⚠️  %F{red}You need to fix some issues%f before committing. %F{209}Do not pass go, do not collect 200 dollars.%f 💸 😦\" && exit 1",
-    "git add .",
-    "hk check || print -P \"%F{209}[codeweaver]%f ⚠️  %F{red}You need to fix some issues before committing. Almost there!%f\" && exit 1",
-    "print -P \"%F{209}[codeweaver]%f ✅ %F{green}All pre-commit checks passed! You're awesome!%f 🎉 ... and they said the Kobiyashi Maru was unwinnable! 🖖\"",
+  "print -P \"%F{209}[codeweaver]%f Running %F{209}CodeWeaver%f pre-commit checks 🪝... %F{38} Thanks for your contributions! You're pretty cool.%f 🚀\" || true",
+  "hk fix || print -P \"%F{209}[codeweaver]%f ⚠️  %F{red}You need to fix some issues%f before committing. %F{209}Do not pass go, do not collect 200 dollars.%f 💸 😦\" && exit 1",
+  "git add .",
+  "hk check || print -P \"%F{209}[codeweaver]%f ⚠️  %F{red}You need to fix some issues before committing. Almost there!%f\" && exit 1",
+  "print -P \"%F{209}[codeweaver]%f ✅ %F{green}All pre-commit checks passed! You're awesome!%f 🎉 ... and they said the Kobiyashi Maru was unwinnable! 🖖\"",
 ]
 run_windows = '''
 Write-Host "[codeweaver] Running CodeWeaver pre-commit checks 🪝... Thanks for your contributions! You're pretty cool. 🚀" -ForegroundColor DarkYellow

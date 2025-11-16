@@ -32,34 +32,34 @@ import pytest
 @pytest.fixture
 async def indexed_test_project(known_test_codebase, real_provider_registry):
     """Create pre-indexed test project with configured settings.
-    
+
     This fixture:
     1. Configures CodeWeaverSettings with project path
     2. Patches the provider registry with real providers
     3. Creates and initializes the Indexer
     4. Indexes the test codebase
     5. Yields the project path for tests
-    
+
     Tests using this fixture can call find_code() without worrying about
     indexing - the project is already indexed and settings are configured.
     """
     from codeweaver.config.settings import CodeWeaverSettings
     from codeweaver.engine.indexer.indexer import Indexer
-    
+
     # Configure settings with project path
     settings = CodeWeaverSettings(project_path=known_test_codebase)
     settings_dict = settings.model_dump()
-    
+
     # Patch provider registry and settings
     call_count = [0]
-    
+
     def mock_time() -> float:
         call_count[0] += 1
         return 1000000.0 + call_count[0] * 0.001
-    
+
     with (
         patch(
-            "codeweaver.common.registry.get_provider_registry", 
+            "codeweaver.common.registry.get_provider_registry",
             return_value=real_provider_registry
         ),
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
@@ -68,7 +68,7 @@ async def indexed_test_project(known_test_codebase, real_provider_registry):
         # Create and initialize indexer
         indexer = await Indexer.from_settings_async(settings_dict)
         await indexer.prime_index()
-        
+
         yield known_test_codebase
 
 
@@ -181,14 +181,14 @@ def process_refund(transaction_id: str) -> None:
 
     # Re-index with patched provider registry
     call_count = [0]
-    
+
     def mock_time() -> float:
         call_count[0] += 1
         return 1000000.0 + call_count[0] * 0.001
-    
+
     with (
         patch(
-            "codeweaver.common.registry.get_provider_registry", 
+            "codeweaver.common.registry.get_provider_registry",
             return_value=real_provider_registry
         ),
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
@@ -229,11 +229,12 @@ async def test_pipeline_handles_large_codebase(tmp_path, real_provider_registry)
     - Batch processing bugs
     - Vector store capacity issues
     """
+    import time
+
     from codeweaver.agent_api.find_code import find_code
     from codeweaver.agent_api.find_code.intent import IntentType
     from codeweaver.config.settings import CodeWeaverSettings
     from codeweaver.engine.indexer.indexer import Indexer
-    import time
 
     # Create a larger test codebase
     large_codebase = tmp_path / "large_codebase"
@@ -267,20 +268,20 @@ class {module_name.capitalize()}Handler:
 
     # Index and search with patched provider registry
     call_count = [0]
-    
+
     def mock_time() -> float:
         call_count[0] += 1
         return 1000000.0 + call_count[0] * 0.001
-    
+
     with (
         patch(
-            "codeweaver.common.registry.get_provider_registry", 
+            "codeweaver.common.registry.get_provider_registry",
             return_value=real_provider_registry
         ),
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
     ):
         settings = CodeWeaverSettings(project_path=large_codebase)
-        
+
         # Measure indexing performance
         start_time = time.time()
         indexer = await Indexer.from_settings_async(settings.model_dump())
@@ -289,7 +290,7 @@ class {module_name.capitalize()}Handler:
 
         # Search
         response = await find_code(
-            query="module function", 
+            query="module function",
             intent=IntentType.UNDERSTAND,
         )
 
@@ -362,14 +363,14 @@ def generate_jwt(user_id: str) -> str:
 
     # Re-index and search with patched provider registry
     call_count = [0]
-    
+
     def mock_time() -> float:
         call_count[0] += 1
         return 1000000.0 + call_count[0] * 0.001
-    
+
     with (
         patch(
-            "codeweaver.common.registry.get_provider_registry", 
+            "codeweaver.common.registry.get_provider_registry",
             return_value=real_provider_registry
         ),
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
@@ -380,7 +381,7 @@ def generate_jwt(user_id: str) -> str:
 
         # Search should now find OAuth content
         response_after = await find_code(
-            query="OAuth2 JWT token", 
+            query="OAuth2 JWT token",
             intent=IntentType.UNDERSTAND,
         )
 
@@ -450,14 +451,14 @@ def another_working_function():
 
     # Index and search with patched provider registry
     call_count = [0]
-    
+
     def mock_time() -> float:
         call_count[0] += 1
         return 1000000.0 + call_count[0] * 0.001
-    
+
     with (
         patch(
-            "codeweaver.common.registry.get_provider_registry", 
+            "codeweaver.common.registry.get_provider_registry",
             return_value=real_provider_registry
         ),
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
@@ -467,7 +468,7 @@ def another_working_function():
         await indexer.prime_index()
 
         response = await find_code(
-            query="function", 
+            query="function",
             intent=IntentType.UNDERSTAND,
         )
 
@@ -573,20 +574,20 @@ def function_{i}(param):
 
     # Index and search with patched provider registry
     call_count = [0]
-    
+
     def mock_time() -> float:
         call_count[0] += 1
         return 1000000.0 + call_count[0] * 0.001
-    
+
     with (
         patch(
-            "codeweaver.common.registry.get_provider_registry", 
+            "codeweaver.common.registry.get_provider_registry",
             return_value=real_provider_registry
         ),
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
     ):
         settings = CodeWeaverSettings(project_path=perf_codebase)
-        
+
         # Measure indexing performance
         start_time = time.time()
         indexer = await Indexer.from_settings_async(settings.model_dump())
@@ -594,7 +595,7 @@ def function_{i}(param):
         indexing_time = time.time() - start_time
 
         response = await find_code(
-            query="function", 
+            query="function",
             intent=IntentType.UNDERSTAND,
         )
 

@@ -52,7 +52,7 @@ class TestInitFullWorkflow:
         self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
     ) -> None:
         """Test init creates both CodeWeaver config and MCP config."""
-        home = test_environment["home"]
+        test_environment["home"]
         project = test_environment["project"]
 
         # Set API key to avoid interactive prompts
@@ -98,7 +98,7 @@ class TestInitFullWorkflow:
         self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
     ) -> None:
         """Test MCP config uses HTTP streaming, not STDIO."""
-        home = test_environment["home"]
+        test_environment["home"]
         project = test_environment["project"]
 
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
@@ -135,7 +135,7 @@ class TestInitModes:
         self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
     ) -> None:
         """Test --config-only creates only CodeWeaver config."""
-        home = test_environment["home"]
+        test_environment["home"]
         project = test_environment["project"]
 
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
@@ -161,7 +161,7 @@ class TestInitModes:
         self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
     ) -> None:
         """Test --mcp-only creates only MCP config."""
-        home = test_environment["home"]
+        test_environment["home"]
         project = test_environment["project"]
 
         mock_confirm.ask.return_value = True
@@ -198,7 +198,7 @@ class TestInitIntegration:
         """Test init followed by config show."""
         from codeweaver.cli.commands.config import app as config_app
 
-        project = test_environment["project"]
+        test_environment["project"]
 
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
         mock_confirm.ask.return_value = True
@@ -228,7 +228,7 @@ class TestInitIntegration:
         """Test init followed by doctor check."""
         from codeweaver.cli.commands.doctor import app as doctor_app
 
-        project = test_environment["project"]
+        test_environment["project"]
 
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
         mock_confirm.ask.return_value = True
@@ -299,7 +299,7 @@ class TestInitMultipleClients:
         self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
     ) -> None:
         """Test init for Claude Code client."""
-        home = test_environment["home"]
+        test_environment["home"]
         project = test_environment["project"]
 
         mock_confirm.ask.return_value = True
@@ -322,7 +322,7 @@ class TestInitMultipleClients:
     ) -> None:
         """Test init for Claude Desktop client."""
         home = test_environment["home"]
-        project = test_environment["project"]
+        test_environment["project"]
 
         mock_confirm.ask.return_value = True
 
@@ -344,7 +344,7 @@ class TestInitMultipleClients:
         self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
     ) -> None:
         """Test init for multiple clients in sequence."""
-        project = test_environment["project"]
+        test_environment["project"]
 
         mock_confirm.ask.return_value = True
 

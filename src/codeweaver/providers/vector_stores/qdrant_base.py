@@ -7,8 +7,10 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from textwrap import dedent
+from typing import Any, Literal, NoReturn
 
+from fastembed.sparse.sparse_embedding_base import SparseEmbedding
 from pydantic import UUID7
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.models import (
@@ -90,7 +92,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
 
     def _generate_metadata(self) -> CollectionMetadata:
         """Generate collection metadata from current provider configuration.
-        
+
         Returns:
             CollectionMetadata configured according to provider settings.
         """
@@ -146,7 +148,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         from codeweaver.common.utils.git import get_project_path
         from codeweaver.config.settings import get_settings_map
         from codeweaver.core.stores import get_blake_hash
-        from codeweaver.core.types.sentinels import Unset
+        from codeweaver.core.types.sentinel import Unset
 
         settings_map = get_settings_map()
         project_path = get_project_path()
@@ -163,18 +165,15 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         if self.config is not None:
             # Config was provided (e.g., in tests) - use it directly
             qdrant_config = self.config
-            collection_name = qdrant_config.get("collection_name") or self._default_collection_name()
-            base_url = qdrant_config.get("url") if self._provider == Provider.QDRANT else ":memory:"
         else:
             # No config provided - fetch from global registry (production path)
             config = self._fetch_config()
             qdrant_config = config["provider_settings"]
-            collection_name = qdrant_config.get("collection_name") or self._default_collection_name()
-            base_url = qdrant_config.get("url") if self._provider == Provider.QDRANT else ":memory:"
-        
+        collection_name = qdrant_config.get("collection_name") or self._default_collection_name()
+        base_url = qdrant_config.get("url") if self._provider == Provider.QDRANT else ":memory:"
         object.__setattr__(self, "_collection", collection_name)
         object.__setattr__(self, "_base_url", base_url)
-        
+
         client = await self._build_client()
         object.__setattr__(self, "_client", client)
 
@@ -223,7 +222,9 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         if not self._ensure_client(self._client):
             raise ProviderError("Qdrant client not initialized")
 
-        await self._ensure_collection(collection_name=self._collection)
+        await self._ensure_collection(
+            collection_name=self._collection or self._default_collection_name()
+        )
         collection_name = self.collection
         if not collection_name:
             raise ProviderError("No collection configured")
@@ -260,68 +261,86 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
 
     async def _validate_collection_config(self, collection_name: str) -> None:
         """Validate that existing collection configuration matches current provider settings.
-        
+
         Checks for dimension mismatches (critical) and configuration drift (warnings).
-        
+
         Args:
             collection_name: Name of the collection to validate.
-            
+
         Raises:
             DimensionMismatchError: Collection dimension doesn't match configured dimension.
         """
+
+        def _raise_dimension_error() -> NoReturn:
+            from codeweaver.exceptions import DimensionMismatchError
+
+            raise DimensionMismatchError(
+                dedent(f"""\
+                Collection '{collection_name}' has {actual_dense.size}-dimensional vectors but current configuration specifies {expected_dense.size} dimensions.
+
+                This typically happens when:
+
+                    • The embedding model changed (e.g., switched providers or model versions)
+                    • The embedding configuration changed
+                    • The collection was created with different settings
+                """),
+                details={
+                    "collection": collection_name,
+                    "actual_dimension": actual_dense.size,
+                    "expected_dimension": expected_dense.size,
+                    "resolution_command": "codeweaver index --clear",
+                },
+                suggestions=[
+                    "  1. Rebuild the collection: codeweaver index --clear",
+                    "  2. Or revert to the embedding model and settings that created this collection",
+                ],
+            )
+
         try:
             collection_info = await self._client.get_collection(collection_name)
             expected_metadata = self._generate_metadata()
-            
+
             # Get actual vector config from collection
             actual_vectors = collection_info.config.params.vectors
             if isinstance(actual_vectors, dict) and "dense" in actual_vectors:
                 actual_dense = actual_vectors["dense"]
                 expected_dense = expected_metadata.vector_config["dense"]
-                
+
                 # Check dimension mismatch (CRITICAL)
                 if actual_dense.size != expected_dense.size:
-                    from codeweaver.exceptions import DimensionMismatchError
-                    
-                    raise DimensionMismatchError(
-                        f"Collection '{collection_name}' has {actual_dense.size}-dimensional vectors "
-                        f"but current configuration specifies {expected_dense.size} dimensions.\n\n"
-                        f"This typically happens when:\n"
-                        f"  • The embedding model changed (e.g., switched providers or model versions)\n"
-                        f"  • The embedding configuration changed\n"
-                        f"  • The collection was created with different settings\n\n"
-                        f"To resolve:\n"
-                        f"  1. Rebuild the collection: codeweaver index --clear\n"
-                        f"  2. Or revert to the embedding model that created this collection\n",
-                        details={
-                            "collection": collection_name,
-                            "actual_dimension": actual_dense.size,
-                            "expected_dimension": expected_dense.size,
-                            "resolution_command": "codeweaver index --clear",
-                        },
-                    )
-                
+                    _raise_dimension_error()
                 # Check distance metric (WARNING)
                 if actual_dense.distance != expected_dense.distance:
                     logger.warning(
-                        f"Collection '{collection_name}' uses {actual_dense.distance.value} distance metric "
-                        f"but current configuration specifies {expected_dense.distance.value}. "
-                        f"Search results may differ from expectations. "
-                        f"Consider rebuilding: codeweaver index --clear"
+                        "Collection '%s' uses %s distance metric "
+                        "but current configuration specifies %s. "
+                        "Search results may differ from expectations. "
+                        "Consider rebuilding: codeweaver index --clear",
+                        collection_name,
+                        actual_dense.distance.value,
+                        expected_dense.distance.value,
                     )
-                
+
                 # Check datatype (WARNING)
-                if hasattr(actual_dense, 'datatype') and hasattr(expected_dense, 'datatype'):
-                    if actual_dense.datatype != expected_dense.datatype:
-                        logger.warning(
-                            f"Collection '{collection_name}' datatype mismatch: "
-                            f"{actual_dense.datatype.value} (actual) vs {expected_dense.datatype.value} (expected). "
-                            f"This may affect storage efficiency and precision."
-                        )
-                        
+                if (
+                    hasattr(actual_dense, "datatype")
+                    and hasattr(expected_dense, "datatype")
+                    and actual_dense.datatype != expected_dense.datatype
+                ):
+                    logger.warning(
+                        "Collection '%s' datatype mismatch: "
+                        "%s (actual) vs %s (expected). "
+                        "This may affect storage efficiency and precision.",
+                        collection_name,
+                        actual_dense.datatype.value,
+                        expected_dense.datatype.value,
+                    )
+
         except Exception as e:
             # Don't fail on validation errors - just log them
-            logger.debug(f"Could not validate collection config for '{collection_name}': {e}")
+            logger.debug(
+                "Could not validate collection config for '%s'", collection_name, exc_info=e
+            )
 
     async def _execute_search_query(
         self, vector: StrategizedQuery, collection_name: str
@@ -460,7 +479,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         if chunk.dense_embeddings:
             vectors["dense"] = list(chunk.dense_embeddings.embeddings)
 
-        if chunk.sparse_embeddings:
+        if chunk.sparse_embeddings and isinstance(chunk.sparse_embeddings, SparseEmbedding):
             sparse = chunk.sparse_embeddings
             indices, values = sparse.embeddings
 
@@ -627,8 +646,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         )
 
         # Trigger persistence
-        if self._auto_persist:  # type: ignore
-            await self._persist_to_disk()
+        await self.handle_persistence()
 
     def _chunks_to_points(self, chunks: list[CodeChunk]) -> list[PointStruct]:
         """Convert code chunks to Qdrant points.

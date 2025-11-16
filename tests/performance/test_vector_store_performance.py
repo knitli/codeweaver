@@ -34,6 +34,7 @@ from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.metadata import ChunkKind, ExtKind
 from codeweaver.core.spans import Span
+from codeweaver.providers.provider import Provider
 from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
 
@@ -121,7 +122,7 @@ async def memory_store() -> AsyncGenerator[MemoryVectorStoreProvider, None]:
             auto_persist=False,
             collection_name=f"perf_test_{uuid7().hex[:8]}",
         )
-        store = MemoryVectorStoreProvider(config=config)
+        store = MemoryVectorStoreProvider(_provider=Provider.MEMORY, config=config)
         await store._initialize()
         yield store
 
@@ -262,7 +263,7 @@ async def test_memory_persistence_performance(chunk_count: int) -> None:
         )
 
         # Create store and populate
-        store = MemoryVectorStoreProvider(config=config)
+        store = MemoryVectorStoreProvider(_provider=Provider.MEMORY, config=config)
         await store._initialize()
 
         chunks = create_test_chunks(count=chunk_count, files=10)
@@ -284,7 +285,7 @@ async def test_memory_persistence_performance(chunk_count: int) -> None:
 
         # Measure restore performance
         # Create a new store - _initialize will automatically restore from disk
-        new_store = MemoryVectorStoreProvider(config=config)
+        new_store = MemoryVectorStoreProvider(_provider=Provider.MEMORY, config=config)
 
         start = time.perf_counter()
         await new_store._initialize()
