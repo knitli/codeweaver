@@ -25,11 +25,10 @@ from codeweaver.engine.indexer import FileWatcher, WatchfilesLogManager
 # ==============================================================================
 
 
-def example_basic_capture():
+def example_basic_capture() -> FileWatcher:
     """Enable watchfiles logging with default WARNING level."""
-    watcher = FileWatcher("/path/to/watch", capture_watchfiles_output=True)
+    return FileWatcher("/path/to/watch", capture_watchfiles_output=True)
     # watchfiles will now log warnings and errors to console with Rich formatting
-    return watcher
 
 
 # ==============================================================================
@@ -37,15 +36,14 @@ def example_basic_capture():
 # ==============================================================================
 
 
-def example_debug_logging():
+def example_debug_logging() -> FileWatcher:
     """Capture all watchfiles debug output for troubleshooting."""
-    watcher = FileWatcher(
+    return FileWatcher(
         "/path/to/watch",
         capture_watchfiles_output=True,
         watchfiles_log_level=logging.DEBUG,  # Show everything
     )
     # Now you'll see detailed internal watchfiles operations
-    return watcher
 
 
 # ==============================================================================
@@ -53,14 +51,13 @@ def example_debug_logging():
 # ==============================================================================
 
 
-def example_quiet_mode():
+def example_quiet_mode() -> FileWatcher:
     """Only show critical errors, suppress all other watchfiles output."""
-    watcher = FileWatcher(
+    return FileWatcher(
         "/path/to/watch",
         capture_watchfiles_output=True,
         watchfiles_log_level=logging.ERROR,  # Only errors
     )
-    return watcher
 
 
 # ==============================================================================
@@ -68,9 +65,9 @@ def example_quiet_mode():
 # ==============================================================================
 
 
-def example_pattern_filtering():
+def example_pattern_filtering() -> FileWatcher:
     """Only show logs matching specific patterns."""
-    watcher = FileWatcher(
+    return FileWatcher(
         "/path/to/watch",
         capture_watchfiles_output=True,
         watchfiles_log_level=logging.INFO,
@@ -79,7 +76,6 @@ def example_pattern_filtering():
         # Exclude logs containing "debug" or "trace"
         watchfiles_exclude_pattern=r"debug|trace",
     )
-    return watcher
 
 
 # ==============================================================================
@@ -87,7 +83,7 @@ def example_pattern_filtering():
 # ==============================================================================
 
 
-async def example_fastmcp_routing(context: Context):
+async def example_fastmcp_routing(context: Context) -> None:
     """Route watchfiles logs to FastMCP client for structured logging."""
     watcher = FileWatcher(
         "/path/to/watch",
@@ -106,7 +102,7 @@ async def example_fastmcp_routing(context: Context):
 # ==============================================================================
 
 
-async def example_dynamic_updates():
+async def example_dynamic_updates() -> None:
     """Change logging configuration at runtime."""
     watcher = FileWatcher(
         "/path/to/watch", capture_watchfiles_output=True, watchfiles_log_level=logging.WARNING
@@ -130,7 +126,7 @@ async def example_dynamic_updates():
 # ==============================================================================
 
 
-def example_standalone_log_manager():
+def example_standalone_log_manager() -> WatchfilesLogManager:
     """Use WatchfilesLogManager independently for any watchfiles usage."""
     # Create log manager
     log_manager = WatchfilesLogManager(
@@ -155,21 +151,20 @@ def example_standalone_log_manager():
 # ==============================================================================
 
 
-def example_complex_filtering():
+def example_complex_filtering() -> FileWatcher:
     """Use compiled regex patterns for advanced filtering."""
     # Pre-compile complex patterns
     include_pattern = re.compile(r"(?:file|directory).*(?:added|modified|deleted)", re.IGNORECASE)
 
     exclude_pattern = re.compile(r"\.git/|node_modules/|__pycache__/", re.IGNORECASE)
 
-    watcher = FileWatcher(
+    return FileWatcher(
         "/path/to/watch",
         capture_watchfiles_output=True,
         watchfiles_log_level=logging.INFO,
         watchfiles_include_pattern=include_pattern,
         watchfiles_exclude_pattern=exclude_pattern,
     )
-    return watcher
 
 
 # ==============================================================================
@@ -177,7 +172,7 @@ def example_complex_filtering():
 # ==============================================================================
 
 
-def example_output_formats():
+def example_output_formats() -> tuple[FileWatcher, FileWatcher]:
     """Control output formatting."""
     # Rich formatted output (default)
     watcher_rich = FileWatcher(
@@ -201,7 +196,7 @@ def example_output_formats():
 # ==============================================================================
 
 
-async def example_mcp_tool_integration():
+async def example_mcp_tool_integration() -> None:
     """Complete example of using watchfiles logging in an MCP tool."""
     from fastmcp import FastMCP
 
@@ -238,9 +233,10 @@ async def example_mcp_tool_integration():
         # Start watching (this would run until interrupted)
         try:
             reload_count = await watcher.run()
-            return f"Watcher completed with {reload_count} reloads"
         except KeyboardInterrupt:
             return "Watching interrupted by user"
+        else:
+            return f"Watcher completed with {reload_count} reloads"
 
     # Run the MCP server
     await mcp.run()
@@ -251,7 +247,7 @@ async def example_mcp_tool_integration():
 # ==============================================================================
 
 
-def example_environment_based():
+def example_environment_based() -> FileWatcher:
     """Configure logging based on environment variables or conditions."""
     import os
 
@@ -264,14 +260,13 @@ def example_environment_based():
 
     use_rich = sys.stdout.isatty()
 
-    watcher = FileWatcher(
+    return FileWatcher(
         "/path/to/watch",
         capture_watchfiles_output=True,
         watchfiles_log_level=log_level,
         watchfiles_use_rich=use_rich,
     )
 
-    return watcher
 
 
 # ==============================================================================
@@ -279,7 +274,7 @@ def example_environment_based():
 # ==============================================================================
 
 
-async def example_multiple_watchers():
+async def example_multiple_watchers() -> None:
     """Run multiple watchers with different logging configurations."""
     # Source code watcher - verbose logging
     watcher_src = FileWatcher(
@@ -314,7 +309,7 @@ async def example_multiple_watchers():
 # ==============================================================================
 
 
-def example_custom_processing():
+def example_custom_processing() -> tuple[FileWatcher, logging.Handler]:
     """Process watchfiles logs with custom logic."""
     import queue
 
@@ -354,7 +349,7 @@ def example_custom_processing():
 # ==============================================================================
 
 
-async def example_temporary_verbose():
+async def example_temporary_verbose() -> None:
     """Temporarily increase logging verbosity for debugging."""
     watcher = FileWatcher(
         "/path/to/watch",
@@ -385,7 +380,7 @@ async def example_temporary_verbose():
 # ==============================================================================
 
 
-async def main():
+async def main() -> None:
     """Run example demonstrations."""
     print("CodeWeaver Watchfiles Logging Examples\n" + "=" * 50)
 

@@ -68,7 +68,7 @@ def estimate_file_count(project_path: Path, max_depth: int = 5) -> int:
     try:
         # Check if path exists
         if not project_path.exists():
-            logger.warning(f"Project path does not exist: {project_path}")
+            logger.warning("Project path does not exist: %s", project_path)
             return 1000  # Conservative default
 
         # Quick estimation by sampling directories
@@ -113,7 +113,7 @@ def estimate_backup_memory_requirements(
 
     Memory estimation:
     - Per-chunk overhead: ~5KB (text content + embeddings + metadata)
-    - Dense embedding: 768 dimensions × 4 bytes = 3,072 bytes  # noqa: RUF002
+    - Dense embedding: 768 dimensions x 4 bytes = 3,072 bytes
     - Sparse embedding: ~1KB average
     - Text content: ~500 bytes average
     - Metadata: ~500 bytes
@@ -183,11 +183,13 @@ def estimate_backup_memory_requirements(
     is_safe = available_memory > required_memory
 
     logger.debug(
-        f"Memory estimation: {estimated_chunks:,} chunks, "
-        f"{estimated_memory / 1e9:.2f}GB estimated, "
-        f"{available_memory / 1e9:.2f}GB available, "
-        f"{required_memory / 1e9:.2f}GB required, "
-        f"zone={zone}, safe={is_safe}"
+        "Memory estimation: %d chunks, %.2fGB estimated, %.2fGB available, %.2fGB required, zone=%s, safe=%s",
+        estimated_chunks,
+        estimated_memory / 1e9,
+        available_memory / 1e9,
+        required_memory / 1e9,
+        zone,
+        is_safe,
     )
 
     return MemoryEstimate(

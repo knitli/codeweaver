@@ -237,9 +237,9 @@ async def test_reference_queries_comprehensive(
     # Report detailed results
     # ========================================================================
 
-    logger.info("\n" + "=" * 80)
+    logger.info("\n%s", "=" * 80)
     logger.info("REFERENCE QUERY TEST RESULTS")
-    logger.info("=" * 80)
+    logger.info("%s", "=" * 80)
     logger.info("Total queries: %d", len(results))
     logger.info("Precision@3 queries: %d", len(precision_at_3_scores))
     logger.info("Precision@5 queries: %d", len(precision_at_5_scores))
@@ -297,7 +297,7 @@ async def test_reference_queries_comprehensive(
                 if missed:
                     logger.info("      Missed: %s", ", ".join(sorted(missed)))
 
-    logger.info("\n" + "=" * 80 + "\n")
+    logger.info("\n%s\n", "=" * 80)
 
     # ========================================================================
     # Assert quality targets (skip for mock providers)

@@ -90,9 +90,7 @@ class VectorStoreFailoverManager(BasedModel):
     _failover_time: Annotated[datetime | None, PrivateAttr()] = None
     _last_health_check: Annotated[datetime | None, PrivateAttr()] = None
     _last_backup_sync: Annotated[datetime | None, PrivateAttr()] = None
-    _failover_chunks: Annotated[set[str], PrivateAttr()] = (
-        set()
-    )  # Chunk IDs indexed during failover
+    _failover_chunks: Annotated[set[str], PrivateAttr(default_factory=set)]  # Chunk IDs indexed during failover
     _last_context: Annotated[Context | None, PrivateAttr()] = None  # For client notifications
 
     async def initialize(
@@ -606,8 +604,8 @@ class VectorStoreFailoverManager(BasedModel):
                     "⚠️  %d chunks failed to sync - may need manual recovery", failed_count
                 )
 
-        except Exception as e:
-            logger.exception("Sync-back failed: %s", e)
+        except Exception:
+            logger.exception("Sync-back failed")
             raise
 
     async def _sync_chunk_to_primary(self, chunk_id: str) -> None:

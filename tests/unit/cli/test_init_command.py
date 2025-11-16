@@ -15,19 +15,14 @@ from __future__ import annotations
 import json
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
 
 from codeweaver.cli.commands.init import app as init_app
 
 
-if TYPE_CHECKING:
-    from pytest import MonkeyPatch
-
-
 @pytest.fixture
-def temp_home(tmp_path: Path, monkeypatch: MonkeyPatch) -> Path:
+def temp_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Create temporary home directory."""
     home = tmp_path / "home"
     home.mkdir()
@@ -36,7 +31,7 @@ def temp_home(tmp_path: Path, monkeypatch: MonkeyPatch) -> Path:
 
 
 @pytest.fixture
-def temp_project(tmp_path: Path, monkeypatch: MonkeyPatch) -> Path:
+def temp_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Create temporary project directory."""
     project = tmp_path / "project"
     project.mkdir()

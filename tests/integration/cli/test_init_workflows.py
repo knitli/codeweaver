@@ -17,19 +17,14 @@ from __future__ import annotations
 import json
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
 
 from codeweaver.cli.commands.init import app as init_app
 
 
-if TYPE_CHECKING:
-    from pytest import MonkeyPatch
-
-
 @pytest.fixture
-def test_environment(tmp_path: Path, monkeypatch: MonkeyPatch) -> dict[str, Path]:
+def test_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
     """Set up test environment with home and project directories."""
     home = tmp_path / "home"
     home.mkdir()
@@ -49,7 +44,7 @@ class TestInitFullWorkflow:
     """Tests for complete init workflows."""
 
     def test_full_init_creates_both_configs(
-        self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
+        self, test_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
     ) -> None:
         """Test init creates both CodeWeaver config and MCP config."""
         test_environment["home"]
@@ -95,7 +90,7 @@ class TestInitFullWorkflow:
         assert "url" in cw_server or "command" in cw_server
 
     def test_http_streaming_architecture(
-        self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
+        self, test_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
     ) -> None:
         """Test MCP config uses HTTP streaming, not STDIO."""
         test_environment["home"]
@@ -132,7 +127,7 @@ class TestInitModes:
     """Tests for different init modes."""
 
     def test_config_only_flag(
-        self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
+        self, test_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
     ) -> None:
         """Test --config-only creates only CodeWeaver config."""
         test_environment["home"]
@@ -158,7 +153,7 @@ class TestInitModes:
         assert not mcp_config_path.exists()
 
     def test_mcp_only_flag(
-        self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
+        self, test_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
     ) -> None:
         """Test --mcp-only creates only MCP config."""
         test_environment["home"]
@@ -193,7 +188,7 @@ class TestInitIntegration:
     """Tests for init integration with other commands."""
 
     def test_init_then_config_show(
-        self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm, capsys
+        self, test_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm, capsys
     ) -> None:
         """Test init followed by config show."""
         from codeweaver.cli.commands.config import app as config_app
@@ -223,7 +218,7 @@ class TestInitIntegration:
         assert "project" in captured.out.lower() or "provider" in captured.out.lower()
 
     def test_init_then_doctor(
-        self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
+        self, test_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
     ) -> None:
         """Test init followed by doctor check."""
         from codeweaver.cli.commands.doctor import app as doctor_app
@@ -255,7 +250,7 @@ class TestInitIntegration:
         assert exit_code in (0, 1, None)
 
     def test_init_respects_existing_config(
-        self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
+        self, test_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
     ) -> None:
         """Test init handles existing configuration."""
         project = test_environment["project"]
@@ -296,7 +291,7 @@ class TestInitMultipleClients:
     """Tests for init with multiple MCP clients."""
 
     def test_init_claude_code(
-        self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
+        self, test_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
     ) -> None:
         """Test init for Claude Code client."""
         test_environment["home"]
@@ -318,7 +313,7 @@ class TestInitMultipleClients:
             assert config_path.exists()
 
     def test_init_claude_desktop(
-        self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
+        self, test_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
     ) -> None:
         """Test init for Claude Desktop client."""
         home = test_environment["home"]
@@ -341,7 +336,7 @@ class TestInitMultipleClients:
             assert config_path.exists()
 
     def test_init_multiple_clients_sequentially(
-        self, test_environment: dict[str, Path], monkeypatch: MonkeyPatch, mock_confirm
+        self, test_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
     ) -> None:
         """Test init for multiple clients in sequence."""
         test_environment["project"]

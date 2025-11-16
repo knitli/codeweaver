@@ -65,7 +65,7 @@ async def memory_provider(memory_config, test_embedding_caps):
     from codeweaver.providers.provider import Provider
 
     provider = MemoryVectorStoreProvider(
-        _provider=Provider.MEMORY_STORE, config=memory_config, embedding_caps=test_embedding_caps
+        _provider=Provider.MEMORY, config=memory_config, embedding_caps=test_embedding_caps
     )
     await provider._initialize()
     return provider
