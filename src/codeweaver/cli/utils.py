@@ -100,14 +100,14 @@ def format_file_link(file_path: str | Path, line: NonNegativeInt | None = None) 
 
 def get_codeweaver_config_paths() -> tuple[Path, ...]:
     """Get all possible CodeWeaver configuration file paths."""
-    from codeweaver.common.utils import get_project_path, get_user_config_dir
+    from codeweaver.common.utils import get_user_config_dir
     from codeweaver.config.settings import get_settings_map
 
     settings_map = get_settings_map()
     project_path = (
         settings_map["project_path"]
         if isinstance(settings_map["project_path"], Path)
-        else get_project_path()
+        else resolve_project_root()
     )
     user_config_dir = get_user_config_dir()
     repo_paths = [
@@ -125,14 +125,25 @@ def get_codeweaver_config_paths() -> tuple[Path, ...]:
     repo_paths.extend([
         user_config_dir / f"codeweaver.{ext}" for ext in ("toml", "yaml", "yml", "json")
     ])
-    if env_path := os.environ.get("CODEWEAVER_CONFIG_FILE"):
-        repo_paths.append(Path(env_path))
+    if (
+        (env_path := Path(os.environ.get("CODEWEAVER_CONFIG_FILE")))
+        and env_path.exists()
+        and env_path.is_file()
+        and env_path not in repo_paths
+        and env_path.suffix.lstrip(".") in {"toml", "yaml", "yml", "json"}
+    ):
+        repo_paths.append(env_path)
     return tuple(repo_paths)
 
 
 def is_codeweaver_config_path(path: Path) -> bool:
     """Check if the given path is a CodeWeaver configuration file path."""
     return any(path.samefile(config_path) for config_path in get_codeweaver_config_paths())
+
+
+def is_wsl() -> bool:
+    """Check if running inside Windows Subsystem for Linux (WSL)."""
+    return "microsoft" in (release := os.uname().release.lower()) or "wsl" in release
 
 
 __all__ = (
@@ -142,6 +153,7 @@ __all__ = (
     "in_ide",
     "is_codeweaver_config_path",
     "is_tty",
+    "is_wsl",
     "resolve_project_root",
     "we_are_in_jetbrains",
     "we_are_in_vscode",

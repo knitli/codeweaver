@@ -16,8 +16,8 @@ import pytest
 from rich.console import Console
 from rich.table import Table
 
+from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay
 from codeweaver.exceptions import CodeWeaverError
-from codeweaver.ui import CLIErrorHandler, StatusDisplay
 
 
 @pytest.mark.unit

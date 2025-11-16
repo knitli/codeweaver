@@ -365,7 +365,7 @@ async def lifespan(
         verbose: Enable verbose logging
         debug: Enable debug logging
     """
-    from codeweaver.ui import StatusDisplay
+    from codeweaver.cli.ui import StatusDisplay
 
     # Create StatusDisplay for clean user-facing output
     status_display = StatusDisplay()

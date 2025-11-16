@@ -18,20 +18,22 @@ import httpx
 from cyclopts import App
 from pydantic import FilePath
 
+from codeweaver.cli.ui import get_status_display
 from codeweaver.common.utils.git import get_project_path
 from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.core.types.dictview import DictView
 from codeweaver.exceptions import CodeWeaverError
-from codeweaver.ui import CLIErrorHandler, StatusDisplay
 
 
 if TYPE_CHECKING:
+    from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay
     from codeweaver.config.settings import CodeWeaverSettings
     from codeweaver.config.types import CodeWeaverSettingsDict
     from codeweaver.engine.indexer.checkpoint import CheckpointManager
 
+_display: StatusDisplay | None = get_status_display()
 
-app = App("index", help="Index codebase for semantic search.")
+app = App("index", help="Index codebase for semantic search.", console=_display.console)
 
 
 def _check_server_health() -> bool:
@@ -263,13 +265,23 @@ def _check_and_print_server_status(display: StatusDisplay):
     display.console.print()
     display.print_info("The CodeWeaver server automatically indexes your codebase")
     display.console.print("  • Initial indexing runs on server startup")
-    display.console.print("  • File watcher monitors for changes in real-time")
-    display.console.print()
-    display.console.print("[cyan]To check indexing status:[/cyan]")
-    display.console.print("  curl http://localhost:9328/health/ | jq '.indexing'")
-    display.console.print()
-    display.console.print("[dim]Tip: Use --standalone to run indexing without the server[/dim]")
+    _print_status_series(
+        display,
+        "  • File watcher monitors for changes in real-time",
+        "[cyan]To check indexing status:[/cyan]",
+    )
+    _print_status_series(
+        display,
+        "  curl http://localhost:9328/health/ | jq '.indexing'",
+        "[dim]Tip: Use --standalone to run indexing without the server[/dim]",
+    )
     return False
+
+
+def _print_status_series(display: StatusDisplay, message: str, tip: str):
+    display.console.print(message)
+    display.console.print()
+    display.console.print(tip)
 
 
 async def _run_standalone_indexing(
@@ -368,7 +380,7 @@ async def index(
         clear: If True, clear vector store and checkpoints before indexing
         yes: If True, skip confirmation prompts
     """
-    display = StatusDisplay()
+    display = _display or get_status_display()
     error_handler = CLIErrorHandler(display, verbose=False, debug=False)
 
     try:

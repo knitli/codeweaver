@@ -20,11 +20,21 @@ from cyclopts import App
 from pydantic_core import from_json
 from rich.table import Table
 
-from codeweaver.config.settings import get_settings
-from codeweaver.ui import StatusDisplay
+from codeweaver.cli.ui import StatusDisplay, get_status_display
 
 
+_display: StatusDisplay = get_status_display()
 app = App("status", help="Show CodeWeaver runtime status.")
+
+
+def get_url() -> str:
+    """Get the server URL from settings."""
+    from codeweaver.config.settings import get_settings_map
+
+    settings_map = get_settings_map()
+    host = settings_map["server"]["host"] or "127.0.0.1"
+    port = settings_map["server"]["port"] or "9328"  # WEAV
+    return f"http://{host}:{port}"
 
 
 @app.default
@@ -36,7 +46,7 @@ def status(*, verbose: bool = False, watch: bool = False, watch_interval: int = 
         watch: Continuously watch status (refresh every watch_interval seconds)
         watch_interval: Seconds between updates in watch mode (default: 5)
     """
-    display = StatusDisplay()
+    display = _display
 
     if watch:
         _watch_status(display, verbose, watch_interval)
@@ -47,9 +57,7 @@ def status(*, verbose: bool = False, watch: bool = False, watch_interval: int = 
 def _show_status_once(display: StatusDisplay, *, verbose: bool) -> None:
     """Show status one time."""
     display.print_command_header("status", "CodeWeaver Runtime Status")
-
-    settings = get_settings()
-    server_url = f"http://{settings.server.host}:{settings.server.port}"
+    server_url = get_url()
 
     status_data = _query_server_status(server_url)
 
@@ -63,9 +71,7 @@ def _watch_status(display: StatusDisplay, *, verbose: bool, interval: int) -> No
     """Continuously watch and display status."""
     display.print_command_header("status", "CodeWeaver Runtime Status (Watch Mode)")
     display.print_info(f"Refreshing every {interval} seconds. Press Ctrl+C to exit.")
-
-    settings = get_settings()
-    server_url = f"http://{settings.server.host}:{settings.server.port}"
+    server_url = get_url()
 
     try:
         while True:
@@ -171,17 +177,21 @@ def _display_indexing_status(
         table.add_row("Chunks Indexed", str(indexing_data.get("chunks_indexed", 0)))
 
         if verbose:
-            elapsed = indexing_data.get("elapsed_time_seconds", 0)
-            rate = indexing_data.get("processing_rate", 0)
-            errors = indexing_data.get("errors", 0)
-
-            table.add_row("Elapsed Time", _format_duration(elapsed))
-            table.add_row("Processing Rate", f"{rate:.2f} files/sec")
-            table.add_row("Errors", str(errors))
-
+            table = _report_indexing_timing(indexing_data, table)
         display.print_table(table)
     else:
         display.print_info("Indexing: IDLE", prefix="💤")
+
+
+def _report_indexing_timing(indexing_data, table) -> Table:
+    elapsed = indexing_data.get("elapsed_time_seconds", 0)
+    rate = indexing_data.get("processing_rate", 0)
+    errors = indexing_data.get("errors", 0)
+
+    table.add_row("Elapsed Time", _format_duration(elapsed))
+    table.add_row("Processing Rate", f"{rate:.2f} files/sec")
+    table.add_row("Errors", str(errors))
+    return table
 
 
 def _display_failover_status(
@@ -267,7 +277,13 @@ def _format_duration(seconds: float) -> str:
     if minutes < 60:
         return f"{minutes}m {remaining_seconds}s"
 
-    hours = minutes // 60
-    remaining_minutes = minutes % 60
-
+    hours, remaining_minutes = divmod(minutes, 60)
     return f"{hours}h {remaining_minutes}m {remaining_seconds}s"
+
+
+if __name__ == "__main__":
+    display = _display
+    try:
+        app()
+    except Exception as e:
+        display.print_error("Fatal error running status command.", exception=e)

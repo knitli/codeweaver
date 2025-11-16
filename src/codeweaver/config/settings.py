@@ -370,7 +370,13 @@ class CodeWeaverSettings(BaseSettings):
     config_file: Annotated[
         FilePath | None,
         Field(description="""Path to the configuration file, if any""", exclude=True),
-    ] = None
+    ] = (
+        env_config
+        if (env_config := Path(os.environ.get("CODEWEAVER_CONFIG_FILE")))
+        and env_config.exists()
+        and env_config.is_file()
+        else None
+    )
 
     # Performance settings
     token_limit: Annotated[

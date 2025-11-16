@@ -15,19 +15,22 @@ from typing import TYPE_CHECKING, Annotated, Literal, TypedDict, is_typeddict
 import cyclopts
 
 from cyclopts import App
-from rich.console import Console
 from rich.table import Table
 
+from codeweaver.cli.ui.status_display import get_status_display
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.provider import Provider, ProviderKind
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
 if TYPE_CHECKING:
+    from rich.console import Console
+
+    from codeweaver.cli.ui import StatusDisplay
     from codeweaver.providers.embedding.capabilities.base import SparseEmbeddingModelCapabilities
 
-
-console = Console(markup=True, emoji=True)
+_display: StatusDisplay = get_status_display()
+console: Console = _display.console
 app = App("list", help="List available CodeWeaver resources.", console=console)
 
 
@@ -96,6 +99,7 @@ def providers(
     """
     from codeweaver.common.registry.provider import get_provider_registry
 
+    display = _display
     registry = get_provider_registry()
     provider_capabilities = {
         p: registry.list_providers(p) for p in ProviderKind if p != ProviderKind.UNSET
@@ -107,9 +111,10 @@ def providers(
         try:
             kind_filter = ProviderKind.from_string(kind) if isinstance(kind, str) else kind
         except (AttributeError, KeyError, ValueError):
-            console.print(f"[red]Invalid provider kind: {kind}[/red]")
-            console.print(
-                f"Valid kinds: {', '.join(k.value for k in ProviderKind if k != ProviderKind.UNSET)}"
+            display.print_error("Invalid provider kind", fatal=True)
+            display.print_list(
+                [prov for prov in ProviderKind if prov != ProviderKind.UNSET],
+                title="The following are valid provider kinds:",
             )
             sys.exit(1)
 
@@ -118,6 +123,7 @@ def providers(
         show_header=True,
         header_style="bold blue",
         title=f"Available {kind.as_title} Providers" if kind_filter else "Available Providers",
+        console=console,
     )
     table.add_column("Provider", style="cyan", no_wrap=True)
     table.add_column("Kind", style="white")
@@ -257,9 +263,10 @@ def _list_reranking_models(
     provider: Provider, models: Sequence[RerankingModelCapabilities]
 ) -> None:
     """List reranking models for a provider."""
+    display = _display
     try:
         if not models:
-            console.print(f"[yellow]No reranking models available for {provider.as_title}[/yellow]")
+            display.print_warning(f"No reranking models available for {provider.as_title}")
             return
 
         table = Table(
@@ -277,9 +284,9 @@ def _list_reranking_models(
         console.print(table)
 
     except ImportError as e:
-        console.print(f"[yellow]Cannot list models for {provider.value}: {e}[/yellow]")
-        console.print(
-            f"Install provider dependencies: pip install 'codeweaver[provider-{provider.value}]'"
+        display.print_error(f"[yellow]Cannot list models for {provider.value}: {e}[/yellow]")
+        display.print_info(
+            f"Install provider dependencies: pip install 'codeweaver[provider-{provider.variable}]'"
         )
 
 
@@ -287,11 +294,10 @@ def _list_sparse_embedding_models(
     provider: Provider, models: Sequence[SparseEmbeddingModelCapabilities]
 ) -> None:
     """List sparse embedding models for a provider."""
+    display = _display
     try:
         if not models:
-            console.print(
-                f"[yellow]No sparse embedding models available for {provider.as_title}[/yellow]"
-            )
+            display.print_warning(f"No sparse embedding models available for {provider.as_title}")
             return
 
         table = Table(
@@ -307,8 +313,8 @@ def _list_sparse_embedding_models(
         console.print(table)
 
     except ImportError as e:
-        console.print(f"[yellow]Cannot list models for {provider.value}: {e}[/yellow]")
-        console.print(
+        display.print_error(f"Cannot list models for {provider.value}: {e}")
+        display.print_info(
             f"Install provider dependencies: pip install 'codeweaver[provider-{provider.value}]'"
         )
 
@@ -369,13 +375,14 @@ def data() -> None:
 
 def main() -> None:
     """Entry point for the list CLI command."""
+    display = _display
     try:
         app()
     except KeyboardInterrupt:
-        console.print("\n[red]Operation cancelled by user.[/red]")
+        display.print_warning("Looks like you cancelled the operation. Exiting...")
         sys.exit(1)
     except Exception as e:
-        console.print(f"[red]An unexpected error occurred: {e}[/red]")
+        display.print_error(f"An unexpected error occurred: {e}", fatal=True)
         sys.exit(1)
 
 

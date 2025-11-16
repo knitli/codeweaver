@@ -23,13 +23,15 @@ from pydantic import ValidationError
 from rich.console import Console
 from rich.table import Table
 
+from codeweaver.cli.ui import get_status_display
+from codeweaver.cli.utils import get_codeweaver_config_paths
 from codeweaver.common.utils.git import get_project_path, is_git_dir
 from codeweaver.core.types.sentinel import Unset
 from codeweaver.providers.provider import ProviderKind
-from codeweaver.ui import CLIErrorHandler, StatusDisplay
 
 
 if TYPE_CHECKING:
+    from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay
     from codeweaver.config.providers import ProviderSettings
     from codeweaver.config.settings import CodeWeaverSettings
     from codeweaver.providers.provider import Provider
@@ -37,15 +39,7 @@ if TYPE_CHECKING:
 
 # Module-level display for check functions
 # This allows existing check functions to work without refactoring all of them
-_display: StatusDisplay | None = None
-
-
-def _get_display() -> StatusDisplay:
-    """Get the module-level display instance."""
-    global _display
-    if _display is None:
-        _display = StatusDisplay()
-    return _display
+_display: StatusDisplay = get_status_display()
 
 
 class _ConsoleProxy:
@@ -58,7 +52,7 @@ class _ConsoleProxy:
     @property
     def _current_console(self) -> Console:
         """Get the current display console."""
-        return _get_display().console
+        return _display.console
 
     def print(self, *args: Any, **kwargs: Any):
         """Proxy print to current console."""
@@ -73,7 +67,11 @@ class _ConsoleProxy:
 console = _ConsoleProxy()
 
 
-app = App("doctor", help="Validate prerequisites and configuration for CodeWeaver.")
+app = App(
+    "doctor",
+    help="Validate prerequisites and configuration for CodeWeaver.",
+    console=_display.console,
+)
 
 
 class DoctorCheck:
@@ -270,26 +268,9 @@ def check_configuration_file(settings: CodeWeaverSettings | None = None) -> Doct
 
             settings = get_settings()
 
-        # Check all possible config file locations
-        from codeweaver.common.utils.utils import get_user_config_dir
+        possible_config_locations = get_codeweaver_config_paths()
 
-        user_config_dir = get_user_config_dir()
-        possible_config_locations = [
-            Path("codeweaver.local.toml"),
-            Path("codeweaver.toml"),
-            Path(".codeweaver.local.toml"),
-            Path(".codeweaver.toml"),
-            Path(".codeweaver/codeweaver.local.toml"),
-            Path(".codeweaver/codeweaver.toml"),
-            user_config_dir / "codeweaver.toml",
-            Path("codeweaver.local.yaml"),
-            Path("codeweaver.yaml"),
-            Path(".codeweaver.local.yaml"),
-            Path(".codeweaver.yaml"),
-            Path(".codeweaver/codeweaver.local.yaml"),
-            Path(".codeweaver/codeweaver.yaml"),
-        ]
-
+        # The function also checks for environment variable config file
         if found_config := next((loc for loc in possible_config_locations if loc.exists()), None):
             check.status = "✅"
             check.message = f"Valid config at {found_config}"
@@ -339,14 +320,18 @@ def _docker_is_running() -> bool:
 
 def _qdrant_running_at_url(url: Any | None = None) -> bool:
     """Check if Qdrant is running at the given URL."""
+    import re
+
     import httpx
 
     try:
-        response = httpx.get(f"http://{str(url) or '127.0.0.1:6333'}/health", timeout=2.0)
+        response = httpx.get(f"{str(url) or 'http://127.0.0.1:6333'}/metrics", timeout=2.0)
     except (httpx.ConnectError, httpx.TimeoutException):
         return False
     else:
-        return response.status_code == 200
+        return response.status_code == 200 and bool(
+            re.search(r'app_info\{name="qdrant"\}', response.text)
+        )
 
 
 type DeploymentType = Literal["local docker", "cloud", "local", "remote", "in-memory", "unknown"]
@@ -377,7 +362,7 @@ def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
     deployment_type = "unknown"
     url = None
     vector_provider_config = vector_config["provider_settings"]
-    if (provider := vector_config["provider"]) == Provider.QDRANT and (
+    if (provider := vector_config["provider"]) != Provider.MEMORY and (
         url := vector_provider_config.get("url")
     ):
         if "qdrant.io" in url:
@@ -832,7 +817,7 @@ def doctor(*, verbose: bool = False, display: StatusDisplay | None = None) -> No
     """
     global _display
     if display is None:
-        display = StatusDisplay()
+        display = _display
     _display = display  # Set module-level display for check functions
 
     display.console.print()

@@ -17,24 +17,29 @@ from typing import TYPE_CHECKING, Annotated, Literal
 import cyclopts
 
 from cyclopts import App
-from rich import print as rich_print
 from rich.table import Table
 
 from codeweaver.agent_api.find_code.intent import IntentType
 from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
+from codeweaver.cli.ui.status_display import get_status_display
+from codeweaver.cli.utils import resolve_project_root
 from codeweaver.config.settings import get_settings_map
 from codeweaver.exceptions import CodeWeaverError
-from codeweaver.ui import CLIErrorHandler, StatusDisplay
+from codeweaver.utils.utils import get_user_config_dir
 
 
 if TYPE_CHECKING:
+    from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay
     from codeweaver.config.settings import CodeWeaverSettings
     from codeweaver.config.types import CodeWeaverSettingsDict
     from codeweaver.core.types.dictview import DictView
 
-
+_display: StatusDisplay = get_status_display()
+console = _display.console
 logger = logging.getLogger(__name__)
-app = App(help="Search codebase from command line.")
+app = App(help="Search your codebase from the command line.")
+
+rich_print = console.print
 
 
 async def _index_exists(settings: DictView[CodeWeaverSettingsDict]) -> bool:
@@ -47,13 +52,12 @@ async def _index_exists(settings: DictView[CodeWeaverSettingsDict]) -> bool:
         True if a valid index exists with indexed files
     """
     try:
-        from codeweaver.common.utils import get_project_path, get_user_config_dir
         from codeweaver.engine.indexer.manifest import FileManifestManager
 
         project_path = (
             settings.get("project_path")
             if isinstance(settings.get("project_path"), Path)
-            else get_project_path()
+            else resolve_project_root()
         )
         if not project_path:
             return False
@@ -101,7 +105,7 @@ async def _run_search_indexing(
     from codeweaver.core.types.dictview import DictView
     from codeweaver.engine.indexer import Indexer
 
-    display = StatusDisplay()
+    display = _display
     display.print_warning("No index found. Indexing project...")
 
     try:
@@ -139,7 +143,7 @@ async def search(
     """Search your codebase from the command line with plain language."""
     from codeweaver.exceptions import ConfigurationError
 
-    display = StatusDisplay()
+    display = _display
     error_handler = CLIErrorHandler(display, verbose=False, debug=False)
 
     try:
@@ -162,7 +166,6 @@ async def search(
         display.print_info(f"Query: {query}")
         display.console.print()
 
-        # Use stub find_code_tool during refactor
         from codeweaver.server.app_bindings import find_code_tool
 
         response = await find_code_tool(
@@ -187,15 +190,12 @@ async def search(
                     "  [yellow]•[/yellow] Set VOYAGE_API_KEY environment variable for cloud embeddings"
                 )
                 display.console.print(
-                    "  [yellow]•[/yellow] Or install local provider: pip install codeweaver-mcp[provider-fastembed]"
+                    "  [yellow]•[/yellow] Or use a local embedding provider in your config, `fastembed` is in the default install."
                 )
                 display.console.print(
-                    "  [yellow]•[/yellow] Or configure fastembed in .codeweaver.toml"
+                    "  [yellow]•[/yellow] You can use the `codeweaver init` command to set up a config file. Use `codeweaver init --config-only` to just create the config with the recommended profile, or for a quickstart, local-only, profile: `codeweaver init --profile quickstart`."
                 )
-                display.console.print(
-                    "  [yellow]•[/yellow] See docs: https://github.com/knitli/codeweaver-mcp#configuration"
-                )
-            display.console.print()
+                display.console.print()
             sys.exit(1)
 
         # Limit results for CLI display

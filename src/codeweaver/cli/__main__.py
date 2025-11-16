@@ -23,14 +23,22 @@ with contextlib.suppress(Exception):
 
     warnings.simplefilter("ignore", PydanticDeprecatedSince212)
 
+from typing import TYPE_CHECKING
+
 from cyclopts import App, Parameter
-from rich.console import Console
 
 from codeweaver import __version__
+from codeweaver.cli.ui import get_status_display
 from codeweaver.common import CODEWEAVER_PREFIX
 
 
-console = Console(markup=True, emoji=True)
+if TYPE_CHECKING:
+    from rich.console import Console
+
+    from codeweaver.cli.ui.status_display import StatusDisplay
+
+display: StatusDisplay = get_status_display()
+console: Console = display.console
 app = App(
     "codeweaver",
     help="CodeWeaver: Powerful code search and understanding for humans and agents.",

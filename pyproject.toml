@@ -221,7 +221,6 @@ provider-sentence-transformers = [
 provider-sentence-transformers-gpu = [
   # GPU requires additional setup
   "sentence-transformers[onnx-gpu]",
-  "py-cpuinfo",
 ]
 # disabled until we can fully integrate and resolve dependency conflicts
 # provider-sentence-transformers-openvino = [
@@ -231,7 +230,6 @@ provider-sentence-transformers-gpu = [
 provider-voyageai = ["voyageai"]
 recommended-local-only = [
   "fastembed",
-  "py-cpuinfo",
   "sentence-transformers",
   "tokenizers",
 ]

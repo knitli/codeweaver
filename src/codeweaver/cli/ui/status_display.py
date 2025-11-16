@@ -29,7 +29,7 @@ class StatusDisplay:
     """Clean status display using rich for user-facing output.
 
     This class provides clean, formatted status output that bypasses the logging system
-    entirely, ensuring users see clean, contextual information without debug noise.
+    entirely, ensuring users see clean, contextual information without logging noise. Lets more information through to users if 'verbose' or 'debug' modes are enabled.
     """
 
     def __init__(self, *, console: Console | None = None) -> None:
@@ -38,7 +38,7 @@ class StatusDisplay:
         Args:
             console: Optional rich Console instance. If not provided, creates one.
         """
-        self.console = console or Console(markup=False, emoji=True)
+        self.console = console or Console(markup=True, emoji=True)
         self._start_time = time.time()
 
     def print_header(self, *, host: str = "127.0.0.1", port: int = 9328) -> None:
@@ -49,7 +49,7 @@ class StatusDisplay:
             port: Server port number
         """
         self.console.print(f"CodeWeaver v{__version__}")
-        self.console.print(f"Server: http://{host}:{port}/codeweaver")
+        self.console.print(f"Server: http://{host}:{port}")
         self.console.print()
 
     def print_step(self, message: str) -> None:
@@ -75,6 +75,21 @@ class StatusDisplay:
         if details:
             full_message += f" {details}"
         self.console.print(full_message)
+
+    def print_list(
+        self, items: list[str], *, title: str | None = None, numbered: bool = False
+    ) -> None:
+        """Print a list of items.
+
+        Args:
+            items: List of strings to display
+            title: Optional title for the list
+            numbered: Whether to number the list items
+        """
+        if title:
+            self.console.print(f"{title}:", style="bold")
+        for i, item in enumerate(items, start=1):
+            self.console.print(f" {i if numbered else '-'}{'.' if numbered else ''} {item}")
 
     def print_indexing_stats(
         self,
@@ -144,15 +159,33 @@ class StatusDisplay:
         with Live(spinner_obj, console=self.console, refresh_per_second=10):
             yield
 
-    def print_error(self, message: str, *, details: str | None = None) -> None:
+    def print_error(
+        self,
+        message: str,
+        *,
+        details: str | None = None,
+        fatal: bool = False,
+        exception: Exception | None = None,
+    ) -> None:
         """Print an error message.
 
         Args:
             message: Error message
             details: Optional additional details
+            fatal: Whether the error is fatal
         """
+        import sys
+
         self.console.print(f"✗ Error: {message}", style="bold red")
-        if details:
+        if fatal and exception:
+            try:
+                raise exception  # noqa: TRY301
+            except Exception:
+                self.console.print_exception(show_locals=True)
+                self.console.print("Exiting...")
+                sys.exit(1)
+        if details and exception:
+            details = f"{details} ({exception or ''})" if details else f"({exception})"
             self.console.print(f"  {details}", style="red")
 
     def print_warning(self, message: str) -> None:
@@ -244,4 +277,19 @@ class StatusDisplay:
             yield progress
 
 
-__all__ = ("StatusDisplay",)
+_display: StatusDisplay | None = None
+
+
+def get_display() -> StatusDisplay:
+    """Get the global StatusDisplay instance, creating it if necessary.
+
+    Returns:
+        StatusDisplay instance
+    """
+    global _display
+    if _display is None:
+        _display = StatusDisplay()
+    return _display
+
+
+__all__ = ("StatusDisplay", "get_display")

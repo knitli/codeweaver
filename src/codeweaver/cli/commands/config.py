@@ -16,18 +16,22 @@ from typing import TYPE_CHECKING, Annotated
 import cyclopts
 
 from cyclopts import App
-from rich.console import Console
 from rich.table import Table
 
+from codeweaver.cli.ui.status_display import get_status_display
 from codeweaver.common import CODEWEAVER_PREFIX
 from codeweaver.core.types.enum import BaseEnum
 
 
 if TYPE_CHECKING:
+    from rich.console import Console
+
+    from codeweaver.cli.ui import StatusDisplay
     from codeweaver.config.types import CodeWeaverSettingsDict
     from codeweaver.core.types.dictview import DictView
 
-console = Console(markup=True, emoji=True)
+display: StatusDisplay = get_status_display()
+console: Console = display.console
 app = App("config", help="Manage and view your CodeWeaver config.", console=console)
 
 

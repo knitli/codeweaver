@@ -25,17 +25,21 @@ import httpx
 from pydantic import AnyHttpUrl
 from pydantic_core import from_json as from_json
 from pydantic_core import to_json as to_json
-from rich.console import Console
 from rich.prompt import Confirm
 
-from codeweaver.common.utils.git import get_project_path
+from codeweaver.cli.ui import get_status_display
+from codeweaver.cli.utils import resolve_project_root
 from codeweaver.common.utils.utils import get_user_config_dir
 
 
 if TYPE_CHECKING:
+    from rich.console import Console
+
+    from codeweaver.cli.ui import StatusDisplay
     from codeweaver.config.mcp import CodeWeaverMCPConfig, StdioCodeWeaverConfig
 
-console = Console(markup=True, emoji=True)
+_display: StatusDisplay = get_status_display()
+console: Console = _display.console
 
 # Create cyclopts app at module level
 app = cyclopts.App(
@@ -52,12 +56,13 @@ def _backup_config(path: Path) -> Path:
     Returns:
         Path to backup file
     """
+    display = _display
     timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
     backup_path = path.parent / f"{path.stem}.backup_{timestamp}{path.suffix}"
 
     if path.exists():
         shutil.copy2(path, backup_path)
-        console.print(f"[green]✓[/green] Created backup: {backup_path}")
+        display.print_success(f"Created backup: {backup_path}")
 
     return backup_path
 
@@ -65,10 +70,10 @@ def _backup_config(path: Path) -> Path:
 def _create_codeweaver_config(
     project_path: Path,
     *,
-    profile: Literal["recommended", "quickstart", "test"] | None = None,
+    profile: Literal["recommended", "quickstart", "test"],
     vector_deployment: Literal["local", "cloud"] = "local",
     vector_url: AnyHttpUrl | None = None,
-    config_path: Path | None = None,
+    config_path: Path,
 ) -> Path:
     """Create CodeWeaver configuration file with defaults or from profile.
 
@@ -82,11 +87,8 @@ def _create_codeweaver_config(
     Returns:
         Path to created configuration file
     """
-    # Determine config file path - default to .codeweaver.toml but allow override
-    if config_path is None:
-        config_path = project_path / ".codeweaver.toml"
+    display = _display
 
-    # Ensure parent directory exists
     config_path.parent.mkdir(parents=True, exist_ok=True)
     from codeweaver.config.profiles import get_profile
 
@@ -107,9 +109,9 @@ def _create_codeweaver_config(
     # Save to TOML file
     settings.save_to_file(config_path)
 
-    console.print(f"[green]✓[/green] Created configuration file: {config_path}")
+    display.print_success(f"Created configuration file: {config_path}")
     if profile:
-        console.print(f"[dim]Profile:[/dim] {profile}")
+        display.print_info(f"Profile: {profile}")
 
     return config_path
 
@@ -119,12 +121,19 @@ def config(
     *,
     project: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
     profile: Annotated[
-        Literal["recommended", "quickstart", "test"] | None,
+        Literal["recommended", "quickstart", "test"],
         cyclopts.Parameter(
             name=["--profile"],
             help="Configuration profile to use (recommended, quickstart, or test)",
         ),
-    ] = None,
+    ] = "recommended",
+    quickstart: Annotated[
+        bool,
+        cyclopts.Parameter(
+            name=["--quickstart"],
+            help="Use the quickstart local-only profile instead of the recommended profile.",
+        ),
+    ] = False,
     vector_deployment: Annotated[
         Literal["local", "cloud"],
         cyclopts.Parameter(name=["--vector-deployment"], help="Vector store deployment type"),
@@ -165,36 +174,43 @@ def config(
         config_path: Custom path for configuration file
         force: Overwrite existing configuration file
     """
-    console.print("\n[bold cyan]CodeWeaver Configuration Setup[/bold cyan]\n")
+    display = _display
+    display.command_header(
+        "init config",
+        "Initialize CodeWeaver configuration file.",
+        "create a CodeWeaver configuration file.",
+    )
+    if quickstart:
+        profile = "quickstart"
 
     # Validate vector_url if cloud deployment
-    project_path = project or get_project_path()
+    project_path = project or resolve_project_root()
     parsed_vector_url: AnyHttpUrl | None = None
     if vector_deployment == "cloud" and not vector_url:
-        console.print("[red]✗[/red] --vector-url is required when --vector-deployment=cloud")
+        display.print_error(
+            "Vector URL is required for cloud vector deployment.",
+            details="Please provide a valid --vector-url when using --vector-deployment=cloud.",
+        )
         sys.exit(1)
     if not config_path:
         if config_level == "local":
-            config_path = project_path / f"codeweaver_local.{config_extension}"
+            config_path = project_path / f"codeweaver.local.{config_extension}"
         elif config_level == "project":
-            config_path = project_path / f"codeweaver_project.{config_extension}"
+            config_path = project_path / f"codeweaver.{config_extension}"
         else:
             config_path = get_user_config_dir() / f"codeweaver.{config_extension}"
 
-    # Determine project path
-    project_path = (project or Path.cwd()).resolve()
-    if not project_path.exists():
-        console.print(f"[red]✗[/red] Project path does not exist: {project_path}")
-        sys.exit(1)
-
     if not project_path.is_dir():
-        console.print(f"[red]✗[/red] Path is not a directory: {project_path}")
+        display.print_error(
+            "Project path is not a directory.",
+            details=f"Please provide a valid project path. Current path: {project_path} is not a directory.",
+        )
         sys.exit(1)
 
     console.print(f"[dim]Project:[/dim] {project_path}\n")
 
     # Determine final config path
-    final_config_path = config_path or project_path / ".codeweaver.toml"
+    final_config_path = config_path or project_path / "codeweaver.toml"
 
     if final_config_path.exists() and not force:
         if Confirm.ask(
@@ -208,9 +224,9 @@ def config(
                 vector_url=parsed_vector_url,
                 config_path=final_config_path,
             )
-            console.print(f"[green]✓[/green] Config created: {created_path}\n")
+            display.print_success(f"Config created: {created_path}\n")
         else:
-            console.print("[yellow]Skipping CodeWeaver config creation.[/yellow]\n")
+            display.print_warning("Skipping CodeWeaver config creation.\n")
     else:
         created_path = _create_codeweaver_config(
             project_path,
@@ -219,7 +235,7 @@ def config(
             vector_url=parsed_vector_url,
             config_path=final_config_path,
         )
-        console.print(f"[green]✓[/green] Config created: {created_path}\n")
+        display.print_completion(f"Config created: {created_path}\n")
 
 
 def _get_client_config_path(
@@ -252,7 +268,7 @@ def _get_client_config_path(
         case "mcpjson":
             if config_level == "project":
                 return project_path / ".mcp.json"
-            return get_user_config_dir(base_only=True) / "mcp.json"
+            return get_user_config_dir(base_only=True) / "mcp" / "mcp.json"
 
         case "claude_code":
             if config_level == "project":
@@ -280,15 +296,12 @@ def _get_client_config_path(
             return _get_user_config_path(sys, "Claude", "claude_desktop_config.json", os)
 
 
-# TODO Rename this here and in `_get_client_config_path`
 def _get_user_config_path(sys, provider: str, file_name: str, os):
-    # User-level config paths
-    if sys.platform == "win32":
-        return Path(Path.home(), "AppData", "Roaming", provider, file_name)
-    if sys.platform == "darwin":
-        return Path(Path.home(), "Library", "Application Support", provider, file_name)
-    # Linux
-    return Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"), provider, file_name)
+    """Get user config path for specific provider based on OS."""
+    from codeweaver.common.utils.utils import get_user_config_dir
+
+    user_configdir = get_user_config_dir(base_only=True)
+    return user_configdir / provider / file_name
 
 
 def _create_stdio_config(
@@ -394,6 +407,7 @@ def _handle_write_output(
     """
     from codeweaver.config.mcp import MCPConfig
 
+    display = _display
     try:
         # Determine config file path
         if file_path:
@@ -460,18 +474,15 @@ def _handle_write_output(
                 to_json(serialized_config, indent=2).decode("utf-8"), encoding="utf-8"
             )
 
-        console.print(f"[green]✓[/green] MCP config written: {config_path}\n")
-        console.print("[dim]Configuration details:[/dim]")
-        console.print_json(mcp_config.model_dump_json(exclude_none=True))
+        display.print_success(f"MCP config written: {config_path}\n")
+        display.print_info("Configuration details:")
+        display.print_json(mcp_config.model_dump_json(exclude_none=True))
 
     except ValueError as e:
-        console.print(f"[red]✗[/red] Configuration error: {e}")
+        display.print_error(f"Configuration error: {e}")
         sys.exit(1)
-    except Exception as e:
-        console.print(f"[red]✗[/red] Unexpected error: {e}")
-        import traceback
-
-        console.print(f"[dim]{traceback.format_exc()}[/dim]")
+    except Exception:
+        display.console.print_exception()
         sys.exit(1)
 
 
@@ -493,20 +504,22 @@ def handle_output(
         file_path: Custom file path for writing config
         project_path: Path to project directory
     """
+    display = _display
     match output:
         case "write":
             _handle_write_output(mcp_config, config_level, client, file_path, project_path)
         case "print":
-            console.print("[bold]MCP Client Configuration:[/bold]\n")
-            console.print_json(mcp_config.model_dump_json())
+            display.print_info("MCP Client Configuration:")
+            display.print_json(mcp_config.model_dump_json())
         case "copy":
             try:
                 import pyperclip
 
                 pyperclip.copy(mcp_config.model_dump_json())
-                console.print("[green]✓[/green] MCP configuration copied to clipboard.\n")
+                display.print_success("MCP configuration copied to clipboard.")
             except ImportError:
-                console.print("[red]✗[/red] pyperclip not installed. Cannot copy to clipboard.")
+                # TODO: Offer to install pyperclip?
+                display.print_error("pyperclip not installed. Cannot copy to clipboard.")
                 sys.exit(1)
 
 
@@ -577,7 +590,7 @@ def mcp(
     env: Annotated[
         dict[str, Any] | None,
         cyclopts.Parameter(
-            name=["--env"], help="[stdio-only] Environment variables for MCP client process"
+            name=["--env"], help="**stdio-only** Environment variables for MCP client process"
         ),
     ] = None,
     authentication: Annotated[
@@ -618,13 +631,14 @@ def mcp(
         authentication: Authentication configuration
         file_path: Custom file path for configuration output
     """
-    console.print("\n[bold cyan]MCP Client Configuration Setup[/bold cyan]\n")
-    from codeweaver.config.settings import get_settings_map
+    display = _display
+    display.command_header("init mcp", "Initialize MCP client configuration for CodeWeaver.")
+    display.print_section("MCP Client Configuration Setup")
 
     # Determine project path
-    project_path = project or get_settings_map().get("project_path") or Path.cwd()
+    project_path = project or resolve_project_root()
     project_path = Path(project_path).resolve()
-    console.print(f"[dim]Project:[/dim] {project_path}\n")
+    display.print(f"[dim]Project:[/dim] {project_path}\n")
 
     # Determine transport and create appropriate config
     if transport == "stdio":
@@ -660,14 +674,14 @@ def init(
     project: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
     config_only: Annotated[bool, cyclopts.Parameter(name=["--config-only"])] = False,
     mcp_only: Annotated[bool, cyclopts.Parameter(name=["--mcp-only"])] = False,
-    quick: Annotated[bool, cyclopts.Parameter(name=["--quick", "-q"])] = False,
+    quickstart: Annotated[bool, cyclopts.Parameter(name=["--quickstart", "-q"])] = False,
     profile: Annotated[
-        Literal["recommended", "quickstart", "test"] | None,
+        Literal["recommended", "quickstart", "test"],
         cyclopts.Parameter(
             name=["--profile"],
-            help="Configuration profile to use (recommended, quickstart, or test). Defaults to 'recommended' with --quick.",
+            help="Configuration profile to use (recommended, quickstart, or test). Defaults to 'recommended' with --recommended.",
         ),
-    ] = None,
+    ] = "recommended",
     vector_deployment: Annotated[
         Literal["local", "cloud"],
         cyclopts.Parameter(name=["--vector-deployment"], help="Vector store deployment type"),
@@ -681,16 +695,40 @@ def init(
     ] = None,
     client: Annotated[
         Literal["claude_code", "claude_desktop", "cursor", "vscode", "mcpjson"],
-        cyclopts.Parameter(name=["--client", "-c"]),
+        cyclopts.Parameter(name=["--client", "-c"], help="MCP client to configure"),
     ] = "claude_code",
-    host: Annotated[str, cyclopts.Parameter(name=["--host"])] = "127.0.0.1",
-    port: Annotated[int, cyclopts.Parameter(name=["--port"])] = 9328,
-    force: Annotated[bool, cyclopts.Parameter(name=["--force", "-f"])] = False,
+    host: Annotated[
+        str, cyclopts.Parameter(name=["--host"], help="CodeWeaver server host")
+    ] = "127.0.0.1",
+    port: Annotated[int, cyclopts.Parameter(name=["--port"], help="CodeWeaver server port")] = 9328,
+    force: Annotated[
+        bool, cyclopts.Parameter(name=["--force", "-f"], help="Force overwrite existing config")
+    ] = False,
     transport: Annotated[
         Literal["streamable-http", "stdio"], cyclopts.Parameter(name=["--transport", "-t"])
     ] = "streamable-http",
+    config_extension: Annotated[
+        Literal["toml", "yaml", "yml", "json"], cyclopts.Parameter(name=["--config-extension"])
+    ] = "toml",
+    config_path: Annotated[
+        Path | None,
+        cyclopts.Parameter(
+            name=["--config-path"], help="Custom path for CodeWeaver configuration file"
+        ),
+    ] = None,
+    mcp_config_level: Annotated[
+        Literal["project", "user"],
+        cyclopts.Parameter(
+            name=["--mcp-config-level"],
+            help="The level of mcp configuration to write to (project or user)",
+        ),
+    ] = "project",
     config_level: Annotated[
-        Literal["project", "user"], cyclopts.Parameter(name=["--config-level", "-l"])
+        Literal["local", "project", "user"],
+        cyclopts.Parameter(
+            name=["--config-level"],
+            help="Configuration level for CodeWeaver config (local, project, or user)",
+        ),
     ] = "project",
 ) -> None:
     """Initialize CodeWeaver configuration and MCP client setup.
@@ -718,43 +756,44 @@ def init(
         client: MCP client to configure (claude_code, claude_desktop, cursor, vscode, mcpjson)
         host: Server host address for MCP config (default: 127.0.0.1)
         port: Server port for MCP config (default: 9328)
-        transport: Transport type (streamable-http or stdio)
+        transport: Transport type (streamable-http or stdio). Streamable default and recommended.
         config_level: Configuration level (project or user)
         force: Overwrite existing configurations
 
     Examples:
-        codeweaver init --quick              # Full setup with recommended profile
-        codeweaver init --profile quickstart # Use quickstart profile (free/offline)
+        codeweaver init --quickstart         # Full setup with quickstart profile (free/offline)
+        codeweaver init                      # Full setup with recommended profile
         codeweaver init --config-only        # Just config file
         codeweaver init --mcp-only           # Just MCP client config
         codeweaver init --client cursor      # Setup for Cursor
-        codeweaver init --transport stdio    # Use stdio transport
+        codeweaver init --transport stdio    # Use stdio transport (not recommended)
     """
-    console.print("\n[bold cyan]CodeWeaver Initialization[/bold cyan]\n")
+    display = _display
+    display.print_command_header(
+        "init", "Create a CodeWeaver config and/or add CodeWeaver to your MCP clients."
+    )
+    if quickstart:
+        profile = "quickstart"
 
     # Validate vector_url if cloud deployment
     parsed_vector_url: AnyHttpUrl | None = None
     if vector_deployment == "cloud":
         if not vector_url:
-            console.print("[red]✗[/red] --vector-url is required when --vector-deployment=cloud")
+            display.print_error("You must provide --vector-url when --vector-deployment=cloud")
             sys.exit(1)
         parsed_vector_url = AnyHttpUrl(vector_url) if vector_url else None
 
-    # If --quick and no profile specified, use recommended
-    if quick and profile is None:
-        profile = "recommended"
-
     # Determine project path
-    project_path = (project or Path.cwd()).resolve()
+    project_path = (project or resolve_project_root()).resolve()
     if not project_path.exists():
-        console.print(f"[red]✗[/red] Project path does not exist: {project_path}")
+        display.print_error(f"Project path does not exist: {project_path}")
         sys.exit(1)
 
     if not project_path.is_dir():
-        console.print(f"[red]✗[/red] Path is not a directory: {project_path}")
+        display.print_error(f"Path is not a directory: {project_path}")
         sys.exit(1)
 
-    console.print(f"[dim]Project:[/dim] {project_path}\n")
+    display.print_info(f"Project: {project_path}\n")
 
     # Default: do both if neither flag specified
     if not config_only and not mcp_only:
@@ -762,54 +801,34 @@ def init(
 
     # Part 1: CodeWeaver Configuration
     if config_only:
-        console.print("[bold]Step 1: CodeWeaver Configuration[/bold]\n")
+        display.print_section("Step 1: CodeWeaver Configuration")
 
-        config_path = project_path / ".codeweaver.toml"
-
-        if config_path.exists() and not force:
-            if Confirm.ask(
-                f"[yellow]Configuration file already exists at {config_path}. Overwrite?[/yellow]",
-                default=False,
-            ):
-                config_path = _create_codeweaver_config(
-                    project_path,
-                    profile=profile,
-                    vector_deployment=vector_deployment,
-                    vector_url=parsed_vector_url,
-                )
-                console.print(f"[green]✓[/green] Config created: {config_path}\n")
-            else:
-                console.print("[yellow]Skipping CodeWeaver config creation.[/yellow]\n")
-        else:
-            config_path = _create_codeweaver_config(
-                project_path,
-                profile=profile,
-                vector_deployment=vector_deployment,
-                vector_url=parsed_vector_url,
-            )
-            console.print(f"[green]✓[/green] Config created: {config_path}\n")
+        config(
+            project=project_path,
+            profile=profile,
+            quickstart=quickstart,
+            vector_deployment=vector_deployment,
+            vector_url=parsed_vector_url,
+            force=force,
+            config_level=config_level,
+            config_extension=config_extension,
+            config_path=config_path,
+        )
 
     # Part 2: MCP Client Configuration
     if mcp_only:
-        console.print("[bold]Step 2: MCP Client Configuration[/bold]\n")
+        display.print_section("Step 2: MCP Client Configuration")
 
         # Call the mcp() command directly with the provided parameters
         try:
             mcp(
                 output="write",
                 project=project_path,
-                config_level=config_level,
-                file_path=None,
+                config_level=mcp_config_level,
                 client=client,
                 host=host,
                 port=port,
                 transport=transport,
-                timeout=120,
-                auth=None,
-                cmd=None,
-                args=None,
-                env=None,
-                authentication=None,
             )
         except Exception as e:
             console.print(f"[red]✗[/red] Failed to create MCP config: {e}")
@@ -819,35 +838,70 @@ def init(
             sys.exit(1)
 
     # Final Instructions
-    console.print("[bold green]Setup complete![/bold green]\n")
-    console.print("[bold]Next steps:[/bold]")
-    console.print("  1. Set VOYAGE_API_KEY environment variable:")
-    console.print("     [dim]export VOYAGE_API_KEY='your-api-key'[/dim]")
-    console.print("  2. Start the server: [cyan]codeweaver server[/cyan]")
-    console.print(f"  3. Restart {client} to load MCP config")
-    console.print("  4. Test with a query:")
-    console.print("     [dim]'Find the authentication logic'[/dim]\n")
-
+    display.print_section("Setup Complete!")
+    if mcp_only:
+        display.print_completion("MCP client configuration created successfully.\n")
+    if config_only:
+        display.print_completion("CodeWeaver configuration created successfully.\n")
+        display.print_list(
+            [
+                "Set VOYAGE_API_KEY environment variable:\n    [dim]export VOYAGE_API_KEY='your-api-key'[/dim]",
+                "Start the server: [dim]codeweaver server[/dim]",
+                "Test with a query: [dim]codeweaver search 'authentication configuration'[/dim]",
+            ],
+            title="Next Steps:",
+            numbered=True,
+        )
     if transport == "streamable-http":
-        console.print("[bold]Architecture Note:[/bold]")
-        console.print("CodeWeaver uses HTTP streaming transport, meaning the server")
-        console.print("must be running before your MCP client can connect. Background")
-        console.print("indexing persists between client sessions.\n")
+        display.print_list(
+            [
+                "CodeWeaver uses HTTP streaming transport for MCP communication.",
+                "Ensure the CodeWeaver server is running before starting your MCP client.",
+                "Background indexing will persist between client sessions.",
+            ],
+            title="Important Notes:",
+        )
+
     else:
-        console.print("[bold]Architecture Note:[/bold]")
-        console.print("Using stdio transport - CodeWeaver will launch per-session.")
-        console.print("Each client session starts a new server instance.\n")
+        display.print_warning(
+            "You chose stdio transport, which is not the recommended setup for CodeWeaver."
+        )
+        display.console.print("Important Notes:")
+        display.print_list(
+            [
+                "Each MCP client session will launch a separate CodeWeaver server instance.",
+                "Background indexing will NOT persist between client sessions.",
+                "Consider using the default streamable-http transport for better performance, less resource use, and a more consistent experience between clients and sessions.",
+            ],
+            title="Using the stdio transport:",
+        )
+
+    display.print_section("Using CodeWeaver")
+    display.print_list(
+        [
+            "We recommend you start and run CodeWeaver while you code, whether you are using MCP clients or not.",
+            "You can use a tool like `mise` to automatically start CodeWeaver when you enter your project directory.",
+            "Or, just get in the habit of running `codeweaver server` in a terminal tab when you start coding.",
+            "You can use CodeWeaver to search your codebase outside of an MCP client with `codeweaver search`",
+            "Check status with `codeweaver status`",
+            "To check your config setup, run `codeweaver doctor`",
+            "[red]CodeWeaver is in Alpha. There are bugs.[/red] Help us by reporting them: https://github.com/knitli/codeweaver-mcp/issues",
+        ],
+        title="Tips for Best Experience:",
+    )
 
 
 def main() -> None:
     """CLI entry point for init command."""
+    display = _display
     try:
         app()
     except KeyboardInterrupt:
-        console.print("\n[yellow]Initialization cancelled by user.[/yellow]")
+        display.print_warning("Looks like you cancelled the operation. Exiting.")
         sys.exit(0)
-    except Exception as e:
-        console.print(f"[red]✗[/red] Initialization failed: {e}")
+    except Exception:
+        display.print_error("CodeWeaver init command failed")
+        display.console.print_exception()
         sys.exit(1)
 
 

@@ -11,11 +11,12 @@ import sys
 
 from typing import TYPE_CHECKING
 
+from codeweaver.common import CODEWEAVER_PREFIX
 from codeweaver.exceptions import CodeWeaverError
 
 
 if TYPE_CHECKING:
-    from codeweaver.ui.status_display import StatusDisplay
+    from codeweaver.cli.ui.status_display import StatusDisplay
 
 
 class CLIErrorHandler:
@@ -26,7 +27,12 @@ class CLIErrorHandler:
     """
 
     def __init__(
-        self, display: StatusDisplay, *, verbose: bool = False, debug: bool = False
+        self,
+        display: StatusDisplay,
+        *,
+        verbose: bool = False,
+        debug: bool = False,
+        prefix: str = CODEWEAVER_PREFIX,
     ) -> None:
         """Initialize error handler.
 
@@ -34,10 +40,12 @@ class CLIErrorHandler:
             display: StatusDisplay instance for output
             verbose: Enable verbose error output
             debug: Enable debug error output (includes verbose)
+            prefix: Prefix to use in messages
         """
         self.display = display
         self.verbose = verbose
         self.debug = debug
+        self.prefix = prefix
 
     def handle_error(self, error: Exception, context: str, *, exit_code: int = 1) -> None:
         """Handle and display errors appropriately.
@@ -61,12 +69,8 @@ class CLIErrorHandler:
             error: CodeWeaverError to display
             context: Context description
         """
-        from codeweaver.common import CODEWEAVER_PREFIX
-
         # Print header with error context
-        self.display.console.print(
-            f"\n{CODEWEAVER_PREFIX} [bold red]✗ {context} failed[/bold red]\n"
-        )
+        self.display.console.print(f"\n{self.prefix} [bold red]✗ {context} failed[/bold red]\n")
 
         # Print error message
         self.display.console.print(f"[red]Error:[/red] {error}\n")
@@ -101,11 +105,9 @@ class CLIErrorHandler:
             error: Exception to display
             context: Context description
         """
-        from codeweaver.common import CODEWEAVER_PREFIX
-
         # Print header
         self.display.console.print(
-            f"\n{CODEWEAVER_PREFIX} [bold red]✗ {context} crashed unexpectedly[/bold red]\n"
+            f"\n{self.prefix} [bold red]✗ {context} crashed unexpectedly[/bold red]\n"
         )
 
         # Print error type and message

@@ -843,7 +843,6 @@ provider-sentence-transformers = [
     { name = "sentence-transformers" },
 ]
 provider-sentence-transformers-gpu = [
-    { name = "py-cpuinfo" },
     { name = "sentence-transformers" },
 ]
 provider-voyageai = [
@@ -851,7 +850,6 @@ provider-voyageai = [
 ]
 recommended-local-only = [
     { name = "fastembed" },
-    { name = "py-cpuinfo" },
     { name = "sentence-transformers" },
     { name = "tokenizers" },
 ]
@@ -944,8 +942,6 @@ requires-dist = [
     { name = "py-cpuinfo", marker = "extra == 'provider-fastembed'" },
     { name = "py-cpuinfo", marker = "extra == 'provider-fastembed-gpu'" },
     { name = "py-cpuinfo", marker = "extra == 'provider-sentence-transformers'" },
-    { name = "py-cpuinfo", marker = "extra == 'provider-sentence-transformers-gpu'" },
-    { name = "py-cpuinfo", marker = "extra == 'recommended-local-only'" },
     { name = "pydantic", specifier = ">=2.12.4" },
     { name = "pydantic-ai", specifier = ">=1.18.0" },
     { name = "pydantic-ai-slim", extras = ["anthropic"], marker = "extra == 'provider-anthropic'" },
