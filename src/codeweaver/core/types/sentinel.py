@@ -118,6 +118,12 @@ class Sentinel(BasedModel):
         """Return the hash of the sentinel."""
         return hash((self.name, self.module_name))
 
+    def __eq__(self, other: object) -> bool:
+        """Compare sentinels by identity."""
+        # Sentinels are singletons, so we can use identity comparison
+        # This avoids issues with Pydantic's __eq__ trying to access __pydantic_extra__
+        return self is other
+
     @staticmethod
     def _get_module_name_generator() -> Callable[[], str]:
         """Get a generator function that returns the module name of the caller."""
