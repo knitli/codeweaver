@@ -94,7 +94,7 @@ async def failover_manager(mock_primary_store: Mock, mock_backup_store: Mock, tm
     async def mock_create_backup():
         return mock_backup_store
 
-    manager._create_backup_store = mock_create_backup
+    manager._create_backup_store = mock_create_backup  # ty: ignore[invalid-assignment]
 
     # Initialize with required parameters
     await manager.initialize(primary_store=mock_primary_store, project_path=tmp_path)

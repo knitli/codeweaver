@@ -101,13 +101,13 @@ class DataclassSerializationMixin:
         if not self._adapter:
             raise RuntimeError("TypeAdapter is not initialized.")
         if self._adapter.pydantic_complete:
-            return self._adapter
+            return cast(TypeAdapter[Self], self._adapter)
         try:
             _ = self._adapter.rebuild()
         except Exception as e:
             raise RuntimeError("Failed to rebuild the TypeAdapter.") from e
         else:
-            return self._adapter
+            return cast(TypeAdapter[Self], self._adapter)
 
     @classmethod
     def _get_module(cls) -> str | None:

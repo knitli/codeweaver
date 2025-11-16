@@ -164,28 +164,15 @@ class StatusDisplay:
         message: str,
         *,
         details: str | None = None,
-        fatal: bool = False,
-        exception: Exception | None = None,
     ) -> None:
         """Print an error message.
 
         Args:
             message: Error message
             details: Optional additional details
-            fatal: Whether the error is fatal
         """
-        import sys
-
         self.console.print(f"✗ Error: {message}", style="bold red")
-        if fatal and exception:
-            try:
-                raise exception  # noqa: TRY301
-            except Exception:
-                self.console.print_exception(show_locals=True)
-                self.console.print("Exiting...")
-                sys.exit(1)
-        if details and exception:
-            details = f"{details} ({exception or ''})" if details else f"({exception})"
+        if details:
             self.console.print(f"  {details}", style="red")
 
     def print_warning(self, message: str) -> None:

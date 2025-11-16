@@ -170,14 +170,18 @@ def test_e2e_multiple_files_parallel_process(sample_files):
     assert results, "Should process at least one file"
     assert len(results) <= len(sample_files), "Should not have more results than input files"
 
-    # Quality checks on all results
-    for file_path, chunks in results.items():
+    def _assert_chunk_quality(file_path, chunks):
         assert len(chunks) > 0, f"File {file_path} should produce chunks"
         assert all(c.content.strip() for c in chunks), f"No empty chunks in {file_path}"
         assert all(c.metadata for c in chunks), f"All chunks have metadata in {file_path}"
         assert all(c.line_range.start <= c.line_range.end for c in chunks), (
             f"Valid line ranges in {file_path}"
         )
+
+    # Quality checks on all results
+    # sourcery skip: no-loop-in-tests
+    for file_path, chunks in results.items():
+        _assert_chunk_quality(file_path, chunks)
 
 
 @pytest.mark.slow
@@ -211,6 +215,7 @@ def test_e2e_multiple_files_parallel_thread(sample_files):
     assert len(results) <= len(sample_files), "Should not have more results than input files"
 
     # Quality checks
+    # sourcery skip: no-loop-in-tests
     for file_path, chunks in results.items():
         assert len(chunks) > 0, f"File {file_path} should produce chunks"
 
@@ -280,7 +285,7 @@ def test_e2e_parallel_empty_file_list():
     results = list(chunk_files_parallel([], governor))
 
     # Should return empty without error
-    assert results == [], "Empty input should yield no results"
+    assert not results, "Empty input should yield no results"
 
 
 def test_e2e_parallel_dict_convenience():
@@ -304,15 +309,21 @@ def test_e2e_parallel_dict_convenience():
     capabilities = EmbeddingModelCapabilities(context_window=8192, default_dimension=1536)
     governor = ChunkGovernor(capabilities=(capabilities,), settings=ChunkerSettings())
 
+    if not files:
+        pytest.skip("No fixture files available for parallel dict test")
     # Get results as dict
-    results = chunk_files_parallel_dict(files, governor, max_workers=2)
+    results = chunk_files_parallel_dict(files, governor, max_workers=2)  # ty: ignore[invalid-argument-type]
 
     # Verify it's a dictionary
     assert isinstance(results, dict), "Should return dictionary"
     assert len(results) > 0, "Should have some results"
 
-    # Verify structure
-    for file_path, chunks in results.items():
+    def _assert_result_structure(file_path, chunks):
         assert isinstance(file_path, Path), "Keys should be Paths"
         assert isinstance(chunks, list), "Values should be lists"
         assert all(hasattr(c, "content") for c in chunks), "Should contain chunks"
+
+    # Verify structure
+    # sourcery skip: no-loop-in-tests
+    for file_path, chunks in results.items():
+        _assert_result_structure(file_path, chunks)

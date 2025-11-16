@@ -33,7 +33,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from codeweaver.common.statistics import Identifier, SessionStatistics
+from codeweaver.common.statistics import FailoverStats, Identifier, SessionStatistics
 from codeweaver.engine.indexer import Indexer, IndexingStats
 from codeweaver.server.health_models import (
     HealthResponse,
@@ -189,7 +189,7 @@ def session_statistics() -> SessionStatistics:
         _failed_request_log=[],
         _successful_http_request_log=[],
         _failed_http_request_log=[],
-        failover_statistics=[],
+        failover_statistics=FailoverStats(),
     )
 
 

@@ -7,14 +7,14 @@
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from codeweaver.common.utils.lazy_imports import create_lazy_module
+from codeweaver.common.utils.lazy_importer import create_lazy_getattr
 
 
 if TYPE_CHECKING:
     # Import everything for IDE and type checker support
     # These imports are never executed at runtime, only during type checking
     from codeweaver.cli.__main__ import app, console, main
-    from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_status_display
+    from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
     from codeweaver.cli.utils import (
         format_file_link,
         get_codeweaver_config_paths,
@@ -32,7 +32,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "console": (__spec__.parent, "__main__"),
     "format_file_link": (__spec__.parent, "utils"),
     "get_codeweaver_config_paths": (__spec__.parent, "utils"),
-    "get_status_display": (__spec__.parent, "ui"),
+    "get_display": (__spec__.parent, "ui"),
     "in_ide": (__spec__.parent, "utils"),
     "is_tty": (__spec__.parent, "utils"),
     "is_wsl": (__spec__.parent, "utils"),
@@ -42,7 +42,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
 })
 
 
-__getattr__ = create_lazy_module(_dynamic_imports, globals(), __name__)
+__getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 
 __all__ = (
@@ -52,7 +52,7 @@ __all__ = (
     "console",
     "format_file_link",
     "get_codeweaver_config_paths",
-    "get_status_display",
+    "get_display",
     "in_ide",
     "is_tty",
     "is_wsl",

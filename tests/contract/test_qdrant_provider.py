@@ -17,6 +17,8 @@ Uses QdrantTestManager for reliable test instance management with:
 import asyncio
 
 from pathlib import Path
+from typing import cast
+from uuid import UUID
 
 import pytest
 
@@ -72,15 +74,15 @@ def _register_chunk_embeddings(chunk, dense=None, sparse=None):
     registry = get_embedding_registry()
 
     # Create batch IDs for this chunk - separate for dense and sparse
-    dense_batch_id = uuid7() if dense is not None else None
-    sparse_batch_id = uuid7() if sparse is not None else None
+    dense_batch_id = cast(UUID, uuid7()) if dense is not None else None
+    sparse_batch_id = cast(UUID, uuid7()) if sparse is not None else None
     batch_index = 0
 
     # Create EmbeddingBatchInfo objects for dense/sparse embeddings
     dense_info = None
     if dense is not None:
         dense_info = EmbeddingBatchInfo.create_dense(
-            batch_id=dense_batch_id,
+            batch_id=cast(UUID, dense_batch_id),
             batch_index=batch_index,
             chunk_id=chunk.chunk_id,
             model="test-dense-model",
@@ -93,7 +95,7 @@ def _register_chunk_embeddings(chunk, dense=None, sparse=None):
 
         sparse_emb = SparseEmbedding(indices=sparse["indices"], values=sparse["values"])
         sparse_info = EmbeddingBatchInfo.create_sparse(
-            batch_id=sparse_batch_id,
+            batch_id=cast(UUID, sparse_batch_id),
             batch_index=batch_index,
             chunk_id=chunk.chunk_id,
             model="test-sparse-model",
@@ -111,12 +113,12 @@ def _register_chunk_embeddings(chunk, dense=None, sparse=None):
 
     # Add dense batch key if we have dense embeddings
     if dense is not None:
-        dense_batch_keys = BatchKeys(id=dense_batch_id, idx=batch_index, sparse=False)
+        dense_batch_keys = BatchKeys(id=cast(UUID, dense_batch_id), idx=batch_index, sparse=False)
         result_chunk = result_chunk.set_batch_keys(dense_batch_keys)
 
     # Add sparse batch key if we have sparse embeddings
     if sparse is not None:
-        sparse_batch_keys = BatchKeys(id=sparse_batch_id, idx=batch_index, sparse=True)
+        sparse_batch_keys = BatchKeys(id=cast(UUID, sparse_batch_id), idx=batch_index, sparse=True)
         result_chunk = result_chunk.set_batch_keys(sparse_batch_keys)
 
     return result_chunk

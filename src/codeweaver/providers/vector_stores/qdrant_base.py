@@ -28,6 +28,7 @@ from codeweaver.agent_api.find_code.results import SearchResult
 from codeweaver.agent_api.find_code.types import StrategizedQuery
 from codeweaver.config.providers import VectorStoreProviderSettings
 from codeweaver.core.chunks import CodeChunk
+from codeweaver.core.types import DictView
 from codeweaver.engine.search import Filter
 from codeweaver.exceptions import ProviderError
 from codeweaver.providers.provider import Provider
@@ -60,7 +61,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
     def _telemetry_keys(self) -> None:
         return None
 
-    def _fetch_config(self) -> VectorStoreProviderSettings:
+    def _fetch_config(self) -> DictView[VectorStoreProviderSettings]:
         from codeweaver.common.registry.provider import get_provider_config_for
 
         return get_provider_config_for("vector_store")

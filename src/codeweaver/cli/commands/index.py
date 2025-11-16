@@ -18,20 +18,20 @@ import httpx
 from cyclopts import App
 from pydantic import FilePath
 
-from codeweaver.cli.ui import get_status_display
+from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.common.utils.git import get_project_path
 from codeweaver.common.utils.utils import get_user_config_dir
+from codeweaver.config.types import CodeWeaverSettingsDict
 from codeweaver.core.types.dictview import DictView
 from codeweaver.exceptions import CodeWeaverError
 
 
 if TYPE_CHECKING:
-    from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay
     from codeweaver.config.settings import CodeWeaverSettings
     from codeweaver.config.types import CodeWeaverSettingsDict
     from codeweaver.engine.indexer.checkpoint import CheckpointManager
 
-_display: StatusDisplay | None = get_status_display()
+_display: StatusDisplay = get_display()
 
 app = App("index", help="Index codebase for semantic search.", console=_display.console)
 
@@ -82,7 +82,9 @@ def _load_and_configure_settings(
     settings = get_settings(config_file=config_file)
 
     if project_path:
-        settings = update_settings(**{**settings.model_dump(), "project_path": project_path})
+        settings = update_settings(
+            **CodeWeaverSettingsDict(**(settings.model_dump() | {"project_path": project_path}))  # type: ignore
+        )
 
     new_settings = get_settings()
 
@@ -148,7 +150,7 @@ async def _perform_clear_operation(
         display: StatusDisplay for output
 
     Raises:
-        SystemExit: If user cancels operation or error occurs
+        CodeWeaverError: If operation fails
     """
     from codeweaver.common.registry.provider import get_provider_registry
     from codeweaver.config.indexer import IndexerSettings
@@ -171,69 +173,64 @@ async def _perform_clear_operation(
             display.print_info("Operation cancelled")
             sys.exit(0)
 
-    try:
-        display.print_info("Clearing vector store and checkpoints...")
+    display.print_info("Clearing vector store and checkpoints...")
 
-        # Setup paths and managers
-        indexes_dir = (
-            settings.indexer.cache_dir
-            if isinstance(settings.indexer, IndexerSettings)
-            else get_user_config_dir() / ".indexes"
-        )
+    # Setup paths and managers
+    indexes_dir = (
+        settings.indexer.cache_dir
+        if isinstance(settings.indexer, IndexerSettings)
+        else get_user_config_dir() / ".indexes"
+    )
 
-        checkpoint_mgr = CheckpointManager(
-            project_path=project_path, checkpoint_dir=indexes_dir / "checkpoints"
-        )
-        manifest = FileManifestManager(
-            project_path=project_path, manifest_dir=indexes_dir / "manifests"
-        )
+    checkpoint_mgr = CheckpointManager(
+        project_path=project_path, checkpoint_dir=indexes_dir / "checkpoints"
+    )
+    manifest = FileManifestManager(
+        project_path=project_path, manifest_dir=indexes_dir / "manifests"
+    )
 
-        # Derive collection name
-        collection_name = _derive_collection_name(settings, project_path, checkpoint_mgr)
+    # Derive collection name
+    collection_name = _derive_collection_name(settings, project_path, checkpoint_mgr)
 
-        # Clear vector store
-        from codeweaver.config.providers import ProviderSettings
+    # Clear vector store
+    from codeweaver.config.providers import ProviderSettings
 
-        registry = get_provider_registry()
-        provider = registry.get_provider_enum_for("vector_store")
+    registry = get_provider_registry()
+    provider = registry.get_provider_enum_for("vector_store")
 
-        # Extract provider settings from config
-        provider_config: dict[str, object] = {}
-        if (
-            (provider_settings := settings.provider)
-            and isinstance(provider_settings, ProviderSettings)
-            and (vector_settings := provider_settings.vector_store)
-            and vector_settings is not None
-            and (vector_provider_config := vector_settings.get("provider_settings"))
-        ):
-            # Copy provider_settings (url, collection_name, etc.)
-            provider_config = dict(vector_provider_config)
-            # Add api_key from parent level if present
-            if api_key := vector_settings.get("api_key"):
-                provider_config["api_key"] = api_key
+    # Extract provider settings from config
+    provider_config: dict[str, object] = {}
+    if (
+        (provider_settings := settings.provider)
+        and isinstance(provider_settings, ProviderSettings)
+        and (vector_settings := provider_settings.vector_store)
+        and vector_settings is not None
+        and (vector_provider_config := vector_settings.get("provider_settings"))
+    ):
+        # Copy provider_settings (url, collection_name, etc.)
+        provider_config = dict(vector_provider_config)
+        # Add api_key from parent level if present
+        if api_key := vector_settings.get("api_key"):
+            provider_config["api_key"] = api_key
 
-        store = registry.create_provider(provider, "vector_store", config=provider_config)  # type: ignore
+    store = registry.create_provider(provider, "vector_store", config=provider_config)  # type: ignore
 
-        await store._initialize()
-        await_result = await store.delete_collection(collection_name)
+    await store._initialize()
+    await_result = await store.delete_collection(collection_name)
 
-        if await_result:
-            display.print_success(f"Vector store collection '{collection_name}' deleted")
-        else:
-            display.print_info(f"Vector store collection '{collection_name}' did not exist")
+    if await_result:
+        display.print_success(f"Vector store collection '{collection_name}' deleted")
+    else:
+        display.print_info(f"Vector store collection '{collection_name}' did not exist")
 
-        # Clear checkpoints and manifests
-        checkpoint_mgr.delete()
-        display.print_success("Checkpoints cleared")
-        manifest.delete()
-        display.print_success("File manifest cleared")
+    # Clear checkpoints and manifests
+    checkpoint_mgr.delete()
+    display.print_success("Checkpoints cleared")
+    manifest.delete()
+    display.print_success("File manifest cleared")
 
-        display.print_success("Clear operation complete")
-        display.console.print()
-
-    except Exception as e:
-        display.print_error(f"Error during clear operation: {e}")
-        raise
+    display.print_success("Clear operation complete")
+    display.console.print()
 
 
 def _handle_server_status(*, standalone: bool, display: StatusDisplay) -> bool:
@@ -265,23 +262,13 @@ def _check_and_print_server_status(display: StatusDisplay):
     display.console.print()
     display.print_info("The CodeWeaver server automatically indexes your codebase")
     display.console.print("  • Initial indexing runs on server startup")
-    _print_status_series(
-        display,
-        "  • File watcher monitors for changes in real-time",
-        "[cyan]To check indexing status:[/cyan]",
-    )
-    _print_status_series(
-        display,
-        "  curl http://localhost:9328/health/ | jq '.indexing'",
-        "[dim]Tip: Use --standalone to run indexing without the server[/dim]",
-    )
-    return False
-
-
-def _print_status_series(display: StatusDisplay, message: str, tip: str):
-    display.console.print(message)
+    display.console.print("  • File watcher monitors for changes in real-time")
     display.console.print()
-    display.console.print(tip)
+    display.console.print("[cyan]To check indexing status:[/cyan]")
+    display.console.print("  curl http://localhost:9328/health/ | jq '.indexing'")
+    display.console.print()
+    display.console.print("[dim]Tip: Use --standalone to run indexing without the server[/dim]")
+    return False
 
 
 async def _run_standalone_indexing(
@@ -298,7 +285,7 @@ async def _run_standalone_indexing(
         display: StatusDisplay for output
 
     Raises:
-        SystemExit: On completion or error
+        CodeWeaverError: If indexing fails
     """
     from codeweaver.engine.indexer import Indexer, IndexingProgressTracker
 
@@ -380,7 +367,7 @@ async def index(
         clear: If True, clear vector store and checkpoints before indexing
         yes: If True, skip confirmation prompts
     """
-    display = _display or get_status_display()
+    display = _display or get_display()
     error_handler = CLIErrorHandler(display, verbose=False, debug=False)
 
     try:
@@ -402,10 +389,12 @@ async def index(
 
     except CodeWeaverError as e:
         error_handler.handle_error(e, "Indexing", exit_code=1)
+
     except KeyboardInterrupt:
         display.console.print()
         display.print_warning("Indexing cancelled by user")
         sys.exit(130)
+
     except Exception as e:
         error_handler.handle_error(e, "Indexing", exit_code=1)
 

@@ -21,25 +21,21 @@ from rich.table import Table
 
 from codeweaver.agent_api.find_code.intent import IntentType
 from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
-from codeweaver.cli.ui.status_display import get_status_display
+from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.cli.utils import resolve_project_root
+from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.settings import get_settings_map
 from codeweaver.exceptions import CodeWeaverError
-from codeweaver.utils.utils import get_user_config_dir
 
 
 if TYPE_CHECKING:
-    from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay
     from codeweaver.config.settings import CodeWeaverSettings
     from codeweaver.config.types import CodeWeaverSettingsDict
     from codeweaver.core.types.dictview import DictView
 
-_display: StatusDisplay = get_status_display()
-console = _display.console
+_display: StatusDisplay = get_display()
 logger = logging.getLogger(__name__)
 app = App(help="Search your codebase from the command line.")
-
-rich_print = console.print
 
 
 async def _index_exists(settings: DictView[CodeWeaverSettingsDict]) -> bool:
@@ -164,7 +160,7 @@ async def search(
 
         display.print_info(f"Searching in: {settings['project_path']}")
         display.print_info(f"Query: {query}")
-        display.console.print()
+        display.print_info("")  # Empty line for spacing
 
         from codeweaver.server.app_bindings import find_code_tool
 
@@ -179,23 +175,23 @@ async def search(
 
         # Check for error status in response
         if response.status.lower() == "error":
-            display.console.print()
+            display.print_info("")  # Empty line for spacing
             display.print_error(f"Configuration Error: {response.summary}")
-            display.console.print()
+            display.print_info("")  # Empty line for spacing
 
             # Check if error is about missing embedding providers
             if "embedding providers" in response.summary.lower():
-                display.console.print("[yellow]To fix this:[/yellow]")
-                display.console.print(
-                    "  [yellow]•[/yellow] Set VOYAGE_API_KEY environment variable for cloud embeddings"
+                display.print_warning("To fix this:")
+                display.print_info(
+                    "  • Set VOYAGE_API_KEY environment variable for cloud embeddings"
                 )
-                display.console.print(
-                    "  [yellow]•[/yellow] Or use a local embedding provider in your config, `fastembed` is in the default install."
+                display.print_info(
+                    "  • Or use a local embedding provider in your config, `fastembed` is in the default install."
                 )
-                display.console.print(
-                    "  [yellow]•[/yellow] You can use the `codeweaver init` command to set up a config file. Use `codeweaver init --config-only` to just create the config with the recommended profile, or for a quickstart, local-only, profile: `codeweaver init --profile quickstart`."
+                display.print_info(
+                    "  • You can use the `codeweaver init` command to set up a config file. Use `codeweaver init --config-only` to just create the config with the recommended profile, or for a quickstart, local-only, profile: `codeweaver init --profile quickstart`."
                 )
-                display.console.print()
+                display.print_info("")  # Empty line for spacing
             sys.exit(1)
 
         # Limit results for CLI display
@@ -203,7 +199,8 @@ async def search(
 
         # Output results in requested format
         if output_format == "json":
-            rich_print(response.model_dump_json(indent=2))
+            # JSON output uses console.print for proper formatting
+            display.console.print(response.model_dump_json(indent=2))
 
         elif output_format == "table":
             _display_table_results(query, response, limited_matches, display)
@@ -226,8 +223,8 @@ def _display_table_results(
     display: StatusDisplay,
 ) -> None:
     """Display search results as a table using serialize_for_cli."""
-    display.console.print()
-    display.console.print(f"[bold green]Search Results for: '{query}'[/bold green]")
+    display.print_info("")  # Empty line for spacing
+    display.print_success(f"Search Results for: '{query}'")
 
     # Use the built-in CLI summary from FindCodeResponseSummary
     summary_table = response.assemble_cli_summary()
@@ -237,11 +234,13 @@ def _display_table_results(
     if matches:
         _display_match_details(matches, display)
     else:
-        display.console.print("\n[yellow]No matches found[/yellow]")
+        display.print_warning("No matches found")
 
 
 def _display_match_details(matches: Sequence[CodeMatch], display: StatusDisplay) -> None:
-    display.console.print("\n[bold blue]Match Details:[/bold blue]\n")
+    display.print_info("")  # Empty line for spacing
+    display.print_info("Match Details:")
+    display.print_info("")  # Empty line for spacing
 
     table = Table(show_header=True, header_style="bold blue")
     table.add_column("File", style="cyan", no_wrap=True, min_width=30)

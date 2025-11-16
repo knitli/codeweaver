@@ -14,6 +14,7 @@ import pytest
 
 from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
 from codeweaver.common.utils.utils import uuid7
+from codeweaver.config.providers import QdrantConfig
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
 from tests.conftest import create_test_chunk_with_embeddings
@@ -34,7 +35,7 @@ async def test_persistence_across_restarts(qdrant_test_manager):
     collection_name = qdrant_test_manager.create_collection_name("persist")
     await qdrant_test_manager.create_collection(collection_name, dense_vector_size=768)
 
-    config = {"url": qdrant_test_manager.url, "collection_name": collection_name}
+    config = QdrantConfig(url=qdrant_test_manager.url, collection_name=collection_name)
 
     # Phase 1: Initial indexing
     provider1 = QdrantVectorStoreProvider(config=config)

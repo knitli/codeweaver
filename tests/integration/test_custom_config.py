@@ -68,7 +68,7 @@ async def test_custom_configuration():
     })
     # AsyncQdrantClient doesn't accept collection_name - filter it out
     client_config = {k: v for k, v in config.items() if k not in ["collection_name", "batch_size"]}
-    client = AsyncQdrantClient(**client_config)
+    client = AsyncQdrantClient(**client_config)  # ty: ignore[invalid-argument-type]
 
     # Cleanup any existing collection first
     with contextlib.suppress(Exception):

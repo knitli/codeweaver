@@ -20,10 +20,9 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 
 from cyclopts import App
 from pydantic import ValidationError
-from rich.console import Console
 from rich.table import Table
 
-from codeweaver.cli.ui import get_status_display
+from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.cli.utils import get_codeweaver_config_paths
 from codeweaver.common.utils.git import get_project_path, is_git_dir
 from codeweaver.core.types.sentinel import Unset
@@ -31,40 +30,13 @@ from codeweaver.providers.provider import ProviderKind
 
 
 if TYPE_CHECKING:
-    from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay
     from codeweaver.config.providers import ProviderSettings
     from codeweaver.config.settings import CodeWeaverSettings
     from codeweaver.providers.provider import Provider
 
 
 # Module-level display for check functions
-# This allows existing check functions to work without refactoring all of them
-_display: StatusDisplay = get_status_display()
-
-
-class _ConsoleProxy:
-    """Proxy class that dynamically retrieves the current console.
-
-    This ensures check functions always use the current display's console,
-    even when _display is reassigned in the doctor() function.
-    """
-
-    @property
-    def _current_console(self) -> Console:
-        """Get the current display console."""
-        return _display.console
-
-    def print(self, *args: Any, **kwargs: Any):
-        """Proxy print to current console."""
-        return self._current_console.print(*args, **kwargs)
-
-    def input(self, *args: Any, **kwargs: Any):
-        """Proxy input to current console."""
-        return self._current_console.input(*args, **kwargs)
-
-
-# For backward compatibility with check functions
-console = _ConsoleProxy()
+_display: StatusDisplay = get_display()
 
 
 app = App(
@@ -383,7 +355,7 @@ def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
     elif provider == Provider.MEMORY:
         deployment_type = "in-memory"
 
-    console.print(
+    _display.console.print(
         f"\nVector Store: [cyan]{provider.as_title}[/cyan] ({deployment_type})"
         if deployment_type != "unknown"
         else f"\nVector Store: [cyan]{provider.as_title}[/cyan] -- [bold yellow]Unknown Deployment Type[/bold yellow]"
@@ -394,16 +366,16 @@ def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
         case "cloud":
             return _check_qdrant_cloud_api_key(provider, settings, check, url)
         case "local" | "local docker":
-            console.print(
+            _display.console.print(
                 f"  [green]✓[/green] Local Qdrant {'docker container' if deployment_type == 'local docker' else 'install'} detected"
             )
             # Check if Docker is running
-            console.print(
+            _display.console.print(
                 f"  [green]✓[/green] {'Docker' if deployment_type == 'local docker' else 'Local Qdrant'} is running at {url!s}"
             )
         case "unknown":
             user_os = sys.platform
-            console.print("  [yellow]⚠[/yellow] Docker may not be running")
+            _display.print_warning("Docker may not be running")
             check.status = "⚠️"
             check.message = f"We didn't find a running local Qdrant instance at {url!s}"
             check.suggestions = [
@@ -416,7 +388,7 @@ def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
             ]
 
         case "in-memory":
-            console.print(
+            _display.console.print(
                 "  [yellow]⚠[/yellow] You're using in-memory Qdrant. While we do try to persist data to json, this isn't suitable for any serious use. If you're testing or playing around, cool. If not, consider switching to a more robust solution."
             )
             _set_warning_status(
@@ -430,7 +402,7 @@ def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
                     "  [green]✓[/green] Remote Qdrant at ", url, check, "Remote Qdrant at "
                 )
             else:
-                console.print(
+                _display.console.print(
                     "  [yellow]⚠[/yellow] No API key or TLS certificates found for remote Qdrant. This may not be a problem if you have other authentication methods configured outside of the CodeWeaver settings."
                 )
     return check
@@ -444,10 +416,10 @@ def _has_auth_configured(provider: Provider, settings: ProviderSettings) -> bool
 def _check_qdrant_cloud_api_key(
     provider: Provider, settings: ProviderSettings, check: DoctorCheck, url: str | None
 ) -> DoctorCheck:
-    console.print("  [green]✓[/green] Qdrant Cloud detected")
+    _display.console.print("  [green]✓[/green] Qdrant Cloud detected")
     if not _has_auth_configured(provider, settings):
         return _check_qdrant_api_key_env_vars(provider, check)
-    console.print("  [green]✓[/green] We found your api_key for Qdrant Cloud")
+    _display.console.print("  [green]✓[/green] We found your api_key for Qdrant Cloud")
     check.status = "✅"
     check.message = f"Qdrant Cloud at {url}"
     return check
@@ -463,15 +435,15 @@ def _check_qdrant_api_key_env_vars(provider, check) -> DoctorCheck:
 
     if set_vars:
         # Env var is set but not being detected by has_auth_configured
-        console.print(
+        _display.console.print(
             f"  [yellow]⚠[/yellow] Found {', '.join(set_vars)} in environment, but authentication check failed."
         )
-        console.print(
+        _display.console.print(
             "  [yellow]⚠[/yellow] This might be an issue with how the provider checks credentials."
         )
     else:
         # Env var not set
-        console.print(
+        _display.console.print(
             f"  [yellow]⚠[/yellow] You need to set your Qdrant API key. You can set using one of these environment variables: {', '.join(possible_keys)}"
             if len(possible_keys) > 1
             else f"  [yellow]⚠[/yellow] You need to set your Qdrant API key. You can set using the environment variable: {possible_keys[0]}"  # type: ignore
@@ -489,7 +461,7 @@ def _check_qdrant_api_key_env_vars(provider, check) -> DoctorCheck:
 def _print_vector_store_status(
     intro: str, url: str | Any | None, check: DoctorCheck, message: str
 ) -> None:
-    console.print(f"{intro}{url!s}")
+    _display.console.print(f"{intro}{url!s}")
     check.status = "✅"
     check.message = f"{message}{url!s}"
 
@@ -687,13 +659,13 @@ def _print_check_suggestions(
         if check.status == "❌":
             has_failures = True
             if check.suggestions:
-                display.console.print(f"\n[red]✗[/red] [bold]{check.name}[/bold]")
+                display.console.print(f"\n[bold]{check.name}[/bold]")
                 for suggestion in check.suggestions:
                     display.console.print(f"  • {suggestion}")
         elif check.status == "⚠️" and verbose:
             has_warnings = True
             if check.suggestions:
-                display.console.print(f"\n[yellow]⚠[/yellow] [bold]{check.name}[/bold]")
+                display.console.print(f"\n[bold]{check.name}[/bold]")
                 for suggestion in check.suggestions:
                     display.console.print(f"  • {suggestion}")
 

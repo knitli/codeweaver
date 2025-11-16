@@ -340,7 +340,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             logger.exception("Non-retryable error in embedding")
             raise
         else:
-            return result
+            return result  # ty: ignore[invalid-return-type]
 
     @abstractmethod
     async def _embed_documents(
@@ -477,7 +477,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 # Sparse embedding format
                 from codeweaver.providers.embedding.types import SparseEmbedding
 
-                results = [
+                results = [  # ty: ignore[invalid-assignment]
                     SparseEmbedding(
                         indices=result["indices"],  # type: ignore
                         values=result["values"],  # type: ignore
@@ -488,7 +488,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 self._register_chunks(
                     chunks=chunks,  # Already a tuple, no need to convert again
                     batch_id=cast(UUID7, batch_id or cache_key),
-                    embeddings=results,
+                    embeddings=results,  # ty: ignore[invalid-argument-type]
                 )
 
             await log_to_client_or_fallback(
@@ -504,7 +504,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 },
             )
 
-            return results
+            return results  # ty: ignore[invalid-return-type]
 
     @retry(
         stop=stop_after_attempt(5),
@@ -574,11 +574,6 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                     for result in results
                 ]
             return results
-
-    @property
-    def client(self) -> EmbeddingClient:
-        """Get the client for the embedding provider."""
-        return self._client
 
     @property
     def model_name(self) -> str:

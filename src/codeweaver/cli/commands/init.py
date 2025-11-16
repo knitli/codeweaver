@@ -27,23 +27,23 @@ from pydantic_core import from_json as from_json
 from pydantic_core import to_json as to_json
 from rich.prompt import Confirm
 
-from codeweaver.cli.ui import get_status_display
+from codeweaver.cli.ui import CLIErrorHandler, get_display
 from codeweaver.cli.utils import resolve_project_root
 from codeweaver.common.utils.utils import get_user_config_dir
+from codeweaver.exceptions import CodeWeaverError
 
 
 if TYPE_CHECKING:
-    from rich.console import Console
-
     from codeweaver.cli.ui import StatusDisplay
     from codeweaver.config.mcp import CodeWeaverMCPConfig, StdioCodeWeaverConfig
 
-_display: StatusDisplay = get_status_display()
-console: Console = _display.console
+_display: StatusDisplay = get_display()
 
 # Create cyclopts app at module level
 app = cyclopts.App(
-    "init", help="Initialize CodeWeaver configuration and MCP client setup.", console=console
+    "init",
+    help="Initialize CodeWeaver configuration and MCP client setup.",
+    console=_display.console,
 )
 
 
@@ -101,7 +101,7 @@ def _create_codeweaver_config(
 
     settings = get_settings()
     _settings_view = update_settings(
-        **({"project_path": project_path, "config_file": config_path} | (deployment_profile or {}))
+        **({"project_path": project_path, "config_file": config_path} | (deployment_profile or {}))  # type: ignore
     )
     # The reference should reflect the updated settings, but we'll refetch to be sure
     settings = get_settings()
@@ -175,11 +175,10 @@ def config(
         force: Overwrite existing configuration file
     """
     display = _display
-    display.command_header(
-        "init config",
-        "Initialize CodeWeaver configuration file.",
-        "create a CodeWeaver configuration file.",
-    )
+    error_handler = CLIErrorHandler(display)
+
+    display.print_command_header("init config", "Initialize CodeWeaver configuration file.")
+
     if quickstart:
         profile = "quickstart"
 
@@ -187,11 +186,15 @@ def config(
     project_path = project or resolve_project_root()
     parsed_vector_url: AnyHttpUrl | None = None
     if vector_deployment == "cloud" and not vector_url:
-        display.print_error(
-            "Vector URL is required for cloud vector deployment.",
-            details="Please provide a valid --vector-url when using --vector-deployment=cloud.",
+        error_handler.handle_error(
+            CodeWeaverError(
+                "Vector URL is required for cloud vector deployment. "
+                "Please provide a valid --vector-url when using --vector-deployment=cloud."
+            ),
+            "Configuration validation",
+            exit_code=1,
         )
-        sys.exit(1)
+
     if not config_path:
         if config_level == "local":
             config_path = project_path / f"codeweaver.local.{config_extension}"
@@ -201,13 +204,16 @@ def config(
             config_path = get_user_config_dir() / f"codeweaver.{config_extension}"
 
     if not project_path.is_dir():
-        display.print_error(
-            "Project path is not a directory.",
-            details=f"Please provide a valid project path. Current path: {project_path} is not a directory.",
+        error_handler.handle_error(
+            CodeWeaverError(
+                f"Project path is not a directory: {project_path}. "
+                "Please provide a valid project path."
+            ),
+            "Project validation",
+            exit_code=1,
         )
-        sys.exit(1)
 
-    console.print(f"[dim]Project:[/dim] {project_path}\n")
+    display.console.print(f"[dim]Project:[/dim] {project_path}\n")
 
     # Determine final config path
     final_config_path = config_path or project_path / "codeweaver.toml"
@@ -408,6 +414,8 @@ def _handle_write_output(
     from codeweaver.config.mcp import MCPConfig
 
     display = _display
+    error_handler = CLIErrorHandler(display)
+
     try:
         # Determine config file path
         if file_path:
@@ -439,8 +447,8 @@ def _handle_write_output(
                     # Standard format - validate directly
                     config_file = MCPConfig.model_validate(config_data)
             except Exception as e:
-                console.print(
-                    f"[yellow]Warning: Could not parse existing config file at {config_path!s}. Creating new one. Error: {e}[/yellow]"
+                display.print_warning(
+                    f"Could not parse existing config file at {config_path!s}. Creating new one. Error: {e}"
                 )
                 # Create new empty config
                 config_file = MCPConfig.model_validate({"mcpServers": {}})
@@ -476,14 +484,14 @@ def _handle_write_output(
 
         display.print_success(f"MCP config written: {config_path}\n")
         display.print_info("Configuration details:")
-        display.print_json(mcp_config.model_dump_json(exclude_none=True))
+        display.console.print(mcp_config.model_dump_json(exclude_none=True, indent=2))
 
     except ValueError as e:
-        display.print_error(f"Configuration error: {e}")
-        sys.exit(1)
-    except Exception:
-        display.console.print_exception()
-        sys.exit(1)
+        error_handler.handle_error(
+            CodeWeaverError(f"Configuration error: {e}"), "MCP configuration", exit_code=1
+        )
+    except Exception as e:
+        error_handler.handle_error(e, "MCP configuration write", exit_code=1)
 
 
 def handle_output(
@@ -505,12 +513,14 @@ def handle_output(
         project_path: Path to project directory
     """
     display = _display
+    error_handler = CLIErrorHandler(display)
+
     match output:
         case "write":
             _handle_write_output(mcp_config, config_level, client, file_path, project_path)
         case "print":
             display.print_info("MCP Client Configuration:")
-            display.print_json(mcp_config.model_dump_json())
+            display.console.print(mcp_config.model_dump_json(indent=2))
         case "copy":
             try:
                 import pyperclip
@@ -518,9 +528,14 @@ def handle_output(
                 pyperclip.copy(mcp_config.model_dump_json())
                 display.print_success("MCP configuration copied to clipboard.")
             except ImportError:
-                # TODO: Offer to install pyperclip?
-                display.print_error("pyperclip not installed. Cannot copy to clipboard.")
-                sys.exit(1)
+                error_handler.handle_error(
+                    CodeWeaverError(
+                        "pyperclip not installed. Cannot copy to clipboard. "
+                        "Install with: pip install pyperclip"
+                    ),
+                    "Clipboard operation",
+                    exit_code=1,
+                )
 
 
 @app.command
@@ -632,13 +647,13 @@ def mcp(
         file_path: Custom file path for configuration output
     """
     display = _display
-    display.command_header("init mcp", "Initialize MCP client configuration for CodeWeaver.")
+    display.print_command_header("init mcp", "Initialize MCP client configuration for CodeWeaver.")
     display.print_section("MCP Client Configuration Setup")
 
     # Determine project path
     project_path = project or resolve_project_root()
     project_path = Path(project_path).resolve()
-    display.print(f"[dim]Project:[/dim] {project_path}\n")
+    display.console.print(f"[dim]Project:[/dim] {project_path}\n")
 
     # Determine transport and create appropriate config
     if transport == "stdio":
@@ -651,7 +666,7 @@ def mcp(
             authentication=authentication,
             transport="stdio",
         )
-        console.print("[dim]Transport:[/dim] stdio (launches CodeWeaver per-session)\n")
+        display.console.print("[dim]Transport:[/dim] stdio (launches CodeWeaver per-session)\n")
     else:
         # Create HTTP config
         config = _create_remote_config(
@@ -662,7 +677,9 @@ def mcp(
             authentication=authentication,
             transport="streamable-http",
         )
-        console.print(f"[dim]Transport:[/dim] streamable-http (connects to {host}:{port})\n")
+        display.console.print(
+            f"[dim]Transport:[/dim] streamable-http (connects to {host}:{port})\n"
+        )
 
     # Handle output
     handle_output(config, output, config_level, client, file_path, project_path)
@@ -769,9 +786,12 @@ def init(
         codeweaver init --transport stdio    # Use stdio transport (not recommended)
     """
     display = _display
+    error_handler = CLIErrorHandler(display)
+
     display.print_command_header(
         "init", "Create a CodeWeaver config and/or add CodeWeaver to your MCP clients."
     )
+
     if quickstart:
         profile = "quickstart"
 
@@ -779,19 +799,28 @@ def init(
     parsed_vector_url: AnyHttpUrl | None = None
     if vector_deployment == "cloud":
         if not vector_url:
-            display.print_error("You must provide --vector-url when --vector-deployment=cloud")
-            sys.exit(1)
+            error_handler.handle_error(
+                CodeWeaverError("You must provide --vector-url when --vector-deployment=cloud"),
+                "Configuration validation",
+                exit_code=1,
+            )
         parsed_vector_url = AnyHttpUrl(vector_url) if vector_url else None
 
     # Determine project path
     project_path = (project or resolve_project_root()).resolve()
     if not project_path.exists():
-        display.print_error(f"Project path does not exist: {project_path}")
-        sys.exit(1)
+        error_handler.handle_error(
+            CodeWeaverError(f"Project path does not exist: {project_path}"),
+            "Project validation",
+            exit_code=1,
+        )
 
     if not project_path.is_dir():
-        display.print_error(f"Path is not a directory: {project_path}")
-        sys.exit(1)
+        error_handler.handle_error(
+            CodeWeaverError(f"Path is not a directory: {project_path}"),
+            "Project validation",
+            exit_code=1,
+        )
 
     display.print_info(f"Project: {project_path}\n")
 
@@ -831,11 +860,7 @@ def init(
                 transport=transport,
             )
         except Exception as e:
-            console.print(f"[red]✗[/red] Failed to create MCP config: {e}")
-            import traceback
-
-            console.print(f"[dim]{traceback.format_exc()}[/dim]")
-            sys.exit(1)
+            error_handler.handle_error(e, "MCP configuration", exit_code=1)
 
     # Final Instructions
     display.print_section("Setup Complete!")
@@ -894,15 +919,15 @@ def init(
 def main() -> None:
     """CLI entry point for init command."""
     display = _display
+    error_handler = CLIErrorHandler(display)
+
     try:
         app()
     except KeyboardInterrupt:
         display.print_warning("Looks like you cancelled the operation. Exiting.")
         sys.exit(0)
-    except Exception:
-        display.print_error("CodeWeaver init command failed")
-        display.console.print_exception()
-        sys.exit(1)
+    except Exception as e:
+        error_handler.handle_error(e, "Init command", exit_code=1)
 
 
 if __name__ == "__main__":

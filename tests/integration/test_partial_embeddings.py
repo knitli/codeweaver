@@ -28,13 +28,15 @@ async def test_partial_embeddings(qdrant_test_manager):
     Edge Case: Partial embedding failure
     Then: Store chunk with sparse-only and mark as 'incomplete'
     """
+    from codeweaver.config.providers import QdrantConfig
+
     # Create unique collection
     collection_name = qdrant_test_manager.create_collection_name("partial")
     await qdrant_test_manager.create_collection(
         collection_name, dense_vector_size=768, sparse_vector_size=1000
     )
 
-    config = {"url": qdrant_test_manager.url, "collection_name": collection_name}
+    config = QdrantConfig(url=qdrant_test_manager.url, collection_name=collection_name)
     provider = QdrantVectorStoreProvider(config=config)
     await provider._initialize()
 

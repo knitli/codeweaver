@@ -256,7 +256,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         """Get vectors for a sequence of texts."""
         response = await self.client.embeddings.create(
             input=cast(list[str], texts),
-            **(
+            **(  # ty: ignore[invalid-argument-type]
                 self.doc_kwargs
                 | (
                     {k: v for k, v in kwargs.items() if k in self.valid_client_kwargs}
@@ -322,7 +322,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
             ),
             Provider.HEROKU: try_for_heroku_endpoint(self.doc_kwargs or {}),
             Provider.AZURE: try_for_azure_endpoint(self.doc_kwargs or {}),
-        }
+        }  # ty: ignore[invalid-return-type]
 
 
 __all__ = ("OpenAIEmbeddingBase",)

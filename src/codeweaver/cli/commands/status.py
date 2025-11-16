@@ -20,10 +20,10 @@ from cyclopts import App
 from pydantic_core import from_json
 from rich.table import Table
 
-from codeweaver.cli.ui import StatusDisplay, get_status_display
+from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 
 
-_display: StatusDisplay = get_status_display()
+_display: StatusDisplay = get_display()
 app = App("status", help="Show CodeWeaver runtime status.")
 
 
@@ -49,9 +49,9 @@ def status(*, verbose: bool = False, watch: bool = False, watch_interval: int = 
     display = _display
 
     if watch:
-        _watch_status(display, verbose, watch_interval)
+        _watch_status(display, verbose=verbose, interval=watch_interval)
     else:
-        _show_status_once(display, verbose)
+        _show_status_once(display, verbose=verbose)
 
 
 def _show_status_once(display: StatusDisplay, *, verbose: bool) -> None:
@@ -64,7 +64,7 @@ def _show_status_once(display: StatusDisplay, *, verbose: bool) -> None:
     if status_data is None:
         _display_server_offline(display, server_url)
     else:
-        _display_full_status(display, status_data, verbose)
+        _display_full_status(display, status_data, verbose=verbose)
 
 
 def _watch_status(display: StatusDisplay, *, verbose: bool, interval: int) -> None:
@@ -87,7 +87,7 @@ def _watch_status(display: StatusDisplay, *, verbose: bool, interval: int) -> No
             if status_data is None:
                 _display_server_offline(display, server_url)
             else:
-                _display_full_status(display, status_data, verbose)
+                _display_full_status(display, status_data, verbose=verbose)
 
             time.sleep(interval)
     except KeyboardInterrupt:
@@ -145,11 +145,11 @@ def _display_full_status(
 
     # Indexing status
     if "indexing" in status_data:
-        _display_indexing_status(display, status_data["indexing"], verbose)
+        _display_indexing_status(display, status_data["indexing"], verbose=verbose)
 
     # Failover status
     if "failover" in status_data:
-        _display_failover_status(display, status_data["failover"], verbose)
+        _display_failover_status(display, status_data["failover"], verbose=verbose)
 
     # Statistics summary
     if "statistics" in status_data and verbose:
@@ -283,7 +283,8 @@ def _format_duration(seconds: float) -> str:
 
 if __name__ == "__main__":
     display = _display
+    error_handler = CLIErrorHandler(display, verbose=True, debug=True)
     try:
         app()
     except Exception as e:
-        display.print_error("Fatal error running status command.", exception=e)
+        error_handler.handle_error(e, "Status command", exit_code=1)

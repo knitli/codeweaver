@@ -107,7 +107,7 @@ async def run(
         from codeweaver.config.settings import update_settings
 
         logger.debug("Type of server_setup['settings']: %s", type(server_setup["settings"]))
-        _ = update_settings(**{
+        _ = update_settings(**{  # ty: ignore[invalid-argument-type]
             **server_setup["settings"].model_dump(),
             "project_path": project_path,
         })
@@ -118,7 +118,7 @@ async def run(
     server_setup["app"], server_setup["middleware"] = await register_app_bindings(  # type: ignore
         server_setup["app"],
         cast(set[Middleware], middleware),
-        server_setup.get("middleware_settings", {}),
+        server_setup.get("middleware_settings", {}),  # ty: ignore[invalid-argument-type]
     )
     server_setup["app"] = register_tool(server_setup["app"])
     await start_server(server_setup)

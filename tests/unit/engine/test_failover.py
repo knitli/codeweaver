@@ -149,7 +149,7 @@ class TestSyncPrimaryToBackup:
         # Verify temp file was cleaned up
         backup_dir = tmp_path / ".codeweaver" / "backup"
         temp_files = list(backup_dir.glob("*.tmp"))
-        assert len(temp_files) == 0
+        assert not temp_files
 
     @pytest.mark.asyncio
     async def test_handles_pagination(self, tmp_path: Path):
@@ -503,7 +503,7 @@ class TestSyncBackToPrimary:
                 # Verify restored to primary
                 assert manager._active_store == primary
                 assert not manager._failover_active
-                assert len(manager._failover_chunks) == 0
+                assert not manager._failover_chunks
 
     @pytest.mark.asyncio
     async def test_restore_stays_in_backup_on_sync_failure(self, tmp_path: Path):

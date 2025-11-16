@@ -13,11 +13,11 @@ import cyclopts
 from cyclopts import App
 from pydantic import FilePath
 
-from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_status_display
+from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.exceptions import CodeWeaverError
 
 
-_display: StatusDisplay = get_status_display()
+_display: StatusDisplay = get_display()
 app = App("server", help="Start CodeWeaver MCP server.")
 
 

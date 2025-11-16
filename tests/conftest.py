@@ -5,7 +5,11 @@
 
 """Global pytest configuration and fixtures for CodeWeaver tests."""
 
+import contextlib
+
 from pathlib import Path
+from types import GeneratorType
+from typing import UUID, cast
 
 import pytest
 
@@ -59,7 +63,7 @@ async def qdrant_client_cleanup():
     """
     collections_to_cleanup = []
 
-    async def cleanup(client: AsyncQdrantClient, collection_name: str):
+    async def cleanup(client: AsyncQdrantClient, collection_name: str) -> None:
         """Clean up a Qdrant collection."""
         if collection_name:
             collections_to_cleanup.append((client, collection_name))
@@ -68,15 +72,12 @@ async def qdrant_client_cleanup():
 
     # Cleanup all collections at test end
     for client, collection_name in collections_to_cleanup:
-        try:
+        with contextlib.suppress(Exception):
             await client.delete_collection(collection_name=collection_name)
-        except Exception:
-            # Ignore cleanup errors - collection might not exist
-            pass
 
 
 @pytest.fixture
-def temp_test_file(tmp_path: Path):
+def temp_test_file(tmp_path: Path) -> Path:
     """Create a temporary test file."""
     test_file = tmp_path / "test_code.py"
     test_file.write_text("def test_function():\n    pass\n")
@@ -84,7 +85,7 @@ def temp_test_file(tmp_path: Path):
 
 
 @pytest.fixture(autouse=True)
-def clear_semantic_chunker_stores():
+def clear_semantic_chunker_stores() -> GeneratorType:
     """Clear SemanticChunker class-level deduplication stores before each test.
 
     This prevents test interference where chunks from one test are marked as
@@ -274,14 +275,14 @@ def create_test_chunk_with_embeddings(
 
     if dense_embedding:
         dense_info = EmbeddingBatchInfo.create_dense(
-            batch_id=dense_batch_id,
+            batch_id=cast(UUID, dense_batch_id),
             batch_index=0,
             chunk_id=chunk_id,
             model="test-dense-model",
             embeddings=dense_embedding,
         )
         # Set batch key on chunk
-        dense_batch_key = BatchKeys(id=dense_batch_id, idx=0, sparse=False)
+        dense_batch_key = BatchKeys(id=cast(UUID, dense_batch_id), idx=0, sparse=False)
         chunk = chunk.set_batch_keys(dense_batch_key)
 
     if sparse_embedding:
@@ -292,14 +293,14 @@ def create_test_chunk_with_embeddings(
             indices=sparse_embedding.get("indices", []), values=sparse_embedding.get("values", [])
         )
         sparse_info = EmbeddingBatchInfo.create_sparse(
-            batch_id=sparse_batch_id,
+            batch_id=cast(UUID, sparse_batch_id),
             batch_index=0,
             chunk_id=chunk_id,
             model="test-sparse-model",
             embeddings=sparse_emb,
         )
         # Set batch key on chunk
-        sparse_batch_key = BatchKeys(id=sparse_batch_id, idx=0, sparse=True)
+        sparse_batch_key = BatchKeys(id=cast(UUID, sparse_batch_id), idx=0, sparse=True)
         chunk = chunk.set_batch_keys(sparse_batch_key)
 
     # Register in the embedding registry

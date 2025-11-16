@@ -13,8 +13,11 @@ from pathlib import Path
 import pytest
 
 from codeweaver.common.utils.utils import uuid7
+from codeweaver.config.providers import QdrantConfig
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+
+# sourcery skip: dont-import-test-modules
 from tests.conftest import create_test_chunk_with_embeddings
 
 
@@ -33,7 +36,7 @@ async def test_incremental_updates(qdrant_test_manager):
     collection_name = qdrant_test_manager.create_collection_name("incremental")
     await qdrant_test_manager.create_collection(collection_name, dense_vector_size=768)
 
-    config = {"url": qdrant_test_manager.url, "collection_name": collection_name}
+    config = QdrantConfig(url=qdrant_test_manager.url, collection_name=collection_name)
     provider = QdrantVectorStoreProvider(config=config)
     await provider._initialize()
 

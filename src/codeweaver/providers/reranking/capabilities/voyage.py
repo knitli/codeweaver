@@ -47,7 +47,11 @@ def _voyage_max_limit(chunks: list[CodeChunk], query: str) -> tuple[bool, NonNeg
         ) from e
     tokenizer = get_tokenizer("tokenizers", "voyageai/voyage-rerank-2.5")
     stringified_chunks = [chunk.serialize_for_embedding() for chunk in chunks]
-    sizes = [tokenizer.estimate(chunk) + tokenizer.estimate(query) for chunk in stringified_chunks]
+    sizes = [
+        tokenizer.estimate(chunk if isinstance(chunk, str | bytes) else chunk.content)
+        + tokenizer.estimate(query)
+        for chunk in stringified_chunks
+    ]
     too_large = sum(sizes) > 600_000
     too_many = len(stringified_chunks) > 1000
     too_big = any(size > 32_000 for size in sizes)
@@ -64,7 +68,9 @@ def _voyage_max_limit(chunks: list[CodeChunk], query: str) -> tuple[bool, NonNeg
         truncated_chunks = chunks[:1000]
         truncated_strings = [chunk.serialize_for_embedding() for chunk in truncated_chunks]
         truncated_sizes = [
-            tokenizer.estimate(c) + tokenizer.estimate(query) for c in truncated_strings
+            tokenizer.estimate(c if isinstance(c, str | bytes) else c.content)
+            + tokenizer.estimate(query)
+            for c in truncated_strings
         ]
         # If still too large, determine where to cut; otherwise accept the truncated set.
         if sum(truncated_sizes) > 600_000:

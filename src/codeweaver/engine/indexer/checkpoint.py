@@ -19,7 +19,8 @@ import re
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, TypedDict, cast
+from uuid import UUID
 
 from pydantic import UUID7, DirectoryPath, Field, NonNegativeInt
 from pydantic_core import from_json, to_json
@@ -34,7 +35,7 @@ from codeweaver.config.providers import (
     SparseEmbeddingProviderSettings,
     VectorStoreProviderSettings,
 )
-from codeweaver.core.stores import BlakeHashKey, get_blake_hash
+from codeweaver.core.stores import BlakeHashKey, BlakeKey, get_blake_hash
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.sentinel import Unset
@@ -132,16 +133,16 @@ def _get_settings_map() -> DictView[CheckpointSettingsFingerprint]:
     return DictView(
         CheckpointSettingsFingerprint(
             indexer=indexer_map,  # type: ignore[typeddict-item]
-            embedding_provider=tuple(settings.provider.embedding)
+            embedding_provider=tuple(settings.provider.embedding)  # ty: ignore[invalid-argument-type]
             if settings.provider.embedding
             else None,
-            reranking_provider=tuple(settings.provider.reranking)
+            reranking_provider=tuple(settings.provider.reranking)  # ty: ignore[invalid-argument-type]
             if settings.provider.reranking
             else None,
-            sparse_provider=tuple(settings.provider.sparse_embedding)
+            sparse_provider=tuple(settings.provider.sparse_embedding)  # ty: ignore[invalid-argument-type]
             if settings.provider.sparse_embedding
             else None,
-            vector_store=tuple(settings.provider.vector_store)
+            vector_store=tuple(settings.provider.vector_store)  # ty: ignore[invalid-argument-type]
             if settings.provider.vector_store
             else None,
             project_path=settings.project_path,
@@ -159,7 +160,7 @@ class IndexingCheckpoint(BasedModel):
 
     session_id: Annotated[
         UUID7, Field(description="Unique session identifier (UUIDv7) for this indexing checkpoint")
-    ] = uuid7()  # type: ignore
+    ] = cast(UUID, uuid7())  # type: ignore
     project_path: Annotated[Path | None, Field(description="Path to the indexed codebase")] = Field(
         default_factory=lambda: _get_settings_map().get("project_path")
     )
@@ -224,11 +225,11 @@ class IndexingCheckpoint(BasedModel):
             self.project_path = self.project_path.resolve()
         if not self.settings_hash:
             if data.get("settings_hash") is str:
-                self.settings_hash = BlakeHashKey(data["settings_hash"])
+                self.settings_hash = BlakeKey(data["settings_hash"])
             elif data.get("settings_hash") is object and hasattr(
                 data["settings_hash"], "hexdigest"
             ):
-                self.settings_hash = BlakeHashKey(data["settings_hash"].hexdigest())
+                self.settings_hash = BlakeKey(data["settings_hash"].hexdigest())
             else:
                 self.settings_hash = self.current_settings_hash()
 

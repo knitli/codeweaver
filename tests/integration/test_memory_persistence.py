@@ -17,6 +17,7 @@ import pytest
 from codeweaver.common.utils.utils import uuid7
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
+from codeweaver.config.providers import MemoryConfig
 
 # sourcery skip: dont-import-test-modules
 from tests.conftest import create_test_chunk_with_embeddings
@@ -36,11 +37,9 @@ async def test_inmemory_persistence():
     """
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_path = Path(tmpdir) / "test_memory.json"
-        config = {
-            "persist_path": str(temp_path),
-            "auto_persist": True,
-            "collection_name": "test_memory",
-        }
+        config = MemoryConfig(
+            persist_path=temp_path, auto_persist=True, collection_name="test_memory"
+        )
 
         # Phase 1: Create and populate
         provider1 = MemoryVectorStoreProvider(_provider=Provider.MEMORY, config=config)

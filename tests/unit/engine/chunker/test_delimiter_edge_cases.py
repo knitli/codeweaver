@@ -244,8 +244,12 @@ function outer() {
         assert len(chunks) > 0, "Should produce chunks from nested structure"
 
         # Verify nesting information in metadata
-        nesting_levels = [chunk.metadata.get("nesting_level", 0) for chunk in chunks]
-        assert max(nesting_levels) > 0, "Should track nesting levels"
+        nesting_levels = [
+            chunk.metadata.get("nesting_level", 0) if chunk.metadata else 0 for chunk in chunks
+        ]
+        # Filter out None values and ensure we have valid integers
+        valid_nesting_levels = [level for level in nesting_levels if level is not None]
+        assert valid_nesting_levels and max(valid_nesting_levels) > 0, "Should track nesting levels"  # noqa: PT018
 
     def test_overlapping_delimiter_resolution(
         self, delimiter_chunker: DelimiterChunker, tmp_path: Path

@@ -433,7 +433,7 @@ class Indexer(BasedModel):
                         "phase": "discovery",
                         "file_path": str(path),
                         "file_size": discovered_file.size,
-                        "file_language": discovered_file.ext_kind.language.as_variable
+                        "file_language": discovered_file.ext_kind.language.variable
                         if discovered_file.ext_kind
                         and isinstance(
                             discovered_file.ext_kind.language,

@@ -49,6 +49,7 @@ from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
 from codeweaver.core.types.sentinel import Unset
+from codeweaver.engine.failover import VectorStoreFailoverManager
 from codeweaver.engine.indexer import Indexer
 from codeweaver.exceptions import InitializationError
 from codeweaver.providers.provider import Provider as Provider
@@ -140,7 +141,11 @@ class AppState(DataclassSerializationMixin):
         Indexer | None, Field(default=None, description="Indexer instance for background indexing")
     ] = None
     health_service: Annotated[
-        HealthService | None, Field(description="Health service instance")
+        HealthService | None, Field(description="Health service instance", exclude=True)
+    ] = None
+    failover_manager: Annotated[
+        VectorStoreFailoverManager | None,
+        Field(description="Failover manager instance", exclude=True),
     ] = None
     startup_time: Annotated[
         float, Field(default_factory=time.time, description="Server startup timestamp")
@@ -289,13 +294,16 @@ def _initialize_app_state(
         initialized=False,
         settings=settings,
         statistics=statistics or get_session_statistics._resolve()(),
-        project_path=settings.project_path,
+        project_path=get_project_path()
+        if isinstance(settings.project_path, Unset)
+        else settings.project_path,
         config_path=settings.config_file if settings else get_settings._resolve()().config_file,
         provider_registry=get_provider_registry._resolve()(),
         services_registry=get_services_registry._resolve()(),
         model_registry=get_model_registry._resolve()(),
         middleware_stack=tuple(getattr(app, "middleware", ())),
         health_service=None,  # Initialize as None, will be set after AppState construction
+        failover_manager=None,  # Initialize as None, will be set after AppState construction
         telemetry=PostHogClient.from_settings(),
         indexer=Indexer.from_settings(),
         startup_time=time.time(),
@@ -422,7 +430,8 @@ async def lifespan(
                 f"Sparse embeddings ({health_response.services.sparse_embedding.provider})",
                 health_response.services.sparse_embedding.status,
             )
-
+        if not state.failover_manager:
+            state.failover_manager = VectorStoreFailoverManager()
         status_display.print_ready()
 
         if verbose or debug:
@@ -562,7 +571,7 @@ def _configure_middleware(
         StructuredLoggingMiddleware if use_structured_logging else LoggingMiddleware
     )
     middleware_defaults: MiddlewareOptions = get_default_middleware_settings(app_logger, level)
-    middleware: MiddlewareOptions = middleware_defaults | middleware
+    middleware: MiddlewareOptions = MiddlewareOptions(middleware_defaults | middleware)
     return (middleware, logging_middleware)
 
 

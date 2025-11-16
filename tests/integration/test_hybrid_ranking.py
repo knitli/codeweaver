@@ -14,6 +14,7 @@ import pytest
 
 from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
 from codeweaver.common.utils.utils import uuid7
+from codeweaver.config.providers import QdrantConfig
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
 
@@ -38,7 +39,7 @@ async def test_hybrid_search_ranking(qdrant_test_manager):
         collection_name, dense_vector_size=768, sparse_vector_size=1000
     )
 
-    config = {"url": qdrant_test_manager.url, "collection_name": collection_name}
+    config = QdrantConfig(url=qdrant_test_manager.url, collection_name=collection_name)
     provider = QdrantVectorStoreProvider(config=config)
     await provider._initialize()
 

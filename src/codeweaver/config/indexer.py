@@ -18,7 +18,7 @@ import re
 from collections.abc import Callable
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, NotRequired, TypedDict, cast
 
 from fastmcp.server.middleware import MiddlewareContext
 from pydantic import DirectoryPath, Field, FilePath, PrivateAttr, computed_field
@@ -401,7 +401,7 @@ class IndexerSettings(BasedModel):
         rignore_settings["additional_ignores"] = [
             str(p)
             for p in self.excludes
-            if str(p) not in rignore_settings["additional_ignore_paths"]
+            if str(p) not in cast(list[str], rignore_settings["additional_ignore_paths"])
         ]
         rignore_settings["should_exclude_entry"] = self.filter
         return RignoreSettings(rignore_settings)

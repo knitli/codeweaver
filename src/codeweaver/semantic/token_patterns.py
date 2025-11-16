@@ -245,14 +245,9 @@ class TokenPatternCacheDict(TypedDict):
     not_symbol: re.Pattern[str] | None
 
 
-_token_pattern_cache: TokenPatternCacheDict = {}.fromkeys((
-    "operator",
-    "literal",
-    "identifier",
-    "annotation",
-    "keyword",
-    "not_symbol",
-))
+_token_pattern_cache: TokenPatternCacheDict = {}.fromkeys(  # ty: ignore[invalid-assignment]
+    ("operator", "literal", "identifier", "annotation", "keyword", "not_symbol"), None
+)
 
 # spellchecker:off
 IS_OPERATOR = r"""^

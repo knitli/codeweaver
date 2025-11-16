@@ -579,7 +579,7 @@ class ProviderSettings(BasedModel):
             if "provider_settings" not in new_settings:
                 new_settings["provider_settings"] = {}
             new_settings["provider_settings"]["api_key"] = api_key
-        return settings.copy() | new_settings
+        return VectorStoreProviderSettings(**(settings.copy() | new_settings))  # ty: ignore[missing-typed-dict-key]
 
     def _validate_vector_stores(self) -> tuple[VectorStoreProviderSettings, ...]:
         """Validate vector store settings."""
@@ -608,7 +608,7 @@ class ProviderSettings(BasedModel):
                 new_vector = vector.copy() | {"client_options": {}}
             else:
                 new_vector = self._validate_qdrant(vector)
-            new_vector_store.append(new_vector)
+            new_vector_store.append(new_vector)  # type: ignore[missing-typed-dict-key]
         return tuple(new_vector_store)
 
     @model_validator(mode="after")

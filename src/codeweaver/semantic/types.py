@@ -185,7 +185,7 @@ class NodeTypeDTO(BasedModel):
     def direct_field_children(self) -> dict[LiteralStringT, tuple[SimpleNodeTypeDTO, ...]]:
         """Extract direct field children from the fields mapping."""
         return (
-            {role: tuple(child.types) for role, child in self.fields.items()} if self.fields else {}
+            {role: tuple(child.types) for role, child in self.fields.items()} if self.fields else {}  # ty: ignore[invalid-return-type]
         )
 
     @computed_field

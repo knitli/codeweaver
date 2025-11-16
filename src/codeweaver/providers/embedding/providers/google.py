@@ -138,7 +138,7 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
             if response.embeddings is not None and item
         ] or [[]]
         _ = await self._report_stats(content)
-        return embeddings
+        return embeddings  # ty: ignore[invalid-return-type]
 
     async def _embed_query(self, query: Sequence[str], **kwargs: Any) -> list[list[float]]:
         """
@@ -160,4 +160,4 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
             if response.embeddings is not None and item
         ] or [[]]
         _ = await self._report_stats(content)
-        return embeddings
+        return embeddings  # ty: ignore[invalid-return-type]

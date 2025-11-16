@@ -128,6 +128,7 @@ dependencies = [
   "tokenizers>=0.22.1",
   "tomli-w>=1.2.0",
   "types-boto3-bedrock-agent-runtime>=1.40.61",
+  "types-boto3-bedrock-runtime>=1.40.61",
   "typing_extensions>=4.15.0",
   "uuid7>=0.1.0; python_version < '3.14'",
   "uvicorn[standard]>=0.38.0",
@@ -194,7 +195,6 @@ provider-anthropic = ["pydantic-ai-slim[anthropic]"]
 # we need types for runtime because our implementation is a pydantic model that uses boto3 types
 provider-bedrock = [
   "pydantic-ai-slim[bedrock]",
-  "types-boto3-bedrock-agent-runtime>=1.40.61"
 ]
 provider-cohere = ["pydantic-ai-slim[cohere]"]
 # --- Embedding and Rerank Only --- (no agent)

@@ -23,7 +23,7 @@ from codeweaver.core.file_extensions import (
     DOC_FILES_EXTENSIONS,
 )
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
-from codeweaver.core.types import Unset
+from codeweaver.core.types import DictView, Unset
 
 
 logger = logging.getLogger(__name__)
@@ -221,7 +221,7 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
 
     @classmethod
     def from_settings(
-        cls, settings: CodeWeaverSettingsDict | None = None
+        cls, settings: DictView[CodeWeaverSettingsDict] | None = None
     ) -> IgnoreFilter[rignore.Walker]:
         """Create an IgnoreFilter instance from settings (sync version).
 
@@ -237,12 +237,12 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         """
         from codeweaver.common.utils.git import get_project_path
         from codeweaver.config.indexer import DefaultIndexerSettings, IndexerSettings
-        from codeweaver.config.settings import get_settings
+        from codeweaver.config.settings import get_settings_map
 
-        settings = settings or get_settings()
+        settings = settings or get_settings_map()
         index_settings = (
-            settings.indexer
-            if isinstance(settings.indexer, IndexerSettings)
+            settings["indexer"]
+            if isinstance(settings["indexer"], IndexerSettings)
             else IndexerSettings.model_validate(DefaultIndexerSettings)
         )
 
@@ -261,13 +261,13 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         return cls(
             walker=walker,
             base_path=get_project_path()
-            if isinstance(settings.project_path, Unset)
-            else settings.project_path,
+            if isinstance(settings["project_path"], Unset)
+            else settings["project_path"],
         )
 
     @classmethod
     async def from_settings_async(
-        cls, settings: CodeWeaverSettingsDict | None = None
+        cls, settings: DictView[CodeWeaverSettingsDict] | None = None
     ) -> IgnoreFilter[rignore.Walker]:
         """Create an IgnoreFilter instance from settings with full async initialization.
 
@@ -282,12 +282,12 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         """
         from codeweaver.common.utils.git import get_project_path
         from codeweaver.config.indexer import DefaultIndexerSettings, IndexerSettings
-        from codeweaver.config.settings import get_settings
+        from codeweaver.config.settings import get_settings_map
 
-        settings = settings or get_settings()
+        settings = settings or get_settings_map()
         index_settings = (
-            settings.indexer
-            if isinstance(settings.indexer, IndexerSettings)
+            settings["indexer"]
+            if isinstance(settings["indexer"], IndexerSettings)
             else IndexerSettings.model_validate(DefaultIndexerSettings)
         )
 
@@ -295,8 +295,8 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         if not index_settings.inc_exc_set:
             project_path = (
                 get_project_path()
-                if isinstance(settings.project_path, Unset)
-                else settings.project_path
+                if isinstance(settings["project_path"], Unset)
+                else settings["project_path"]
             )
             await index_settings.set_inc_exc(project_path)
             logger.debug("inc_exc patterns initialized for project: %s", project_path)
@@ -307,8 +307,8 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         return cls(
             walker=walker,
             base_path=get_project_path()
-            if isinstance(settings.project_path, Unset)
-            else settings.project_path,
+            if isinstance(settings["project_path"], Unset)
+            else settings["project_path"],
         )
 
     @property

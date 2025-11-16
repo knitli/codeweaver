@@ -115,7 +115,7 @@ class CodeMatch(BasedModel):
                 details={
                     "start_line": self.span.start,
                     "end_line": self.span.end,
-                    "file_path": str(self.file.abs_path) if self.file else None,
+                    "file_path": str(self.file.path.absolute()) if self.file else None,
                 },
                 suggestions=[
                     "Check that the span coordinates are calculated correctly",
@@ -127,7 +127,7 @@ class CodeMatch(BasedModel):
                 "Invalid span: line numbers must start from 1",
                 details={
                     "start_line": self.span.start,
-                    "file_path": str(self.file.abs_path) if self.file else None,
+                    "file_path": str(self.file.path.absolute()) if self.file else None,
                 },
                 suggestions=[
                     "Verify span calculation logic uses 1-based indexing",

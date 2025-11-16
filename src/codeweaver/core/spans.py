@@ -162,9 +162,9 @@ class Span(DataclassSerializationMixin):
         diff2 = other - self
         result: list[Span] = []
         if diff1:
-            result.extend(diff1 if isinstance(diff1, tuple) else [diff1])
+            result.extend(diff1 if isinstance(diff1, tuple) else [diff1])  # ty: ignore[invalid-argument-type]
         if diff2:
-            result.extend(diff2 if isinstance(diff2, tuple) else [diff2])
+            result.extend(diff2 if isinstance(diff2, tuple) else [diff2])  # ty: ignore[invalid-argument-type]
         return tuple(result) if result else None
 
     def __le__(self, other: Span) -> bool:  # Subset
@@ -413,7 +413,7 @@ class SpanGroup(DataclassSerializationMixin):
                     new_leftovers: list[Span] = []
                     for lf in leftovers:
                         if diff := lf - s2:
-                            new_leftovers.extend(diff if isinstance(diff, tuple) else [diff])
+                            new_leftovers.extend(diff if isinstance(diff, tuple) else [diff])  # ty: ignore[invalid-argument-type]
                     leftovers = new_leftovers
             result.update(leftovers)
         return SpanGroup({r for r in result if r})

@@ -153,7 +153,7 @@ class DiscoveredFile(DataclassSerializationMixin):
     @property
     def size(self) -> NonNegativeInt:
         """Return the size of the file in bytes."""
-        if self.ext_kind and self.ext_kind.self.path.exists() and self.path.is_file():
+        if self.ext_kind and self.path.exists() and self.path.is_file():
             return self.path.stat().st_size
         return 0  # Return 0 for non-existent files (e.g., test fixtures)
 

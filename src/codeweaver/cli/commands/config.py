@@ -8,8 +8,6 @@
 
 from __future__ import annotations
 
-import sys
-
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
@@ -18,29 +16,15 @@ import cyclopts
 from cyclopts import App
 from rich.table import Table
 
-from codeweaver.cli.ui.status_display import get_status_display
-from codeweaver.common import CODEWEAVER_PREFIX
-from codeweaver.core.types.enum import BaseEnum
+from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 
 
 if TYPE_CHECKING:
-    from rich.console import Console
-
-    from codeweaver.cli.ui import StatusDisplay
     from codeweaver.config.types import CodeWeaverSettingsDict
     from codeweaver.core.types.dictview import DictView
 
-display: StatusDisplay = get_status_display()
-console: Console = display.console
-app = App("config", help="Manage and view your CodeWeaver config.", console=console)
-
-
-class ConfigProfile(BaseEnum):
-    """Configuration profiles for quick setup."""
-
-    RECOMMENDED = "recommended"
-    LOCAL_ONLY = "local-only"
-    MINIMAL = "minimal"
+display: StatusDisplay = get_display()
+app = App("config", help="Manage and view your CodeWeaver config.", console=display.console)
 
 
 @app.default()
@@ -49,10 +33,18 @@ def config(
     project_path: Annotated[
         Path | None, cyclopts.Parameter(name=["--project", "-p"], help="Path to project directory")
     ] = None,
+    verbose: Annotated[
+        bool, cyclopts.Parameter(name=["--verbose", "-v"], help="Enable verbose logging")
+    ] = False,
+    debug: Annotated[
+        bool, cyclopts.Parameter(name=["--debug", "-d"], help="Enable debug logging")
+    ] = False,
 ) -> None:
     """Manage CodeWeaver configuration."""
     from codeweaver.config.settings import get_settings_map
     from codeweaver.exceptions import CodeWeaverError
+
+    error_handler = CLIErrorHandler(display, verbose=verbose, debug=debug)
 
     try:
         settings = get_settings_map()
@@ -64,19 +56,16 @@ def config(
         _show_config(settings)
 
     except CodeWeaverError as e:
-        console.print(f"{CODEWEAVER_PREFIX} [red]Configuration Error: {e.message}[/red]")
-        if e.suggestions:
-            console.print(f"{CODEWEAVER_PREFIX} [yellow]Suggestions:[/yellow]")
-            for suggestion in e.suggestions:
-                console.print(f"  • {suggestion}")
-        sys.exit(1)
+        error_handler.handle_error(e, "Configuration", exit_code=1)
+    except Exception as e:
+        error_handler.handle_error(e, "Configuration", exit_code=1)
 
 
 def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
     """Display current configuration."""
     from codeweaver.core.types.sentinel import Unset
 
-    console.print("[bold blue]CodeWeaver Configuration[/bold blue]\n")
+    display.print_command_header("CodeWeaver Configuration")
 
     table = Table(show_header=True, header_style="bold blue")
     table.add_column("Setting", style="cyan", no_wrap=True)
@@ -99,7 +88,7 @@ def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
     )
     table.add_row("Telemetry", "❌" if settings["telemetry"].get("disable_telemetry") else "✅")
 
-    console.print(table)
+    display.print_table(table)
 
     # Provider configuration
     if provider_settings := settings.get("provider"):
@@ -110,11 +99,11 @@ def _show_provider_config(provider_settings: dict) -> None:
     """Display provider configuration details."""
     from codeweaver.core.types.sentinel import Unset
 
-    console.print("\n[bold blue]Provider Configuration[/bold blue]\n")
+    display.print_section("Provider Configuration")
 
     # provider_settings dict directly contains the configs by kind
     if not provider_settings or isinstance(provider_settings, Unset):
-        console.print("[yellow]No providers configured[/yellow]")
+        display.print_warning("No providers configured")
         return
 
     # Group by provider kind - filter to only config dicts/tuples
@@ -166,20 +155,21 @@ def _show_provider_config(provider_settings: dict) -> None:
                 details_str,
             )
 
-        console.print(table)
-        console.print()  # Add spacing between tables
+        display.print_table(table)
+        display.console.print()  # Add spacing between tables
 
 
 def main() -> None:
     """Main entry point for config CLI."""
+    display_instance = StatusDisplay()
+    error_handler = CLIErrorHandler(display_instance, verbose=True, debug=True)
+
     try:
         app()
     except KeyboardInterrupt:
-        console.print(f"\n{CODEWEAVER_PREFIX} [yellow]Operation cancelled by user[/yellow]")
-        sys.exit(0)
+        display_instance.print_warning("Operation cancelled by user")
     except Exception as e:
-        console.print(f"{CODEWEAVER_PREFIX} [red]Fatal error: {e}[/red]")
-        sys.exit(1)
+        error_handler.handle_error(e, "CLI", exit_code=1)
 
 
 if __name__ == "__main__":

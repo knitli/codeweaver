@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Annotated, Any, NoReturn
 
 from fastmcp import Context
 from pydantic import Field, PrivateAttr
+from qdrant_client.client_base import QdrantBase
 
 from codeweaver.common.logging import log_to_client_or_fallback
 from codeweaver.core.types.models import BasedModel
@@ -90,7 +91,7 @@ class VectorStoreFailoverManager(BasedModel):
     _failover_time: Annotated[datetime | None, PrivateAttr()] = None
     _last_health_check: Annotated[datetime | None, PrivateAttr()] = None
     _last_backup_sync: Annotated[datetime | None, PrivateAttr()] = None
-    _failover_chunks: Annotated[set[str], PrivateAttr(default_factory=set)]  # Chunk IDs indexed during failover
+    _failover_chunks: set[str] = PrivateAttr(default_factory=set)
     _last_context: Annotated[Context | None, PrivateAttr()] = None  # For client notifications
 
     async def initialize(
@@ -495,7 +496,9 @@ class VectorStoreFailoverManager(BasedModel):
 
         try:
             # Get all collections
-            collections = await self._backup_store.list_collections()
+            if not (collections := await self._backup_store.list_collections()):
+                logger.debug("No collections in backup store to snapshot")
+                return
 
             # Track existing point IDs
             for collection_name in collections:
@@ -548,7 +551,9 @@ class VectorStoreFailoverManager(BasedModel):
         try:
             # Get all current point IDs from backup
             current_chunks: set[str] = set()
-            collections = await self._backup_store.list_collections()
+            if not (collections := await self._backup_store.list_collections()):
+                logger.debug("No collections in backup store to sync from")
+                return
 
             for collection_name in collections:
                 offset = None
@@ -706,12 +711,9 @@ class VectorStoreFailoverManager(BasedModel):
         """
 
         def _raise_if_closedcircuit() -> NoReturn:
-            from codeweaver.providers.vector_stores.base import CircuitBreakerState
-
-            if self._primary_store.circuit_breaker_state != CircuitBreakerState.CLOSED:
-                raise RuntimeError(
-                    f"Primary vector store's circuit breaker was not closed: {self._primary_store.circuit_breaker_state}"
-                )
+            raise RuntimeError(
+                f"Primary vector store's circuit breaker was not closed: {self._primary_store.circuit_breaker_state}"
+            )
 
         if not self._primary_store:
             raise ValueError("No primary store to verify")
@@ -727,11 +729,18 @@ class VectorStoreFailoverManager(BasedModel):
             # Check 2: Circuit breaker is closed
             from codeweaver.providers.vector_stores.base import CircuitBreakerState
 
-            if self._primary_store.circuit_breaker_state != CircuitBreakerState.CLOSED:
+            if (
+                self._primary_store.circuit_breaker_state != CircuitBreakerState.CLOSED
+                or not self._primary_store
+            ):
                 _raise_if_closedcircuit()
 
             # Check 3: Can get collection info (if collections exist)
-            if collections:
+            if (
+                collections
+                and self._primary_store
+                and issubclass(type(self._primary_store), QdrantBase)
+            ):
                 await self._primary_store.get_collection(collections[0])
                 logger.debug("Primary health check: retrieved collection info")
 
@@ -804,6 +813,9 @@ class VectorStoreFailoverManager(BasedModel):
             collections_response = await self._primary_store.list_collections()
             collections_data = {}
             total_points = 0
+            if not collections_response:
+                logger.debug("No collections in primary store to back up")
+                collections_response = []
 
             for collection_name in collections_response:
                 # Get collection info

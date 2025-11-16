@@ -13,7 +13,7 @@ import time
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypedDict, overload
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypedDict, cast, overload
 
 from pydantic import UUID7, ConfigDict, PrivateAttr
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
@@ -69,20 +69,6 @@ class CircuitBreakerOpenError(Exception):
     """Raised when circuit breaker is open and rejecting requests."""
 
 
-def _get_embedding_settings() -> EmbeddingSettingsDict:
-    """Get embedding model settings for in-memory provider.
-
-    Returns:
-        Embedding model settings dictionary.
-    """
-    from codeweaver.common.registry.provider import get_provider_config_for
-
-    return EmbeddingSettingsDict(
-        dense=get_provider_config_for("embedding"),
-        sparse=get_provider_config_for("sparse_embedding"),
-    )
-
-
 @overload
 def _get_caps(*, sparse: Literal[False] = False) -> EmbeddingModelCapabilities | None: ...
 @overload
@@ -106,6 +92,23 @@ def _get_caps(
     if not sparse and (dense_settings := registry.configured_models_for_kind(kind="embedding")):
         return dense_settings[0] if isinstance(dense_settings, tuple) else dense_settings  # type: ignore
     return None
+
+
+def _get_embedding_settings() -> EmbeddingSettingsDict:
+    """Get embedding model settings for in-memory provider.
+
+    Returns:
+        Embedding model settings dictionary.
+    """
+    from codeweaver.common.registry.provider import get_provider_registry
+
+    registry = get_provider_registry()
+    dense = registry.get_configured_provider_settings("embedding")
+    sparse = registry.get_configured_provider_settings("sparse_embedding")
+    return EmbeddingSettingsDict(
+        dense=dense.get("model_settings") if dense else None,
+        sparse=sparse.get("model_settings") if sparse else None,
+    )
 
 
 def _default_embedding_caps() -> EmbeddingCapsDict:
@@ -269,7 +272,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         dense_settings = self.embedding_settings.get("dense")
         set_dtype = dense_settings.get("data_type") if dense_settings else None
 
-        return set_dtype or default_dtype
+        return cast(Literal["float32", "float16", "int8", "binary"], set_dtype or default_dtype)
 
     @property
     def distance_metric(self) -> Literal["cosine", "dot", "euclidean"]:
@@ -385,14 +388,14 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
     )
     async def _search_with_retry(
         self,
-        vector: list[float] | dict[str, list[float] | Any],
+        vector: StrategizedQuery | MixedQueryInput,
         query_filter: Filter | None = None,
         context: Any = None,
     ) -> list[SearchResult]:
         """Wrapper around search with retry logic and circuit breaker."""
         from codeweaver.common.logging import log_to_client_or_fallback
 
-        self._check_circuit_breaker()
+        _ = self._check_circuit_breaker
 
         try:
             result = await self.search(vector, query_filter)
@@ -486,7 +489,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         """Wrapper around upsert with retry logic and circuit breaker."""
         from codeweaver.common.logging import log_to_client_or_fallback
 
-        self._check_circuit_breaker()
+        _ = self._check_circuit_breaker
 
         await log_to_client_or_fallback(
             context,

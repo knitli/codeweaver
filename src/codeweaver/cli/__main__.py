@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING
 from cyclopts import App, Parameter
 
 from codeweaver import __version__
-from codeweaver.cli.ui import get_status_display
+from codeweaver.cli.ui import get_display
 from codeweaver.common import CODEWEAVER_PREFIX
 
 
@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 
     from codeweaver.cli.ui.status_display import StatusDisplay
 
-display: StatusDisplay = get_status_display()
+display: StatusDisplay = get_display()
 console: Console = display.console
 app = App(
     "codeweaver",

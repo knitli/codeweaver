@@ -684,7 +684,7 @@ class BedrockEmbeddingProvider(
         return [
             self._postprocessor(response, doc)  # type: ignore
             for (response, doc) in zip(responses, documents, strict=True)
-        ]
+        ]  # ty: ignore[invalid-return-type]
 
     async def _embed_query(
         self, query: Sequence[str], **kwargs: Any
@@ -696,9 +696,9 @@ class BedrockEmbeddingProvider(
             requests if isinstance(requests, list) else [requests]
         )
         return [
-            self._postprocessor(response, doc)  # type: ignore
+            self._postprocessor(response, doc)
             for (response, doc) in zip(responses, query, strict=True)
-        ]
+        ]  # ty: ignore[invalid-return-type]
 
 
 __all__ = ("BedrockEmbeddingProvider",)
