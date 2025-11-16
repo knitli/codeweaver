@@ -185,6 +185,7 @@ class TestFindCodeResponseSchema:
                 indexing_state="unknown",
                 index_coverage=1.0,
                 search_mode="hybrid",
+                metadata={},
             )
 
     def test_response_model_creates_valid_instance(self):
@@ -204,6 +205,7 @@ class TestFindCodeResponseSchema:
             indexing_state="unknown",
             index_coverage=1.0,
             search_mode="hybrid",
+            metadata={},
         )
 
         assert isinstance(response, FindCodeResponseSummary)
@@ -438,6 +440,7 @@ class TestContractExamples:
             indexing_state="unknown",
             index_coverage=1.0,
             search_mode="hybrid",
+            metadata={},
         )
 
         # Verify all fields are accessible and have expected types
@@ -489,6 +492,7 @@ class TestTypesSafety:
                 indexing_state="unknown",
                 index_coverage=1.0,
                 search_mode="hybrid",
+                metadata={},
             )
 
     def test_response_schema_serialization(self):
@@ -508,6 +512,7 @@ class TestTypesSafety:
             indexing_state="unknown",
             index_coverage=1.0,
             search_mode="hybrid",
+            metadata={},
         )
 
         # Serialize to dict (JSON-compatible)

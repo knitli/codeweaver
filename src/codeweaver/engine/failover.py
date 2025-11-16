@@ -13,10 +13,12 @@ import logging
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, NoReturn
 
+from fastmcp import Context
 from pydantic import Field, PrivateAttr
 
+from codeweaver.common.logging import log_to_client_or_fallback
 from codeweaver.core.types.models import BasedModel
 from codeweaver.engine.resource_estimation import estimate_backup_memory_requirements
 from codeweaver.providers.vector_stores.base import CircuitBreakerState
@@ -88,7 +90,10 @@ class VectorStoreFailoverManager(BasedModel):
     _failover_time: Annotated[datetime | None, PrivateAttr()] = None
     _last_health_check: Annotated[datetime | None, PrivateAttr()] = None
     _last_backup_sync: Annotated[datetime | None, PrivateAttr()] = None
-    _failover_chunks: Annotated[set[str], PrivateAttr()] = set()  # Chunk IDs indexed during failover
+    _failover_chunks: Annotated[set[str], PrivateAttr()] = (
+        set()
+    )  # Chunk IDs indexed during failover
+    _last_context: Annotated[Context | None, PrivateAttr()] = None  # For client notifications
 
     async def initialize(
         self,
@@ -141,6 +146,14 @@ class VectorStoreFailoverManager(BasedModel):
                 logger.info("Persisted backup state on shutdown")
             except Exception as e:
                 logger.warning("Failed to persist backup on shutdown", exc_info=e)
+
+    def set_context(self, context: Context | None) -> None:
+        """Set the MCP context for client notifications.
+
+        Args:
+            context: FastMCP context from current request
+        """
+        self._last_context = context
 
     @property
     def active_store(self) -> VectorStoreProvider | None:
@@ -333,8 +346,7 @@ class VectorStoreFailoverManager(BasedModel):
                 is_valid = await self._validate_backup_file(backup_file)
                 if not is_valid:
                     logger.warning(
-                        "Backup file validation failed - will start with empty backup. "
-                        "File: %s",
+                        "Backup file validation failed - will start with empty backup. File: %s",
                         backup_file,
                     )
                     logger.info("Backup will be populated as indexing continues")
@@ -357,10 +369,38 @@ class VectorStoreFailoverManager(BasedModel):
         self._failover_active = True
         self._failover_time = datetime.now(UTC)
 
+        # Update global statistics
+        from codeweaver.common.statistics import get_session_statistics
+
+        stats = get_session_statistics()
+        stats.update_failover_stats(
+            failover_active=True,
+            increment_failover_count=True,
+            last_failover_time=self._failover_time.isoformat(),
+            active_store_type="backup",
+        )
+
         logger.warning(
             "⚠️  BACKUP MODE ACTIVE - Search functionality will continue "
             "with in-memory backup. Run 'codeweaver status' for details."
         )
+
+        # Notify client if context available
+        if self._last_context:
+            await log_to_client_or_fallback(
+                self._last_context,
+                "warning",
+                {
+                    "msg": "⚠️  Failover activated - switched to backup vector store",
+                    "extra": {
+                        "reason": "Primary vector store unavailable",
+                        "active_store": "backup",
+                        "failover_time": self._failover_time.isoformat()
+                        if self._failover_time
+                        else None,
+                    },
+                },
+            )
 
     async def _consider_restoration(self) -> None:
         """Consider restoring to primary when it recovers.
@@ -419,17 +459,30 @@ class VectorStoreFailoverManager(BasedModel):
             self._failover_time = None
             self._failover_chunks.clear()
 
+            # Update global statistics
+            from codeweaver.common.statistics import get_session_statistics
+
+            stats = get_session_statistics()
+            stats.update_failover_stats(failover_active=False, active_store_type="primary")
+
             logger.info(
                 "✓ PRIMARY VECTOR STORE RESTORED - Backup mode deactivated. "
                 "Normal operation resumed with all changes synced."
             )
 
-        except Exception as e:
-            logger.error(
-                "Failed to restore to primary: %s. Staying in backup mode for safety.",
-                e,
-                exc_info=True,
-            )
+            # Notify client if context available
+            if self._last_context:
+                await log_to_client_or_fallback(
+                    self._last_context,
+                    "info",
+                    {
+                        "msg": "✓ Primary vector store restored - failover deactivated",
+                        "extra": {"active_store": "primary", "status": "Normal operation resumed"},
+                    },
+                )
+
+        except Exception:
+            logger.exception("Failed to restore to primary. Staying in backup mode for safety.")
             # Stay in backup mode if sync-back fails
 
     async def _snapshot_backup_state(self) -> None:
@@ -469,7 +522,9 @@ class VectorStoreFailoverManager(BasedModel):
                     if offset is None:
                         break
 
-            logger.debug("Snapshotted %d existing chunks before failover", len(self._failover_chunks))
+            logger.debug(
+                "Snapshotted %d existing chunks before failover", len(self._failover_chunks)
+            )
 
         except Exception as e:
             logger.warning("Failed to snapshot backup state: %s", e)
@@ -548,8 +603,7 @@ class VectorStoreFailoverManager(BasedModel):
 
             if failed_count > 0:
                 logger.warning(
-                    "⚠️  %d chunks failed to sync - may need manual recovery",
-                    failed_count,
+                    "⚠️  %d chunks failed to sync - may need manual recovery", failed_count
                 )
 
         except Exception as e:
@@ -575,10 +629,11 @@ class VectorStoreFailoverManager(BasedModel):
 
         try:
             # Get chunk from backup (need payload for re-embedding)
-            collections = await self._backup_store.list_collections()
-
+            if not (collections := await self._backup_store.list_collections()):
+                logger.warning("No collections in backup store to find chunk %s", chunk_id)
+                return
             for collection_name in collections:
-                points = await self._backup_store._client.retrieve(  # type: ignore[union-attr]
+                points = await self._backup_store._client.retrieve(
                     collection_name=collection_name,
                     ids=[chunk_id],
                     with_payload=True,
@@ -601,7 +656,10 @@ class VectorStoreFailoverManager(BasedModel):
                 dense_vector = None
                 sparse_vector = None
 
-                if hasattr(self._indexer, "_embedding_provider") and self._indexer._embedding_provider:  # type: ignore[attr-defined]
+                if (
+                    hasattr(self._indexer, "_embedding_provider")
+                    and self._indexer._embedding_provider
+                ):  # type: ignore[attr-defined]
                     dense_embeddings = await self._indexer._embedding_provider.embed([chunk_text])  # type: ignore[attr-defined]
                     if dense_embeddings:
                         dense_vector = dense_embeddings[0]
@@ -625,11 +683,7 @@ class VectorStoreFailoverManager(BasedModel):
                 # Upsert to primary with new embeddings
                 await self._primary_store.upsert(
                     collection_name=collection_name,
-                    points=[{
-                        "id": chunk_id,
-                        "vector": vectors,
-                        "payload": payload,
-                    }],
+                    points=[{"id": chunk_id, "vector": vectors, "payload": payload}],
                 )
 
                 logger.debug("✓ Synced chunk %s to primary with re-embedding", chunk_id)
@@ -637,8 +691,8 @@ class VectorStoreFailoverManager(BasedModel):
 
             logger.warning("Chunk %s not found in any backup collection", chunk_id)
 
-        except Exception as e:
-            logger.exception("Failed to sync chunk %s: %s", chunk_id, e)
+        except Exception:
+            logger.exception("Failed to sync chunk %s", chunk_id)
             raise
 
     async def _verify_primary_health(self) -> None:
@@ -652,31 +706,41 @@ class VectorStoreFailoverManager(BasedModel):
         Raises:
             Exception: If primary fails health checks
         """
+
+        def _raise_if_closedcircuit() -> NoReturn:
+            from codeweaver.providers.vector_stores.base import CircuitBreakerState
+
+            if self._primary_store.circuit_breaker_state != CircuitBreakerState.CLOSED:
+                raise RuntimeError(
+                    f"Primary vector store's circuit breaker was not closed: {self._primary_store.circuit_breaker_state}"
+                )
+
         if not self._primary_store:
             raise ValueError("No primary store to verify")
 
         try:
             # Check 1: Can list collections
             collections = await self._primary_store.list_collections()
-            logger.debug("Primary health check: listed %d collections", len(collections))
+            if collections:
+                logger.debug("Primary health check: listed %d collections", len(collections))
+            else:
+                logger.debug("Primary health check: no collections found")
 
             # Check 2: Circuit breaker is closed
             from codeweaver.providers.vector_stores.base import CircuitBreakerState
 
             if self._primary_store.circuit_breaker_state != CircuitBreakerState.CLOSED:
-                raise RuntimeError(
-                    f"Primary circuit breaker not closed: {self._primary_store.circuit_breaker_state}"
-                )
+                _raise_if_closedcircuit()
 
             # Check 3: Can get collection info (if collections exist)
             if collections:
-                collection_info = await self._primary_store.get_collection(collections[0])
+                await self._primary_store.get_collection(collections[0])
                 logger.debug("Primary health check: retrieved collection info")
 
             logger.info("✓ Primary health verification passed")
 
-        except Exception as e:
-            logger.error("Primary health verification failed: %s", e)
+        except Exception:
+            logger.exception("Primary health verification failed")
             raise
 
     async def _create_backup_store(self) -> MemoryVectorStoreProvider:
@@ -811,8 +875,8 @@ class VectorStoreFailoverManager(BasedModel):
                 backup_file,
             )
 
-        except Exception as e:
-            logger.exception("Failed to sync primary to backup: %s", e)
+        except Exception:
+            logger.exception("Failed to sync primary to backup")
             raise
 
     async def _validate_backup_file(self, backup_file: Path) -> bool:
@@ -871,15 +935,15 @@ class VectorStoreFailoverManager(BasedModel):
                     logger.warning("Collection %s missing points field", col_name)
                     return False
 
-            logger.debug("Backup file validation passed: %s", backup_file)
-            return True
-
         except json.JSONDecodeError as e:
             logger.warning("Backup file contains invalid JSON: %s", e)
             return False
         except Exception as e:
             logger.warning("Error validating backup file: %s", e)
             return False
+        else:
+            logger.debug("Backup file %s validated successfully", backup_file)
+            return True
 
     def _log_resource_constraint_message(self, memory_estimate: Any) -> None:
         """Log detailed resource constraint message for user.

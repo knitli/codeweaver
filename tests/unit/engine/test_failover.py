@@ -1,7 +1,7 @@
 """Tests for vector store failover functionality."""
 
-import asyncio
 import json
+
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -240,11 +240,7 @@ class TestValidateBackupFile:
         backup_data = {
             "version": "1.0",
             "metadata": {"created_at": "2024-01-01T00:00:00Z"},
-            "collections": {
-                "test": {
-                    "points": [{"id": "1", "vector": {}, "payload": {}}],
-                }
-            },
+            "collections": {"test": {"points": [{"id": "1", "vector": {}, "payload": {}}]}},
         }
         backup_file.write_text(json.dumps(backup_data))
 
@@ -293,7 +289,9 @@ class TestFailoverWithValidation:
         primary = MockVectorStoreProvider(circuit_state=CircuitBreakerState.OPEN)
         manager = VectorStoreFailoverManager(backup_enabled=True)
 
-        with patch("codeweaver.engine.failover.estimate_backup_memory_requirements") as mock_estimate:
+        with patch(
+            "codeweaver.engine.failover.estimate_backup_memory_requirements"
+        ) as mock_estimate:
             # Create proper MemoryEstimate with numeric values
             from codeweaver.engine.resource_estimation import MemoryEstimate
 
@@ -336,7 +334,9 @@ class TestFailoverWithValidation:
         primary = MockVectorStoreProvider(circuit_state=CircuitBreakerState.OPEN)
         manager = VectorStoreFailoverManager(backup_enabled=True)
 
-        with patch("codeweaver.engine.failover.estimate_backup_memory_requirements") as mock_estimate:
+        with patch(
+            "codeweaver.engine.failover.estimate_backup_memory_requirements"
+        ) as mock_estimate:
             # Create proper MemoryEstimate with numeric values
             from codeweaver.engine.resource_estimation import MemoryEstimate
 
@@ -366,7 +366,6 @@ class TestSyncBackToPrimary:
     @pytest.mark.asyncio
     async def test_snapshot_backup_state(self, tmp_path: Path):
         """Test snapshotting backup state before failover."""
-        from codeweaver.engine.resource_estimation import MemoryEstimate
 
         backup = MockMemoryProvider()
         backup._initialized = True

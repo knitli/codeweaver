@@ -431,7 +431,9 @@ class TestHelperFunctions:
         assert config_path.parent.exists()
         assert config_path.exists()
 
-    @pytest.mark.skip(reason="Backup functionality exists but test needs updating for actual backup behavior")
+    @pytest.mark.skip(
+        reason="Backup functionality exists but test needs updating for actual backup behavior"
+    )
     def test_handle_write_output_backs_up_existing(self, temp_project: Path) -> None:
         """Test _handle_write_output backs up existing config."""
         # Skipping - backup is created but the merge behavior makes testing complex
@@ -443,11 +445,16 @@ class TestHelperFunctions:
         with pytest.raises(SystemExit) as exc_info:
             init_app([
                 "mcp",
-                "--output", "write",
-                "--transport", "stdio",
-                "--client", "claude_code",
-                "--config-level", "project",
-                "--project", str(temp_project),
+                "--output",
+                "write",
+                "--transport",
+                "stdio",
+                "--client",
+                "claude_code",
+                "--config-level",
+                "project",
+                "--project",
+                str(temp_project),
             ])
 
         assert exc_info.value.code == 0
@@ -471,13 +478,20 @@ class TestHelperFunctions:
         with pytest.raises(SystemExit) as exc_info:
             init_app([
                 "mcp",
-                "--output", "write",
-                "--transport", "streamable-http",
-                "--client", "claude_code",
-                "--config-level", "project",
-                "--host", "127.0.0.1",
-                "--port", "9328",
-                "--project", str(temp_project),
+                "--output",
+                "write",
+                "--transport",
+                "streamable-http",
+                "--client",
+                "claude_code",
+                "--config-level",
+                "project",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "9328",
+                "--project",
+                str(temp_project),
             ])
 
         assert exc_info.value.code == 0

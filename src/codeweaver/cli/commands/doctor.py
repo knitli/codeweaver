@@ -60,11 +60,11 @@ class _ConsoleProxy:
         """Get the current display console."""
         return _get_display().console
 
-    def print(self, *args, **kwargs):
+    def print(self, *args: Any, **kwargs: Any):
         """Proxy print to current console."""
         return self._current_console.print(*args, **kwargs)
 
-    def input(self, *args, **kwargs):
+    def input(self, *args: Any, **kwargs: Any):
         """Proxy input to current console."""
         return self._current_console.input(*args, **kwargs)
 

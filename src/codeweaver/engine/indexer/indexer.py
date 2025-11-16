@@ -13,7 +13,7 @@ vector store services.
 
 It is the backend service that powers CodeWeaver's code search and retrieval capabilities.
 """
-# TODO: register with providers registry
+# TODO: register with services registry
 
 from __future__ import annotations
 
@@ -103,7 +103,7 @@ def _get_embedding_instance(*, sparse: bool = False) -> EmbeddingProvider[Any] |
 
 
 def _get_vector_store_instance() -> Any | None:
-    """Get vector store provider instance using new registry API."""
+    """Get vector store provider instance using registry API."""
     from codeweaver.common.registry import get_provider_registry
 
     registry = get_provider_registry()
@@ -969,7 +969,7 @@ class Indexer(BasedModel):
     ) -> int:
         """Perform an initial indexing pass using the configured rignore walker.
 
-        Enhanced version with persistence support, incremental indexing, and batch processing.
+        Enhanced with persistence support, incremental indexing, and batch processing.
 
         Args:
             force_reindex: If True, skip persistence checks and reindex everything

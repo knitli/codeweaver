@@ -100,13 +100,13 @@ classifiers = [
 dependencies = [
   # Core functionality
   "aenum>=3.1.16",
-  "ast-grep-py>=0.39.7",
+  "ast-grep-py>=0.39.9",
   "blake3>=1.0.8",
   # CLI framework and output
-  "cyclopts>=4.2.1",
+  "cyclopts>=4.2.4",
   "fastembed>=0.7.3",
   # MCP server framework
-  "fastmcp>=2.13.0.2",
+  "fastmcp>=2.13.1",
   "httpx>=0.28.1",
   "mcp>=1.19.0",
   # Numerical and ML
@@ -116,9 +116,9 @@ dependencies = [
   # Core data models and validation
   "py-cpuinfo>=9.0.0",
   "pydantic>=2.12.4",
-  "pydantic-ai>=1.10.0",
-  "pydantic-graph>=1.10.0",
-  "pydantic-settings[toml,yaml]>=2.11.0",  # Pulls: tomli>=2.0.1, pyyaml>=6.0.1
+  "pydantic-ai>=1.18.0",
+  "pydantic-graph>=1.18.0",
+  "pydantic-settings[toml,yaml]>=2.12.0",  # Pulls: tomli>=2.0.1, pyyaml>=6.0.1
   "qdrant-client>=1.15.1",
   "rich>=14.2.0",
   "rignore>=0.7.6",
@@ -257,7 +257,6 @@ dev = [
   "ruff>=0.14.2",
   "superclaude>=4.1.6",
   "ty>=0.0.1a25",
-  "types-boto3-custom",
   "uv>=0.9.5",
 ]
 build = ["hatchling>=1.27.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.11.2"]
@@ -315,7 +314,7 @@ __all__ = ("__version__",)
 [tool.hatch.build.targets.wheel]
 artifacts = ["*.so", "src/**"]
 packages = ["src/codeweaver"]
-include = ["node_types/**", "typings/**", "vendored/**"]
+include = ["node_types/**", "typings/**"]
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -336,7 +335,6 @@ include = [
   "typings/**",
   "uv.lock",
   "uv.lock.license",
-  "vendored/**",
 ]
 
 [tool.hatch.version]
@@ -416,7 +414,7 @@ timeout_method = "thread"
 python-version = "3.12"
 root = ["./src", "./tests", "./scripts", "./mise-tasks"]
 python = "./.venv"
-extra-paths = ["./vendored", "./typings"]
+extra-paths = ["./typings"]
 
 [tool.ty.rules]
 # === Core Type Safety Rules (kept strict for src/) ===
@@ -441,7 +439,7 @@ unresolved-import = "warn"  # Downgrade to warn for optional dependencies
 [tool.ty.src]
 include = ["./src", "./tests", "./scripts", "./mise-tasks"]
 # Exclude vendored code, typings, and intentionally malformed test fixtures
-exclude = ["./typings", "./vendored", "./tests/fixtures/malformed.py"]
+exclude = ["./typings", "./tests/fixtures/malformed.py"]
 
 # === Per-Directory Overrides ===
 # Apply different strictness levels: strict for src/, lenient for scripts/mise-tasks/tests
@@ -489,15 +487,12 @@ invalid-assignment = "warn"  # Test setup patterns
 # Test Fixtures: Intentionally malformed or edge-case test data
 # These may have type errors by design to test error handling
 [[tool.ty.overrides]]
-include = ["tests/fixtures/**/*.py"]
+include = ["tests/fixtures/**/*.py", "tests/unit/engine/test_failover.py"]
 
 [tool.ty.overrides.rules]
 invalid-assignment = "ignore"
 invalid-argument-type = "ignore"
 unresolved-reference = "ignore"
-
-[tool.uv.sources]
-types-boto3-custom = { path = "vendored/types_boto3_custom-1.40.66-py3-none-any.whl" }
 
 [tool.uv-dynamic-versioning]
 vcs = "git"

@@ -45,6 +45,7 @@ app.command("codeweaver.cli.commands.index:app", name="index")
 app.command("codeweaver.cli.commands.doctor:app", name="doctor")
 app.command("codeweaver.cli.commands.list:app", name="list", alias="ls")
 app.command("codeweaver.cli.commands.init:app", name="init")
+app.command("codeweaver.cli.commands.status:app", name="status")
 
 # these are scaffolded for future implementation
 # app.command("codeweaver.cli.commands.context:app", name="context", alias="prep")

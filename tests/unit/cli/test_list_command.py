@@ -212,12 +212,16 @@ class TestListCoverage:
 class TestListModelRegistry:
     """Tests for ModelRegistry integration."""
 
-    @pytest.mark.skip(reason="Test needs access to internal model registry API which may not be public")
+    @pytest.mark.skip(
+        reason="Test needs access to internal model registry API which may not be public"
+    )
     def test_uses_model_registry(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test list command uses ModelRegistry."""
         # Skipping - requires internal model registry API
 
-    @pytest.mark.skip(reason="Test needs access to internal model registry API which may not be public")
+    @pytest.mark.skip(
+        reason="Test needs access to internal model registry API which may not be public"
+    )
     def test_model_registry_has_sparse_models(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test ModelRegistry includes sparse embedding models."""
         # Skipping - requires internal model registry API
@@ -270,4 +274,8 @@ class TestListOutput:
 
         if exc_info.value.code == 1:
             # Should show helpful error - "invalid" is the actual message
-            assert "not found" in captured.out.lower() or "unknown" in captured.out.lower() or "invalid" in captured.out.lower()
+            assert (
+                "not found" in captured.out.lower()
+                or "unknown" in captured.out.lower()
+                or "invalid" in captured.out.lower()
+            )

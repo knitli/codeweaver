@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import time
 
 from collections.abc import Container
+from datetime import UTC, datetime
 from functools import cache
 from typing import TYPE_CHECKING, Any, cast
 
@@ -94,6 +96,13 @@ async def find_code_tool(
             else None
         )
 
+        # Set context on failover manager for notifications
+        from codeweaver.server.server import get_state
+
+        state = get_state()
+        if state.failover_manager and context:
+            state.failover_manager.set_context(context)
+
         response = await find_code(
             query=query,
             intent=intent,
@@ -103,7 +112,7 @@ async def find_code_tool(
             max_results=50,  # Default from find_code signature
         )
 
-        with contextlib.suppress(ValueError):
+        with contextlib.suppress(RuntimeError):
             # try to get request id from context for logging and stats.
             # Context is only available when called via MCP and will raise ValueError otherwise.
             # Track successful request in statistics
@@ -115,6 +124,20 @@ async def find_code_tool(
                 request_context: RequestContext[BaseSession[Any, Any, Any, Any, Any], Any, Any]
                 request_id = request_context.request_id
                 statistics().add_successful_request(request_id)
+
+        # Add failover metadata if failover manager exists
+        if state.failover_manager:
+            failover_metadata = {
+                "failover": {
+                    "enabled": state.failover_manager.backup_enabled,
+                    "active": state.failover_manager.is_failover_active,
+                    "active_store_type": "backup"
+                    if state.failover_manager.is_failover_active
+                    else "primary",
+                }
+            }
+            # Set metadata on response
+            response = response.model_copy(update={"metadata": failover_metadata})
 
     except Exception as e:
         # Track failed request
@@ -339,6 +362,86 @@ async def health(_request: Request) -> PlainTextResponse:
         )
 
 
+@timed_http("status")
+async def status_info(_request: Request) -> PlainTextResponse:
+    """Return current operational status (progress, failover, runtime state).
+
+    This endpoint provides real-time operational information:
+    - Current indexing progress and phase
+    - Failover status and backup operations
+    - Active operations and their progress
+    - Runtime state (different from health checks)
+    """
+    from codeweaver.server.server import get_state
+
+    try:
+        state = get_state()
+
+        status_data: dict[str, Any] = {
+            "timestamp": datetime.now(UTC).isoformat(),
+            "uptime_seconds": int(time.time() - state.startup_time)
+            if hasattr(state, "startup_time")
+            else 0,
+        }
+
+        # Indexing status
+        if state.indexer:
+            indexer_stats = state.indexer.stats
+            status_data["indexing"] = {
+                "active": state.indexer._running if hasattr(state.indexer, "_running") else False,
+                "files_discovered": indexer_stats.files_discovered,
+                "files_processed": indexer_stats.files_processed,
+                "chunks_created": indexer_stats.chunks_created,
+                "chunks_embedded": indexer_stats.chunks_embedded,
+                "chunks_indexed": indexer_stats.chunks_indexed,
+                "elapsed_time_seconds": indexer_stats.elapsed_time(),
+                "processing_rate": indexer_stats.processing_rate(),
+                "errors": indexer_stats.total_errors,
+            }
+        else:
+            status_data["indexing"] = {"active": False}
+
+        # Failover status
+        failover_manager = getattr(state, "failover_manager", None)
+        if failover_manager:
+            failover_stats = statistics().failover_statistics
+            if failover_stats:
+                status_data["failover"] = {
+                    "enabled": True,
+                    "active": failover_stats.failover_active,
+                    "active_store_type": failover_stats.active_store_type or "primary",
+                    "failover_count": failover_stats.failover_count,
+                    "total_failover_time_seconds": failover_stats.total_failover_time_seconds,
+                    "last_failover_time": failover_stats.last_failover_time,
+                    "primary_circuit_breaker_state": failover_stats.primary_circuit_breaker_state,
+                    "backup_syncs_completed": failover_stats.backup_syncs_completed,
+                    "chunks_in_failover": failover_stats.chunks_in_failover,
+                }
+            else:
+                status_data["failover"] = {"enabled": True, "active": False}
+        else:
+            status_data["failover"] = {"enabled": False}
+
+        # Session statistics summary
+        stats = statistics()
+        if stats:
+            status_data["statistics"] = {
+                "total_requests": stats.total_requests,
+                "successful_requests": len(stats._successful_request_log),
+                "failed_requests": len(stats._failed_request_log),
+            }
+
+        return PlainTextResponse(content=to_json(status_data), media_type="application/json")
+
+    except Exception:
+        _logger.exception("Failed to get status information")
+        return PlainTextResponse(
+            content=to_json({"error": "Failed to retrieve status information"}),
+            status_code=500,
+            media_type="application/json",
+        )
+
+
 def setup_middleware(
     middleware: Container[type[Middleware]], middleware_settings: MiddlewareOptions
 ) -> set[Middleware]:
@@ -430,7 +533,10 @@ async def register_app_bindings(
         )  # type: ignore[arg-type]
     if endpoint_settings.get("enable_health", True):
         app.custom_route("/health", methods=["GET"], name="health", include_in_schema=True)(health)  # type: ignore[arg-type]
-    # todo: add status endpoint (more what I'm doing right now/progress than health)
+    if endpoint_settings.get("enable_status", True):
+        app.custom_route("/status", methods=["GET"], name="status", include_in_schema=True)(
+            status_info
+        )  # type: ignore[arg-type]
 
     middleware = setup_middleware(
         cast(Container[type[Middleware]], middleware), middleware_settings

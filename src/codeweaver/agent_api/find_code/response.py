@@ -148,6 +148,7 @@ def build_success_response(
         indexing_state=indexing_state,
         index_coverage=index_coverage,
         search_mode=search_mode,
+        metadata={},
     )
 
 
@@ -186,6 +187,7 @@ def build_error_response(
         indexing_state=indexing_state,
         index_coverage=index_coverage,
         search_mode="keyword",
+        metadata={},
     )
 
 

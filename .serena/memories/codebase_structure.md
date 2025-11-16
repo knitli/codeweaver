@@ -21,7 +21,6 @@ codeweaver-mcp/
 ├── claudedocs/                  # Claude-specific documentation
 ├── examples/                    # Usage examples
 ├── typings/                     # Type stub files
-├── vendored/                    # Vendored dependencies
 └── mise-tasks/                  # Mise task scripts
 ```
 
@@ -158,8 +157,7 @@ scripts/
 - `ARCHITECTURE.md` - Design decisions and principles
 - `PRODUCT.md` - Product overview and roadmap
 - `CODE_STYLE.md` - Code style guide
-- `CLAUDE.md` - AI agent context (Claude Code)
-- `AGENTS.md` - Agent development guidance
+- `AGENTS.md` - Agent development guidance and context
 - `.specify/memory/constitution.md` - Project constitution (v2.0.1)
 
 ### API Documentation (`context/apis/`)
@@ -205,8 +203,10 @@ Run local documentation server: `mise run docs-serve`
 
 ### Preferred Import Style
 ```python
+# 'import' separated from 'from x import' statements at all levels
 # Standard library
 import sys
+
 from typing import Any
 
 # Third-party (grouped by category)
@@ -228,8 +228,5 @@ from codeweaver.exceptions import CodeWeaverError
 Following pydantic ecosystem patterns:
 - **Group related modules**: In packages (e.g., all providers together)
 - **Keep root-level otherwise**: Avoid unnecessary nesting
-- **Core types in `__init__.py`**: For subpackages (not root)
-- **Foundations in private mirrors**: `chunking.py` ← `_chunking.py`
-- **Extensive logic**: In `_internals` subpackage
 
 This structure balances discoverability with organization.

@@ -37,7 +37,7 @@ def test_install_from_testpypi():
     - Clean Python environment
     """
     # Get expected version from current build
-    Path(__file__).parent.parent.parent
+    _ = Path(__file__).parent.parent.parent
 
     # You would get this from the published version
     # For manual testing, replace with actual version

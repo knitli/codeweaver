@@ -94,17 +94,16 @@ def estimate_file_count(project_path: Path, max_depth: int = 5) -> int:
         if total_files < 10:
             return 1000
 
-        return total_files
-
     except Exception as e:
-        logger.warning(f"Failed to estimate file count: {e}")
+        logger.warning("Failed to estimate file count", exc_info=e)
         # Return conservative default
         return 1000
+    else:
+        return total_files
 
 
 def estimate_backup_memory_requirements(
-    project_path: Path | None = None,
-    stats: IndexingStats | None = None,
+    project_path: Path | None = None, stats: IndexingStats | None = None
 ) -> MemoryEstimate:
     """Estimate memory needed for in-memory backup vector store.
 
@@ -114,7 +113,7 @@ def estimate_backup_memory_requirements(
 
     Memory estimation:
     - Per-chunk overhead: ~5KB (text content + embeddings + metadata)
-    - Dense embedding: 768 dimensions × 4 bytes = 3,072 bytes
+    - Dense embedding: 768 dimensions × 4 bytes = 3,072 bytes  # noqa: RUF002
     - Sparse embedding: ~1KB average
     - Text content: ~500 bytes average
     - Metadata: ~500 bytes
@@ -185,9 +184,9 @@ def estimate_backup_memory_requirements(
 
     logger.debug(
         f"Memory estimation: {estimated_chunks:,} chunks, "
-        f"{estimated_memory/1e9:.2f}GB estimated, "
-        f"{available_memory/1e9:.2f}GB available, "
-        f"{required_memory/1e9:.2f}GB required, "
+        f"{estimated_memory / 1e9:.2f}GB estimated, "
+        f"{available_memory / 1e9:.2f}GB available, "
+        f"{required_memory / 1e9:.2f}GB required, "
         f"zone={zone}, safe={is_safe}"
     )
 
@@ -201,8 +200,4 @@ def estimate_backup_memory_requirements(
     )
 
 
-__all__ = [
-    "MemoryEstimate",
-    "estimate_backup_memory_requirements",
-    "estimate_file_count",
-]
+__all__ = ["MemoryEstimate", "estimate_backup_memory_requirements", "estimate_file_count"]

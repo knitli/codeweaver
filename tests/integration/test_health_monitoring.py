@@ -189,6 +189,7 @@ def session_statistics() -> SessionStatistics:
         _failed_request_log=[],
         _successful_http_request_log=[],
         _failed_http_request_log=[],
+        failover_statistics=[],
     )
 
 
@@ -376,11 +377,7 @@ async def test_health_status_unhealthy(health_service: HealthService, mocker):
     # Mock vector store as down using unified API
     # Note: get_provider_instance is called with (enum, "string_type", singleton=True)
     def failing_get_provider_instance(
-        provider_enum,
-        provider_type: str,
-        *,
-        singleton: bool = False,
-        **kwargs,
+        provider_enum, provider_type: str, *, singleton: bool = False, **kwargs
     ):
         if provider_type == "vector_store":
             raise RuntimeError("Vector store unavailable")

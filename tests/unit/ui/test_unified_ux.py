@@ -251,7 +251,7 @@ class TestDoctorConsoleProxy:
         from codeweaver.cli.commands import doctor
 
         # Verify proxy has the methods check functions use
-        assert hasattr(doctor.console, 'print'), "Console proxy should have print method"
-        assert hasattr(doctor.console, 'input'), "Console proxy should have input method"
+        assert hasattr(doctor.console, "print"), "Console proxy should have print method"
+        assert hasattr(doctor.console, "input"), "Console proxy should have input method"
         assert callable(doctor.console.print), "Console print should be callable"
         assert callable(doctor.console.input), "Console input should be callable"

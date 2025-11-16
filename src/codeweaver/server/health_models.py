@@ -149,6 +149,37 @@ class StatisticsInfo(BasedModel):
         return None
 
 
+class FailoverInfo(BasedModel):
+    """Failover status and statistics information."""
+
+    failover_enabled: Annotated[bool, Field(description="Whether failover is enabled")]
+    failover_active: Annotated[bool, Field(description="Whether failover is currently active")]
+    active_store_type: Annotated[
+        str | None, Field(description="Currently active store type (primary/backup)")
+    ] = None
+    failover_count: Annotated[
+        NonNegativeInt, Field(default=0, description="Total number of failover activations")
+    ]
+    total_failover_time_seconds: Annotated[
+        NonNegativeFloat, Field(ge=0, default=0.0, description="Total time spent in failover")
+    ]
+    last_failover_time: Annotated[
+        str | None, Field(description="Last failover activation time (ISO8601)")
+    ] = None
+    primary_circuit_breaker_state: Annotated[
+        str | None, Field(description="Primary vector store circuit breaker state")
+    ] = None
+    backup_syncs_completed: Annotated[
+        NonNegativeInt, Field(default=0, description="Number of backup syncs completed")
+    ]
+    chunks_in_failover: Annotated[
+        NonNegativeInt, Field(default=0, description="Number of chunks currently in failover")
+    ]
+
+    def _telemetry_keys(self) -> None:
+        return None
+
+
 class HealthResponse(BasedModel):
     """Represents the health of CodeWeaver and its components."""
 
@@ -166,6 +197,9 @@ class HealthResponse(BasedModel):
     indexing: Annotated[IndexingInfo, Field(description="Indexing state and progress")]
     services: Annotated[ServicesInfo, Field(description="Service health information")]
     statistics: Annotated[StatisticsInfo, Field(description="Statistics and metrics")]
+    failover: Annotated[
+        FailoverInfo | None, Field(description="Failover status and statistics")
+    ] = None
 
     @classmethod
     def create_with_current_timestamp(
@@ -175,6 +209,7 @@ class HealthResponse(BasedModel):
         indexing: IndexingInfo,
         services: ServicesInfo,
         statistics: StatisticsInfo,
+        failover: FailoverInfo | None = None,
     ) -> HealthResponse:
         """Create health response with current timestamp."""
         return cls(
@@ -184,6 +219,7 @@ class HealthResponse(BasedModel):
             indexing=indexing,
             services=services,
             statistics=statistics,
+            failover=failover,
         )
 
     def _telemetry_keys(self) -> None:
@@ -192,6 +228,7 @@ class HealthResponse(BasedModel):
 
 __all__ = (
     "EmbeddingProviderServiceInfo",
+    "FailoverInfo",
     "HealthResponse",
     "IndexingInfo",
     "IndexingProgressInfo",

@@ -236,6 +236,14 @@ class FindCodeResponseSummary(BasedModel):
         ),
     ]
 
+    metadata: Annotated[
+        dict[str, Any] | None,
+        Field(
+            default=None,
+            description="""Optional metadata about the search operation, including failover status and system state""",
+        ),
+    ]
+
     @model_validator(mode="after")
     def populate_computed_fields(self) -> FindCodeResponseSummary:
         """Populate computed fields from other data."""

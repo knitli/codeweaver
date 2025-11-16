@@ -317,7 +317,9 @@ class TestInstantiateClient:
         )
 
         # FastEmbed now gets lazy_load=True by default
-        mock_client_class.assert_called_once_with(model_name="BAAI/bge-small-en-v1.5", lazy_load=True)
+        mock_client_class.assert_called_once_with(
+            model_name="BAAI/bge-small-en-v1.5", lazy_load=True
+        )
 
     def test_local_model_without_model_name(self, registry):
         """Test local models default when no model name."""

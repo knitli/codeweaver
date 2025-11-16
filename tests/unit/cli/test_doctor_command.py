@@ -56,7 +56,9 @@ class TestDoctorUnsetHandling:
         assert isinstance(unset_value, Unset)
         assert not isinstance(None, Unset)
 
-    @pytest.mark.skip(reason="Doctor command may fail if no providers configured - test needs provider setup")
+    @pytest.mark.skip(
+        reason="Doctor command may fail if no providers configured - test needs provider setup"
+    )
     def test_doctor_handles_auto_detected_settings(
         self, temp_project: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:

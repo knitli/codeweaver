@@ -59,8 +59,7 @@ async def indexed_test_project(known_test_codebase, real_provider_registry):
 
     with (
         patch(
-            "codeweaver.common.registry.get_provider_registry",
-            return_value=real_provider_registry
+            "codeweaver.common.registry.get_provider_registry", return_value=real_provider_registry
         ),
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
         patch("codeweaver.config.settings.get_settings", return_value=settings),
@@ -105,8 +104,7 @@ async def test_full_pipeline_index_then_search(indexed_test_project):
 
     # Search for specific functionality in the indexed codebase
     search_response = await find_code(
-        query="authentication user login",
-        intent=IntentType.UNDERSTAND,
+        query="authentication user login", intent=IntentType.UNDERSTAND
     )
 
     # Validate search found the code we indexed
@@ -128,7 +126,9 @@ async def test_full_pipeline_index_then_search(indexed_test_project):
 @pytest.mark.integration
 @pytest.mark.real_providers
 @pytest.mark.asyncio
-async def test_incremental_indexing_updates_search_results(indexed_test_project, real_provider_registry):
+async def test_incremental_indexing_updates_search_results(
+    indexed_test_project, real_provider_registry
+):
     """Validate that adding new files updates search results.
 
     **What this validates:**
@@ -188,8 +188,7 @@ def process_refund(transaction_id: str) -> None:
 
     with (
         patch(
-            "codeweaver.common.registry.get_provider_registry",
-            return_value=real_provider_registry
+            "codeweaver.common.registry.get_provider_registry", return_value=real_provider_registry
         ),
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
     ):
@@ -199,8 +198,7 @@ def process_refund(transaction_id: str) -> None:
 
         # Search for new file's content
         response = await find_code(
-            query="payment processing credit card Stripe",
-            intent=IntentType.UNDERSTAND,
+            query="payment processing credit card Stripe", intent=IntentType.UNDERSTAND
         )
 
     # Validate new file appears in results
@@ -275,8 +273,7 @@ class {module_name.capitalize()}Handler:
 
     with (
         patch(
-            "codeweaver.common.registry.get_provider_registry",
-            return_value=real_provider_registry
+            "codeweaver.common.registry.get_provider_registry", return_value=real_provider_registry
         ),
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
     ):
@@ -289,10 +286,7 @@ class {module_name.capitalize()}Handler:
         indexing_time = time.time() - start_time
 
         # Search
-        response = await find_code(
-            query="module function",
-            intent=IntentType.UNDERSTAND,
-        )
+        response = await find_code(query="module function", intent=IntentType.UNDERSTAND)
 
     # Validate indexing completed
     assert response is not None, "Indexing should complete"
@@ -370,8 +364,7 @@ def generate_jwt(user_id: str) -> str:
 
     with (
         patch(
-            "codeweaver.common.registry.get_provider_registry",
-            return_value=real_provider_registry
+            "codeweaver.common.registry.get_provider_registry", return_value=real_provider_registry
         ),
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
     ):
@@ -380,10 +373,7 @@ def generate_jwt(user_id: str) -> str:
         await indexer.prime_index()
 
         # Search should now find OAuth content
-        response_after = await find_code(
-            query="OAuth2 JWT token",
-            intent=IntentType.UNDERSTAND,
-        )
+        response_after = await find_code(query="OAuth2 JWT token", intent=IntentType.UNDERSTAND)
 
     # Validate updated content is found
     result_files = [r.file_path.name for r in response_after.matches[:3]]
@@ -458,8 +448,7 @@ def another_working_function():
 
     with (
         patch(
-            "codeweaver.common.registry.get_provider_registry",
-            return_value=real_provider_registry
+            "codeweaver.common.registry.get_provider_registry", return_value=real_provider_registry
         ),
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
     ):
@@ -467,10 +456,7 @@ def another_working_function():
         indexer = await Indexer.from_settings_async(settings.model_dump())
         await indexer.prime_index()
 
-        response = await find_code(
-            query="function",
-            intent=IntentType.UNDERSTAND,
-        )
+        response = await find_code(query="function", intent=IntentType.UNDERSTAND)
 
     # Should index good files even if bad file fails
     # At minimum, shouldn't crash completely
@@ -513,8 +499,7 @@ async def test_search_performance_with_real_providers(indexed_test_project):
     start_time = time.time()
 
     response = await find_code(
-        query="authentication database API configuration",
-        intent=IntentType.UNDERSTAND,
+        query="authentication database API configuration", intent=IntentType.UNDERSTAND
     )
 
     search_time = time.time() - start_time
@@ -581,8 +566,7 @@ def function_{i}(param):
 
     with (
         patch(
-            "codeweaver.common.registry.get_provider_registry",
-            return_value=real_provider_registry
+            "codeweaver.common.registry.get_provider_registry", return_value=real_provider_registry
         ),
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
     ):
@@ -594,10 +578,7 @@ def function_{i}(param):
         await indexer.prime_index()
         indexing_time = time.time() - start_time
 
-        response = await find_code(
-            query="function",
-            intent=IntentType.UNDERSTAND,
-        )
+        response = await find_code(query="function", intent=IntentType.UNDERSTAND)
 
     # Validate indexing completed
     assert response is not None, "Indexing should complete"

@@ -113,6 +113,9 @@ class TimingStatistics(DataclassSerializationMixin):
         default_factory=list,
         description="""Time taken for settings http requests in milliseconds.""",
     )
+    status_http: list[PositiveFloat] = Field(
+        default_factory=list, description="""Time taken for status http requests in milliseconds."""
+    )
 
     def _telemetry_keys(self) -> None:
         return None
@@ -931,6 +934,30 @@ class Identifier(NamedTuple):
         return datetime.fromtimestamp(self.timestamp / 1_000, tz=UTC)
 
 
+@dataclass(config=DATACLASS_CONFIG | ConfigDict(extra="forbid", defer_build=True))
+class FailoverStats(DataclassSerializationMixin):
+    """Statistics tracking for vector store failover operations."""
+
+    failover_active: bool = False
+    failover_count: int = 0
+    total_failover_time_seconds: float = 0.0
+    last_failover_time: str | None = None
+    backup_syncs_completed: int = 0
+    sync_back_operations: int = 0
+    chunks_synced_back: int = 0
+    active_store_type: str | None = None
+    primary_circuit_breaker_state: str | None = None
+    backup_file_exists: bool = False
+    backup_file_size_bytes: int = 0
+    chunks_in_failover: int = 0
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        """Define telemetry anonymization for failover statistics."""
+        # Most failover stats are safe to send as-is (counts, states)
+        # No identifying information in failover statistics
+        return {}
+
+
 @dataclass(kw_only=True, config=DATACLASS_CONFIG | ConfigDict(defer_build=True))
 class SessionStatistics(DataclassSerializationMixin):
     """Statistics for tracking session performance and usage."""
@@ -958,6 +985,13 @@ class SessionStatistics(DataclassSerializationMixin):
         Field(
             default=None,
             description="""Semantic category usage metrics. Uses UsageMetrics from semantic.classifications.""",
+        ),
+    ]
+    failover_statistics: Annotated[
+        FailoverStats | None,
+        Field(
+            default_factory=FailoverStats,
+            description="""Vector store failover statistics tracking backup operations and status.""",
         ),
     ]
 
@@ -991,6 +1025,8 @@ class SessionStatistics(DataclassSerializationMixin):
             except ImportError:
                 # If semantic module not available, leave as None
                 self.semantic_statistics = None
+        if not self.failover_statistics:
+            self.failover_statistics = FailoverStats()
         self.timing_statistics = TimingStatistics(
             on_call_tool_requests={},
             on_read_resource_requests={},
@@ -1004,6 +1040,7 @@ class SessionStatistics(DataclassSerializationMixin):
             state_http=[],
             settings_http=[],
             statistics_http=[],
+            status_http=[],
         )
         for attr in (
             "_successful_http_request_log",
@@ -1084,6 +1121,7 @@ class SessionStatistics(DataclassSerializationMixin):
             state_http=[],
             settings_http=[],
             statistics_http=[],
+            status_http=[],
         )
         return self.timing_statistics.timing_summary
 
@@ -1248,6 +1286,68 @@ class SessionStatistics(DataclassSerializationMixin):
             self.index_statistics = FileStatistics()
         self.index_statistics.add_other_files(*files)
 
+    def update_failover_stats(
+        self,
+        *,
+        failover_active: bool | None = None,
+        increment_failover_count: bool = False,
+        failover_time_seconds: float | None = None,
+        last_failover_time: str | None = None,
+        increment_backup_syncs: bool = False,
+        increment_sync_back_ops: bool = False,
+        chunks_synced_back: int | None = None,
+        active_store_type: str | None = None,
+        primary_circuit_breaker_state: str | None = None,
+        backup_file_exists: bool | None = None,
+        backup_file_size_bytes: int | None = None,
+        chunks_in_failover: int | None = None,
+    ) -> None:
+        """Update failover statistics.
+
+        Args:
+            failover_active: Set failover active status
+            increment_failover_count: Increment the failover count
+            failover_time_seconds: Add to total failover time
+            last_failover_time: Set last failover timestamp
+            increment_backup_syncs: Increment backup sync counter
+            increment_sync_back_ops: Increment sync-back operations counter
+            chunks_synced_back: Add to chunks synced back count
+            active_store_type: Set active store type (primary/backup)
+            primary_circuit_breaker_state: Set circuit breaker state
+            backup_file_exists: Set backup file existence flag
+            backup_file_size_bytes: Set backup file size
+            chunks_in_failover: Set number of chunks in failover
+        """
+        if not self.failover_statistics:
+            self.failover_statistics = FailoverStats()
+
+        stats = self.failover_statistics
+
+        if failover_active is not None:
+            stats.failover_active = failover_active
+        if increment_failover_count:
+            stats.failover_count += 1
+        if failover_time_seconds is not None:
+            stats.total_failover_time_seconds += failover_time_seconds
+        if last_failover_time is not None:
+            stats.last_failover_time = last_failover_time
+        if increment_backup_syncs:
+            stats.backup_syncs_completed += 1
+        if increment_sync_back_ops:
+            stats.sync_back_operations += 1
+        if chunks_synced_back is not None:
+            stats.chunks_synced_back += chunks_synced_back
+        if active_store_type is not None:
+            stats.active_store_type = active_store_type
+        if primary_circuit_breaker_state is not None:
+            stats.primary_circuit_breaker_state = primary_circuit_breaker_state
+        if backup_file_exists is not None:
+            stats.backup_file_exists = backup_file_exists
+        if backup_file_size_bytes is not None:
+            stats.backup_file_size_bytes = backup_file_size_bytes
+        if chunks_in_failover is not None:
+            stats.chunks_in_failover = chunks_in_failover
+
     def reset(self) -> None:
         """Reset all statistics to their initial state."""
         self.timing_statistics = TimingStatistics(
@@ -1266,6 +1366,7 @@ class SessionStatistics(DataclassSerializationMixin):
         )
         self.index_statistics = FileStatistics()
         self.token_statistics = TokenCounter()
+        self.failover_statistics = FailoverStats()
 
     def report(self) -> bytes:
         """Generate a report of the current statistics."""
@@ -1330,6 +1431,7 @@ _statistics: SessionStatistics = SessionStatistics(
     index_statistics=FileStatistics(),
     token_statistics=TokenCounter(),
     semantic_statistics=None,
+    failover_statistics=FailoverStats(),
     _successful_request_log=[],
     _failed_request_log=[],
     _successful_http_request_log=[],
@@ -1373,7 +1475,7 @@ def get_session_statistics() -> SessionStatistics:
 
 
 def timed_http(
-    request_type: Literal["health", "version", "settings", "state", "metrics"],
+    request_type: Literal["health", "version", "settings", "state", "metrics", "status"],
 ) -> Callable[
     [Callable[..., Awaitable[PlainTextResponse]]], Callable[..., Awaitable[PlainTextResponse]]
 ]:

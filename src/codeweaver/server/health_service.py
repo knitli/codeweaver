@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, Literal, NoReturn, cast
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.server.health_models import (
     EmbeddingProviderServiceInfo,
+    FailoverInfo,
     HealthResponse,
     IndexingInfo,
     IndexingProgressInfo,
@@ -30,6 +31,7 @@ from codeweaver.server.health_models import (
 if TYPE_CHECKING:
     from codeweaver.common.registry import ProviderRegistry
     from codeweaver.common.statistics import SessionStatistics
+    from codeweaver.engine.failover import VectorStoreFailoverManager
     from codeweaver.engine.indexer import Indexer
 
 
@@ -45,6 +47,7 @@ class HealthService:
         provider_registry: ProviderRegistry,
         statistics: SessionStatistics,
         indexer: Indexer | None = None,
+        failover_manager: VectorStoreFailoverManager | None = None,
         startup_time: float,
     ) -> None:
         """Initialize health service.
@@ -53,11 +56,13 @@ class HealthService:
             provider_registry: Provider registry for accessing embedding/vector store providers
             statistics: Session statistics for query metrics
             indexer: Indexer instance for indexing progress (optional)
+            failover_manager: Failover manager for vector store failover (optional)
             startup_time: Server startup timestamp
         """
         self._provider_registry = provider_registry
         self._statistics = statistics
         self._indexer = indexer
+        self._failover_manager = failover_manager
         self._startup_time = startup_time
         self._last_indexed: str | None = None
         self._indexed_languages: set[str] = set()
@@ -84,9 +89,10 @@ class HealthService:
         indexing_info_task = asyncio.create_task(self._get_indexing_info())
         services_info_task = asyncio.create_task(self._get_services_info())
         statistics_info_task = asyncio.create_task(self._get_statistics_info())
+        failover_info_task = asyncio.create_task(self._get_failover_info())
 
-        indexing_info, services_info, statistics_info = await asyncio.gather(
-            indexing_info_task, services_info_task, statistics_info_task
+        indexing_info, services_info, statistics_info, failover_info = await asyncio.gather(
+            indexing_info_task, services_info_task, statistics_info_task, failover_info_task
         )
 
         # Determine overall status
@@ -101,6 +107,7 @@ class HealthService:
             indexing=indexing_info,
             services=services_info,
             statistics=statistics_info,
+            failover=failover_info,
         )
 
     async def _get_indexing_info(self) -> IndexingInfo:
@@ -409,6 +416,49 @@ class HealthService:
             delimiter_chunks=delimiter_chunks,
             file_chunks=file_chunks,
             avg_chunk_size=avg_chunk_size,
+        )
+
+    async def _get_failover_info(self) -> FailoverInfo | None:
+        """Get failover status information.
+
+        Returns:
+            FailoverInfo if failover is configured, None otherwise
+        """
+        if self._failover_manager is None:
+            return None
+
+        # Get failover statistics from session statistics
+        failover_stats = self._statistics.failover_statistics
+        if not failover_stats:
+            return FailoverInfo(
+                failover_enabled=True,
+                failover_active=False,
+                failover_count=0,
+                total_failover_time_seconds=0.0,
+                backup_syncs_completed=0,
+                chunks_in_failover=0,
+            )
+
+        # Get active store type from failover manager
+        active_store = "backup" if self._failover_manager._failover_active else "primary"
+
+        # Get circuit breaker state
+        circuit_state = None
+        if self._failover_manager._primary_store and hasattr(
+            self._failover_manager._primary_store, "circuit_breaker_state"
+        ):
+            circuit_state = str(self._failover_manager._primary_store.circuit_breaker_state)
+
+        return FailoverInfo(
+            failover_enabled=True,
+            failover_active=failover_stats.failover_active,
+            active_store_type=active_store,
+            failover_count=failover_stats.failover_count,
+            total_failover_time_seconds=failover_stats.total_failover_time_seconds,
+            last_failover_time=failover_stats.last_failover_time,
+            primary_circuit_breaker_state=circuit_state,
+            backup_syncs_completed=failover_stats.backup_syncs_completed,
+            chunks_in_failover=failover_stats.chunks_in_failover,
         )
 
     def _determine_status(

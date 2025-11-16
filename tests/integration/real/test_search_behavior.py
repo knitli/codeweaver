@@ -61,8 +61,7 @@ async def indexed_test_project(known_test_codebase, real_provider_registry):
 
     with (
         patch(
-            "codeweaver.common.registry.get_provider_registry",
-            return_value=real_provider_registry
+            "codeweaver.common.registry.get_provider_registry", return_value=real_provider_registry
         ),
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
         patch("codeweaver.config.settings.get_settings", return_value=settings),
@@ -106,8 +105,7 @@ async def test_search_finds_authentication_code(indexed_test_project):
 
     # Search for authentication functionality
     response = await find_code(
-        query="authentication login session management",
-        intent=IntentType.UNDERSTAND,
+        query="authentication login session management", intent=IntentType.UNDERSTAND
     )
 
     # Extract file paths from results
@@ -141,8 +139,7 @@ async def test_search_finds_database_code(indexed_test_project):
     from codeweaver.agent_api.find_code.intent import IntentType
 
     response = await find_code(
-        query="database connection query execution SQL",
-        intent=IntentType.UNDERSTAND,
+        query="database connection query execution SQL", intent=IntentType.UNDERSTAND
     )
 
     result_files = [r.file_path.name for r in response.matches[:3]]
@@ -173,8 +170,7 @@ async def test_search_finds_api_endpoints(indexed_test_project):
     from codeweaver.agent_api.find_code.intent import IntentType
 
     response = await find_code(
-        query="REST API endpoints HTTP routing handlers",
-        intent=IntentType.UNDERSTAND,
+        query="REST API endpoints HTTP routing handlers", intent=IntentType.UNDERSTAND
     )
 
     result_files = [r.file_path.name for r in response.matches[:3]]
@@ -208,16 +204,12 @@ async def test_search_distinguishes_different_concepts(indexed_test_project):
     from codeweaver.agent_api.find_code.intent import IntentType
 
     # Query 1: Authentication
-    auth_response = await find_code(
-        query="user authentication login",
-        intent=IntentType.UNDERSTAND,
-    )
+    auth_response = await find_code(query="user authentication login", intent=IntentType.UNDERSTAND)
     auth_files = {r.file_path.name for r in auth_response.matches[:3]}
 
     # Query 2: Configuration
     config_response = await find_code(
-        query="configuration settings environment variables",
-        intent=IntentType.UNDERSTAND,
+        query="configuration settings environment variables", intent=IntentType.UNDERSTAND
     )
     config_files = {r.file_path.name for r in config_response.matches[:3]}
 
@@ -251,10 +243,7 @@ async def test_search_returns_relevant_code_chunks(indexed_test_project):
     from codeweaver.agent_api.find_code import find_code
     from codeweaver.agent_api.find_code.intent import IntentType
 
-    response = await find_code(
-        query="password hashing",
-        intent=IntentType.UNDERSTAND,
-    )
+    response = await find_code(query="password hashing", intent=IntentType.UNDERSTAND)
 
     # Validate we got results
     assert len(response.matches) > 0, "Search should return results"
@@ -294,10 +283,7 @@ async def test_search_respects_file_types(indexed_test_project):
     from codeweaver.agent_api.find_code import find_code
     from codeweaver.agent_api.find_code.intent import IntentType
 
-    response = await find_code(
-        query="function definition",
-        intent=IntentType.UNDERSTAND,
-    )
+    response = await find_code(query="function definition", intent=IntentType.UNDERSTAND)
 
     # All results should be Python files
     for result in response.matches:
@@ -333,8 +319,7 @@ async def test_search_handles_no_matches_gracefully(indexed_test_project):
 
     # Query for something not in the codebase
     response = await find_code(
-        query="machine learning neural network training",
-        intent=IntentType.UNDERSTAND,
+        query="machine learning neural network training", intent=IntentType.UNDERSTAND
     )
 
     # Should either return nothing or low-confidence results
@@ -382,8 +367,7 @@ async def test_search_handles_empty_codebase(tmp_path, real_provider_registry):
 
     with (
         patch(
-            "codeweaver.common.registry.get_provider_registry",
-            return_value=real_provider_registry
+            "codeweaver.common.registry.get_provider_registry", return_value=real_provider_registry
         ),
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
     ):
@@ -391,10 +375,7 @@ async def test_search_handles_empty_codebase(tmp_path, real_provider_registry):
         indexer = await Indexer.from_settings_async(settings.model_dump())
         await indexer.prime_index()
 
-        response = await find_code(
-            query="any query",
-            intent=IntentType.UNDERSTAND,
-        )
+        response = await find_code(query="any query", intent=IntentType.UNDERSTAND)
 
     # Should return no results, not crash
     assert len(response.matches) == 0, "Empty codebase should return no results"
@@ -423,10 +404,7 @@ async def test_search_with_very_long_query(indexed_test_project):
     long_query = "I'm looking for code that handles user authentication including login functionality, password validation, session management, and logout procedures. The code should validate credentials against a database and create session tokens for authenticated users."
 
     # Should handle long query without crashing
-    response = await find_code(
-        query=long_query,
-        intent=IntentType.UNDERSTAND,
-    )
+    response = await find_code(query=long_query, intent=IntentType.UNDERSTAND)
 
     # Should still find auth-related code
     result_files = [r.file_path.name for r in response.matches[:3]]
