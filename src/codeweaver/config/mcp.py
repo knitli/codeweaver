@@ -48,8 +48,6 @@ import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, Required, TypedDict
 
-import httpx
-
 from fastmcp.mcp_config import MCPConfig as FastMCPConfig
 from fastmcp.mcp_config import RemoteMCPServer as FastMCPRemoteMCPServer
 from fastmcp.mcp_config import StdioMCPServer as FastMCPStdioMCPServer
@@ -58,6 +56,10 @@ from pydantic_core import from_json
 
 from codeweaver.core.types.models import BasedModel
 from codeweaver.exceptions import MissingValueError
+
+
+if TYPE_CHECKING:
+    pass
 
 
 if TYPE_CHECKING:
@@ -202,7 +204,7 @@ class CodeWeaverMCPConfigDict(TypedDict, total=False):
     url: Required[str]
     transport: NotRequired[Literal["http", "streamable-http"] | None]
     timeout: NotRequired[int | None]
-    auth: NotRequired[str | Literal["oauth"] | httpx.Auth | None]
+    auth: NotRequired[str | Literal["oauth"] | Any | None]  # httpx.Auth at runtime
     authentication: NotRequired[dict[str, Any] | None]
     headers: NotRequired[dict[str, str] | None]
     description: NotRequired[str | None]

@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 import cyclopts
-import httpx
 
 from cyclopts import App
 from pydantic import FilePath
@@ -42,6 +41,8 @@ async def _check_server_health() -> bool:
     Returns:
         True if server is running and healthy
     """
+    import httpx
+
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get("http://localhost:9328/health/", timeout=2.0)
