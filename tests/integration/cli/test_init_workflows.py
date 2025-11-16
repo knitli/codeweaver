@@ -24,12 +24,8 @@ import pytest
 from codeweaver.cli.commands.init import app as init_app
 
 
-if TYPE_CHECKING:
-    import pytest as pytest_types
-
-
 @pytest.fixture
-def test_environment(tmp_path: Path, monkeypatch: pytest_types.MonkeyPatch) -> dict[str, Path]:
+def test_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
     """Set up test environment with home and project directories."""
     home = tmp_path / "home"
     home.mkdir()
