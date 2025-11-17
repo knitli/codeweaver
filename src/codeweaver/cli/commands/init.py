@@ -33,7 +33,6 @@ from codeweaver.exceptions import CodeWeaverError
 
 
 if TYPE_CHECKING:
-    import httpx
 
     from codeweaver.cli.ui import StatusDisplay
     from codeweaver.config.mcp import CodeWeaverMCPConfig, StdioCodeWeaverConfig

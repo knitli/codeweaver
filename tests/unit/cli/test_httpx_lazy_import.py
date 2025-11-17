@@ -105,11 +105,11 @@ class TestHttpxLazyImport:
         # Verify our code has the lazy import pattern
         # (import statements are inside functions, not at module level)
         import inspect
-        
+
         # Check index._check_server_health has lazy import
         source = inspect.getsource(index._check_server_health)
         assert "import httpx" in source, "index._check_server_health should have lazy import"
-        
+
         # Check that httpx is in TYPE_CHECKING block in init module
         init_source = inspect.getsource(init)
         assert "if TYPE_CHECKING:" in init_source
