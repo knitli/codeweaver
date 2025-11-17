@@ -51,10 +51,18 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
     server_setup: ServerSetup | EllipsisType = server if is_server_setup(server) else ...
     if server_setup and is_server_setup(server_setup):
         settings: CodeWeaverSettings = server_setup["settings"]
+        # Transport priority: 1) CLI param (in server_setup), 2) settings, 3) default
+        transport = (
+            server_setup.get("transport")
+            or (
+                "streamable-http"
+                if isinstance(settings.server, Unset)
+                else settings.server.transport
+            )
+            or "streamable-http"
+        )
         new_kwargs = {  # type: ignore
-            "transport": "streamable-http"
-            if isinstance(settings.server, Unset)
-            else settings.server.transport,
+            "transport": transport,
             "host": server_setup.pop("host", "127.0.0.1"),
             "port": server_setup.pop("port", 9328),
             "log_level": server_setup.pop("log_level", "INFO"),
@@ -85,6 +93,7 @@ async def run(
     project_path: Path | None = None,
     host: str = "127.0.0.1",
     port: int = 9328,
+    transport: str = "streamable-http",
     verbose: bool = False,
     debug: bool = False,
 ) -> None:
@@ -92,7 +101,7 @@ async def run(
     from codeweaver.server import build_app
     from codeweaver.server.app_bindings import register_app_bindings, register_tool
 
-    server_setup = build_app(verbose=verbose, debug=debug)
+    server_setup = build_app(verbose=verbose, debug=debug, transport=transport)
     server_setup["verbose"] = verbose
     server_setup["debug"] = debug
     if host:

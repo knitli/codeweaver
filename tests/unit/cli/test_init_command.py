@@ -4,10 +4,11 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Unit tests for init command.
 
-Tests validate corrections from CLI_CORRECTIONS_PLAN.md:
+Tests validate:
 - HTTP streaming architecture (not STDIO)
-- Command unification (init vs config init)
+- Command unification (init vs init config)
 - MCP config generation (correct transport)
+- Config file creation via init config subcommand
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import json
 from pathlib import Path
 
 import pytest
+import tomli
 
 from codeweaver.cli.commands.init import app as init_app
 
@@ -38,6 +40,57 @@ def temp_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (project / ".git").mkdir()
     monkeypatch.chdir(project)
     return project
+
+
+@pytest.mark.unit
+@pytest.mark.config
+class TestInitConfigCommand:
+    """Tests for the `init config` subcommand - creates CodeWeaver configuration files."""
+
+    def test_config_profile_recommended(
+        self, temp_project: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Test `init config --profile recommended` creates correct config."""
+        with pytest.raises(SystemExit) as exc_info:
+            init_app(["config", "--profile", "recommended"])
+        capsys.readouterr()
+
+        assert exc_info.value.code == 0
+        config_path = temp_project / "codeweaver.toml"
+        assert config_path.exists()
+        config = tomli.loads(config_path.read_text())
+
+        assert config["embedding"][0]["provider"] == "voyage"
+        assert config["vector_store"]["provider"] == "qdrant"
+
+    def test_config_profile_quickstart(
+        self, temp_project: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Test `init config --profile quickstart` creates offline-capable config."""
+        with pytest.raises(SystemExit) as exc_info:
+            init_app(["config", "--profile", "quickstart"])
+        capsys.readouterr()
+
+        assert exc_info.value.code == 0
+        config_path = temp_project / "codeweaver.toml"
+        assert config_path.exists()
+        config = tomli.loads(config_path.read_text())
+
+        # Should use local providers (fastembed or sentence-transformers)
+        assert config["embedding"][0]["provider"] in ["fastembed", "sentence-transformers"]
+        assert config["vector_store"]["provider"] == "qdrant"
+
+    def test_config_quickstart_flag(
+        self, temp_project: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Test `init config --quickstart` creates quickstart config."""
+        with pytest.raises(SystemExit) as exc_info:
+            init_app(["config", "--quickstart"])
+        capsys.readouterr()
+
+        assert exc_info.value.code == 0
+        config_path = temp_project / "codeweaver.toml"
+        assert config_path.exists()
 
 
 @pytest.mark.unit

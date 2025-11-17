@@ -4,12 +4,14 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Unit tests for config command.
 
-Tests validate corrections from CLI_CORRECTIONS_PLAN.md:
-- Registry usage (not hardcoded providers)
-- Provider.other_env_vars usage (correct env var names)
-- Settings construction (respects pydantic-settings hierarchy)
-- Config profiles (quick setup)
-- Helper utilities usage
+The config command is for viewing/showing the current resolved configuration.
+Config creation functionality has been moved to the `init config` command.
+
+Tests validate:
+- Displaying current configuration
+- Showing provider settings
+- Handling missing configuration
+- Environment variable overrides
 """
 
 from __future__ import annotations
@@ -19,11 +21,9 @@ import contextlib
 from pathlib import Path
 
 import pytest
-import tomli
 
-from codeweaver.cli.commands.config import ConfigProfile
 from codeweaver.cli.commands.config import app as config_app
-from codeweaver.cli.commands.init import app as init_app  # For config creation tests
+from codeweaver.cli.commands.init import app as init_app  # For setup in integration tests
 from codeweaver.common.registry import get_provider_registry
 from codeweaver.providers.provider import Provider, ProviderKind
 
@@ -253,45 +253,3 @@ provider = "invalid_provider_xyz"
 
         with pytest.raises((CodeWeaverError, ValueError)):
             CodeWeaverSettings(config_file=config_path)
-
-    @pytest.mark.skip(reason="API key validation not yet implemented in init config command")
-    def test_missing_required_api_key_warned(
-        self,
-        temp_project: Path,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """Test missing API keys are warned about."""
-        monkeypatch.delenv("VOYAGE_API_KEY", raising=False)
-
-        with pytest.raises(SystemExit) as exc_info:
-            init_app(["config", "--profile", ConfigProfile.RECOMMENDED.value])
-
-        captured = capsys.readouterr()
-        # Should warn about missing API key
-        assert "VOYAGE_API_KEY" in captured.out or exc_info.value.code != 0
-
-
-@pytest.mark.unit
-@pytest.mark.config
-class TestConfigProfiles:
-    """Tests for config profiles."""
-
-    def test_all_profiles_valid(self) -> None:
-        """Test all ConfigProfile enum values are valid."""
-        # Test that profile enum values exist and are valid strings
-        for profile in ConfigProfile:
-            assert profile.value in {"recommended", "quickstart", "backup"}
-            assert isinstance(profile.value, str)
-
-    def test_profile_enum_values_match_functions(self) -> None:
-        """Test ConfigProfile enum values match profile functions."""
-        expected_profiles = {
-            ConfigProfile.RECOMMENDED,
-            ConfigProfile.QUICKSTART,
-            ConfigProfile.BACKUP,
-        }
-
-        assert len(ConfigProfile) == len(expected_profiles)
-        for profile in ConfigProfile:
-            assert profile in expected_profiles

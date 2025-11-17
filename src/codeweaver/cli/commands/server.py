@@ -6,7 +6,7 @@
 """CodeWeaver MCP server command-line interface."""
 
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import cyclopts
 
@@ -26,6 +26,13 @@ async def _run_server(
     project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
     host: str = "127.0.0.1",
     port: int = 9328,
+    transport: Annotated[
+        Literal["streamable-http", "stdio"],
+        cyclopts.Parameter(
+            name=["--transport", "-t"],
+            help="Transport type for MCP communication (streamable-http or stdio)",
+        ),
+    ] = "streamable-http",
     *,
     debug: bool = False,
     verbose: bool = False,
@@ -41,6 +48,7 @@ async def _run_server(
         project_path=project_path,
         host=host,
         port=port,
+        transport=transport,
         debug=debug,
         verbose=verbose,
     )
@@ -53,6 +61,13 @@ async def server(
     project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
     host: str = "127.0.0.1",
     port: int = 9328,
+    transport: Annotated[
+        Literal["streamable-http", "stdio"],
+        cyclopts.Parameter(
+            name=["--transport", "-t"],
+            help="Transport type for MCP communication (streamable-http or stdio)",
+        ),
+    ] = "streamable-http",
     verbose: Annotated[
         bool,
         cyclopts.Parameter(name=["--verbose", "-v"], help="Enable verbose logging with timestamps"),
@@ -71,6 +86,7 @@ async def server(
             project_path=project_path,
             host=host,
             port=port,
+            transport=transport,
             debug=debug,
             verbose=verbose,
         )

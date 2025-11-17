@@ -16,7 +16,9 @@ import sys
 from importlib.util import find_spec
 from pathlib import Path
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
+
+import cyclopts
 
 from cyclopts import App
 from pydantic import ValidationError
@@ -783,17 +785,36 @@ async def process_checks(display: StatusDisplay) -> list[DoctorCheck]:
 
 
 @app.default
-async def doctor(*, verbose: bool = False, display: StatusDisplay | None = None) -> None:
+async def doctor(
+    *,
+    verbose: bool = False,
+    display: StatusDisplay | None = None,
+    config_file: Annotated[
+        Path | None,
+        cyclopts.Parameter(
+            name=["--config-file", "-c"], help="Path to a specific config file to use"
+        ),
+    ] = None,
+    project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
+) -> None:
     """Validate prerequisites and configuration.
 
     Args:
         verbose: Show detailed information for all checks
         display: StatusDisplay instance for output
+        config_file: Path to a specific config file to use
+        project_path: Path to project directory
     """
     global _display
     if display is None:
         display = _display
     _display = display  # Set module-level display for check functions
+
+    # Update settings if config_file or project_path provided
+    if config_file or project_path:
+        from codeweaver.config.settings import update_settings
+
+        _ = update_settings(config_file=config_file, project_path=project_path)  # type: ignore
 
     display.console.print()
     display.print_section("Running diagnostic checks...")
