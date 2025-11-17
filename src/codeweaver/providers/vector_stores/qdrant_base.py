@@ -70,7 +70,12 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
     async def _metadata(self) -> CollectionMetadata | None:
         """Get the collection metadata."""
         collection = await self.get_collection(collection_name=self._collection)  # type: ignore
-        if collection and collection.config and collection.config.metadata:
+        if (
+            collection
+            and collection.config
+            and hasattr(collection.config, "metadata")
+            and collection.config.metadata
+        ):
             return CollectionMetadata.model_validate(collection.config.metadata)  # type: ignore
         return None
 

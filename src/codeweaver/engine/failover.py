@@ -845,8 +845,8 @@ class VectorStoreFailoverManager(BasedModel):
                         "point_count": len(points),
                     },
                     "config": {
-                        "vectors_config": collection_info.get("vectors_config", {}),
-                        "sparse_vectors_config": collection_info.get("sparse_vectors_config", {}),
+                        "vectors_config": collection_info.points_count,
+                        "sparse_vectors_config": collection_info.config.sparse_vector_config,
                     },
                     "points": [
                         {"id": str(point.id), "vector": point.vector, "payload": point.payload}  # type: ignore[attr-defined]
