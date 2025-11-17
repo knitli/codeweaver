@@ -38,7 +38,15 @@ class StatusDisplay:
         Args:
             console: Optional rich Console instance. If not provided, creates one.
         """
-        self.console = console or Console(markup=True, emoji=True)
+        # Detect if we're in an interactive terminal to avoid stdin issues in pytest
+        import sys
+
+        is_interactive = sys.stdin.isatty() if hasattr(sys.stdin, 'isatty') else False
+        self.console = console or Console(
+            markup=True,
+            emoji=True,
+            force_interactive=is_interactive
+        )
         self._start_time = time.time()
 
     def print_header(self, *, host: str = "127.0.0.1", port: int = 9328) -> None:

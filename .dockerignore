@@ -7,7 +7,8 @@
 # Excludes unnecessary files from Docker build context to improve build speed
 
 # Git
-.git/
+# Note: .git/ is needed for uv-dynamic-versioning during Docker build
+# .git/
 .gitignore
 .gitattributes
 .gitconfig
@@ -16,6 +17,7 @@
 # Python
 __pycache__/
 *.py[cod]
+*.pyc
 *$py.class
 *.so
 .Python

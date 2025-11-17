@@ -15,6 +15,27 @@ from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapab
 from codeweaver.providers.provider import Provider
 
 
+@pytest.fixture(autouse=True)
+def reset_embedding_registry():
+    """Reset the global embedding registry and hash stores between tests to avoid state pollution."""
+    import codeweaver.providers.embedding.registry as registry_module
+    from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+
+    # Reset the global singleton registry
+    registry_module._embedding_registry = None
+
+    # Reset the class-level hash stores that handle deduplication
+    EmbeddingProvider._hash_store.clear()
+    EmbeddingProvider._backup_hash_store.clear()
+
+    yield
+
+    # Clean up after test
+    registry_module._embedding_registry = None
+    EmbeddingProvider._hash_store.clear()
+    EmbeddingProvider._backup_hash_store.clear()
+
+
 @pytest.fixture
 def mock_cohere_client():
     """Create a mock Cohere async client."""

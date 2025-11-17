@@ -87,6 +87,7 @@ def _register_chunk_embeddings(chunk, dense=None, sparse=None):
             chunk_id=chunk.chunk_id,
             model="test-dense-model",
             embeddings=dense,
+            dimension=len(dense),
         )
 
     sparse_info = None

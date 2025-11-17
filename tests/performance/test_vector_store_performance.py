@@ -388,7 +388,7 @@ async def test_hybrid_search_performance(qdrant_store: QdrantVectorStoreProvider
         await qdrant_store.search(
             StrategizedQuery(
                 query="test",
-                strategy=SearchStrategy.HYBRID,
+                strategy=SearchStrategy.HYBRID_SEARCH,
                 dense=dense_vector,
                 sparse=sparse_vector,
             )

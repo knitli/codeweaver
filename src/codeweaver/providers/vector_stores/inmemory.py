@@ -59,6 +59,11 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
     config: MemoryConfig = MemoryConfig()
     _client: AsyncQdrantClient | None = None
 
+    @property
+    def base_url(self) -> str | None:
+        """Get the base URL for the memory provider - always :memory:."""
+        return ":memory:"
+
     _provider: ClassVar[Literal[Provider.MEMORY]] = Provider.MEMORY
 
     async def _init_provider(self) -> None:  # type: ignore

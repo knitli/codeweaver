@@ -41,6 +41,11 @@ class QdrantVectorStoreProvider(QdrantBaseProvider):
     _metadata: dict[str, Any] | None = None
     _provider: Provider = Provider.QDRANT  # type: ignore
 
+    @property
+    def base_url(self) -> str | None:
+        """Get the base URL for the Qdrant instance from config."""
+        return self.config.get("url", "http://localhost:6333")
+
     async def _build_client(self) -> AsyncQdrantClient:
         """Build Qdrant client based on configuration."""
         url = self.config.get("url", "http://localhost:6333")

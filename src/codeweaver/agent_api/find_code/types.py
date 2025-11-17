@@ -46,6 +46,9 @@ class SearchStrategy(BaseEnum):
     DENSE_ONLY = "dense_only"
     KEYWORD_FALLBACK = "keyword_fallback"
 
+    # Alias for HYBRID_SEARCH for backward compatibility
+    HYBRID = HYBRID_SEARCH
+
 
 class CodeMatchType(BaseEnum):
     """Enumeration of code match types."""

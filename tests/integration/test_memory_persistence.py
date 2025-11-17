@@ -45,13 +45,15 @@ async def test_inmemory_persistence():
         provider1 = MemoryVectorStoreProvider(_provider=Provider.MEMORY, config=config)
         await provider1._initialize()
 
+        # Get the actual dimension from the created collection
+        # Default voyage-3-lite has 1024 dimensions
         chunk = create_test_chunk_with_embeddings(
             chunk_id=uuid7(),
             chunk_name="memory_test.py:func",
             file_path=Path("memory_test.py"),
             language=Language.PYTHON,
             content="test function",
-            dense_embedding=[0.7, 0.7, 0.7] * 256,
+            dense_embedding=[0.7] * 1024,  # Match voyage-3-lite dimension
             line_start=1,
             line_end=5,
         )
@@ -75,7 +77,7 @@ async def test_inmemory_persistence():
             StrategizedQuery(
                 query="test function",
                 strategy=SearchStrategy.DENSE_ONLY,
-                dense=[0.7, 0.7, 0.7] * 256,
+                dense=[0.7] * 1024,  # Match voyage-3-lite dimension
                 sparse=None,
             )
         )

@@ -58,7 +58,7 @@ class TestNewUserQuickStart:
 
         # Step 1: Quick init
         with pytest.raises(SystemExit) as init_result:
-            init_app(["--quick", "--client", "claude_code"])
+            init_app(["--quickstart", "--client", "claude_code"])
 
         assert init_result.value.code == 0
 
@@ -77,7 +77,7 @@ class TestNewUserQuickStart:
 
         # Init
         with pytest.raises(SystemExit) as init_result:
-            init_app(["--quick", "--config-only"])
+            init_app(["--quickstart", "--config-only"])
         assert init_result.value.code == 0
 
         # Show config
@@ -93,7 +93,7 @@ class TestNewUserQuickStart:
 
         # Init
         with pytest.raises(SystemExit):
-            init_app(["--quick", "--config-only"])
+            init_app(["--quickstart", "--config-only"])
 
         # List providers
         with pytest.raises(SystemExit) as list_result:
@@ -119,7 +119,7 @@ class TestOfflineDeveloperWorkflow:
 
         # Step 1: Quickstart profile (free/offline providers)
         with pytest.raises(SystemExit) as init_result:
-            init_app(["--profile", "quickstart", "--config-only"])
+            init_app(["--profile", "quickstart", "--config-only", "--force"])
 
         # Should succeed even without API keys
         assert init_result.value.code == 0
@@ -135,7 +135,7 @@ class TestOfflineDeveloperWorkflow:
         """Test listing local providers in offline mode."""
         # Init with quickstart (free/offline)
         with pytest.raises(SystemExit):
-            init_app(["--profile", "quickstart", "--config-only"])
+            init_app(["--profile", "quickstart", "--config-only", "--force"])
 
         # List local providers
         with pytest.raises(SystemExit) as list_result:
@@ -150,7 +150,7 @@ class TestOfflineDeveloperWorkflow:
 
         # Init
         with pytest.raises(SystemExit):
-            init_app(["--profile", "quickstart", "--config-only"])
+            init_app(["--profile", "quickstart", "--config-only", "--force"])
 
         # Modify config
         config_path = project / "codeweaver.toml"
@@ -268,7 +268,7 @@ class TestCompleteUserJourneys:
 
         # 1. Init (quick setup)
         with pytest.raises(SystemExit) as init_result:
-            init_app(["--quick", "--client", "claude_code"])
+            init_app(["--quickstart", "--client", "claude_code"])
         assert init_result.value.code == 0
 
         # 2. Verify both configs created

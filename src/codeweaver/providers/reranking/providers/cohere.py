@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import SkipValidation
 
+from codeweaver.common.utils.utils import rpartial
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult
@@ -35,6 +36,43 @@ except ImportError as e:
     raise ConfigurationError(
         'Please install the `cohere` package to use the Cohere provider, \nyou can use the `cohere` optional group — `pip install "codeweaver[cohere]"`'
     ) from e
+
+
+def cohere_reranking_output_transformer(
+    returned_result: V2RerankResponse,
+    _original_chunks: Iterator[CodeChunk] | tuple[CodeChunk, ...],
+    _instance: CohereRerankingProvider,
+) -> list[RerankingResult]:
+    """Transform the output of the Cohere reranking model.
+
+    Cohere returns reranked results in order from highest score to lowest,
+    with their original indices in the results.index field.
+    """
+    from collections.abc import Iterator
+
+    original_chunks = (
+        tuple(_original_chunks) if isinstance(_original_chunks, Iterator) else _original_chunks
+    )
+
+    def map_result(batch_index: int, cohere_result: V2RerankResponseResultsItem) -> RerankingResult:
+        return RerankingResult(
+            original_index=cohere_result.index,
+            batch_rank=batch_index + 1,
+            score=cohere_result.relevance_score,
+            chunk=original_chunks[cohere_result.index],
+        )
+
+    processed_results = [map_result(i, result) for i, result in enumerate(returned_result.results)]
+
+    # Update token stats
+    if (
+        tokens := (returned_result.meta.tokens.output_tokens or returned_result.meta.tokens.input_tokens)
+        if returned_result.meta and returned_result.meta.tokens
+        else None
+    ):
+        _instance._update_token_stats(token_count=int(tokens))
+
+    return processed_results
 
 
 class CohereRerankingProvider(RerankingProvider[CohereClient]):
@@ -79,8 +117,10 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
 
     def _initialize(self) -> None:
         """Initialize the Cohere reranking provider after Pydantic setup."""
-        # Set _caps and _provider after Pydantic initialization
-        # Note: base class might set these, but we ensure they're correct here
+        # Set up the output transformer to use cohere_reranking_output_transformer
+        type(self)._output_transformer = rpartial(
+            cohere_reranking_output_transformer, _instance=self
+        )
 
     @property
     def base_url(self) -> str:
@@ -97,38 +137,6 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
             top_n=top_n,
             **kwargs,
         )
-
-    def process_cohere_output(
-        self, response: V2RerankResponse, chunks: tuple[CodeChunk]
-    ) -> list[RerankingResult]:
-        """Process the output from the Cohere API.
-
-        Cohere returns the raranked results *in order from highest score to lowest*, with their original indices in the results.index field.
-        """
-
-        def map_result(index: int, cohere_result: V2RerankResponseResultsItem) -> RerankingResult:
-            return RerankingResult(
-                original_index=cohere_result.index,
-                batch_rank=index + 1,
-                score=cohere_result.relevance_score,
-                chunk=chunks[cohere_result.index],
-            )
-
-        processed_results = [map_result(i, result) for i, result in enumerate(response.results)]
-        loop = asyncio.get_running_loop()
-        if (
-            tokens := (response.meta.tokens.output_tokens or response.meta.tokens.input_tokens)
-            if response.meta and response.meta.tokens
-            else None
-        ):
-            _ = loop.run_in_executor(None, self._update_token_stats, token_count=int(tokens))  # type: ignore
-        else:
-            _ = loop.run_in_executor(  # type: ignore
-                None,
-                self._update_token_stats,
-                from_docs=self._input_transformer(chunks),  # type: ignore
-            )  # type: ignore
-        return processed_results
 
 
 __all__ = ("CohereRerankingProvider",)

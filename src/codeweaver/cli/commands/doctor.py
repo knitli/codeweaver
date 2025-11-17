@@ -41,6 +41,31 @@ if TYPE_CHECKING:
 _display: StatusDisplay = get_display()
 
 
+def _get_display() -> StatusDisplay:
+    """Get the current display instance.
+
+    Returns:
+        Current StatusDisplay instance
+    """
+    return _display
+
+
+class _ConsoleProxy:
+    """Dynamic proxy that always uses the current display's console.
+
+    This allows tests to replace the display and have all console operations
+    use the new display's console automatically.
+    """
+
+    def __getattr__(self, name: str):
+        """Delegate all attribute access to current display's console."""
+        return getattr(_get_display().console, name)
+
+
+# Console proxy that dynamically delegates to current display
+console = _ConsoleProxy()
+
+
 app = App(
     "doctor",
     help="Validate prerequisites and configuration for CodeWeaver.",

@@ -5,13 +5,29 @@
 
 """Unit tests for CohereRerankingProvider."""
 
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from codeweaver.common.utils.utils import uuid7
 from codeweaver.core.chunks import CodeChunk
+from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.core.metadata import ChunkKind, ExtKind
+from codeweaver.core.spans import Span
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+
+
+def make_test_chunk(content: str, index: int = 0) -> CodeChunk:
+    """Helper to create CodeChunk for testing."""
+    return CodeChunk(
+        content=content,
+        ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+        language=SemanticSearchLanguage.PYTHON,
+        line_range=Span(start=index + 1, end=index + 1, _source_id=uuid7()),
+        file_path=Path("/test/file.py"),
+    )
 
 
 @pytest.fixture
@@ -203,10 +219,10 @@ class TestCohereRerankingProviderReranking:
         assert results[1].chunk == chunks[0]
 
     @pytest.mark.asyncio
-    async def test_process_cohere_output_with_tokens(
+    async def test_rerank_with_single_chunk(
         self, mock_cohere_rerank_client, cohere_rerank_capabilities
     ):
-        """Test that process_cohere_output correctly handles token counts."""
+        """Test that reranking works correctly with a single chunk."""
         from codeweaver.providers.reranking.providers.cohere import CohereRerankingProvider
 
         # Setup mock response
@@ -216,6 +232,8 @@ class TestCohereRerankingProviderReranking:
         mock_response.meta.tokens = MagicMock()
         mock_response.meta.tokens.output_tokens = 100
         mock_response.meta.tokens.input_tokens = None
+
+        mock_cohere_rerank_client.rerank.return_value = mock_response
 
         provider = CohereRerankingProvider(
             caps=cohere_rerank_capabilities, client=mock_cohere_rerank_client
@@ -227,24 +245,23 @@ class TestCohereRerankingProviderReranking:
         from codeweaver.core.metadata import ChunkKind, ExtKind
         from codeweaver.core.spans import Span
 
-        chunks = (
-            CodeChunk(
-                content="test content",
-                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
-                language=SemanticSearchLanguage.PYTHON,
-                line_range=Span(start=1, end=1, _source_id=uuid7()),
-                file_path=Path("/test/file.py"),
-            ),
+        chunk = CodeChunk(
+            content="test content",
+            ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+            language=SemanticSearchLanguage.PYTHON,
+            line_range=Span(start=1, end=1, _source_id=uuid7()),
+            file_path=Path("/test/file.py"),
         )
 
-        # Process output
-        results = provider.process_cohere_output(mock_response, chunks)
+        # Rerank with single chunk
+        results = await provider.rerank(query="test query", documents=[chunk])
 
         # Verify results
         assert len(results) == 1
         assert results[0].score == 0.9
         assert results[0].original_index == 0
-        assert results[0].chunk == chunks[0]
+        assert results[0].batch_rank == 1
+        assert results[0].chunk == chunk
 
 
 @pytest.mark.async_test
@@ -267,7 +284,8 @@ class TestCohereRerankingProviderErrorHandling:
         )
 
         # Call rerank - should return empty list after retries
-        results = await provider.rerank(query="test query", documents=["doc 1"])
+        test_chunk = make_test_chunk("doc 1")
+        results = await provider.rerank(query="test query", documents=[test_chunk])
 
         # Verify empty results are returned
         assert results == []
@@ -286,7 +304,8 @@ class TestCohereRerankingProviderErrorHandling:
         )
 
         # Call rerank - should return empty list after retries
-        results = await provider.rerank(query="test query", documents=["doc 1"])
+        test_chunk = make_test_chunk("doc 1")
+        results = await provider.rerank(query="test query", documents=[test_chunk])
 
         # Verify empty results are returned
         assert results == []

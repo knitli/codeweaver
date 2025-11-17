@@ -43,10 +43,19 @@ def mock_confirm(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
 
     Returns a mock Confirm object that automatically returns True for all confirmations.
     Tests can override by setting mock_confirm.ask.return_value to False.
+
+    Patches module-level imports of Confirm to avoid stdin access issues during testing
+    when pytest captures output. Only patches locations where Confirm is imported at
+    module level, not inside functions.
     """
     mock = MagicMock()
     mock.ask.return_value = True
+
+    # Patch the module-level import in init.py (imported at line 27)
+    monkeypatch.setattr("codeweaver.cli.commands.init.Confirm", mock)
+    # Also patch the base location to catch any other imports
     monkeypatch.setattr("rich.prompt.Confirm", mock)
+
     return mock
 
 
@@ -921,3 +930,63 @@ def real_providers(real_provider_registry: MagicMock) -> Generator[ProviderRegis
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
     ):
         yield real_provider_registry
+
+
+# ===========================================================================
+# AppState Initialization Fixture
+# ===========================================================================
+
+
+@pytest.fixture
+def initialized_app_state(tmp_path: Path) -> Generator[Any, None, None]:
+    """Initialize AppState for integration tests that call find_code_tool.
+
+    This fixture ensures AppState is properly initialized before tests that
+    call find_code_tool, which requires AppState.get_state() to succeed.
+
+    The fixture creates a minimal AppState with:
+    - Settings initialized
+    - Registries initialized (provider, services, model)
+    - Statistics tracking
+    - No failover manager (optional for basic tests)
+
+    Usage:
+        @pytest.mark.asyncio
+        async def test_something(initialized_app_state):
+            # find_code_tool will work now
+            response = await find_code_tool("test query", ...)
+    """
+    from codeweaver.common.registry import (
+        get_model_registry,
+        get_provider_registry,
+        get_services_registry,
+    )
+    from codeweaver.common.statistics import get_session_statistics
+    from codeweaver.config.settings import get_settings
+    from codeweaver.server.server import AppState
+
+    # Initialize settings
+    settings = get_settings()
+
+    # Create AppState (this sets the global _state)
+    state = AppState(
+        initialized=True,
+        settings=settings,
+        project_path=tmp_path,
+        config_path=None,
+        provider_registry=get_provider_registry(),
+        services_registry=get_services_registry(),
+        model_registry=get_model_registry(),
+        statistics=get_session_statistics(),
+        middleware_stack=(),
+        indexer=None,
+        health_service=None,
+        failover_manager=None,
+    )
+
+    yield state
+
+    # Cleanup: Reset global state
+    from codeweaver.server import server
+
+    server._state = None

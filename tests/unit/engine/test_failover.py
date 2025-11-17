@@ -12,6 +12,32 @@ from codeweaver.engine.failover import VectorStoreFailoverManager
 from codeweaver.providers.vector_stores.base import CircuitBreakerState
 
 
+def _create_mock_collection_info():
+    """Create a properly structured mock CollectionInfo object.
+
+    Uses MagicMock with JSON-serializable dict attributes to avoid pydantic
+    auto-conversion that would turn dicts back into VectorParams objects.
+    """
+    from qdrant_client.http.models import Distance, SparseVectorParams, VectorParams
+
+    # Create mock with nested structure
+    # The key is that config.params.vectors and sparse_vectors must be dicts, not pydantic objects
+    mock_info = MagicMock()
+    mock_info.config = MagicMock()
+    mock_info.config.params = MagicMock()
+
+    # These MUST be plain dicts for JSON serialization to work
+    # The production code at line 848-849 stores these directly in the backup dict
+    dense_vector_params = VectorParams(size=768, distance=Distance.COSINE)
+    sparse_vector_params = SparseVectorParams()
+
+    # Use model_dump() to convert to JSON-serializable dicts
+    mock_info.config.params.vectors = {"dense": dense_vector_params.model_dump()}
+    mock_info.config.params.sparse_vectors = {"sparse": sparse_vector_params.model_dump()}
+
+    return mock_info
+
+
 class MockVectorStoreProvider:
     """Mock vector store provider for testing."""
 
@@ -110,6 +136,9 @@ class TestSyncPrimaryToBackup:
         """Test that sync creates backup file with correct structure."""
         primary = MockVectorStoreProvider()
 
+        # Mock get_collection to return proper CollectionInfo structure
+        primary.get_collection = AsyncMock(return_value=_create_mock_collection_info())
+
         # Mock scroll to return test points
         mock_point = MagicMock()
         mock_point.id = "point-1"
@@ -138,6 +167,10 @@ class TestSyncPrimaryToBackup:
     async def test_atomic_write_with_temp_file(self, tmp_path: Path):
         """Test that sync uses atomic write via temp file."""
         primary = MockVectorStoreProvider()
+
+        # Mock get_collection to return proper CollectionInfo structure
+        primary.get_collection = AsyncMock(return_value=_create_mock_collection_info())
+
         primary._client.scroll = AsyncMock(return_value=([], None))
 
         manager = VectorStoreFailoverManager()
@@ -155,6 +188,9 @@ class TestSyncPrimaryToBackup:
     async def test_handles_pagination(self, tmp_path: Path):
         """Test that sync handles pagination correctly."""
         primary = MockVectorStoreProvider()
+
+        # Mock get_collection to return proper CollectionInfo structure
+        primary.get_collection = AsyncMock(return_value=_create_mock_collection_info())
 
         # Create mock points for multiple pages
         points_page1 = [MagicMock(id=f"id-{i}", vector={}, payload={}) for i in range(100)]
@@ -428,9 +464,43 @@ class TestSyncBackToPrimary:
         manager._backup_store = backup
         manager._indexer = indexer
 
+        # Create a proper CodeChunk
+        from datetime import UTC, datetime
+        from pathlib import Path as PathlibPath
+
+        from codeweaver.common.utils import uuid7
+        from codeweaver.core.chunks import CodeChunk
+        from codeweaver.core.metadata import Metadata
+        from codeweaver.core.spans import Span
+        from codeweaver.providers.vector_stores.metadata import HybridVectorPayload
+
+        chunk = CodeChunk(
+            content="test content",
+            line_range=Span(1, 10),
+            file_path=PathlibPath("test.py"),
+            chunk_id=uuid7(),
+            metadata=Metadata(
+                chunk_id=uuid7(), created_at=datetime.now(UTC).timestamp(), line_start=1, line_end=10
+            ),
+        )
+
+        # Create proper HybridVectorPayload
+        payload = HybridVectorPayload(
+            chunk=chunk,
+            chunk_id=str(chunk.chunk_id),
+            file_path="test.py",
+            line_start=1,
+            line_end=10,
+            indexed_at=datetime.now(UTC).isoformat(),
+            chunked_on=datetime.now(UTC).isoformat(),
+            hash=chunk.blake_hash,
+            provider="test_provider",
+            embedding_complete=True,
+        )
+
         # Mock backup retrieval
         mock_point = MagicMock()
-        mock_point.payload = {"chunk_text": "test content", "file": "test.py"}
+        mock_point.payload = payload.model_dump()
         backup._client.retrieve = AsyncMock(return_value=[mock_point])
 
         # Mock primary upsert
@@ -438,23 +508,30 @@ class TestSyncBackToPrimary:
 
         await manager._sync_chunk_to_primary("test-chunk-id")
 
-        # Verify re-embedding was called
-        indexer._embedding_provider.embed.assert_called_once_with(["test content"])
-        indexer._sparse_provider.embed.assert_called_once_with(["test content"])
+        # Verify re-embedding was called with the chunk object
+        assert indexer._embedding_provider.embed.called
+        embed_call = indexer._embedding_provider.embed.call_args
+        assert len(embed_call[0][0]) == 1  # Called with a list of 1 chunk
+        assert isinstance(embed_call[0][0][0], CodeChunk)
+        assert embed_call[0][0][0].content == "test content"
 
-        # Verify upsert to primary was called
+        assert indexer._sparse_provider.embed.called
+        sparse_call = indexer._sparse_provider.embed.call_args
+        assert len(sparse_call[0][0]) == 1  # Called with a list of 1 chunk
+        assert isinstance(sparse_call[0][0][0], CodeChunk)
+        assert sparse_call[0][0][0].content == "test content"
+
+        # Verify upsert to primary was called with the chunk
         assert primary.upsert.called
         upsert_call = primary.upsert.call_args
-        assert upsert_call[1]["points"][0]["id"] == "test-chunk-id"
-        assert "dense" in upsert_call[1]["points"][0]["vector"]
-        assert "sparse" in upsert_call[1]["points"][0]["vector"]
+        assert len(upsert_call[0][0]) == 1  # Called with a list of 1 chunk
+        assert isinstance(upsert_call[0][0][0], CodeChunk)
 
     @pytest.mark.asyncio
     async def test_verify_primary_health_checks(self, tmp_path: Path):
         """Test primary health verification performs all checks."""
         primary = MockVectorStoreProvider(circuit_state=CircuitBreakerState.CLOSED)
         primary.list_collections = AsyncMock(return_value=["test_collection"])
-        primary.get_collection = AsyncMock(return_value={"name": "test_collection"})
 
         manager = VectorStoreFailoverManager()
         manager._primary_store = primary
@@ -464,7 +541,7 @@ class TestSyncBackToPrimary:
 
         # Verify checks were called
         assert primary.list_collections.called
-        assert primary.get_collection.called
+        # Note: get_collection is only called for QdrantBaseProvider subclasses
 
     @pytest.mark.asyncio
     async def test_verify_primary_health_fails_on_open_circuit(self, tmp_path: Path):
@@ -476,7 +553,7 @@ class TestSyncBackToPrimary:
         manager._primary_store = primary
 
         # Should raise due to open circuit
-        with pytest.raises(RuntimeError, match="circuit breaker not closed"):
+        with pytest.raises(RuntimeError, match=r"Primary vector store's circuit breaker was not closed"):
             await manager._verify_primary_health()
 
     @pytest.mark.asyncio

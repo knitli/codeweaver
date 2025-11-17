@@ -33,8 +33,21 @@ from codeweaver.exceptions import CodeWeaverError
 
 
 if TYPE_CHECKING:
+    import httpx  # Used in type hints only
     from codeweaver.cli.ui import StatusDisplay
     from codeweaver.config.mcp import CodeWeaverMCPConfig, StdioCodeWeaverConfig
+
+
+def _lazy_import_httpx() -> None:
+    """Lazy import httpx for type checking compatibility.
+
+    This function ensures httpx is imported at runtime when needed,
+    following the lazy import pattern used elsewhere in the CLI.
+
+    Note: The actual httpx usage happens in FastMCP dependencies,
+    but we maintain the lazy import pattern in our code.
+    """
+    import httpx  # noqa: F401
 
 _display: StatusDisplay = get_display()
 

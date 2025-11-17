@@ -5,14 +5,39 @@
 
 """Unit tests for VoyageRerankingProvider."""
 
+from collections import namedtuple
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from codeweaver.common.utils.utils import uuid7
 from codeweaver.core.chunks import CodeChunk
+from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.core.metadata import ChunkKind, ExtKind
+from codeweaver.core.spans import Span
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.voyage import VoyageRerankingProvider
+
+# Create a mock VoyageRerankingResult that matches the real API structure
+MockVoyageResult = namedtuple("MockVoyageResult", ["document", "index", "relevance_score"])
+
+
+def create_voyage_result(index: int, relevance_score: float, document: str = "") -> MockVoyageResult:
+    """Create a mock Voyage reranking result matching the API structure."""
+    return MockVoyageResult(document=document, index=index, relevance_score=relevance_score)
+
+
+def make_test_chunk(content: str, index: int = 0) -> CodeChunk:
+    """Helper to create CodeChunk for testing."""
+    return CodeChunk(
+        content=content,
+        ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+        language=SemanticSearchLanguage.PYTHON,
+        line_range=Span(start=index + 1, end=index + 1, _source_id=uuid7()),
+        file_path=Path("/test/file.py"),
+    )
 
 
 @pytest.fixture
@@ -41,13 +66,11 @@ class TestVoyageRerankingProviderInitialization:
         provider = VoyageRerankingProvider(
             client=mock_voyage_rerank_client,
             caps=voyage_rerank_capabilities,
-            prompt=None,
-            _rerank_kwargs={},
         )
 
         assert provider.client is mock_voyage_rerank_client
         assert provider.caps == voyage_rerank_capabilities
-        assert provider._provider == Provider.VOYAGE
+        assert provider.provider == Provider.VOYAGE
 
     def test_provider_initialization_sets_output_transformer(
         self, mock_voyage_rerank_client, voyage_rerank_capabilities
@@ -83,15 +106,15 @@ class TestVoyageRerankingProviderInitialization:
     def test_provider_prompt_not_supported(
         self, mock_voyage_rerank_client, voyage_rerank_capabilities
     ):
-        """Test that custom prompts are not supported (should be None)."""
+        """Test that custom prompts are stored but not used by Voyage."""
         provider = VoyageRerankingProvider(
             client=mock_voyage_rerank_client,
             caps=voyage_rerank_capabilities,
             prompt="custom prompt",
         )
 
-        # Voyage doesn't support custom prompts
-        assert provider._prompt == "custom prompt"  # stored but not used
+        # Voyage stores prompt via base class but doesn't use it
+        assert provider.prompt == "custom prompt"  # stored via base class field
 
 
 class TestVoyageRerankingProviderReranking:
@@ -105,8 +128,8 @@ class TestVoyageRerankingProviderReranking:
         # Setup mock response
         mock_response = MagicMock()
         mock_response.results = [
-            MagicMock(index=1, relevance_score=0.9),
-            MagicMock(index=0, relevance_score=0.8),
+            create_voyage_result(index=1, relevance_score=0.9, document="doc 2"),
+            create_voyage_result(index=0, relevance_score=0.8, document="doc 1"),
         ]
         mock_response.total_tokens = 150
         mock_voyage_rerank_client.rerank.return_value = mock_response
@@ -139,8 +162,8 @@ class TestVoyageRerankingProviderReranking:
         # Setup mock response
         mock_response = MagicMock()
         mock_response.results = [
-            MagicMock(index=1, relevance_score=0.9),
-            MagicMock(index=0, relevance_score=0.7),
+            create_voyage_result(index=1, relevance_score=0.9, document="def bar(): pass"),
+            create_voyage_result(index=0, relevance_score=0.7, document="def foo(): pass"),
         ]
         mock_response.total_tokens = 150
         mock_voyage_rerank_client.rerank.return_value = mock_response
@@ -193,7 +216,7 @@ class TestVoyageRerankingProviderReranking:
         """Test reranking with string documents."""
         # Setup mock response
         mock_response = MagicMock()
-        mock_response.results = [MagicMock(index=0, relevance_score=0.95)]
+        mock_response.results = [create_voyage_result(index=0, relevance_score=0.95, document="document 1")]
         mock_response.total_tokens = 100
         mock_voyage_rerank_client.rerank.return_value = mock_response
 
@@ -201,8 +224,9 @@ class TestVoyageRerankingProviderReranking:
             client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
         )
 
-        # Call rerank with strings
-        results = await provider.rerank(query="test query", documents=["document 1"])
+        # Call rerank with CodeChunk
+        test_chunk = make_test_chunk("document 1")
+        results = await provider.rerank(query="test query", documents=[test_chunk])
 
         # Verify results
         assert len(results) == 1
@@ -215,7 +239,10 @@ class TestVoyageRerankingProviderReranking:
     ):
         """Test that rerank limits results to top_n."""
         # Setup mock response with more results than top_n
-        mock_results = [MagicMock(index=i, relevance_score=1.0 - i * 0.1) for i in range(10)]
+        mock_results = [
+            create_voyage_result(index=i, relevance_score=1.0 - i * 0.1, document=f"doc {i}")
+            for i in range(10)
+        ]
         mock_response = MagicMock()
         mock_response.results = mock_results
         mock_response.total_tokens = 200
@@ -225,7 +252,7 @@ class TestVoyageRerankingProviderReranking:
             client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities, top_n=5
         )
 
-        chunks = [f"doc {i}" for i in range(10)]
+        chunks = [make_test_chunk(f"doc {i}", i) for i in range(10)]
 
         # Call rerank
         results = await provider.rerank(query="test query", documents=chunks)
@@ -268,7 +295,8 @@ class TestVoyageRerankingProviderErrorHandling:
         )
 
         # Call rerank - should return empty list after retries
-        results = await provider.rerank(query="test query", documents=["doc 1"])
+        test_chunk = make_test_chunk("doc 1")
+        results = await provider.rerank(query="test query", documents=[test_chunk])
 
         # Verify empty results are returned
         assert results == []
@@ -285,7 +313,8 @@ class TestVoyageRerankingProviderErrorHandling:
         )
 
         # Call rerank - should return empty list after retries
-        results = await provider.rerank(query="test query", documents=["doc 1"])
+        test_chunk = make_test_chunk("doc 1")
+        results = await provider.rerank(query="test query", documents=[test_chunk])
 
         # Verify empty results are returned
         assert results == []
@@ -336,8 +365,9 @@ class TestVoyageRerankingProviderCircuitBreaker:
         )
 
         # Make multiple failed requests
+        test_chunk = make_test_chunk("doc 1")
         for _ in range(3):
-            await provider.rerank(query="test query", documents=["doc 1"])
+            await provider.rerank(query="test query", documents=[test_chunk])
 
         # Check circuit breaker state
         assert provider.circuit_breaker_state in ["closed", "open"]

@@ -57,14 +57,12 @@ class TestInitFullWorkflow:
         mock_confirm.ask.return_value = True
 
         # Parse and execute init command
-        with pytest.raises(SystemExit) as exc_info:  # noqa: PT012
-            func, bound_args, _ = init_app.parse_args(
-                ["--quick", "--client", "claude_code"], exit_on_error=False
-            )
-            # Execute the function
-            func(**bound_args.arguments)
-        # Success exits with code 0
-        assert exc_info.value.code == 0 or exc_info.value.code is None
+        func, bound_args, _ = init_app.parse_args(
+            ["--quickstart", "--client", "claude_code", "--project", str(project)],
+            exit_on_error=False,
+        )
+        # Execute the function - successful execution doesn't raise SystemExit
+        func(**bound_args.arguments)
 
         # CodeWeaver config created
         cw_config = project / "codeweaver.toml"
@@ -99,12 +97,11 @@ class TestInitFullWorkflow:
         mock_confirm.ask.return_value = True
 
         # Execute init
-        with pytest.raises(SystemExit) as exc_info:  # noqa: PT012
-            func, bound_args, _ = init_app.parse_args(
-                ["--quick", "--client", "claude_code"], exit_on_error=False
-            )
-            func(**bound_args.arguments)
-        assert exc_info.value.code == 0 or exc_info.value.code is None
+        func, bound_args, _ = init_app.parse_args(
+            ["--quickstart", "--client", "claude_code", "--project", str(project)],
+            exit_on_error=False,
+        )
+        func(**bound_args.arguments)
 
         mcp_config_path = project / ".claude" / "mcp.json"
         mcp_config = json.loads(mcp_config_path.read_text())
@@ -135,12 +132,11 @@ class TestInitModes:
         mock_confirm.ask.return_value = True
 
         # Execute init with --config-only
-        with pytest.raises(SystemExit) as exc_info:  # noqa: PT012
-            func, bound_args, _ = init_app.parse_args(
-                ["--quick", "--config-only"], exit_on_error=False
-            )
-            func(**bound_args.arguments)
-        assert exc_info.value.code == 0 or exc_info.value.code is None
+        func, bound_args, _ = init_app.parse_args(
+            ["--quickstart", "--config-only", "--force", "--project", str(project)],
+            exit_on_error=False,
+        )
+        func(**bound_args.arguments)
 
         # CodeWeaver config created
         assert (project / "codeweaver.toml").exists()
@@ -159,24 +155,18 @@ class TestInitModes:
         mock_confirm.ask.return_value = True
 
         # Execute init with --mcp-only
-        exit_code = None
-        try:
-            func, bound_args, _ = init_app.parse_args(
-                ["--mcp-only", "--client", "claude_code"], exit_on_error=False
-            )
-            func(**bound_args.arguments)
-        except SystemExit as e:
-            exit_code = e.code if e.code is not None else 0
+        func, bound_args, _ = init_app.parse_args(
+            ["--mcp-only", "--client", "claude_code", "--project", str(project)],
+            exit_on_error=False,
+        )
+        func(**bound_args.arguments)
 
-        # Should succeed or prompt
-        assert exit_code in (0, 1, None)
+        # MCP config created
+        mcp_config_path = project / ".claude" / "mcp.json"
+        assert mcp_config_path.exists()
 
-        if exit_code in (0, None):
-            # MCP config created
-            mcp_config_path = project / ".claude" / "mcp.json"
-            assert mcp_config_path.exists()
-
-            # CodeWeaver config may or may not exist (depends on previous state)
+        # CodeWeaver config should NOT exist (mcp-only mode)
+        assert not (project / "codeweaver.toml").exists()
 
 
 @pytest.mark.integration
@@ -199,19 +189,19 @@ class TestInitIntegration:
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
         mock_confirm.ask.return_value = True
 
+        # Get project from test_environment
+        project = test_environment["project"]
+
         # Init
-        with pytest.raises(SystemExit) as exc_info:  # noqa: PT012
-            func, bound_args, _ = init_app.parse_args(
-                ["--quick", "--config-only"], exit_on_error=False
-            )
-            func(**bound_args.arguments)
-        assert exc_info.value.code == 0 or exc_info.value.code is None
+        func, bound_args, _ = init_app.parse_args(
+            ["--quickstart", "--config-only", "--force", "--project", str(project)],
+            exit_on_error=False,
+        )
+        func(**bound_args.arguments)
 
         # Config show should work (default command, no args needed)
-        with pytest.raises(SystemExit) as exc_info:  # noqa: PT012
-            func, bound_args, _ = config_app.parse_args([], exit_on_error=False)
-            func(**bound_args.arguments)
-        assert exc_info.value.code == 0 or exc_info.value.code is None
+        func, bound_args, _ = config_app.parse_args([], exit_on_error=False)
+        func(**bound_args.arguments)
 
         captured = capsys.readouterr()
         assert "project" in captured.out.lower() or "provider" in captured.out.lower()
@@ -227,23 +217,21 @@ class TestInitIntegration:
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
         mock_confirm.ask.return_value = True
 
+        # Get project from test_environment
+        project = test_environment["project"]
+
         # Init
-        with pytest.raises(SystemExit) as exc_info:  # noqa: PT012
-            func, bound_args, _ = init_app.parse_args(
-                ["--quick", "--config-only"], exit_on_error=False
-            )
-            func(**bound_args.arguments)
-        assert exc_info.value.code == 0 or exc_info.value.code is None
+        func, bound_args, _ = init_app.parse_args(
+            ["--quickstart", "--config-only", "--force", "--project", str(project)],
+            exit_on_error=False,
+        )
+        func(**bound_args.arguments)
 
         # Doctor may report issues with quick config (missing providers)
-        # Exit code 1 is acceptable for warnings
-        with pytest.raises(SystemExit) as exc_info:  # noqa: PT012
-            func, bound_args, _ = doctor_app.parse_args([], exit_on_error=False)
-            func(**bound_args.arguments)
-
-        # 0 = all good, 1 = warnings/issues detected, both acceptable
-        exit_code = exc_info.value.code if exc_info.value.code is not None else 0
-        assert exit_code in (0, 1)
+        # Exit code 1 is acceptable for warnings - but doctor command doesn't raise SystemExit
+        # on success, only on errors
+        func, bound_args, _ = doctor_app.parse_args([], exit_on_error=False)
+        func(**bound_args.arguments)  # Successful execution doesn't raise
 
     def test_init_respects_existing_config(
         self, test_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
@@ -262,17 +250,11 @@ provider = "fastembed"
         mock_confirm.ask.return_value = True
 
         # Init should detect existing config and overwrite with --force
-        exit_code = None
-        try:
-            func, bound_args, _ = init_app.parse_args(
-                ["--quick", "--config-only", "--force"], exit_on_error=False
-            )
-            func(**bound_args.arguments)
-        except SystemExit as e:
-            exit_code = e.code if e.code is not None else 0
-
-        # Should succeed
-        assert exit_code in (0, None)
+        func, bound_args, _ = init_app.parse_args(
+            ["--quickstart", "--config-only", "--force", "--project", str(project)],
+            exit_on_error=False,
+        )
+        func(**bound_args.arguments)  # Should succeed without raising
 
         # Config file should still exist and be updated
         assert existing_config.exists()
@@ -295,18 +277,14 @@ class TestInitMultipleClients:
 
         mock_confirm.ask.return_value = True
 
-        exit_code = None
-        try:
-            func, bound_args, _ = init_app.parse_args(
-                ["--mcp-only", "--client", "claude_code"], exit_on_error=False
-            )
-            func(**bound_args.arguments)
-        except SystemExit as e:
-            exit_code = e.code if e.code is not None else 0
+        func, bound_args, _ = init_app.parse_args(
+            ["--mcp-only", "--client", "claude_code", "--project", str(project)],
+            exit_on_error=False,
+        )
+        func(**bound_args.arguments)
 
-        if exit_code in (0, None):
-            config_path = project / ".claude" / "mcp.json"
-            assert config_path.exists()
+        config_path = project / ".claude" / "mcp.json"
+        assert config_path.exists()
 
     def test_init_claude_desktop(
         self, test_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm

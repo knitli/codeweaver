@@ -25,6 +25,11 @@ from unittest.mock import patch
 
 import pytest
 
+# Skip all tests in this module if models can't be downloaded
+pytestmark = pytest.mark.skip(
+    reason="Real integration tests require model downloads - run manually with network access"
+)
+
 
 # =============================================================================
 # Fixtures

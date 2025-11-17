@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 import tomli
@@ -48,11 +49,11 @@ class TestInitConfigCommand:
     """Tests for the `init config` subcommand - creates CodeWeaver configuration files."""
 
     def test_config_profile_recommended(
-        self, temp_project: Path, capsys: pytest.CaptureFixture[str]
+        self, temp_project: Path, capsys: pytest.CaptureFixture[str], mock_confirm: MagicMock
     ) -> None:
         """Test `init config --profile recommended` creates correct config."""
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["config", "--profile", "recommended"])
+            init_app(["config", "--profile", "recommended", "--force", "--project", str(temp_project)])
         capsys.readouterr()
 
         assert exc_info.value.code == 0
@@ -64,11 +65,11 @@ class TestInitConfigCommand:
         assert config["vector_store"]["provider"] == "qdrant"
 
     def test_config_profile_quickstart(
-        self, temp_project: Path, capsys: pytest.CaptureFixture[str]
+        self, temp_project: Path, capsys: pytest.CaptureFixture[str], mock_confirm: MagicMock
     ) -> None:
         """Test `init config --profile quickstart` creates offline-capable config."""
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["config", "--profile", "quickstart"])
+            init_app(["config", "--profile", "quickstart", "--force", "--project", str(temp_project)])
         capsys.readouterr()
 
         assert exc_info.value.code == 0
@@ -81,11 +82,11 @@ class TestInitConfigCommand:
         assert config["vector_store"]["provider"] == "qdrant"
 
     def test_config_quickstart_flag(
-        self, temp_project: Path, capsys: pytest.CaptureFixture[str]
+        self, temp_project: Path, capsys: pytest.CaptureFixture[str], mock_confirm: MagicMock
     ) -> None:
         """Test `init config --quickstart` creates quickstart config."""
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["config", "--quickstart"])
+            init_app(["config", "--quickstart", "--project", str(temp_project)])
         capsys.readouterr()
 
         assert exc_info.value.code == 0
@@ -99,18 +100,16 @@ class TestInitCommand:
     """Tests for init command."""
 
     def test_init_creates_both_configs(
-        self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str]
+        self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str], mock_confirm: MagicMock
     ) -> None:
         """Test init creates both CodeWeaver config and MCP config."""
         from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--quickstart", "--client", "claude_code"])
+            init_app(["--quickstart", "--client", "claude_code", "--project", str(temp_project)])
         capsys.readouterr()
 
-        # Should succeed
         assert exc_info.value.code == 0
-
         # CodeWeaver config created - now codeweaver.toml not codeweaver.toml
         assert (temp_project / "codeweaver.toml").exists()
 
@@ -121,17 +120,16 @@ class TestInitCommand:
         assert mcp_config_path.exists()
 
     def test_config_only_flag(
-        self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str]
+        self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str], mock_confirm: MagicMock
     ) -> None:
         """Test --config-only creates only CodeWeaver config."""
         from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--quickstart", "--config-only"])
+            init_app(["--quickstart", "--config-only", "--force", "--project", str(temp_project)])
         capsys.readouterr()
 
         assert exc_info.value.code == 0
-
         # CodeWeaver config created - codeweaver.toml
         assert (temp_project / "codeweaver.toml").exists()
 
@@ -142,18 +140,16 @@ class TestInitCommand:
         assert not mcp_config_path.exists()
 
     def test_mcp_only_flag(
-        self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str]
+        self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str], mock_confirm: MagicMock
     ) -> None:
         """Test --mcp-only creates only MCP config."""
         from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--mcp-only", "--client", "claude_code"])
+            init_app(["--mcp-only", "--client", "claude_code", "--project", str(temp_project)])
         capsys.readouterr()
 
-        # Should succeed
         assert exc_info.value.code == 0
-
         # MCP config should be created - using project config level by default
         mcp_config_path = _get_client_config_path(
             client="claude_code", config_level="project", project_path=temp_project
@@ -298,18 +294,15 @@ class TestInitIntegration:
     """Tests for init command integration with other commands."""
 
     def test_init_integrates_with_config(
-        self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str]
+        self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str], mock_confirm: MagicMock
     ) -> None:
         """Test init command integrates with config command."""
         # Init should create valid config
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--quick"])
+            init_app(["--quickstart", "--project", str(temp_project)])
         capsys.readouterr()
 
-        # Only test config integration if init succeeded
-        if exc_info.value.code != 0:
-            return
-
+        assert exc_info.value.code == 0
         # Config command should recognize it - config app doesn't take --show, just runs
         from codeweaver.cli.commands.config import app as config_app
 
@@ -319,7 +312,7 @@ class TestInitIntegration:
         assert config_exc_info.value.code == 0
 
     def test_init_respects_existing_config(
-        self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str]
+        self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str], mock_confirm: MagicMock
     ) -> None:
         """Test init respects existing configuration."""
         # Create existing config
@@ -331,11 +324,13 @@ provider = "fastembed"
 
         # Init should detect and handle existing config
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--quick"])
+            init_app(["--quickstart", "--project", str(temp_project)])
         capsys.readouterr()
 
-        # Should either merge or prompt
-        assert exc_info.value.code in (0, 1)
+        # Should succeed (with --force or confirmation mocked)
+        assert exc_info.value.code == 0
+        # Config file should exist
+        assert config_file.exists()
 
 
 @pytest.mark.unit

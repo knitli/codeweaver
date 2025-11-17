@@ -19,6 +19,7 @@ from __future__ import annotations
 import contextlib
 
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -42,12 +43,14 @@ class TestConfigShow:
     """Tests for config show command - the main functionality of `config` command."""
 
     def test_show_displays_config(
-        self, temp_project: Path, capsys: pytest.CaptureFixture[str]
+        self, temp_project: Path, capsys: pytest.CaptureFixture[str], mock_confirm: MagicMock
     ) -> None:
         """Test config show displays current configuration."""
         # Create config first
-        with pytest.raises(SystemExit):
-            init_app(["config", "--quick"])
+        with pytest.raises(SystemExit) as init_exc:
+            init_app(["config", "--quickstart", "--project", str(temp_project)])
+
+        assert init_exc.value.code == 0
 
         # Show config - config_app default command shows config
         with pytest.raises(SystemExit) as exc_info:

@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from qdrant_client.http.models import VectorParams
+from qdrant_client.http.models import Distance, VectorParams
 from qdrant_client.http.models.models import SparseVectorParams
 
 from codeweaver.exceptions import ModelSwitchError
@@ -34,9 +34,8 @@ def test_model_switch_detection():
     metadata_original = CollectionMetadata(
         provider="qdrant",
         project_name="test-project",
-        embedding_model="voyage-code-3",
-        embedding_dim_dense=1536,
-        vector_config={"dense": VectorParams()},
+        dense_model="voyage-code-3",
+        vector_config={"dense": VectorParams(size=1536, distance=Distance.COSINE)},
         sparse_config={"sparse": SparseVectorParams()},
         created_at=datetime.now(UTC),
     )
@@ -44,9 +43,8 @@ def test_model_switch_detection():
     metadata_switched = CollectionMetadata(
         provider="qdrant",  # Same provider is OK
         project_name="test-project",
-        embedding_model="text-embedding-ada-002",  # Different model is NOT OK
-        embedding_dim_dense=1536,
-        vector_config={"dense": VectorParams()},
+        dense_model="text-embedding-ada-002",  # Different model is NOT OK
+        vector_config={"dense": VectorParams(size=1536, distance=Distance.COSINE)},
         sparse_config={"sparse": SparseVectorParams()},
         created_at=datetime.now(UTC),
     )
@@ -92,9 +90,8 @@ def test_provider_switch_warning(caplog):
     metadata_original = CollectionMetadata(
         provider="qdrant",
         project_name="test-project",
-        embedding_model="voyage-code-3",
-        embedding_dim_dense=1536,
-        vector_config={"dense": VectorParams()},
+        dense_model="voyage-code-3",
+        vector_config={"dense": VectorParams(size=1536, distance=Distance.COSINE)},
         sparse_config={"sparse": SparseVectorParams()},
         created_at=datetime.now(UTC),
     )
@@ -102,9 +99,8 @@ def test_provider_switch_warning(caplog):
     metadata_switched = CollectionMetadata(
         provider="pinecone",  # Different provider
         project_name="test-project",
-        embedding_model="voyage-code-3",  # Same model is OK
-        embedding_dim_dense=1536,
-        vector_config={"dense": VectorParams()},
+        dense_model="voyage-code-3",  # Same model is OK
+        vector_config={"dense": VectorParams(size=1536, distance=Distance.COSINE)},
         sparse_config={"sparse": SparseVectorParams()},
         created_at=datetime.now(UTC),
     )
@@ -116,10 +112,16 @@ def test_provider_switch_warning(caplog):
     assert len(caplog.records) > 0
     warning_msg = caplog.records[0].message.lower()
 
-    assert "provider switch detected" in warning_msg or "provider" in warning_msg
+    # Check main warning message content
+    assert "provider switch detected" in warning_msg
     assert "qdrant" in warning_msg
     assert "pinecone" in warning_msg
-    assert "reindex" in warning_msg
+
+    # Check that suggestions include re-indexing guidance (in extra dict)
+    log_record = caplog.records[0]
+    if hasattr(log_record, "suggestions"):
+        suggestions_text = " ".join(log_record.suggestions).lower()
+        assert "re-index" in suggestions_text or "reindex" in suggestions_text
 
     print("✅ Provider switch logged warning suggesting reindex")
 
@@ -137,9 +139,8 @@ def test_dimension_mismatch_detection():
     metadata_original = CollectionMetadata(
         provider="qdrant",
         project_name="test-project",
-        embedding_model="voyage-code-3",
-        embedding_dim_dense=1536,
-        vector_config={"dense": VectorParams()},
+        dense_model="voyage-code-3",
+        vector_config={"dense": VectorParams(size=1536, distance=Distance.COSINE)},
         sparse_config={"sparse": SparseVectorParams()},
         created_at=datetime.now(UTC),
     )
@@ -147,9 +148,8 @@ def test_dimension_mismatch_detection():
     metadata_switched = CollectionMetadata(
         provider="qdrant",
         project_name="test-project",
-        embedding_model="voyage-code-3",  # Same model
-        embedding_dim_dense=768,  # Different dimension - NOT OK
-        vector_config={"dense": VectorParams()},
+        dense_model="voyage-code-3",  # Same model
+        vector_config={"dense": VectorParams(size=768, distance=Distance.COSINE)},  # Different dimension - NOT OK
         sparse_config={"sparse": SparseVectorParams()},
         created_at=datetime.now(UTC),
     )
@@ -176,9 +176,8 @@ def test_compatible_metadata_no_error():
     metadata_original = CollectionMetadata(
         provider="qdrant",
         project_name="test-project",
-        embedding_model="voyage-code-3",
-        embedding_dim_dense=1536,
-        vector_config={"dense": VectorParams()},
+        dense_model="voyage-code-3",
+        vector_config={"dense": VectorParams(size=1536, distance=Distance.COSINE)},
         sparse_config={"sparse": SparseVectorParams()},
         created_at=datetime.now(UTC),
     )
@@ -186,9 +185,8 @@ def test_compatible_metadata_no_error():
     metadata_same = CollectionMetadata(
         provider="qdrant",
         project_name="test-project",
-        embedding_model="voyage-code-3",
-        embedding_dim_dense=1536,
-        vector_config={"dense": VectorParams()},
+        dense_model="voyage-code-3",
+        vector_config={"dense": VectorParams(size=1536, distance=Distance.COSINE)},
         sparse_config={"sparse": SparseVectorParams()},
         created_at=datetime.now(UTC),
     )
@@ -210,9 +208,8 @@ def test_model_switch_with_none_embedding():
     metadata_old = CollectionMetadata(
         provider="qdrant",
         project_name="test-project",
-        embedding_model=None,  # Old collection without model tracking
-        embedding_dim_dense=1536,
-        vector_config={"dense": VectorParams()},
+        dense_model=None,  # Old collection without model tracking
+        vector_config={"dense": VectorParams(size=1536, distance=Distance.COSINE)},
         sparse_config={"sparse": SparseVectorParams()},
         created_at=datetime.now(UTC),
     )
@@ -220,9 +217,8 @@ def test_model_switch_with_none_embedding():
     metadata_new = CollectionMetadata(
         provider="qdrant",
         project_name="test-project",
-        embedding_model="voyage-code-3",  # New has model
-        embedding_dim_dense=1536,
-        vector_config={"dense": VectorParams()},
+        dense_model="voyage-code-3",  # New has model
+        vector_config={"dense": VectorParams(size=1536, distance=Distance.COSINE)},
         sparse_config={"sparse": SparseVectorParams()},
         created_at=datetime.now(UTC),
     )

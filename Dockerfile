@@ -17,6 +17,7 @@ ARG BUILD_DATE
 ARG VCS_REF
 
 # Install system dependencies required for building Python packages
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
@@ -32,6 +33,9 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY LICENSE* ./
 
+# Copy .git directory for dynamic versioning during build
+COPY .git/ .git/
+
 # Copy the entire source code
 COPY src/ src/
 COPY typings/ typings/
@@ -39,6 +43,7 @@ COPY typings/ typings/
 # Install pip and setuptools, then install the package
 # Note: In some CI environments, you may need to skip SSL verification
 # If you encounter SSL errors, you can add --trusted-host pypi.org --trusted-host files.pythonhosted.org
+# hadolint ignore=DL3013
 RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
     python -m pip install --no-cache-dir .
 
@@ -58,6 +63,7 @@ LABEL org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${VCS_REF}"
 
 # Install runtime dependencies
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \

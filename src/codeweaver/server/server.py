@@ -149,7 +149,7 @@ class AppState(DataclassSerializationMixin):
     ] = None
     startup_time: Annotated[
         float, Field(default_factory=time.time, description="Server startup timestamp")
-    ] = time.time()
+    ]
 
     telemetry: PostHogClient | None = None
 

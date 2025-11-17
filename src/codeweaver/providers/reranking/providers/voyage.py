@@ -67,7 +67,11 @@ def voyage_reranking_output_transformer(
 
     results, token_count = returned_result.results, returned_result.total_tokens
     _instance._update_token_stats(token_count=token_count)
-    results.sort(key=lambda x: cast(float, x[2]), reverse=True)
+    # Sort by relevance_score - handle both tuple (x[2]) and attribute (x.relevance_score) access
+    try:
+        results.sort(key=lambda x: cast(float, x.relevance_score), reverse=True)
+    except AttributeError:
+        results.sort(key=lambda x: cast(float, x[2]), reverse=True)
     return [map_result(res, i) for i, res in enumerate(results, 1)]
 
 
@@ -77,8 +81,7 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
     client: SkipValidation[AsyncClient]
-    provider: Provider = Provider.VOYAGE
-    _prompt: str | None = None  # custom prompts not supported
+    _provider: Provider = Provider.VOYAGE
     caps: RerankingModelCapabilities
 
     _rerank_kwargs: MappingProxyType[str, Any]

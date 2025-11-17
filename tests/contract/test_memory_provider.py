@@ -105,6 +105,7 @@ def sample_chunk():
         chunk_id=chunk_id,
         model="test-dense-model",
         embeddings=[0.5] * 768,  # 768 dimensions
+        dimension=768,
     )
 
     # Set batch key on chunk

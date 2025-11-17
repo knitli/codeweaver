@@ -93,6 +93,7 @@ class CollectionMetadata(BasedModel):
 
     def to_collection(self) -> dict[str, Any]:
         """Convert to a dictionary that is the argument for collection creation."""
+        # Return collection creation params without metadata (metadata is stored separately)
         return self.model_dump(
             exclude_none=True,
             by_alias=True,
@@ -105,7 +106,7 @@ class CollectionMetadata(BasedModel):
                 "dense_model",
                 "sparse_model",
             },
-        ) | {"metadata": self.model_dump(exclude_none=True, by_alias=True, round_trip=True)}
+        )
 
     @classmethod
     def from_collection(cls, data: dict[str, Any]) -> CollectionMetadata:

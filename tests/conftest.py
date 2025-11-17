@@ -281,6 +281,7 @@ def create_test_chunk_with_embeddings(
             chunk_id=chunk_id,
             model="test-dense-model",
             embeddings=dense_embedding,
+            dimension=len(dense_embedding),
         )
         # Set batch key on chunk
         dense_batch_key = BatchKeys(id=cast(UUID, dense_batch_id), idx=0, sparse=False)

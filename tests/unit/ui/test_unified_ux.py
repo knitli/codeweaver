@@ -181,8 +181,12 @@ class TestCLIErrorHandler:
         error = ValueError("Unexpected error")
 
         # This will exit, so we catch it
+        # We need to actually raise the exception to create proper traceback context
         with pytest.raises(SystemExit) as exc_info:
-            handler.handle_error(error, "Test operation")
+            try:
+                raise error
+            except ValueError:
+                handler.handle_error(error, "Test operation")
 
         assert exc_info.value.code == 1
         output = buffer.getvalue()

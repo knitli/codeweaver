@@ -108,7 +108,7 @@ def test_project_path(tmp_path: Path) -> Path:
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_cli_search_returns_results(test_project_path: Path):
+async def test_cli_search_returns_results(test_project_path: Path, initialized_app_state):
     """T010: CLI search command returns results (stub validation).
 
     Given: Test project path
@@ -158,7 +158,7 @@ async def test_cli_search_returns_results(test_project_path: Path):
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_cli_search_output_formats(test_project_path: Path):
+async def test_cli_search_output_formats(test_project_path: Path, initialized_app_state):
     """T010: CLI search supports multiple output formats.
 
     Given: Search results available
@@ -205,7 +205,7 @@ async def test_cli_search_output_formats(test_project_path: Path):
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_mcp_find_code_tool(test_project_path: Path):
+async def test_mcp_find_code_tool(test_project_path: Path, initialized_app_state):
     """T010: MCP find_code tool returns valid response conforming to contract.
 
     Given: CodeWeaver MCP tool interface
@@ -267,7 +267,7 @@ async def test_mcp_find_code_tool(test_project_path: Path):
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_mcp_find_code_required_parameters(test_project_path: Path):
+async def test_mcp_find_code_required_parameters(test_project_path: Path, initialized_app_state):
     """T010: MCP find_code handles parameter validation.
 
     Given: MCP tool interface
@@ -311,7 +311,7 @@ async def test_mcp_find_code_required_parameters(test_project_path: Path):
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_search_with_intent_parameter():
+async def test_search_with_intent_parameter(initialized_app_state):
     """T010: Search with explicit intent parameter.
 
     Given: Search query with intent specified
@@ -360,7 +360,7 @@ async def test_search_with_intent_parameter():
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_search_filters_work():
+async def test_search_filters_work(initialized_app_state):
     """T010: Search filters (include_tests) parameter handling.
 
     Given: Search with filter parameters
@@ -397,7 +397,7 @@ async def test_search_filters_work():
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_search_token_limit():
+async def test_search_token_limit(initialized_app_state):
     """T010: Search respects token_limit parameter.
 
     Given: Search with token_limit specified
@@ -426,7 +426,7 @@ async def test_search_token_limit():
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_empty_query_handling():
+async def test_empty_query_handling(initialized_app_state):
     """T010: Empty query handled gracefully.
 
     Given: Empty or whitespace-only query
@@ -453,7 +453,7 @@ async def test_empty_query_handling():
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_no_results_scenario():
+async def test_no_results_scenario(initialized_app_state):
     """T010: No matching results handled gracefully.
 
     Given: Query that matches nothing in codebase
@@ -486,7 +486,7 @@ async def test_no_results_scenario():
 @pytest.mark.integration
 @pytest.mark.asyncio
 @pytest.mark.benchmark
-async def test_search_performance(test_project_path: Path):
+async def test_search_performance(test_project_path: Path, initialized_app_state):
     """T010: Search performance meets <3s requirement for ≤10k files (FR-037).
 
     Given: Indexed project with embeddings (≤10k files)
@@ -519,7 +519,7 @@ async def test_search_performance(test_project_path: Path):
 @pytest.mark.integration
 @pytest.mark.asyncio
 @pytest.mark.benchmark
-async def test_search_response_time_tracking():
+async def test_search_response_time_tracking(initialized_app_state):
     """T010: Search response time accurately tracked.
 
     Given: Search query executed
@@ -584,7 +584,7 @@ async def test_search_strategy_reporting(test_project_path: Path, configured_pro
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_search_languages_found():
+async def test_search_languages_found(initialized_app_state):
     """T010: Languages found correctly reported.
 
     Given: Search across codebase

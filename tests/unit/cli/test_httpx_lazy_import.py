@@ -17,7 +17,7 @@ from __future__ import annotations
 import sys
 
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -151,7 +151,8 @@ class TestHttpxLazyImport:
         mock_client = MagicMock()
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_client.get.return_value = mock_response
+        # Use AsyncMock for the get method since it's awaited
+        mock_client.get = AsyncMock(return_value=mock_response)
         mock_httpx.AsyncClient.return_value.__aenter__.return_value = mock_client
         mock_httpx.ConnectError = Exception
         mock_httpx.TimeoutException = Exception

@@ -160,16 +160,16 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
 
     _rerank_kwargs: ClassVar[MappingProxyType[str, Any]]
     # transforms the input documents into a format suitable for the provider
-    _input_transformer: ClassVar[Callable[[StructuredDataInput], Any]] = PrivateAttr(
-        default=staticmethod(default_reranking_input_transformer)
+    _input_transformer: Callable[[StructuredDataInput], Any] = PrivateAttr(
+        default_factory=lambda: default_reranking_input_transformer
     )
     """The input transformer is a function that takes the input documents and returns them in a format suitable for the provider.
 
     The `StructuredDataInput` type is a CodeChunk or iterable of CodeChunks, but they can be in string, bytes, bytearray, python dictionary, or CodeChunk format.
     """
-    _output_transformer: ClassVar[
-        Callable[[Any, Iterator[CodeChunk]], Sequence[RerankingResult]]
-    ] = PrivateAttr(default=staticmethod(default_reranking_output_transformer))
+    _output_transformer: Callable[[Any, Iterator[CodeChunk]], Sequence[RerankingResult]] = (
+        PrivateAttr(default_factory=lambda: default_reranking_output_transformer)
+    )
     """The output transformer is a function that takes the raw results from the provider and returns a Sequence of RerankingResult."""
 
     _chunk_store: tuple[CodeChunk, ...] | None = PrivateAttr(default=None)
@@ -336,7 +336,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         processed_kwargs = self._set_kwargs(**kwargs)
         transformed_docs = CodeChunk.chunkify(documents)
         self._chunk_store = tuple(transformed_docs)
-        processed_docs = self._input_transformer(transformed_docs)
+        processed_docs = tuple(self._input_transformer(self._chunk_store))
 
         try:
             # Use retry wrapper instead of calling _execute_rerank directly
@@ -387,7 +387,11 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     @property
     def provider(self) -> Provider:
         """Get the provider for the reranking provider."""
-        return type(self)._provider
+        # Unwrap the value if it's a ModelPrivateAttr
+        provider_value = type(self)._provider
+        if hasattr(provider_value, 'default'):
+            return provider_value.default
+        return provider_value
 
     @property
     def model_name(self) -> str:
