@@ -105,7 +105,7 @@ class TestInitCommand:
         from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--quick", "--client", "claude_code"])
+            init_app(["--quickstart", "--client", "claude_code"])
         capsys.readouterr()
 
         # Should succeed
@@ -127,7 +127,7 @@ class TestInitCommand:
         from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--quick", "--config-only"])
+            init_app(["--quickstart", "--config-only"])
         capsys.readouterr()
 
         assert exc_info.value.code == 0

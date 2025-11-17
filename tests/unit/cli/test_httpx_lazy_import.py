@@ -15,6 +15,7 @@ follows the lazy import pattern.
 from __future__ import annotations
 
 import sys
+
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
@@ -100,11 +101,11 @@ class TestHttpxLazyImport:
         """
         # This test documents the behavior rather than asserting on it
         # since the external dependency behavior is beyond our control
-        from codeweaver.cli.commands import index, init
-
         # Verify our code has the lazy import pattern
         # (import statements are inside functions, not at module level)
         import inspect
+
+        from codeweaver.cli.commands import index, init
 
         # Check index._check_server_health has lazy import
         source = inspect.getsource(index._check_server_health)
