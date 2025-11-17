@@ -319,9 +319,9 @@ class CodeWeaverSettings(BaseSettings):
 
     Configuration precedence (highest to lowest):
     1. Environment variables (CODEWEAVER_*)
-    2. Local config (.codeweaver.local.toml (or .yaml, .yml, .json) in current directory)
-    3. Project config (.codeweaver.toml (or .yaml, .yml, .json) in project root)
-    4. User config (~/.codeweaver.toml (or .yaml, .yml, .json))
+    2. Local config (codeweaver.local.toml (or .yaml, .yml, .json) in current directory)
+    3. Project config (codeweaver.toml (or .yaml, .yml, .json) in project root)
+    4. User config (~/codeweaver.toml (or .yaml, .yml, .json))
     5. Global config (/etc/codeweaver.toml (or .yaml, .yml, .json))
     6. Defaults
 
@@ -570,7 +570,7 @@ class CodeWeaverSettings(BaseSettings):
     def from_config(cls, path: FilePath, **kwargs: Unpack[CodeWeaverSettingsDict]) -> Self:
         """Create a CodeWeaverSettings instance from a configuration file.
 
-        This is a convenience method for creating a settings instance from a specific config file. By default, CodeWeaverSettings will look for configuration files in standard locations (like .codeweaver.toml in the project root). This method allows you to specify a particular config file to load settings from, primarily for testing or special use cases.
+        This is a convenience method for creating a settings instance from a specific config file. By default, CodeWeaverSettings will look for configuration files in standard locations (like codeweaver.toml in the project root). This method allows you to specify a particular config file to load settings from, primarily for testing or special use cases.
         """
         extension = path.suffix.lower()
         match extension:
@@ -818,7 +818,7 @@ class CodeWeaverSettings(BaseSettings):
                 if isinstance(obj.project_path, Path)
                 else get_project_path() or Path.cwd()
             )
-            / Path(".codeweaver.toml")
+            / Path("codeweaver.toml")
         )
         extension = config_file.suffix.lower()
         match extension:
@@ -858,7 +858,7 @@ class CodeWeaverSettings(BaseSettings):
         """
         path = path or self.config_file
         if path is None and isinstance(self.project_path, Path):
-            path = self.project_path / ".codeweaver.toml"
+            path = self.project_path / "codeweaver.toml"
         if path is None:
             raise ValueError("No path provided to save configuration file.")
         extension = path.suffix.lower()

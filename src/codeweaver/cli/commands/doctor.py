@@ -456,7 +456,7 @@ def _check_qdrant_api_key_env_vars(provider, check) -> DoctorCheck:
         "Check provider authentication logic"
         if set_vars
         else f"Set {possible_keys[0]} environment variable",  # type: ignore
-        "Or configure api_key in your .codeweaver.toml file",
+        "Or configure api_key in your codeweaver.toml file",
     ]
     return check
 
@@ -599,7 +599,7 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
                                 f"Set environment variable: {env_vars[0]}"
                                 if env_vars
                                 else "Configure API key in settings",
-                                "Or configure in your .codeweaver.toml file",
+                                "Or configure in your codeweaver.toml file",
                             ],
                         )
                     )

@@ -58,8 +58,8 @@ class TestInitCommand:
         # Should succeed
         assert exc_info.value.code == 0
 
-        # CodeWeaver config created - now .codeweaver.toml not codeweaver.toml
-        assert (temp_project / ".codeweaver.toml").exists()
+        # CodeWeaver config created - now codeweaver.toml not codeweaver.toml
+        assert (temp_project / "codeweaver.toml").exists()
 
         # MCP config created - with project config level, goes in project not user
         mcp_config_path = _get_client_config_path(
@@ -79,8 +79,8 @@ class TestInitCommand:
 
         assert exc_info.value.code == 0
 
-        # CodeWeaver config created - .codeweaver.toml not codeweaver.toml
-        assert (temp_project / ".codeweaver.toml").exists()
+        # CodeWeaver config created - codeweaver.toml
+        assert (temp_project / "codeweaver.toml").exists()
 
         # MCP config should NOT be created
         mcp_config_path = _get_client_config_path(

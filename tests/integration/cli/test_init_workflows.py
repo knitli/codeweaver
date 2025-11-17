@@ -57,18 +57,17 @@ class TestInitFullWorkflow:
         mock_confirm.ask.return_value = True
 
         # Parse and execute init command
-        try:
+        with pytest.raises(SystemExit) as exc_info:  # noqa: PT012
             func, bound_args, _ = init_app.parse_args(
                 ["--quick", "--client", "claude_code"], exit_on_error=False
             )
             # Execute the function
             func(**bound_args.arguments)
-        except SystemExit as e:
-            # Success exits with code 0
-            assert e.code == 0 or e.code is None
+        # Success exits with code 0
+        assert exc_info.value.code == 0 or exc_info.value.code is None
 
         # CodeWeaver config created
-        cw_config = project / ".codeweaver.toml"
+        cw_config = project / "codeweaver.toml"
         assert cw_config.exists(), "CodeWeaver config should be created"
 
         config_content = cw_config.read_text()
@@ -100,13 +99,12 @@ class TestInitFullWorkflow:
         mock_confirm.ask.return_value = True
 
         # Execute init
-        try:
+        with pytest.raises(SystemExit) as exc_info:  # noqa: PT012
             func, bound_args, _ = init_app.parse_args(
                 ["--quick", "--client", "claude_code"], exit_on_error=False
             )
             func(**bound_args.arguments)
-        except SystemExit as e:
-            assert e.code == 0 or e.code is None
+        assert exc_info.value.code == 0 or exc_info.value.code is None
 
         mcp_config_path = project / ".claude" / "mcp.json"
         mcp_config = json.loads(mcp_config_path.read_text())
@@ -137,16 +135,15 @@ class TestInitModes:
         mock_confirm.ask.return_value = True
 
         # Execute init with --config-only
-        try:
+        with pytest.raises(SystemExit) as exc_info:  # noqa: PT012
             func, bound_args, _ = init_app.parse_args(
                 ["--quick", "--config-only"], exit_on_error=False
             )
             func(**bound_args.arguments)
-        except SystemExit as e:
-            assert e.code == 0 or e.code is None
+        assert exc_info.value.code == 0 or exc_info.value.code is None
 
         # CodeWeaver config created
-        assert (project / ".codeweaver.toml").exists()
+        assert (project / "codeweaver.toml").exists()
 
         # MCP config should NOT be created
         mcp_config_path = project / ".claude" / "mcp.json"
@@ -188,7 +185,11 @@ class TestInitIntegration:
     """Tests for init integration with other commands."""
 
     def test_init_then_config_show(
-        self, test_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm, capsys
+        self,
+        test_environment: dict[str, Path],
+        monkeypatch: pytest.MonkeyPatch,
+        mock_confirm,
+        capsys,
     ) -> None:
         """Test init followed by config show."""
         from codeweaver.cli.commands.config import app as config_app
@@ -199,20 +200,18 @@ class TestInitIntegration:
         mock_confirm.ask.return_value = True
 
         # Init
-        try:
+        with pytest.raises(SystemExit) as exc_info:  # noqa: PT012
             func, bound_args, _ = init_app.parse_args(
                 ["--quick", "--config-only"], exit_on_error=False
             )
             func(**bound_args.arguments)
-        except SystemExit as e:
-            assert e.code == 0 or e.code is None
+        assert exc_info.value.code == 0 or exc_info.value.code is None
 
         # Config show should work (default command, no args needed)
-        try:
+        with pytest.raises(SystemExit) as exc_info:  # noqa: PT012
             func, bound_args, _ = config_app.parse_args([], exit_on_error=False)
             func(**bound_args.arguments)
-        except SystemExit as e:
-            assert e.code == 0 or e.code is None
+        assert exc_info.value.code == 0 or exc_info.value.code is None
 
         captured = capsys.readouterr()
         assert "project" in captured.out.lower() or "provider" in captured.out.lower()
@@ -229,25 +228,22 @@ class TestInitIntegration:
         mock_confirm.ask.return_value = True
 
         # Init
-        try:
+        with pytest.raises(SystemExit) as exc_info:  # noqa: PT012
             func, bound_args, _ = init_app.parse_args(
                 ["--quick", "--config-only"], exit_on_error=False
             )
             func(**bound_args.arguments)
-        except SystemExit as e:
-            assert e.code == 0 or e.code is None
+        assert exc_info.value.code == 0 or exc_info.value.code is None
 
         # Doctor may report issues with quick config (missing providers)
         # Exit code 1 is acceptable for warnings
-        exit_code = None
-        try:
+        with pytest.raises(SystemExit) as exc_info:  # noqa: PT012
             func, bound_args, _ = doctor_app.parse_args([], exit_on_error=False)
             func(**bound_args.arguments)
-        except SystemExit as e:
-            exit_code = e.code if e.code is not None else 0
 
         # 0 = all good, 1 = warnings/issues detected, both acceptable
-        assert exit_code in (0, 1, None)
+        exit_code = exc_info.value.code if exc_info.value.code is not None else 0
+        assert exit_code in (0, 1)
 
     def test_init_respects_existing_config(
         self, test_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
@@ -256,7 +252,7 @@ class TestInitIntegration:
         project = test_environment["project"]
 
         # Create existing config
-        existing_config = project / ".codeweaver.toml"
+        existing_config = project / "codeweaver.toml"
         existing_config.write_text("""
 [embedding]
 provider = "fastembed"

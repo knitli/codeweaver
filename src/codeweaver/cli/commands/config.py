@@ -15,9 +15,11 @@ from typing import TYPE_CHECKING, Annotated
 import cyclopts
 
 from cyclopts import App
+from pydantic import FilePath
 from rich.table import Table
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
+from codeweaver.cli.utils import is_codeweaver_config_path
 
 
 class ConfigProfile(StrEnum):
@@ -43,6 +45,12 @@ def config(
     project_path: Annotated[
         Path | None, cyclopts.Parameter(name=["--project", "-p"], help="Path to project directory")
     ] = None,
+    config_file: Annotated[
+        FilePath | None,
+        cyclopts.Parameter(
+            name=["--config-file", "-c"], help="Path to a specific config file to use"
+        ),
+    ] = None,
     verbose: Annotated[
         bool, cyclopts.Parameter(name=["--verbose", "-v"], help="Enable verbose logging")
     ] = False,
@@ -58,10 +66,18 @@ def config(
 
     try:
         settings = get_settings_map()
-        if project_path:
+        if project_path or (config_file and not is_codeweaver_config_path(config_file)):
             from codeweaver.config.settings import update_settings
 
-            settings = update_settings(project_path=project_path)  # type: ignore
+            if config_file:
+                display.print_info(f"Updating settings from config file: {config_file}")
+                display.print_info(
+                    "[red]Your config file is not in a standard location or name.[/red]"
+                )
+                display.print_info(
+                    f"[blue]Tip[/blue]: To ensure CodeWeaver finds it, you must set the `CODEWEAVER_CONFIG_FILE` environment variable to {config_file}, or always specify it with the `--config-file` option"
+                )
+            settings = update_settings(project_path=project_path, config_file=config_file)  # type: ignore
 
         _show_config(settings)
 

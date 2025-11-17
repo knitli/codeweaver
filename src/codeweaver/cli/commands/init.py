@@ -33,7 +33,6 @@ from codeweaver.exceptions import CodeWeaverError
 
 
 if TYPE_CHECKING:
-
     from codeweaver.cli.ui import StatusDisplay
     from codeweaver.config.mcp import CodeWeaverMCPConfig, StdioCodeWeaverConfig
 
@@ -82,7 +81,7 @@ def _create_codeweaver_config(
         profile: Profile name to use ("recommended", "quickstart", "test")
         vector_deployment: Vector store deployment type ("local" or "cloud")
         vector_url: URL for cloud vector deployment (required if vector_deployment="cloud")
-        config_path: Custom config file path (defaults to .codeweaver.toml in project)
+        config_path: Custom config file path (defaults to codeweaver.toml in project)
 
     Returns:
         Path to created configuration file

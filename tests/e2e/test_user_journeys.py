@@ -63,7 +63,7 @@ class TestNewUserQuickStart:
         assert init_result.value.code == 0
 
         # Step 2: Verify config created
-        config_path = project / ".codeweaver.toml"
+        config_path = project / "codeweaver.toml"
         assert config_path.exists()
 
         # Step 3: Doctor check (may have warnings about dependencies or services)
@@ -125,7 +125,7 @@ class TestOfflineDeveloperWorkflow:
         assert init_result.value.code == 0
 
         # Step 2: Verify config created
-        assert (project / ".codeweaver.toml").exists()
+        assert (project / "codeweaver.toml").exists()
 
         # Step 3: Config uses local providers (no API keys needed)
 
@@ -153,7 +153,7 @@ class TestOfflineDeveloperWorkflow:
             init_app(["--profile", "quickstart", "--config-only"])
 
         # Modify config
-        config_path = project / ".codeweaver.toml"
+        config_path = project / "codeweaver.toml"
         config = tomli.loads(config_path.read_text())
         config["max_results"] = 20
 
@@ -193,7 +193,7 @@ model = "voyage-code-3"
 type = "qdrant"
 url = "https://prod.cloud.qdrant.io"
 """
-        (project / ".codeweaver.toml").write_text(config_content)
+        (project / "codeweaver.toml").write_text(config_content)
 
         # Step 2: Config created for cloud deployment
 
@@ -208,7 +208,7 @@ url = "https://prod.cloud.qdrant.io"
 [embedding]
 provider = "fastembed"
 """
-        (project / ".codeweaver.toml").write_text(config_content)
+        (project / "codeweaver.toml").write_text(config_content)
 
         # Override via env var (production pattern)
         monkeypatch.setenv("CODEWEAVER_EMBEDDING_PROVIDER", "voyage")
@@ -230,7 +230,7 @@ provider = "fastembed"
 [embedding]
 provider = "voyage"
 """
-        (project / ".codeweaver.toml").write_text(base_config)
+        (project / "codeweaver.toml").write_text(base_config)
 
         # Test different environments
         environments = {
@@ -272,7 +272,7 @@ class TestCompleteUserJourneys:
         assert init_result.value.code == 0
 
         # 2. Verify both configs created
-        assert (project / ".codeweaver.toml").exists()
+        assert (project / "codeweaver.toml").exists()
         mcp_config = _get_client_config_path(
             client="claude_code", config_level="project", project_path=project
         )
@@ -314,7 +314,7 @@ enabled = true
 type = "qdrant"
 collection = "my_code"
 """
-        (project / ".codeweaver.toml").write_text(custom_config)
+        (project / "codeweaver.toml").write_text(custom_config)
 
         # 2. Set API key
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
@@ -348,7 +348,7 @@ type = "qdrant"
 
 # Individual developers set API keys via env vars
 """
-        (project / ".codeweaver.toml").write_text(team_config)
+        (project / "codeweaver.toml").write_text(team_config)
 
         # 2. Each developer sets their own keys
         monkeypatch.setenv("VOYAGE_API_KEY", "dev1-key")

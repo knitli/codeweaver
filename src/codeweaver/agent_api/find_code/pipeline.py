@@ -238,7 +238,7 @@ async def embed_query(query: str, context: Any = None) -> QueryResult:
             },
             suggestions=[
                 "Set VOYAGE_API_KEY environment variable for cloud embeddings",
-                "Or configure local provider in .codeweaver.toml: embedding_provider = 'fastembed'",
+                "Or configure local provider in codeweaver.toml: embedding_provider = 'fastembed'",
                 "See docs: https://codeweaver.ai/config/providers",
             ],
         )
@@ -351,7 +351,7 @@ async def execute_vector_search(
             "No vector store provider configured",
             details={"available_providers": ["qdrant", "in_memory"], "configured_provider": None},
             suggestions=[
-                "Configure vector store in .codeweaver.toml: vector_store_provider = 'qdrant'",
+                "Configure vector store in codeweaver.toml: vector_store_provider = 'qdrant'",
                 "Or use in-memory provider for testing: vector_store_provider = 'in_memory'",
                 "See docs: https://codeweaver.ai/config/vector-stores",
             ],

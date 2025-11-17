@@ -49,10 +49,7 @@ class TestConfigInit:
         """Test --profile recommended creates config with recommended defaults."""
         with pytest.raises(SystemExit) as exc_info:
             init_app(["config", "--profile", "recommended"])
-        capsys.readouterr()  # Clear output
-
-        assert exc_info.value.code == 0
-        config_path = temp_project / "codeweaver.toml"
+        config_path = self._assert_quickstart_exit_code(capsys, exc_info, temp_project)
         assert config_path.exists()
 
     def test_profile_recommended(
@@ -61,10 +58,7 @@ class TestConfigInit:
         """Test --profile recommended creates correct config."""
         with pytest.raises(SystemExit) as exc_info:
             init_app(["config", "--profile", ConfigProfile.RECOMMENDED.value])
-        capsys.readouterr()
-
-        assert exc_info.value.code == 0
-        config_path = temp_project / "codeweaver.toml"
+        config_path = self._assert_quickstart_exit_code(capsys, exc_info, temp_project)
         config = tomli.loads(config_path.read_text())
 
         assert config["embedding"][0]["provider"] == "voyage"
@@ -76,10 +70,7 @@ class TestConfigInit:
         """Test --profile quickstart creates offline-capable config."""
         with pytest.raises(SystemExit) as exc_info:
             init_app(["config", "--profile", "quickstart"])
-        capsys.readouterr()
-
-        assert exc_info.value.code == 0
-        config_path = temp_project / "codeweaver.toml"
+        config_path = self._assert_quickstart_exit_code(capsys, exc_info, temp_project)
         config = tomli.loads(config_path.read_text())
 
         # Should use local providers (fastembed or sentence-transformers)
@@ -101,18 +92,21 @@ class TestConfigInit:
         user_config = tmp_path / ".config" / "codeweaver" / "config.toml"
         assert user_config.exists()
 
-    @pytest.mark.skip(reason="Local flag not yet implemented in init config command")
-    def test_local_flag_creates_local_override(
+    def test_quickstart_flag_creates_local_override(
         self, temp_project: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Test --local flag creates .codeweaver.toml override."""
+        """Test --quickstart flag creates codeweaver.toml override."""
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["config", "--quick", "--local"])
-        capsys.readouterr()
-
-        assert exc_info.value.code == 0
-        local_config = temp_project / ".codeweaver.toml"
+            init_app(["config", "--quickstart"])
+        local_config = self._assert_quickstart_exit_code(capsys, exc_info, temp_project)
         assert local_config.exists()
+
+    # TODO Rename this here and in `test_quick_flag_creates_config`, `test_profile_recommended`, `test_profile_local_only` and `test_quickstart_flag_creates_local_override`
+    def _assert_quickstart_exit_code(self, capsys, exc_info, temp_project):
+        capsys.readouterr()
+        assert exc_info.value.code == 0
+        result = temp_project / "codeweaver.toml"
+        return result
 
     def test_registry_integration(self) -> None:
         """Test config command uses ProviderRegistry correctly."""
@@ -157,7 +151,7 @@ class TestConfigInit:
         from codeweaver.config.settings import CodeWeaverSettings
 
         # Create config file
-        config_path = temp_project / ".codeweaver.toml"
+        config_path = temp_project / "codeweaver.toml"
         config_content = """
 [project]
 path = "."
@@ -188,7 +182,7 @@ type = "qdrant"
         capsys.readouterr()
 
         assert exc_info.value.code == 0
-        config = tomli.loads((temp_project / ".codeweaver.toml").read_text())
+        config = tomli.loads((temp_project / "codeweaver.toml").read_text())
 
         # Recommended profile should include sparse embeddings
         assert "sparse_embedding" in config.get("embedding", {})
@@ -247,7 +241,7 @@ class TestConfigValidation:
     @pytest.mark.skip(reason="Provider validation not yet implemented in settings")
     def test_invalid_provider_rejected(self, temp_project: Path) -> None:
         """Test invalid provider names are rejected."""
-        config_path = temp_project / ".codeweaver.toml"
+        config_path = temp_project / "codeweaver.toml"
         config_content = """
 [embedding]
 provider = "invalid_provider_xyz"
