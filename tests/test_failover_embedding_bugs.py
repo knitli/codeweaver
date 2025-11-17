@@ -18,17 +18,12 @@ repurposed for regression testing after fixes are implemented.
 """
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
 
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.spans import Span
 from codeweaver.providers.embedding.registry import get_embedding_registry
-
-
-if TYPE_CHECKING:
-    pass
 
 
 @pytest.fixture
@@ -140,7 +135,7 @@ async def test_registry_cross_provider_collision(
 
     # Get the chunk with batch keys set
     embedded_chunk = sample_chunk.set_batch_keys(
-        list(primary_embedding_provider._store.values())[0][0]._embedding_index[0]
+        next(iter(primary_embedding_provider._store.values()))[0]._embedding_index.primary_dense
     )
 
     # Step 2: Check what embeddings the chunk retrieves
@@ -151,13 +146,7 @@ async def test_registry_cross_provider_collision(
     print(f"Retrieved embeddings: {retrieved_dims} dimensions")
     assert retrieved_dims == 384, "Should retrieve PRIMARY's 384-dim embeddings"
 
-    # Step 3: Now backup provider tries to upsert this chunk
-    # In real scenario, vector store calls chunk.dense_embeddings
-    # This would give backup the WRONG embeddings (384-dim instead of 768-dim)
-
-    # Simulate what happens in _prepare_vectors
-    chunk_embeddings = embedded_chunk.dense_embeddings
-    if chunk_embeddings:
+    if chunk_embeddings := embedded_chunk.dense_embeddings:
         vector_dims = len(chunk_embeddings.embeddings)
         backup_expected_dims = 768  # Backup provider uses 768-dim model
         print(f"\n❌ BUG CONFIRMED: Backup would get {vector_dims}-dim embeddings from registry")
@@ -264,7 +253,7 @@ async def test_chunk_property_fetches_from_global_registry(
 
     # Get chunk with batch keys
     embedded_chunk = sample_chunk.set_batch_keys(
-        list(primary_embedding_provider._store.values())[0][0]._embedding_index[0]
+        next(iter(primary_embedding_provider._store.values()))[0]._embedding_index.primary_dense
     )
 
     # Access the property
