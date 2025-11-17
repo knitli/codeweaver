@@ -114,6 +114,7 @@ class SparseEmbeddingModelSettings(TypedDict, total=False):
     """Keyword arguments to pass to the *provider* **client's** (like `sentence_transformers.SparseEncoder`) `embed` method. These are different from `model_options`, which are passed to the model constructor itself."""
     model_options: NotRequired[dict[str, Any] | None]
     """Keyword arguments to pass to the model's constructor."""
+    data_type: NotRequired[Literal["float32", "float16", "int8", "binary"] | None]
 
 
 class RerankingModelSettings(TypedDict, total=False):

@@ -32,6 +32,7 @@ from uuid import UUID
 
 from pydantic import UUID7, ConfigDict, Field, SkipValidation
 from pydantic.main import IncEx
+from pydantic.types import PositiveInt
 from tenacity import (
     RetryError,
     retry,
@@ -41,6 +42,7 @@ from tenacity import (
 )
 
 from codeweaver.common.utils import LazyImport, lazy_import, uuid7
+from codeweaver.config.providers import EmbeddingModelSettings, SparseEmbeddingModelSettings
 from codeweaver.core.stores import BlakeStore, UUIDStore, make_blake_store, make_uuid_store
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BasedModel
@@ -175,8 +177,13 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     _store: ClassVar[UUIDStore[list]] = make_uuid_store(  # type: ignore
         value_type=list, size_limit=1024 * 1024 * 3
     )
-
     """The store for embedding documents, keyed by batch ID (UUID7) and stored as a batch of CodeChunks."""
+
+    _backup_store: ClassVar[UUIDStore[list]] = make_uuid_store(
+        value_type=list, size_limit=1024 * 1024
+    )
+    """A smaller backup store for mapping batch IDs *for codeweaver's failsafe mechanism* to the batch ID of code chunks."""
+
     _hash_store: ClassVar[BlakeStore[UUID7]] = make_blake_store(
         value_type=UUID, size_limit=1024 * 256
     )  # 256kb limit -- we're just storing hashes
@@ -184,7 +191,11 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
     Note that we're only storing the hash keys and batch ID values, not the full CodeChunk objects. This keeps the store size small. We can lookup by batch ID in the main `_store` if needed, or if it has been ejected, in the `_store`'s `_trash_heap`. `SimpleTypedStore`, the parent class, handles that for us with a simple "get" method.
     """
-
+    _backup_hash_store: ClassVar[BlakeStore[UUID7]] = make_blake_store(
+        value_type=UUID, size_limit=1024 * 128
+    )  # 128kb limit -- we're just storing hashes
+    """A backup store for deduplicating CodeChunks based on their content hash. The keys are each CodeChunk's content hash, the values are their backup batch IDs.
+    """
     # Circuit breaker state tracking
     _circuit_state: CircuitBreakerState = CircuitBreakerState.CLOSED
     _failure_count: int = 0
@@ -315,7 +326,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         reraise=True,
     )
     async def _embed_documents_with_retry(
-        self, documents: Sequence[CodeChunk], **kwargs: Any
+        self, documents: Sequence[CodeChunk], *, for_backup: bool = False, **kwargs: Any
     ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]] | dict[str, list[int] | list[float]]:
         """Wrapper around _embed_documents with retry logic and circuit breaker.
 
@@ -370,6 +381,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         documents: Sequence[CodeChunk],  # type: ignore # intentionally obscurred
         *,
         batch_id: UUID7 | None = None,
+        for_backup: bool = False,
         context: Any = None,
         **kwargs: Any,
     ) -> list[list[float]] | list[list[int]] | list[SparseEmbedding] | EmbeddingErrorInfo:
@@ -380,10 +392,16 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         from codeweaver.common.logging import log_to_client_or_fallback
 
         is_old_batch = False
-        if batch_id and self._store and batch_id in self._store:
-            documents: Sequence[CodeChunk] = self._store[batch_id]  # type: ignore
+        if (batch_id and self._store and batch_id in self._store and not for_backup) or (
+            batch_id and for_backup and self._backup_store and batch_id in self._backup_store
+        ):
+            documents: Sequence[CodeChunk] = (
+                self._backup_store[batch_id] if for_backup else self._store[batch_id]
+            )  # type: ignore
             is_old_batch = True
-        chunks_iter, cache_key = self._process_input(documents, is_old_batch=is_old_batch)  # type: ignore
+        chunks_iter, cache_key = self._process_input(
+            documents, is_old_batch=is_old_batch, for_backup=for_backup
+        )  # type: ignore
 
         # Convert iterator to tuple once to avoid exhaustion issues
         chunks = tuple(chunks_iter)
@@ -426,7 +444,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 Sequence[Sequence[float]]
                 | Sequence[Sequence[int]]
                 | Sequence[dict[str, list[int] | list[float]]]
-            ) = await self._embed_documents_with_retry(chunks, **kwargs)
+            ) = await self._embed_documents_with_retry(chunks, for_backup=for_backup, **kwargs)
         except CircuitBreakerOpenError as e:
             # Circuit breaker open - return error immediately
             await log_to_client_or_fallback(
@@ -489,6 +507,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                     chunks=chunks,  # Already a tuple, no need to convert again
                     batch_id=cast(UUID7, batch_id or cache_key),
                     embeddings=results,  # ty: ignore[invalid-argument-type]
+                    for_backup=for_backup,
                 )
 
             await log_to_client_or_fallback(
@@ -655,6 +674,53 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 ],
             )
 
+    @overload
+    def _get_model_settings(
+        self, *, sparse: Literal[False] = False
+    ) -> EmbeddingModelSettings | None: ...
+    @overload
+    def _get_model_settings(
+        self, *, sparse: Literal[True] = True
+    ) -> SparseEmbeddingModelSettings | None: ...
+    def _get_model_settings(
+        self, *, sparse: bool = False
+    ) -> EmbeddingModelSettings | SparseEmbeddingModelSettings | None:
+        from codeweaver.common.registry.provider import get_provider_config_for
+
+        settings = get_provider_config_for("sparse_embedding" if sparse else "embedding")
+        return settings.get("model_settings")
+
+    def get_datatype(
+        self, *, sparse: bool = False, backup: bool = False
+    ) -> Literal["float32", "float16", "int8", "binary"]:
+        """Get the datatype of the embedding vectors based on capabilities."""
+        if backup:
+            return "int8"
+        default_dtype = self.caps.default_dtype
+        if default_dtype and default_dtype not in ("float32", "float16", "int8", "binary"):
+            default_dtype = "float16" if "float" in default_dtype else "int8"
+        model_settings = self._get_model_settings(sparse=sparse)
+        if model_settings and model_settings.get("data_type"):
+            return model_settings["data_type"]
+        return cast(Literal["float32", "float16", "int8", "binary"], default_dtype)
+
+    def get_dimension(
+        self, *, sparse: bool = False, backup: bool = False
+    ) -> PositiveInt | Literal[0]:
+        """Get the dimension of the embedding vectors based on capabilities."""
+        if sparse:
+            return 0
+        if backup:
+            from codeweaver.config.profiles import get_profile
+
+            profile = get_profile("backup")  # type: ignore
+            return profile["embedding"]["model_settings"]["dimension"]
+        default_dim = self.caps.default_dimension
+        model_settings = self._get_model_settings(sparse=sparse)
+        if model_settings and model_settings.get("dimension"):
+            return model_settings["dimension"]
+        return default_dim
+
     @staticmethod
     def normalize(embedding: Sequence[float] | Sequence[int]) -> list[float]:
         """Normalize an embedding vector to unit L2 length.
@@ -719,6 +785,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         chunks: Sequence[CodeChunk],
         batch_id: UUID7,
         embeddings: Sequence[Sequence[float]] | Sequence[Sequence[int]] | Sequence[SparseEmbedding],
+        *,
+        for_backup: bool = False,
     ) -> None:  # sourcery skip: low-code-quality
         """Register chunks in the embedding registry."""
         from codeweaver.core.types.aliases import LiteralStringT, ModelName
@@ -750,6 +818,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                     chunk_id=chunk.chunk_id,
                     model=ModelName(cast(LiteralStringT, self.model_name)),
                     embeddings=sparse_emb,
+                    dtype=self.get_datatype(sparse=True, backup=for_backup),
+                    backup=for_backup,
                 )
             else:
                 # For dense embeddings or old format
@@ -759,6 +829,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                     chunk_id=chunk.chunk_id,
                     model=ModelName(cast(LiteralStringT, self.model_name)),
                     embeddings=embedding,
+                    dimension=self.get_dimension(sparse=is_sparse, backup=for_backup),
+                    dtype=self.get_datatype(sparse=is_sparse, backup=for_backup),
+                    backup=for_backup,
                 )
             chunk_infos.append(chunk_info)
 
@@ -770,13 +843,19 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                     registry[info.chunk_id] = registry[info.chunk_id]._replace(chunk=chunks[i])
             else:
                 registry[info.chunk_id] = ChunkEmbeddings(
-                    dense=info if attr == "dense" else None,
-                    sparse=info if attr == "sparse" else None,
+                    dense=info if attr == "dense" and not for_backup else None,
+                    sparse=info if attr == "sparse" and not for_backup else None,
                     chunk=chunks[i],
+                    backup_dense=info if attr == "dense" and for_backup else None,
+                    backup_sparse=info if attr == "sparse" and for_backup else None,
                 )
 
     def _process_input(
-        self, input_data: StructuredDataInput, *, is_old_batch: bool = False
+        self,
+        input_data: StructuredDataInput,
+        *,
+        is_old_batch: bool = False,
+        for_backup: bool = False,
     ) -> tuple[Iterator[CodeChunk], UUID7 | None]:
         """Process input data for embedding."""
         processed_chunks = default_input_transformer(input_data)
@@ -795,24 +874,40 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         hashes = [get_blake_hash(chunk.content.encode("utf-8")) for chunk in chunk_list]
 
         # Check which chunks are NEW (hash not in store)
-        starter_chunks = [
-            chunk
-            for i, chunk in enumerate(chunk_list)
-            if chunk and hashes[i] not in type(self)._hash_store
-        ]
+        starter_chunks = (
+            [
+                chunk
+                for i, chunk in enumerate(chunk_list)
+                if chunk and hashes[i] not in type(self)._backup_hash_store
+            ]
+            if for_backup
+            else [
+                chunk
+                for i, chunk in enumerate(chunk_list)
+                if chunk and hashes[i] not in type(self)._hash_store
+            ]
+        )
 
         # Add NEW chunks with batch keys and add their hashes to store
         for i, chunk in enumerate(starter_chunks):
             # Find the original index in chunk_list to get correct hash
             original_idx = chunk_list.index(chunk)
             batch_keys = BatchKeys(id=key, idx=i)
-            final_chunks.append(chunk.set_batch_keys(batch_keys))
+            final_chunks.append(chunk.set_batch_keys(batch_keys, secondary=for_backup))
             # Now add the hash to store, mapping it to this batch key
-            type(self)._hash_store[hashes[original_idx]] = key
+            if for_backup:
+                type(self)._backup_hash_store[hashes[original_idx]] = key
+                if not type(self)._backup_store:
+                    type(self)._backup_store = make_uuid_store(
+                        value_type=list, size_limit=1024 * 1024
+                    )  # type: ignore
+                type(self)._backup_store[key] = final_chunks  # type: ignore
+            else:
+                type(self)._hash_store[hashes[original_idx]] = key
+                if not type(self)._store:
+                    type(self)._store = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)  # type: ignore
+                type(self)._store[key] = final_chunks  # type: ignore
 
-        if not type(self)._store:  # type: ignore
-            type(self)._store = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)  # type: ignore
-        type(self)._store[key] = final_chunks  # type: ignore
         return iter(final_chunks), key
 
     def _process_output(self, output_data: Any) -> list[list[float]] | list[list[int]]:

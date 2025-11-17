@@ -46,19 +46,19 @@ class EmbeddingRegistry(UUIDStore[ChunkEmbeddings]):
 
     @property
     def complete(self) -> bool:
-        """Check if all chunks have both dense and sparse embeddings."""
+        """Check if all chunks have both primary dense and sparse embeddings."""
         return all(embeddings.is_complete for embeddings in self.values())
 
     @property
     def dense_only(self) -> bool:
-        """Check if all chunks have only dense embeddings."""
+        """Check if all chunks have only (primary) dense embeddings."""
         return all(
             embeddings.has_dense and not embeddings.has_sparse for embeddings in self.values()
         )
 
     @property
     def sparse_only(self) -> bool:
-        """Check if all chunks have only sparse embeddings."""
+        """Check if all chunks have only (primary) sparse embeddings."""
         return all(
             not embeddings.has_dense and embeddings.has_sparse for embeddings in self.values()
         )
@@ -88,12 +88,12 @@ class EmbeddingRegistry(UUIDStore[ChunkEmbeddings]):
 
     @property
     def sparse_model(self) -> ModelNameT | None:
-        """Get the model name used for sparse embeddings, if any."""
+        """Get the model name used for primary sparse embeddings, if any."""
         return self._fetch_model_by_kind(EmbeddingKind.SPARSE)
 
     @property
     def dense_model(self) -> ModelNameT | None:
-        """Get the model name used for dense embeddings, if any."""
+        """Get the model name used for primary dense embeddings, if any."""
         return self._fetch_model_by_kind(EmbeddingKind.DENSE)
 
     def validate_models(self) -> None:

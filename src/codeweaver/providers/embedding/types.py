@@ -8,9 +8,9 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Annotated, NamedTuple, cast
+from typing import Annotated, Literal, NamedTuple, cast
 
-from pydantic import UUID7, Field, NonNegativeInt
+from pydantic import UUID7, Field, NonNegativeInt, PositiveInt
 
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.aliases import LiteralStringT, ModelName, ModelNameT
@@ -69,6 +69,9 @@ class EmbeddingBatchInfo(NamedTuple):
     chunk_id: UUID7
     model: ModelNameT
     embeddings: StoredEmbeddingVectors | SparseEmbedding
+    dimension: PositiveInt | Literal[0]
+    dtype: Literal["float32", "float16", "int8", "binary"] = "float32"
+    backup: bool = False
 
     @classmethod
     def create_dense(
@@ -78,6 +81,10 @@ class EmbeddingBatchInfo(NamedTuple):
         chunk_id: UUID7,
         model: LiteralStringT | ModelNameT,
         embeddings: RawEmbeddingVectors,
+        dimension: PositiveInt,
+        *,
+        dtype: Literal["float32", "float16", "int8", "binary"] = "float32",
+        backup: bool = False,
     ) -> EmbeddingBatchInfo:
         """Create EmbeddingBatchInfo for dense embeddings."""
         return cls(
@@ -87,6 +94,9 @@ class EmbeddingBatchInfo(NamedTuple):
             chunk_id=chunk_id,
             model=ModelName(model),
             embeddings=tuple(embeddings),
+            dimension=dimension,
+            dtype=dtype,
+            backup=backup,
         )
 
     @classmethod
@@ -97,6 +107,10 @@ class EmbeddingBatchInfo(NamedTuple):
         chunk_id: UUID7,
         model: LiteralStringT | ModelNameT,
         embeddings: SparseEmbedding,
+        *,
+        dimension: Literal[0] = 0,
+        backup: bool = False,
+        dtype: Literal["float32", "float16", "int8", "binary"] = "float32",
     ) -> EmbeddingBatchInfo:
         """Create EmbeddingBatchInfo for sparse embeddings.
 
@@ -106,6 +120,9 @@ class EmbeddingBatchInfo(NamedTuple):
             chunk_id: Unique identifier for the chunk
             model: Model name
             embeddings: SparseEmbedding with indices and values
+            dimension: Dimensionality of the embedding (always 0 for sparse)
+            dtype: Data type of the embedding values
+            backup: Whether this embedding is for the backup vector store
         """
         return cls(
             batch_id=batch_id,
@@ -114,15 +131,36 @@ class EmbeddingBatchInfo(NamedTuple):
             chunk_id=chunk_id,
             model=ModelName(model),
             embeddings=embeddings.to_tuple(),
+            dimension=0
+            if dimension
+            else dimension,  # just to be safe -- we keep it 0 but in signature for clarity
+            dtype=dtype,
+            backup=backup,
         )
 
+    @property
     def is_dense(self) -> bool:
         """Check if the embedding kind is dense."""
         return self.kind == EmbeddingKind.DENSE
 
+    @property
     def is_sparse(self) -> bool:
         """Check if the embedding kind is sparse."""
         return self.kind == EmbeddingKind.SPARSE
+
+    @property
+    def is_backup(self) -> bool:
+        """Check if the embedding is marked as a backup."""
+        return self.backup
+
+
+class EmbeddingModelInfo(NamedTuple):
+    """NamedTuple representing information about an embedding model."""
+
+    dense: ModelNameT | None
+    sparse: ModelNameT | None
+    backup_dense: ModelNameT | None
+    backup_sparse: ModelNameT | None
 
 
 class ChunkEmbeddings(NamedTuple):
@@ -131,11 +169,18 @@ class ChunkEmbeddings(NamedTuple):
     sparse: EmbeddingBatchInfo | None
     dense: EmbeddingBatchInfo | None
     chunk: CodeChunk
+    backup_dense: EmbeddingBatchInfo | None = None
+    backup_sparse: EmbeddingBatchInfo | None = None
 
     @property
     def is_complete(self) -> bool:
-        """Check if both sparse and dense embeddings are present."""
+        """Check if both sparse and dense embeddings are present for primary embeddings."""
         return self.has_dense and self.has_sparse
+
+    @property
+    def is_backup_complete(self) -> bool:
+        """Check if both sparse and dense embeddings are present for backup embeddings."""
+        return self.backup_dense is not None and self.backup_sparse is not None
 
     @property
     def has_dense(self) -> bool:
@@ -156,8 +201,27 @@ class ChunkEmbeddings(NamedTuple):
         Returns:
             ChunkEmbeddings: A new ChunkEmbeddings instance with the added embedding.
         """
-        if (embedding_info.kind == EmbeddingKind.DENSE and self.dense is not None) or (
-            embedding_info.kind == EmbeddingKind.SPARSE and self.sparse is not None
+        if (
+            (
+                embedding_info.kind == EmbeddingKind.DENSE
+                and embedding_info.backup
+                and self.backup_dense is not None
+            )
+            or (
+                embedding_info.kind == EmbeddingKind.DENSE
+                and not embedding_info.backup
+                and self.dense is not None
+            )
+            or (
+                embedding_info.kind == EmbeddingKind.SPARSE
+                and embedding_info.backup
+                and self.backup_sparse is not None
+            )
+            or (
+                embedding_info.kind == EmbeddingKind.SPARSE
+                and not embedding_info.backup
+                and self.sparse is not None
+            )
         ):
             raise ValueError(
                 f"Embeddings are already set for {embedding_info.kind.value} in chunk {embedding_info.chunk_id}."
@@ -167,8 +231,18 @@ class ChunkEmbeddings(NamedTuple):
                 f"Embedding chunk ID {embedding_info.chunk_id} does not match ChunkEmbeddings chunk ID {self.chunk.chunk_id}."
             )
         return self._replace(
-            dense=embedding_info if embedding_info.kind == EmbeddingKind.DENSE else self.dense,
-            sparse=embedding_info if embedding_info.kind == EmbeddingKind.SPARSE else self.sparse,
+            dense=embedding_info
+            if embedding_info.kind == EmbeddingKind.DENSE and not embedding_info.backup
+            else self.dense,
+            sparse=embedding_info
+            if embedding_info.kind == EmbeddingKind.SPARSE and not embedding_info.backup
+            else self.sparse,
+            backup_dense=embedding_info
+            if embedding_info.kind == EmbeddingKind.DENSE and embedding_info.backup
+            else self.backup_dense,
+            backup_sparse=embedding_info
+            if embedding_info.kind == EmbeddingKind.SPARSE and embedding_info.backup
+            else self.backup_sparse,
         )
 
     @property
@@ -193,6 +267,16 @@ class ChunkEmbeddings(NamedTuple):
     def sparse_model(self) -> ModelNameT | None:
         """Get the model name used for sparse embeddings, if any."""
         return self.sparse.model if self.sparse is not None else None
+
+    @property
+    def backup_dense_model(self) -> ModelNameT | None:
+        """Get the model name used for backup dense embeddings, if any."""
+        return self.backup_dense.model if self.backup_dense is not None else None
+
+    @property
+    def backup_sparse_model(self) -> ModelNameT | None:
+        """Get the model name used for backup sparse embeddings, if any."""
+        return self.backup_sparse.model if self.backup_sparse is not None else None
 
 
 __all__ = (
