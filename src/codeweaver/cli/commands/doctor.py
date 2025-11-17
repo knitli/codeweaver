@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 import cyclopts
 
 from cyclopts import App
-from pydantic import ValidationError
+from pydantic import FilePath, ValidationError
 from rich.table import Table
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
@@ -790,7 +790,7 @@ async def doctor(
     verbose: bool = False,
     display: StatusDisplay | None = None,
     config_file: Annotated[
-        Path | None,
+        FilePath | None,
         cyclopts.Parameter(
             name=["--config-file", "-c"], help="Path to a specific config file to use"
         ),

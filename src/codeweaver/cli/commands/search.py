@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Annotated, Literal
 import cyclopts
 
 from cyclopts import App
+from pydantic import FilePath
 from rich.table import Table
 
 from codeweaver.agent_api.find_code.intent import IntentType
@@ -135,7 +136,7 @@ async def search(
     include_tests: bool = True,
     project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
     config_file: Annotated[
-        Path | None,
+        FilePath | None,
         cyclopts.Parameter(
             name=["--config-file", "-c"], help="Path to a specific config file to use"
         ),

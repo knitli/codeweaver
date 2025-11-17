@@ -703,7 +703,10 @@ class ServerSetup(TypedDict):
 
 
 def build_app(
-    *, verbose: bool = False, debug: bool = False, transport: str = "streamable-http"
+    *,
+    verbose: bool = False,
+    debug: bool = False,
+    transport: Literal["streamable-http", "stdio"] = "streamable-http",
 ) -> ServerSetup:
     """Build and configure the FastMCP application without starting it.
 
@@ -781,7 +784,7 @@ def build_app(
         host=host or "127.0.0.1",
         port=port or 9328,
         streamable_http_path=cast(str, http_path or "/codeweaver"),
-        transport=transport,  # type: ignore
+        transport=transport,
         log_level=_final_level or "INFO",
         middleware={*middleware},
         verbose=verbose,

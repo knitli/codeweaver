@@ -12,7 +12,7 @@ import logging
 
 from pathlib import Path
 from types import EllipsisType
-from typing import TYPE_CHECKING, Any, cast, is_typeddict
+from typing import TYPE_CHECKING, Any, Literal, cast, is_typeddict
 
 from fastmcp import FastMCP
 from fastmcp.server.middleware import Middleware
@@ -93,7 +93,7 @@ async def run(
     project_path: Path | None = None,
     host: str = "127.0.0.1",
     port: int = 9328,
-    transport: str = "streamable-http",
+    transport: Literal["streamable-http", "stdio"] = "streamable-http",
     verbose: bool = False,
     debug: bool = False,
 ) -> None:
