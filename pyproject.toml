@@ -374,6 +374,7 @@ markers = [
   "external_api: Tests that interact with external APIs",
   "voyageai: Tests that require VoyageAI API access",
   "qdrant: Tests that require Qdrant vector database",
+  "docker: Tests that require Docker and Docker Compose (may fail in some CI environments)",
   # Configuration & environment
   "config: Configuration-related tests",
   "env_vars: Tests that depend on environment variables",
