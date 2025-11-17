@@ -492,6 +492,7 @@ docker stats codeweaver-server codeweaver-qdrant
 - **Resource Usage:** Indexing large codebases (>100k files) requires significant memory
 - **API Keys:** Default configuration requires VoyageAI API key (use local providers as alternative)
 - **Platform Support:** Currently tested on linux/amd64 and linux/arm64
+- **CI/CD SSL Issues:** Building in some CI environments may encounter SSL certificate issues. Use pre-built images from Docker Hub as a workaround. See [DOCKER_BUILD_NOTES.md](DOCKER_BUILD_NOTES.md) for details.
 
 ## See Also
 

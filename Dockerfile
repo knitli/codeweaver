@@ -16,36 +16,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     git \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install uv for fast dependency management
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.cargo/bin:$PATH"
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && update-ca-certificates
 
 # Set working directory
 WORKDIR /app
 
 # Copy dependency files first for better layer caching
-COPY pyproject.toml uv.lock README.md ./
+COPY pyproject.toml README.md ./
 COPY LICENSE* ./
-COPY src/codeweaver/_version.py src/codeweaver/_version.py
-
-# Create a minimal version file if it doesn't exist
-RUN mkdir -p src/codeweaver && \
-    echo '# SPDX-FileCopyrightText: 2025 Knitli Inc.' > src/codeweaver/__init__.py && \
-    echo '# SPDX-License-Identifier: MIT OR Apache-2.0' >> src/codeweaver/__init__.py && \
-    echo '__version__ = "0.1.0a1"' >> src/codeweaver/__init__.py || true
-
-# Install dependencies using uv (much faster than pip)
-# Install only production dependencies, excluding dev/test/docs groups
-RUN uv sync --no-dev --no-install-project
 
 # Copy the entire source code
 COPY src/ src/
 COPY typings/ typings/
 
-# Install the package itself
-RUN uv sync --no-dev
+# Install pip and setuptools, then install the package
+# Note: In some CI environments, you may need to skip SSL verification
+# If you encounter SSL errors, you can add --trusted-host pypi.org --trusted-host files.pythonhosted.org
+RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    python -m pip install --no-cache-dir .
 
 # =============================================================================
 # Stage 2: Runtime - Minimal production image
@@ -64,13 +54,13 @@ RUN useradd -m -u 1000 -s /bin/bash codeweaver
 # Set working directory
 WORKDIR /app
 
-# Copy virtual environment from builder
-COPY --from=builder /app/.venv /app/.venv
+# Copy installed packages from builder
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /app/src /app/src
 
 # Set up environment
-ENV PATH="/app/.venv/bin:$PATH" \
-    PYTHONUNBUFFERED=1 \
+ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     # CodeWeaver specific settings
     CODEWEAVER_HOST=0.0.0.0 \

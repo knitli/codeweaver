@@ -88,7 +88,8 @@ jobs:
       - name: Run tests with coverage
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          mise run test-cov
+          # Skip docker tests in CI due to potential SSL issues
+          mise run test-cov -m "not docker"
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.12'
         uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7
