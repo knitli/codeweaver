@@ -112,7 +112,7 @@ The easiest way to get started is with Docker Compose, which includes CodeWeaver
 # 1. Download the configuration files
 curl -O https://raw.githubusercontent.com/knitli/codeweaver-mcp/main/docker-compose.yml
 curl -O https://raw.githubusercontent.com/knitli/codeweaver-mcp/main/.env.example
-mv .env.example .env
+cp .env.example .env
 
 # 2. Configure your environment
 # Edit .env and set:

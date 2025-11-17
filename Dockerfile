@@ -11,6 +11,11 @@
 # =============================================================================
 FROM python:3.12-slim AS builder
 
+# Build arguments for versioning
+ARG VERSION
+ARG BUILD_DATE
+ARG VCS_REF
+
 # Install system dependencies required for building Python packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -41,6 +46,16 @@ RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
 # Stage 2: Runtime - Minimal production image
 # =============================================================================
 FROM python:3.12-slim
+
+# Build arguments for image metadata
+ARG VERSION
+ARG BUILD_DATE
+ARG VCS_REF
+
+# Add image metadata
+LABEL org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${VCS_REF}"
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \

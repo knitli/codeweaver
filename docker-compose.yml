@@ -10,7 +10,7 @@ services:
   # Qdrant Vector Database
   # Provides persistent vector storage for code embeddings
   qdrant:
-    image: qdrant/qdrant:latest
+    image: qdrant/qdrant:v1.7.4
     container_name: codeweaver-qdrant
     ports:
       - "${QDRANT_PORT:-6333}:6333"     # REST API
@@ -59,12 +59,13 @@ services:
       - CODEWEAVER_VECTOR_STORE_PREFER_GRPC=true
       
       # Embedding Provider (VoyageAI default)
-      - VOYAGE_API_KEY=${VOYAGE_API_KEY}
+      # NOTE: VOYAGE_API_KEY is required for VoyageAI embedding provider. The container will fail to start if it is not set.
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY:?VOYAGE_API_KEY is required and must be set in your environment}
       - CODEWEAVER_EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-voyage}
       - CODEWEAVER_EMBEDDING_MODEL=${EMBEDDING_MODEL:-voyage-code-3}
       
       # Sparse Embedding (FastEmbed - local, no API key needed)
-      - CODEWEAVER_SPARSE_EMBEDDING_PROVIDER=fastembed
+      - CODEWEAVER_SPARSE_EMBEDDING_PROVIDER=${SPARSE_EMBEDDING_PROVIDER:-fastembed}
       - CODEWEAVER_SPARSE_EMBEDDING_MODEL=${SPARSE_EMBEDDING_MODEL:-prithivida/Splade_PP_en_v1}
       
       # Reranking Provider (VoyageAI default)
@@ -87,7 +88,7 @@ services:
       qdrant:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9328/health/"]
+      test: ["CMD", "curl", "-sf", "http://localhost:9328/health/"]
       interval: 30s
       timeout: 10s
       retries: 3

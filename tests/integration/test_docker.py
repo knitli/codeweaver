@@ -15,11 +15,8 @@ These tests validate that:
 
 from __future__ import annotations
 
-import json
 import subprocess
 import time
-
-from typing import Any
 
 import pytest
 
@@ -71,18 +68,27 @@ class TestDockerfile:
     def test_dockerfile_syntax(self, repo_root):
         """Validate Dockerfile syntax using hadolint (if available)."""
         try:
+            # Check if hadolint is available
             result = run_command(
                 ["docker", "run", "--rm", "-i", "hadolint/hadolint", "hadolint", "-"],
                 check=False,
             )
-            # If hadolint is available, use it
-            if result.returncode == 0:
-                run_command(
+            if result.returncode != 0:
+                pytest.skip("hadolint not available for Dockerfile linting")
+
+            # Run hadolint on the Dockerfile by passing its content as stdin
+            dockerfile = repo_root / "Dockerfile"
+            with open(dockerfile, "r") as f:
+                lint_result = subprocess.run(
                     ["docker", "run", "--rm", "-i", "hadolint/hadolint"],
+                    stdin=f,
+                    capture_output=True,
+                    text=True,
                     check=False,
                 )
+            assert lint_result.returncode == 0, f"hadolint found issues:\n{lint_result.stdout}"
         except FileNotFoundError:
-            pytest.skip("hadolint not available for Dockerfile linting")
+            pytest.skip("Docker not available for Dockerfile linting")
     
     @pytest.mark.slow
     def test_docker_build_succeeds(self, repo_root):
@@ -202,8 +208,18 @@ LOG_LEVEL=DEBUG
             
             assert result.returncode == 0, "Failed to start docker-compose services"
             
-            # Wait a bit for services to initialize
-            time.sleep(10)
+            # Wait for services to be ready using polling instead of fixed sleep
+            max_attempts = 30
+            for attempt in range(max_attempts):
+                result_ps = run_command(
+                    ["docker", "compose", "-f", str(compose_file), "ps", "--format", "json"],
+                    check=False,
+                )
+                if result_ps.returncode == 0:
+                    break
+                time.sleep(2)
+            else:
+                pytest.fail("Services did not become healthy in time")
             
             # Check that services are running
             result = run_command(
@@ -261,6 +277,7 @@ ENABLE_TELEMETRY=false
                     if result.returncode == 0:
                         break
                 except Exception:
+                    # Ignore exceptions while waiting for Qdrant to become available; will retry.
                     pass
                 
                 time.sleep(2)
@@ -342,7 +359,7 @@ class TestEnvironmentFile:
 
 
 @pytest.fixture
-def repo_root(tmp_path):
+def repo_root():
     """Fixture providing repository root path."""
     import pathlib
     
@@ -354,6 +371,7 @@ def repo_root(tmp_path):
         current = current.parent
     
     pytest.fail("Could not find repository root (no pyproject.toml found)")
+    return None  # Explicit return for type safety
 
 
 if __name__ == "__main__":

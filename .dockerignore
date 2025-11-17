@@ -42,6 +42,8 @@ env/
 
 # Documentation
 docs/
+# Exclude all Markdown files to keep the image lean, except README.md which is needed by the Dockerfile.
+# If you want other documentation (e.g., DOCKER.md) included in the image, adjust these rules.
 *.md
 !README.md
 mkdocs.yml
