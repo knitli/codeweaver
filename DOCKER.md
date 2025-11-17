@@ -29,7 +29,7 @@ curl -O https://raw.githubusercontent.com/knitli/codeweaver-mcp/main/docker-comp
 
 # Download the example .env file
 curl -O https://raw.githubusercontent.com/knitli/codeweaver-mcp/main/.env.example
-mv .env.example .env
+cp .env.example .env
 
 # Optional: Download and run the setup validator
 curl -O https://raw.githubusercontent.com/knitli/codeweaver-mcp/main/scripts/docker/validate-setup.sh
