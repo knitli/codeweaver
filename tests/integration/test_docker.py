@@ -78,7 +78,7 @@ class TestDockerfile:
             # If hadolint is available, use it
             if result.returncode == 0:
                 dockerfile = repo_root / "Dockerfile"
-                result = run_command(
+                run_command(
                     ["docker", "run", "--rm", "-i", "hadolint/hadolint"],
                     check=False,
                 )
