@@ -401,7 +401,12 @@ class StrategizedQuery(NamedTuple):
         }
 
     def to_query(self, kwargs: dict[str, Any]) -> dict[str, FusionQuery | list[Prefetch] | Any]:
-        """Convert to a FusionQuery based on available embeddings."""
+        """Convert to a query dict based on available embeddings.
+        
+        For sparse-only queries, returns query_points parameters.
+        For dense-only queries, returns search parameters.
+        For hybrid queries, delegates to to_hybrid_query.
+        """
         from codeweaver.exceptions import QueryError
 
         if self.is_empty():
@@ -420,21 +425,21 @@ class StrategizedQuery(NamedTuple):
             )
         if self.is_hybrid():
             return self.to_hybrid_query({}, kwargs)
-        from qdrant_client.http.models import NamedSparseVector, NamedVector, SparseVector
+        from qdrant_client.http.models import NamedVector, SparseVector
 
         if self.has_dense():
-            # Use NamedVector for named vector collections
+            # Dense-only: Use NamedVector for search API
             assert self.dense is not None  # noqa: S101
             dense_vector = NamedVector(name="dense", vector=list(self.dense))
             return {"query_vector": dense_vector, **kwargs}
-        # Convert sparse dict to SparseVector and wrap in NamedSparseVector
+        
+        # Sparse-only: Use SparseVector with query_points API
         assert self.sparse is not None  # noqa: S101
         sparse_vector = SparseVector(
             indices=list(self.sparse.indices), values=list(self.sparse.values)
         )
-        # Use NamedSparseVector for sparse vectors
-        named_sparse = NamedSparseVector(name="sparse", vector=sparse_vector)
-        return {"query_vector": named_sparse, **kwargs}
+        # Return query_points parameters with using="sparse"
+        return {"query": sparse_vector, "using": "sparse", **kwargs}
 
 
 __all__ = (

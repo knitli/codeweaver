@@ -364,8 +364,10 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             Raw search results from Qdrant.
         """
         qdrant_filter = None  # TODO: Convert Filter to Qdrant filter when needed
-        return (
-            await self._client.query_points(
+
+        # Hybrid search uses query_points with FusionQuery
+        if vector.is_hybrid():
+            response = await self._client.query_points(
                 **vector.to_hybrid_query(
                     query_kwargs={
                         "limit": 100,
@@ -377,8 +379,12 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                     kwargs={"collection_name": collection_name},
                 )  # type: ignore
             )
-            if vector.is_hybrid()
-            else await self._client.search(
+            # query_points returns QueryResponse with .points attribute
+            return response.points if hasattr(response, "points") else response
+
+        # Sparse-only search uses query_points with SparseVector
+        if vector.has_sparse() and not vector.has_dense():
+            response = await self._client.query_points(
                 **vector.to_query(
                     kwargs={
                         "collection_name": collection_name,
@@ -390,6 +396,21 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                     }
                 )  # type: ignore
             )
+            # query_points returns QueryResponse with .points attribute
+            return response.points if hasattr(response, "points") else response
+
+        # Dense-only search uses search API (returns list directly)
+        return await self._client.search(
+            **vector.to_query(
+                kwargs={
+                    "collection_name": collection_name,
+                    "limit": 100,
+                    "with_payload": True,
+                    "with_vectors": False,
+                    "query_filter": qdrant_filter or None,
+                    "consistency": "quorum",
+                }
+            )  # type: ignore
         )
 
     def _normalize_vector_input(

@@ -43,6 +43,7 @@ async def qdrant_provider(qdrant_test_manager: Any):
     # Cleanup handled by test manager
 
 
+@pytest.mark.xfail(reason="ISSUE-001: Sparse-only search data flow issue - API usage fixed, storage/retrieval needs investigation")
 async def test_store_hybrid_embeddings(qdrant_provider: QdrantVectorStoreProvider):
     """
     User Story: Store both dense and sparse embeddings with default settings.
@@ -90,10 +91,8 @@ async def test_store_hybrid_embeddings(qdrant_provider: QdrantVectorStoreProvide
             dense=None,
         )
     )
-    pytest.xfail("ISSUE-001: Sparse-only search not finding stored chunks in Qdrant. "
-                 "Sparse embeddings are stored correctly and hybrid search works, "
-                 "but sparse-only searches return 0 results. Needs investigation of "
-                 "Qdrant sparse vector search API compatibility.")
+    assert len(sparse_results) > 0, "Sparse vector search should return results"
+    assert sparse_results[0].chunk.chunk_id == chunk.chunk_id
 
     # Verify: Hybrid search returns result (uses dense by default)
     hybrid_results = await qdrant_provider.search(

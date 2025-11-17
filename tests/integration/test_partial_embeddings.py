@@ -21,6 +21,7 @@ from tests.conftest import create_test_chunk_with_embeddings
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
 
+@pytest.mark.xfail(reason="ISSUE-001: Sparse-only search data flow issue - API usage fixed, storage/retrieval needs investigation")
 async def test_partial_embeddings(qdrant_test_manager):
     """
     User Story: Handle cases where dense embedding generation fails.
@@ -76,10 +77,7 @@ async def test_partial_embeddings(qdrant_test_manager):
             sparse=SparseEmbedding(indices=test_sparse_indices, values=test_sparse_values),
         )
     )
-    pytest.xfail("ISSUE-001: Sparse-only search not finding stored chunks in Qdrant. "
-                 "The chunk with sparse-only embedding is stored correctly, but sparse "
-                 "searches return 0 results. This test validates partial embedding storage, "
-                 "which works - only the sparse-only search has known issues.")
+    assert len(results) > 0, "Sparse search should find the chunk"
 
     # Verify metadata marks as incomplete
     # Note: This will be in the payload when we implement it

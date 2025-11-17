@@ -50,17 +50,19 @@ class TestNewUserQuickStart:
     """Test: New user wants fastest setup."""
 
     def test_new_user_quick_start_journey(
-        self, user_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+        self, user_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
     ) -> None:
         """Test complete quick start journey for new user."""
         project = user_environment["project"]
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
 
         # Step 1: Quick init
-        with pytest.raises(SystemExit) as init_result:
-            init_app(["--quickstart", "--client", "claude_code"])
-
-        assert init_result.value.code == 0
+        func, bound_args, _ = init_app.parse_args(
+            ["--quickstart", "--client", "claude_code", "--project", str(project)],
+            exit_on_error=False,
+        )
+        # Execute - successful execution doesn't raise exception
+        func(**bound_args.arguments)
 
         # Step 2: Verify config created
         config_path = project / "codeweaver.toml"
@@ -70,15 +72,19 @@ class TestNewUserQuickStart:
         # We don't assert on exit code since it's environment-dependent
 
     def test_quick_start_with_config_show(
-        self, user_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+        self, user_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
     ) -> None:
         """Test quick start followed by viewing configuration."""
+        project = user_environment["project"]
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
 
         # Init
-        with pytest.raises(SystemExit) as init_result:
-            init_app(["--quickstart", "--config-only"])
-        assert init_result.value.code == 0
+        func, bound_args, _ = init_app.parse_args(
+            ["--quickstart", "--config-only", "--project", str(project)],
+            exit_on_error=False,
+        )
+        # Execute - successful execution doesn't raise exception
+        func(**bound_args.arguments)
 
         # Show config
         with pytest.raises(SystemExit) as config_result:
@@ -86,14 +92,18 @@ class TestNewUserQuickStart:
         assert config_result.value.code == 0
 
     def test_quick_start_list_capabilities(
-        self, user_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+        self, user_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
     ) -> None:
         """Test quick start followed by listing capabilities."""
+        project = user_environment["project"]
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
 
         # Init
-        with pytest.raises(SystemExit):
-            init_app(["--quickstart", "--config-only"])
+        func, bound_args, _ = init_app.parse_args(
+            ["--quickstart", "--config-only", "--project", str(project)],
+            exit_on_error=False,
+        )
+        func(**bound_args.arguments)
 
         # List providers
         with pytest.raises(SystemExit) as list_result:
@@ -112,17 +122,18 @@ class TestOfflineDeveloperWorkflow:
     """Test: Developer wants offline-capable setup."""
 
     def test_offline_developer_workflow(
-        self, user_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+        self, user_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
     ) -> None:
         """Test complete offline developer workflow."""
         project = user_environment["project"]
 
         # Step 1: Quickstart profile (free/offline providers)
-        with pytest.raises(SystemExit) as init_result:
-            init_app(["--profile", "quickstart", "--config-only", "--force"])
-
-        # Should succeed even without API keys
-        assert init_result.value.code == 0
+        func, bound_args, _ = init_app.parse_args(
+            ["--profile", "quickstart", "--config-only", "--force", "--project", str(project)],
+            exit_on_error=False,
+        )
+        # Execute - should succeed even without API keys
+        func(**bound_args.arguments)
 
         # Step 2: Verify config created
         assert (project / "codeweaver.toml").exists()
@@ -130,12 +141,17 @@ class TestOfflineDeveloperWorkflow:
         # Step 3: Config uses local providers (no API keys needed)
 
     def test_offline_list_local_providers(
-        self, user_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+        self, user_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
     ) -> None:
         """Test listing local providers in offline mode."""
+        project = user_environment["project"]
+
         # Init with quickstart (free/offline)
-        with pytest.raises(SystemExit):
-            init_app(["--profile", "quickstart", "--config-only", "--force"])
+        func, bound_args, _ = init_app.parse_args(
+            ["--profile", "quickstart", "--config-only", "--force", "--project", str(project)],
+            exit_on_error=False,
+        )
+        func(**bound_args.arguments)
 
         # List local providers
         with pytest.raises(SystemExit) as list_result:
@@ -143,14 +159,17 @@ class TestOfflineDeveloperWorkflow:
         assert list_result.value.code == 0
 
     def test_offline_config_modifications(
-        self, user_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+        self, user_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
     ) -> None:
         """Test modifying config in offline mode."""
         project = user_environment["project"]
 
         # Init
-        with pytest.raises(SystemExit):
-            init_app(["--profile", "quickstart", "--config-only", "--force"])
+        func, bound_args, _ = init_app.parse_args(
+            ["--profile", "quickstart", "--config-only", "--force", "--project", str(project)],
+            exit_on_error=False,
+        )
+        func(**bound_args.arguments)
 
         # Modify config
         config_path = project / "codeweaver.toml"
@@ -256,7 +275,7 @@ class TestCompleteUserJourneys:
     """Test complete end-to-end user journeys."""
 
     def test_first_time_user_complete_journey(
-        self, user_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+        self, user_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
     ) -> None:
         """Test: First-time user from install to working setup."""
         from codeweaver.cli.commands.init import _get_client_config_path
@@ -267,9 +286,12 @@ class TestCompleteUserJourneys:
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
 
         # 1. Init (quick setup)
-        with pytest.raises(SystemExit) as init_result:
-            init_app(["--quickstart", "--client", "claude_code"])
-        assert init_result.value.code == 0
+        func, bound_args, _ = init_app.parse_args(
+            ["--quickstart", "--client", "claude_code", "--project", str(project)],
+            exit_on_error=False,
+        )
+        # Execute - successful execution doesn't raise exception
+        func(**bound_args.arguments)
 
         # 2. Verify both configs created
         assert (project / "codeweaver.toml").exists()
