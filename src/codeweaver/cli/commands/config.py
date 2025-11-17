@@ -26,6 +26,7 @@ class ConfigProfile(StrEnum):
     RECOMMENDED = "recommended"
     QUICKSTART = "quickstart"
     BACKUP = "backup"
+    TEST = "test"
 
 
 if TYPE_CHECKING:
