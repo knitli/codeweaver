@@ -35,6 +35,7 @@ if TYPE_CHECKING:
 def sample_chunk() -> CodeChunk:
     """Create a sample code chunk for testing."""
     from codeweaver.common.utils import uuid7
+
     return CodeChunk(
         content="def test_function():\n    return 42",
         line_range=Span(start=1, end=2, _source_id=uuid7()),
@@ -52,6 +53,8 @@ async def primary_embedding_provider():
     """
     pytest.importorskip("sentence_transformers", reason="SentenceTransformers required for test")
 
+    from sentence_transformers import SentenceTransformer
+
     from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
     from codeweaver.providers.embedding.capabilities.ibm_granite import (
         GRANITE_EMBEDDING_SMALL_ENGLISH_R2_CAPABILITIES,
@@ -60,18 +63,17 @@ async def primary_embedding_provider():
         SentenceTransformersEmbeddingProvider,
     )
     from codeweaver.providers.provider import Provider
-    from sentence_transformers import SentenceTransformer
 
     # Use a small model for fast testing (384 dimensions)
     model = SentenceTransformer("ibm-granite/granite-embedding-small-english-r2")
 
-    caps_dict = {**GRANITE_EMBEDDING_SMALL_ENGLISH_R2_CAPABILITIES, "provider": Provider.SENTENCE_TRANSFORMERS}  # type: ignore
+    caps_dict = {
+        **GRANITE_EMBEDDING_SMALL_ENGLISH_R2_CAPABILITIES,
+        "provider": Provider.SENTENCE_TRANSFORMERS,
+    }  # type: ignore
     caps = EmbeddingModelCapabilities.model_validate(caps_dict)
 
-    provider = SentenceTransformersEmbeddingProvider(
-        capabilities=caps,
-        client=model,
-    )
+    provider = SentenceTransformersEmbeddingProvider(capabilities=caps, client=model)
     return provider
 
 
@@ -84,6 +86,8 @@ async def backup_embedding_provider():
     """
     pytest.importorskip("sentence_transformers", reason="SentenceTransformers required for test")
 
+    from sentence_transformers import SentenceTransformer
+
     from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
     from codeweaver.providers.embedding.capabilities.ibm_granite import (
         GRANITE_EMBEDDING_ENGLISH_R2_CAPABILITIES,  # 768 dimensions
@@ -92,18 +96,17 @@ async def backup_embedding_provider():
         SentenceTransformersEmbeddingProvider,
     )
     from codeweaver.providers.provider import Provider
-    from sentence_transformers import SentenceTransformer
 
     # Use larger Granite model (768 dimensions - different from primary's 384!)
     model = SentenceTransformer("ibm-granite/granite-embedding-english-r2")
 
-    caps_dict = {**GRANITE_EMBEDDING_ENGLISH_R2_CAPABILITIES, "provider": Provider.SENTENCE_TRANSFORMERS}  # type: ignore
+    caps_dict = {
+        **GRANITE_EMBEDDING_ENGLISH_R2_CAPABILITIES,
+        "provider": Provider.SENTENCE_TRANSFORMERS,
+    }  # type: ignore
     caps = EmbeddingModelCapabilities.model_validate(caps_dict)
 
-    provider = SentenceTransformersEmbeddingProvider(
-        capabilities=caps,
-        client=model,
-    )
+    provider = SentenceTransformersEmbeddingProvider(capabilities=caps, client=model)
     return provider
 
 
@@ -137,7 +140,7 @@ async def test_registry_cross_provider_collision(
 
     # Get the chunk with batch keys set
     embedded_chunk = sample_chunk.set_batch_keys(
-        list(primary_embedding_provider._store.values())[0][0]._embedding_batches[0]
+        list(primary_embedding_provider._store.values())[0][0]._embedding_index[0]
     )
 
     # Step 2: Check what embeddings the chunk retrieves
@@ -160,7 +163,9 @@ async def test_registry_cross_provider_collision(
         print(f"\n❌ BUG CONFIRMED: Backup would get {vector_dims}-dim embeddings from registry")
         print(f"   Expected: {backup_expected_dims}-dim (backup provider's model)")
         print(f"   Got: {vector_dims}-dim (primary provider's embeddings)")
-        print("   This happens because EmbeddingRegistry is GLOBAL and chunk.dense_embeddings fetches from it!")
+        print(
+            "   This happens because EmbeddingRegistry is GLOBAL and chunk.dense_embeddings fetches from it!"
+        )
 
         assert vector_dims == 384, "Proves backup gets primary's embeddings"
         assert vector_dims != backup_expected_dims, "Dimension mismatch - this is the bug!"
@@ -186,10 +191,12 @@ async def test_deduplication_prevents_reembedding(sample_chunk, primary_embeddin
 
     # Verify hash is stored
     from codeweaver.core.stores import get_blake_hash
+
     content_hash = get_blake_hash(sample_chunk.content.encode("utf-8"))
 
-    assert content_hash in primary_embedding_provider._hash_store, \
+    assert content_hash in primary_embedding_provider._hash_store, (
         "Content hash should be in provider's hash store"
+    )
 
     # Step 2: Try to re-embed the SAME chunk (simulates sync-back scenario)
     embeddings_second = await primary_embedding_provider.embed_documents([sample_chunk])
@@ -229,8 +236,9 @@ async def test_hash_store_is_class_variable(primary_embedding_provider, backup_e
         print("✓ Instances have separate hash stores")
 
     # Since both are SentenceTransformersEmbeddingProvider, they SHOULD share the store
-    assert primary_store_id == backup_store_id, \
+    assert primary_store_id == backup_store_id, (
         "Same provider class should share hash store (ClassVar behavior)"
+    )
 
     # But the REGISTRY is still global!
     registry1 = get_embedding_registry()
@@ -244,7 +252,9 @@ async def test_hash_store_is_class_variable(primary_embedding_provider, backup_e
 
 
 @pytest.mark.asyncio
-async def test_chunk_property_fetches_from_global_registry(sample_chunk, primary_embedding_provider):
+async def test_chunk_property_fetches_from_global_registry(
+    sample_chunk, primary_embedding_provider
+):
     """Test that chunk.dense_embeddings property fetches from global registry.
 
     This is the mechanism that causes Bug #1.
@@ -254,19 +264,22 @@ async def test_chunk_property_fetches_from_global_registry(sample_chunk, primary
 
     # Get chunk with batch keys
     embedded_chunk = sample_chunk.set_batch_keys(
-        list(primary_embedding_provider._store.values())[0][0]._embedding_batches[0]
+        list(primary_embedding_provider._store.values())[0][0]._embedding_index[0]
     )
 
     # Access the property
     registry = get_embedding_registry()
     property_embeddings = embedded_chunk.dense_embeddings
-    registry_embeddings = registry[embedded_chunk.chunk_id].dense if embedded_chunk.chunk_id in registry else None
+    registry_embeddings = (
+        registry[embedded_chunk.chunk_id].dense if embedded_chunk.chunk_id in registry else None
+    )
 
     # Verify they're the same
     assert property_embeddings is not None
     assert registry_embeddings is not None
-    assert property_embeddings.batch_id == registry_embeddings.batch_id, \
+    assert property_embeddings.batch_id == registry_embeddings.batch_id, (
         "Property fetches from global registry"
+    )
 
     print("\n❌ CONFIRMED: chunk.dense_embeddings fetches from global registry")
     print("   This means backup will get primary's embeddings when upserting!")
