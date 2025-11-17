@@ -52,7 +52,7 @@ class TestConfigInit:
         capsys.readouterr()  # Clear output
 
         assert exc_info.value.code == 0
-        config_path = temp_project / ".codeweaver.toml"
+        config_path = temp_project / "codeweaver.toml"
         assert config_path.exists()
 
     def test_profile_recommended(
@@ -64,7 +64,7 @@ class TestConfigInit:
         capsys.readouterr()
 
         assert exc_info.value.code == 0
-        config_path = temp_project / ".codeweaver.toml"
+        config_path = temp_project / "codeweaver.toml"
         config = tomli.loads(config_path.read_text())
 
         assert config["embedding"][0]["provider"] == "voyage"
@@ -79,7 +79,7 @@ class TestConfigInit:
         capsys.readouterr()
 
         assert exc_info.value.code == 0
-        config_path = temp_project / ".codeweaver.toml"
+        config_path = temp_project / "codeweaver.toml"
         config = tomli.loads(config_path.read_text())
 
         # Should use local providers (fastembed or sentence-transformers)
@@ -287,15 +287,15 @@ class TestConfigProfiles:
         """Test all ConfigProfile enum values are valid."""
         # Test that profile enum values exist and are valid strings
         for profile in ConfigProfile:
-            assert profile.value in {"recommended", "local-only", "minimal"}
+            assert profile.value in {"recommended", "quickstart", "backup"}
             assert isinstance(profile.value, str)
 
     def test_profile_enum_values_match_functions(self) -> None:
         """Test ConfigProfile enum values match profile functions."""
         expected_profiles = {
             ConfigProfile.RECOMMENDED,
-            ConfigProfile.LOCAL_ONLY,
-            ConfigProfile.MINIMAL,
+            ConfigProfile.QUICKSTART,
+            ConfigProfile.BACKUP,
         }
 
         assert len(ConfigProfile) == len(expected_profiles)

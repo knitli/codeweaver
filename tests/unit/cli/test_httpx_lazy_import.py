@@ -16,12 +16,13 @@ from __future__ import annotations
 
 import sys
 from typing import TYPE_CHECKING
+from unittest.mock import MagicMock
 
 import pytest
 
 
 if TYPE_CHECKING:
-    from unittest.mock import MagicMock
+    pass
 
 
 @pytest.mark.unit
