@@ -30,6 +30,11 @@ curl -O https://raw.githubusercontent.com/knitli/codeweaver-mcp/main/docker-comp
 # Download the example .env file
 curl -O https://raw.githubusercontent.com/knitli/codeweaver-mcp/main/.env.example
 mv .env.example .env
+
+# Optional: Download and run the setup validator
+curl -O https://raw.githubusercontent.com/knitli/codeweaver-mcp/main/scripts/docker/validate-setup.sh
+chmod +x validate-setup.sh
+./validate-setup.sh
 ```
 
 Or if you've cloned the repository:
@@ -37,6 +42,9 @@ Or if you've cloned the repository:
 git clone https://github.com/knitli/codeweaver-mcp.git
 cd codeweaver-mcp
 cp .env.example .env
+
+# Optional: Validate your setup
+./scripts/docker/validate-setup.sh
 ```
 
 ### 2. Configure Your Environment

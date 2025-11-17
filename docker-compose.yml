@@ -6,8 +6,6 @@
 # CodeWeaver Docker Compose Configuration
 # Provides CodeWeaver MCP server with Qdrant vector database
 
-version: "3.9"
-
 services:
   # Qdrant Vector Database
   # Provides persistent vector storage for code embeddings
