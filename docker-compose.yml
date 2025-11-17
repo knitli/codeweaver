@@ -44,8 +44,8 @@ services:
       # Persist CodeWeaver data and cache
       - codeweaver_data:/app/data
       - codeweaver_cache:/app/.codeweaver
-      # Optional: Mount custom configuration
-      - ${CONFIG_PATH:-./codeweaver.toml}:/app/config/codeweaver.toml:ro
+      # Optional: Mount custom configuration (uncomment and set CONFIG_PATH if needed)
+      # - ${CONFIG_PATH}:/app/config/codeweaver.toml:ro
     environment:
       # CodeWeaver Configuration
       - CODEWEAVER_PROJECT_PATH=/workspace
