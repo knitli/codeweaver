@@ -33,7 +33,6 @@ from codeweaver.exceptions import CodeWeaverError
 
 
 if TYPE_CHECKING:
-    import httpx
 
     from codeweaver.cli.ui import StatusDisplay
     from codeweaver.config.mcp import CodeWeaverMCPConfig, StdioCodeWeaverConfig
@@ -101,8 +100,9 @@ def _create_codeweaver_config(
     from codeweaver.config.settings import get_settings, update_settings
 
     settings = get_settings()
+    # Don't pass config_file when creating a new config - the file doesn't exist yet
     _settings_view = update_settings(
-        **({"project_path": project_path, "config_file": config_path} | (deployment_profile or {}))  # type: ignore
+        **({"project_path": project_path} | (deployment_profile or {}))  # type: ignore
     )
     # The reference should reflect the updated settings, but we'll refetch to be sure
     settings = get_settings()
@@ -585,7 +585,7 @@ def mcp(
         ),
     ] = 120,
     auth: Annotated[
-        str | Literal["oauth"] | httpx.Auth | None,
+        str | Literal["oauth"] | Any | None,
         cyclopts.Parameter(
             name=["--auth"],
             help="Authentication method for MCP client (bearer token, 'oauth', an httpx.Auth object, or None)",

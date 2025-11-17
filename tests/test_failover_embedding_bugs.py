@@ -17,7 +17,6 @@ Each test is designed to reproduce the actual failure scenario and can be
 repurposed for regression testing after fixes are implemented.
 """
 
-import asyncio
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -29,8 +28,7 @@ from codeweaver.providers.embedding.registry import get_embedding_registry
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.embedding.providers.base import EmbeddingProvider
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    pass
 
 
 @pytest.fixture
@@ -162,7 +160,7 @@ async def test_registry_cross_provider_collision(
         print(f"\n❌ BUG CONFIRMED: Backup would get {vector_dims}-dim embeddings from registry")
         print(f"   Expected: {backup_expected_dims}-dim (backup provider's model)")
         print(f"   Got: {vector_dims}-dim (primary provider's embeddings)")
-        print(f"   This happens because EmbeddingRegistry is GLOBAL and chunk.dense_embeddings fetches from it!")
+        print("   This happens because EmbeddingRegistry is GLOBAL and chunk.dense_embeddings fetches from it!")
 
         assert vector_dims == 384, "Proves backup gets primary's embeddings"
         assert vector_dims != backup_expected_dims, "Dimension mismatch - this is the bug!"
@@ -198,8 +196,8 @@ async def test_deduplication_prevents_reembedding(sample_chunk, primary_embeddin
 
     # Check result
     print(f"\n❌ BUG CONFIRMED: Re-embedding returned {len(embeddings_second)} embeddings")
-    print(f"   Expected: New embeddings generated")
-    print(f"   Got: Empty list (filtered by deduplication)")
+    print("   Expected: New embeddings generated")
+    print("   Got: Empty list (filtered by deduplication)")
 
     assert len(embeddings_second) == 0, "Second embedding should return empty due to deduplication"
     print("   This means sync-back would silently fail for unchanged chunks!")
@@ -215,9 +213,6 @@ async def test_hash_store_is_class_variable(primary_embedding_provider, backup_e
 
     Expected Behavior: Same class shares store, instances share the ClassVar
     """
-    from codeweaver.providers.embedding.providers.sentence_transformers import (
-        SentenceTransformersEmbeddingProvider,
-    )
 
     # Check if both provider instances share the same hash store (they're both SentenceTransformers)
     primary_store_id = id(primary_embedding_provider._hash_store)
