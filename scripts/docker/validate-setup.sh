@@ -100,10 +100,13 @@ fi
 echo -n "Checking available memory... "
 if command -v free &> /dev/null; then
     AVAILABLE_MEM=$(free -g | awk '/^Mem:/{print $7}')
-    if [ "$AVAILABLE_MEM" -ge 4 ]; then
+    if [ -n "$AVAILABLE_MEM" ] && [[ "$AVAILABLE_MEM" =~ ^[0-9]+$ ]] && [ "$AVAILABLE_MEM" -ge 4 ]; then
         echo -e "${GREEN}✓${NC} ${AVAILABLE_MEM}GB available"
-    else
+    elif [ -n "$AVAILABLE_MEM" ] && [[ "$AVAILABLE_MEM" =~ ^[0-9]+$ ]]; then
         echo -e "${YELLOW}⚠${NC} ${AVAILABLE_MEM}GB available (4GB recommended)"
+        warnings=$((warnings + 1))
+    else
+        echo -e "${YELLOW}⚠${NC} Unable to determine available memory (at least 4GB recommended)"
         warnings=$((warnings + 1))
     fi
 elif command -v vm_stat &> /dev/null; then
