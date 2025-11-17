@@ -409,7 +409,7 @@ def main() -> None:
     try:
         app()
     except Exception as e:
-        error_handler.handle_error(e, "Index CLI", exit_code=1)
+        error_handler.handle_error(e, "Index Command", exit_code=1)
 
 
 if __name__ == "__main__":

@@ -105,7 +105,13 @@ class CollectionMetadata(BasedModel):
                 "dense_model",
                 "sparse_model",
             },
-        )
+        ) | {"metadata": self.model_dump(exclude_none=True, by_alias=True, round_trip=True)}
+
+    @classmethod
+    def from_collection(cls, data: dict[str, Any]) -> CollectionMetadata:
+        """Create CollectionMetadata from a collection dictionary."""
+        metadata = data.get("metadata", {})
+        return cls.model_validate(metadata)
 
     def validate_compatibility(self, other: CollectionMetadata) -> None:
         """Validate collection metadata against current provider configuration.

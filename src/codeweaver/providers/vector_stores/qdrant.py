@@ -64,3 +64,10 @@ class QdrantVectorStoreProvider(QdrantBaseProvider):
 
 
 __all__ = ("QdrantVectorStoreProvider",)
+
+# for debugging purposes
+if __name__ == "__main__":
+    store = QdrantVectorStoreProvider()
+    import asyncio
+
+    asyncio.run(store._initialize())

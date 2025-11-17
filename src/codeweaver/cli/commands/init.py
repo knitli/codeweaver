@@ -33,6 +33,8 @@ from codeweaver.exceptions import CodeWeaverError
 
 
 if TYPE_CHECKING:
+    import httpx
+
     from codeweaver.cli.ui import StatusDisplay
     from codeweaver.config.mcp import CodeWeaverMCPConfig, StdioCodeWeaverConfig
 
@@ -583,7 +585,7 @@ def mcp(
         ),
     ] = 120,
     auth: Annotated[
-        str | Literal["oauth"] | Any | None,  # httpx.Auth at runtime
+        str | Literal["oauth"] | httpx.Auth | None,
         cyclopts.Parameter(
             name=["--auth"],
             help="Authentication method for MCP client (bearer token, 'oauth', an httpx.Auth object, or None)",
@@ -749,6 +751,10 @@ def init(
 ) -> None:
     """Initialize CodeWeaver configuration and MCP client setup.
 
+    This command sets up both the CodeWeaver configuration file and the MCP client configuration
+    in one step. It does not expose all available options; if you want more control, use the
+    `codeweaver init config` and `codeweaver init mcp` commands directly.
+
     By default, creates both CodeWeaver config and MCP client config.
     Use --config-only or --mcp-only to create just one.
 
@@ -794,17 +800,6 @@ def init(
     if quickstart:
         profile = "quickstart"
 
-    # Validate vector_url if cloud deployment
-    parsed_vector_url: AnyHttpUrl | None = None
-    if vector_deployment == "cloud":
-        if not vector_url:
-            error_handler.handle_error(
-                CodeWeaverError("You must provide --vector-url when --vector-deployment=cloud"),
-                "Configuration validation",
-                exit_code=1,
-            )
-        parsed_vector_url = AnyHttpUrl(vector_url) if vector_url else None
-
     # Determine project path
     project_path = (project or resolve_project_root()).resolve()
     if not project_path.exists():
@@ -836,7 +831,7 @@ def init(
             profile=profile,
             quickstart=quickstart,
             vector_deployment=vector_deployment,
-            vector_url=parsed_vector_url,
+            vector_url=vector_url,
             force=force,
             config_level=config_level,
             config_extension=config_extension,
@@ -931,3 +926,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+__all__ = ("app",)

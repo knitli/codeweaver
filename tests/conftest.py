@@ -9,7 +9,8 @@ import contextlib
 
 from pathlib import Path
 from types import GeneratorType
-from typing import UUID, cast
+from typing import cast
+from uuid import UUID
 
 import pytest
 

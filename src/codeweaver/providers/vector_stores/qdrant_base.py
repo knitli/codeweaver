@@ -22,6 +22,7 @@ from qdrant_client.http.models import (
     SparseVectorParams,
     VectorParams,
 )
+from qdrant_client.http.models.models import CollectionInfo
 from typing_extensions import TypeIs
 
 from codeweaver.agent_api.find_code.results import SearchResult
@@ -66,18 +67,16 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
 
         return get_provider_config_for("vector_store")
 
-    @property
-    def _metadata(self) -> CollectionMetadata | None:
+    async def _metadata(self) -> CollectionMetadata | None:
         """Get the collection metadata."""
-        collection = self._client.get_collection_details(collection_name=self._collection)  # type: ignore
-        if collection and collection.result:
-            return CollectionMetadata.model_validate(collection.result.metadata)  # type: ignore
+        collection = await self.get_collection(collection_name=self._collection)  # type: ignore
+        if collection and collection.config and collection.config.metadata:
+            return CollectionMetadata.model_validate(collection.config.metadata)  # type: ignore
         return None
 
-    @property
-    def collection_info(self) -> CollectionMetadata | None:
+    async def collection_info(self) -> CollectionMetadata | None:
         """Get the collection metadata."""
-        return self._metadata
+        return await self._metadata()
 
     @staticmethod
     def _ensure_client(client: Any) -> TypeIs[AsyncQdrantClient]:
@@ -200,8 +199,12 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         """
         if not self._client:
             raise ProviderError("Qdrant client is not initialized")
-        collections = await self._client.get_collections()
-        return [col.name for col in collections.collections]
+        try:
+            collections = await self._client.get_collections()
+            return [col.name for col in collections.collections]
+        except Exception as e:
+            logger.exception("Failed to list collections from Qdrant")
+            raise ProviderError(f"Failed to list collections: {e}") from e
 
     async def search(
         self, vector: StrategizedQuery | MixedQueryInput, query_filter: Filter | None = None
@@ -594,6 +597,28 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
 
     async def handle_persistence(self) -> None:
         """This is no-op, but implemented by the memory provider to trigger persistence."""
+
+    async def get_collection(self, collection_name: str) -> CollectionInfo:
+        """Get collection details.
+
+        Args:
+            collection_name: Name of the collection to retrieve.
+
+        Returns:
+            Collection information as CollectionInfo from Qdrant.
+
+        Raises:
+            ProviderError: If client is not initialized or operation fails.
+        """
+        if not self._ensure_client(self._client):
+            raise ProviderError("Qdrant client not initialized")
+        try:
+            return await self._client.get_collection(collection_name=collection_name)
+        except Exception as e:
+            raise ProviderError(
+                f"Failed to get collection '{collection_name}': {e}",
+                details={"collection": collection_name, "error": str(e)},
+            ) from e
 
     async def delete_by_id(self, ids: list[UUID7]) -> None:
         """Delete chunks by their unique identifiers.

@@ -20,7 +20,7 @@ from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.types import CodeWeaverSettingsDict
+    from codeweaver.config.types import CodeWeaverSettingsDict, ProviderSettingsDict
     from codeweaver.core.types.dictview import DictView
 
 display: StatusDisplay = get_display()
@@ -95,7 +95,7 @@ def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
         _show_provider_config(provider_settings)
 
 
-def _show_provider_config(provider_settings: dict) -> None:
+def _show_provider_config(provider_settings: ProviderSettingsDict) -> None:
     """Display provider configuration details."""
     from codeweaver.core.types.sentinel import Unset
 

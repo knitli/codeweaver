@@ -12,17 +12,13 @@ from __future__ import annotations
 
 import asyncio
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from cyclopts import App
 from pydantic_core import from_json
 from rich.table import Table
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-
-
-if TYPE_CHECKING:
-    pass
 
 
 _display: StatusDisplay = get_display()
@@ -214,30 +210,7 @@ def _display_failover_status(
     active_store = failover_data.get("active_store_type", "primary")
 
     if active:
-        display.print_warning(f"Failover: ACTIVE - Using {active_store} store")
-
-        # Create failover details table
-        table = Table(title="Failover Details", show_header=True, header_style="bold yellow")
-        table.add_column("Metric", style="dim")
-        table.add_column("Value", justify="right")
-
-        table.add_row("Active Store", active_store)
-        table.add_row("Failover Count", str(failover_data.get("failover_count", 0)))
-
-        total_time = failover_data.get("total_failover_time_seconds", 0)
-        table.add_row("Total Failover Time", _format_duration(total_time))
-
-        if last_failover := failover_data.get("last_failover_time"):
-            table.add_row("Last Failover", last_failover)
-
-        if verbose:
-            table.add_row("Backup Syncs", str(failover_data.get("backup_syncs_completed", 0)))
-            table.add_row("Chunks in Failover", str(failover_data.get("chunks_in_failover", 0)))
-
-            if circuit_state := failover_data.get("primary_circuit_breaker_state"):
-                table.add_row("Primary Circuit Breaker", circuit_state)
-
-        display.print_table(table)
+        _generate_failover_details_table(display, active_store, failover_data, verbose=verbose)
     else:
         display.print_success(f"Failover: ENABLED - Using {active_store} store")
 
@@ -246,6 +219,35 @@ def _display_failover_status(
                 f"Total failovers: {failover_data.get('failover_count', 0)} "
                 f"(Total time: {_format_duration(failover_data.get('total_failover_time_seconds', 0))})"
             )
+
+
+def _generate_failover_details_table(
+    display: StatusDisplay, active_store: str, failover_data: dict[str, Any], *, verbose: bool
+) -> None:
+    display.print_warning(f"Failover: ACTIVE - Using {active_store} store")
+
+    # Create failover details table
+    table = Table(title="Failover Details", show_header=True, header_style="bold yellow")
+    table.add_column("Metric", style="dim")
+    table.add_column("Value", justify="right")
+
+    table.add_row("Active Store", active_store)
+    table.add_row("Failover Count", str(failover_data.get("failover_count", 0)))
+
+    total_time = failover_data.get("total_failover_time_seconds", 0)
+    table.add_row("Total Failover Time", _format_duration(total_time))
+
+    if last_failover := failover_data.get("last_failover_time"):
+        table.add_row("Last Failover", last_failover)
+
+    if verbose:
+        table.add_row("Backup Syncs", str(failover_data.get("backup_syncs_completed", 0)))
+        table.add_row("Chunks in Failover", str(failover_data.get("chunks_in_failover", 0)))
+
+        if circuit_state := failover_data.get("primary_circuit_breaker_state"):
+            table.add_row("Primary Circuit Breaker", circuit_state)
+
+    display.print_table(table)
 
 
 def _display_statistics(display: StatusDisplay, stats_data: dict[str, Any]) -> None:

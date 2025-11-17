@@ -13,16 +13,16 @@ import logging
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, NoReturn
+from typing import TYPE_CHECKING, Annotated, Any, NoReturn, cast
 
 from fastmcp import Context
 from pydantic import Field, PrivateAttr
-from qdrant_client.client_base import QdrantBase
 
 from codeweaver.common.logging import log_to_client_or_fallback
 from codeweaver.core.types.models import BasedModel
 from codeweaver.engine.resource_estimation import estimate_backup_memory_requirements
 from codeweaver.providers.vector_stores.base import CircuitBreakerState
+from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
 
 
 if TYPE_CHECKING:
@@ -629,6 +629,7 @@ class VectorStoreFailoverManager(BasedModel):
         """
         if not self._backup_store or not self._indexer or not self._primary_store:
             return
+        from codeweaver.providers.vector_stores.metadata import HybridVectorPayload
 
         try:
             # Get chunk from backup (need payload for re-embedding)
@@ -647,13 +648,9 @@ class VectorStoreFailoverManager(BasedModel):
                     continue
 
                 point = points[0]
-                payload = point.payload  # type: ignore[attr-defined]
-
-                # Extract text content from payload
-                chunk_text = payload.get("chunk_text", "") or payload.get("text", "")
-                if not chunk_text:
-                    logger.warning("Chunk %s has no text content to re-embed", chunk_id)
-                    return
+                raw_payload = point.payload
+                payload = HybridVectorPayload.model_validate(raw_payload)
+                chunk = payload.chunk
 
                 # Re-embed using primary's embedding providers
                 dense_vector = None
@@ -663,12 +660,12 @@ class VectorStoreFailoverManager(BasedModel):
                     hasattr(self._indexer, "_embedding_provider")
                     and self._indexer._embedding_provider
                 ):  # type: ignore[attr-defined]
-                    dense_embeddings = await self._indexer._embedding_provider.embed([chunk_text])  # type: ignore[attr-defined]
+                    dense_embeddings = await self._indexer._embedding_provider.embed([chunk])  # type: ignore[attr-defined]
                     if dense_embeddings:
                         dense_vector = dense_embeddings[0]
 
                 if hasattr(self._indexer, "_sparse_provider") and self._indexer._sparse_provider:  # type: ignore[attr-defined]
-                    sparse_embeddings = await self._indexer._sparse_provider.embed([chunk_text])  # type: ignore[attr-defined]
+                    sparse_embeddings = await self._indexer._sparse_provider.embed([chunk])  # type: ignore[attr-defined]
                     if sparse_embeddings:
                         sparse_vector = sparse_embeddings[0]
 
@@ -684,10 +681,7 @@ class VectorStoreFailoverManager(BasedModel):
                     return
 
                 # Upsert to primary with new embeddings
-                await self._primary_store.upsert(
-                    collection_name=collection_name,
-                    points=[{"id": chunk_id, "vector": vectors, "payload": payload}],
-                )
+                await self._primary_store.upsert([chunk])
 
                 logger.debug("✓ Synced chunk %s to primary with re-embedding", chunk_id)
                 return
@@ -739,9 +733,9 @@ class VectorStoreFailoverManager(BasedModel):
             if (
                 collections
                 and self._primary_store
-                and issubclass(type(self._primary_store), QdrantBase)
+                and issubclass(type(self._primary_store), QdrantBaseProvider)
             ):
-                await self._primary_store.get_collection(collections[0])
+                await cast(QdrantBaseProvider, self._primary_store).list_collections()
                 logger.debug("Primary health check: retrieved collection info")
 
             logger.info("✓ Primary health verification passed")
@@ -819,23 +813,25 @@ class VectorStoreFailoverManager(BasedModel):
 
             for collection_name in collections_response:
                 # Get collection info
-                collection_info = await self._primary_store.get_collection(collection_name)
+                collection_info = await cast(
+                    QdrantBaseProvider, self._primary_store
+                ).get_collection(collection_name)
 
                 # Scroll all points from the collection
                 points = []
                 offset = None
                 while True:
-                    result = await self._primary_store._client.scroll(  # type: ignore[union-attr]
+                    result = await self._primary_store._client.scroll(
                         collection_name=collection_name,
                         limit=100,
                         offset=offset,
                         with_payload=True,
-                        with_vectors=True,  # type: ignore[arg-type]
+                        with_vectors=True,
                     )
                     if not result[0]:  # No more points
                         break
-                    points.extend(result[0])  # type: ignore[arg-type]
-                    offset = result[1]  # Next offset
+                    points.extend(result[0])
+                    offset = result[1]  # next offset
                     if offset is None:  # Reached end
                         break
 

@@ -651,7 +651,7 @@ class Indexer(BasedModel):
             except ValueError as e:
                 # Handle duplicate embedding errors gracefully
                 if "already set" in str(e):
-                    logger.warning("Some chunks already embedded (dense), skipping: %s", e)
+                    logger.info("Some chunks already embedded (dense), skipping: %s", e)
                 else:
                     raise
             except Exception:
