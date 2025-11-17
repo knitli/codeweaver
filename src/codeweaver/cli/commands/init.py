@@ -585,7 +585,7 @@ def mcp(
         ),
     ] = 120,
     auth: Annotated[
-        str | Literal["oauth"] | httpx.Auth | None,
+        str | Literal["oauth"] | Any | None,
         cyclopts.Parameter(
             name=["--auth"],
             help="Authentication method for MCP client (bearer token, 'oauth', an httpx.Auth object, or None)",

@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
@@ -17,6 +18,14 @@ from cyclopts import App
 from rich.table import Table
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
+
+
+class ConfigProfile(StrEnum):
+    """Available configuration profiles for CodeWeaver setup."""
+    
+    RECOMMENDED = "recommended"
+    QUICKSTART = "quickstart"
+    BACKUP = "backup"
 
 
 if TYPE_CHECKING:
