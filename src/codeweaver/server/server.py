@@ -695,18 +695,25 @@ class ServerSetup(TypedDict):
     host: NotRequired[str | None]
     port: NotRequired[int | None]
     streamable_http_path: NotRequired[str | None]
+    transport: NotRequired[Literal["streamable-http", "stdio"]]
     log_level: NotRequired[Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]]
     middleware: NotRequired[set[Middleware] | set[type[Middleware]]]
     verbose: NotRequired[bool]
     debug: NotRequired[bool]
 
 
-def build_app(*, verbose: bool = False, debug: bool = False) -> ServerSetup:
+def build_app(
+    *,
+    verbose: bool = False,
+    debug: bool = False,
+    transport: Literal["streamable-http", "stdio"] = "streamable-http",
+) -> ServerSetup:
     """Build and configure the FastMCP application without starting it.
 
     Args:
         verbose: Enable verbose logging (INFO level)
         debug: Enable debug logging (DEBUG level)
+        transport: Transport type for MCP communication (streamable-http or stdio)
     """
     session_statistics = get_session_statistics._resolve()()
 
@@ -777,6 +784,7 @@ def build_app(*, verbose: bool = False, debug: bool = False) -> ServerSetup:
         host=host or "127.0.0.1",
         port=port or 9328,
         streamable_http_path=cast(str, http_path or "/codeweaver"),
+        transport=transport,
         log_level=_final_level or "INFO",
         middleware={*middleware},
         verbose=verbose,

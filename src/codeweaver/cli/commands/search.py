@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Annotated, Literal
 import cyclopts
 
 from cyclopts import App
+from pydantic import FilePath
 from rich.table import Table
 
 from codeweaver.agent_api.find_code.intent import IntentType
@@ -134,6 +135,12 @@ async def search(
     limit: int = 10,
     include_tests: bool = True,
     project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
+    config_file: Annotated[
+        FilePath | None,
+        cyclopts.Parameter(
+            name=["--config-file", "-c"], help="Path to a specific config file to use"
+        ),
+    ] = None,
     output_format: Literal["json", "table", "markdown"] = "table",
 ) -> None:
     """Search your codebase from the command line with plain language."""
@@ -144,10 +151,10 @@ async def search(
 
     try:
         settings = get_settings_map()
-        if project_path:
+        if project_path or config_file:
             from codeweaver.config.settings import update_settings
 
-            settings = update_settings(project_path=project_path)  # type: ignore
+            settings = update_settings(project_path=project_path, config_file=config_file)  # type: ignore
 
         # Check if index exists, auto-index if needed
         if not await _index_exists(settings):
