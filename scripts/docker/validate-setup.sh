@@ -109,12 +109,16 @@ if command -v free &> /dev/null; then
 elif command -v vm_stat &> /dev/null; then
     # macOS
     FREE_BLOCKS=$(vm_stat | grep free | awk '{ print $3 }' | sed 's/\.//')
-    FREE_GB=$((FREE_BLOCKS * 4096 / 1024 / 1024 / 1024))
-    if [ "$FREE_GB" -ge 4 ]; then
-        echo -e "${GREEN}✓${NC} ~${FREE_GB}GB available"
+    if [[ -n "$FREE_BLOCKS" && "$FREE_BLOCKS" =~ ^[0-9]+$ ]]; then
+        FREE_GB=$((FREE_BLOCKS * 4096 / 1024 / 1024 / 1024))
+        if [ "$FREE_GB" -ge 4 ]; then
+            echo -e "${GREEN}✓${NC} ~${FREE_GB}GB available"
+        else
+            echo -e "${YELLOW}⚠${NC} ~${FREE_GB}GB available (4GB recommended)"
+            warnings=$((warnings + 1))
+        fi
     else
-        echo -e "${YELLOW}⚠${NC} ~${FREE_GB}GB available (4GB recommended)"
-        warnings=$((warnings + 1))
+        echo -e "${YELLOW}⚠${NC} Unable to determine available memory"
     fi
 else
     echo -e "${YELLOW}⚠${NC} Unable to check"
