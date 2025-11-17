@@ -99,10 +99,34 @@ Cost: $0.03-$0.06 per query
 **Current Status**: Alpha Release - Install from PyPI with pre-release flag
 
 ### Prerequisites
-- Python 3.12 or higher
+- Python 3.12 or higher (or Docker for containerized setup)
 - Git for cloning repository (if installing from source)
 - 8GB RAM minimum for vector operations
 - VoyageAI API key (for embeddings and reranking)
+
+### 🐳 Quick Start with Docker (Recommended)
+
+The easiest way to get started is with Docker Compose, which includes CodeWeaver and Qdrant:
+
+```bash
+# 1. Download the configuration files
+curl -O https://raw.githubusercontent.com/knitli/codeweaver-mcp/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/knitli/codeweaver-mcp/main/.env.example
+mv .env.example .env
+
+# 2. Configure your environment
+# Edit .env and set:
+#   VOYAGE_API_KEY=your-api-key-here
+#   PROJECT_PATH=/path/to/your/codebase
+
+# 3. Start the services
+docker compose up -d
+
+# 4. Check health
+curl http://localhost:9328/health/
+```
+
+**See [DOCKER.md](DOCKER.md) for complete Docker documentation.**
 
 ### Quick Install (PyPI - Alpha)
 

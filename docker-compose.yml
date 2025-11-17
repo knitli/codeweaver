@@ -1,0 +1,120 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+# CodeWeaver Docker Compose Configuration
+# Provides CodeWeaver MCP server with Qdrant vector database
+
+version: "3.9"
+
+services:
+  # Qdrant Vector Database
+  # Provides persistent vector storage for code embeddings
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: codeweaver-qdrant
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"     # REST API
+      - "${QDRANT_GRPC_PORT:-6334}:6334" # gRPC API
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - codeweaver-network
+
+  # CodeWeaver MCP Server
+  # Semantic code search and context delivery for AI agents
+  codeweaver:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: codeweaver-server
+    ports:
+      - "${CODEWEAVER_PORT:-9328}:9328"
+    volumes:
+      # Mount your codebase to be indexed
+      - ${PROJECT_PATH:-.}:/workspace:ro
+      # Persist CodeWeaver data and cache
+      - codeweaver_data:/app/data
+      - codeweaver_cache:/app/.codeweaver
+      # Optional: Mount custom configuration
+      - ${CONFIG_PATH:-./codeweaver.toml}:/app/config/codeweaver.toml:ro
+    environment:
+      # CodeWeaver Configuration
+      - CODEWEAVER_PROJECT_PATH=/workspace
+      - CODEWEAVER_HOST=0.0.0.0
+      - CODEWEAVER_PORT=9328
+      
+      # Qdrant Connection
+      - CODEWEAVER_VECTOR_STORE_PROVIDER=qdrant
+      - CODEWEAVER_VECTOR_STORE_URL=http://qdrant:6333
+      - CODEWEAVER_VECTOR_STORE_COLLECTION_NAME=${COLLECTION_NAME:-codeweaver}
+      - CODEWEAVER_VECTOR_STORE_PREFER_GRPC=true
+      
+      # Embedding Provider (VoyageAI default)
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY}
+      - CODEWEAVER_EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-voyage}
+      - CODEWEAVER_EMBEDDING_MODEL=${EMBEDDING_MODEL:-voyage-code-3}
+      
+      # Sparse Embedding (FastEmbed - local, no API key needed)
+      - CODEWEAVER_SPARSE_EMBEDDING_PROVIDER=fastembed
+      - CODEWEAVER_SPARSE_EMBEDDING_MODEL=${SPARSE_EMBEDDING_MODEL:-prithivida/Splade_PP_en_v1}
+      
+      # Reranking Provider (VoyageAI default)
+      - CODEWEAVER_RERANKING_PROVIDER=${RERANKING_PROVIDER:-voyage}
+      - CODEWEAVER_RERANKING_MODEL=${RERANKING_MODEL:-voyage-rerank-2.5}
+      
+      # Operational Settings
+      - CODEWEAVER_ENABLE_TELEMETRY=${ENABLE_TELEMETRY:-false}
+      - CODEWEAVER_LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CODEWEAVER_MAX_CHUNK_SIZE=${MAX_CHUNK_SIZE:-800}
+      - CODEWEAVER_TOKEN_LIMIT=${TOKEN_LIMIT:-10000}
+      
+      # Optional: Alternative Embedding Providers
+      # Uncomment and configure as needed:
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # - COHERE_API_KEY=${COHERE_API_KEY}
+      # - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9328/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - codeweaver-network
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+volumes:
+  # Persistent storage for Qdrant vector database
+  qdrant_storage:
+    driver: local
+  # CodeWeaver data and cache
+  codeweaver_data:
+    driver: local
+  codeweaver_cache:
+    driver: local
+
+networks:
+  codeweaver-network:
+    driver: bridge

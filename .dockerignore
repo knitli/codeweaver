@@ -1,0 +1,104 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+# Docker ignore file for CodeWeaver
+# Excludes unnecessary files from Docker build context to improve build speed
+
+# Git
+.git/
+.gitignore
+.gitattributes
+.gitconfig
+.github/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.venv/
+venv/
+ENV/
+env/
+
+# IDE and Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation
+docs/
+*.md
+!README.md
+mkdocs.yml
+overrides/
+
+# Testing
+tests/
+test-results.xml
+coverage.xml
+.pytest_cache/
+
+# Development
+.roo
+.roomodes
+.claude
+.specify/
+.serena
+.editorconfig
+.mailmap
+.sourcery.yaml
+
+# Build and CI
+.github/
+mise.toml
+mise-tasks/
+scripts/
+hk.pkl
+_typos.toml
+ruff.toml
+sgconfig.yml
+
+# Data and config (will be mounted)
+data/
+context7.json
+claudedocs/
+examples/
+plans/
+specs/
+todo-tree.txt
+
+# Temporary files
+*.log
+*.tmp
+temp/
+tmp/
+.cache/
+
+# Licenses and Legal (keep LICENSE files, ignore LICENSES dir)
+LICENSES/
+CONTRIBUTORS_LICENSE_AGREEMENT.md
+SECURITY.md
+
+# Project specific
+.codeweaver/
+codeweaver.toml
+sbom.spdx
+NOTES.md
+PRODUCT.md
+ARCHITECTURE.md
+CODE_STYLE.md
