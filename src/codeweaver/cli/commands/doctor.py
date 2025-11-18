@@ -19,6 +19,7 @@ from types import ModuleType
 from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
 import cyclopts
+from urllib.parse import urlparse
 
 from cyclopts import App
 from pydantic import FilePath, ValidationError
@@ -376,7 +377,8 @@ async def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
     if (provider := vector_config["provider"]) != Provider.MEMORY and (
         url := vector_provider_config.get("url")
     ):
-        if "qdrant.io" in url:
+        host = urlparse(url).hostname
+        if host and (host == "qdrant.io" or host.endswith(".qdrant.io")):
             deployment_type = "cloud"
         # if they have port in the path we need to check for inclusion, not membership or equality
         elif "localhost" not in url and "127.0.0.1" not in url:
