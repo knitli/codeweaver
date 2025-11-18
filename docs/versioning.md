@@ -50,16 +50,16 @@ git push origin v0.1.0-beta.1
 The build will create packages with version `0.1.0b1` (Python normalizes `-beta.1` to `b1`).
 
 ### Pre-Release (Development)
-**Format**: `X.Y.ZrcN+gHASH`
+**Format**: `X.Y.ZrcN+gHASH` (where `rcN` is concatenated, e.g., `rc295`)
 **Example**: `0.1.0rc295+gfc4f90a`
 
 For untagged commits (commits after the latest tag):
 - `X.Y.Z`: Version from latest tag
-- `rcN`: Release candidate with commit distance N from tag
+- `rcN`: Release candidate with commit distance N from tag (concatenated, no dot or dash, e.g., `rc295`)
 - `+gHASH`: Git commit short hash
 
 ### Dirty Working Directory
-**Format**: `X.Y.ZrcN+gHASH.dirty`
+**Format**: `X.Y.ZrcN+gHASH.dirty` (where `rcN` is concatenated, e.g., `rc295`)
 **Example**: `0.1.0rc295+gfc4f90a.dirty`
 
 Building with uncommitted changes appends `.dirty` suffix.
