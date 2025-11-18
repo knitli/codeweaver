@@ -104,7 +104,7 @@ class EndpointSettingsDict(TypedDict, total=False):
 
     enable_state: NotRequired[bool | Unset]
     enable_health: NotRequired[bool | Unset]
-    enable_stats: NotRequired[bool | Unset]
+    enable_metrics: NotRequired[bool | Unset]
     enable_settings: NotRequired[bool | Unset]
     enable_version: NotRequired[bool | Unset]
 

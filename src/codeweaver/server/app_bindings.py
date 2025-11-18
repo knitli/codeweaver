@@ -402,8 +402,7 @@ async def status_info(_request: Request) -> PlainTextResponse:
             status_data["indexing"] = {"active": False}
 
         # Failover status
-        failover_manager = getattr(state, "failover_manager", None)
-        if failover_manager:
+        if getattr(state, "failover_manager", None):
             failover_stats = statistics().failover_statistics
             if failover_stats:
                 status_data["failover"] = {
@@ -422,9 +421,7 @@ async def status_info(_request: Request) -> PlainTextResponse:
         else:
             status_data["failover"] = {"enabled": False}
 
-        # Session statistics summary
-        stats = statistics()
-        if stats:
+        if stats := statistics():
             status_data["statistics"] = {
                 "total_requests": stats.total_requests,
                 "successful_requests": len(stats._successful_request_log),
@@ -519,8 +516,8 @@ async def register_app_bindings(
         app.custom_route("/state", methods=["GET"], name="state", include_in_schema=True)(
             state_info
         )  # type: ignore[arg-type]
-    if endpoint_settings.get("enable_stats", True):
-        app.custom_route("/stats", methods=["GET"], name="stats", include_in_schema=True)(
+    if endpoint_settings.get("enable_metrics", True):
+        app.custom_route("/metrics", methods=["GET"], name="metrics", include_in_schema=True)(
             stats_info
         )  # type: ignore[arg-type]
     if endpoint_settings.get("enable_settings", True):
