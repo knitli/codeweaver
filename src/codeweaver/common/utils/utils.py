@@ -15,7 +15,7 @@ import sys
 
 from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 from pydantic import UUID7
 
@@ -163,33 +163,6 @@ def get_user_config_dir(*, base_only: bool = False) -> Path:
     else:
         config_dir = Path(os.getenv("XDG_CONFIG_HOME", Path.home() / ".config"))
     return config_dir if base_only else config_dir / "codeweaver"
-
-
-def set_args_on_signature(
-    func: Callable[..., Any], /, **kwargs: object
-) -> tuple[tuple[object, ...], dict[str, object]]:
-    """Filter args and kwargs, and return them."""
-    import inspect
-
-    # Use inspect.signature(func) to respect __signature__ attribute for mocks
-    sig = inspect.signature(func)
-    all_kwargs = kwargs.copy()
-    if "self" in all_kwargs:
-        del all_kwargs["self"]
-    args, kwargs = (), {}
-    if arg_names := [
-        param.name
-        for param in sig.parameters.values()
-        if param.kind in (0, 2) and param.name != "self"
-    ]:
-        args = tuple(all_kwargs.get(arg) for arg in arg_names if arg in all_kwargs)
-    if kwarg_names := [
-        param.name
-        for param in sig.parameters.values()
-        if param.name not in arg_names and param.name != "self"
-    ]:
-        kwargs = {k: v for k, v in all_kwargs.items() if k in kwarg_names}
-    return args, kwargs
 
 
 __all__ = (
