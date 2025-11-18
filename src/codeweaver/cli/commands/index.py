@@ -45,7 +45,7 @@ async def _check_server_health() -> bool:
 
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get("http://localhost:9328/health/", timeout=2.0)
+            response = await client.get(f"{_get_url()}/health", timeout=2.0)
     except (httpx.ConnectError, httpx.TimeoutException):
         return False
     else:
@@ -257,6 +257,15 @@ async def _handle_server_status(*, standalone: bool, display: StatusDisplay) -> 
     return True
 
 
+def _get_url():
+    from codeweaver.config.settings import get_settings_map
+
+    settings_map = get_settings_map()
+    host = settings_map.get("server.host", "localhost")
+    port = settings_map.get("server.port", 9328)
+    return f"http://{host}:{port}"
+
+
 def _check_and_print_server_status(display: StatusDisplay):
     display.print_success("Server is running")
     display.console.print()
@@ -265,7 +274,8 @@ def _check_and_print_server_status(display: StatusDisplay):
     display.console.print("  • File watcher monitors for changes in real-time")
     display.console.print()
     display.console.print("[cyan]To check indexing status:[/cyan]")
-    display.console.print("  curl http://localhost:9328/health/ | jq '.indexing'")
+    display.console.print("   cw status # view overall server and indexing status OR:")
+    display.console.print(f"  curl {_get_url()}/health | jq '.indexer'")
     display.console.print()
     display.console.print("[dim]Tip: Use --standalone to run indexing without the server[/dim]")
     return False
