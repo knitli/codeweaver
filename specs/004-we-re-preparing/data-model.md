@@ -21,7 +21,7 @@ This feature primarily deals with process orchestration and artifact management 
 **Description**: Project metadata embedded in distributions, defined in `pyproject.toml` following PEP 621
 
 **Fields**:
-- `name` (str, required): PyPI package name - "codeweaver-mcp"
+- `name` (str, required): PyPI package name - "codeweaver"
 - `version` (str, dynamic): Derived automatically by uv-versioning from git state
 - `description` (str, required): One-line package summary
 - `readme` (Path, required): Path to README.md for long description

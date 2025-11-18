@@ -120,7 +120,7 @@ Single project structure (per plan.md):
 
 **Goal**: User-facing documentation for installation and publishing
 
-- [X] **T022** [P] Update `README.md` with installation instructions - add `pip install codeweaver-mcp` example, PyPI badge, supported Python versions section
+- [X] **T022** [P] Update `README.md` with installation instructions - add `pip install codeweaver` example, PyPI badge, supported Python versions section
 
 - [X] **T023** [P] Create version workflow documentation in `docs/versioning.md` or `CONTRIBUTING.md` - explain git tagging workflow, changeset integration, version derivation from git state
 

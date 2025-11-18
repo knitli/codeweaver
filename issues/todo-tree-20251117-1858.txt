@@ -1,0 +1,89 @@
+└─ codeweaver
+   ├─ mise.toml
+   │  └─ line 71: TODO : We should combine the scripts/ and these tasks into the `mise-tasks` directory as standalone scripts.
+   ├─ cwdev.py
+   │  └─ line 11: TODO : The plan for this script is to make it an overall dev helper to do things like:
+   ├─ generate-delimiters.py
+   │  └─ line 19: TODO : I'm fairly sure we aren't using this anymore, and instead we construct them dynamically
+   ├─ doctor.py
+   │  └─ line 598: TODO : Unblock when these provider types are fully supported
+   ├─ index.py
+   │  └─ line 66: TODO : Add admin endpoint in future for manual re-index trigger
+   ├─ provider.py
+   │  └─ line 119: TODO : We need to allow for dynamic providers in the future, we would check if there's a provider class registered for the value, then register the provider here with `cls.add_member("NEW_PROVIDER", "new_provider")`.
+   ├─ services.py
+   │  └─ line 34: TODO register default services
+   ├─ statistics.py
+   │  └─ line 688: TODO : We'd ideally want to make sure these are pushed to the indexer, unless we receive these in the same action
+   ├─ normalize.py
+   │  ├─ line 27: TODO : Add Rebuff.ai integration, and/or other advanced sanitization options. Probably as middleware.
+   │  └─ line 61: TODO : Need to add a mechanism to override or customize the injection patterns.
+   ├─ textify.py
+   │  └─ line 8: TODO : Integrate into the delimiter based chunker.
+   ├─ logging.py
+   │  └─ line 107: TODO : Once they become more available, we should use `raw template strings` here
+   ├─ mcp.py
+   │  └─ line 70: TODO : add icon
+   ├─ providers.py
+   │  └─ line 47: TODO : Convert provider TypedDicts to Pydantic models. That gives us: 1) automatic env variables for free (pydantic-settings), 2) better validation, 3) Flexibility to put more validation, default, and other logic in the models.
+   ├─ settings.py
+   │  └─ line 328: TODO : flatten the config structure. It's a bit too much when using env vars for nested models, particularly for provider settings.
+   ├─ types.py
+   │  ├─ line 54: TODO : Replace most defaults with Unset, to better track user-set vs default values. We just need to ensure we don't pass Unset to places that don't accept it. I'm not sure what the best way to do that is yet. My thought is that we could possibly modify pydantic serialization to convert Unset to None or missing values, but *not* do that for telemetry serialization.
+   │  └─ line 170: TODO : We should add hot reload, but we need to manage handling it mid-request.
+   ├─ discovery.py
+   │  ├─ line 165: TODO : Use ast() to compute hash for semantic files
+   │  └─ line 182: TODO : A better approach for files that we can semantically analyze is to hash the AST or structure instead of the raw file contents and compare those.
+   ├─ language.py
+   │  ├─ line 365: TODO : Validate the `dependency_key_paths` for each config file to ensure they are correct. If you use these languages, please let us know if you find any issues with the `dependency_key_paths` in the config files. Some are probably incorrect.
+   │  └─ line 1493: TODO : Integrate into indexing and search services to use these languages.
+   ├─ metadata.py
+   │  ├─ line 111: TODO : Logic for symbol extraction from AST nodes
+   │  └─ line 696: TODO : Add DevTool class -- probably in a separate module -- to capture common developer tooling file types, language associations, function/purpose, etc.
+   ├─ enum.py
+   │  └─ line 39: TODO : For our larger enums with lots of property methods, like `SemanticSearchLanguage`, it probably makes sense to define it as an enum with type `dataclass` members, where most of the properties are defined on the dataclass, and the enum just holds instances of that dataclass. This would make it easier to manage and extend the enum members. See https://docs.python.org/3/howto/enum.html#dataclass-support. This would also make it easier to add new members without having to add the member to the enum methods themselves. Since attributes and properties are accessed the same way, we could do this without it being a breaking change. Classes that would benefit from this treatment:
+   ├─ delimiter.py
+   │  └─ line 1237: TODO : Implement proper conversion when delimiter families are integrated
+   ├─ registry.py
+   │  ├─ line 32: TODO : Make size_limit configurable by users in settings.
+   │  ├─ line 34: TODO : Should we make `EmbeddingRegistry`'s size dynamic based on conditions? For example, if we are getting service errors from the vector store, we could increase the size_limit temporarily as a queue.
+   │  └─ line 36: TODO : Save the store to disk to persist across restarts. Ideally we'd use a contextmanager to load/save the store automatically. The parent class, `SimpleTypedStore` already has `load` and `save` methods we could leverage.
+   ├─ selector.py
+   │  └─ line 161: TODO : Consider returning a NullChunker or raising FileTooLargeError
+   ├─ semantic.py
+   │  ├─ line 141: TODO : Make importance_threshold configurable via governor
+   │  └─ line 708: TODO : Implement proper token estimation
+   ├─ indexer.py
+   │  ├─ line 16: TODO : register with services registry
+   │  ├─ line 117: TODO : This should probably come from the services registry but that's not fully implemented yet
+   │  └─ line 1559: TODO : Implement persistence loading from vector store.
+   ├─ capabilities.py
+   │  ├─ line 25: TODO : Add more vector providers as they are supported.
+   │  └─ line 27: TODO : The vector provider capabilities aren't what they need to be.... it needs to be things like sparse vectors, quantization, etc.
+   ├─ base.py
+   │  └─ line 116: TODO : We need to handle the case where the first chunk is larger than the max_input.
+   ├─ fastembed_extensions.py
+   │  └─ line 92: TODO : Temporarily disabled until we can work out the bugs on added sparse models in Fastembed.
+   ├─ mistral.py
+   │  └─ line 33: TODO : Add support for batch jobs. Ideal for most usage, but becomes more difficult to manage state.
+   ├─ openai_factory.py
+   │  └─ line 315: TODO : Add LiteLLM, Cerebras
+   ├─ __init__.py
+   │  └─ line 41: TODO : Implement the same system we have for Embedding models
+   ├─ inmemory.py
+   │  └─ line 164: TODO : this should be a CollectionMetadata instance
+   ├─ qdrant_base.py
+   │  └─ line 366: TODO : Convert Filter to Qdrant filter when needed
+   ├─ ast_grep.py
+   │  └─ line 446: TODO : This is clearly not the right answer... this can't be hard -- many libraries use tree-sitter to identify symbols. Needs research.
+   ├─ health_service.py
+   │  ├─ line 160: TODO : Track current file in Indexer
+   │  ├─ line 228: TODO : Add ping/health check method to vector store providers
+   │  └─ line 276: TODO : Add actual latency tracking to providers
+   ├─ server.py
+   │  └─ line 166: TODO : These can all be boolean but need to differentiate from defaults vs set values
+   ├─ test_find_code_contract.py
+   │  ├─ line 380: TODO : Add validation in find_code to enforce min=1000, max=100000
+   │  └─ line 389: TODO : Add validation in find_code to enforce min=1, max=100
+   └─ test_model_switch.py
+      └─ line 86: TODO : This isn't testing the correct thing. The warning should raise if the *embedding provider changes but the model doesn't*

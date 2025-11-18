@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 # sourcery skip: no-complex-if-expressions
 """Defines a base class for the Qdrant and In Memory Qdrant vector stores to reduce code duplication."""
 
@@ -297,10 +302,10 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                     "collection": collection_name,
                     "actual_dimension": actual_dense.size,
                     "expected_dimension": expected_dense.size,
-                    "resolution_command": "codeweaver index --clear",
+                    "resolution_command": "cw index --clear",
                 },
                 suggestions=[
-                    "  1. Rebuild the collection: codeweaver index --clear",
+                    "  1. Rebuild the collection: cw index --clear",
                     "  2. Or revert to the embedding model and settings that created this collection",
                 ],
             )
@@ -324,7 +329,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                         "Collection '%s' uses %s distance metric "
                         "but current configuration specifies %s. "
                         "Search results may differ from expectations. "
-                        "Consider rebuilding: codeweaver index --clear",
+                        "Consider rebuilding: cw index --clear",
                         collection_name,
                         actual_dense.distance.value,
                         expected_dense.distance.value,

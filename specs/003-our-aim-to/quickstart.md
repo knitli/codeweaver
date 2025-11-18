@@ -23,8 +23,8 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/knitli/codeweaver-mcp.git
-cd codeweaver-mcp
+git clone https://github.com/knitli/codeweaver.git
+cd codeweaver
 ```
 
 ### 2. Set Up Environment
@@ -366,7 +366,7 @@ curl http://localhost:9328/health/ | jq '.status, .services.embedding_provider'
 # Point CodeWeaver at itself
 cat > codeweaver.toml <<EOF
 [codeweaver]
-project_path = "."  # Current directory (codeweaver-mcp)
+project_path = "."  # Current directory (codeweaver)
 EOF
 
 # Start server

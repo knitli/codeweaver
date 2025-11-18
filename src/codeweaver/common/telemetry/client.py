@@ -113,7 +113,7 @@ class PostHogClient:
             except ImportError:
                 self.logger.warning(
                     "PostHog package not installed, telemetry disabled. "
-                    "Install with: uv pip install 'codeweaver-mcp[recommended]'"  # type: ignore
+                    "Install with: uv pip install 'codeweaver[recommended]'"  # type: ignore
                 )
                 self.enabled = False
                 self._client = None

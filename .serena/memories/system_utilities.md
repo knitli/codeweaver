@@ -112,7 +112,7 @@ git root                # Show repository root path
 
 ### Auto-Configured (mise.toml)
 - `GH_REPO` - Repository path (config_root)
-- `PROJECT_NAME` - "codeweaver-mcp"
+- `PROJECT_NAME` - "codeweaver"
 - `CODEWEAVER_PROJECT_PATH` - Project root path
 - `CODEWEAVER_VERSION` - Current version from _version.py
 - `CI` - "true" in GitHub Actions, "false" otherwise
@@ -305,7 +305,7 @@ free -h                 # Memory usage
 - WSL2 filesystem is faster for Linux operations
 - Windows filesystem access (`/mnt/c/`) is slower
 - Keep development files in WSL filesystem for best performance
-- Default project path: `/home/knitli/codeweaver-mcp`
+- Default project path: `/home/knitli/codeweaver`
 
 ### Resource Limits
 - WSL2 defaults: 50% of total memory, 8 logical processors

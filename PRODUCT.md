@@ -661,7 +661,7 @@ Open questions/decisions on measurement:
 
 **Step 3: Installation** (3 minutes)
 ```bash
-uv pip install "codeweaver-mcp[recommended]"
+uv pip install "codeweaver[recommended]"
 ```
 - Installs successfully with clear progress indicators
 - Receives setup guidance for API keys (if needed)
@@ -816,8 +816,8 @@ User's AI agent gives accurate, context-aware answer to question about unfamilia
 
 ## Contact & Resources
 
-**Product Feedback**: https://github.com/knitli/codeweaver-mcp/discussions
-**Bug Reports**: https://github.com/knitli/codeweaver-mcp/issues
+**Product Feedback**: https://github.com/knitli/codeweaver/discussions
+**Bug Reports**: https://github.com/knitli/codeweaver/issues
 **Knitli Home**: https://knitli.com
 **Documentation**: https://dev.knitli.com/codeweaver (coming soon)
 **Community**: [Email me](mailto:adam@knit.li)!

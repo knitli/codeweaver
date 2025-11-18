@@ -735,7 +735,7 @@ class Category(BasedModel):
             SemanticSearchLanguage.YAML,
         ):
             logger.warning(
-                """Something doesn't look right here. You provided %s and that language has no Categories. We're going to let it go because the grammar could have changed. Please submit an issue at https://github.com/knitli/codeweaver-mcp/issues/ to let us look into it more deeply.""",
+                """Something doesn't look right here. You provided %s and that language has no Categories. We're going to let it go because the grammar could have changed. Please submit an issue at https://github.com/knitli/codeweaver/issues/ to let us look into it more deeply.""",
                 value.variable,
             )
         return value

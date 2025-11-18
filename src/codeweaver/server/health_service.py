@@ -200,7 +200,7 @@ class HealthService:
                 suggestions=[
                     "Ensure a vector store provider is configured in your settings.",
                     "Check that the provider settings are correct and the provider is reachable.",
-                    "If the issue persists, please submit an issue: https://github.com/knitli/codeweaver-mcp/issues/new",
+                    "If the issue persists, please submit an issue: https://github.com/knitli/codeweaver/issues/new",
                 ],
             )
 

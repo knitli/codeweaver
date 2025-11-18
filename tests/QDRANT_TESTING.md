@@ -554,4 +554,4 @@ For issues with Qdrant testing:
 2. Review test logs: `pytest tests/contract/test_qdrant_provider.py -vv -s`
 3. Verify Qdrant health: `curl http://localhost:6333/health`
 4. Check this guide's troubleshooting section
-5. Open issue at https://github.com/knitli/codeweaver-mcp/issues
+5. Open issue at https://github.com/knitli/codeweaver/issues

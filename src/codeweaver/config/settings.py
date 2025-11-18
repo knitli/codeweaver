@@ -445,7 +445,7 @@ class CodeWeaverSettings(BaseSettings):
     default_mcp_config: Annotated[
         MCPServerConfig | Unset,
         Field(
-            description="""Default MCP server configuration for mcp clients. Setting this makes it quick and easy to add codeweaver to any mcp.json file using `codeweaver init`. Defaults to a streamable-http CodeWeaver server at `http://127.0.0.1:9328`. We strongly recommend using streamable-http instead of stdio for a better experience.""",
+            description="""Default MCP server configuration for mcp clients. Setting this makes it quick and easy to add codeweaver to any mcp.json file using `cw init`. Defaults to a streamable-http CodeWeaver server at `http://127.0.0.1:9328`. We strongly recommend using streamable-http instead of stdio for a better experience.""",
             validate_default=False,
         ),
     ] = UNSET

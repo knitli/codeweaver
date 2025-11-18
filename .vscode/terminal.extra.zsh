@@ -19,7 +19,7 @@ full_setup() {
 
 # Make sure Mise is installed and available
 print -P "%F{209}[codeweaver]%f Welcome to the%f %F{209}CodeWeaver%f development environment!"
-print -P "%F{209}[codeweaver]%f If you run into any issues, please visit %F{cyan}https://github.com/knitli/codeweaver-mcp/issues%f for assistance."
+print -P "%F{209}[codeweaver]%f If you run into any issues, please visit %F{cyan}https://github.com/knitli/codeweaver/issues%f for assistance."
 print -P "%F{209}[codeweaver]%f We're going to set up your environment now..."
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
 cd "$REPO_ROOT" || {

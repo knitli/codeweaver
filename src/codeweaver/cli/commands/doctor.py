@@ -152,7 +152,7 @@ def check_required_dependencies() -> DoctorCheck:
     missing: list[str] = []
     _installed: list[tuple[str, str]] = []
 
-    if our_dependencies := metadata.metadata("codeweaver-mcp").get_all("Requires-Dist") or []:
+    if our_dependencies := metadata.metadata("codeweaver").get_all("Requires-Dist") or []:
         missing, _installed = _check_required_dependencies(
             our_dependencies, package_to_module_map, metadata
         )
@@ -161,8 +161,8 @@ def check_required_dependencies() -> DoctorCheck:
         "fail" if missing else "success",
         f"Missing packages: {', '.join(missing)}" if missing else "All required packages installed",
         [
-            "Run: uv pip install codeweaver-mcp[full]",
-            "Or: pip install codeweaver-mcp[full]",
+            "Run: uv pip install codeweaver[full]",
+            "Or: pip install codeweaver[full]",
             f"Missing: {', '.join(missing)}",
         ]
         if missing
@@ -282,8 +282,8 @@ def check_configuration_file(settings: CodeWeaverSettings | None = None) -> Doct
             check.message = "No config file (using defaults or environment variables)"
             check.suggestions = [
                 "Create your config file for custom configuration",
-                "Run: codeweaver config --generate",
-                "Or: codeweaver init",
+                "Run: cw init config",
+                "Or: cw init",
             ]
 
     except ValidationError as e:
@@ -323,11 +323,17 @@ async def _qdrant_running_at_url(url: Any | None = None) -> bool:
 
     import httpx
 
+    # Ensure URL has protocol
+    if url:
+        url_str = str(url)
+        if not url_str.startswith(("http://", "https://")):
+            url_str = f"http://{url_str}"
+    else:
+        url_str = "http://127.0.0.1:6333"
+
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{str(url) or 'http://127.0.0.1:6333'}/metrics", timeout=2.0
-            )
+            response = await client.get(f"{url_str}/metrics", timeout=2.0)
     except (httpx.ConnectError, httpx.TimeoutException):
         return False
     else:
@@ -351,7 +357,7 @@ async def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
             check.name,
             "warn",
             "No vector store configured",
-            ["Run: codeweaver config init to set up a vector store"],
+            ["Run: cw config init to set up a vector store"],
         )
 
     vector_config = (
@@ -639,8 +645,8 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
                             "Package not installed",
                             [
                                 f"Install extra dependencies for {provider.as_title}",
-                                "Run: uv pip install codeweaver-mcp[full]",
-                                "Or: pip install codeweaver-mcp[full]",
+                                "Run: uv pip install codeweaver[full]",
+                                "Or: pip install codeweaver[full]",
                             ],
                         )
                     )

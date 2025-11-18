@@ -103,7 +103,7 @@ Building with uncommitted changes appends `.dirty` suffix.
 To test publishing without affecting production:
 1. Go to GitHub Actions
 2. Run "Publish to TestPyPI" workflow manually
-3. Package published to https://test.pypi.org/project/codeweaver-mcp/
+3. Package published to https://test.pypi.org/project/codeweaver/
 
 ## Version Configuration
 
@@ -180,12 +180,12 @@ git push origin v0.1.1
 **Alpha** (`-alpha.N`): Robust infrastructure, not heavily tested
 - Signals "feature-complete but not battle-tested"
 - Sets appropriate expectations for early testers
-- Users must explicitly install: `pip install --pre codeweaver-mcp`
+- Users must explicitly install: `pip install --pre codeweaver`
 
 **Beta** (`-beta.N`): Feature complete, undergoing testing
 - Signals "mostly stable, finding edge cases"
 - Ready for broader testing audience
-- Users must explicitly install: `pip install --pre codeweaver-mcp`
+- Users must explicitly install: `pip install --pre codeweaver`
 
 **Release Candidate** (`-rc.N`): Final testing before release
 - Signals "production-ready pending final validation"
@@ -198,16 +198,16 @@ Users who want to test alpha/beta versions must explicitly opt-in:
 
 ```bash
 # Install latest pre-release (alpha, beta, or rc)
-pip install --pre codeweaver-mcp
+pip install --pre codeweaver
 
 # Install specific alpha version
-pip install codeweaver-mcp==0.1.0a1
+pip install codeweaver==0.1.0a1
 
 # Upgrade to latest pre-release
-pip install --pre --upgrade codeweaver-mcp
+pip install --pre --upgrade codeweaver
 ```
 
-By default, `pip install codeweaver-mcp` will **not** install pre-releases.
+By default, `pip install codeweaver` will **not** install pre-releases.
 
 ## Integration with Changesets
 

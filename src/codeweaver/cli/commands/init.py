@@ -33,7 +33,6 @@ from codeweaver.exceptions import CodeWeaverError
 
 
 if TYPE_CHECKING:
-    import httpx  # Used in type hints only
     from codeweaver.cli.ui import StatusDisplay
     from codeweaver.config.mcp import CodeWeaverMCPConfig, StdioCodeWeaverConfig
 
@@ -48,6 +47,7 @@ def _lazy_import_httpx() -> None:
     but we maintain the lazy import pattern in our code.
     """
     import httpx  # noqa: F401
+
 
 _display: StatusDisplay = get_display()
 
@@ -347,7 +347,7 @@ def _create_stdio_config(
     from codeweaver.config.mcp import StdioCodeWeaverConfig
 
     # Build the command - CodeWeaver doesn't need uv environment
-    # We directly execute: codeweaver server --transport stdio
+    # We directly execute: cw server --transport stdio
     command = cmd or "codeweaver"
     command_args = args or ["server", "--transport", "stdio"]
 
@@ -469,7 +469,7 @@ def _handle_write_output(
             # Create new empty config
             config_file = MCPConfig.model_validate({"mcpServers": {}})
 
-        # Add/update codeweaver server in the config
+        # Add/update cw server in the config
         # The config_file should have an mcpServers dict we can update
         serialized_config = config_file.model_dump(exclude_none=True)
         if "mcpServers" not in serialized_config:
@@ -638,7 +638,7 @@ def mcp(
     - `stdio`: Standard input/output transport that launches CodeWeaver per-session
 
     **Tip**: Set a default MCP config in your CodeWeaver config, then just run
-    `codeweaver init mcp --client your_client` to generate the config for that client.
+    `cw init mcp --client your_client` to generate the config for that client.
 
     Args:
         client: MCP client to configure (claude_code, claude_desktop, cursor, vscode, mcpjson)
@@ -765,7 +765,7 @@ def init(
 
     This command sets up both the CodeWeaver configuration file and the MCP client configuration
     in one step. It does not expose all available options; if you want more control, use the
-    `codeweaver init config` and `codeweaver init mcp` commands directly.
+    `cw init config` and `cw init mcp` commands directly.
 
     By default, creates both CodeWeaver config and MCP client config.
     Use --config-only or --mcp-only to create just one.
@@ -775,7 +775,7 @@ def init(
     This means:
     - Single server instance shared across all clients
     - Background indexing persists between client sessions
-    - Server must be started separately: `codeweaver server`
+    - Server must be started separately: `cw server`
 
     You can use --transport stdio if you prefer per-session server instances.
 
@@ -795,12 +795,12 @@ def init(
         force: Overwrite existing configurations
 
     Examples:
-        codeweaver init --quickstart         # Full setup with quickstart profile (free/offline)
-        codeweaver init                      # Full setup with recommended profile
-        codeweaver init --config-only        # Just config file
-        codeweaver init --mcp-only           # Just MCP client config
-        codeweaver init --client cursor      # Setup for Cursor
-        codeweaver init --transport stdio    # Use stdio transport (not recommended)
+        cw init --quickstart         # Full setup with quickstart profile (free/offline)
+        cw init                      # Full setup with recommended profile
+        cw init --config-only        # Just config file
+        cw init --mcp-only           # Just MCP client config
+        cw init --client cursor      # Setup for Cursor
+        cw init --transport stdio    # Use stdio transport (not recommended)
     """
     display = _display
     error_handler = CLIErrorHandler(display)
@@ -877,7 +877,7 @@ def init(
         display.print_list(
             [
                 "Set VOYAGE_API_KEY environment variable:\n    [dim]export VOYAGE_API_KEY='your-api-key'[/dim]",
-                "Start the server: [dim]codeweaver server[/dim]",
+                "Start the server: [dim]cw server[/dim]",
                 "Test with a query: [dim]codeweaver search 'authentication configuration'[/dim]",
             ],
             title="Next Steps:",
@@ -912,11 +912,11 @@ def init(
         [
             "We recommend you start and run CodeWeaver while you code, whether you are using MCP clients or not.",
             "You can use a tool like `mise` to automatically start CodeWeaver when you enter your project directory.",
-            "Or, just get in the habit of running `codeweaver server` in a terminal tab when you start coding.",
+            "Or, just get in the habit of running `cw server` in a terminal tab when you start coding.",
             "You can use CodeWeaver to search your codebase outside of an MCP client with `codeweaver search`",
-            "Check status with `codeweaver status`",
+            "Check status with `cw status`",
             "To check your config setup, run `codeweaver doctor`",
-            "[red]CodeWeaver is in Alpha. There are bugs.[/red] Help us by reporting them: https://github.com/knitli/codeweaver-mcp/issues",
+            "[red]CodeWeaver is in Alpha. There are bugs.[/red] Help us by reporting them: https://github.com/knitli/codeweaver/issues",
         ],
         title="Tips for Best Experience:",
     )

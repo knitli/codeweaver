@@ -5,7 +5,7 @@
 #:tombi schema.strict = false
 
 [project]
-name = "codeweaver-mcp"
+name = "codeweaver"
 description = "Extensible MCP server for semantic code search with plugin architecture supporting multiple embedding providers, vector databases, and data sources."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.12"
@@ -138,11 +138,11 @@ dependencies = [
 dynamic = ["version"]
 
 [project.urls]
-Changelog = "https://github.com/knitli/codeweaver-mcp/blob/main/CHANGELOG.md"
+Changelog = "https://github.com/knitli/codeweaver/blob/main/CHANGELOG.md"
 # Documentation = "https://dev.knitli.com/codeweaver" not live yet
 Homepage = "https://knitli.com"
-Issues = "https://github.com/knitli/codeweaver-mcp/issues"
-Repository = "https://github.com/knitli/codeweaver-mcp"
+Issues = "https://github.com/knitli/codeweaver/issues"
+Repository = "https://github.com/knitli/codeweaver"
 
 [project.scripts]
 codeweaver = "codeweaver.cli.__main__:main"

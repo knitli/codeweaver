@@ -48,7 +48,7 @@ Create a reliable, reproducible build and publishing system for CodeWeaver v0.1.
 **Project Type**: single (Python package library)
 **Performance Goals**: Build completion in "reasonable time" (baseline to be measured during research, optimization targets TBD)
 **Constraints**: Must integrate with existing uv-versioning (automatic per-commit versions), must integrate with existing changeset workflow, must use GitHub Actions OAuth trusted publishing (already configured), CI testing must pass on Python 3.12-3.14 before publication allowed
-**Scale/Scope**: Single package (codeweaver-mcp), initial v0.1.0 release, support for automated releases on tagged commits
+**Scale/Scope**: Single package (codeweaver), initial v0.1.0 release, support for automated releases on tagged commits
 
 ## Constitution Check
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*

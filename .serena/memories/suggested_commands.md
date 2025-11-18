@@ -144,7 +144,7 @@ mise run add-plaintext-to-codeblock     # Fix markdown code blocks
 
 ### Starting Development
 ```bash
-cd /path/to/codeweaver-mcp
+cd /path/to/codeweaver
 mise run activate       # Activate environment (automatic on cd if mise hook enabled)
 ```
 

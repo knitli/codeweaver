@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # Test Suite Investigation Report
 **Date**: 2025-11-14
 **Total Tests**: 628
@@ -51,7 +58,7 @@ Location: qdrant_client/local/local_collection.py:2367 in _add_point
 2. **Option B**: Update Qdrant collection config to use 768 dimensions
 3. **Option C**: Add explicit dimension configuration parameter to test fixtures
 
-**Implementation**: Modify `/home/knitli/codeweaver-mcp/tests/contract/test_memory_provider.py` fixture at line ~47
+**Implementation**: Modify `/home/knitli/codeweaver/tests/contract/test_memory_provider.py` fixture at line ~47
 
 ---
 
@@ -93,7 +100,7 @@ ERROR - codeweaver.exceptions.ProviderError: Qdrant client is not initialized
 3. Verify fixture cleanup/teardown properly closes client
 4. Consider using `pytest.mark.asyncio` fixture scope management
 
-**Implementation**: Modify `/home/knitli/codeweaver-mcp/tests/contract/test_qdrant_provider.py` fixture setup
+**Implementation**: Modify `/home/knitli/codeweaver/tests/contract/test_qdrant_provider.py` fixture setup
 
 ---
 
@@ -135,7 +142,7 @@ tests/integration/real/test_full_pipeline.py::test_incremental_indexing_updates_
 - Align embedding dimensions across all test fixtures (768 vs 1024)
 
 **Secondary Fixes**:
-1. **Tokenizer Issue**: Fix generator-to-sequence conversion in `/home/knitli/codeweaver-mcp/src/codeweaver/tokenizers/tokenizers.py:57`
+1. **Tokenizer Issue**: Fix generator-to-sequence conversion in `/home/knitli/codeweaver/src/codeweaver/tokenizers/tokenizers.py:57`
    - Convert generator to list: `list(self._to_string(txt) for txt in texts)`
 
 2. **System Time Warning**: This is a WSL environment issue, can be ignored for tests but note in CI/CD docs
@@ -203,7 +210,7 @@ tests/benchmark/chunker/test_performance.py::TestChunkerPerformance::test_large_
 ## Code Bugs Documented (Separate Attention Needed)
 
 ### Bug #1: Tokenizer Generator Conversion
-**Location**: `/home/knitli/codeweaver-mcp/src/codeweaver/tokenizers/tokenizers.py:57`
+**Location**: `/home/knitli/codeweaver/src/codeweaver/tokenizers/tokenizers.py:57`
 **Issue**: Passing generator to function expecting Sequence
 **Fix**: Convert generator to list
 ```python

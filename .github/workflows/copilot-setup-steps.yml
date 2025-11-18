@@ -64,8 +64,8 @@ jobs:
         run: |
           current_dir="$(pwd)"
           subdirs="$(ls -d */ 2>/dev/null || echo '')"
-          if [[ "$current_dir" != *codeweaver-mcp && "$current_dir" =~ $subdirs ]]; then
-            cd codeweaver-mcp
+          if [[ "$current_dir" != *codeweaver && "$current_dir" =~ $subdirs ]]; then
+            cd codeweaver
           fi
           echo "Mise setup in directory: $(pwd)"
           export MISE="$(which mise)"

@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 # Tasks: CodeWeaver v0.1 Release
 
-**Input**: Design documents from `/home/knitli/codeweaver-mcp/specs/003-our-aim-to/`
+**Input**: Design documents from `/home/knitli/codeweaver/specs/003-our-aim-to/`
 **Prerequisites**: plan.md ✅, research.md ✅, data-model.md ✅, contracts/ ✅, quickstart.md ✅
 **Baseline**: Core infrastructure exists, needs wiring and integration
 
@@ -1251,8 +1251,8 @@ async def test_reference_queries():
 **Quickstart Sections**:
 1. **Installation** (validated)
    ```bash
-   git clone https://github.com/knitli/codeweaver-mcp.git
-   cd codeweaver-mcp
+   git clone https://github.com/knitli/codeweaver.git
+   cd codeweaver
    uv sync --all-groups
    ```
 

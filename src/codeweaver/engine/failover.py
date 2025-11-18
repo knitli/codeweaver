@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Vector store failover management for backup activation and recovery.
 
 This module implements automatic failover to an in-memory backup vector store
@@ -381,7 +386,7 @@ class VectorStoreFailoverManager(BasedModel):
 
         logger.warning(
             "⚠️  BACKUP MODE ACTIVE - Search functionality will continue "
-            "with in-memory backup. Run 'codeweaver status' for details."
+            "with in-memory backup. Run 'cw status' for details."
         )
 
         # Notify client if context available

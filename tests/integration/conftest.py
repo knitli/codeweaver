@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import contextlib
+import time
 
 from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
@@ -967,12 +968,12 @@ def initialized_app_state(tmp_path: Path) -> Generator[Any, None, None]:
 
     # Initialize settings
     settings = get_settings()
-
     # Create AppState (this sets the global _state)
     state = AppState(
         initialized=True,
         settings=settings,
         project_path=tmp_path,
+        startup_time=time.time(),
         config_path=None,
         provider_registry=get_provider_registry(),
         services_registry=get_services_registry(),

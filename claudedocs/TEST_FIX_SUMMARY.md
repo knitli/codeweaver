@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # CLI Test Fix Summary
 
 ## Problem
@@ -15,11 +22,11 @@ CLI integration tests were failing with three main issues:
 Tests expected commands to raise `SystemExit` on success, but cyclopts commands only exit via `error_handler.handle_error()` on errors. Successful execution just returns.
 
 ### 3. Config File Location
-Tests weren't passing the `--project` parameter, so `init()` command called `resolve_project_root()` which returned cached settings from the codeweaver-mcp repo root instead of the test's temporary directory.
+Tests weren't passing the `--project` parameter, so `init()` command called `resolve_project_root()` which returned cached settings from the codeweaver repo root instead of the test's temporary directory.
 
 ## Solutions Implemented
 
-### File: `/home/knitli/codeweaver-mcp/tests/integration/conftest.py`
+### File: `/home/knitli/codeweaver/tests/integration/conftest.py`
 **Fix**: Updated `mock_confirm` fixture to patch module-level imports
 
 ```python
@@ -37,7 +44,7 @@ def mock_confirm(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     return mock
 ```
 
-### File: `/home/knitli/codeweaver-mcp/tests/integration/cli/test_init_workflows.py`
+### File: `/home/knitli/codeweaver/tests/integration/cli/test_init_workflows.py`
 **Fixes**:
 1. Removed `pytest.raises(SystemExit)` blocks from successful command executions
 2. Added `--project` parameter to all `init_app.parse_args()` calls

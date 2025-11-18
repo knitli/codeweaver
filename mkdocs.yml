@@ -7,8 +7,8 @@ site_name: CodeWeaver
 site_description: Codeweaver -- The MCP Context Platform -- Official Documentation
 site_author: Knitli Inc.
 site_url: https://docs.codeweaver.dev
-repo_url: https://github.com/knitli/codeweaver-mcp
-repo_name: knitli/codeweaver-mcp
+repo_url: https://github.com/knitli/codeweaver
+repo_name: knitli/codeweaver
 edit_uri: edit/main/docs/
 # Copyright and Legal
 copyright: |
@@ -251,7 +251,7 @@ extra:
           name: This page was helpful
           data: 1
           note: |-
-            Thanks for your feedback! Help us improve by <a href="https://github.com/knitli/codeweaver-mcp/issues/new/?title=[Docs]+{title}+-+{url}" target="_blank" rel="noopener">
+            Thanks for your feedback! Help us improve by <a href="https://github.com/knitli/codeweaver/issues/new/?title=[Docs]+{title}+-+{url}" target="_blank" rel="noopener">
 
 
               telling us what you found helpful
@@ -260,7 +260,7 @@ extra:
           name: This page could be improved
           data: 0
           note: |-
-            Thanks for your feedback! Help us improve by <a href="https://github.com/knitli/codeweaver-mcp/issues/new/?title=[Docs]+{title}+-+{url}" target="_blank" rel="noopener">
+            Thanks for your feedback! Help us improve by <a href="https://github.com/knitli/codeweaver/issues/new/?title=[Docs]+{title}+-+{url}" target="_blank" rel="noopener">
 
 
               telling us what we can do better
@@ -268,7 +268,7 @@ extra:
   # Social links
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/knitli/codeweaver-mcp
+      link: https://github.com/knitli/codeweaver
       name: GitHub Repository
     - icon: fontawesome/brands/python
       link: https://pypi.org/project/codeweaver/

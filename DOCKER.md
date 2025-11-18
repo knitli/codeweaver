@@ -25,22 +25,22 @@ If you're using the CodeWeaver Docker image from Docker Hub:
 
 ```bash
 # Download the example docker-compose.yml
-curl -O https://raw.githubusercontent.com/knitli/codeweaver-mcp/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/knitli/codeweaver/main/docker-compose.yml
 
 # Download the example .env file
-curl -O https://raw.githubusercontent.com/knitli/codeweaver-mcp/main/.env.example
+curl -O https://raw.githubusercontent.com/knitli/codeweaver/main/.env.example
 cp .env.example .env
 
 # Optional: Download and run the setup validator
-curl -O https://raw.githubusercontent.com/knitli/codeweaver-mcp/main/scripts/docker/validate-setup.sh
+curl -O https://raw.githubusercontent.com/knitli/codeweaver/main/scripts/docker/validate-setup.sh
 chmod +x validate-setup.sh
 ./validate-setup.sh
 ```
 
 Or if you've cloned the repository:
 ```bash
-git clone https://github.com/knitli/codeweaver-mcp.git
-cd codeweaver-mcp
+git clone https://github.com/knitli/codeweaver.git
+cd codeweaver
 cp .env.example .env
 
 # Optional: Validate your setup
@@ -490,8 +490,8 @@ docker stats codeweaver-server codeweaver-qdrant
 
 ## Support
 
-- **Issues:** [GitHub Issues](https://github.com/knitli/codeweaver-mcp/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/knitli/codeweaver-mcp/discussions)
+- **Issues:** [GitHub Issues](https://github.com/knitli/codeweaver/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/knitli/codeweaver/discussions)
 - **Documentation:** [Main README](README.md)
 
 ## Known Limitations

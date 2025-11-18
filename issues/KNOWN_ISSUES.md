@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # Known Issues
 
 ## Sparse-Only Vector Search Not Finding Results (ISSUE-001)
@@ -41,14 +48,14 @@ Sparse-only vector searches using Qdrant are returning 0 results even when match
 
 ### Code Locations
 
-- **Search implementation**: `/home/knitli/codeweaver-mcp/src/codeweaver/providers/vector_stores/qdrant_base.py`
+- **Search implementation**: `/home/knitli/codeweaver/src/codeweaver/providers/vector_stores/qdrant_base.py`
   - Query generation: `StrategizedQuery.to_query()` (lines 400-434)
   - Search execution: `_execute_search_query()` (lines 354-393)
   - Sparse vector preparation: `_prepare_vectors()` (lines 475-513)
 
 - **Test files**:
-  - `/home/knitli/codeweaver-mcp/tests/integration/test_hybrid_storage.py` (line 91)
-  - `/home/knitli/codeweaver-mcp/tests/integration/test_partial_embeddings.py` (line 76)
+  - `/home/knitli/codeweaver/tests/integration/test_hybrid_storage.py` (line 91)
+  - `/home/knitli/codeweaver/tests/integration/test_partial_embeddings.py` (line 76)
 
 ### Workarounds
 

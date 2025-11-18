@@ -142,7 +142,7 @@ class CollectionMetadata(BasedModel):
                     "suggestions": [
                         "Changing vector storage providers without changing models *may* be OK.",
                         "To ensure compatibility, consider re-indexing your codebase with the new provider.",
-                        "If you encounter issues, you may need to delete the existing collection and re-index. Run `codeweaver index` to re-index.",
+                        "If you encounter issues, you may need to delete the existing collection and re-index. Run `cw index` to re-index.",
                     ],
                 },
             )

@@ -1556,7 +1556,7 @@ class Indexer(BasedModel):
     async def initialize_from_vector_store(self) -> None:
         """Query vector store for indexed files on cold start.
 
-        TODO: Implement in T007/T008
+        TODO: Implement persistence loading from vector store.
         - Query vector store for all indexed chunks
         - Reconstruct file metadata store from chunk payloads
         - Populate self._store with DiscoveredFile objects

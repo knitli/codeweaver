@@ -35,7 +35,7 @@ All tests must pass on:
 Use TestPyPI to validate publishing before production:
 
 ### Manual Workflow Dispatch
-1. Go to [GitHub Actions](https://github.com/knitli/codeweaver-mcp/actions)
+1. Go to [GitHub Actions](https://github.com/knitli/codeweaver/actions)
 2. Select "Publish to TestPyPI" workflow
 3. Click "Run workflow"
 4. Select branch
@@ -46,7 +46,7 @@ Use TestPyPI to validate publishing before production:
 1. (Optional) Runs tests on Python 3.12, 3.13, 3.14
 2. Builds package with current version
 3. Validates with `twine check`
-4. Publishes to https://test.pypi.org/project/codeweaver-mcp/
+4. Publishes to https://test.pypi.org/project/codeweaver/
 
 ### Verifying TestPyPI Publish
 After workflow completes:
@@ -58,7 +58,7 @@ source /tmp/test-install/bin/activate
 # Install from TestPyPI
 pip install --index-url https://test.pypi.org/simple/ \
             --extra-index-url https://pypi.org/simple/ \
-            codeweaver-mcp
+            codeweaver
 
 # Verify
 python -c "import codeweaver; print(codeweaver.__version__)"
@@ -87,23 +87,23 @@ Production publishing is fully automated via git tags.
    - Runs tests on Python 3.12, 3.13, 3.14
    - Builds package
    - Validates metadata with `twine check`
-   - Publishes to https://pypi.org/project/codeweaver-mcp/
+   - Publishes to https://pypi.org/project/codeweaver/
    - Creates GitHub release with notes
 
 ### Monitoring Release
-Watch workflow at: https://github.com/knitli/codeweaver-mcp/actions/workflows/publish.yml
+Watch workflow at: https://github.com/knitli/codeweaver/actions/workflows/publish.yml
 
 ### Verifying PyPI Publish
 After workflow completes:
 ```bash
 # Install from PyPI
-pip install codeweaver-mcp==0.1.0
+pip install codeweaver==0.1.0
 
 # Verify
 python -c "import codeweaver; print(codeweaver.__version__)"
 ```
 
-Check package page: https://pypi.org/project/codeweaver-mcp/0.1.0/
+Check package page: https://pypi.org/project/codeweaver/0.1.0/
 
 ## Workflow Details
 
@@ -240,7 +240,7 @@ If a broken version is published:
    ```
 
 2. **Yanking**: Mark version as "yanked" on PyPI (users can still install with `==version`)
-   - Go to https://pypi.org/manage/project/codeweaver-mcp/releases/
+   - Go to https://pypi.org/manage/project/codeweaver/releases/
    - Find the version
    - Click "Yank release"
    - Publish fixed version
@@ -256,7 +256,7 @@ If a broken version is published:
 
 ## Resources
 
-- PyPI Project: https://pypi.org/project/codeweaver-mcp/
-- TestPyPI Project: https://test.pypi.org/project/codeweaver-mcp/
-- GitHub Actions: https://github.com/knitli/codeweaver-mcp/actions
+- PyPI Project: https://pypi.org/project/codeweaver/
+- TestPyPI Project: https://test.pypi.org/project/codeweaver/
+- GitHub Actions: https://github.com/knitli/codeweaver/actions
 - Trusted Publishing Guide: https://docs.pypi.org/trusted-publishers/

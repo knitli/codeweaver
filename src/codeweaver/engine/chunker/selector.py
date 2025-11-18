@@ -246,14 +246,14 @@ class GracefulChunker(BaseChunker):
         Wrapping semantic chunker with delimiter fallback:
 
         >>> from codeweaver.engine.chunker.semantic import SemanticChunker
-        >>> # from codeweaver.engine.chunker.delimiter import DelimiterChunker  # TODO
+        >>> from codeweaver.engine.chunker.delimiter import DelimiterChunker
         >>>
         >>> primary = SemanticChunker(governor, SemanticSearchLanguage.PYTHON)
-        >>> # fallback = DelimiterChunker(governor, LanguageFamily.C_LIKE)  # TODO
-        >>> # chunker = GracefulChunker(primary, fallback)
+        >>> fallback = DelimiterChunker(governor, LanguageFamily.C_LIKE)
+        >>> chunker = GracefulChunker(primary, fallback)
         >>>
         >>> # This will try semantic first, fall back on error
-        >>> # chunks = chunker.chunk(content, file_path=path)
+        >>> chunks = chunker.chunk(content, file_path=path)
 
     Error Handling:
         - Catches all exceptions from primary chunker

@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Tests for vector store failover functionality."""
 
 import json
@@ -476,11 +481,14 @@ class TestSyncBackToPrimary:
 
         chunk = CodeChunk(
             content="test content",
-            line_range=Span(1, 10),
+            line_range=Span(1, 10, _source_id=uuid7()),
             file_path=PathlibPath("test.py"),
             chunk_id=uuid7(),
             metadata=Metadata(
-                chunk_id=uuid7(), created_at=datetime.now(UTC).timestamp(), line_start=1, line_end=10
+                chunk_id=uuid7(),
+                created_at=datetime.now(UTC).timestamp(),
+                line_start=1,
+                line_end=10,
             ),
         )
 
@@ -553,7 +561,9 @@ class TestSyncBackToPrimary:
         manager._primary_store = primary
 
         # Should raise due to open circuit
-        with pytest.raises(RuntimeError, match=r"Primary vector store's circuit breaker was not closed"):
+        with pytest.raises(
+            RuntimeError, match=r"Primary vector store's circuit breaker was not closed"
+        ):
             await manager._verify_primary_health()
 
     @pytest.mark.asyncio

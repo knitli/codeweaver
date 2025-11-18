@@ -89,7 +89,7 @@ class CodeMatch(BasedModel):
 
         The final relevance score, which is what this field represents, is a value between 0.0 and 1.0, where 1.0 indicates the highest relevance to the search query (screened results are normalized to 1, where 1 is the most relevant).
 
-        If you persistently have issues where a relevance score seems off or isn't returning quality results for a particular task, please [start a discussion](https://github.com/knitli/codeweaver-mcp/discussions) or [open an issue](https://github.com/knitli/codeweaver-mcp/issues). Results aren't perfect but we are going to try to get there!
+        If you persistently have issues where a relevance score seems off or isn't returning quality results for a particular task, please [start a discussion](https://github.com/knitli/codeweaver/discussions) or [open an issue](https://github.com/knitli/codeweaver/issues). Results aren't perfect but we are going to try to get there!
     """,
         ),
     ]
@@ -402,7 +402,7 @@ class StrategizedQuery(NamedTuple):
 
     def to_query(self, kwargs: dict[str, Any]) -> dict[str, FusionQuery | list[Prefetch] | Any]:
         """Convert to a query dict based on available embeddings.
-        
+
         For sparse-only queries, returns query_points parameters.
         For dense-only queries, returns search parameters.
         For hybrid queries, delegates to to_hybrid_query.
@@ -432,7 +432,7 @@ class StrategizedQuery(NamedTuple):
             assert self.dense is not None  # noqa: S101
             dense_vector = NamedVector(name="dense", vector=list(self.dense))
             return {"query_vector": dense_vector, **kwargs}
-        
+
         # Sparse-only: Use SparseVector with query_points API
         assert self.sparse is not None  # noqa: S101
         sparse_vector = SparseVector(

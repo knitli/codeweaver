@@ -1,9 +1,6 @@
-<!--
-SPDX-FileCopyrightText: 2025 Knitli Inc.
-SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-
-SPDX-License-Identifier: MIT OR Apache-2.0
--->
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+# SPDX-License-Identifier: MIT OR Apache-2.0
 
 # Build System Command Interface Contract
 
@@ -14,15 +11,15 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 ### Command: `uv build`
 
-**Purpose**: Create distributable package artifacts (wheel + sdist)
+"**Purpose**": Create distributable package artifacts (wheel + sdist)
 
-**Preconditions**:
+"**Preconditions**":
 - Repository is a valid Python project with `pyproject.toml`
-- `pyproject.toml` contains valid PEP 621 metadata
+- "`pyproject.toml` contains valid PEP 621 metadata"
 - Git repository is initialized (for version detection)
 - Build backend dependencies available (hatchling, uv-versioning)
 
-**Inputs** (Configuration):
+"**Inputs** (Configuration)":
 ```yaml
 pyproject.toml:
   build-system:
@@ -183,7 +180,7 @@ artifacts:
   - sdist: "{name}-{version}.tar.gz"
 
 metadata:
-  package_name: "codeweaver-mcp"
+  package_name: "codeweaver"
   version: string  # PEP 440 version from build
 ```
 
@@ -248,8 +245,8 @@ common_errors:
 ```
 
 **Postconditions** (Success):
-- Package visible on PyPI at `https://pypi.org/project/codeweaver-mcp/{version}/`
-- Both wheel and sdist installable via `pip install codeweaver-mcp=={version}`
+- Package visible on PyPI at `https://pypi.org/project/codeweaver/{version}/`
+- Both wheel and sdist installable via `pip install codeweaver=={version}`
 - Package metadata displayed correctly on PyPI project page
 - Installation works on Python 3.12, 3.13, 3.14
 

@@ -70,7 +70,7 @@ As an **end user**, I need access to stable, versioned releases on PyPI so that 
 
 ### Acceptance Scenarios
 1. **Given** a tagged release commit, **When** the build process is triggered, **Then** a distributable package is created containing all necessary source files and metadata
-2. **Given** a successfully built package, **When** uploaded to PyPI, **Then** the package is installable via `pip install codeweaver-mcp`
+2. **Given** a successfully built package, **When** uploaded to PyPI, **Then** the package is installable via `pip install codeweaver`
 3. **Given** multiple Python versions (3.12, 3.13, 3.14), **When** a user installs the package, **Then** the package works correctly on all supported versions
 4. **Given** an untagged commit, **When** building the package, **Then** the version is automatically derived as a per-commit pre-release version (e.g., "0.0.1rc295+gfc4f90a")
 5. **Given** pending changesets, **When** preparing a release, **Then** the version is coordinated with the changeset workflow

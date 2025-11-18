@@ -53,7 +53,14 @@ class TestInitConfigCommand:
     ) -> None:
         """Test `init config --profile recommended` creates correct config."""
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["config", "--profile", "recommended", "--force", "--project", str(temp_project)])
+            init_app([
+                "config",
+                "--profile",
+                "recommended",
+                "--force",
+                "--project",
+                str(temp_project),
+            ])
         capsys.readouterr()
 
         assert exc_info.value.code == 0
@@ -69,7 +76,14 @@ class TestInitConfigCommand:
     ) -> None:
         """Test `init config --profile quickstart` creates offline-capable config."""
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["config", "--profile", "quickstart", "--force", "--project", str(temp_project)])
+            init_app([
+                "config",
+                "--profile",
+                "quickstart",
+                "--force",
+                "--project",
+                str(temp_project),
+            ])
         capsys.readouterr()
 
         assert exc_info.value.code == 0
@@ -100,7 +114,11 @@ class TestInitCommand:
     """Tests for init command."""
 
     def test_init_creates_both_configs(
-        self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str], mock_confirm: MagicMock
+        self,
+        temp_project: Path,
+        temp_home: Path,
+        capsys: pytest.CaptureFixture[str],
+        mock_confirm: MagicMock,
     ) -> None:
         """Test init creates both CodeWeaver config and MCP config."""
         from codeweaver.cli.commands.init import _get_client_config_path
@@ -120,7 +138,11 @@ class TestInitCommand:
         assert mcp_config_path.exists()
 
     def test_config_only_flag(
-        self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str], mock_confirm: MagicMock
+        self,
+        temp_project: Path,
+        temp_home: Path,
+        capsys: pytest.CaptureFixture[str],
+        mock_confirm: MagicMock,
     ) -> None:
         """Test --config-only creates only CodeWeaver config."""
         from codeweaver.cli.commands.init import _get_client_config_path
@@ -140,7 +162,11 @@ class TestInitCommand:
         assert not mcp_config_path.exists()
 
     def test_mcp_only_flag(
-        self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str], mock_confirm: MagicMock
+        self,
+        temp_project: Path,
+        temp_home: Path,
+        capsys: pytest.CaptureFixture[str],
+        mock_confirm: MagicMock,
     ) -> None:
         """Test --mcp-only creates only MCP config."""
         from codeweaver.cli.commands.init import _get_client_config_path
@@ -294,7 +320,11 @@ class TestInitIntegration:
     """Tests for init command integration with other commands."""
 
     def test_init_integrates_with_config(
-        self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str], mock_confirm: MagicMock
+        self,
+        temp_project: Path,
+        temp_home: Path,
+        capsys: pytest.CaptureFixture[str],
+        mock_confirm: MagicMock,
     ) -> None:
         """Test init command integrates with config command."""
         # Init should create valid config
@@ -312,7 +342,11 @@ class TestInitIntegration:
         assert config_exc_info.value.code == 0
 
     def test_init_respects_existing_config(
-        self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str], mock_confirm: MagicMock
+        self,
+        temp_project: Path,
+        temp_home: Path,
+        capsys: pytest.CaptureFixture[str],
+        mock_confirm: MagicMock,
     ) -> None:
         """Test init respects existing configuration."""
         # Create existing config
@@ -346,7 +380,7 @@ class TestHelperFunctions:
 
         # Check required fields
         assert hasattr(config, "command")
-        assert config.command == "codeweaver server --transport stdio"
+        assert config.command == "cw server --transport stdio"
         assert config.type == "stdio"
 
     def test_create_stdio_config_with_custom_args(self) -> None:

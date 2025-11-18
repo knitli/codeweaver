@@ -76,7 +76,7 @@ source = "vcs"
 **Decision**: Define metadata in `[project]` table following PEP 621
 
 **Required Fields**:
-- `name`: Package name on PyPI (`codeweaver-mcp`)
+- `name`: Package name on PyPI (`codeweaver`)
 - `version`: Dynamic, managed by uv-versioning
 - `description`: Short one-line description
 - `readme`: Path to README.md (automatically included in distributions)

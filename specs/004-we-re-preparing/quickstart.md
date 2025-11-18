@@ -137,10 +137,10 @@ gh workflow run publish-test.yml
 **Validation**:
 ```bash
 # Visit TestPyPI package page
-# https://test.pypi.org/project/codeweaver-mcp/{version}/
+# https://test.pypi.org/project/codeweaver/{version}/
 
 # Verify metadata displayed correctly:
-# - Package name: codeweaver-mcp
+# - Package name: codeweaver
 # - Description matches README
 # - License: MIT OR Apache-2.0
 # - Supported Python versions: 3.12, 3.13, 3.14
@@ -152,7 +152,7 @@ source /tmp/test-testpypi/bin/activate
 
 pip install --index-url https://test.pypi.org/simple/ \
             --extra-index-url https://pypi.org/simple/ \
-            codeweaver-mcp=={version}
+            codeweaver=={version}
 
 python -c "import codeweaver; print(codeweaver.__version__)"
 
@@ -193,13 +193,13 @@ git push origin v0.1.0
 gh run list --workflow=publish.yml --limit=1
 
 # Visit PyPI package page
-# https://pypi.org/project/codeweaver-mcp/0.1.0/
+# https://pypi.org/project/codeweaver/0.1.0/
 
 # Test installation from PyPI
 python -m venv /tmp/test-pypi
 source /tmp/test-pypi/bin/activate
 
-pip install codeweaver-mcp==0.1.0
+pip install codeweaver==0.1.0
 
 python -c "import codeweaver; print(codeweaver.__version__)"
 
@@ -214,7 +214,7 @@ rm -rf /tmp/test-pypi
 **Success Criteria**:
 - ✅ GitHub Actions workflow succeeds
 - ✅ Package published to PyPI
-- ✅ Package installable via `pip install codeweaver-mcp`
+- ✅ Package installable via `pip install codeweaver`
 - ✅ Smoke tests pass
 - ✅ Version matches tag (e.g., `0.1.0`)
 

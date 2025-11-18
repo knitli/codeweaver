@@ -101,9 +101,9 @@ Configuration Error: Search failed: No embedding providers configured
 
 To fix this:
   • Set VOYAGE_API_KEY environment variable for cloud embeddings
-  • Or install local provider: pip install codeweaver-mcp[provider-fastembed]
+  • Or install local provider: pip install codeweaver[provider-fastembed]
   • Or configure fastembed in .codeweaver.toml
-  • See docs: https://github.com/knitli/codeweaver-mcp#configuration
+  • See docs: https://github.com/knitli/codeweaver#configuration
 ```
 
 **Note**: True keyword-only fallback (without embeddings) would require architectural changes and is deferred to v0.2.
@@ -179,7 +179,7 @@ Please run this command from within a git repository, or initialize one with: gi
 **Issue**: 
 ```python
 config_content = """# CodeWeaver Configuration
-# For more options, see: https://github.com/knitli/codeweaver-mcp
+# For more options, see: https://github.com/knitli/codeweaver
 ...
 """
 ```
@@ -193,7 +193,7 @@ This template string is created but never used. The code then calls `settings.sa
 
 **Severity**: MEDIUM  
 **Impact**: Noisy console output, will break in Pydantic v3  
-**File**: `/home/runner/work/codeweaver-mcp/codeweaver-mcp/.venv/lib/python3.12/site-packages/google/genai/types.py:9952`
+**File**: `/home/runner/work/codeweaver/codeweaver/.venv/lib/python3.12/site-packages/google/genai/types.py:9952`
 
 **Warning**:
 ```

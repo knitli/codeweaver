@@ -43,13 +43,13 @@ The telemetry module provides:
 Telemetry is included by default in the `recommended` install:
 
 ```bash
-uv pip install "codeweaver-mcp[recommended]"
+uv pip install "codeweaver[recommended]"
 ```
 
 Or opt-out with:
 
 ```bash
-uv pip install "codeweaver-mcp[recommended-no-telemetry]"
+uv pip install "codeweaver[recommended-no-telemetry]"
 ```
 
 ### Configuration

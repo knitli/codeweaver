@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # Test Suite Fixes - Summary Report
 **Date**: 2025-11-14
 **Investigation Time**: ~90 minutes
@@ -6,7 +13,7 @@
 ## Fixes Applied
 
 ### 1. Qdrant Client Initialization Bug (CODE BUG)
-**File**: `/home/knitli/codeweaver-mcp/src/codeweaver/providers/vector_stores/qdrant.py`
+**File**: `/home/knitli/codeweaver/src/codeweaver/providers/vector_stores/qdrant.py`
 **Lines**: 55-60
 **Status**: ✅ FIXED
 
@@ -47,7 +54,7 @@ return client
 ---
 
 ### 2. Tokenizer Generator-to-Sequence Conversion (CODE BUG)
-**File**: `/home/knitli/codeweaver-mcp/src/codeweaver/tokenizers/tokenizers.py`
+**File**: `/home/knitli/codeweaver/src/codeweaver/tokenizers/tokenizers.py`
 **Lines**: 55-57
 **Status**: ✅ FIXED
 

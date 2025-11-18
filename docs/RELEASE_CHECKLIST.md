@@ -67,10 +67,10 @@ SPDX-License-Identifier: MIT OR Apache-2.0
   - [ ] GitHub release created and marked as "pre-release"
 
 - [ ] **Verify PyPI Upload**
-  - [ ] Package appears on PyPI: https://pypi.org/project/codeweaver-mcp/
+  - [ ] Package appears on PyPI: https://pypi.org/project/codeweaver/
   - [ ] Version shows as `0.1.0a1`
   - [ ] README renders correctly on PyPI
-  - [ ] Installation works: `pip install --pre codeweaver-mcp`
+  - [ ] Installation works: `pip install --pre codeweaver`
 
 ### Post-Release
 

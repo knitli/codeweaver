@@ -8,7 +8,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 # Implementation Plan: CodeWeaver v0.1 Release
 
 **Branch**: `003-our-aim-to` | **Date**: 2025-10-27 | **Spec**: [spec.md](./spec.md)
-**Input**: Feature specification from `/home/knitli/codeweaver-mcp/specs/003-our-aim-to/spec.md`
+**Input**: Feature specification from `/home/knitli/codeweaver/specs/003-our-aim-to/spec.md`
 
 ## Execution Flow (/plan command scope)
 ```

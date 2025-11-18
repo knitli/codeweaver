@@ -100,7 +100,7 @@ persistence_format:
           - id: string
             vector:
               dense: list[float]
-              sparse: {indices: list[int], values: list[float]}
+              sparse: {indices: "list[int]", values: "list[float]"}
             payload: dict
   example: |
     {
@@ -111,7 +111,7 @@ persistence_format:
         "codeweaver_version": "0.1.0"
       },
       "collections": {
-        "codeweaver-mcp": {
+        "codeweaver": {
           "metadata": {
             "provider": "memory",
             "embedding_dim_dense": 768,
@@ -127,6 +127,7 @@ persistence_format:
         }
       }
     }
+
 
 persistence_operations:
   - name: _persist_to_disk

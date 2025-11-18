@@ -47,7 +47,7 @@ uv = "latest"
 
 [env]
 GH_REPO = "{{config_root}}"
-REMOTE_ORIGIN_URL = '''http://github.com/knitli/codeweaver-mcp.git'''
+REMOTE_ORIGIN_URL = '''http://github.com/knitli/codeweaver.git'''
 # Use the project name derived from the current directory
 PROJECT_NAME = "{{ config_root | basename }}"
 CODEWEAVER_PROJECT_PATH = '''{{ config_root }}'''

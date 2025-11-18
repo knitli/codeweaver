@@ -138,9 +138,13 @@ def _show_provider_config(provider_settings: ProviderSettingsDict) -> None:
         if kind not in valid_kinds or not configs or isinstance(configs, Unset):
             continue
 
-        # Normalize to tuple
-        config_list = configs if isinstance(configs, tuple) else (configs,)
-
+        # Normalize to tuple and filter out invalid elements
+        if isinstance(configs, tuple):
+            config_list = tuple(c for c in configs if c is not None and not isinstance(c, Unset))
+        else:
+            config_list = (
+                (configs,) if configs is not None and not isinstance(configs, Unset) else ()
+            )
         # Create table for this kind
         table = Table(
             title=f"{kind.replace('_', ' ').title()}", show_header=True, header_style="bold cyan"
@@ -150,6 +154,8 @@ def _show_provider_config(provider_settings: ProviderSettingsDict) -> None:
         table.add_column("Details", style="white")
 
         for config in config_list:
+            if config is None or isinstance(config, Unset):
+                continue
             provider = config.get("provider")
             enabled = config.get("enabled", True)
 

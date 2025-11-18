@@ -1,25 +1,30 @@
-project_path = "/home/knitli/codeweaver-mcp"
-project_name = "codeweaver-mcp"
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+project_path = "/home/knitli/codeweaver"
+project_name = "codeweaver"
 token_limit = 30000
 max_file_size = 1048576
 max_results = 75
 agent = [
-    { provider = "anthropic", enabled = true, model = "claude-haiku-4.5", model_settings = {} },
+  { provider = "anthropic", enabled = true, model = "claude-haiku-4.5", model_settings = {  } },
 ]
 data = [
-    { provider = "tavily", enabled = true },
-    { provider = "duckduckgo", enabled = true },
+  { provider = "tavily", enabled = true },
+  { provider = "duckduckgo", enabled = true },
 ]
 
 [provider]
 embedding = [
-    { provider = "voyage", enabled = true, model_settings = { model = "voyage-code-3" } },
+  { provider = "voyage", enabled = true, model_settings = { model = "voyage-code-3" } },
 ]
 reranking = [
-    { provider = "voyage", enabled = true, model_settings = { model = "voyage:rerank-2.5" } },
+  { provider = "voyage", enabled = true, model_settings = { model = "voyage:rerank-2.5" } },
 ]
 vector_store = [
-    { provider = "qdrant", enabled = true, provider_settings = {} },
+  { provider = "qdrant", enabled = true, provider_settings = {  } },
 ]
 
 [[provider.sparse_embedding]]
@@ -72,46 +77,46 @@ global_limit = true
 
 [indexer]
 forced_includes = [
-    "**/.vscode/**",
-    "**/.codeweaver/**",
-    "**/.github/prompts/**",
-    "**/.specify/memory/**",
-    "**/.yarn/**",
-    "**/.devcontainer/**",
-    "**/.cargo/**",
-    "**/.mcp.json/**",
-    "**/.idea/**",
-    "**/.serena/**",
-    "**/.roo/commands/**",
-    "**/.github/**",
-    "**/.ruff.toml/**",
-    "**/.stylelintrc.yml/**",
-    "**/.stylelintrc.json/**",
-    "**/.specify/templates/**",
-    "**/.husky/**",
-    "**/.continue/**",
-    "**/.changeset/**",
-    "**/.codex/**",
-    "**/.specify/scripts/bash/**",
-    "**/.cursor/**",
-    "**/.stylelintrc.yaml/**",
-    "**/.yarnrc/**",
-    "**/.typos.toml/**",
-    "**/.github/chatmodes/**",
-    "**/.roomodes/**",
-    "**/.pre-commit-config.yaml/**",
-    "**/.yarnrc.yml/**",
-    "**/.mvn/**",
-    "**/.specify/**",
-    "**/.husky/pre-push/**",
-    "**/.husky/pre-commit/**",
-    "**/.claude/commands/**",
-    "**/.npmrc/**",
-    "**/.pre-commit-config.yml/**",
-    "**/.roo/**",
-    "**/.moon/**",
-    "**/.claude/**",
-    "**/.stylelintrc/**",
+  "**/.vscode/**",
+  "**/.codeweaver/**",
+  "**/.github/prompts/**",
+  "**/.specify/memory/**",
+  "**/.yarn/**",
+  "**/.devcontainer/**",
+  "**/.cargo/**",
+  "**/.mcp.json/**",
+  "**/.idea/**",
+  "**/.serena/**",
+  "**/.roo/commands/**",
+  "**/.github/**",
+  "**/.ruff.toml/**",
+  "**/.stylelintrc.yml/**",
+  "**/.stylelintrc.json/**",
+  "**/.specify/templates/**",
+  "**/.husky/**",
+  "**/.continue/**",
+  "**/.changeset/**",
+  "**/.codex/**",
+  "**/.specify/scripts/bash/**",
+  "**/.cursor/**",
+  "**/.stylelintrc.yaml/**",
+  "**/.yarnrc/**",
+  "**/.typos.toml/**",
+  "**/.github/chatmodes/**",
+  "**/.roomodes/**",
+  "**/.pre-commit-config.yaml/**",
+  "**/.yarnrc.yml/**",
+  "**/.mvn/**",
+  "**/.specify/**",
+  "**/.husky/pre-push/**",
+  "**/.husky/pre-commit/**",
+  "**/.claude/commands/**",
+  "**/.npmrc/**",
+  "**/.pre-commit-config.yml/**",
+  "**/.roo/**",
+  "**/.moon/**",
+  "**/.claude/**",
+  "**/.stylelintrc/**",
 ]
 
 [chunker]

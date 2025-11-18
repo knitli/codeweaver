@@ -192,7 +192,7 @@ class AzureOpenAIProviderSettings(TypedDict, total=False):
 class FastembedGPUProviderSettings(TypedDict, total=False):
     """Special settings for Fastembed-GPU provider.
 
-    These settings only apply if you are using a Fastembed provider, installed the `codeweaver-mcp[provider-fastembed-gpu]` extra, have a CUDA-capable GPU, and have properly installed and configured the ONNX GPU runtime.
+    These settings only apply if you are using a Fastembed provider, installed the `codeweaver[provider-fastembed-gpu]` extra, have a CUDA-capable GPU, and have properly installed and configured the ONNX GPU runtime.
     You can provide these settings with your CodeWeaver embedding provider settings, or rerank provider settings. If you're using fastembed-gpu for both, we'll assume you are using the same settings for both if we find one of them.
     """
 
@@ -595,7 +595,7 @@ class ProviderSettings(BasedModel):
                 details={"vector_store": self.vector_store},
                 suggestions=[
                     "Configure a vector store in your CodeWeaver settings.",
-                    "If you got this error and *don't have blank settings in your config* (meaning they're provided and literally blank or None), please open an issue at https://github.com/knitli/codeweaver-mcp/issues/new",
+                    "If you got this error and *don't have blank settings in your config* (meaning they're provided and literally blank or None), please open an issue at https://github.com/knitli/codeweaver/issues/new",
                 ],
             )
         vectors = (

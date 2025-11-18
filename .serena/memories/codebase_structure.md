@@ -10,7 +10,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 ## Directory Layout
 
 ```
-codeweaver-mcp/
+codeweaver/
 ├── src/codeweaver/              # Main source code
 ├── tests/                       # Test suite
 ├── scripts/                     # Development and build scripts

@@ -22,9 +22,9 @@ class CodeWeaverError(Exception):
     """
 
     _issue_information: ClassVar[tuple[str, ...]] = (
-        "CodeWeaver is still in beta. If you encounter issues, and think they are bugs, please report them at https://github.com/knitli/codeweaver-mcp/issues",
+        "CodeWeaver is still in beta. If you encounter issues, and think they are bugs, please report them at https://github.com/knitli/codeweaver/issues",
         "",
-        "If you're not sure, you can open a discussion at: https://github.com/knitli/codeweaver-mcp/discussions",
+        "If you're not sure, you can open a discussion at: https://github.com/knitli/codeweaver/discussions",
         "",
         "Thank you for helping us improve CodeWeaver!",
     )
@@ -94,7 +94,7 @@ class CodeWeaverError(Exception):
             if self.suggestions
             else "- No suggestions provided.",
             "",
-            "If you're not sure, you can open a discussion at: https://github.com/knitli/codeweaver-mcp/discussions",
+            "If you're not sure, you can open a discussion at: https://github.com/knitli/codeweaver/discussions",
             "",
             "Thank you for helping us improve CodeWeaver!",
         ))

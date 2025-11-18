@@ -252,9 +252,7 @@ async def _handle_server_status(*, standalone: bool, display: StatusDisplay) -> 
         return _check_and_print_server_status(display)
     display.print_warning("Server not running")
     display.print_info("Running standalone indexing")
-    display.console.print(
-        "[dim]Tip: Start server with 'codeweaver server' for automatic indexing[/dim]"
-    )
+    display.console.print("[dim]Tip: Start server with 'cw server' for automatic indexing[/dim]")
     display.console.print()
     return True
 
@@ -355,11 +353,11 @@ async def index(
     Use --standalone to run indexing without server.
 
     Examples:
-        codeweaver index                  # Check server status
-        codeweaver index --force          # Force full re-index in standalone mode
-        codeweaver index --standalone     # Standalone indexing
-        codeweaver index --clear          # Clear vector store and re-index (with confirmation)
-        codeweaver index --clear --yes    # Clear and re-index without confirmation
+        cw index                  # Check server status
+        cw index --force          # Force full re-index in standalone mode
+        cw index --standalone     # Standalone indexing
+        cw index --clear          # Clear vector store and re-index (with confirmation)
+        cw index --clear --yes    # Clear and re-index without confirmation
 
     Args:
         config_file: Optional path to CodeWeaver configuration file

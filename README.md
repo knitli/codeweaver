@@ -110,8 +110,8 @@ The easiest way to get started is with Docker Compose, which includes CodeWeaver
 
 ```bash
 # 1. Download the configuration files
-curl -O https://raw.githubusercontent.com/knitli/codeweaver-mcp/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/knitli/codeweaver-mcp/main/.env.example
+curl -O https://raw.githubusercontent.com/knitli/codeweaver/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/knitli/codeweaver/main/.env.example
 cp .env.example .env
 
 # 2. Configure your environment
@@ -132,10 +132,10 @@ curl http://localhost:9328/health/
 
 ```bash
 # Install latest alpha release
-pip install --pre codeweaver-mcp
+pip install --pre codeweaver
 
 # Or install specific alpha version
-pip install codeweaver-mcp==0.1.0a1
+pip install codeweaver==0.1.0a1
 
 # Verify installation
 codeweaver --version
@@ -145,8 +145,8 @@ codeweaver --version
 
 ```bash
 # Clone repository
-git clone https://github.com/knitli/codeweaver-mcp.git
-cd codeweaver-mcp
+git clone https://github.com/knitli/codeweaver.git
+cd codeweaver
 
 # Set up environment (requires mise: https://mise.jdx.dev)
 mise run setup
@@ -199,7 +199,7 @@ export VOYAGE_API_KEY="your-api-key-here"
 
 ```bash
 # Start CodeWeaver MCP server (auto-indexes project from config)
-codeweaver server --config ./codeweaver.toml
+cw server --config codeweaver.toml
 
 # Expected output:
 # CodeWeaver MCP server starting...
@@ -283,7 +283,7 @@ Agent receives structured results with:
 
 ---
 
-## What Works Today (v0.1)
+## What Works Today (Alpha Release 1)
 
 ✅ **Core Functionality**:
 - Hybrid search (dense + sparse vectors)
@@ -309,13 +309,14 @@ Agent receives structured results with:
 - Graceful degradation when services unavailable
 - Structured logging and metrics
 
-## Planned for v0.2
+## Next Stops on the Roadmap 🚌
 
 🔮 **Coming Soon**:
-- Real-time code change watching (FileWatcher exists but not fully wired)
 - Agent-driven intent analysis (currently keyword-based heuristics)
+- Improved caching
 - Search result explanations
-- Advanced filters (date, file type, size)
+- Advanced filters
+- Integrated data sources (Tavili, DuckDuckGo, Context7)
 
 ---
 
@@ -443,7 +444,7 @@ curl http://localhost:9328/health/ | jq '.indexing.state'  # Should be "idle"
 curl http://localhost:9328/health/ | jq '.statistics.total_chunks_indexed'  # Should be > 0
 
 # Verify project path
-codeweaver config --show | grep "path:"
+cw config --show | grep "path:"
 ```
 
 ### VoyageAI API Unavailable
@@ -497,9 +498,9 @@ curl http://localhost:9328/health/ | jq '.indexing.progress.errors'
 ### Server
 Start the MCP server with auto-indexing:
 ```bash
-codeweaver server --config ./codeweaver.toml
-codeweaver server --project /path/to/codebase --port 9328
-codeweaver server --debug  # Enable debug logging
+cw server --config ./codeweaver.toml
+cw server --project /path/to/codebase --port 9328
+cw server --debug  # Enable debug logging
 ```
 
 ### Search
@@ -514,8 +515,8 @@ codeweaver search "database setup" --intent implement --project ./my-project
 ### Config
 Manage configuration settings:
 ```bash
-codeweaver config --show                    # Display current configuration
-codeweaver config --project ./my-project    # Show project-specific config
+cw config --show                    # Display current configuration
+cw config --project ./my-project    # Show project-specific config
 ```
 
 **Use `--help`** on any command for full options.
@@ -625,8 +626,8 @@ codeweaver config --project ./my-project    # Show project-specific config
 
 ```bash
 # Clone and install full dev environment
-git clone https://github.com/knitli/codeweaver-mcp.git
-cd codeweaver-mcp
+git clone https://github.com/knitli/codeweaver.git
+cd codeweaver
 # if you don't have mise installed, first run:
 # chmod +x scripts/ && ./scripts/dev-env/install-mise.sh
 mise run setup
@@ -757,10 +758,10 @@ All original Knitli code is licensed under your choice of MIT or Apache-2.0. See
 ## Links
 
 **Project**:
-- Repository: https://github.com/knitli/codeweaver-mcp
-- Issues: https://github.com/knitli/codeweaver-mcp/issues
+- Repository: https://github.com/knitli/codeweaver
+- Issues: https://github.com/knitli/codeweaver/issues
 - Documentation: https://dev.knitli.com/codeweaver (in progress)
-- Changelog: https://github.com/knitli/codeweaver-mcp/blob/main/CHANGELOG.md
+- Changelog: https://github.com/knitli/codeweaver/blob/main/CHANGELOG.md
 
 **Company**:
 - Knitli: https://knitli.com
@@ -769,7 +770,7 @@ All original Knitli code is licensed under your choice of MIT or Apache-2.0. See
 - GitHub: https://github.com/knitli
 
 **Package Info**:
-- Python package: `codeweaver-mcp`
+- Python package: `codeweaver`
 - CLI command: `codeweaver`
 - Python requirement: ≥3.12 (tested on 3.12, 3.13, 3.14)
 - Entry point: `codeweaver.cli.app:main`

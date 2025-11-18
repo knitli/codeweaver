@@ -196,7 +196,7 @@ async def search(
                     "  • Or use a local embedding provider in your config, `fastembed` is in the default install."
                 )
                 display.print_info(
-                    "  • You can use the `codeweaver init` command to set up a config file. Use `codeweaver init --config-only` to just create the config with the recommended profile, or for a quickstart, local-only, profile: `codeweaver init --profile quickstart`."
+                    "  • You can use the `cw init` command to set up a config file. Use `cw init --config-only` to just create the config with the recommended profile, or for a quickstart, local-only, profile: `cw init --profile quickstart`."
                 )
                 display.print_info("")  # Empty line for spacing
             sys.exit(1)

@@ -146,7 +146,7 @@ class MemoryVectorStoreProvider(VectorStoreProvider[AsyncQdrantClient]):
 
 **Evidence**:
 - Spec clarification: "Use project name as default collection name" (spec.md:55)
-- Example: project "codeweaver-mcp" → collection "codeweaver-mcp"
+- Example: project "codeweaver" → collection "codeweaver"
 
 **Implementation Pattern**:
 ```python

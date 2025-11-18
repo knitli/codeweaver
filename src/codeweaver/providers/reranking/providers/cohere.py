@@ -3,15 +3,14 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
-# sourcery skip: avoid-single-character-names-variables
+# sourcery skip: avoid-single-character-names-variables, no-complex-if-expressions
 """Cohere reranking provider implementation."""
 
 from __future__ import annotations
 
-import asyncio
 import os
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from typing import TYPE_CHECKING, Any
 
 from pydantic import SkipValidation
@@ -48,8 +47,6 @@ def cohere_reranking_output_transformer(
     Cohere returns reranked results in order from highest score to lowest,
     with their original indices in the results.index field.
     """
-    from collections.abc import Iterator
-
     original_chunks = (
         tuple(_original_chunks) if isinstance(_original_chunks, Iterator) else _original_chunks
     )
@@ -66,7 +63,9 @@ def cohere_reranking_output_transformer(
 
     # Update token stats
     if (
-        tokens := (returned_result.meta.tokens.output_tokens or returned_result.meta.tokens.input_tokens)
+        tokens := (
+            returned_result.meta.tokens.output_tokens or returned_result.meta.tokens.input_tokens
+        )
         if returned_result.meta and returned_result.meta.tokens
         else None
     ):
@@ -89,8 +88,6 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
         # Prepare client options before calling super().__init__()
         kwargs = kwargs or {}
 
-        provider = caps.provider or Provider.COHERE
-
         # Initialize client if not provided
         if client is None:
             if "client_options" in kwargs:
@@ -98,6 +95,8 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
             else:
                 client_options = kwargs.copy()
             client_options["client_name"] = "codeweaver"
+
+            provider = caps.provider or Provider.COHERE
 
             if not client_options.get("api_key"):
                 if provider == Provider.COHERE:

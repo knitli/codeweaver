@@ -110,7 +110,7 @@ class CodeWeaverMCPConfig(BasedModel, FastMCPRemoteMCPServer):
 class StdioCodeWeaverConfig(BasedModel, FastMCPStdioMCPServer):
     """Configuration model for CodeWeaver mxp.json files using stdio communication."""
 
-    command: str = "codeweaver server --transport stdio"
+    command: str = "cw server --transport stdio"
     type: Literal["stdio"] | None = "stdio"
     description: str | None = CODEWEAVER_DESCRIPTION
     icon: str | None = CODEWEAVER_ICON

@@ -30,7 +30,7 @@ CodeWeaver is now **ready for alpha release** (v0.1.0-alpha.1). Your infrastruct
 - **`RELEASE_CHECKLIST.md`**: Created comprehensive release checklist
 
 ### ✅ PyPI Pre-Release Handling
-- Alpha versions require `--pre` flag: `pip install --pre codeweaver-mcp`
+- Alpha versions require `--pre` flag: `pip install --pre codeweaver`
 - Protects users from accidentally installing unstable versions
 - Explicit opt-in for early testers
 
@@ -66,7 +66,7 @@ git push origin v0.1.0-alpha.1
 2. **PyPI receives**:
    - Version: `0.1.0a1` (normalized from `0.1.0-alpha.1`)
    - Users must use `--pre` flag to install
-   - Visible at: https://pypi.org/project/codeweaver-mcp/
+   - Visible at: https://pypi.org/project/codeweaver/
 
 3. **GitHub release**:
    - Automatically marked as "pre-release" ✅
@@ -116,7 +116,7 @@ Alpha tag = appropriate expectations + positive surprises
 
 ### User Protection
 - Alpha versions don't auto-install for unsuspecting users
-- Explicit opt-in required: `pip install --pre codeweaver-mcp`
+- Explicit opt-in required: `pip install --pre codeweaver`
 - Clear warnings in documentation
 
 ### Iteration Speed

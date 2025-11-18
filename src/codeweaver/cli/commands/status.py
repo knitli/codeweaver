@@ -123,7 +123,7 @@ def _display_server_offline(display: StatusDisplay, server_url: str) -> None:
     display.print_info(
         "The CodeWeaver server is not running. Commands like 'index' and 'search' can still work without the server."
     )
-    display.print_info("To start the server, run: codeweaver server start")
+    display.print_info("To start the server, run: 'cw server'")
 
 
 def _display_full_status(
