@@ -277,7 +277,7 @@ async def _run_background_indexing(
                 status_display=None if verbose or debug else status_display,
             )
 
-        duration = time.time() - start_time
+        time.time() - start_time
 
         # Get final statistics from indexer
         stats = state.indexer.stats

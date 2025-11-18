@@ -280,11 +280,11 @@ class StatusDisplay:
         self, total: int, description: str = "Processing"
     ) -> Generator[Callable[[int], None], None, None]:
         """Context manager for displaying a progress bar.
-        
+
         Args:
             total: Total number of items to process
             description: Description to show with progress bar
-            
+
         Yields:
             Function to update progress (call with current count)
         """
@@ -314,7 +314,7 @@ class StatusDisplay:
         avg_tokens_per_chunk: float | None = None,
     ) -> None:
         """Print index summary with statistics.
-        
+
         Args:
             files_indexed: Number of files indexed
             chunks_created: Number of chunks created
@@ -329,9 +329,12 @@ class StatusDisplay:
 
         if language_breakdown:
             # Format: "Python (8), TypeScript (3), Markdown (1)"
-            lang_parts = [f"{lang} ({count})" for lang, count in sorted(
-                language_breakdown.items(), key=lambda x: x[1], reverse=True
-            )]
+            lang_parts = [
+                f"{lang} ({count})"
+                for lang, count in sorted(
+                    language_breakdown.items(), key=lambda x: x[1], reverse=True
+                )
+            ]
             lang_str = ", ".join(lang_parts[:5])  # Show top 5
             if len(language_breakdown) > 5:
                 lang_str += f", +{len(language_breakdown) - 5} more"
@@ -345,7 +348,7 @@ class StatusDisplay:
 
     def print_reindex_brief(self, files: int, chunks: int, duration: float) -> None:
         """Print brief reindexing message.
-        
+
         Args:
             files: Number of files reindexed
             chunks: Number of chunks created

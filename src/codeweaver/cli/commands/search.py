@@ -20,9 +20,9 @@ from cyclopts import App
 from pydantic import FilePath
 from rich.table import Table
 
+from codeweaver.agent_api.find_code import find_code
 from codeweaver.agent_api.find_code.intent import IntentType
 from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
-from codeweaver.agent_api.find_code import find_code
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.cli.utils import resolve_project_root
 from codeweaver.common.utils.utils import get_user_config_dir
@@ -114,10 +114,10 @@ async def _run_search_indexing(
 
         # Create and run indexer
         indexer = await Indexer.from_settings_async(settings=settings_view)
-        
+
         # Create progress tracker for live feedback
         progress_tracker = IndexingProgressTracker(console=display.console)
-        
+
         await indexer.prime_index(
             force_reindex=False,
             progress_callback=lambda stats, phase: progress_tracker.update(stats, phase),

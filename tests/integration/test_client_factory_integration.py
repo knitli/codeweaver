@@ -55,14 +55,15 @@ class TestProviderInstantiationWithClientFactory:
     def test_create_provider_with_client_from_map(self, registry):
         """Test create_provider integrates with client factory."""
         # Mock the CLIENT_MAP and client class
+        from inspect import Parameter, Signature
+
         from codeweaver.providers.capabilities import Client
-        from inspect import Signature, Parameter
 
         mock_client_instance = Mock()
         mock_client_class = Mock(return_value=mock_client_instance)
         # Add __signature__ to make it pass clean_args type checking
         mock_client_class.__signature__ = Signature([
-            Parameter('api_key', Parameter.KEYWORD_ONLY, default=None)
+            Parameter("api_key", Parameter.KEYWORD_ONLY, default=None)
         ])
         mock_lazy_import = Mock()
         mock_lazy_import._resolve.return_value = mock_client_class
@@ -351,14 +352,15 @@ class TestProviderKindStringHandling:
 
     def test_string_provider_kind_in_create_provider(self, registry):
         """Test create_provider works with string provider_kind."""
+        from inspect import Parameter, Signature
+
         from codeweaver.providers.capabilities import Client
-        from inspect import Signature, Parameter
 
         mock_client_instance = Mock()
         mock_client_class = Mock(return_value=mock_client_instance)
         # Add __signature__ to make it pass clean_args type checking
         mock_client_class.__signature__ = Signature([
-            Parameter('api_key', Parameter.KEYWORD_ONLY, default=None)
+            Parameter("api_key", Parameter.KEYWORD_ONLY, default=None)
         ])
         mock_lazy_import = Mock()
         mock_lazy_import._resolve.return_value = mock_client_class

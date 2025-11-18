@@ -43,7 +43,9 @@ async def qdrant_provider(qdrant_test_manager: Any):
     # Cleanup handled by test manager
 
 
-@pytest.mark.xfail(reason="ISSUE-001: Sparse-only search data flow issue - API usage fixed, storage/retrieval needs investigation")
+@pytest.mark.xfail(
+    reason="ISSUE-001: Sparse-only search data flow issue - API usage fixed, storage/retrieval needs investigation"
+)
 async def test_store_hybrid_embeddings(qdrant_provider: QdrantVectorStoreProvider):
     """
     User Story: Store both dense and sparse embeddings with default settings.

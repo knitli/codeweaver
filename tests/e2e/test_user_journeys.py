@@ -80,8 +80,7 @@ class TestNewUserQuickStart:
 
         # Init
         func, bound_args, _ = init_app.parse_args(
-            ["--quickstart", "--config-only", "--project", str(project)],
-            exit_on_error=False,
+            ["--quickstart", "--config-only", "--project", str(project)], exit_on_error=False
         )
         # Execute - successful execution doesn't raise exception
         func(**bound_args.arguments)
@@ -100,8 +99,7 @@ class TestNewUserQuickStart:
 
         # Init
         func, bound_args, _ = init_app.parse_args(
-            ["--quickstart", "--config-only", "--project", str(project)],
-            exit_on_error=False,
+            ["--quickstart", "--config-only", "--project", str(project)], exit_on_error=False
         )
         func(**bound_args.arguments)
 

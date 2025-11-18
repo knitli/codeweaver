@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 @pytest.mark.unit
 class TestHttpxLazyImport:
     """Tests for lazy import of httpx in CLI commands.
-    
+
     These tests verify that CodeWeaver CLI command code does not eagerly
     import httpx at module load time. External dependencies (mcp, fastmcp)
     may import httpx, which is acceptable and beyond our control.
@@ -37,7 +37,7 @@ class TestHttpxLazyImport:
 
     def test_status_command_lazy_import(self) -> None:
         """Test that status command doesn't eagerly import httpx.
-        
+
         The status command module should not import httpx at module load.
         httpx should only be imported when _query_server_status is called.
         """
@@ -63,7 +63,7 @@ class TestHttpxLazyImport:
 
     def test_doctor_command_lazy_import(self) -> None:
         """Test that doctor command doesn't eagerly import httpx.
-        
+
         The doctor command already uses lazy imports correctly.
         httpx should only be imported inside _qdrant_running_at_url.
         """
@@ -89,13 +89,13 @@ class TestHttpxLazyImport:
 
     def test_index_and_init_external_dependency_note(self) -> None:
         """Document that index.py and init.py may trigger httpx via external deps.
-        
+
         NOTE: index.py imports config.types which imports fastmcp which imports mcp
         which imports httpx. This is an external dependency issue beyond our control.
-        
+
         init.py imports config.mcp which extends FastMCPRemoteMCPServer, which also
         imports httpx.
-        
+
         The important thing is that OUR code uses lazy imports - the type hints use
         TYPE_CHECKING and the runtime usage imports httpx inside functions.
         """
@@ -134,7 +134,7 @@ class TestHttpxLazyImport:
         # This will import httpx inside the function
         with monkeypatch.context() as m:
             m.setitem(sys.modules, "httpx", mock_httpx)
-            result = await _query_server_status("http://localhost:9328")
+            await _query_server_status("http://localhost:9328")
 
         # Verify httpx was used
         mock_httpx.AsyncClient.assert_called_once()
@@ -165,4 +165,3 @@ class TestHttpxLazyImport:
         # Verify httpx was used
         mock_httpx.AsyncClient.assert_called_once()
         assert result is True
-

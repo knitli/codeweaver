@@ -544,7 +544,7 @@ async def test_error_logging_structured():
     log_stream = StringIO()
     handler = logging.StreamHandler(log_stream)
     handler.setLevel(logging.ERROR)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     handler.setFormatter(formatter)
 
     logger = logging.getLogger("codeweaver")
@@ -570,10 +570,11 @@ async def test_error_logging_structured():
             pass
 
         # Alternative: Trigger an error from indexer file processing
-        from codeweaver.engine.indexer import Indexer
-
         # Create temporary directory with a file that will cause processing errors
         import tempfile
+
+        from codeweaver.engine.indexer import Indexer
+
         with tempfile.TemporaryDirectory() as tmpdir:
             test_path = Path(tmpdir)
             # Create a file that might cause chunking errors
@@ -584,7 +585,7 @@ async def test_error_logging_structured():
             await indexer.prime_index(force_reindex=True)
 
         # Check log output has error messages
-        log_output = log_stream.getvalue()
+        log_stream.getvalue()
 
         # Verify that errors were logged (should contain error-level log messages)
         # Note: The specific error content may vary, but we should see ERROR level logs

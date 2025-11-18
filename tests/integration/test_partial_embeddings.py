@@ -21,7 +21,9 @@ from tests.conftest import create_test_chunk_with_embeddings
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
 
-@pytest.mark.xfail(reason="ISSUE-001: Sparse-only search data flow issue - API usage fixed, storage/retrieval needs investigation")
+@pytest.mark.xfail(
+    reason="ISSUE-001: Sparse-only search data flow issue - API usage fixed, storage/retrieval needs investigation"
+)
 async def test_partial_embeddings(qdrant_test_manager):
     """
     User Story: Handle cases where dense embedding generation fails.

@@ -68,8 +68,7 @@ async def primary_embedding_provider():
     }  # type: ignore
     caps = EmbeddingModelCapabilities.model_validate(caps_dict)
 
-    provider = SentenceTransformersEmbeddingProvider(capabilities=caps, client=model)
-    return provider
+    return SentenceTransformersEmbeddingProvider(capabilities=caps, client=model)
 
 
 @pytest.fixture
@@ -101,8 +100,7 @@ async def backup_embedding_provider():
     }  # type: ignore
     caps = EmbeddingModelCapabilities.model_validate(caps_dict)
 
-    provider = SentenceTransformersEmbeddingProvider(capabilities=caps, client=model)
-    return provider
+    return SentenceTransformersEmbeddingProvider(capabilities=caps, client=model)
 
 
 @pytest.mark.asyncio

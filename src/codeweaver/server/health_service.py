@@ -93,14 +93,18 @@ class HealthService:
         failover_info_task = asyncio.create_task(self._get_failover_info())
         resources_info_task = asyncio.create_task(self._collect_resource_info())
 
-        indexing_info, services_info, statistics_info, failover_info, resources_info = (
-            await asyncio.gather(
-                indexing_info_task,
-                services_info_task,
-                statistics_info_task,
-                failover_info_task,
-                resources_info_task,
-            )
+        (
+            indexing_info,
+            services_info,
+            statistics_info,
+            failover_info,
+            resources_info,
+        ) = await asyncio.gather(
+            indexing_info_task,
+            services_info_task,
+            statistics_info_task,
+            failover_info_task,
+            resources_info_task,
         )
 
         # Determine overall status (including resource checks)

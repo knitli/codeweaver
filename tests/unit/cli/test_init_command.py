@@ -28,8 +28,7 @@ from codeweaver.cli.commands.init import app as init_app
 @pytest.fixture
 def temp_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Get temporary home directory (created by autouse isolated_test_environment fixture)."""
-    home = Path(os.environ["HOME"])
-    return home
+    return Path(os.environ["HOME"])
 
 
 @pytest.fixture

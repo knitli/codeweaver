@@ -149,7 +149,9 @@ def test_dimension_mismatch_detection():
         provider="qdrant",
         project_name="test-project",
         dense_model="voyage-code-3",  # Same model
-        vector_config={"dense": VectorParams(size=768, distance=Distance.COSINE)},  # Different dimension - NOT OK
+        vector_config={
+            "dense": VectorParams(size=768, distance=Distance.COSINE)
+        },  # Different dimension - NOT OK
         sparse_config={"sparse": SparseVectorParams()},
         created_at=datetime.now(UTC),
     )

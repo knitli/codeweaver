@@ -184,7 +184,9 @@ class ResourceInfo(BasedModel):
     """System resource usage information."""
 
     memory_mb: Annotated[NonNegativeInt, Field(description="Current memory usage in MB")]
-    cpu_percent: Annotated[NonNegativeFloat, Field(ge=0, description="Current CPU usage percentage")]
+    cpu_percent: Annotated[
+        NonNegativeFloat, Field(ge=0, description="Current CPU usage percentage")
+    ]
     disk_total_mb: Annotated[NonNegativeInt, Field(description="Total disk usage in MB")]
     disk_index_mb: Annotated[NonNegativeInt, Field(description="Disk usage for index in MB")]
     disk_cache_mb: Annotated[NonNegativeInt, Field(description="Disk usage for cache in MB")]

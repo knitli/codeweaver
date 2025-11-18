@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import signal
 import sys
@@ -134,10 +135,8 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
     finally:
         # Restore original signal handler
         if original_sigint_handler:
-            try:
+            with contextlib.suppress(ValueError, OSError):
                 signal.signal(signal.SIGINT, original_sigint_handler)
-            except (ValueError, OSError):
-                pass
 
 
 async def run(

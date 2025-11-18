@@ -266,8 +266,7 @@ class FileWatcher:
         # For large batches, show progress bar
         if num_changes > 5 and self._status_display:
             with self._status_display.progress_bar(
-                total=num_changes,
-                description="↻ Reindexing changes"
+                total=num_changes, description="↻ Reindexing changes"
             ) as update:
                 for i, change in enumerate(changes, 1):
                     logger.info("File change detected.", extra={"change": change})
@@ -290,9 +289,7 @@ class FileWatcher:
         # Show brief summary for all batches
         if self._status_display:
             self._status_display.print_reindex_brief(
-                files=num_changes,
-                chunks=chunks_created,
-                duration=duration,
+                files=num_changes, chunks=chunks_created, duration=duration
             )
 
     async def run(self) -> int:

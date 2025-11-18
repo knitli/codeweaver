@@ -338,9 +338,7 @@ class Indexer(BasedModel):
         total_duplicates = self._duplicate_dense_count + self._duplicate_sparse_count
         if total_duplicates > 0:
             if status_display:
-                status_display.print_warning(
-                    f"{total_duplicates} chunks already indexed, skipped"
-                )
+                status_display.print_warning(f"{total_duplicates} chunks already indexed, skipped")
             elif logger.isEnabledFor(logging.INFO):
                 logger.info(
                     "%d chunks already indexed (dense: %d, sparse: %d), skipped",
@@ -435,24 +433,20 @@ class Indexer(BasedModel):
                     e,
                 )
             elif "timeout" in error_msg or "timed out" in error_msg:
-                logger.error(
+                logger.exception(
                     "Qdrant connection timed out. Please verify:\n"
                     "  - Qdrant server is responsive\n"
                     "  - Network latency is acceptable\n"
                     "  - Consider increasing timeout settings\n"
-                    "  Original error: %s",
-                    e,
                 )
             elif "unauthorized" in error_msg or "authentication" in error_msg:
-                logger.error(
+                logger.exception(
                     "Qdrant authentication failed. Please verify:\n"
                     "  - API key is correctly configured\n"
                     "  - Authentication credentials are valid\n"
-                    "  Original error: %s",
-                    e,
                 )
             else:
-                logger.warning("Could not initialize vector store with failover: %s", e)
+                logger.exception("Could not initialize vector store with failover")
 
             self._vector_store = None
             self._failover_manager = None
