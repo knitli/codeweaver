@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     from codeweaver.config.providers import ProviderSettings
     from codeweaver.config.settings import CodeWeaverSettings
     from codeweaver.providers.provider import Provider
+    from codeweaver.server.health_models import HealthResponse
 
 
 # Module-level display for check functions
@@ -209,6 +210,8 @@ def _identify_missing_dependencies(
         )
         for match in matches
         if match
+        and match["name"]
+        != "py_cpuinfo"  # it's technically required, but it's for optimizations; not strictly required
     ]
 
     for display_name, module_name, _version in required_packages:
@@ -370,6 +373,7 @@ async def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
     deployment_type = "unknown"
     url = None
     vector_provider_config = vector_config["provider_settings"]
+    # this is intentionally generalized to cover other providers in the future
     if (provider := vector_config["provider"]) != Provider.MEMORY and (
         url := vector_provider_config.get("url")
     ):
@@ -390,7 +394,8 @@ async def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
         deployment_type = "local" if await _qdrant_running_at_url() else "unknown"
     elif provider == Provider.MEMORY:
         deployment_type = "in-memory"
-
+    else:
+        deployment_type = "unknown"
     _display.console.print(
         f"\nVector Store: [cyan]{provider.as_title}[/cyan] ({deployment_type})"
         if deployment_type != "unknown"
@@ -673,6 +678,189 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
     return tested_providers
 
 
+def _get_health_endpoint():
+    from codeweaver.config.settings import get_settings_map
+
+    settings_map = get_settings_map()
+    host = settings_map.get("server.host", "localhost")
+    port = settings_map.get("server.port", 9328)
+    return f"http://{host}:{port}/health/"
+
+
+async def check_daemon_health() -> DoctorCheck:
+    """Check daemon status and health.
+
+    Queries the daemon status and health endpoint to verify:
+    - Daemon is running
+    - Health status (healthy/degraded/unhealthy)
+    - Resource usage within acceptable limits
+    - All services are operational
+
+    Returns:
+        DoctorCheck with daemon health status
+    """
+    from codeweaver.daemon import DaemonManager
+    from codeweaver.daemon.exceptions import DaemonError
+
+    check = DoctorCheck("Daemon Health")
+
+    try:
+        # Get platform-specific daemon manager
+        manager = DaemonManager.for_platform()
+        daemon_status = manager.status()
+
+        # Check if daemon is running
+        if not daemon_status.running:
+            return DoctorCheck.set_check(
+                check.name,
+                "warn",
+                "Daemon not running (auto-start recommended for best experience)",
+                [
+                    "Start daemon: cw daemon start",
+                    "Install as service: cw daemon install",
+                    "Check status: cw daemon status",
+                ],
+            )
+
+        # Daemon is running, query health endpoint
+        import httpx
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(_get_health_endpoint(), timeout=2.0)
+
+                if response.status_code != 200:
+                    return DoctorCheck.set_check(
+                        check.name,
+                        "fail",
+                        f"Daemon health endpoint returned {response.status_code}",
+                        ["Check daemon logs: cw daemon logs", "Restart daemon: cw daemon restart"],
+                    )
+
+                health: HealthResponse = response.json()
+
+                # Analyze health status
+                if health["status"] == "unhealthy":
+                    # Critical issues
+                    issues = []
+                    if health["services"]["vector_store"]["status"] == "down":
+                        issues.append("Vector store is down")
+                    if health["services"]["embedding_provider"]["status"] == "down":
+                        issues.append("Embedding provider is down")
+
+                    return DoctorCheck.set_check(
+                        check.name,
+                        "fail",
+                        f"Daemon unhealthy: {', '.join(issues) if issues else 'Critical service failures'}",
+                        [
+                            "Check daemon logs: cw daemon logs",
+                            "Check vector store: docker ps (if using Qdrant)",
+                            "Restart daemon: cw daemon restart",
+                            "Check provider configuration: cw doctor --verbose",
+                        ],
+                    )
+
+                if health["status"] == "degraded":
+                    # Performance issues
+                    warnings = []
+
+                    if resources := health.get("resources"):
+                        if resources["memory_mb"] > 2048:
+                            warnings.append(f"High memory usage: {resources['memory_mb']}MB")
+                        if resources["cpu_percent"] > 80:
+                            warnings.append(f"High CPU usage: {resources['cpu_percent']}%")
+                        if (
+                            (fds := resources.get("file_descriptors"))
+                            and (limit := resources.get("file_descriptors_limit"))
+                            and fds > limit * 0.8
+                        ):
+                            warnings.append(f"High file descriptor usage: {fds}/{limit}")
+
+                    return DoctorCheck.set_check(
+                        check.name,
+                        "warn",
+                        f"Daemon degraded: {', '.join(warnings) if warnings else 'Performance issues detected'}",
+                        [
+                            "Restart daemon to clear resources: cw daemon restart",
+                            "Check daemon logs: cw daemon logs",
+                            "Monitor with: cw daemon status --verbose",
+                        ],
+                    )
+
+                # healthy
+                # Show uptime and key metrics
+                uptime = daemon_status.uptime or "unknown"
+                message = f"Running (uptime: {uptime})"
+
+                if resources := health.get("resources"):
+                    message += (
+                        f", {resources['memory_mb']}MB memory, {resources['cpu_percent']:.1f}% CPU"
+                    )
+
+                return DoctorCheck.set_check(check.name, "success", message, [])
+
+        except httpx.ConnectError:
+            return DoctorCheck.set_check(
+                check.name,
+                "fail",
+                f"Cannot connect to daemon (PID {daemon_status.pid})",
+                [
+                    "Daemon process exists but is not responding",
+                    "Check daemon logs: cw daemon logs",
+                    "Restart daemon: cw daemon restart",
+                    "Check port 9328 is not blocked by firewall",
+                ],
+            )
+        except httpx.TimeoutException:
+            return DoctorCheck.set_check(
+                check.name,
+                "warn",
+                "Daemon health check timed out",
+                [
+                    "Daemon may be under heavy load",
+                    "Check daemon logs: cw daemon logs",
+                    "Try again: cw doctor",
+                ],
+            )
+        except (httpx.HTTPError, httpx.HTTPStatusError) as e:
+            return DoctorCheck.set_check(
+                check.name,
+                "warn",
+                f"HTTP error querying daemon: {e!s}",
+                [
+                    "Check daemon logs: cw daemon logs",
+                    "Verify daemon status: cw daemon status",
+                    "Daemon may not be running on expected port",
+                ],
+            )
+        except Exception as e:
+            return DoctorCheck.set_check(
+                check.name,
+                "warn",
+                f"Health check failed: {e!s}",
+                ["Check daemon logs: cw daemon logs", "Verify daemon status: cw daemon status"],
+            )
+
+    except DaemonError as e:
+        return DoctorCheck.set_check(
+            check.name,
+            "fail",
+            f"Daemon error: {e.message}",
+            e.suggestions
+            or [
+                "Check daemon logs: cw daemon logs",
+                "Reinstall daemon: cw daemon uninstall && cw daemon install",
+            ],
+        )
+    except Exception as e:
+        return DoctorCheck.set_check(
+            check.name,
+            "warn",
+            f"Unable to check daemon: {e!s}",
+            ["Daemon checks are optional but recommended", "Install daemon: cw daemon install"],
+        )
+
+
 def _print_check_suggestions(
     checks: list[DoctorCheck],
     verbose: bool,  # noqa: FBT001
@@ -812,6 +1000,11 @@ async def process_checks(display: StatusDisplay) -> list[DoctorCheck]:
                         [],
                     )
                 )
+
+    # Check daemon health (optional but recommended)
+    daemon_check = await check_daemon_health()
+    checks.append(daemon_check)
+
     return checks
 
 
