@@ -182,6 +182,8 @@ class Indexer(BasedModel):
     _last_checkpoint_time: Annotated[NonNegativeFloat, PrivateAttr()] = 0.0
     _files_since_checkpoint: Annotated[NonNegativeInt, PrivateAttr()] = 0
     _failover_manager: Annotated[Any | None, PrivateAttr()] = None  # VectorStoreFailoverManager
+    _duplicate_dense_count: Annotated[NonNegativeInt, PrivateAttr()] = 0
+    _duplicate_sparse_count: Annotated[NonNegativeInt, PrivateAttr()] = 0
 
     def __init__(
         self,
@@ -283,31 +285,24 @@ class Indexer(BasedModel):
         logger.debug("Providers will be initialized lazily on first use")
 
     def _register_signal_handlers(self) -> None:
-        """Register signal handlers for graceful shutdown with checkpoint saving."""
+        """Register signal handlers for graceful shutdown with checkpoint saving.
+
+        Note: Signal handlers are intentionally minimal and thread-safe.
+        They only set the shutdown flag - actual cleanup happens in async context.
+        """
 
         def handle_shutdown_signal(signum: int, frame: Any) -> None:
-            """Handle shutdown signal by saving checkpoint and exiting gracefully."""
+            """Handle shutdown signal by setting shutdown flag.
+
+            This is intentionally minimal to avoid blocking in signal handler.
+            Checkpoint saving happens in the finally block of prime_index.
+            """
             signal_name = signal.Signals(signum).name
-            logger.info("Received %s signal, saving checkpoint and shutting down...", signal_name)
+            logger.info("Received %s signal, requesting shutdown...", signal_name)
             self._shutdown_requested = True
 
-            # Save final checkpoint
-            try:
-                self.save_checkpoint()
-                logger.info("Checkpoint saved successfully before shutdown")
-            except Exception:
-                logger.exception("Failed to save checkpoint during shutdown")
-
-            # Call original handler if it existed
-            if signum == signal.SIGTERM and self._original_sigterm_handler:
-                if callable(self._original_sigterm_handler):
-                    self._original_sigterm_handler(signum, frame)
-            elif (
-                signum == signal.SIGINT
-                and self._original_sigint_handler
-                and callable(self._original_sigint_handler)
-            ):
-                self._original_sigint_handler(signum, frame)
+            # Don't save checkpoint here - it may block
+            # Checkpoint is saved in finally blocks of async methods
 
         # Store original handlers and install new ones
         try:
@@ -328,6 +323,31 @@ class Indexer(BasedModel):
             logger.debug("Signal handlers restored")
         except (ValueError, OSError) as e:
             logger.debug("Could not restore signal handlers: %s", e)
+
+    def _reset_duplicate_counts(self) -> None:
+        """Reset duplicate embedding counters."""
+        self._duplicate_dense_count = 0
+        self._duplicate_sparse_count = 0
+
+    def _log_duplicate_summary(self, status_display: Any | None = None) -> None:
+        """Log summary of duplicate embeddings.
+
+        Args:
+            status_display: Optional StatusDisplay instance for clean user-facing output
+        """
+        total_duplicates = self._duplicate_dense_count + self._duplicate_sparse_count
+        if total_duplicates > 0:
+            if status_display:
+                status_display.print_warning(
+                    f"{total_duplicates} chunks already indexed, skipped"
+                )
+            elif logger.isEnabledFor(logging.INFO):
+                logger.info(
+                    "%d chunks already indexed (dense: %d, sparse: %d), skipped",
+                    total_duplicates,
+                    self._duplicate_dense_count,
+                    self._duplicate_sparse_count,
+                )
 
     async def _initialize_providers_async(self) -> None:
         """Initialize pipeline providers asynchronously from global registry.
@@ -388,10 +408,52 @@ class Indexer(BasedModel):
                     type(self._vector_store).__name__,
                 )
             else:
-                logger.warning("No vector store available (primary failed to initialize)")
+                logger.debug("No vector store available (primary failed to initialize)")
 
         except Exception as e:
-            logger.warning("Could not initialize vector store with failover: %s", e)
+            # Provide specific guidance for common connection errors
+            error_msg = str(e).lower()
+            if any(
+                indicator in error_msg
+                for indicator in [
+                    "illegal request line",
+                    "connection refused",
+                    "connect error",
+                    "cannot connect",
+                    "connection error",
+                    "failed to connect",
+                ]
+            ):
+                # Log at debug level - health checks will display this to users
+                logger.debug(
+                    "Failed to connect to PRIMARY Qdrant vector store. "
+                    "Please verify:\n"
+                    "  - Qdrant is running (default: http://localhost:6333 for HTTP, :6334 for gRPC)\n"
+                    "  - The configured URL matches your Qdrant instance\n"
+                    "  - Check firewall/network settings if using remote Qdrant\n"
+                    "  Original error: %s",
+                    e,
+                )
+            elif "timeout" in error_msg or "timed out" in error_msg:
+                logger.error(
+                    "Qdrant connection timed out. Please verify:\n"
+                    "  - Qdrant server is responsive\n"
+                    "  - Network latency is acceptable\n"
+                    "  - Consider increasing timeout settings\n"
+                    "  Original error: %s",
+                    e,
+                )
+            elif "unauthorized" in error_msg or "authentication" in error_msg:
+                logger.error(
+                    "Qdrant authentication failed. Please verify:\n"
+                    "  - API key is correctly configured\n"
+                    "  - Authentication credentials are valid\n"
+                    "  Original error: %s",
+                    e,
+                )
+            else:
+                logger.warning("Could not initialize vector store with failover: %s", e)
+
             self._vector_store = None
             self._failover_manager = None
 
@@ -477,6 +539,15 @@ class Indexer(BasedModel):
             if self._embedding_provider or self._sparse_provider:
                 await self._embed_chunks(chunks)
                 self._stats.chunks_embedded += len(chunks)
+
+                # Log summary of duplicate embeddings if any were skipped
+                if self._duplicate_dense_count > 0 or self._duplicate_sparse_count > 0:
+                    logger.info(
+                        "Skipped %d chunks with existing embeddings (dense: %d, sparse: %d)",
+                        self._duplicate_dense_count + self._duplicate_sparse_count,
+                        self._duplicate_dense_count,
+                        self._duplicate_sparse_count,
+                    )
 
                 await log_to_client_or_fallback(
                     context,
@@ -651,7 +722,8 @@ class Indexer(BasedModel):
             except ValueError as e:
                 # Handle duplicate embedding errors gracefully
                 if "already set" in str(e):
-                    logger.info("Some chunks already embedded (dense), skipping: %s", e)
+                    # Increment counter silently - this is normal deduplication behavior
+                    self._duplicate_dense_count += 1
                 else:
                     raise
             except Exception:
@@ -676,7 +748,8 @@ class Indexer(BasedModel):
             except ValueError as e:
                 # Handle duplicate embedding errors gracefully
                 if "already set" in str(e):
-                    logger.warning("Some chunks already embedded (sparse), skipping: %s", e)
+                    # Increment counter silently - this is normal deduplication behavior
+                    self._duplicate_sparse_count += 1
                 else:
                     raise
             except Exception:
@@ -966,6 +1039,7 @@ class Indexer(BasedModel):
         *,
         force_reindex: bool = False,
         progress_callback: Callable[[IndexingStats, str | None], None] | None = None,
+        status_display: Any | None = None,
     ) -> int:
         """Perform an initial indexing pass using the configured rignore walker.
 
@@ -974,6 +1048,7 @@ class Indexer(BasedModel):
         Args:
             force_reindex: If True, skip persistence checks and reindex everything
             progress_callback: Optional callback to report progress (receives stats and phase)
+            status_display: Optional StatusDisplay instance for clean user-facing output
 
         Returns:
             Number of files indexed
@@ -997,6 +1072,7 @@ class Indexer(BasedModel):
         # Reset stats for new indexing run
         self._stats = IndexingStats()
         self._deleted_files = []
+        self._reset_duplicate_counts()
 
         # Discover files to index (with incremental filtering if manifest exists)
         files_to_index = self._discover_files_to_index()
@@ -1022,6 +1098,9 @@ class Indexer(BasedModel):
 
         # Finalize and report
         self._finalize_indexing()
+
+        # Log duplicate summary
+        self._log_duplicate_summary(status_display)
 
         return self._stats.files_processed
 
@@ -1228,7 +1307,11 @@ class Indexer(BasedModel):
             chunks: List of chunks to index
         """
         if not self._vector_store:
-            logger.warning("No vector store configured, skipping indexing")
+            # Log at debug level - this was already shown during health checks
+            logger.debug(
+                "No vector store configured, skipping vector store upsert. "
+                "Chunking will continue, but chunks will not be indexed for semantic search."
+            )
             return
 
         try:
