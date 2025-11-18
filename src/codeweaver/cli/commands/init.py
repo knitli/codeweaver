@@ -36,6 +36,10 @@ if TYPE_CHECKING:
     from codeweaver.cli.ui import StatusDisplay
     from codeweaver.config.mcp import CodeWeaverMCPConfig, StdioCodeWeaverConfig
 
+type MCPClient = Literal[
+    "claude_code", "claude_desktop", "cursor", "gemini_cli", "vscode", "mcpjson"
+]
+
 
 def _lazy_import_httpx() -> None:
     """Lazy import httpx for type checking compatibility.
@@ -62,19 +66,39 @@ app = cyclopts.App(
 def _backup_config(path: Path) -> Path:
     """Create timestamped backup of configuration file.
 
+    Only creates a backup if the file content differs from the most recent backup.
+
     Args:
         path: Path to configuration file to backup
 
     Returns:
-        Path to backup file
+        Path to backup file (may be existing backup if content unchanged)
     """
     display = _display
     timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
     backup_path = path.parent / f"{path.stem}.backup_{timestamp}{path.suffix}"
 
-    if path.exists():
-        shutil.copy2(path, backup_path)
-        display.print_success(f"Created backup: {backup_path}")
+    if not path.exists():
+        return backup_path
+
+    # Check for existing backups
+    existing_backups = sorted(
+        path.parent.glob(f"{path.stem}.backup_*{path.suffix}"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+
+    # If we have a recent backup with identical content, reuse it
+    current_content = path.read_bytes()
+    if existing_backups:
+        latest_backup = existing_backups[0]
+        if latest_backup.read_bytes() == current_content:
+            display.print_info(f"Using existing backup (content unchanged): {latest_backup}")
+            return latest_backup
+
+    # Content changed or no backup exists - create new backup
+    shutil.copy2(path, backup_path)
+    display.print_success(f"Created backup: {backup_path}")
 
     return backup_path
 
@@ -258,9 +282,7 @@ def config(
 
 
 def _get_client_config_path(
-    client: Literal["claude_code", "claude_desktop", "cursor", "gemini_cli", "vscode", "mcpjson"],
-    config_level: Literal["project", "user"],
-    project_path: Path,
+    client: MCPClient, config_level: Literal["project", "user"], project_path: Path
 ) -> Path:
     """Get the configuration file path for a specific MCP client.
 
@@ -408,7 +430,7 @@ def _create_remote_config(
 def _handle_write_output(
     mcp_config: StdioCodeWeaverConfig | CodeWeaverMCPConfig,
     config_level: Literal["project", "user"],
-    client: Literal["claude_code", "claude_desktop", "cursor", "gemini_cli", "vscode", "mcpjson"],
+    client: MCPClient,
     file_path: Path | None,
     project_path: Path,
 ) -> None:
@@ -511,7 +533,7 @@ def handle_output(
     mcp_config: StdioCodeWeaverConfig | CodeWeaverMCPConfig,
     output: Literal["write", "print", "copy"],
     config_level: Literal["project", "user"],
-    client: Literal["claude_code", "claude_desktop", "cursor", "vscode", "mcpjson"],
+    client: MCPClient,
     file_path: Path | None,
     project_path: Path,
 ) -> None:
@@ -572,14 +594,15 @@ def mcp(
             name=["--file-path", "-f"], help="Custom path to MCP client configuration file."
         ),
     ] = None,
-    client: Annotated[
-        Literal["claude_code", "claude_desktop", "cursor", "vscode", "mcpjson"],
+    clients: Annotated[
+        list[MCPClient] | None,
         cyclopts.Parameter(
             name=["--client", "-c"],
-            help="MCP client to configure, you can provide multiple clients by repeating this flag",
+            consume_multiple=True,
+            help="MCP client to configure, you can provide multiple clients by repeating this flag. Defaults to 'mcpjson' if none specified.",
         ),
-    ] = "mcpjson",
-    host: Annotated[str, cyclopts.Parameter(name=["--host"])] = "127.0.0.1",
+    ] = None,
+    host: Annotated[str, cyclopts.Parameter(name=["--host"])] = "http://127.0.0.1",
     port: Annotated[int, cyclopts.Parameter(name=["--port"])] = 9328,
     transport: Annotated[
         Literal["streamable-http", "stdio"],
@@ -638,16 +661,16 @@ def mcp(
     - `stdio`: Standard input/output transport that launches CodeWeaver per-session
 
     **Tip**: Set a default MCP config in your CodeWeaver config, then just run
-    `cw init mcp --client your_client` to generate the config for that client.
+    `cw init mcp --client your_client --client another_client` to generate the config for those clients.
 
     Args:
-        client: MCP client to configure (claude_code, claude_desktop, cursor, vscode, mcpjson)
+        clients: MCP clients to configure (claude_code, claude_desktop, cursor, vscode, gemini_cli, mcpjson)
         output: Output method for MCP client configuration
         project: Path to project directory (auto-detected if not provided)
         config_level: Configuration level (project or user)
         transport: Transport type for MCP communication
 
-        host: [http-only] Server host address (default: 127.0.0.1)
+        host: [http-only] Server host address (default: http://127.0.0.1)
         port: [http-only] Server port (default: 9328)
         auth: [http-only] Authentication method
 
@@ -659,6 +682,8 @@ def mcp(
         authentication: Authentication configuration
         file_path: Custom file path for configuration output
     """
+    if clients is None:
+        clients = ["mcpjson"]
     display = _display
     display.print_command_header("init mcp", "Initialize MCP client configuration for CodeWeaver.")
     display.print_section("MCP Client Configuration Setup")
@@ -695,7 +720,8 @@ def mcp(
         )
 
     # Handle output
-    handle_output(config, output, config_level, client, file_path, project_path)
+    for client in clients:
+        handle_output(config, output, config_level, client, file_path, project_path)
 
 
 @app.default
@@ -723,13 +749,17 @@ def init(
             help="URL for cloud vector deployment (required if --vector-deployment=cloud)",
         ),
     ] = None,
-    client: Annotated[
-        Literal["claude_code", "claude_desktop", "cursor", "vscode", "mcpjson"],
-        cyclopts.Parameter(name=["--client", "-c"], help="MCP client to configure"),
-    ] = "claude_code",
+    clients: Annotated[
+        list[MCPClient] | None,
+        cyclopts.Parameter(
+            name=["--client", "-c"],
+            help="MCP clients to configure. Defaults to 'mcpjson' if none specified. You can provide multiple clients by repeating this flag.",
+            consume_multiple=True,
+        ),
+    ] = None,
     host: Annotated[
         str, cyclopts.Parameter(name=["--host"], help="CodeWeaver server host")
-    ] = "127.0.0.1",
+    ] = "http://127.0.0.1",
     port: Annotated[int, cyclopts.Parameter(name=["--port"], help="CodeWeaver server port")] = 9328,
     force: Annotated[
         bool, cyclopts.Parameter(name=["--force", "-f"], help="Force overwrite existing config")
@@ -787,7 +817,7 @@ def init(
         profile: Configuration profile to use (recommended, quickstart, or test)
         vector_deployment: Vector store deployment type (local or cloud)
         vector_url: URL for cloud vector deployment
-        client: MCP client to configure (claude_code, claude_desktop, cursor, vscode, mcpjson)
+        clients: MCP clients to configure (claude_code, claude_desktop, cursor, gemini_cli, vscode, mcpjson).
         host: Server host address for MCP config (default: 127.0.0.1)
         port: Server port for MCP config (default: 9328)
         transport: Transport type (streamable-http or stdio). Streamable default and recommended.
@@ -802,6 +832,8 @@ def init(
         cw init --client cursor      # Setup for Cursor
         cw init --transport stdio    # Use stdio transport (not recommended)
     """
+    if clients is None:
+        clients = ["mcpjson"]
     display = _display
     error_handler = CLIErrorHandler(display)
 
@@ -831,6 +863,7 @@ def init(
     display.print_info(f"Project: {project_path}\n")
 
     # Default: do both if neither flag specified
+    # This makes 'cw init' do the full setup by default, so the 'only' here are a little misleading because both 'only' are true now.
     if not config_only and not mcp_only:
         config_only = mcp_only = True
 
@@ -851,7 +884,8 @@ def init(
         )
 
     # Part 2: MCP Client Configuration
-    if mcp_only:
+    # if client args were passed, then we count that as a 'mcp_only' request
+    if mcp_only or (len(clients) > 1) or (clients and clients[0] != "mcpjson"):
         display.print_section("Step 2: MCP Client Configuration")
 
         # Call the mcp() command directly with the provided parameters
@@ -860,7 +894,7 @@ def init(
                 output="write",
                 project=project_path,
                 config_level=mcp_config_level,
-                client=client,
+                clients=clients,
                 host=host,
                 port=port,
                 transport=transport,
