@@ -689,7 +689,7 @@ from pathlib import Path
 import platform
 import tomli_w
 
-from codeweaver.settings_types import DEFAULT_IGNORE_PATTERNS, DEFAULT_PROVIDERS_SETTINGS, DEFAULT_STRATEGY_SETTINGS, Provider, ConfigurationRegistry, ProviderKind, PerformanceProfile, _BaseProviderSettings, get_project_name
+from codeweaver.settings_types import DEFAULT_IGNORE_PATTERNS, DEFAULT_PROVIDERS_SETTINGS, DEFAULT_STRATEGY_SETTINGS, Provider, ConfigurationRegistry, ProviderKind, PerformanceProfile, _BaseProviderSettingsDict, get_project_name
 from codeweaver._semantic_search import SemanticLanguage
 
 # This should actually import from settings_types because we would use it to define the base settings types there, like _BaseProvider, which would subclass BaseCodeWeaverSettings (which would be _BaseCodeWeaverSettings))

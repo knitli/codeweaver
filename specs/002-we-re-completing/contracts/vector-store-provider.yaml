@@ -30,7 +30,7 @@ operations:
     examples:
       - input: {}
         output:
-          - codeweaver-mcp
+          - codeweaver
           - test-project
       - input: {}
         output: []

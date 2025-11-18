@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 
+from os import cpu_count
 from typing import TYPE_CHECKING, Annotated, Any, Literal, NotRequired, Self, TypedDict
 
 from pydantic import ConfigDict, Field, NonNegativeFloat, PositiveInt, model_validator
@@ -186,7 +187,7 @@ class ConcurrencySettings(BasedModel):
         Field(
             description="""Maximum files to chunk concurrently (equivalent to number of workers or threads)"""
         ),
-    ] = 4
+    ] = cpu_count() or 4
 
     executor: Annotated[
         Literal["process", "thread"],

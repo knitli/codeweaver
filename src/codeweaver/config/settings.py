@@ -610,6 +610,18 @@ class CodeWeaverSettings(BaseSettings):
         Configuration precedence (highest to lowest):
         1. init_settings - Direct initialization arguments
         2. env_settings - Environment variables (CODEWEAVER_*)
+            - Nested models are separated by double underscores (__)
+            - Only applies to fields in nested BaseModels
+            - Currently, this includes all fields in:
+                - `CodeWeaverSettings` (`CODEWEAVER__CONFIG_FILE`, etc)
+                - `ProviderSettings` (`CODEWEAVER__PROVIDER__VECTOR_STORE`, etc)
+                - `FastMcpServerSettings` (`CODEWEAVER__SERVER__HOST`, etc)
+                - `IndexerSettings` (`CODEWEAVER__INDEXER__USE_GITIGNORE`, etc)
+                - `ChunkerSettings` (`CODEWEAVER__CHUNKER__SEMANTIC_IMPORTANCE_THRESHOLD`, etc)
+                - `TelemetrySettings` (`CODEWEAVER__TELEMETRY__TOOLS_BEFORE_PRIVACY`, etc)
+                - UvicornServerSettings (`CODEWEAVER__UVICORN__LOG_LEVEL`, etc)
+            - It does NOT apply to `LoggingSettings`, `MiddlewareOptions`, `MCPServerConfig`, or any other fields using TypedDict, including those in the above models.
+            - It *does* apply to nested models in those models, currently only `CustomDelimiter`, `PerformanceSettings`, and `ConcurrencySettings`, which are fields in `ChunkerSettings`. You could set: `CODEWEAVER__CHUNKER__PERFORMANCE__MAX_PARALLEL_FILES=4`
         3. dotenv_settings - .env files:
             - .local.env,
             - .env
@@ -872,6 +884,7 @@ class CodeWeaverSettings(BaseSettings):
             "exclude_computed_fields": True,
             "mode": "json",  # Changed from "python" to handle Path serialization
             "exclude_none": True,  # Exclude None values for TOML compatibility
+            "exclude": {"config_file", "default_mcp_config"},
         }
         # JSON serialization kwargs (includes indent for to_json)
         json_kwargs = {"indent": 4, "round_trip": True}

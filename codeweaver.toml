@@ -8,6 +8,8 @@ project_name = "codeweaver"
 token_limit = 30000
 max_file_size = 1048576
 max_results = 75
+
+[provider]
 agent = [
   { provider = "anthropic", enabled = true, model = "claude-haiku-4.5", model_settings = {  } },
 ]
@@ -15,31 +17,18 @@ data = [
   { provider = "tavily", enabled = true },
   { provider = "duckduckgo", enabled = true },
 ]
-
-[provider]
 embedding = [
   { provider = "voyage", enabled = true, model_settings = { model = "voyage-code-3" } },
 ]
 reranking = [
-  { provider = "voyage", enabled = true, model_settings = { model = "voyage:rerank-2.5" } },
+  { provider = "voyage", enabled = true, model_settings = { model = "rerank-2.5" } },
 ]
 vector_store = [
-  { provider = "qdrant", enabled = true, provider_settings = {  } },
+  { provider = "qdrant", enabled = true, provider_settings = { prefer_grpc = true, url = "http://localhost:6337" } },
 ]
-
-[[provider.sparse_embedding]]
-provider = "sentence-transformers"
-enabled = true
-
-[provider.sparse_embedding.model_settings]
-model = "opensearch/opensearch-neural-sparse-encoding-doc-v3-gte"
-
-[[provider.agent]]
-provider = "anthropic"
-enabled = true
-model = "claude-sonnet-4-latest"
-
-[provider.agent.model_settings]
+sparse_embedding = [
+  { provider = "fastembed", enabled = true, model_settings = { model = "prithivida/Splade_PP_en_v1" } },
+]
 
 [server]
 on_duplicate_tools = "warn"
@@ -53,8 +42,6 @@ tools = []
 name = "codeweaver"
 level = 20
 use_rich = false
-
-[logging.rich_options]
 
 [middleware.error_handling]
 include_traceback = true
@@ -118,51 +105,3 @@ forced_includes = [
   "**/.claude/**",
   "**/.stylelintrc/**",
 ]
-
-[chunker]
-
-[endpoints]
-enable_state = true
-enable_health = true
-enable_stats = true
-enable_settings = true
-enable_version = true
-
-[uvicorn]
-
-[telemetry]
-disable_telemetry = false
-tools_before_privacy = false
-batch_size = 10
-batch_interval_seconds = 60
-
-[default_mcp_config]
-
-[[embedding]]
-provider = "sentence-transformers"
-enabled = true
-
-[embedding.model_settings]
-model = "ibm-granite/granite-embedding-small-english-r2"
-
-[[sparse_embedding]]
-provider = "sentence-transformers"
-enabled = true
-
-[sparse_embedding.model_settings]
-model = "opensearch/openensearch-neural-sparse-encoding-doc-v3-gte"
-
-[[reranking]]
-provider = "sentence-transformers"
-enabled = true
-
-[reranking.model_settings]
-model = "BAAI/bge-reranking-v2-m3"
-
-[vector_store]
-provider = "qdrant"
-enabled = true
-
-[vector_store.provider_settings]
-prefer_grpc = true
-url = "http://localhost:6334"

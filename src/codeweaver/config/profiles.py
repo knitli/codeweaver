@@ -113,6 +113,9 @@ def _vector_client_opts(*, remote: bool) -> dict[str, object]:
     return {}
 
 
+HAS_ST = util.find_spec("sentence_transformers") is not None
+
+
 def _recommended_default(
     vector_deployment: Literal["cloud", "local"], *, url: AnyHttpUrl | None = None
 ) -> ProviderSettingsDict:
@@ -128,6 +131,13 @@ def _recommended_default(
                 model_settings=EmbeddingModelSettings(model="voyage-code-3"),
                 provider=Provider.VOYAGE,
                 enabled=True,
+            ),
+        ),
+        sparse_embedding=(
+            SparseEmbeddingProviderSettings(
+                provider=Provider.FASTEMBED,
+                enabled=True,
+                model_settings=SparseEmbeddingModelSettings(model="prithivida/Splade_PP_en_v1"),
             ),
         ),
         reranking=(
@@ -155,9 +165,6 @@ def _recommended_default(
             provider_settings=_get_vector_config(vector_deployment, url=url),
         ),
     )
-
-
-HAS_ST = util.find_spec("sentence_transformers") is not None
 
 
 def _quickstart_default(

@@ -229,7 +229,7 @@ def config(
     display.console.print(f"[dim]Project:[/dim] {project_path}\n")
 
     # Determine final config path
-    final_config_path = config_path or project_path / "codeweaver.toml"
+    final_config_path = config_path or project_path / f"codeweaver.{config_extension}"
 
     if final_config_path.exists() and not force:
         if Confirm.ask(

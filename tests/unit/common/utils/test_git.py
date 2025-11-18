@@ -599,7 +599,7 @@ class TestInCodeweaverClone:
 
     def test_path_contains_codeweaver(self, tmp_path: Path) -> None:
         """Test returns True when path contains 'codeweaver'."""
-        path = tmp_path / "codeweaver-mcp"
+        path = tmp_path / "codeweaver"
         assert in_codeweaver_clone(path) is True
 
     def test_path_contains_code_weaver(self, tmp_path: Path) -> None:

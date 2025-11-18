@@ -42,7 +42,7 @@ def package_info():
     wheel_name = wheels[0].name
     # Format: codeweaver_mcp-{version}-py3-none-any.whl
     parts = wheel_name.split("-")
-    package_name = "codeweaver-mcp"  # PyPI normalized name
+    package_name = "codeweaver"  # PyPI normalized name
     version = parts[1] if len(parts) > 1 else ""
 
     return {

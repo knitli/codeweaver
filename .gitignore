@@ -14,6 +14,7 @@ hk.local.pkl.license
 .roo/mcp.json
 # local terminal zsh config -- can contain sensitive info
 .vscode/terminal.local.zsh
+*mcp*.backup*
 
 # CLAUDE.md -- we symlink this file from AGENTS.md in the setup script
 CLAUDE.md

@@ -44,6 +44,7 @@ shfmt = "latest"
 typos = "latest"
 usage = "latest"
 uv = "latest"
+"npm:changesets" = "latest"
 
 [env]
 GH_REPO = "{{config_root}}"

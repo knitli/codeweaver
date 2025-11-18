@@ -62,7 +62,7 @@ def test_install_from_testpypi():
             "https://test.pypi.org/simple/",
             "--extra-index-url",
             "https://pypi.org/simple/",
-            "codeweaver-mcp",
+            "codeweaver",
         ]
 
         result = subprocess.run(install_cmd, capture_output=True, text=True, check=False)
@@ -90,7 +90,7 @@ def test_testpypi_metadata():
     Verify package metadata is correct on TestPyPI.
 
     Manual validation:
-    1. Visit https://test.pypi.org/project/codeweaver-mcp/
+    1. Visit https://test.pypi.org/project/codeweaver/
     2. Verify metadata fields:
        - Description matches README
        - License: MIT OR Apache-2.0

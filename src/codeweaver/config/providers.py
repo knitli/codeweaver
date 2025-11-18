@@ -70,7 +70,7 @@ class ConnectionConfiguration(TypedDict, total=False):
     rate_limits: NotRequired[ConnectionRateLimitConfig | None]
 
 
-class BaseProviderSettings(TypedDict, total=False):
+class BaseProviderSettingsDict(TypedDict, total=False):
     """Base settings for all providers."""
 
     provider: Required[Provider]
@@ -88,7 +88,7 @@ class BaseProviderSettings(TypedDict, total=False):
 # ===========================================================================
 
 
-class DataProviderSettings(BaseProviderSettings):
+class DataProviderSettings(BaseProviderSettingsDict):
     """Settings for data providers."""
 
 
@@ -247,7 +247,7 @@ type ProviderSpecificSettings = (
 )
 
 
-class EmbeddingProviderSettings(BaseProviderSettings):
+class EmbeddingProviderSettings(BaseProviderSettingsDict):
     """Settings for (dense) embedding models. It validates that the model and provider settings are compatible and complete, reconciling environment variables and config file settings as needed."""
 
     model_settings: Required[EmbeddingModelSettings]
@@ -256,7 +256,7 @@ class EmbeddingProviderSettings(BaseProviderSettings):
     """Settings for specific providers, if any. Some providers have special settings that are required for them to work properly, but you may provide them by environment variables as well as in your config, or both."""
 
 
-class SparseEmbeddingProviderSettings(BaseProviderSettings):
+class SparseEmbeddingProviderSettings(BaseProviderSettingsDict):
     """Settings for sparse embedding models."""
 
     model_settings: Required[SparseEmbeddingModelSettings]
@@ -264,7 +264,7 @@ class SparseEmbeddingProviderSettings(BaseProviderSettings):
     provider_settings: NotRequired[ProviderSpecificSettings | None]
 
 
-class RerankingProviderSettings(BaseProviderSettings):
+class RerankingProviderSettings(BaseProviderSettingsDict):
     """Settings for re-ranking models."""
 
     model_settings: Required[RerankingModelSettings]
@@ -273,7 +273,7 @@ class RerankingProviderSettings(BaseProviderSettings):
     top_n: NotRequired[PositiveInt | None]
 
 
-class VectorStoreProviderSettings(BaseProviderSettings, total=False):
+class VectorStoreProviderSettings(BaseProviderSettingsDict, total=False):
     """Settings for vector store provider selection and configuration."""
 
     """Vector store provider: Provider.QDRANT or Provider.MEMORY. Defaults to Provider.QDRANT."""
@@ -290,7 +290,7 @@ type ModelString = Annotated[
 ]
 
 
-class AgentProviderSettings(BaseProviderSettings):
+class AgentProviderSettings(BaseProviderSettingsDict):
     """Settings for agent models."""
 
     model: Required[ModelString | None]
@@ -679,9 +679,9 @@ class ProviderSettings(BasedModel):
         return ("data", "embedding", "sparse_embedding", "reranking", "vector_store", "agent")
 
     @property
-    def provider_configs(self) -> dict[ProviderField, tuple[BaseProviderSettings, ...] | None]:
+    def provider_configs(self) -> dict[ProviderField, tuple[BaseProviderSettingsDict, ...] | None]:
         """Get a summary of configured provider settings by kind."""
-        configs: dict[ProviderField, tuple[BaseProviderSettings, ...] | None] = {}
+        configs: dict[ProviderField, tuple[BaseProviderSettingsDict, ...] | None] = {}
         for field in self._field_names:
             setting = self.settings_for_kind(field)
             if setting is None or setting is Unset:
@@ -706,7 +706,7 @@ class ProviderSettings(BasedModel):
 
     def get_provider_settings(
         self, provider: Provider
-    ) -> BaseProviderSettings | tuple[BaseProviderSettings, ...] | None:
+    ) -> BaseProviderSettingsDict | tuple[BaseProviderSettingsDict, ...] | None:
         """Get the settings for a specific provider."""
         if provider == Provider.NOT_SET:
             return None
@@ -724,7 +724,7 @@ class ProviderSettings(BasedModel):
             return None
 
         # Retrieve and flatten settings for matching fields
-        all_settings: list[BaseProviderSettings] = []
+        all_settings: list[BaseProviderSettingsDict] = []
         for field in matching_fields:
             if setting := self.settings_for_kind(field):
                 if isinstance(setting, tuple):
@@ -752,7 +752,7 @@ class ProviderSettings(BasedModel):
 
     def settings_for_kind(
         self, kind: ProviderField | LiteralKinds
-    ) -> BaseProviderSettings | tuple[BaseProviderSettings, ...] | None:
+    ) -> BaseProviderSettingsDict | tuple[BaseProviderSettingsDict, ...] | None:
         """Get the settings for a specific provider kind.
 
         Args:

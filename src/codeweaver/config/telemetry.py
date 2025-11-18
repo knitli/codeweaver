@@ -50,6 +50,7 @@ class TelemetrySettings(BasedModel):
                 - errors,
                 - performance metrics,
                 - settings usage (e.g., which providers you use, whether you explicitly set certain settings, etc).
+            Well, technically we don't collect anything yet -- telemetry isn't wired up -- but when we do, this is what we will collect. This helps us make CodeWeaver better for everyone.  **We will never sell your data or show you ads. We only use it to improve CodeWeaver.**
     We pass all data we collect through filters in CodeWeaver before we send it to PostHog, and at PostHog, we have additional filters set up at the entry point (before we can see it) to further ensure we don't collect any potentially identifying information.
     """
 

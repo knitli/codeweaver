@@ -51,7 +51,7 @@ def test_install_from_pypi():
         python = venv_path / "bin" / "python"
 
         # Install from PyPI
-        install_cmd = [str(pip), "install", "codeweaver-mcp"]
+        install_cmd = [str(pip), "install", "codeweaver"]
 
         result = subprocess.run(install_cmd, capture_output=True, text=True, check=False)
         assert result.returncode == 0, f"Installation failed: {result.stderr}"
@@ -85,7 +85,7 @@ def test_pypi_metadata():
     Verify package metadata is correct on production PyPI.
 
     Manual validation:
-    1. Visit https://pypi.org/project/codeweaver-mcp/
+    1. Visit https://pypi.org/project/codeweaver/
     2. Verify metadata fields:
        - Description matches README
        - License: MIT OR Apache-2.0
@@ -105,7 +105,7 @@ def test_pypi_search():
 
     Manual validation:
     1. Search for "codeweaver" on pypi.org
-    2. Verify codeweaver-mcp appears in results
+    2. Verify codeweaver appears in results
     3. Verify description is visible
     4. Verify keywords aid discoverability
     """
