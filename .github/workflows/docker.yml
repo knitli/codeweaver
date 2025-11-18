@@ -112,6 +112,8 @@ jobs:
     name: Test Docker Compose
     runs-on: ubuntu-latest
     needs: build
+    permissions:
+      contents: read
     # Note: This job rebuilds the image independently with 'docker compose build'
     # The 'needs: build' dependency is for logical ordering, not artifact reuse
     # Mark as non-blocking since build may fail in CI due to SSL issues
