@@ -13,7 +13,14 @@ from typing import TYPE_CHECKING, Literal
 
 from rich.console import Console
 from rich.live import Live
-from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TaskProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
 from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
@@ -22,7 +29,7 @@ from codeweaver import __version__
 
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Callable, Generator
 
 
 class StatusDisplay:
@@ -41,12 +48,8 @@ class StatusDisplay:
         # Detect if we're in an interactive terminal to avoid stdin issues in pytest
         import sys
 
-        is_interactive = sys.stdin.isatty() if hasattr(sys.stdin, 'isatty') else False
-        self.console = console or Console(
-            markup=True,
-            emoji=True,
-            force_interactive=is_interactive
-        )
+        is_interactive = sys.stdin.isatty() if hasattr(sys.stdin, "isatty") else False
+        self.console = console or Console(markup=True, emoji=True, force_interactive=is_interactive)
         self._start_time = time.time()
 
     def print_header(self, *, host: str = "127.0.0.1", port: int = 9328) -> None:
@@ -58,7 +61,13 @@ class StatusDisplay:
         """
         self.console.print(f"CodeWeaver v{__version__}")
         self.console.print(f"Server: http://{host}:{port}")
+        self.console.print("[dim]Built with FastMCP (https://gofastmcp.com)[/dim]")
         self.console.print()
+        self.console.print("Built by Knitli: https://knitli.com")
+        self.console.print()
+        self.console.print(
+            "Find a bug? Want to contribute? Visit https://github.com/knitli/codeweaver"
+        )
 
     def print_step(self, message: str) -> None:
         """Print a status step message.
@@ -167,12 +176,7 @@ class StatusDisplay:
         with Live(spinner_obj, console=self.console, refresh_per_second=10):
             yield
 
-    def print_error(
-        self,
-        message: str,
-        *,
-        details: str | None = None,
-    ) -> None:
+    def print_error(self, message: str, *, details: str | None = None) -> None:
         """Print an error message.
 
         Args:
@@ -270,6 +274,84 @@ class StatusDisplay:
         )
         with progress:
             yield progress
+
+    @contextmanager
+    def progress_bar(
+        self, total: int, description: str = "Processing"
+    ) -> Generator[Callable[[int], None], None, None]:
+        """Context manager for displaying a progress bar.
+        
+        Args:
+            total: Total number of items to process
+            description: Description to show with progress bar
+            
+        Yields:
+            Function to update progress (call with current count)
+        """
+        progress = Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            TimeElapsedColumn(),
+            console=self.console,
+        )
+
+        with progress:
+            task = progress.add_task(description, total=total)
+
+            def update(current: int) -> None:
+                progress.update(task, completed=current)
+
+            yield update
+
+    def print_index_summary(
+        self,
+        files_indexed: int,
+        chunks_created: int,
+        language_breakdown: dict[str, int] | None = None,
+        avg_chunks_per_file: float | None = None,
+        avg_tokens_per_chunk: float | None = None,
+    ) -> None:
+        """Print index summary with statistics.
+        
+        Args:
+            files_indexed: Number of files indexed
+            chunks_created: Number of chunks created
+            language_breakdown: Optional dict of language -> file count
+            avg_chunks_per_file: Average chunks per file
+            avg_tokens_per_chunk: Average tokens per chunk
+        """
+        self.console.print()
+        self.console.print("[bold cyan]Index Summary:[/bold cyan]")
+        self.console.print(f"  Files indexed: {files_indexed}")
+        self.console.print(f"  Code chunks: {chunks_created}")
+
+        if language_breakdown:
+            # Format: "Python (8), TypeScript (3), Markdown (1)"
+            lang_parts = [f"{lang} ({count})" for lang, count in sorted(
+                language_breakdown.items(), key=lambda x: x[1], reverse=True
+            )]
+            lang_str = ", ".join(lang_parts[:5])  # Show top 5
+            if len(language_breakdown) > 5:
+                lang_str += f", +{len(language_breakdown) - 5} more"
+            self.console.print(f"  Languages: {lang_str}")
+
+        if avg_chunks_per_file is not None and avg_tokens_per_chunk is not None:
+            self.console.print(
+                f"  Average: {avg_chunks_per_file:.1f} chunks/file, "
+                f"{avg_tokens_per_chunk:.0f} tokens/chunk"
+            )
+
+    def print_reindex_brief(self, files: int, chunks: int, duration: float) -> None:
+        """Print brief reindexing message.
+        
+        Args:
+            files: Number of files reindexed
+            chunks: Number of chunks created
+            duration: Duration in seconds
+        """
+        self.console.print(f"↻ Reindexed {files} files, {chunks} chunks ({duration:.1f}s)")
 
 
 _display: StatusDisplay | None = None

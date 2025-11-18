@@ -22,6 +22,7 @@ from rich.table import Table
 
 from codeweaver.agent_api.find_code.intent import IntentType
 from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
+from codeweaver.agent_api.find_code import find_code
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.cli.utils import resolve_project_root
 from codeweaver.common.utils.utils import get_user_config_dir
@@ -100,7 +101,7 @@ async def _run_search_indexing(
         Exception: On indexing failure
     """
     from codeweaver.core.types.dictview import DictView
-    from codeweaver.engine.indexer import Indexer
+    from codeweaver.engine.indexer import Indexer, IndexingProgressTracker
 
     display = _display
     display.print_warning("No index found. Indexing project...")
@@ -113,7 +114,14 @@ async def _run_search_indexing(
 
         # Create and run indexer
         indexer = await Indexer.from_settings_async(settings=settings_view)
-        await indexer.prime_index(force_reindex=False)
+        
+        # Create progress tracker for live feedback
+        progress_tracker = IndexingProgressTracker(console=display.console)
+        
+        await indexer.prime_index(
+            force_reindex=False,
+            progress_callback=lambda stats, phase: progress_tracker.update(stats, phase),
+        )
 
         # Show quick summary
         stats = indexer.stats
@@ -169,9 +177,7 @@ async def search(
         display.print_info(f"Query: {query}")
         display.print_info("")  # Empty line for spacing
 
-        from codeweaver.server.app_bindings import find_code_tool
-
-        response = await find_code_tool(
+        response = await find_code(
             query=query,
             intent=intent,
             token_limit=settings.get("token_limit", 10000),
