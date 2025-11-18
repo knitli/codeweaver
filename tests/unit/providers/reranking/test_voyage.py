@@ -20,11 +20,14 @@ from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.voyage import VoyageRerankingProvider
 
+
 # Create a mock VoyageRerankingResult that matches the real API structure
 MockVoyageResult = namedtuple("MockVoyageResult", ["document", "index", "relevance_score"])
 
 
-def create_voyage_result(index: int, relevance_score: float, document: str = "") -> MockVoyageResult:
+def create_voyage_result(
+    index: int, relevance_score: float, document: str = ""
+) -> MockVoyageResult:
     """Create a mock Voyage reranking result matching the API structure."""
     return MockVoyageResult(document=document, index=index, relevance_score=relevance_score)
 
@@ -64,8 +67,7 @@ class TestVoyageRerankingProviderInitialization:
     ):
         """Test that provider initializes correctly with a client."""
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client,
-            caps=voyage_rerank_capabilities,
+            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
         )
 
         assert provider.client is mock_voyage_rerank_client
@@ -216,7 +218,9 @@ class TestVoyageRerankingProviderReranking:
         """Test reranking with string documents."""
         # Setup mock response
         mock_response = MagicMock()
-        mock_response.results = [create_voyage_result(index=0, relevance_score=0.95, document="document 1")]
+        mock_response.results = [
+            create_voyage_result(index=0, relevance_score=0.95, document="document 1")
+        ]
         mock_response.total_tokens = 100
         mock_voyage_rerank_client.rerank.return_value = mock_response
 

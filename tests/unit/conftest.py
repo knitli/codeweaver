@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -32,3 +33,33 @@ def mock_confirm(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     monkeypatch.setattr("rich.prompt.Confirm", mock)
 
     return mock
+
+
+@pytest.fixture(autouse=True)
+def isolated_test_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Ensure all tests run in isolated environment.
+
+    This autouse fixture prevents tests from touching real user configs by:
+    - Setting a temporary HOME directory
+    - Setting CODEWEAVER_TEST_MODE environment variable
+    - Resetting CodeWeaver settings between tests
+
+    Applied automatically to all unit tests.
+    """
+    from codeweaver.config.settings import reset_settings
+
+    # Create isolated HOME directory
+    fake_home = tmp_path / "home"
+    fake_home.mkdir(exist_ok=True)
+    monkeypatch.setenv("HOME", str(fake_home))
+
+    # Enable test mode for CodeWeaver settings
+    monkeypatch.setenv("CODEWEAVER_TEST_MODE", "1")
+
+    # Reset settings to prevent cross-test contamination
+    reset_settings()
+
+    yield
+
+    # Cleanup after test
+    reset_settings()

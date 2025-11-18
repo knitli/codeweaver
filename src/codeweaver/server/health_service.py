@@ -21,6 +21,7 @@ from codeweaver.server.health_models import (
     IndexingInfo,
     IndexingProgressInfo,
     RerankingServiceInfo,
+    ResourceInfo,
     ServicesInfo,
     SparseEmbeddingServiceInfo,
     StatisticsInfo,
@@ -90,13 +91,20 @@ class HealthService:
         services_info_task = asyncio.create_task(self._get_services_info())
         statistics_info_task = asyncio.create_task(self._get_statistics_info())
         failover_info_task = asyncio.create_task(self._get_failover_info())
+        resources_info_task = asyncio.create_task(self._collect_resource_info())
 
-        indexing_info, services_info, statistics_info, failover_info = await asyncio.gather(
-            indexing_info_task, services_info_task, statistics_info_task, failover_info_task
+        indexing_info, services_info, statistics_info, failover_info, resources_info = (
+            await asyncio.gather(
+                indexing_info_task,
+                services_info_task,
+                statistics_info_task,
+                failover_info_task,
+                resources_info_task,
+            )
         )
 
-        # Determine overall status
-        status = self._determine_status(indexing_info, services_info)
+        # Determine overall status (including resource checks)
+        status = self._determine_status(indexing_info, services_info, resources_info)
 
         # Calculate uptime
         uptime_seconds = int(time.time() - self._startup_time)
@@ -108,6 +116,7 @@ class HealthService:
             services=services_info,
             statistics=statistics_info,
             failover=failover_info,
+            resources=resources_info,
         )
 
     async def _get_indexing_info(self) -> IndexingInfo:
@@ -461,15 +470,99 @@ class HealthService:
             chunks_in_failover=failover_stats.chunks_in_failover,
         )
 
+    async def _collect_resource_info(self) -> ResourceInfo | None:
+        """Collect system resource usage.
+
+        Returns:
+            ResourceInfo with current resource usage, or None if psutil unavailable
+        """
+        try:
+            import os
+
+            from pathlib import Path
+
+            import psutil
+
+            process = psutil.Process(os.getpid())
+
+            # Memory usage (RSS = Resident Set Size)
+            memory_info = process.memory_info()
+            memory_mb = memory_info.rss // (1024 * 1024)
+
+            # CPU usage (over short interval)
+            cpu_percent = process.cpu_percent(interval=0.1)
+
+            # Disk usage
+            from codeweaver.common.utils import get_user_config_dir
+
+            config_dir = Path(get_user_config_dir())
+            index_dir = config_dir / ".indexes"
+            cache_dir = config_dir
+
+            def get_dir_size(path: Path) -> int:
+                """Get directory size in MB."""
+                if not path.exists():
+                    return 0
+                try:
+                    total = sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
+                    return total // (1024 * 1024)
+                except (PermissionError, OSError):
+                    # Gracefully handle permission errors
+                    return 0
+
+            disk_index_mb = get_dir_size(index_dir)
+            disk_cache_mb = get_dir_size(cache_dir)
+            disk_total_mb = disk_cache_mb  # Cache includes index
+
+            # File descriptors (Unix only)
+            file_descriptors = None
+            file_descriptors_limit = None
+            try:
+                file_descriptors = process.num_fds()  # Unix only
+                # Get system limit
+                import resource
+
+                soft_limit, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
+                file_descriptors_limit = soft_limit
+            except (AttributeError, ImportError):
+                # Windows or unavailable
+                pass
+
+            return ResourceInfo(
+                memory_mb=memory_mb,
+                cpu_percent=cpu_percent,
+                disk_total_mb=disk_total_mb,
+                disk_index_mb=disk_index_mb,
+                disk_cache_mb=disk_cache_mb,
+                file_descriptors=file_descriptors,
+                file_descriptors_limit=file_descriptors_limit,
+            )
+        except ImportError:
+            # psutil not available - graceful degradation
+            logger.debug("psutil not available, skipping resource collection")
+            return None
+        except Exception as e:
+            # Gracefully handle any other errors
+            logger.warning("Failed to collect resource information: %s", e)
+            return None
+
     def _determine_status(
-        self, indexing: IndexingInfo, services: ServicesInfo
+        self, indexing: IndexingInfo, services: ServicesInfo, resources: ResourceInfo | None = None
     ) -> str:  # Literal["healthy", "degraded", "unhealthy"]:
         """Determine overall system health status based on component states.
 
         Status rules (from FR-010-Enhanced contract):
         - healthy: All services up, indexing idle or progressing normally
-        - degraded: Some services down but core functionality works
+        - degraded: Some services down but core functionality works, or high resource usage
         - unhealthy: Critical services down (vector store unavailable)
+
+        Args:
+            indexing: Indexing state information
+            services: Service health information
+            resources: Resource usage information (optional)
+
+        Returns:
+            Overall health status
         """
         # Unhealthy: Vector store down OR indexing in error state
         if services.vector_store.status == "down" or indexing.state == "error":
@@ -481,6 +574,33 @@ class HealthService:
             and services.sparse_embedding.status == "up"
         ):
             return "degraded"
+
+        # Check resource usage (warnings, not critical)
+        if resources:
+            # Memory warning at 1.5GB, critical at 2GB
+            if resources.memory_mb > 2048:
+                logger.warning("High memory usage: %d MB", resources.memory_mb)
+                return "degraded"
+
+            # CPU sustained high usage (>80%)
+            if resources.cpu_percent > 80:
+                logger.warning("High CPU usage: %.1f%%", resources.cpu_percent)
+                return "degraded"
+
+            # File descriptor warning at 80% of limit
+            if (
+                resources.file_descriptors is not None
+                and resources.file_descriptors_limit is not None
+            ):
+                fd_percent = (resources.file_descriptors / resources.file_descriptors_limit) * 100
+                if fd_percent > 80:
+                    logger.warning(
+                        "High file descriptor usage: %d/%d (%.1f%%)",
+                        resources.file_descriptors,
+                        resources.file_descriptors_limit,
+                        fd_percent,
+                    )
+                    return "degraded"
 
         return "degraded" if indexing.progress.errors >= 25 else "healthy"
 

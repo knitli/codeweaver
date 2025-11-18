@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -45,6 +46,7 @@ class FileWatcher:
 
     _indexer: Indexer
     _log_manager: WatchfilesLogManager | None
+    _status_display: Any | None  # StatusDisplay instance
 
     def __init__(
         self,
@@ -55,6 +57,7 @@ class FileWatcher:
         file_filter: watchfiles.BaseFilter | None = None,
         walker: rignore.Walker | None = None,
         indexer: Indexer | None = None,  # NEW: Accept optional indexer
+        status_display: Any | None = None,  # NEW: Accept optional status display
         capture_watchfiles_output: bool = True,
         watchfiles_log_level: int = logging.WARNING,
         watchfiles_use_rich: bool = USE_RICH,
@@ -72,6 +75,7 @@ class FileWatcher:
             file_filter: Optional filter for file changes
             walker: Optional rignore walker for initial indexing
             indexer: Optional indexer instance to use (if None, creates new one)
+            status_display: Optional StatusDisplay instance for user-facing output
             capture_watchfiles_output: Enable watchfiles logging capture
             watchfiles_log_level: Minimum log level (default: WARNING)
             watchfiles_use_rich: Use Rich handler for pretty output
@@ -86,6 +90,7 @@ class FileWatcher:
         self.paths = paths
         self.handler = handler or self._default_handler
         self.context = context
+        self._status_display = status_display
         # Initialize log manager if capture enabled
         self._log_manager = None
         if capture_watchfiles_output:
@@ -151,6 +156,7 @@ class FileWatcher:
         file_filter: watchfiles.BaseFilter | None = None,
         walker: rignore.Walker | None = None,
         indexer: Indexer | None = None,  # NEW: Accept optional indexer
+        status_display: Any | None = None,  # NEW: Accept status_display
         capture_watchfiles_output: bool = True,
         watchfiles_log_level: int = logging.WARNING,
         watchfiles_use_rich: bool = USE_RICH,
@@ -178,6 +184,7 @@ class FileWatcher:
             file_filter=file_filter,
             walker=walker,
             indexer=indexer,  # Pass through indexer
+            status_display=status_display,  # Pass through status_display
             capture_watchfiles_output=capture_watchfiles_output,
             watchfiles_log_level=watchfiles_log_level,
             watchfiles_use_rich=watchfiles_use_rich,
@@ -245,10 +252,48 @@ class FileWatcher:
             self._log_manager = WatchfilesLogManager(log_level=log_level)
 
     async def _default_handler(self, changes: set[FileChange]) -> None:
-        """Default may be misleading -- 'placeholder' handler."""
-        for change in changes:
-            logger.info("File change detected.", extra={"change": change})
-            await self._indexer.index(change)
+        """Handle file changes with user-facing progress display.
+
+        Shows brief message for small batches (<= 5 files) and progress bar for larger batches.
+        """
+        num_changes = len(changes)
+        if num_changes == 0:
+            return
+
+        start_time = time.time()
+        chunks_created = 0
+
+        # For large batches, show progress bar
+        if num_changes > 5 and self._status_display:
+            with self._status_display.progress_bar(
+                total=num_changes,
+                description="↻ Reindexing changes"
+            ) as update:
+                for i, change in enumerate(changes, 1):
+                    logger.info("File change detected.", extra={"change": change})
+                    # Track chunks before indexing
+                    chunks_before = self._indexer.stats.chunks_created
+                    await self._indexer.index(change)
+                    # Calculate chunks created by this file
+                    chunks_created += self._indexer.stats.chunks_created - chunks_before
+                    update(i)
+        else:
+            # For small batches, process without progress bar
+            for change in changes:
+                logger.info("File change detected.", extra={"change": change})
+                chunks_before = self._indexer.stats.chunks_created
+                await self._indexer.index(change)
+                chunks_created += self._indexer.stats.chunks_created - chunks_before
+
+        duration = time.time() - start_time
+
+        # Show brief summary for all batches
+        if self._status_display:
+            self._status_display.print_reindex_brief(
+                files=num_changes,
+                chunks=chunks_created,
+                duration=duration,
+            )
 
     async def run(self) -> int:
         """Run the file watcher until cancelled. Returns the reload count from arun_process."""

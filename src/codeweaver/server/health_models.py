@@ -180,6 +180,25 @@ class FailoverInfo(BasedModel):
         return None
 
 
+class ResourceInfo(BasedModel):
+    """System resource usage information."""
+
+    memory_mb: Annotated[NonNegativeInt, Field(description="Current memory usage in MB")]
+    cpu_percent: Annotated[NonNegativeFloat, Field(ge=0, description="Current CPU usage percentage")]
+    disk_total_mb: Annotated[NonNegativeInt, Field(description="Total disk usage in MB")]
+    disk_index_mb: Annotated[NonNegativeInt, Field(description="Disk usage for index in MB")]
+    disk_cache_mb: Annotated[NonNegativeInt, Field(description="Disk usage for cache in MB")]
+    file_descriptors: Annotated[
+        int | None, Field(description="Open file descriptors (if available)")
+    ] = None
+    file_descriptors_limit: Annotated[
+        int | None, Field(description="File descriptor limit (if available)")
+    ] = None
+
+    def _telemetry_keys(self) -> None:
+        return None
+
+
 class HealthResponse(BasedModel):
     """Represents the health of CodeWeaver and its components."""
 
@@ -200,6 +219,9 @@ class HealthResponse(BasedModel):
     failover: Annotated[
         FailoverInfo | None, Field(description="Failover status and statistics")
     ] = None
+    resources: Annotated[
+        ResourceInfo | None, Field(description="System resource usage information")
+    ] = None
 
     @classmethod
     def create_with_current_timestamp(
@@ -210,6 +232,7 @@ class HealthResponse(BasedModel):
         services: ServicesInfo,
         statistics: StatisticsInfo,
         failover: FailoverInfo | None = None,
+        resources: ResourceInfo | None = None,
     ) -> HealthResponse:
         """Create health response with current timestamp."""
         return cls(
@@ -220,6 +243,7 @@ class HealthResponse(BasedModel):
             services=services,
             statistics=statistics,
             failover=failover,
+            resources=resources,
         )
 
     def _telemetry_keys(self) -> None:
@@ -233,6 +257,7 @@ __all__ = (
     "IndexingInfo",
     "IndexingProgressInfo",
     "RerankingServiceInfo",
+    "ResourceInfo",
     "ServicesInfo",
     "SparseEmbeddingServiceInfo",
     "StatisticsInfo",

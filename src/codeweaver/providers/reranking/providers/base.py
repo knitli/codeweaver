@@ -389,7 +389,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         """Get the provider for the reranking provider."""
         # Unwrap the value if it's a ModelPrivateAttr
         provider_value = type(self)._provider
-        if hasattr(provider_value, 'default'):
+        if hasattr(provider_value, "default"):
             return provider_value.default
         return provider_value
 

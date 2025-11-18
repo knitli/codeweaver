@@ -171,6 +171,10 @@ class SparseEmbeddingModelCapabilities(BasedModel):
         dict[str, Any],
         Field(description="""Extra model-specific settings.""", default_factory=dict),
     ]
+    default_dtype: Annotated[
+        Literal["float32", "float16", "int8"],
+        Field(description="""The default data type of the model."""),
+    ] = "float16"
 
     _available: Annotated[
         bool, Field(description="""Whether the model is available for use.""")

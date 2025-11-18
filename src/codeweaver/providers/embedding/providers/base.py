@@ -974,7 +974,19 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
 
 class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC):
-    """Abstract class for sparse embedding providers."""
+    """Abstract class for sparse embedding providers.
+
+    Overrides hash stores to prevent collision with dense embedding deduplication.
+    Dense and sparse embeddings should deduplicate independently.
+    """
+
+    # Override parent class hash stores with separate stores for sparse embeddings
+    _hash_store: ClassVar[BlakeStore[UUID7]] = make_blake_store(
+        value_type=UUID, size_limit=1024 * 256
+    )  # 256kb limit -- separate from dense embeddings
+    _backup_hash_store: ClassVar[BlakeStore[UUID7]] = make_blake_store(
+        value_type=UUID, size_limit=1024 * 128
+    )  # 128kb limit -- separate from dense embeddings
 
     @abstractmethod
     @override

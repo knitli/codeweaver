@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import signal
+import sys
 
 from pathlib import Path
 from types import EllipsisType
@@ -42,49 +44,100 @@ def is_server_setup(obj: Any) -> TypeIs[ServerSetup]:
 
 
 async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -> None:
-    """Start CodeWeaver's FastMCP server.
+    """Start CodeWeaver's FastMCP server with force shutdown support.
 
     We start a minimal server here, and once it's up, we register components and merge in settings.
+    Supports force shutdown on second Ctrl+C.
     """
-    app = server if isinstance(server, FastMCP) else server["app"]
-    resolved_kwargs: dict[str, Any] = kwargs or {}
-    server_setup: ServerSetup | EllipsisType = server if is_server_setup(server) else ...
-    if server_setup and is_server_setup(server_setup):
-        settings: CodeWeaverSettings = server_setup["settings"]
-        # Transport priority: 1) CLI param (in server_setup), 2) settings, 3) default
-        transport = (
-            server_setup.get("transport")
-            or (
-                "streamable-http"
-                if isinstance(settings.server, Unset)
-                else settings.server.transport
+    # Track Ctrl+C count for force shutdown
+    shutdown_count = 0
+    original_sigint_handler = None
+
+    def force_shutdown_handler(signum: int, frame: Any) -> None:
+        """Handle multiple SIGINT signals for force shutdown."""
+        nonlocal shutdown_count
+        shutdown_count += 1
+
+        if shutdown_count == 1:
+            logger.info("Shutting down gracefully (press Ctrl+C again to force)...")
+            # Let the signal propagate normally for graceful shutdown
+            if original_sigint_handler and callable(original_sigint_handler):
+                original_sigint_handler(signum, frame)
+        else:
+            logger.warning("Force shutdown requested, exiting immediately...")
+            sys.exit(1)
+
+    # Install force shutdown handler
+    try:
+        original_sigint_handler = signal.signal(signal.SIGINT, force_shutdown_handler)
+    except (ValueError, OSError):
+        # Signal handling not available in this context
+        pass
+
+    try:
+        app = server if isinstance(server, FastMCP) else server["app"]
+        resolved_kwargs: dict[str, Any] = kwargs or {}
+        server_setup: ServerSetup | EllipsisType = server if is_server_setup(server) else ...
+        if server_setup and is_server_setup(server_setup):
+            settings: CodeWeaverSettings = server_setup["settings"]
+
+            # Get verbose/debug flags
+            verbose = server_setup.get("verbose", False)
+            debug = server_setup.get("debug", False)
+
+            # Transport priority: 1) CLI param (in server_setup), 2) settings, 3) default
+            transport = (
+                server_setup.get("transport")
+                or (
+                    "streamable-http"
+                    if isinstance(settings.server, Unset)
+                    else settings.server.transport
+                )
+                or "streamable-http"
             )
-            or "streamable-http"
-        )
-        new_kwargs = {  # type: ignore
-            "transport": transport,
-            "host": server_setup.pop("host", "127.0.0.1"),
-            "port": server_setup.pop("port", 9328),
-            "log_level": server_setup.pop("log_level", "INFO"),
-            "path": server_setup.pop("streamable_http_path", "/codeweaver"),
-            "middleware": server_setup.pop("middleware", set()),
-            "uvicorn_config": settings.uvicorn or {},
-        }
-        resolved_kwargs = new_kwargs | kwargs
-    else:
-        resolved_kwargs = {  # type: ignore
-            "transport": "streamable-http",
-            "host": "127.0.0.1",
-            "port": 9328,
-            "log_level": "INFO",
-            "path": "/codeweaver",
-            "middleware": set(),
-            "uvicorn_config": {},
-            **kwargs.copy(),
-        }  # type: ignore
-    registry = lazy_import("codeweaver.common.registry.provider", "get_provider_registry")  # type: ignore
-    _ = registry()  # type: ignore
-    await app.run_http_async(**resolved_kwargs)  # type: ignore
+
+            # Configure uvicorn based on verbosity
+            uvicorn_config = settings.uvicorn or {}
+            if not (verbose or debug):
+                uvicorn_config = {
+                    **uvicorn_config,
+                    "access_log": False,  # Disable access logging
+                    "log_level": "error",  # Only show errors
+                }
+
+            new_kwargs = {  # type: ignore
+                "transport": transport,
+                "host": server_setup.pop("host", "127.0.0.1"),
+                "port": server_setup.pop("port", 9328),
+                "log_level": server_setup.pop("log_level", "INFO"),
+                "path": server_setup.pop("streamable_http_path", "/codeweaver"),
+                "middleware": server_setup.pop("middleware", set()),
+                "uvicorn_config": uvicorn_config,  # Use configured uvicorn settings
+                "show_banner": False,  # We use our own custom banner via StatusDisplay
+            }
+            resolved_kwargs = new_kwargs | kwargs
+        else:
+            resolved_kwargs = {  # type: ignore
+                "transport": "streamable-http",
+                "host": "127.0.0.1",
+                "port": 9328,
+                "log_level": "INFO",
+                "path": "/codeweaver",
+                "middleware": set(),
+                "uvicorn_config": {},
+                "show_banner": False,  # We use our own custom banner via StatusDisplay
+                **kwargs.copy(),
+            }  # type: ignore
+        registry = lazy_import("codeweaver.common.registry.provider", "get_provider_registry")  # type: ignore
+        _ = registry()  # type: ignore
+        await app.run_http_async(**resolved_kwargs)  # type: ignore
+    finally:
+        # Restore original signal handler
+        if original_sigint_handler:
+            try:
+                signal.signal(signal.SIGINT, original_sigint_handler)
+            except (ValueError, OSError):
+                pass
 
 
 async def run(

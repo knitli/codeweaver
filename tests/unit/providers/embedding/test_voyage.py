@@ -20,6 +20,7 @@ from codeweaver.providers.provider import Provider
 def reset_embedding_registry():
     """Reset the global embedding registry and hash stores between tests to avoid state pollution."""
     import codeweaver.providers.embedding.registry as registry_module
+
     from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 
     # Reset the global singleton registry

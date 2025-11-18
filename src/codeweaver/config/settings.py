@@ -653,7 +653,25 @@ class CodeWeaverSettings(BaseSettings):
         if not secrets_dir.exists():
             secrets_dir.mkdir(parents=True, exist_ok=True)
             secrets_dir.chmod(0o700)
-        locations: list[str] = [
+        # Check if we're in test mode - prioritize test configs
+        is_test_mode = os.environ.get("CODEWEAVER_TEST_MODE") == "1" or os.environ.get(
+            "PYTEST_CURRENT_TEST"
+        )
+
+        locations: list[str] = []
+        if is_test_mode:
+            # In test mode, look for .test configs first
+            locations.extend([
+                "codeweaver.test.local",
+                "codeweaver.test",
+                ".codeweaver.test.local",
+                ".codeweaver.test",
+                ".codeweaver/codeweaver.test.local",
+                ".codeweaver/codeweaver.test",
+            ])
+
+        # Standard config locations
+        locations.extend([
             "codeweaver.local",
             "codeweaver",
             ".codeweaver.local",
@@ -661,7 +679,7 @@ class CodeWeaverSettings(BaseSettings):
             ".codeweaver/codeweaver.local",
             ".codeweaver/codeweaver",
             f"{user_config_dir!s}/codeweaver",
-        ]
+        ])
         for _class in (
             TomlConfigSettingsSource,
             YamlConfigSettingsSource,

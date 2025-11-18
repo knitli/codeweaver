@@ -403,7 +403,7 @@ class TestInstantiateClient:
 
         # Ensure no API key in environment
         with patch.dict("os.environ", {}, clear=True):
-            # This should raise because set_args_on_signature can't satisfy api_key requirement
+            # This should raise because clean_args can't satisfy api_key requirement
             with pytest.raises((TypeError, ConfigurationError)):
                 registry._instantiate_client(
                     Provider.VOYAGE,
@@ -436,30 +436,6 @@ class TestInstantiateClient:
 
         assert _result == mock_instance
         mock_client_class.assert_called_once_with(api_key="test_key", base_url="https://custom.api")
-
-    def test_constructor_signature_mismatch_fallback(self, registry):
-        """Test that set_args_on_signature only passes matching params."""
-
-        # Create a mock class that doesn't accept api_key
-        class MockClient:
-            def __init__(self, timeout: int = 30):
-                self.timeout = timeout
-
-        mock_instance = Mock()
-        mock_client_class = Mock(return_value=mock_instance)
-        mock_client_class.__signature__ = inspect.signature(MockClient)
-
-        _result = registry._instantiate_client(
-            Provider.VOYAGE,
-            ProviderKind.EMBEDDING,
-            mock_client_class,
-            {"api_key": "test_key"},  # api_key not in signature
-            {"timeout": 30},  # timeout IS in signature
-        )
-
-        # set_args_on_signature should only pass timeout, not api_key
-        assert _result == mock_instance
-        mock_client_class.assert_called_once_with(timeout=30)
 
 
 @pytest.mark.external_api

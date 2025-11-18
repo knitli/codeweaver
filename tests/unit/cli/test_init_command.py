@@ -14,6 +14,7 @@ Tests validate:
 from __future__ import annotations
 
 import json
+import os
 
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -26,10 +27,8 @@ from codeweaver.cli.commands.init import app as init_app
 
 @pytest.fixture
 def temp_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Create temporary home directory."""
-    home = tmp_path / "home"
-    home.mkdir()
-    monkeypatch.setenv("HOME", str(home))
+    """Get temporary home directory (created by autouse isolated_test_environment fixture)."""
+    home = Path(os.environ["HOME"])
     return home
 
 
@@ -380,7 +379,7 @@ class TestHelperFunctions:
 
         # Check required fields
         assert hasattr(config, "command")
-        assert config.command == "cw server --transport stdio"
+        assert config.command == "codeweaver server --transport stdio"
         assert config.type == "stdio"
 
     def test_create_stdio_config_with_custom_args(self) -> None:

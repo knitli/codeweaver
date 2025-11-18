@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import re
 import time
@@ -207,7 +208,12 @@ def _get_health_service() -> HealthService:
 
 
 async def _run_background_indexing(
-    state: AppState, settings: CodeWeaverSettings, status_display: Any, *, verbose: bool = False
+    state: AppState,
+    settings: CodeWeaverSettings,
+    status_display: Any,
+    *,
+    verbose: bool = False,
+    debug: bool = False,
 ) -> None:
     """Background task for indexing and file watching.
 
@@ -217,11 +223,14 @@ async def _run_background_indexing(
         status_display: StatusDisplay instance for user-facing output
         verbose: Whether to show verbose output
     """
+    watcher_task = None
     try:
         if verbose:
             logger.info("Starting background indexing...")
 
         if not state.indexer:
+            # Always show this warning to the user - it's important
+            status_display.print_warning("No indexer configured, skipping background indexing")
             if verbose:
                 logger.warning("No indexer configured, skipping background indexing")
             return
@@ -229,32 +238,76 @@ async def _run_background_indexing(
         # Show discovery step to user
         status_display.print_step("Discovering files...")
 
-        # Prime index (initial indexing)
+        # Track progress with callback for live updates
+        progress_update = None
+        total_files = 0
+
+        def progress_callback(stats: Any, phase: str | None) -> None:
+            """Handle progress updates from indexer."""
+            nonlocal progress_update, total_files
+            if phase == "discovery":
+                # Discovery complete, store total for progress bar
+                total_files = stats.files_discovered
+            elif phase == "chunking" and progress_update:
+                # Update progress bar during chunking
+                progress_update(stats.files_processed)
+
+        # Prime index (initial indexing) with progress tracking
         start_time = time.time()
-        await state.indexer.prime_index(force_reindex=False)
+
+        # Show context: discovered files
+        stats = state.indexer.stats
+        files_discovered = stats.files_discovered or 0
+
+        # Only show progress bar if we have files to index
+        if total_files > 0 or files_discovered > 0:
+            with status_display.progress_bar(
+                total=max(total_files, files_discovered), description="Indexing codebase"
+            ) as update:
+                progress_update = update
+                await state.indexer.prime_index(
+                    force_reindex=False,
+                    progress_callback=progress_callback,
+                    status_display=None if verbose or debug else status_display,
+                )
+        else:
+            await state.indexer.prime_index(
+                force_reindex=False,
+                progress_callback=progress_callback,
+                status_display=None if verbose or debug else status_display,
+            )
+
         duration = time.time() - start_time
 
-        # Get statistics from indexer
+        # Get final statistics from indexer
         stats = state.indexer.stats
         files_processed = stats.files_processed
         chunks_created = stats.chunks_created
         files_discovered = stats.files_discovered
-        files_per_second = stats.processing_rate()
 
-        # Show context: X of Y files
-        if files_discovered > 0:
-            status_display.print_step(
-                f"Found {files_processed} changed files of {files_discovered} watched"
-            )
+        # Calculate language breakdown from indexed chunks
+        language_breakdown = {}
+        if hasattr(state.indexer, "_store") and state.indexer._store:
+            for discovered_file in state.indexer._store.values():
+                lang = getattr(discovered_file, "language", None)
+                if lang:
+                    language_breakdown[lang] = language_breakdown.get(lang, 0) + 1
 
-        # Show indexing results
-        status_display.print_step("Indexing...")
-        status_display.print_indexing_stats(
+        # Calculate averages
+        avg_chunks_per_file = chunks_created / files_processed if files_processed > 0 else 0
+        # TODO: Calculate actual token average from chunks when we have access to them
+        avg_tokens_per_chunk = 150  # Placeholder estimate
+
+        # Show index summary
+        status_display.print_index_summary(
             files_indexed=files_processed,
             chunks_created=chunks_created,
-            duration_seconds=duration,
-            files_per_second=files_per_second,
+            language_breakdown=language_breakdown or None,
+            avg_chunks_per_file=avg_chunks_per_file,
+            avg_tokens_per_chunk=avg_tokens_per_chunk,
         )
+
+        status_display.print_step("Watching for file changes...")
 
         # Start file watcher for real-time updates
         if verbose:
@@ -269,18 +322,34 @@ async def _run_background_indexing(
             file_filter=await IgnoreFilter.from_settings_async(),
             walker=state.indexer._walker,
             indexer=state.indexer,
+            status_display=status_display,  # Pass status_display to watcher
         )
 
-        # Run watcher (this will block until cancelled)
-        await watcher.run()
+        # Run watcher in a separate task so we can cancel it cleanly
+        watcher_task = asyncio.create_task(watcher.run())
+        await watcher_task
 
     except asyncio.CancelledError:
         if verbose:
-            logger.info("Background indexing cancelled")
+            logger.info("Background indexing cancelled, shutting down watcher...")
+        # Cancel watcher task if it's still running
+        if watcher_task and not watcher_task.done():
+            watcher_task.cancel()
+            try:
+                await asyncio.wait_for(watcher_task, timeout=2.0)
+            except (TimeoutError, asyncio.CancelledError):
+                if verbose:
+                    logger.warning("Watcher did not stop within timeout")
         raise
     except Exception as e:
         status_display.print_error("Background indexing error", details=str(e))
         logger.exception("Background indexing error")
+    finally:
+        # Ensure watcher task is cancelled on any exit
+        if watcher_task and not watcher_task.done():
+            watcher_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await watcher_task
 
 
 def _initialize_app_state(
@@ -332,11 +401,17 @@ async def _cleanup_state(
     # Show clean shutdown message
     status_display.print_shutdown_start()
 
-    # Cancel background indexing
-    if indexing_task:
+    # Cancel background indexing with timeout
+    if indexing_task and not indexing_task.done():
         indexing_task.cancel()
         try:
-            await indexing_task
+            # Wait up to 5 seconds for graceful shutdown
+            await asyncio.wait_for(indexing_task, timeout=5.0)
+            if verbose:
+                logger.info("Background indexing stopped gracefully")
+        except TimeoutError:
+            logger.warning("Background indexing did not stop within 5 seconds, forcing shutdown")
+            # Task is already cancelled, just move on
         except asyncio.CancelledError:
             if verbose:
                 logger.info("Background indexing stopped")
@@ -407,25 +482,40 @@ async def lifespan(
 
         # Start background indexing task
         indexing_task = asyncio.create_task(
-            _run_background_indexing(state, settings, status_display, verbose=verbose or debug)
+            _run_background_indexing(state, settings, status_display, verbose=verbose, debug=debug)
         )
 
         # Perform health checks and display results
-        status_display.print_step("")
         status_display.print_step("Health checks...")
 
         if state.health_service:
             health_response = await state.health_service.get_health_response()
 
-            # Display service health
-            status_display.print_health_check(
-                "Vector store (Qdrant)", health_response.services.vector_store.status
-            )
+            # Vector store health with degraded handling
+            vs_status = health_response.services.vector_store.status
+            status_display.print_health_check("Vector store (Qdrant)", vs_status)
+
+            # Show helpful message for degraded/down vector store
+            if vs_status in ("down", "degraded") and not (verbose or debug):
+                status_display.console.print(
+                    "  [dim]Unable to connect. Continuing with sparse-only search.[/dim]"
+                )
+                status_display.console.print(
+                    "  [dim]To enable semantic search: docker run -p 6333:6333 qdrant/qdrant[/dim]"
+                )
+            elif vs_status in ("down", "degraded"):
+                logger.warning(
+                    "Failed to connect to Qdrant. Check configuration and ensure Qdrant is running."
+                )
+
+            # Embeddings health
             status_display.print_health_check(
                 "Embeddings (Voyage AI)",
                 health_response.services.embedding_provider.status,
                 model=health_response.services.embedding_provider.model,
             )
+
+            # Sparse embeddings health
             status_display.print_health_check(
                 f"Sparse embeddings ({health_response.services.sparse_embedding.provider})",
                 health_response.services.sparse_embedding.status,
@@ -506,6 +596,9 @@ def __setup_interim_logger(
 
     setup_local_logger(level)
 
+    # Suppress third-party library loggers when not in verbose/debug mode
+    if not verbose and not debug:
+        _set_log_levels()
     # Only set up rich console handler if verbose or debug mode
     if verbose or debug:
         return (
@@ -520,6 +613,18 @@ def __setup_interim_logger(
     # Clear any existing handlers
     logger.handlers.clear()
     return (logger, level)
+
+
+def _set_log_levels():
+    logging.getLogger("voyage").setLevel(logging.WARNING)
+    logging.getLogger("uvicorn").setLevel(logging.ERROR)  # Changed from WARNING
+    logging.getLogger("uvicorn.access").setLevel(logging.CRITICAL)  # Changed from ERROR
+    logging.getLogger("uvicorn.error").setLevel(logging.ERROR)
+    logging.getLogger("mcp").setLevel(logging.WARNING)
+    logging.getLogger("mcp.server").setLevel(logging.WARNING)
+    logging.getLogger("fastmcp").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 LEVEL_MAP: dict[
@@ -552,6 +657,15 @@ def _setup_logger(
         rich_options=rich_options,
         logging_kwargs=logging_kwargs,
     )
+
+    # Suppress third-party library loggers when level is above INFO
+    if level > logging.INFO:
+        logging.getLogger("voyage").setLevel(logging.WARNING)
+        logging.getLogger("uvicorn").setLevel(logging.WARNING)
+        logging.getLogger("uvicorn.access").setLevel(logging.ERROR)
+        logging.getLogger("mcp").setLevel(logging.WARNING)
+        logging.getLogger("mcp.server").setLevel(logging.WARNING)
+
     fast_mcp_log_level = LEVEL_MAP.get(level, "INFO")
     return (app_logger, fast_mcp_log_level)
 
@@ -586,18 +700,12 @@ def _create_base_fastmcp_settings() -> FastMcpServerSettingsDict:
     Returns:
         Dictionary with base FastMCP configuration
     """
-    return {
-        "instructions": "Ask a question, describe what you're trying to do, and get the exact context you need. CodeWeaver is an advanced code search and code context tool. It keeps an updated vector, AST, and text index of your codebase, and uses intelligent intent analysis to provide the most relevant context for AI Agents to complete tasks. It's just one easy-to-use tool - the `find_code` tool. To use it, you only need to provide a plain language description of what you want to find, and what you are trying to do. CodeWeaver will return the most relevant code matches, along with their context and precise locations.",
-        "version": version,
-        # CodeWeaver has three APIs:
-        #  - Human -- through config and CLI
-        #  - *User* Agent: through the `find_code` tool
-        #  - *Context* Agent: through a few internally exposed tools
-        # The include and exclude tags help differentiate between the two agent APIs.
-        # Because these are core to how CodeWeaver works, users can't change them (well, they can if they are persistent enough, but we don't recommend it).
-        "include_tags": {"external", "user", "code-context"},
-        "exclude_tags": {"internal", "system", "admin"},
-    }
+    return FastMcpServerSettingsDict(
+        instructions="Ask a question, describe what you're trying to do, and get the exact context you need. CodeWeaver is an advanced code search and code context tool. It keeps an updated vector, AST, and text index of your codebase, and uses intelligent intent analysis to provide the most relevant context for AI Agents to complete tasks. It's just one easy-to-use tool - the `find_code` tool. To use it, you only need to provide a plain language description of what you want to find, and what you are trying to do. CodeWeaver will return the most relevant code matches, along with their context and precise locations.",
+        version=version,
+        include_tags={"external", "user", "code-context"},
+        exclude_tags={"internal", "system", "admin"},
+    )
 
 
 type SettingsKey = Literal["middleware", "tools"]
