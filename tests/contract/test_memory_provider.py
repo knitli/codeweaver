@@ -22,6 +22,9 @@ from codeweaver.core.spans import Span
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
 
+pytestmark = [pytest.mark.validation]
+
+
 
 pytestmark = pytest.mark.unit
 

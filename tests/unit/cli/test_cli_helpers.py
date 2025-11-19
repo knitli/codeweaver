@@ -16,7 +16,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import pytest
 
+
+pytestmark = [pytest.mark.unit]
 class CliResult:
     """Result from a CLI command execution."""
 

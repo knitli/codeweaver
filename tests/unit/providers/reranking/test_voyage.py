@@ -20,6 +20,9 @@ from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.voyage import VoyageRerankingProvider
 
+pytestmark = [pytest.mark.unit]
+
+
 
 # Create a mock VoyageRerankingResult that matches the real API structure
 MockVoyageResult = namedtuple("MockVoyageResult", ["document", "index", "relevance_score"])

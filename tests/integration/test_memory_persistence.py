@@ -23,6 +23,9 @@ from codeweaver.config.providers import MemoryConfig
 from tests.conftest import create_test_chunk_with_embeddings
 from codeweaver.providers.provider import Provider
 
+pytestmark = [pytest.mark.integration]
+
+
 
 pytestmark = pytest.mark.integration
 

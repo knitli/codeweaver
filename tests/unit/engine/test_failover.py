@@ -16,6 +16,9 @@ import pytest
 from codeweaver.engine.failover import VectorStoreFailoverManager
 from codeweaver.providers.vector_stores.base import CircuitBreakerState
 
+pytestmark = [pytest.mark.unit]
+
+
 
 def _create_mock_collection_info():
     """Create a properly structured mock CollectionInfo object.

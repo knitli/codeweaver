@@ -37,6 +37,9 @@ from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.metadata import ChunkKind
 
 
+pytestmark = [pytest.mark.validation]
+
+
 class TestFindCodeSignature:
     """Test find_code function signature matches contract (FR-014a)."""
 

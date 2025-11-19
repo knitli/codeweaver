@@ -23,6 +23,9 @@ from codeweaver.core.chunks import BatchKeys, CodeChunk
 from codeweaver.core.metadata import ChunkSource, ExtKind, Metadata
 from codeweaver.core.spans import Span
 
+pytestmark = [pytest.mark.unit]
+
+
 
 @pytest.fixture
 def sample_chunk() -> CodeChunk:

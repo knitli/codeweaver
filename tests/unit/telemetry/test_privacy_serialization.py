@@ -35,7 +35,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.telemetry]
 
 @pytest.mark.benchmark
 @pytest.mark.performance
-@pytest.mark.unit
 class TestBasedModelPrivacySerialization:
     """Test privacy serialization for BasedModel instances."""
 
@@ -147,7 +146,6 @@ class TestBasedModelPrivacySerialization:
 
 @pytest.mark.benchmark
 @pytest.mark.performance
-@pytest.mark.unit
 class TestDataclassPrivacySerialization:
     """Test privacy serialization for DataclassSerializationMixin instances."""
 
@@ -190,7 +188,6 @@ class TestDataclassPrivacySerialization:
 
 @pytest.mark.benchmark
 @pytest.mark.performance
-@pytest.mark.unit
 class TestTelemetryEventsSerialization:
     """Test that telemetry events properly serialize."""
 
@@ -300,7 +297,6 @@ class TestTelemetryEventsSerialization:
 
 @pytest.mark.benchmark
 @pytest.mark.performance
-@pytest.mark.unit
 class TestTelemetryHandlerOverride:
     """Test that _telemetry_handler allows custom overrides."""
 

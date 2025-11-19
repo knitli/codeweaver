@@ -30,7 +30,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.server]
 
 @pytest.mark.mock_only
 @pytest.mark.telemetry
-@pytest.mark.unit
 class TestTelemetryIntegration:
     """Test telemetry integration in server initialization."""
 
