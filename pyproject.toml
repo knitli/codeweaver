@@ -107,7 +107,7 @@ dependencies = [
   "fastembed>=0.7.3",
   # MCP server framework
   "fastmcp>=2.13.1",
-  "httpx>=0.28.1",
+  "httpx[http2]>=0.28.1",
   "mcp>=1.19.0",
   # Numerical and ML
   "numpy>=2.3.4",
@@ -132,7 +132,7 @@ dependencies = [
   "typing_extensions>=4.15.0",
   "uuid7>=0.1.0; python_version < '3.14'",
   "uvicorn[standard]>=0.38.0",
-  "uvloop>=0.22.1",
+  "uvloop>=0.22.1; python_implementation == 'CPython' and platform_system != 'Windows'",
   "voyageai>=0.3.5",
   "watchfiles>=1.1.1",
 ]
@@ -295,6 +295,10 @@ build-backend = "hatchling.build"
 
 # TODO: Integrate hatch plugins for:
 #  - readme: https://github.com/hynek/hatch-fancy-pypi-readme
+
+[tool.coverage.run]
+omit = ["scripts/*", "mise-tasks/*", "typings/*", ".venv/*"]
+include = ["src/codeweaver/*", "tests/*"]
 
 [tool.hatch.build.hooks.version]
 additionalProperties = true

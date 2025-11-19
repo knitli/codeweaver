@@ -16,8 +16,6 @@ from pathlib import Path
 from types import EllipsisType
 from typing import TYPE_CHECKING, Any, Literal, cast, is_typeddict
 
-import uvloop
-
 from fastmcp import FastMCP
 from fastmcp.server.middleware import Middleware
 from pydantic import FilePath
@@ -98,32 +96,46 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
             uvicorn_config = settings.uvicorn or {}
             if not (verbose or debug):
                 # Non-verbose mode: Suppress all uvicorn logging
-                import logging
+                # Use a custom log_config that routes access logs to null
 
-                # Create a filter that rejects uvicorn/fastmcp logs
-                class SuppressUvicornFilter(logging.Filter):
-                    """Filter that suppresses uvicorn and fastmcp logs."""
+                uvicorn_log_config = {
+                    "version": 1,
+                    "disable_existing_loggers": False,
+                    "formatters": {
+                        "default": {
+                            "()": "uvicorn.logging.DefaultFormatter",
+                            "fmt": "%(levelprefix)s %(message)s",
+                            "use_colors": None,
+                        }
+                    },
+                    "handlers": {
+                        "null": {"class": "logging.NullHandler"},
+                        "default": {
+                            "formatter": "default",
+                            "class": "logging.StreamHandler",
+                            "stream": "ext://sys.stderr",
+                        },
+                    },
+                    "loggers": {
+                        "uvicorn": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
+                        "uvicorn.error": {
+                            "handlers": ["null"],
+                            "level": "CRITICAL",
+                            "propagate": False,
+                        },
+                        "uvicorn.access": {
+                            "handlers": ["null"],
+                            "level": "CRITICAL",
+                            "propagate": False,
+                        },
+                    },
+                }
 
-                    def filter(self, record: logging.LogRecord) -> bool:
-                        # Reject logs from uvicorn and fastmcp
-                        if record.name.startswith(("uvicorn", "fastmcp")):
-                            return False
-                        return True
-
-                # Add filter to root logger AND all its handlers
-                root_logger = logging.getLogger()
-                suppress_filter = SuppressUvicornFilter()
-                root_logger.addFilter(suppress_filter)
-
-                # Also add to all existing handlers (belt and suspenders approach)
-                for handler in root_logger.handlers:
-                    handler.addFilter(suppress_filter)
-
-                # Disable uvicorn logging via config
                 uvicorn_config = {
                     **uvicorn_config,
                     "access_log": False,  # Disable access logging
                     "log_level": "critical",  # Only critical errors
+                    "log_config": uvicorn_log_config,  # Custom logging config
                 }
             else:
                 # Verbose/debug mode: Enable uvicorn access logs
@@ -211,8 +223,11 @@ async def run(
 
 
 if __name__ == "__main__":
+    from codeweaver.common.utils.utils import asyncio_or_uvloop
+
+    asyncio = asyncio_or_uvloop()
     try:
-        uvloop.run(run())
+        asyncio.run(run())
     except Exception as e:
         logging.getLogger(__name__).exception("Failed to start CodeWeaver server: ")
         raise InitializationError("Failed to start CodeWeaver server.") from e

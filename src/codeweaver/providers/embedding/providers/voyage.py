@@ -70,7 +70,7 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
         shared_kwargs = {
             "model": caps.name,
             "output_dimension": caps.default_dimension,
-            "output_dtype": caps.default_dtype,
+            "output_dtype": "float",
         }
         self.doc_kwargs |= shared_kwargs
         self.query_kwargs |= shared_kwargs

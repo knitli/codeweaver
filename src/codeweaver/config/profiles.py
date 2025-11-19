@@ -44,12 +44,12 @@ from codeweaver.core.stores import get_blake_hash
 
 def _default_local_vector_config() -> QdrantConfig:
     """Default local vector store configuration for Qdrant."""
-    return QdrantConfig(prefer_grpc=True, url="http://localhost:6334")
+    return QdrantConfig(prefer_grpc=False, url="http://localhost:6333")
 
 
 def _default_remote_vector_config(url: AnyHttpUrl) -> QdrantConfig:
     """Default remote vector store configuration for Qdrant."""
-    return QdrantConfig(prefer_grpc=True, url=str(url))
+    return QdrantConfig(prefer_grpc=False, url=str(url))
 
 
 def _get_vector_config(
@@ -245,7 +245,6 @@ def _backup_profile() -> ProviderSettingsDict:
                         if HAS_ST
                         else "Alibaba-NLP/gte-modernbert-base",
                         dimension=384 if HAS_ST else 768,
-                        data_type="int8",
                     ),
                 )
             }

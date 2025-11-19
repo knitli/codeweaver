@@ -25,7 +25,6 @@ from codeweaver.agent_api.find_code.intent import IntentType
 from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.cli.utils import resolve_project_root
-from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.settings import get_settings_map
 from codeweaver.exceptions import CodeWeaverError
 
@@ -60,25 +59,8 @@ async def _index_exists(settings: DictView[CodeWeaverSettingsDict]) -> bool:
         if not project_path:
             return False
 
-        # Get manifest directory (same logic as indexer)
-        if isinstance(settings, dict):
-            indexer_config = settings.get("indexer", {})
-            cache_dir = (
-                indexer_config.get("cache_dir")
-                if isinstance(indexer_config, dict | DictView)
-                else None
-            )
-        else:
-            cache_dir = (
-                settings["indexer"]["cache_dir"] if isinstance(settings["indexer"], dict) else None
-            )
-
-        manifest_dir = (
-            cache_dir / "manifests" if cache_dir else get_user_config_dir() / ".indexes/manifests"
-        )
-
-        # Check manifest
-        manifest_manager = FileManifestManager(Path(project_path), manifest_dir)
+        # Use same logic as Indexer - just pass project_path, let FileManifestManager use default manifest_dir
+        manifest_manager = FileManifestManager(Path(project_path))
         manifest = manifest_manager.load()
 
     except Exception as e:

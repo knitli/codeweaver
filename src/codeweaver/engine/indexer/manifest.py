@@ -267,7 +267,10 @@ class FileManifestManager:
         """
         from codeweaver.core.stores import get_blake_hash
 
-        self.project_path = project_path.resolve()
+        # Ensure consistent path normalization: absolute -> resolve -> real path
+        # This prevents different representations of the same path from generating different hashes
+        self.project_path = project_path.absolute().resolve(strict=False)
+
         manifest_dir = manifest_dir or get_user_config_dir() / ".indexes/manifests"
         if not manifest_dir.exists():
             manifest_dir.mkdir(parents=True, exist_ok=True)
@@ -277,6 +280,14 @@ class FileManifestManager:
         path_hash = get_blake_hash(str(self.project_path))[:16]
         self.manifest_file = (
             self.manifest_dir / f"file_manifest_{self.project_path.name}_{path_hash}.json"
+        )
+
+        # Debug logging to help diagnose path mismatches
+        logger.debug(
+            "FileManifestManager initialized: project_path=%s, hash=%s, manifest=%s",
+            self.project_path,
+            path_hash,
+            self.manifest_file.name,
         )
 
     def save(self, manifest: IndexFileManifest) -> bool:

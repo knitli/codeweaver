@@ -14,6 +14,7 @@ import os
 import sys
 
 from collections.abc import Callable, Iterable
+from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -163,6 +164,27 @@ def get_user_config_dir(*, base_only: bool = False) -> Path:
     else:
         config_dir = Path(os.getenv("XDG_CONFIG_HOME", Path.home() / ".config"))
     return config_dir if base_only else config_dir / "codeweaver"
+
+
+@cache
+def asyncio_or_uvloop() -> object:
+    """Set uvloop as the event loop policy if available and appropriate."""
+    import platform
+    import sys
+
+    from importlib.util import find_spec
+
+    if (
+        sys.platform not in {"win32", "cygwin", "wasi", "ios"}
+        and platform.python_implementation() == "CPython"
+        and find_spec("uvloop") is not None
+    ):
+        import uvloop
+
+        return uvloop
+    import asyncio
+
+    return asyncio
 
 
 __all__ = (

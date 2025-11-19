@@ -42,6 +42,15 @@ SPARSE_MODELS = (
 """
 DENSE_MODELS = (
     DenseModelDescription(
+        model="Alibaba-NLP/gte-modernbert-base",
+        license="apache-2.0",
+        sources=ModelSource(hf="Alibaba-NLP/gte-modernbert-base"),
+        description="""Text embeddings, Unimodal (text), multilingual, 8192 input tokens truncation, Prefixes for queries/documents: not necessary, 2024 year.""",
+        model_file="model.onnx",
+        size_in_GB=1.23,
+        dim=768,
+    ),
+    DenseModelDescription(
         model="BAAI/bge-m3",
         license="mit",
         sources=ModelSource(hf="BAAI/bge-m3"),
@@ -100,6 +109,7 @@ def get_text_embedder() -> type[TextEmbedding]:
     Get the text embedder with added custom models.
     """
     additional_params = {
+        "Alibaba-NLP/gte-modernbert-base": {"pooling": "cls", "normalization": True},
         "BAAI/bge-m3": {"pooling": "cls", "normalization": True},
         "WhereIsAI/UAE-Large-V1": {"pooling": "cls", "normalization": True},
         "snowflake/snowflake-arctic-embed-l-v2.0": {"pooling": "cls", "normalization": True},

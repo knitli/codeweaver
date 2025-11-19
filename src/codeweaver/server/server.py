@@ -58,6 +58,7 @@ from codeweaver.server.health_service import HealthService
 
 
 if TYPE_CHECKING:
+    from codeweaver.cli.ui import StatusDisplay
     from codeweaver.common.utils import LazyImport
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
@@ -210,7 +211,7 @@ def _get_health_service() -> HealthService:
 async def _run_background_indexing(
     state: AppState,
     settings: CodeWeaverSettings,
-    status_display: Any,
+    status_display: StatusDisplay,
     *,
     verbose: bool = False,
     debug: bool = False,
@@ -330,16 +331,18 @@ async def _run_background_indexing(
         await watcher_task
 
     except asyncio.CancelledError:
+        status_display.print_shutdown_start()
         if verbose:
             logger.info("Background indexing cancelled, shutting down watcher...")
         # Cancel watcher task if it's still running
         if watcher_task and not watcher_task.done():
             watcher_task.cancel()
             try:
-                await asyncio.wait_for(watcher_task, timeout=2.0)
+                await asyncio.wait_for(watcher_task, timeout=2.5)
             except (TimeoutError, asyncio.CancelledError):
                 if verbose:
                     logger.warning("Watcher did not stop within timeout")
+                status_display.console.print("  [dim]Tidying up a few loose threads...[/dim]")
         raise
     except Exception as e:
         status_display.print_error("Background indexing error", details=str(e))
@@ -350,6 +353,7 @@ async def _run_background_indexing(
             watcher_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await watcher_task
+        status_display.print_shutdown_complete()
 
 
 def _initialize_app_state(

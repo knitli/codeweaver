@@ -18,13 +18,13 @@ data = [
   { provider = "duckduckgo", enabled = true },
 ]
 embedding = [
-  { provider = "voyage", enabled = true, model_settings = { model = "voyage-code-3" } },
+  { provider = "fastembed", enabled = true, model_settings = { model = "Alibaba-NLP/gte-modernbert-base" } },
 ]
 reranking = [
   { provider = "voyage", enabled = true, model_settings = { model = "rerank-2.5" } },
 ]
 vector_store = [
-  { provider = "qdrant", enabled = true, provider_settings = { prefer_grpc = true, url = "http://localhost:6334" } },
+  { provider = "qdrant", enabled = true, provider_settings = { url = "http://localhost:6333" } },
 ]
 sparse_embedding = [
   { provider = "fastembed", enabled = true, model_settings = { model = "prithivida/Splade_PP_en_v1" } },

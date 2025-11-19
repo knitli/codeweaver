@@ -54,7 +54,7 @@ def get_mistral_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ..
         "default_dimension": 1536,
         "output_dimensions": (3072, 1536, 1024, 512),
         "output_dtypes": ("float", "int8", "uint8", "binary", "ubinary"),
-        "default_dtype": "uint8",
+        "default_dtype": "float",
     }
     return tuple(
         EmbeddingModelCapabilities.model_validate({**shared, **d})

@@ -713,8 +713,10 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         if backup:
             from codeweaver.config.profiles import get_profile
 
-            profile = get_profile("backup")  # type: ignore
-            return profile["embedding"]["model_settings"]["dimension"]
+            profile = get_profile("backup", "local")  # type: ignore
+            if isinstance(profile["embedding"], dict):
+                return profile["embedding"]["model_settings"]["dimension"]
+            return cast(tuple, profile["embedding"])[0]["model_settings"]["dimension"]
         default_dim = self.caps.default_dimension
         model_settings = self._get_model_settings(sparse=sparse)
         if model_settings and model_settings.get("dimension"):

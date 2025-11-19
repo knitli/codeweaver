@@ -161,7 +161,10 @@ jobs:
       - build
       - test-compose
     # Only publish if build succeeded; test-compose can fail due to SSL issues
-    if: "github.event_name != 'pull_request' && \n(github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) &&\nneeds.build.result == 'success'\n"
+    if: |
+      github.event_name != 'pull_request' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) &&
+      needs.build.result == 'success'
     permissions:
       contents: read
       packages: write

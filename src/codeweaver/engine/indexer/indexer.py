@@ -882,6 +882,56 @@ class Indexer(BasedModel):
 
         return self._manifest_manager.save(self._file_manifest)
 
+    async def _update_manifest_for_batch(
+        self, discovered_files: list[DiscoveredFile], all_chunks: list[CodeChunk]
+    ) -> None:
+        """Update file manifest after batch indexing.
+
+        Groups chunks by file and updates manifest with chunk IDs for each file.
+
+        Args:
+            discovered_files: List of files that were indexed
+            all_chunks: All chunks created from those files
+        """
+        if not self._file_manifest or not self._manifest_manager:
+            logger.debug("No manifest to update")
+            return
+
+        # Ensure manifest lock is initialized in async context
+        if self._manifest_lock is None:
+            self._manifest_lock = asyncio.Lock()
+
+        # Group chunks by file path
+        from collections import defaultdict
+
+        chunks_by_file: dict[Path, list[str]] = defaultdict(list)
+        for chunk in all_chunks:
+            if chunk.file_path:
+                chunks_by_file[chunk.file_path].append(str(chunk.chunk_id))
+
+        # Update manifest for each file
+        for discovered_file in discovered_files:
+            chunk_ids = chunks_by_file.get(discovered_file.path, [])
+            if not chunk_ids:
+                logger.debug("No chunks found for file: %s", discovered_file.path)
+                continue
+
+            if relative_path := set_relative_path(discovered_file.path):
+                try:
+                    async with self._manifest_lock:
+                        self._file_manifest.add_file(
+                            path=relative_path,
+                            content_hash=discovered_file.file_hash,
+                            chunk_ids=chunk_ids,
+                        )
+                    logger.debug(
+                        "Updated manifest for file: %s (%d chunks)",
+                        relative_path,
+                        len(chunk_ids),
+                    )
+                except ValueError as e:
+                    logger.warning("Failed to add file to manifest: %s - %s", relative_path, e)
+
     def _try_restore_from_checkpoint(self, *, force_reindex: bool) -> bool:
         """Attempt to restore indexing state from checkpoint.
 
@@ -1555,6 +1605,9 @@ class Indexer(BasedModel):
 
         # Phase 3-5: Embed and index
         await self._phase_embed_and_index(all_chunks, progress_callback, context)
+
+        # Update file manifest for batch indexing
+        await self._update_manifest_for_batch(discovered_files, all_chunks)
 
         # Update stats with successful file count
         self._stats.files_processed += len(discovered_files)

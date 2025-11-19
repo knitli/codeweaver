@@ -38,6 +38,7 @@ def _get_shared_cohere_embedding_capabilities() -> PartialCapabilities:
         "name": MODEL_MAP[Provider.COHERE],
         "provider": Provider.COHERE,
         "supports_context_chunk_embedding": False,
+        "default_dtype": "float",
         "preferred_metrics": ("cosine", "dot", "euclidean"),
         "is_normalized": False,
         "tokenizer": "tokenizers",

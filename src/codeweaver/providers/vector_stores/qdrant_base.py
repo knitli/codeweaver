@@ -441,16 +441,27 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         sparse, dense = None, None
         if isinstance(vector, dict):
             if "indices" in vector and "values" in vector:  # type: ignore
-                sparse = SparseEmbedding(indices=vector["indices"], values=vector["values"])  # type: ignore
+                sparse = SparseEmbedding(
+                    indices=vector["indices"],
+                    values=[float(x) if isinstance(x, int) else x for x in vector["values"]],
+                )  # type: ignore
             elif "sparse" in vector:
                 sparse = SparseEmbedding(
                     indices=vector["sparse"].get("indices", []),  # type: ignore
-                    values=vector["sparse"].get("values", []),  # type: ignore
+                    values=[
+                        float(x) if isinstance(x, int) else x
+                        for x in vector["sparse"].get("values", [])
+                        if vector["sparse"].get("values", [])
+                    ],  # type: ignore
                 )
             if "dense" in vector:  # type: ignore
-                dense = vector["dense"]  # type: ignore
-        elif isinstance(vector, (list, tuple)):
-            dense = vector
+                dense = [
+                    float(x) if isinstance(x, int) else x
+                    for x in vector["dense"]
+                    if vector["dense"]
+                ]  # type: ignore
+        elif isinstance(vector, list | tuple):
+            dense = [float(x) if isinstance(x, int) else x for x in vector]
 
         strategy = (
             SearchStrategy.HYBRID_SEARCH

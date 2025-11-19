@@ -196,6 +196,7 @@ async def _perform_clear_operation(
 
     # Clear vector store
     from codeweaver.config.providers import ProviderSettings
+    from codeweaver.core.types import Unset
 
     registry = get_provider_registry()
     provider = registry.get_provider_enum_for("vector_store")
@@ -205,8 +206,12 @@ async def _perform_clear_operation(
     if (
         (provider_settings := settings.provider)
         and isinstance(provider_settings, ProviderSettings)
-        and (vector_settings := provider_settings.vector_store)
-        and vector_settings is not None
+        and (
+            vector_settings := provider_settings.vector_store[0]
+            if isinstance(provider_settings.vector_store, tuple)
+            else provider_settings.vector_store
+        )
+        and vector_settings is not Unset
         and (vector_provider_config := vector_settings.get("provider_settings"))
     ):
         # Copy provider_settings (url, collection_name, etc.)
@@ -267,17 +272,30 @@ def _get_url():
 
 
 def _check_and_print_server_status(display: StatusDisplay):
-    display.print_success("Server is running")
+    display.console.print()
+    display.print_success(
+        "Good news: Server is running. Your **codebase is indexed automatically**!"
+    )
     display.console.print()
     display.print_info("The CodeWeaver server automatically indexes your codebase")
-    display.console.print("  • Initial indexing runs on server startup")
-    display.console.print("  • File watcher monitors for changes in real-time")
+    display.console.print(
+        "  • Initial indexing runs on server startup if the index is missing or incomplete."
+    )
+    display.console.print(
+        "  • CodeWeaver indexes most codebases in a few seconds. Extremely large codebases may take a minute or two (1M+ lines of code)."
+    )
+    display.console.print(
+        "  • While CodeWeaver runs, it continuously monitors your codebase for changes and updates the index in real-time. It also picks up changes when the server restarts."
+    )
     display.console.print()
     display.console.print("[cyan]To check indexing status:[/cyan]")
-    display.console.print("   cw status # view overall server and indexing status OR:")
+    display.console.print()
+    display.console.print("   run: 'cw status'")
     display.console.print(f"  curl {_get_url()}/health | jq '.indexer'")
     display.console.print()
-    display.console.print("[dim]Tip: Use --standalone to run indexing without the server[/dim]")
+    display.console.print(
+        "[dim]Tip: Use --standalone to run indexing without running the server.[/dim]"
+    )
     return False
 
 
