@@ -362,8 +362,12 @@ class VectorStoreFailoverManager(BasedModel):
                     # Primary healthy - use slow polling
                     check_interval = self.health_check_interval
 
+                elif circuit_state == CircuitBreakerState.HALF_OPEN:
+                    # Circuit breaker is half-open (testing recovery) - use fast polling to quickly detect stabilization
+                    check_interval = self.health_check_interval_failing
+
                 else:
-                    # Primary still failing or in half-open state - use fast polling
+                    # Unexpected circuit breaker state - default to fast polling for safety
                     check_interval = self.health_check_interval_failing
 
             except asyncio.CancelledError:
