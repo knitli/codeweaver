@@ -147,9 +147,10 @@ class DataclassSerializationMixin:
             # pyright won't like this because the attributes only exist on the inherited subclasses
             fields: dict[str, Any] = type(self).__pydantic_fields__  # type: ignore
             if hasattr(self, "__pydantic_decorators__") and (
-                computed_fields := type(self).__pydantic_decorators__.computed_fields.keys()  # type: ignore
+                computed_field_names := type(self).__pydantic_decorators__.computed_fields.keys()  # type: ignore
             ):
-                fields |= computed_fields  # type: ignore
+                # Add computed fields to the fields dict (keys only, values don't matter for iteration)
+                fields = {**fields, **{k: None for k in computed_field_names}}  # type: ignore
             for field in cast(dict[str, Any], self.__pydantic_fields__):  # type: ignore
                 if (attr := getattr(self, field, None)) and hasattr(attr, "serialize_for_cli"):
                     self_map[field] = attr.serialize_for_cli()
@@ -300,7 +301,12 @@ class BasedModel(BaseModel):
                     else item
                     for item in attr  # type: ignore
                 ]
-        return self.model_dump(mode="python", round_trip=True, exclude_none=True) | self_map
+        # Get model dump, handling potential Missing/Undefined values
+        base_dict = self.model_dump(mode="python", round_trip=True, exclude_none=True)
+        # If model_dump returns a non-dict (like Missing), use empty dict
+        if not isinstance(base_dict, dict):
+            base_dict = {}
+        return base_dict | self_map
 
     @abc.abstractmethod
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:

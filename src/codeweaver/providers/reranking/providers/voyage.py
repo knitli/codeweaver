@@ -133,12 +133,12 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
     ) -> Any:
         """Execute the reranking process."""
         try:
+            # Voyage API doesn't accept extra kwargs - only query, documents, model, top_k
             response = await self.client.rerank(
                 query=query,
                 documents=[documents] if isinstance(documents, str) else documents,  # ty: ignore[invalid-argument-type]
                 model=self.caps.name,
                 top_k=top_n,
-                **kwargs,
             )
         except Exception as e:
             raise ProviderError(
