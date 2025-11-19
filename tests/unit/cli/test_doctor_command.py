@@ -17,12 +17,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from urllib.parse import urlparse
 
 from codeweaver.cli.commands.doctor import app as doctor_app
 from codeweaver.config.settings import CodeWeaverSettings
 from codeweaver.core.types.sentinel import Unset
 from codeweaver.providers.provider import Provider
-
 
 @pytest.fixture
 def temp_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
@@ -174,7 +174,8 @@ class TestDoctorQdrantDetection:
     def test_qdrant_cloud_detection(self) -> None:
         """Test Qdrant Cloud detection."""
         cloud_url = "https://xyz.cloud.qdrant.io"
-        assert "cloud.qdrant.io" in cloud_url  # Should detect cloud
+        host = urlparse(cloud_url).hostname
+        assert host is not None and (host == "cloud.qdrant.io" or host.endswith(".cloud.qdrant.io"))  # Should detect cloud
 
     def test_qdrant_docker_detection(self) -> None:
         """Test Docker Qdrant detection."""
@@ -192,7 +193,8 @@ class TestDoctorQdrantDetection:
 
         for deployment_type, url in scenarios.items():
             if deployment_type == "cloud":
-                assert "cloud.qdrant.io" in url
+                host = urlparse(url).hostname
+                assert host is not None and (host == "cloud.qdrant.io" or host.endswith(".cloud.qdrant.io"))
             elif deployment_type == "docker":
                 assert "localhost" in url
             # Custom and memory would need different checks
