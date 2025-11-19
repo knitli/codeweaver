@@ -74,6 +74,17 @@ class VectorStoreFailoverManager(BasedModel):
     )
     max_memory_mb: int = Field(default=2048, ge=256, description="Maximum memory for backup (MB)")
 
+    # Performance tuning
+    health_check_interval: int = Field(
+        default=30, ge=5, description="Seconds between health checks when primary is healthy"
+    )
+    health_check_interval_failing: int = Field(
+        default=5, ge=1, description="Seconds between health checks when primary is failing"
+    )
+    sync_only_on_changes: bool = Field(
+        default=True, description="Only sync backup when data has changed since last sync"
+    )
+
     def _telemetry_keys(self) -> dict[str, str] | None:
         """Telemetry keys for privacy-preserving data collection.
 
@@ -98,6 +109,12 @@ class VectorStoreFailoverManager(BasedModel):
     _last_backup_sync: Annotated[datetime | None, PrivateAttr()] = None
     _failover_chunks: set[str] = PrivateAttr(default_factory=set)
     _last_context: Annotated[Context | None, PrivateAttr()] = None  # For client notifications
+
+    # Performance optimization state
+    _last_indexed_count: Annotated[int, PrivateAttr()] = 0  # Track changes for smart sync
+    _cached_snapshot: Annotated[set[str] | None, PrivateAttr()] = None  # Cache snapshot state
+    _cached_memory_estimate: Annotated[Any | None, PrivateAttr()] = None  # Cache resource estimate
+    _estimate_cache_time: Annotated[datetime | None, PrivateAttr()] = None  # When estimate was cached
 
     async def initialize(
         self,
@@ -179,13 +196,18 @@ class VectorStoreFailoverManager(BasedModel):
         return (datetime.now(UTC) - self._failover_time).total_seconds()
 
     async def _monitor_primary_health(self) -> None:
-        """Continuously monitor primary circuit breaker state.
+        """Continuously monitor primary circuit breaker state with adaptive polling.
 
-        Runs as a background task checking every 5 seconds for:
+        Runs as a background task with adaptive check intervals:
+        - 30 seconds when primary is healthy (configurable via health_check_interval)
+        - 5 seconds when primary is failing (configurable via health_check_interval_failing)
+
+        Monitors for:
         - Primary failure → trigger failover
         - Primary recovery → consider restoration
         """
-        check_interval = 5  # seconds
+        # Start with healthy interval
+        check_interval = self.health_check_interval
 
         while True:
             try:
@@ -199,8 +221,9 @@ class VectorStoreFailoverManager(BasedModel):
                 circuit_state = self._primary_store.circuit_breaker_state
 
                 if circuit_state == CircuitBreakerState.OPEN and not self._failover_active:
-                    # Primary failed - trigger failover
+                    # Primary failed - trigger failover and switch to fast polling
                     logger.warning("Primary vector store circuit breaker opened")
+                    check_interval = self.health_check_interval_failing
                     await self._activate_failover()
 
                 elif (
@@ -208,9 +231,18 @@ class VectorStoreFailoverManager(BasedModel):
                     and self._failover_active
                     and self.auto_restore
                 ):
-                    # Primary recovered - consider restoring
+                    # Primary recovered - consider restoring and switch back to slow polling
                     logger.info("Primary vector store circuit breaker closed")
+                    check_interval = self.health_check_interval
                     await self._consider_restoration()
+
+                elif circuit_state == CircuitBreakerState.CLOSED and not self._failover_active:
+                    # Primary healthy - use slow polling
+                    check_interval = self.health_check_interval
+
+                else:
+                    # Primary still failing or in half-open state - use fast polling
+                    check_interval = self.health_check_interval_failing
 
             except asyncio.CancelledError:
                 logger.debug("Circuit monitor task cancelled")
@@ -225,6 +257,9 @@ class VectorStoreFailoverManager(BasedModel):
         This task runs in the background, syncing the primary vector store
         to a backup JSON file at regular intervals (default: 5 minutes).
 
+        OPTIMIZATION: Only syncs when data has changed since last sync.
+        Tracks indexer statistics to detect changes efficiently.
+
         The backup file is used for quick recovery when the primary fails,
         allowing restoration in <60 seconds vs. re-indexing which could
         take minutes.
@@ -233,6 +268,7 @@ class VectorStoreFailoverManager(BasedModel):
         - Primary store is healthy (circuit breaker CLOSED)
         - Not currently in failover mode
         - Backup is enabled
+        - Data has changed since last sync (if sync_only_on_changes=True)
 
         The backup file includes:
         - Version information
@@ -264,6 +300,18 @@ class VectorStoreFailoverManager(BasedModel):
                     )
                     continue
 
+                # OPTIMIZATION: Check if data has changed since last sync
+                if self.sync_only_on_changes and self._indexer:
+                    current_indexed = self._indexer.stats.chunks_indexed
+                    if current_indexed == self._last_indexed_count:
+                        logger.debug(
+                            "No data changes since last sync (%d chunks) - skipping backup sync",
+                            current_indexed
+                        )
+                        continue
+                    # Update tracked count
+                    self._last_indexed_count = current_indexed
+
                 # Perform backup sync
                 logger.debug("Starting periodic backup sync")
                 await self._sync_primary_to_backup()
@@ -282,7 +330,7 @@ class VectorStoreFailoverManager(BasedModel):
 
         Performs the following steps:
         1. Check if already in failover
-        2. Estimate memory requirements
+        2. Estimate memory requirements (with caching)
         3. Verify resource availability
         4. Initialize backup store if needed
         5. Attempt to restore from persisted state
@@ -290,6 +338,8 @@ class VectorStoreFailoverManager(BasedModel):
         7. Notify user
 
         If resources are insufficient, logs error and continues without backup.
+
+        OPTIMIZATION: Caches resource estimates for 5 minutes to avoid repeated scanning.
         """
         if self._failover_active:
             logger.debug("Failover already active, skipping activation")
@@ -297,11 +347,26 @@ class VectorStoreFailoverManager(BasedModel):
 
         logger.warning("⚠️  PRIMARY VECTOR STORE UNAVAILABLE - Activating backup mode")
 
-        # Step 1: Resource check
-        stats = self._indexer.stats if self._indexer else None
-        memory_estimate = estimate_backup_memory_requirements(
-            project_path=self._project_path, stats=stats
+        # Step 1: Resource check with caching
+        # Reuse cached estimate if it's less than 5 minutes old
+        cache_valid = (
+            self._cached_memory_estimate is not None
+            and self._estimate_cache_time is not None
+            and (datetime.now(UTC) - self._estimate_cache_time).total_seconds() < 300
         )
+
+        if cache_valid:
+            memory_estimate = self._cached_memory_estimate
+            logger.debug("Using cached memory estimate (age: %.1fs)",
+                        (datetime.now(UTC) - self._estimate_cache_time).total_seconds())
+        else:
+            stats = self._indexer.stats if self._indexer else None
+            memory_estimate = estimate_backup_memory_requirements(
+                project_path=self._project_path, stats=stats
+            )
+            # Cache the estimate
+            self._cached_memory_estimate = memory_estimate
+            self._estimate_cache_time = datetime.now(UTC)
 
         logger.info(
             "Backup memory estimate: %.2fGB (%d chunks), available: %.2fGB, zone: %s",
@@ -368,7 +433,13 @@ class VectorStoreFailoverManager(BasedModel):
                 logger.info("No persisted backup found - backup will be populated during indexing")
 
         # Step 4: Snapshot current backup state for sync-back tracking
-        await self._snapshot_backup_state()
+        # OPTIMIZATION: Use cached snapshot if available
+        if self._cached_snapshot is None:
+            await self._snapshot_backup_state()
+        else:
+            # Reuse cached snapshot
+            self._failover_chunks = self._cached_snapshot.copy()
+            logger.debug("Reused cached snapshot with %d chunks", len(self._failover_chunks))
 
         # Step 5: Activate backup
         self._active_store = self._backup_store
@@ -496,6 +567,8 @@ class VectorStoreFailoverManager(BasedModel):
 
         Records all existing point IDs in the backup so we can later
         identify which chunks were added during the failover period.
+
+        OPTIMIZATION: Caches the snapshot to avoid rescanning on subsequent calls.
         """
         if not self._backup_store:
             logger.debug("No backup store to snapshot")
@@ -530,8 +603,12 @@ class VectorStoreFailoverManager(BasedModel):
                     if offset is None:
                         break
 
+            # Cache the snapshot for reuse
+            self._cached_snapshot = self._failover_chunks.copy()
+
             logger.debug(
-                "Snapshotted %d existing chunks before failover", len(self._failover_chunks)
+                "Snapshotted %d existing chunks before failover (cached for reuse)",
+                len(self._failover_chunks)
             )
 
         except Exception as e:
