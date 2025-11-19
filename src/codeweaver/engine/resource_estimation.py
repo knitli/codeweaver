@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
 
@@ -21,6 +22,12 @@ if TYPE_CHECKING:
     from codeweaver.engine.indexer.indexer import IndexingStats
 
 logger = logging.getLogger(__name__)
+
+# Cache for file count estimates (path -> (count, timestamp))
+# Using a bounded cache with LRU-like behavior to prevent unbounded growth
+_file_count_cache: dict[Path, tuple[int, datetime]] = {}
+_CACHE_EXPIRY = timedelta(minutes=10)  # Cache file counts for 10 minutes
+_MAX_CACHE_SIZE = 100  # Maximum number of paths to cache
 
 
 class MemoryEstimate(NamedTuple):
@@ -63,6 +70,8 @@ class MemoryEstimate(NamedTuple):
 def estimate_file_count(project_path: Path, max_depth: int = 5) -> int:
     """Quickly estimate the number of indexable files in a project.
 
+    OPTIMIZATION: Caches results for 10 minutes to avoid repeated file system scans.
+
     Args:
         project_path: Root path of the project
         max_depth: Maximum directory depth to scan
@@ -70,6 +79,15 @@ def estimate_file_count(project_path: Path, max_depth: int = 5) -> int:
     Returns:
         Estimated file count
     """
+    # Check cache first
+    now = datetime.now(UTC)
+    if project_path in _file_count_cache:
+        cached_count, cache_time = _file_count_cache[project_path]
+        if now - cache_time < _CACHE_EXPIRY:
+            logger.debug("Using cached file count for %s: %d (age: %.1fs)",
+                        project_path, cached_count, (now - cache_time).total_seconds())
+            return cached_count
+
     try:
         # Check if path exists
         if not project_path.exists():
@@ -96,15 +114,29 @@ def estimate_file_count(project_path: Path, max_depth: int = 5) -> int:
             total_files = int(total_files * 1.5)
 
         # If we found very few files, return at least default
-        if total_files < 10:
-            return 1000
+        result = 1000 if total_files < 10 else total_files
+
+        # Evict oldest entries if cache is full
+        if len(_file_count_cache) >= _MAX_CACHE_SIZE:
+            # Remove the oldest entry
+            oldest_path = min(_file_count_cache.items(), key=lambda x: x[1][1])[0]
+            del _file_count_cache[oldest_path]
+            logger.debug("Evicted oldest cache entry for %s", oldest_path)
+
+        # Cache the result
+        _file_count_cache[project_path] = (result, now)
+        logger.debug("Cached file count estimate for %s: %d files", project_path, result)
 
     except Exception as e:
         logger.warning("Failed to estimate file count", exc_info=e)
         # Return conservative default
-        return 1000
-    else:
-        return total_files
+        result = 1000
+        # Cache the fallback value to avoid repeated failures
+        if len(_file_count_cache) >= _MAX_CACHE_SIZE:
+            oldest_path = min(_file_count_cache.items(), key=lambda x: x[1][1])[0]
+            del _file_count_cache[oldest_path]
+        _file_count_cache[project_path] = (result, now)
+    return result
 
 
 def estimate_backup_memory_requirements(
