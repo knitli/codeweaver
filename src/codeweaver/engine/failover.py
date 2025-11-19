@@ -144,6 +144,11 @@ class VectorStoreFailoverManager(BasedModel):
 
         # Initialize chunk indexes
         await self._build_chunk_indexes()
+        
+        # Initialize _last_indexed_count to current state to avoid skipping first sync
+        if indexer and indexer.stats:
+            self._last_indexed_count = indexer.stats.chunks_indexed
+            logger.debug("Initialized _last_indexed_count to %d", self._last_indexed_count)
 
         if self.backup_enabled and primary_store:
             logger.info("Initializing vector store failover support")
@@ -266,6 +271,10 @@ class VectorStoreFailoverManager(BasedModel):
     def _update_index_on_upsert(self, collection_name: str, chunk_ids: list[str], *, is_backup: bool) -> None:
         """Update chunk index when chunks are upserted.
 
+        NOTE: Currently not hooked up to actual upsert operations. Indexes are rebuilt
+        on-demand before use to ensure accuracy. This method is available for future
+        optimization where indexes are maintained incrementally in real-time.
+
         Args:
             collection_name: Name of collection
             chunk_ids: List of chunk IDs being upserted
@@ -278,6 +287,10 @@ class VectorStoreFailoverManager(BasedModel):
 
     def _update_index_on_delete(self, collection_name: str, chunk_ids: list[str], *, is_backup: bool) -> None:
         """Update chunk index when chunks are deleted.
+
+        NOTE: Currently not hooked up to actual delete operations. Indexes are rebuilt
+        on-demand before use to ensure accuracy. This method is available for future
+        optimization where indexes are maintained incrementally in real-time.
 
         Args:
             collection_name: Name of collection
@@ -474,19 +487,23 @@ class VectorStoreFailoverManager(BasedModel):
         logger.warning("⚠️  PRIMARY VECTOR STORE UNAVAILABLE - Activating backup mode")
 
         # Step 1: Resource check with caching
-        # Reuse cached estimate if it's less than 5 minutes old
+        # Reuse cached estimate if it's less than 5 minutes old AND chunk count hasn't changed significantly
+        stats = self._indexer.stats if self._indexer else None
+        current_chunks = stats.chunks_indexed if stats else 0
+        
         cache_valid = (
             self._cached_memory_estimate is not None
             and self._estimate_cache_time is not None
             and (datetime.now(UTC) - self._estimate_cache_time).total_seconds() < 300
+            and abs(current_chunks - self._cached_memory_estimate.estimated_chunks) < (current_chunks * 0.1)  # Within 10%
         )
 
         if cache_valid:
             memory_estimate = self._cached_memory_estimate
-            logger.debug("Using cached memory estimate (age: %.1fs)",
-                        (datetime.now(UTC) - self._estimate_cache_time).total_seconds())
+            logger.debug("Using cached memory estimate (age: %.1fs, chunks: %d)",
+                        (datetime.now(UTC) - self._estimate_cache_time).total_seconds(),
+                        memory_estimate.estimated_chunks)
         else:
-            stats = self._indexer.stats if self._indexer else None
             memory_estimate = estimate_backup_memory_requirements(
                 project_path=self._project_path, stats=stats
             )
@@ -559,13 +576,9 @@ class VectorStoreFailoverManager(BasedModel):
                 logger.info("No persisted backup found - backup will be populated during indexing")
 
         # Step 4: Snapshot current backup state for sync-back tracking
-        # OPTIMIZATION: Use cached snapshot if available, otherwise build from index
-        if self._cached_snapshot is None:
-            await self._snapshot_backup_state()
-        else:
-            # Reuse cached snapshot
-            self._failover_chunks = self._cached_snapshot.copy()
-            logger.debug("Reused cached snapshot with %d chunks", len(self._failover_chunks))
+        # Always build a fresh snapshot to avoid stale state issues
+        # The backup store may have been modified (restored from disk, chunks added, etc.)
+        await self._snapshot_backup_state()
 
         # Step 5: Activate backup
         self._active_store = self._backup_store
@@ -694,21 +707,36 @@ class VectorStoreFailoverManager(BasedModel):
         Records all existing point IDs in the backup so we can later
         identify which chunks were added during the failover period.
 
-        OPTIMIZATION: Uses in-memory index instead of scrolling collections.
+        OPTIMIZATION: Uses in-memory index, but rebuilds it first to ensure accuracy.
+        The index may be stale if chunks were added/removed since initialization.
         """
         if not self._backup_store:
             logger.debug("No backup store to snapshot")
             return
 
         try:
-            # Use index instead of scrolling
+            # Rebuild the backup index to ensure it's current
+            # This is necessary because the index is not automatically updated on upsert/delete
+            collections = await self._backup_store.list_collections()
+            if collections:
+                for collection_name in collections:
+                    self._backup_chunk_index[collection_name] = await self._get_collection_ids(
+                        self._backup_store, collection_name
+                    )
+                logger.debug(
+                    "Rebuilt backup index for snapshot: %d collections with %d total chunks",
+                    len(self._backup_chunk_index),
+                    sum(len(ids) for ids in self._backup_chunk_index.values()),
+                )
+
+            # Use index to get all chunk IDs
             self._failover_chunks = self._get_all_chunk_ids(is_backup=True).copy()
 
-            # Cache the snapshot for reuse
+            # Cache the snapshot for use within this failover session
             self._cached_snapshot = self._failover_chunks.copy()
 
             logger.debug(
-                "Snapshotted %d existing chunks before failover (from index, cached for reuse)",
+                "Snapshotted %d existing chunks before failover (from rebuilt index)",
                 len(self._failover_chunks)
             )
 
@@ -729,14 +757,22 @@ class VectorStoreFailoverManager(BasedModel):
         2. Re-embed using primary's embedding provider via indexer
         3. Upsert to primary with correct vectors
 
-        OPTIMIZATION: Uses in-memory index instead of scrolling collections.
+        OPTIMIZATION: Uses in-memory index, but rebuilds it first to ensure accuracy.
         """
         if not self._primary_store or not self._backup_store or not self._indexer:
             logger.warning("Cannot sync back - missing primary, backup, or indexer")
             return
 
         try:
-            # Use index instead of scrolling
+            # Rebuild the backup index to ensure it reflects current state
+            collections = await self._backup_store.list_collections()
+            if collections:
+                for collection_name in collections:
+                    self._backup_chunk_index[collection_name] = await self._get_collection_ids(
+                        self._backup_store, collection_name
+                    )
+
+            # Use index to get all current chunk IDs
             current_chunks = self._get_all_chunk_ids(is_backup=True)
 
             # Find chunks added during failover (diff against snapshot)

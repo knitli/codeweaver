@@ -24,8 +24,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Cache for file count estimates (path -> (count, timestamp))
+# Using a bounded cache with LRU-like behavior to prevent unbounded growth
 _file_count_cache: dict[Path, tuple[int, datetime]] = {}
 _CACHE_EXPIRY = timedelta(minutes=10)  # Cache file counts for 10 minutes
+_MAX_CACHE_SIZE = 100  # Maximum number of paths to cache
 
 
 class MemoryEstimate(NamedTuple):
@@ -114,6 +116,13 @@ def estimate_file_count(project_path: Path, max_depth: int = 5) -> int:
         # If we found very few files, return at least default
         result = 1000 if total_files < 10 else total_files
 
+        # Evict oldest entries if cache is full
+        if len(_file_count_cache) >= _MAX_CACHE_SIZE:
+            # Remove the oldest entry
+            oldest_path = min(_file_count_cache.items(), key=lambda x: x[1][1])[0]
+            del _file_count_cache[oldest_path]
+            logger.debug("Evicted oldest cache entry for %s", oldest_path)
+
         # Cache the result
         _file_count_cache[project_path] = (result, now)
         logger.debug("Cached file count estimate for %s: %d files", project_path, result)
@@ -122,6 +131,10 @@ def estimate_file_count(project_path: Path, max_depth: int = 5) -> int:
         logger.warning("Failed to estimate file count", exc_info=e)
         # Return conservative default
         result = 1000
+        # Cache the fallback value to avoid repeated failures
+        if len(_file_count_cache) >= _MAX_CACHE_SIZE:
+            oldest_path = min(_file_count_cache.items(), key=lambda x: x[1][1])[0]
+            del _file_count_cache[oldest_path]
         _file_count_cache[project_path] = (result, now)
     return result
 
