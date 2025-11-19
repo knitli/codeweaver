@@ -61,8 +61,8 @@ services:
       - CODEWEAVER_VECTOR_STORE_COLLECTION_NAME=${COLLECTION_NAME:-codeweaver}
       - CODEWEAVER_VECTOR_STORE_PREFER_GRPC=true
       # Embedding Provider (VoyageAI default)
-      # NOTE: VOYAGE_API_KEY is required for VoyageAI embedding provider. The container will fail to start if it is not set.
-      - VOYAGE_API_KEY=${VOYAGE_API_KEY:?VOYAGE_API_KEY is required and must be set in your environment}
+      # NOTE: VOYAGE_API_KEY is required for VoyageAI embedding provider. Set this in your environment or in a .env file.
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY}
       - CODEWEAVER_EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-voyage}
       - CODEWEAVER_EMBEDDING_MODEL=${EMBEDDING_MODEL:-voyage-code-3}
       # Sparse Embedding (FastEmbed - local, no API key needed)
