@@ -249,7 +249,7 @@ function outer() {
         ]
         # Filter out None values and ensure we have valid integers
         valid_nesting_levels = [level for level in nesting_levels if level is not None]
-        assert valid_nesting_levels and max(valid_nesting_levels) > 0, "Should track nesting levels"  # noqa: PT018
+        assert valid_nesting_levels and max(valid_nesting_levels) > 0, "Should track nesting levels"
 
     def test_overlapping_delimiter_resolution(
         self, delimiter_chunker: DelimiterChunker, tmp_path: Path

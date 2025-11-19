@@ -17,9 +17,9 @@ from importlib.util import find_spec
 from pathlib import Path
 from types import ModuleType
 from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
+from urllib.parse import urlparse
 
 import cyclopts
-from urllib.parse import urlparse
 
 from cyclopts import App
 from pydantic import FilePath, ValidationError

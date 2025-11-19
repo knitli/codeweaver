@@ -181,10 +181,34 @@ convention = "google"
   "FBT001",  # boolean typed positional argument
   "G004",  # f-string in logging statement
   "N806",  # incorrect case for function name
+  "PT012",  # pytest.raises() block should contain a single simple statement
+  "PT017",  # Found assertion on exception in except block
+  "PT018",  # Assertion should be broken down into multiple parts
+  "PT011",  # pytest.raises() too broad
+  "B017",  # Do not assert blind exception
   "PTH",
   "S",
   "SIM",
   "SLF001",  # Private member accessed
+  "PYI024",  # Use typing.NamedTuple instead of collections.namedtuple
+]
+"scripts/**/*.py" = [
+  "ANN",
+  "C901",  # too complex
+  "D",
+  "DTZ",
+  "N806",  # incorrect case for function name
+  "S108",  # Probable insecure usage of temporary file or directory
+  "TRY300",  # Consider moving this statement to an else block
+  "RUF001",  # String contains ambiguous characters
+]
+"mise-tasks/**/*.py" = [
+  "ANN",
+  "C901",  # too complex
+  "D",
+  "DTZ",
+  "N806",  # incorrect case for function name
+  "S108",  # Probable insecure usage of temporary file or directory
 ]
 "src/codeweaver/testing/**/*.py" = [
   "ANN",
@@ -198,6 +222,38 @@ convention = "google"
   "S",
   "SIM",
   "SLF001",  # Private member accessed
+]
+# CLI commands are complex by nature due to argument parsing and validation
+"src/codeweaver/cli/commands/*.py" = [
+  "C901",  # too complex - CLI commands have inherent complexity
+]
+# Registry and provider management have complex configuration logic
+"src/codeweaver/common/registry/provider.py" = [
+  "C901",  # too complex - provider instantiation has complex branching
+]
+"src/codeweaver/common/statistics.py" = [
+  "C901",  # too complex - statistics updates have complex conditional logic
+]
+# Core metadata determination has many edge cases
+"src/codeweaver/core/metadata.py" = [
+  "C901",  # too complex - file extension detection has many cases
+]
+# Engine components have complex orchestration logic
+"src/codeweaver/engine/chunker/parallel.py" = [
+  "C901",  # too complex - parallel processing has complex error handling
+]
+"src/codeweaver/engine/failover.py" = [
+  "C901",  # too complex - failover logic has many edge cases
+]
+"src/codeweaver/engine/indexer/indexer.py" = [
+  "C901",  # too complex - indexing orchestration is inherently complex
+]
+# Server components have complex lifecycle and health check logic
+"src/codeweaver/server/health_service.py" = [
+  "C901",  # too complex - health checks have many conditions
+]
+"src/codeweaver/server/server.py" = [
+  "C901",  # too complex - server lifecycle has complex orchestration
 ]
 
 [lint.isort]

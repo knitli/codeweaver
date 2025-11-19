@@ -12,7 +12,7 @@ import pkgutil
 from types import ModuleType
 
 
-def find_builtin_usage_in_source(module: ModuleType, builtins: set[str]) -> set[tuple[str, str]]:  # noqa: C901
+def find_builtin_usage_in_source(module: ModuleType, builtins: set[str]) -> set[tuple[str, str]]:
     """Check if the module uses any built-in exceptions by analyzing source code."""
     import ast
     import inspect
@@ -79,7 +79,7 @@ def safe_walk_packages(package, prefix) -> "iter[pkgutil.ModuleInfo]":
         yield from pkgutil.walk_packages(package.__path__, prefix, onerror=onerror)
 
 
-def scan_source_files_for_exceptions(  # noqa: C901
+def scan_source_files_for_exceptions(
     base_path: str, builtin_exceptions: set[str]
 ) -> tuple[set[tuple[str, str]], list[str]]:  # sourcery skip: low-code-quality
     """Scan Python source files directly for exception usage and definitions."""

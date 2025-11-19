@@ -88,7 +88,7 @@ def build_navigation(nav_items: tuple[str, str], *, debug: bool = False) -> None
 
             for doc_path, identifier in sorted(modules[module_name]):
                 # Create a readable title from the identifier
-                title = identifier.replace("codeweaver.", "").replace(".", " › ")  # noqa: RUF001
+                title = identifier.replace("codeweaver.", "").replace(".", " › ")
                 # Convert to relative path from api/index.md
                 relative_path = str(doc_path).replace("api/", "")
                 nav_file.write(f"- [{title}]({relative_path})\n")

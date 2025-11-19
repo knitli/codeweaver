@@ -307,7 +307,7 @@ class ProviderRegistry(BasedModel):
         """Check if the kind is any valid ProviderKind."""
         return kind in ProviderKind
 
-    def register(  # noqa: C901  # how?
+    def register(  # how?
         self,
         provider: Provider | str,
         provider_kind: LiteralKinds,

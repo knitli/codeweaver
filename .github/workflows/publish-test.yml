@@ -80,7 +80,8 @@ jobs:
       - name: Run tests with coverage
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          mise run test-cov
+          # Skip docker and qdrant tests in CI - qdrant container health checks fail in GitHub Actions
+          mise run test-cov -m "not docker and not qdrant"
   build:
     name: Build Distribution
     needs: tests

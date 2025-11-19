@@ -154,7 +154,7 @@ class RuffPatternTester:
             validation_results[filename] = issues
         return validation_results
 
-    def run_comprehensive_test(self) -> bool:  # noqa: C901
+    def run_comprehensive_test(self) -> bool:
         # sourcery skip: no-long-functions
         """Run the complete test suite."""
         print("🚀 Starting comprehensive test of fix-ruff-patterns.sh")
