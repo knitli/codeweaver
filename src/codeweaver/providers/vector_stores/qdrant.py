@@ -133,9 +133,11 @@ class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         else:
             raise ProviderError("No valid vector provided (expected 'dense' or 'sparse' key in dict)")
         try:
+            # Convert generic Filter to Qdrant filter format
             qdrant_filter = None
             if query_filter:
-                pass
+                from codeweaver.engine.filter import to_qdrant_filter
+                qdrant_filter = to_qdrant_filter(query_filter)
             if query_vector == 'sparse' and isinstance(query_value, dict):
                 from qdrant_client.models import SparseVector
                 query_value = SparseVector(indices=query_value.get('indices', []), values=query_value.get('values', []))

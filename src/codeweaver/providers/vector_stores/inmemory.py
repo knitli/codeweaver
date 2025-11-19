@@ -204,8 +204,11 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         try:
             # Perform search using Qdrant's query_points for hybrid support
 
-            # Build Qdrant filter from our Filter if provided
-            qdrant_filter = None
+            # Convert generic Filter to Qdrant filter format
+            from codeweaver.engine.filter import to_qdrant_filter
+
+            qdrant_filter = to_qdrant_filter(query_filter) if query_filter else None
+
             # For sparse vectors, need to convert dict to SparseVector model
             if query_vector == "sparse" and isinstance(query_value, dict):
                 from qdrant_client.models import SparseVector
@@ -457,8 +460,21 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
                     dense_params = vectors_data["dense"]
                     dense_size = dense_params.size if hasattr(dense_params, "size") else 768
 
+                # Create proper CollectionMetadata instance
+                from codeweaver.providers.vector_stores.metadata import CollectionMetadata
+
+                metadata = CollectionMetadata(
+                    provider="memory",
+                    version="1.0",
+                    created_at=datetime.now(UTC),
+                    embedding_dim_dense=dense_size,
+                    embedding_dim_sparse=None,
+                    project_name=col.name,
+                    vector_config={"dense": {"size": dense_size, "distance": "Cosine"}},
+                )
+
                 collections_data[col.name] = {
-                    "metadata": {"provider": "memory", "created_at": datetime.now(UTC).isoformat()},
+                    "metadata": metadata.model_dump(mode="json"),
                     "vectors_config": {"dense": {"size": dense_size, "distance": "Cosine"}},
                     "sparse_vectors_config": {"sparse": {}},
                     "points": [
