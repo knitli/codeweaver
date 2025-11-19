@@ -55,7 +55,7 @@ The build will create packages with version `0.1.0b1` (Python normalizes `-beta.
 
 For untagged commits (commits after the latest tag):
 - `X.Y.Z`: Version from latest tag
-- `rcN`: Release candidate with commit distance N from tag (concatenated, no dot or dash, e.g., `rc295`)
+- `rcN`: Release candidate with commit distance N from tag (concatenated, no dot or dash, e.g., `rc295` - this differs from commonly seen `rc.N` style)
 - `+gHASH`: Git commit short hash
 
 ### Dirty Working Directory

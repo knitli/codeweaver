@@ -41,14 +41,15 @@ def main() -> None:
 
     skip_files = {"__init__.py", "malformed.py", "empty.py", "whitespace_only.py"}
     files = [
-        DiscoveredFile.from_path(file_path)
+        discovered_file
         for file_path in test_dir.glob("*.py")
-        if file_path.name not in skip_files and DiscoveredFile.from_path(file_path)
+        if (discovered_file := DiscoveredFile.from_path(file_path))
+        and discovered_file.path.name not in skip_files
     ]
 
     print(f"  Found {len(files)} files to chunk")
     for file in files[:5]:  # Show first 5
-        print(f"    - {file.path.name if file and file.path else 'Unknown'}")
+        print(f"    - {file.path.name}")
     if len(files) > 5:
         print(f"    ... and {len(files) - 5} more")
     print()
