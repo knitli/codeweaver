@@ -19,6 +19,9 @@ from codeweaver.engine.resource_estimation import (
 )
 
 
+pytestmark = [pytest.mark.unit]
+
+
 class MockIndexingStats:
     """Mock indexing stats for testing."""
 

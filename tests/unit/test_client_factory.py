@@ -23,7 +23,6 @@ pytestmark = [pytest.mark.unit]
 @pytest.mark.external_api
 @pytest.mark.mock_only
 @pytest.mark.qdrant
-@pytest.mark.unit
 class TestClientMapLookup:
     """Test _create_client_from_map CLIENT_MAP lookup logic."""
 
@@ -144,7 +143,6 @@ class TestClientMapLookup:
 @pytest.mark.external_api
 @pytest.mark.mock_only
 @pytest.mark.qdrant
-@pytest.mark.unit
 class TestInstantiateClient:
     """Test _instantiate_client provider-specific instantiation logic."""
 
@@ -441,7 +439,6 @@ class TestInstantiateClient:
 @pytest.mark.external_api
 @pytest.mark.mock_only
 @pytest.mark.qdrant
-@pytest.mark.unit
 class TestClientOptionsHandling:
     """Test that client_options are properly passed through."""
 
@@ -525,7 +522,6 @@ class TestClientOptionsHandling:
 @pytest.mark.external_api
 @pytest.mark.mock_only
 @pytest.mark.qdrant
-@pytest.mark.unit
 class TestProviderKindNormalization:
     """Test that provider_kind strings are normalized to enums."""
 

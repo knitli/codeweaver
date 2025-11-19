@@ -131,7 +131,6 @@ async def memory_store() -> AsyncGenerator[MemoryVectorStoreProvider, None]:
 
 
 @pytest.mark.asyncio
-@pytest.mark.performance
 @pytest.mark.parametrize("chunk_count", [1000, 5000, 10000])
 async def test_qdrant_search_latency(
     qdrant_store: QdrantVectorStoreProvider, chunk_count: int
@@ -176,7 +175,6 @@ async def test_qdrant_search_latency(
 
 
 @pytest.mark.asyncio
-@pytest.mark.performance
 async def test_qdrant_upsert_batch_performance(qdrant_store: QdrantVectorStoreProvider) -> None:
     """Test upsert batch performance meets <1s for 100 chunks requirement.
 
@@ -200,7 +198,6 @@ async def test_qdrant_upsert_batch_performance(qdrant_store: QdrantVectorStorePr
 
 
 @pytest.mark.asyncio
-@pytest.mark.performance
 @pytest.mark.parametrize("chunks_per_file", [10, 50, 100])
 async def test_qdrant_delete_by_file_performance(
     qdrant_store: QdrantVectorStoreProvider, chunks_per_file: int
@@ -248,7 +245,6 @@ async def test_qdrant_delete_by_file_performance(
 
 
 @pytest.mark.asyncio
-@pytest.mark.performance
 @pytest.mark.parametrize("chunk_count", [1000, 5000, 10000])
 async def test_memory_persistence_performance(chunk_count: int) -> None:
     """Test in-memory persistence meets 1-3.5s requirement for 10k chunks.
@@ -305,7 +301,6 @@ async def test_memory_persistence_performance(chunk_count: int) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.performance
 async def test_qdrant_concurrent_search(qdrant_store: QdrantVectorStoreProvider) -> None:
     """Test concurrent search performance and thread safety.
 
@@ -357,7 +352,6 @@ async def test_qdrant_concurrent_search(qdrant_store: QdrantVectorStoreProvider)
 
 
 @pytest.mark.asyncio
-@pytest.mark.performance
 async def test_hybrid_search_performance(qdrant_store: QdrantVectorStoreProvider) -> None:
     """Test hybrid search (dense + sparse) performance.
 
@@ -413,7 +407,6 @@ async def test_hybrid_search_performance(qdrant_store: QdrantVectorStoreProvider
 
 # Performance regression test
 @pytest.mark.asyncio
-@pytest.mark.performance
 async def test_performance_regression_check(qdrant_store: QdrantVectorStoreProvider) -> None:
     """Record performance baselines for regression detection.
 

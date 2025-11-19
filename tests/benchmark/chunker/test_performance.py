@@ -102,7 +102,6 @@ class TestChunkerPerformance:
         return ChunkerSelector(governor)
 
     # Typical files: 100-1000 lines
-    @pytest.mark.benchmark
     @pytest.mark.dev_only
     def test_typical_python_file_performance(self, selector):
         """Benchmark typical Python file (500 lines).
@@ -147,7 +146,6 @@ class TestChunkerPerformance:
         )
 
     @pytest.mark.dev_only
-    @pytest.mark.benchmark
     def test_typical_javascript_file_performance(self, selector):
         """Benchmark typical JavaScript file (500 lines).
 
@@ -180,7 +178,6 @@ class TestChunkerPerformance:
 
     # Large files: 1000-5000 lines
     @pytest.mark.dev_only
-    @pytest.mark.benchmark
     def test_large_python_file_performance(self, selector):
         """Benchmark large Python file (1500 lines - reduced due to timeout constraints).
 
@@ -216,7 +213,6 @@ class TestChunkerPerformance:
 
     # Very large files: 5000+ lines
     @pytest.mark.dev_only
-    @pytest.mark.benchmark
     @pytest.mark.timeout(90)  # Extended timeout due to slow performance
     def test_very_large_python_file_performance(self, selector):
         """Benchmark very large Python file (2000 lines - reduced due to timeout).
@@ -253,7 +249,6 @@ class TestChunkerPerformance:
 
     # Memory profiling
     @pytest.mark.dev_only
-    @pytest.mark.benchmark
     def test_memory_usage_typical_file(self, selector):
         """Verify memory usage stays under 100MB for typical files.
 
@@ -286,7 +281,6 @@ class TestChunkerPerformance:
         )
 
     @pytest.mark.dev_only
-    @pytest.mark.benchmark
     @pytest.mark.timeout(60)  # Extended timeout due to slow chunking performance
     def test_memory_usage_large_file(self, selector):
         """Verify memory usage stays under 100MB even for large files.
@@ -319,7 +313,6 @@ class TestChunkerPerformance:
 
     # Throughput test
     @pytest.mark.dev_only
-    @pytest.mark.benchmark
     def test_bulk_file_throughput(self, selector):
         """Test throughput with multiple files of varying sizes.
 
@@ -355,7 +348,6 @@ class TestChunkerPerformance:
         )
 
     # Performance regression tracking
-    @pytest.mark.benchmark
     @pytest.mark.dev_only
     def test_semantic_vs_delimiter_performance(self, selector):
         """Compare semantic and delimiter chunker performance on same content.
@@ -429,7 +421,6 @@ class TestChunkerScalability:
         return ChunkerSelector(governor)
 
     @pytest.mark.dev_only
-    @pytest.mark.benchmark
     def test_chunking_consistency_across_sizes(self, selector):
         """Verify chunking quality doesn't degrade with file size.
 
@@ -453,7 +444,6 @@ class TestChunkerScalability:
             assert all(chunk.metadata for chunk in chunks), f"Missing metadata in {size} line file"
 
     @pytest.mark.dev_only
-    @pytest.mark.benchmark
     def test_concurrent_chunking_safety(self, selector):
         """Verify concurrent chunking operations are safe."""
         import concurrent.futures

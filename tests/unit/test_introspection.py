@@ -20,7 +20,6 @@ from codeweaver.common.utils.introspect import (
 pytestmark = [pytest.mark.unit]
 
 
-@pytest.mark.unit
 class TestCleanArgs:
     """Test the clean_args function."""
 
@@ -208,7 +207,6 @@ class TestCleanArgs:
         assert "region" not in kwargs
 
 
-@pytest.mark.unit
 class TestIntrospectionHelpers:
     """Test helper functions for introspection."""
 

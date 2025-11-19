@@ -15,6 +15,9 @@ from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapab
 from codeweaver.providers.embedding.providers.voyage import VoyageEmbeddingProvider
 from codeweaver.providers.provider import Provider
 
+pytestmark = [pytest.mark.unit]
+
+
 
 @pytest.fixture(autouse=True)
 def reset_embedding_registry():

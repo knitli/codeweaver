@@ -18,7 +18,6 @@ pytestmark = [pytest.mark.integration]
 
 
 @pytest.mark.external_api
-@pytest.mark.integration
 @pytest.mark.mock_only
 @pytest.mark.qdrant
 class TestProviderInstantiationWithClientFactory:
@@ -196,7 +195,6 @@ class TestProviderInstantiationWithClientFactory:
 
 
 @pytest.mark.external_api
-@pytest.mark.integration
 @pytest.mark.mock_only
 @pytest.mark.qdrant
 class TestVectorStoreProviderWithClientFactory:
@@ -316,7 +314,6 @@ class TestVectorStoreProviderWithClientFactory:
 
 
 @pytest.mark.external_api
-@pytest.mark.integration
 @pytest.mark.mock_only
 @pytest.mark.qdrant
 class TestProviderKindStringHandling:
@@ -402,7 +399,6 @@ class TestProviderKindStringHandling:
 
 
 @pytest.mark.external_api
-@pytest.mark.integration
 @pytest.mark.mock_only
 @pytest.mark.qdrant
 class TestGlobalRegistryIntegration:
