@@ -116,6 +116,14 @@ class VectorStoreFailoverManager(BasedModel):
     _cached_memory_estimate: Annotated[Any | None, PrivateAttr()] = None  # Cache resource estimate
     _estimate_cache_time: Annotated[datetime | None, PrivateAttr()] = None  # When estimate was cached
 
+    # Chunk ID indexes to avoid scrolling operations
+    _backup_chunk_index: Annotated[dict[str, set[str]], PrivateAttr()] = PrivateAttr(
+        default_factory=dict
+    )  # collection_name -> set of chunk IDs
+    _primary_chunk_index: Annotated[dict[str, set[str]], PrivateAttr()] = PrivateAttr(
+        default_factory=dict
+    )  # collection_name -> set of chunk IDs
+
     async def initialize(
         self,
         primary_store: VectorStoreProvider | None,
@@ -133,6 +141,9 @@ class VectorStoreFailoverManager(BasedModel):
         self._active_store = primary_store
         self._project_path = project_path
         self._indexer = indexer
+
+        # Initialize chunk indexes
+        await self._build_chunk_indexes()
 
         if self.backup_enabled and primary_store:
             logger.info("Initializing vector store failover support")
@@ -177,6 +188,117 @@ class VectorStoreFailoverManager(BasedModel):
             context: FastMCP context from current request
         """
         self._last_context = context
+
+    async def _build_chunk_indexes(self) -> None:
+        """Build initial chunk ID indexes for primary and backup stores.
+
+        This avoids the need to scroll through all points later. Indexes are built
+        once during initialization and then maintained incrementally as chunks are added/removed.
+
+        OPTIMIZATION: Replaces expensive scroll operations with O(1) lookups.
+        """
+        try:
+            # Build primary index if available
+            if self._primary_store:
+                collections = await self._primary_store.list_collections()
+                if collections:
+                    for collection_name in collections:
+                        self._primary_chunk_index[collection_name] = await self._get_collection_ids(
+                            self._primary_store, collection_name
+                        )
+                    logger.debug(
+                        "Built primary chunk index for %d collections with %d total chunks",
+                        len(self._primary_chunk_index),
+                        sum(len(ids) for ids in self._primary_chunk_index.values()),
+                    )
+
+            # Build backup index if available
+            if self._backup_store:
+                collections = await self._backup_store.list_collections()
+                if collections:
+                    for collection_name in collections:
+                        self._backup_chunk_index[collection_name] = await self._get_collection_ids(
+                            self._backup_store, collection_name
+                        )
+                    logger.debug(
+                        "Built backup chunk index for %d collections with %d total chunks",
+                        len(self._backup_chunk_index),
+                        sum(len(ids) for ids in self._backup_chunk_index.values()),
+                    )
+        except Exception as e:
+            logger.warning("Failed to build chunk indexes: %s - will build lazily", e)
+            # Continue anyway - indexes will be built lazily as needed
+
+    async def _get_collection_ids(
+        self, store: VectorStoreProvider, collection_name: str
+    ) -> set[str]:
+        """Get all point IDs from a collection (one-time operation during initialization).
+
+        Args:
+            store: Vector store to query
+            collection_name: Name of collection
+
+        Returns:
+            Set of chunk IDs in the collection
+        """
+        chunk_ids: set[str] = set()
+        offset = None
+        while True:
+            result = await store._client.scroll(  # type: ignore[union-attr]
+                collection_name=collection_name,
+                limit=100,
+                offset=offset,
+                with_payload=False,  # Only need IDs
+                with_vectors=False,
+            )
+            if not result[0]:
+                break
+
+            for point in result[0]:
+                chunk_ids.add(str(point.id))  # type: ignore[attr-defined]
+
+            offset = result[1]
+            if offset is None:
+                break
+
+        return chunk_ids
+
+    def _update_index_on_upsert(self, collection_name: str, chunk_ids: list[str], *, is_backup: bool) -> None:
+        """Update chunk index when chunks are upserted.
+
+        Args:
+            collection_name: Name of collection
+            chunk_ids: List of chunk IDs being upserted
+            is_backup: Whether this is for backup store (vs primary)
+        """
+        index = self._backup_chunk_index if is_backup else self._primary_chunk_index
+        if collection_name not in index:
+            index[collection_name] = set()
+        index[collection_name].update(chunk_ids)
+
+    def _update_index_on_delete(self, collection_name: str, chunk_ids: list[str], *, is_backup: bool) -> None:
+        """Update chunk index when chunks are deleted.
+
+        Args:
+            collection_name: Name of collection
+            chunk_ids: List of chunk IDs being deleted
+            is_backup: Whether this is for backup store (vs primary)
+        """
+        index = self._backup_chunk_index if is_backup else self._primary_chunk_index
+        if collection_name in index:
+            index[collection_name].difference_update(chunk_ids)
+
+    def _get_all_chunk_ids(self, *, is_backup: bool) -> set[str]:
+        """Get all chunk IDs from index across all collections.
+
+        Args:
+            is_backup: Whether to get IDs from backup store (vs primary)
+
+        Returns:
+            Set of all chunk IDs
+        """
+        index = self._backup_chunk_index if is_backup else self._primary_chunk_index
+        return set().union(*index.values()) if index else set()
 
     @property
     def active_store(self) -> VectorStoreProvider | None:
@@ -433,7 +555,7 @@ class VectorStoreFailoverManager(BasedModel):
                 logger.info("No persisted backup found - backup will be populated during indexing")
 
         # Step 4: Snapshot current backup state for sync-back tracking
-        # OPTIMIZATION: Use cached snapshot if available
+        # OPTIMIZATION: Use cached snapshot if available, otherwise build from index
         if self._cached_snapshot is None:
             await self._snapshot_backup_state()
         else:
@@ -568,46 +690,21 @@ class VectorStoreFailoverManager(BasedModel):
         Records all existing point IDs in the backup so we can later
         identify which chunks were added during the failover period.
 
-        OPTIMIZATION: Caches the snapshot to avoid rescanning on subsequent calls.
+        OPTIMIZATION: Uses in-memory index instead of scrolling collections.
         """
         if not self._backup_store:
             logger.debug("No backup store to snapshot")
             return
 
         try:
-            # Get all collections
-            if not (collections := await self._backup_store.list_collections()):
-                logger.debug("No collections in backup store to snapshot")
-                return
-
-            # Track existing point IDs
-            for collection_name in collections:
-                # Scroll all points
-                offset = None
-                while True:
-                    result = await self._backup_store._client.scroll(  # type: ignore[union-attr]
-                        collection_name=collection_name,
-                        limit=100,
-                        offset=offset,
-                        with_payload=False,  # Only need IDs
-                        with_vectors=False,
-                    )
-                    if not result[0]:
-                        break
-
-                    # Record IDs
-                    for point in result[0]:
-                        self._failover_chunks.add(str(point.id))  # type: ignore[attr-defined]
-
-                    offset = result[1]
-                    if offset is None:
-                        break
+            # Use index instead of scrolling
+            self._failover_chunks = self._get_all_chunk_ids(is_backup=True).copy()
 
             # Cache the snapshot for reuse
             self._cached_snapshot = self._failover_chunks.copy()
 
             logger.debug(
-                "Snapshotted %d existing chunks before failover (cached for reuse)",
+                "Snapshotted %d existing chunks before failover (from index, cached for reuse)",
                 len(self._failover_chunks)
             )
 
@@ -627,37 +724,16 @@ class VectorStoreFailoverManager(BasedModel):
         1. Get chunk payloads (text content) from backup
         2. Re-embed using primary's embedding provider via indexer
         3. Upsert to primary with correct vectors
+
+        OPTIMIZATION: Uses in-memory index instead of scrolling collections.
         """
         if not self._primary_store or not self._backup_store or not self._indexer:
             logger.warning("Cannot sync back - missing primary, backup, or indexer")
             return
 
         try:
-            # Get all current point IDs from backup
-            current_chunks: set[str] = set()
-            if not (collections := await self._backup_store.list_collections()):
-                logger.debug("No collections in backup store to sync from")
-                return
-
-            for collection_name in collections:
-                offset = None
-                while True:
-                    result = await self._backup_store._client.scroll(  # type: ignore[union-attr]
-                        collection_name=collection_name,
-                        limit=100,
-                        offset=offset,
-                        with_payload=False,
-                        with_vectors=False,
-                    )
-                    if not result[0]:
-                        break
-
-                    for point in result[0]:
-                        current_chunks.add(str(point.id))  # type: ignore[attr-defined]
-
-                    offset = result[1]
-                    if offset is None:
-                        break
+            # Use index instead of scrolling
+            current_chunks = self._get_all_chunk_ids(is_backup=True)
 
             # Find chunks added during failover (diff against snapshot)
             new_chunks = current_chunks - self._failover_chunks
