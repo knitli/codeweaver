@@ -122,7 +122,7 @@ def estimate_file_count(project_path: Path, max_depth: int = 5) -> int:
         logger.warning("Failed to estimate file count", exc_info=e)
         # Return conservative default
         result = 1000
-
+        _file_count_cache[project_path] = (result, now)
     return result
 
 
