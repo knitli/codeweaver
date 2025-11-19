@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import json
 import sys
 
 from typing import TYPE_CHECKING
@@ -69,17 +68,21 @@ class CLIErrorHandler:
             error: CodeWeaverError to display
             context: Context description
         """
+        from pydantic_core import to_json
+
         # Print header with error context
-        self.display.console.print(f"\n{self.prefix} [bold red]✗ {context} failed[/bold red]\n")
+        self.display.console.print(f"\n{self.prefix} \n  [bold red]✗ {context} failed[/bold red]\n")
 
         # Print error message
-        self.display.console.print(f"[red]Error:[/red] {error}\n")
+        self.display.console.print(f"[bold red]Error:[/bold red] {error}\n")
 
         # Show details if available
         if hasattr(error, "details") and error.details:
             self.display.console.print("[yellow]Details:[/yellow]")
             if isinstance(error.details, dict):
-                self.display.console.print(json.dumps(error.details, indent=2))
+                self.display.console.print(
+                    to_json(error.details, round_trip=True, indent=2).decode("utf-8")
+                )
             else:
                 self.display.console.print(str(error.details))
             self.display.console.print()

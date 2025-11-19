@@ -18,7 +18,7 @@ data = [
   { provider = "duckduckgo", enabled = true },
 ]
 embedding = [
-  { provider = "fastembed", enabled = true, model_settings = { model = "Alibaba-NLP/gte-modernbert-base" } },
+  { provider = "fastembed", enabled = true, model_settings = { model = "sentence-transformers/all-MiniLM-L6-v2" } },
 ]
 reranking = [
   { provider = "voyage", enabled = true, model_settings = { model = "rerank-2.5" } },

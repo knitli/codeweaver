@@ -22,6 +22,8 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast, override
 
 import numpy as np
 
+from pydantic import SkipValidation
+
 from codeweaver.common.utils.utils import rpartial
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.embedding.capabilities.base import (
@@ -124,7 +126,7 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
     model_name: The name of the FastEmbed model to use.
     """
 
-    client: TextEmbedding
+    client: SkipValidation[TextEmbedding]
     _provider: Provider = Provider.FASTEMBED
     caps: EmbeddingModelCapabilities
 
@@ -143,10 +145,14 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
         if "model_name" not in type(self)._doc_kwargs:
             model = caps.name  # Use caps parameter, not self.caps
             self.doc_kwargs["model_name"] = model
-            self.query_kwargs["model_name"] = model
+            # Note: model_name should NOT be in query_kwargs - it's only for client init
 
         # 3. Initialize the client
         self.client = _TextEmbedding(**self.doc_kwargs)
+
+        # 4. Remove model_name from runtime kwargs - it was only needed for initialization
+        self.doc_kwargs.pop("model_name", None)
+        self.query_kwargs.pop("model_name", None)
 
     @property
     def base_url(self) -> str | None:
@@ -216,13 +222,17 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         if "model_name" not in self.doc_kwargs:
             model = caps.name  # Use caps parameter, not self.caps
             self.doc_kwargs["model_name"] = model
-            self.query_kwargs["model_name"] = model
+            # Note: model_name should NOT be in query_kwargs - it's only for client init
 
         # 3. Initialize client if it's still a class (not an instance)
         # The _client class variable is set to the class type, so we need to instantiate it
         if isinstance(self.client, type):
             client_options = self.doc_kwargs.get("client_options") or self.doc_kwargs
             self.client = self.client(**client_options)
+
+        # 4. Remove model_name from runtime kwargs - it was only needed for initialization
+        self.doc_kwargs.pop("model_name", None)
+        self.query_kwargs.pop("model_name", None)
 
     def base_url(self) -> str | None:
         """FastEmbed does not use a base URL."""

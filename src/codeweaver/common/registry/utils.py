@@ -77,12 +77,7 @@ def _get_embedding_config(
 
     normalized = _normalize_to_tuple(embedding_settings)
     return next(
-        (
-            DictView(setting)
-            for setting in normalized
-            if setting.get("model_settings") and setting.get("enabled")
-        ),
-        None,
+        (DictView(setting) for setting in normalized if setting.get("model_settings")), None
     )
 
 

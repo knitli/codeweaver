@@ -273,17 +273,19 @@ def build_query_vector(query_result: QueryResult, query: str) -> StrategizedQuer
         ValueError: If both embeddings are None
     """
     if query_result.dense:
+        # Unwrap batch results (embed_query returns list[list[float]], we need list[float])
+        dense_vector = query_result.dense[0] if isinstance(query_result.dense[0], list) else query_result.dense
+
         if query_result.sparse:
             return StrategizedQuery(
                 query=query,
-                dense=query_result.dense,
+                dense=dense_vector,
                 sparse=query_result.sparse,
                 strategy=SearchStrategy.HYBRID_SEARCH,
             )
         logger.warning("Using dense-only search (sparse embeddings unavailable)")
-        # Unwrap batch results (take first element) and ensure float type
         return StrategizedQuery(
-            query=query, dense=query_result.dense, sparse=None, strategy=SearchStrategy.DENSE_ONLY
+            query=query, dense=dense_vector, sparse=None, strategy=SearchStrategy.DENSE_ONLY
         )
     if query_result.sparse:
         logger.warning("Using sparse-only search (dense embeddings unavailable - degraded mode)")

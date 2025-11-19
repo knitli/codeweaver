@@ -62,8 +62,11 @@ def resolve_project_root() -> Path:
 
 def is_tty() -> bool:
     """Check if the output is a TTY in an interactive terminal."""
-    console: Console = globals()["console"]._resolve()()
-    return console.is_terminal and console.file.isatty() and console.is_interactive
+    try:
+        console: Console = globals()["console"]._resolve()()
+        return console.is_terminal and console.file.isatty() and console.is_interactive
+    except Exception:
+        return False
 
 
 def get_terminal_width() -> int:

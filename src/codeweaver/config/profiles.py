@@ -182,7 +182,7 @@ def _quickstart_default(
                 model_settings=EmbeddingModelSettings(
                     model="ibm-granite/granite-embedding-small-english-r2"
                     if HAS_ST
-                    else "Alibaba-NLP/gte-modernbert-base"
+                    else "BAAI/bge-small-en-v1.5"
                 ),
                 provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
                 enabled=True,
@@ -243,8 +243,8 @@ def _backup_profile() -> ProviderSettingsDict:
                     model_settings=EmbeddingModelSettings(
                         model="BAAI/ibm-granite/granite-embedding-small-english-r2"
                         if HAS_ST
-                        else "Alibaba-NLP/gte-modernbert-base",
-                        dimension=384 if HAS_ST else 768,
+                        else "sentence-transformers/all-MiniLM-L6-v2",
+                        dimension=384,
                     ),
                 )
             }

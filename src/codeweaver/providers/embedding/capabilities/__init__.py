@@ -95,6 +95,15 @@ dependency_map = {
 def is_available(model: EmbeddingModelCapabilities) -> bool:
     """Check if a model is available for use."""
     model_string = f"{model.provider!s}:{model.name}"
+    # custom fastembed models temporarily disabled until we can resolve issues
+    if model.provider.variable == "fastembed" and model.name in {
+        "Alibaba-NLP/gte-modernbert-base",
+        "BAAI/bge-m3",
+        "WhereIsAI/UAE-Large-V1",
+        "snowflake/snowflake-arctic-embed-l-v2.0",
+        "snowflake/snowflake-arctic-embed-m-v2.0",
+    }:
+        return False
     if dependency := next(
         (dep for key, dep in dependency_map.items() if model_string.startswith(key)), None
     ):

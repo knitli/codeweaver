@@ -10,15 +10,14 @@ from __future__ import annotations
 
 
 try:
-    from dataclasses import asdict
-
     from fastembed.common.model_description import (
         DenseModelDescription,
         ModelSource,
+        PoolingType,
         #    SparseModelDescription,
     )
     from fastembed.sparse import SparseTextEmbedding
-    from fastembed.text import TextEmbedding
+    from fastembed.text import TextEmbedding, custom_text_embedding
 
 except ImportError as e:
     from codeweaver.exceptions import ConfigurationError
@@ -46,17 +45,18 @@ DENSE_MODELS = (
         license="apache-2.0",
         sources=ModelSource(hf="Alibaba-NLP/gte-modernbert-base"),
         description="""Text embeddings, Unimodal (text), multilingual, 8192 input tokens truncation, Prefixes for queries/documents: not necessary, 2024 year.""",
-        model_file="model.onnx",
-        size_in_GB=1.23,
+        model_file="onnx/model.onnx",
+        size_in_GB=0.60,
         dim=768,
     ),
     DenseModelDescription(
         model="BAAI/bge-m3",
         license="mit",
         sources=ModelSource(hf="BAAI/bge-m3"),
-        # if this seems like a strange description, it's because it mirror the FastEmbed format, which gets parsed
+        # if this seems like a strange description, it's because it mirrors the FastEmbed format, which gets parsed
         description="""Text embeddings, Unimodal (text), multilingual, 8192 input tokens truncation, Prefixes for queries/documents: not necessary, 2024 year.""",
-        model_file="model.onnx",
+        model_file="onnx/model.onnx",
+        additional_files=["onnx/model.onnx_data"],
         size_in_GB=2.27,
         dim=1024,
     ),
@@ -65,8 +65,8 @@ DENSE_MODELS = (
         license="mit",
         sources=ModelSource(hf="WhereIsAI/UAE-Large-V1"),
         description="""Text embeddings, Unimodal (text), multilingual, 512 input tokens truncation, Prefixes for queries/documents: necessary, 2024 year.""",
-        model_file="model.onnx",
-        size_in_GB=0.67,
+        model_file="onnx/model.onnx",
+        size_in_GB=1.23,
         dim=1024,
     ),
     DenseModelDescription(
@@ -74,8 +74,8 @@ DENSE_MODELS = (
         license="apache-2.0",
         sources=ModelSource(hf="Snowflake/snowflake-arctic-embed-l-v2.0"),
         description="""Text embeddings, Unimodal (text), multilingual, 8192 input tokens truncation, Prefixes for queries/documents: necessary, 2024 year.""",
-        model_file="model.onnx",
-        size_in_GB=2.27,
+        model_file="onnx/model.onnx",
+        size_in_GB=1.79,
         dim=1024,
     ),
     DenseModelDescription(
@@ -83,7 +83,7 @@ DENSE_MODELS = (
         license="apache-2.0",
         sources=ModelSource(hf="Snowflake/snowflake-arctic-embed-m-v2.0"),
         description="""Text embeddings, Unimodal (text), multilingual, 8192 input tokens truncation, Prefixes for queries/documents: necessary, 2024 year.""",
-        model_file="model.onnx",
+        model_file="onnx/model.onnx",
         size_in_GB=1.23,
         dim=768,
     ),
@@ -92,6 +92,9 @@ DENSE_MODELS = (
 # FastEmbed hasn't implemented custom model addition for sparse models yet
 # but we only need one for now, and it's the next version of one already implemented
 # so we just subclass and add it ourselves
+
+CUSTOM_DENSE_MODELS = tuple(model.model for model in DENSE_MODELS)
+# CUSTOM_SPARSE_MODELS = tuple(model.model for model in SPARSE_MODELS)
 
 
 def get_sparse_embedder() -> type[SparseTextEmbedding]:
@@ -107,23 +110,44 @@ def get_sparse_embedder() -> type[SparseTextEmbedding]:
 def get_text_embedder() -> type[TextEmbedding]:
     """
     Get the text embedder with added custom models.
+
+    Only adds models that aren't already in FastEmbed's native registry to avoid conflicts.
+    """
     """
     additional_params = {
-        "Alibaba-NLP/gte-modernbert-base": {"pooling": "cls", "normalization": True},
-        "BAAI/bge-m3": {"pooling": "cls", "normalization": True},
-        "WhereIsAI/UAE-Large-V1": {"pooling": "cls", "normalization": True},
-        "snowflake/snowflake-arctic-embed-l-v2.0": {"pooling": "cls", "normalization": True},
-        "snowflake/snowflake-arctic-embed-m-v2.0": {"pooling": "cls", "normalization": True},
+        "Alibaba-NLP/gte-modernbert-base": {"pooling": PoolingType.CLS, "normalization": True},
+        "BAAI/bge-m3": {"pooling": PoolingType.CLS, "normalization": True},
+        "WhereIsAI/UAE-Large-V1": {"pooling": PoolingType.CLS, "normalization": True},
+        "snowflake/snowflake-arctic-embed-l-v2.0": {
+            "pooling": PoolingType.CLS,
+            "normalization": True,
+        },
+        "snowflake/snowflake-arctic-embed-m-v2.0": {
+            "pooling": PoolingType.CLS,
+            "normalization": True,
+        },
     }
+    """
     embedder = TextEmbedding
-    for model in DENSE_MODELS:
-        # there's a lot of bugginess in custom model addition in Fastembed
-        # 1) There's a mismatch in the naming of this field within Fastembed. DenseModelDescription will only accept `size_in_GB` and `TextEmbedding` will only accept `size_in_gb`.
-        # 2) `tasks` is not a valid parameter for `TextEmbedding.add_custom_model`, but it's *added* by `DenseModelDescription`
-        model_as_dict = {k: v for k, v in asdict(model).items() if k != "tasks"}
-        gb_size = model_as_dict.pop("size_in_GB")
-        params = model_as_dict | additional_params[model.model] | {"size_in_gb": gb_size}
-        embedder.add_custom_model(**params)
+    """
+    TODO: Temporarily disabled until we can work out the bugs on added dense models in Fastembed.
+    # Get existing model names from native FastEmbed registry
+    existing_model_names = {model.get("model") for model in embedder.list_supported_models()}
+
+    if models_to_add := [
+        model for model in DENSE_MODELS if model.model not in existing_model_names
+    ]:
+        custom_embedder = custom_text_embedding.CustomTextEmbedding
+        for model in models_to_add:
+            custom_embedder.add_model(model, **additional_params[model.model])  # type: ignore
+
+        embedder.EMBEDDINGS_REGISTRY = [
+            cls
+            for cls in TextEmbedding.EMBEDDINGS_REGISTRY
+            if cls is not custom_text_embedding.CustomTextEmbedding
+        ]
+        embedder.EMBEDDINGS_REGISTRY.append(custom_embedder)
+    """
     return embedder
 
 

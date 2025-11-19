@@ -207,7 +207,9 @@ CLIENT_MAP: MappingProxyType[LiteralProvider, tuple[Client, ...]] = cast(
                 provider=Provider.FASTEMBED,
                 kind=ProviderKind.EMBEDDING,
                 origin="codeweaver",
-                client=lazy_import("fastembed", "TextEmbedding"),
+                client=lazy_import(
+                    "codeweaver.providers.embedding.fastembed_extensions", "get_text_embedder"
+                ),
                 provider_class=lazy_import(
                     "codeweaver.providers.embedding.providers.fastembed",
                     "FastEmbedEmbeddingProvider",

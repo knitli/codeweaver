@@ -70,6 +70,34 @@ CAP_MAP: dict[
 }
 
 
+SENTENCE_TRANSFORMERS_ALL_MINILM_L6_V2_CAPABILITIES: PartialCapabilities = {
+    "name": "sentence-transformers/all-MiniLM-L6-v2",
+    "default_dimension": 384,
+    "context_window": 256,
+    "preferred_metrics": ("cosine", "dot", "euclidean"),
+    "supports_context_chunk_embedding": False,
+    "tokenizer": "tokenizers",
+    "tokenizer_model": "sentence-transformers/all-MiniLM-L6-v2",
+    "default_dtype": "float",
+    "output_dtypes": ("float",),
+    "version": 2,
+    "supports_custom_prompts": False,
+    "custom_query_prompt": None,
+    "custom_document_prompt": None,
+    "other": {
+        "framework": ["Sentence Transformers", "PyTorch"],
+        "license": "apache-2.0",
+        "memory_usage_mb": 90,
+        "modalities": ["text"],
+        "n_parameters": 22700000,
+        "open_weights": True,
+        "reference": "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2",
+        "release_date": "2021-08-30",
+        "revision": "8b3219a92973c328a8e22fadcfa821b5dc75636a",
+        "memory_usage_gb": 0.09,
+    },
+}
+
 SENTENCE_TRANSFORMERS_ALL_MINILM_L12_V2_CAPABILITIES: PartialCapabilities = {
     "name": "sentence-transformers/all-MiniLM-L12-v2",
     "default_dimension": 384,
@@ -242,6 +270,7 @@ SENTENCE_TRANSFORMERS_PARAPHRASE_MULTILINGUAL_MPNET_BASE_V2_CAPABILITIES: Partia
 
 
 ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (
+    SENTENCE_TRANSFORMERS_ALL_MINILM_L6_V2_CAPABILITIES,
     SENTENCE_TRANSFORMERS_ALL_MINILM_L12_V2_CAPABILITIES,
     SENTENCE_TRANSFORMERS_ALL_MPNET_BASE_V2_CAPABILITIES,
     SENTENCE_TRANSFORMERS_GTR_T5_BASE_CAPABILITIES,

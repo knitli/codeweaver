@@ -479,7 +479,9 @@ class ProviderRegistry(BasedModel):
             and provider.uses_openai_api
         )
 
-    def _get_capabilities_for_provider(self, provider: Provider) -> EmbeddingModelCapabilities:
+    def _get_capabilities_for_provider(
+        self, provider: Provider
+    ) -> tuple[EmbeddingModelCapabilities, ...]:
         """Get capabilities for a provider.
 
         Args:
@@ -488,20 +490,12 @@ class ProviderRegistry(BasedModel):
         Returns:
             EmbeddingModelCapabilities instance for the provider
         """
-        from codeweaver.providers.embedding.capabilities.openai import (
-            get_openai_embedding_capabilities,
-        )
+        from codeweaver.providers.embedding.capabilities import load_default_capabilities
 
         # Get all capabilities for this provider type
-        all_caps = get_openai_embedding_capabilities()
+        all_caps = load_default_capabilities()
 
-        # Find the first matching capability for this provider
-        for cap in all_caps:
-            if cap.provider == provider:
-                return cap
-
-        # Fallback to first capability if exact match not found
-        return all_caps[0]
+        return tuple(cap for cap in all_caps if cap.provider == provider)
 
     def _get_default_model_for_provider(
         self, provider: Provider, capabilities: EmbeddingModelCapabilities
@@ -776,7 +770,24 @@ class ProviderRegistry(BasedModel):
             # These take model name/path in provider_settings, not client_options
             # Ensure lazy_load is set for fastembed to avoid blocking model downloads
             if provider == Provider.FASTEMBED:
-                client_options = {"lazy_load": True, **(client_options or {})}
+                # Set default cache_dir to persistent location if not provided
+                if "cache_dir" not in (client_options or {}):
+                    from codeweaver.common.utils.utils import get_user_config_dir
+
+                    models_cache = get_user_config_dir() / ".models"
+                    models_cache.mkdir(parents=True, exist_ok=True)
+                    client_options = {
+                        "cache_dir": str(models_cache),
+                        "lazy_load": True,
+                        **(client_options or {}),
+                    }
+                else:
+                    client_options = {"lazy_load": True, **(client_options or {})}
+
+                if provider_kind == ProviderKind.EMBEDDING:
+                    # The client_class for embeddings is returned by `get_text_embedder()` in `codeweaver.providers.embedding.fastembed_extensions`
+                    # We need to call it first.
+                    client_class = client_class()
 
             model_name_or_path = provider_settings.get("model") if provider_settings else None
             if model_name_or_path:
@@ -1405,6 +1416,13 @@ class ProviderRegistry(BasedModel):
         for key in ("cache_dir", "threads"):
             if value := provider_settings.get(key):
                 client_options[key] = value
+            elif key == "cache_dir":
+                # Set default cache_dir to persistent location
+                from codeweaver.common.utils.utils import get_user_config_dir
+
+                models_cache = get_user_config_dir() / ".models"
+                models_cache.mkdir(parents=True, exist_ok=True)
+                client_options["cache_dir"] = str(models_cache)
 
         if client_options:
             kwargs["client_options"] = client_options
