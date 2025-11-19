@@ -512,7 +512,7 @@ class AstGrepSupportedLanguage(Enum):
         return self.value
 
     @classmethod
-    def from_str(cls, value: str) -> AstGrepSupportedLanguage:  # noqa: C901
+    def from_str(cls, value: str) -> AstGrepSupportedLanguage:
         """Returns the enum member from a string."""
         try:
             normalized_value = value.strip().replace("-", "_").lower()
@@ -783,7 +783,7 @@ def normalize_grammars() -> None:
 
 
 @app.command(name="fetch", help="Fetch grammars from GitHub.")
-async def fetch_grammars(  # noqa: C901
+async def fetch_grammars(
     *,
     gh_username: Annotated[
         str | None,

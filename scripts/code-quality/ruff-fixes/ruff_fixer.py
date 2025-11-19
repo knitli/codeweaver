@@ -80,7 +80,7 @@ class SourcePatternFixer:
 
         return content
 
-    def fix_try_return_statements(self, content: str) -> str:  # noqa: C901
+    def fix_try_return_statements(self, content: str) -> str:
         # sourcery skip: no-long-functions
         """Fix TRY300: Move return statements from try to else block."""
         lines = content.split("\n")
