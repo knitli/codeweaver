@@ -125,9 +125,10 @@ def get_codeweaver_config_paths() -> tuple[Path, ...]:
     repo_paths.extend([
         user_config_dir / f"codeweaver.{ext}" for ext in ("toml", "yaml", "yml", "json")
     ])
+    env_config = os.environ.get("CODEWEAVER_CONFIG_FILE")
     if (
-        (env_path := Path(os.environ.get("CODEWEAVER_CONFIG_FILE")))
-        and env_path.exists()
+        env_config
+        and (env_path := Path(env_config)).exists()
         and env_path.is_file()
         and env_path not in repo_paths
         and env_path.suffix.lstrip(".") in {"toml", "yaml", "yml", "json"}

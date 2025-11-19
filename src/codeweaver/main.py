@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import logging
 import signal
@@ -16,6 +15,8 @@ import sys
 from pathlib import Path
 from types import EllipsisType
 from typing import TYPE_CHECKING, Any, Literal, cast, is_typeddict
+
+import uvloop
 
 from fastmcp import FastMCP
 from fastmcp.server.middleware import Middleware
@@ -69,12 +70,8 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
             sys.exit(1)
 
     # Install force shutdown handler
-    try:
+    with contextlib.suppress(ValueError, OSError):
         original_sigint_handler = signal.signal(signal.SIGINT, force_shutdown_handler)
-    except (ValueError, OSError):
-        # Signal handling not available in this context
-        pass
-
     try:
         app = server if isinstance(server, FastMCP) else server["app"]
         resolved_kwargs: dict[str, Any] = kwargs or {}
@@ -100,10 +97,40 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
             # Configure uvicorn based on verbosity
             uvicorn_config = settings.uvicorn or {}
             if not (verbose or debug):
+                # Non-verbose mode: Suppress all uvicorn logging
+                import logging
+
+                # Create a filter that rejects uvicorn/fastmcp logs
+                class SuppressUvicornFilter(logging.Filter):
+                    """Filter that suppresses uvicorn and fastmcp logs."""
+
+                    def filter(self, record: logging.LogRecord) -> bool:
+                        # Reject logs from uvicorn and fastmcp
+                        if record.name.startswith(("uvicorn", "fastmcp")):
+                            return False
+                        return True
+
+                # Add filter to root logger AND all its handlers
+                root_logger = logging.getLogger()
+                suppress_filter = SuppressUvicornFilter()
+                root_logger.addFilter(suppress_filter)
+
+                # Also add to all existing handlers (belt and suspenders approach)
+                for handler in root_logger.handlers:
+                    handler.addFilter(suppress_filter)
+
+                # Disable uvicorn logging via config
                 uvicorn_config = {
                     **uvicorn_config,
                     "access_log": False,  # Disable access logging
-                    "log_level": "error",  # Only show errors
+                    "log_level": "critical",  # Only critical errors
+                }
+            else:
+                # Verbose/debug mode: Enable uvicorn access logs
+                uvicorn_config = {
+                    **uvicorn_config,
+                    "access_log": True,  # Enable access logging in verbose mode
+                    "log_level": "debug" if debug else "info",  # Match verbosity level
                 }
 
             new_kwargs = {  # type: ignore
@@ -111,7 +138,6 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
                 "host": server_setup.pop("host", "127.0.0.1"),
                 "port": server_setup.pop("port", 9328),
                 "log_level": server_setup.pop("log_level", "INFO"),
-                "path": server_setup.pop("streamable_http_path", "/codeweaver"),
                 "middleware": server_setup.pop("middleware", set()),
                 "uvicorn_config": uvicorn_config,  # Use configured uvicorn settings
                 "show_banner": False,  # We use our own custom banner via StatusDisplay
@@ -123,7 +149,6 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
                 "host": "127.0.0.1",
                 "port": 9328,
                 "log_level": "INFO",
-                "path": "/codeweaver",
                 "middleware": set(),
                 "uvicorn_config": {},
                 "show_banner": False,  # We use our own custom banner via StatusDisplay
@@ -187,7 +212,7 @@ async def run(
 
 if __name__ == "__main__":
     try:
-        asyncio.run(run())
+        uvloop.run(run())
     except Exception as e:
         logging.getLogger(__name__).exception("Failed to start CodeWeaver server: ")
         raise InitializationError("Failed to start CodeWeaver server.") from e

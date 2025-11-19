@@ -4,12 +4,16 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # ! GitHub Action to check CLA signatures for Knitli repositories
 # ! This action is triggered on issue comments and pull request events.
-name: "CLA Assistant"
+name: CLA Assistant
 on:
   issue_comment:
-    types: [created]
+    types:
+      - created
   pull_request_target:
-    types: [opened, closed, synchronize]
+    types:
+      - opened
+      - closed
+      - synchronize
 permissions:
   actions: write
   contents: write # this can be 'read' if the signatures are in remote repository
@@ -18,11 +22,10 @@ permissions:
 jobs:
   set-pr-title:
     runs-on: ubuntu-latest
-    if: >
+    if: |
       github.event_name == 'pull_request_target' && github.event.pull_request.user.login != 'github-actions[bot]' && github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.user.login != 'codegen-sh' && github.event.pull_request.user.login != 'changeset-bot' && github.event.pull_request.user.login != 'claude' && github.event.pull_request.user.login != 'copilot'
-
     steps:
-      - name: "Set PR Title"
+      - name: Set PR Title
         env:
           EV_TITLE: ${{ github.event.pull_request.title }}
           EV_BODY: ${{ github.event.pull_request.body }}
@@ -30,11 +33,10 @@ jobs:
           echo "${EV_TITLE}"
   set-issue-title:
     runs-on: ubuntu-latest
-    if: >
+    if: |
       github.event_name == 'issue_comment' && github.event.issue.user.login != 'github-actions[bot]' && github.event.issue.user.login != 'dependabot[bot]' && github.event.issue.user.login != 'codegen-sh' && github.event.issue.user.login != 'changeset-bot' && github.event.issue.user.login != 'claude' && github.event.issue.user.login != 'copilot'
-
     steps:
-      - name: "Set Issue Title"
+      - name: Set Issue Title
         env:
           EV_TITLE: ${{ toJson(github.event.issue.title) }}
           EV_BODY: ${{ toJson(github.event.comment.body) }}
@@ -43,7 +45,7 @@ jobs:
   check-cla:
     runs-on: ubuntu-latest
     steps:
-      - name: "SetVariables"
+      - name: SetVariables
         run: |
           # shellcheck disable=SC2296
           # This script sets up environment variables based on the GitHub event context.
@@ -116,9 +118,8 @@ jobs:
           fi
   cla-assistant:
     needs: check-cla
-    if: >
+    if: |
       (needs.check-cla.outputs.is_member && needs.check-cla.outputs.is_member == 'false' && needs.check-cla.outputs.is_member != 'true') || needs.check-cla.outputs.is_member == ''
-
     runs-on: ubuntu-latest
     steps:
       - name: Debug
@@ -126,51 +127,26 @@ jobs:
           if [[ $DEBUG_ACTIONS == 'true' ]]; then
             printenv
           fi
-      - name: "CLA Assistant"
-        if: >
+      - name: CLA Assistant
+        if: |
           (env.IS_RECHECK && env.IS_PR) && (env.IS_RECHECK == 'true' || env.IS_PR == 'true')
-
         uses: contributor-assistant/github-action@v2.6.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          path-to-signatures: "cla.json"
-          path-to-document: "https://github.com/knitli/codeweaver/blob/main/CONTRIBUTORS_LICENSE_AGREEMENT.md"
-          branch: "staging"
-          allowlist: >
+          path-to-signatures: cla.json
+          path-to-document: https://github.com/knitli/codeweaver/blob/main/CONTRIBUTORS_LICENSE_AGREEMENT.md
+          branch: staging
+          allowlist: |
             bashandbone,codegen-sh[bot],dependabot[bot],github-actions[bot],actions-user,changeset-bot,claude
-
-          create-file-commit-message: "Adding file for tracking CLA signatures"
-          signed-commit-message: >
-            $env.EV_AUTHOR signed 🖊️ the Thread 🧵 CLA in [$env.GITHUB_REPOSITORY # $env.EV_NUMBER]($env.EV_URL)
-
-          custom-notsigned-prcomment: |
-            ✋🛑 Hey $env.EV_AUTHOR,
-
-            ## Thanks for your contribution to Thread!
-
-            ### You need to agree to the CLA first... 🖊️
-
-            Before we can accept your (awesome) contribution, **we need you to agree to our contributors license agreement (CLA)**. 🖊️
-
-            ### To agree to the CLA, please comment:
-            > I read the contributors license agreement and I agree to it.
-            Those words are important[^1], so please don't change them. 😉
-
-            [^1]: Our bot needs those *exact* words to recognize that you agree to the CLA. If you want to add something else, please do so after those words. 😉
+          create-file-commit-message: Adding file for tracking CLA signatures
+          signed-commit-message: "$env.EV_AUTHOR signed \U0001F58A️ the Thread \U0001F9F5 CLA in [$env.GITHUB_REPOSITORY # $env.EV_NUMBER]($env.EV_URL)\n"
+          custom-notsigned-prcomment: "✋\U0001F6D1 Hey $env.EV_AUTHOR,\n\n## Thanks for your contribution to Thread!\n\n### You need to agree to the CLA first... \U0001F58A️\n\nBefore we can accept your (awesome) contribution, **we need you to agree to our contributors license agreement (CLA)**. \U0001F58A️\n\n### To agree to the CLA, please comment:\n> I read the contributors license agreement and I agree to it.\nThose words are important[^1], so please don't change them. \U0001F609\n\n[^1]: Our bot needs those *exact* words to recognize that you agree to the CLA. If you want to add something else, please do so after those words. \U0001F609\n"
           custom-pr-sign-comment: |
             $env.EV_AUTHOR, agrees to the Thread CLA.
 
             $env.EV_AUTHOR acknowledges they read and agree to the [Thread contributors license agreement](https://github.com/knitli/codeweaver/blob/main/CONTRIBUTORS_LICENSE_AGREEMENT.md).
-          custom-allsigned-prcomment: |
-            ## 🚀 GOOD TO GO. Everyone has agreed to the CLA. 👍
-
-            ### Thanks for your contribution to Thread! 🧵
-            Your contribution is now ready to be merged[^1]. 🎉
-
-            ### Maintainers: Ship this PR! 📦🚀
-
-            [^1]: If it passes the other CI checks, of course. 😉 I'm just here for the legal stuff.
+          custom-allsigned-prcomment: "## \U0001F680 GOOD TO GO. Everyone has agreed to the CLA. \U0001F44D\n\n### Thanks for your contribution to Thread! \U0001F9F5\nYour contribution is now ready to be merged[^1]. \U0001F389\n\n### Maintainers: Ship this PR! \U0001F4E6\U0001F680\n\n[^1]: If it passes the other CI checks, of course. \U0001F609 I'm just here for the legal stuff.\n"
           # UNUSED OPTIONS
           #lock-pullrequest-aftermerge: false - if you don't want this bot to automatically lock the pull request after merging (default - true)
           #use-dco-flag: true - If you are using DCO instead of CLA

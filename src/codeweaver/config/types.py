@@ -162,7 +162,7 @@ class UvicornServerSettings(BasedModel):
     lifespan: LifespanType = "auto"
     env_file: str | os.PathLike[str] | None = None
     log_config: LoggingConfigDict | None = None
-    log_level: str | int | None = "info"
+    log_level: str | int | None = "warning"
     access_log: bool = True
     use_colors: bool | None = None
     interface: InterfaceType = "auto"

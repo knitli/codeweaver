@@ -69,10 +69,10 @@ def _get_status_indicator(provider: Provider, *, has_key: bool) -> str:
 
 
 def _get_provider_type(provider: Provider) -> str:
-    """Get human-readable type for a provider."""
+    """Get human-readable type for a provider with color coding."""
     if provider.always_local:
-        return "local"
-    return "local/cloud" if provider.is_local_provider else "cloud"
+        return "[green]local[/green]"
+    return "[magenta]local/cloud[/magenta]" if provider.is_local_provider else "[blue]cloud[/blue]"
 
 
 class ProviderDict(TypedDict):
@@ -118,17 +118,6 @@ def providers(
             )
             sys.exit(1)
 
-    # Build table
-    table = Table(
-        show_header=True,
-        header_style="bold blue",
-        title=f"Available {kind.as_title} Providers" if kind_filter else "Available Providers",
-    )
-    table.add_column("Provider", style="cyan", no_wrap=True)
-    table.add_column("Kind", style="white")
-    table.add_column("Type", style="white")
-    table.add_column("Status", style="white")
-
     providers = sorted(
         (provider for provider in Provider if provider != Provider.NOT_SET),
         key=lambda p: p.variable,
@@ -153,6 +142,22 @@ def providers(
                 }
             elif capability and provider_map.get(provider) and is_typeddict(provider_map[provider]):
                 provider_map[provider]["capabilities"].append(capability)  # ty: ignore[non-subscriptable]  # not sure how else to prove it..
+
+    # Count valid providers
+    valid_providers = [p for p, info in provider_map.items() if info]
+    provider_count = len(valid_providers)
+
+    # Build table with count
+    title_text = (
+        f"Available {kind.as_title} Providers ({provider_count} found)"
+        if kind_filter
+        else f"Available Providers ({provider_count} found)"
+    )
+    table = Table(show_header=True, header_style="bold blue", title=title_text)
+    table.add_column("Provider", style="cyan", no_wrap=True)
+    table.add_column("Kind", style="white")
+    table.add_column("Type", style="white")
+    table.add_column("Status", style="white")
 
     for provider, info in provider_map.items():
         if not info:

@@ -132,6 +132,7 @@ dependencies = [
   "typing_extensions>=4.15.0",
   "uuid7>=0.1.0; python_version < '3.14'",
   "uvicorn[standard]>=0.38.0",
+  "uvloop>=0.22.1",
   "voyageai>=0.3.5",
   "watchfiles>=1.1.1",
 ]

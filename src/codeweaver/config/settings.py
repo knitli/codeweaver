@@ -175,9 +175,9 @@ class FastMcpServerSettings(BasedModel):
     transport: Annotated[
         Literal["stdio", "http", "streamable-http"] | None,
         Field(
-            description="""Transport protocol to use for the FastMCP server. Stdio is for local use and cannot support concurrent requests. HTTP (streamable HTTP) can be used for local or remote use and supports concurrent requests. Unlike many MCP servers, CodeWeaver **defaults to http**."""
+            description="""Transport protocol to use for the FastMCP server. Stdio is for local use and cannot support concurrent requests. HTTP (streamable HTTP) can be used for local or remote use and supports concurrent requests. Unlike many MCP servers, CodeWeaver **defaults to streamable-http**."""
         ),
-    ] = "http"
+    ] = "streamable-http"
     host: Annotated[str | None, Field(description="""Host address for the FastMCP server.""")] = (
         "127.0.0.1"
     )
@@ -189,9 +189,9 @@ class FastMcpServerSettings(BasedModel):
     auth: Annotated[AuthSettings | None, Field(description="""OAuth provider configuration""")] = (
         None
     )
-    on_duplicate_tools: DuplicateBehavior | None = None
-    on_duplicate_resources: DuplicateBehavior | None = None
-    on_duplicate_prompts: DuplicateBehavior | None = None
+    on_duplicate_tools: DuplicateBehavior | None = "replace"
+    on_duplicate_resources: DuplicateBehavior | None = "replace"
+    on_duplicate_prompts: DuplicateBehavior | None = "replace"
     resource_prefix_format: Literal["protocol", "path"] | None = None
     # these are each "middleware", "tools", and "dependencies" for FastMCP. But we prefix them with "additional_" to make it clear these are *in addition to* the ones we provide by default.
     additional_middleware: Annotated[

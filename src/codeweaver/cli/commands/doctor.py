@@ -211,7 +211,7 @@ def _identify_missing_dependencies(
         for match in matches
         if match
         and match["name"]
-        != "py_cpuinfo"  # it's technically required, but it's for optimizations; not strictly required
+        != "py-cpuinfo"  # it's technically required, but it's for optimizations; not strictly required
     ]
 
     for display_name, module_name, _version in required_packages:
@@ -276,7 +276,11 @@ def check_configuration_file(settings: CodeWeaverSettings | None = None) -> Doct
         if found_config := next((loc for loc in possible_config_locations if loc.exists()), None):
             check.status = "✅"
             check.message = f"Valid config at {found_config}"
-        elif settings.config_file and settings.config_file.exists():
+        elif (
+            settings.config_file
+            and not isinstance(settings.config_file, Unset)
+            and settings.config_file.exists()
+        ):
             # Fallback to settings.config_file if set
             check.status = "✅"
             check.message = f"Valid config at {settings.config_file}"
@@ -337,7 +341,7 @@ async def _qdrant_running_at_url(url: Any | None = None) -> bool:
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(f"{url_str}/metrics", timeout=2.0)
-    except (httpx.ConnectError, httpx.TimeoutException):
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError):
         return False
     else:
         return response.status_code == 200 and bool(

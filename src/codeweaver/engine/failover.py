@@ -20,6 +20,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, NoReturn, cast
 
+import uvloop
+
 from fastmcp import Context
 from pydantic import Field, PrivateAttr
 
@@ -120,11 +122,11 @@ class VectorStoreFailoverManager(BasedModel):
         if self.backup_enabled and primary_store:
             logger.info("Initializing vector store failover support")
             # Start monitoring primary health
-            self._circuit_monitor_task = asyncio.create_task(
+            self._circuit_monitor_task = uvloop.create_task(
                 self._monitor_primary_health(), name="vector_store_circuit_monitor"
             )
             # Start periodic backup sync task
-            self._backup_sync_task = asyncio.create_task(
+            self._backup_sync_task = uvloop.create_task(
                 self._sync_backup_periodically(), name="vector_store_backup_sync"
             )
         else:

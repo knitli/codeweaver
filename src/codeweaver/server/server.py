@@ -405,12 +405,12 @@ async def _cleanup_state(
     if indexing_task and not indexing_task.done():
         indexing_task.cancel()
         try:
-            # Wait up to 5 seconds for graceful shutdown
-            await asyncio.wait_for(indexing_task, timeout=5.0)
+            # Wait up to 7 seconds for graceful shutdown
+            await asyncio.wait_for(indexing_task, timeout=7.0)
             if verbose:
                 logger.info("Background indexing stopped gracefully")
         except TimeoutError:
-            logger.warning("Background indexing did not stop within 5 seconds, forcing shutdown")
+            logger.warning("Background indexing did not stop within 7 seconds, forcing shutdown")
             # Task is already cancelled, just move on
         except asyncio.CancelledError:
             if verbose:
@@ -616,15 +616,32 @@ def __setup_interim_logger(
 
 
 def _set_log_levels():
-    logging.getLogger("voyage").setLevel(logging.WARNING)
-    logging.getLogger("uvicorn").setLevel(logging.ERROR)  # Changed from WARNING
-    logging.getLogger("uvicorn.access").setLevel(logging.CRITICAL)  # Changed from ERROR
-    logging.getLogger("uvicorn.error").setLevel(logging.ERROR)
-    logging.getLogger("mcp").setLevel(logging.WARNING)
-    logging.getLogger("mcp.server").setLevel(logging.WARNING)
-    logging.getLogger("fastmcp").setLevel(logging.WARNING)
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    """Suppress third-party library loggers comprehensively.
+
+    Sets log levels AND removes handlers to prevent any output leakage.
+    """
+    # List of loggers to suppress
+    loggers_to_suppress = [
+        "voyage",
+        "uvicorn",
+        "uvicorn.access",
+        "uvicorn.error",
+        "mcp",
+        "mcp.server",
+        "fastmcp",
+        "fastmcp.server",  # Add this one
+        "httpx",
+        "httpcore",
+    ]
+
+    for logger_name in loggers_to_suppress:
+        logger_obj = logging.getLogger(logger_name)
+        # Set level to CRITICAL to suppress almost everything
+        logger_obj.setLevel(logging.CRITICAL)
+        # Remove all handlers to prevent output
+        logger_obj.handlers.clear()
+        # Disable propagation to parent loggers
+        logger_obj.propagate = False
 
 
 LEVEL_MAP: dict[
@@ -660,11 +677,7 @@ def _setup_logger(
 
     # Suppress third-party library loggers when level is above INFO
     if level > logging.INFO:
-        logging.getLogger("voyage").setLevel(logging.WARNING)
-        logging.getLogger("uvicorn").setLevel(logging.WARNING)
-        logging.getLogger("uvicorn.access").setLevel(logging.ERROR)
-        logging.getLogger("mcp").setLevel(logging.WARNING)
-        logging.getLogger("mcp.server").setLevel(logging.WARNING)
+        _set_log_levels()  # Reuse the comprehensive suppression function
 
     fast_mcp_log_level = LEVEL_MAP.get(level, "INFO")
     return (app_logger, fast_mcp_log_level)
