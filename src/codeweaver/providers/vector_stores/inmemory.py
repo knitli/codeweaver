@@ -138,11 +138,11 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
                         limit=100,
                         offset=offset,
                         with_payload=True,
-                        with_vectors=True,  # type: ignore
+                        with_vectors=True,
                     )
                     if not result[0]:  # No more points
                         break
-                    points.extend(result[0])  # type: ignore
+                    points.extend(result[0])
                     offset = result[1]  # Next offset
                     if offset is None:  # Reached end
                         break

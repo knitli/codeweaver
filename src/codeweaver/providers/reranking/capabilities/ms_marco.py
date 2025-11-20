@@ -36,6 +36,16 @@ def get_marco_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
     fastembed_models = ("L-6-v2", "L-12-v2")
     sentence_transformers_models = ("L6-v2", "L12-v2")
 
+    ultra_light: PartialRerankingCapabilitiesDict = {
+        "name": "cross-encoder/ms-marco-TinyBERT-L2-v2",
+        "provider": Provider.SENTENCE_TRANSFORMERS,
+        "max_input": 512,
+        "context_window": 512,
+        "tokenizer": "tokenizers",
+        "tokenizer_model": "cross-encoder/ms-marco-TinyBERT-L2-v2",
+        "supports_custom_prompt": False,
+    }
+
     assembled_capabilities: list[RerankingModelCapabilities] = []
     assembled_capabilities.extend(
         RerankingModelCapabilities.model_validate({
@@ -52,6 +62,7 @@ def get_marco_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
         })
         for model in fastembed_models + sentence_transformers_models
     )
+    assembled_capabilities.append(RerankingModelCapabilities.model_validate(ultra_light))
     return assembled_capabilities
 
 

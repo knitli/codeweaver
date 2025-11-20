@@ -231,35 +231,36 @@ def _quickstart_default(
 
 
 def _backup_profile() -> ProviderSettingsDict:
+    """Backup profile for local development with backup vector store.
+
+    We choose the lightest models available for either FastEmbed or Sentence Transformers, depending on availability.
+    """
     from codeweaver.providers.provider import Provider
 
-    return ProviderSettingsDict(
-        **(
-            _quickstart_default("local")
-            | {
-                "embedding": EmbeddingProviderSettings(
-                    provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
-                    enabled=True,
-                    model_settings=EmbeddingModelSettings(
-                        model="BAAI/ibm-granite/granite-embedding-small-english-r2"
-                        if HAS_ST
-                        else "sentence-transformers/all-MiniLM-L6-v2",
-                        dimension=384,
-                    ),
-                )
-            }
-            | {
-                "vector_store": VectorStoreProviderSettings(
-                    provider=Provider.MEMORY,
-                    enabled=True,
-                    provider_settings=MemoryConfig(
-                        persist_path=get_user_config_dir() / "vectors/backup",
-                        collection_name=f"{get_project_path().name}-{get_blake_hash(str(get_project_path()).encode('utf-8'))[:8]}-backup",
-                    ),
-                )
-            }
-        )
+    backup_settings = _quickstart_default("local")
+
+    backup_settings["reranking"] = (
+        RerankingProviderSettings(
+            provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
+            enabled=True,
+            model_settings=RerankingModelSettings(
+                model="cross-encoder/ms-marco-TinyBERT-L2-v2"
+                if HAS_ST
+                else "Xenova/ms-marco-MiniLM-L-6-v2"
+            ),
+        ),
     )
+
+    backup_settings["vector_store"] = VectorStoreProviderSettings(
+        provider=Provider.MEMORY,
+        enabled=True,
+        provider_settings=MemoryConfig(
+            persist_path=get_user_config_dir() / "vectors/backup",
+            collection_name=f"{get_project_path().name}-{get_blake_hash(str(get_project_path()).encode('utf-8'))[:8]}-backup",
+        ),
+    )
+
+    return ProviderSettingsDict(**backup_settings)
 
 
 __all__ = ("get_profile",)

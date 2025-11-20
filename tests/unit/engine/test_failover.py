@@ -618,6 +618,180 @@ class TestSyncBackToPrimary:
             assert manager._failover_active
 
 
+class TestBackupSyncCoordination:
+    """Tests for backup sync coordination using FileChangeTracker."""
+
+    @pytest.mark.asyncio
+    async def test_should_sync_false_when_no_tracker(self, tmp_path: Path):
+        """Test should_sync_backup returns False without tracker."""
+        manager = VectorStoreFailoverManager()
+
+        assert manager.should_sync_backup() is False
+
+    @pytest.mark.asyncio
+    async def test_should_sync_false_when_no_changes(self, tmp_path: Path):
+        """Test should_sync_backup returns False with no pending changes."""
+        from codeweaver.engine.failover_tracker import FileChangeTracker
+
+        manager = VectorStoreFailoverManager()
+        manager._change_tracker = FileChangeTracker(project_path=tmp_path)
+
+        assert manager.should_sync_backup() is False
+
+    @pytest.mark.asyncio
+    async def test_should_sync_true_on_volume_threshold(self, tmp_path: Path):
+        """Test should_sync_backup returns True when volume threshold exceeded."""
+        from codeweaver.engine.failover_tracker import FileChangeTracker
+
+        manager = VectorStoreFailoverManager()
+        tracker = FileChangeTracker(project_path=tmp_path)
+        # Add 50+ pending changes
+        tracker.pending_changes = {f"file{i}.py" for i in range(60)}
+        manager._change_tracker = tracker
+
+        assert manager.should_sync_backup(volume_threshold=50) is True
+
+    @pytest.mark.asyncio
+    async def test_should_sync_true_on_time_threshold(self, tmp_path: Path):
+        """Test should_sync_backup returns True when time threshold exceeded."""
+        from datetime import UTC, datetime, timedelta
+
+        from codeweaver.engine.failover_tracker import FileChangeTracker
+
+        manager = VectorStoreFailoverManager()
+        tracker = FileChangeTracker(project_path=tmp_path)
+        tracker.pending_changes = {"file.py"}
+        # Set last sync time to 10 minutes ago
+        tracker.last_sync_time = datetime.now(UTC) - timedelta(minutes=10)
+        manager._change_tracker = tracker
+
+        assert manager.should_sync_backup(time_threshold_seconds=300) is True
+
+    @pytest.mark.asyncio
+    async def test_should_sync_true_when_never_synced(self, tmp_path: Path):
+        """Test should_sync_backup returns True when never synced."""
+        from codeweaver.engine.failover_tracker import FileChangeTracker
+
+        manager = VectorStoreFailoverManager()
+        tracker = FileChangeTracker(project_path=tmp_path)
+        tracker.pending_changes = {"file.py"}
+        # last_sync_time is None by default
+        manager._change_tracker = tracker
+
+        assert manager.should_sync_backup() is True
+
+    @pytest.mark.asyncio
+    async def test_sync_pending_returns_zero_without_tracker(self, tmp_path: Path):
+        """Test sync_pending_to_backup returns 0 without tracker."""
+        manager = VectorStoreFailoverManager()
+
+        result = await manager.sync_pending_to_backup()
+
+        assert result == 0
+
+    @pytest.mark.asyncio
+    async def test_sync_pending_returns_zero_without_indexer(self, tmp_path: Path):
+        """Test sync_pending_to_backup returns 0 without backup indexer."""
+        from codeweaver.engine.failover_tracker import FileChangeTracker
+
+        manager = VectorStoreFailoverManager()
+        manager._change_tracker = FileChangeTracker(project_path=tmp_path)
+
+        result = await manager.sync_pending_to_backup()
+
+        assert result == 0
+
+    @pytest.mark.asyncio
+    async def test_sync_pending_returns_zero_with_no_changes(self, tmp_path: Path):
+        """Test sync_pending_to_backup returns 0 with no pending changes."""
+        from codeweaver.engine.failover_tracker import FileChangeTracker
+
+        manager = VectorStoreFailoverManager()
+        manager._change_tracker = FileChangeTracker(project_path=tmp_path)
+        manager._backup_indexer = MagicMock()
+
+        result = await manager.sync_pending_to_backup()
+
+        assert result == 0
+
+
+class TestBackupIndexerCreation:
+    """Tests for backup indexer creation."""
+
+    @pytest.mark.asyncio
+    async def test_backup_indexer_property(self, tmp_path: Path):
+        """Test backup_indexer property returns indexer."""
+        manager = VectorStoreFailoverManager()
+        mock_indexer = MagicMock()
+        manager._backup_indexer = mock_indexer
+
+        assert manager.backup_indexer is mock_indexer
+
+    @pytest.mark.asyncio
+    async def test_backup_indexer_property_none(self, tmp_path: Path):
+        """Test backup_indexer property returns None when not set."""
+        manager = VectorStoreFailoverManager()
+
+        assert manager.backup_indexer is None
+
+
+class TestPrimaryRecovery:
+    """Tests for primary recovery using FileChangeTracker."""
+
+    @pytest.mark.asyncio
+    async def test_sync_failover_returns_zero_without_tracker(self, tmp_path: Path):
+        """Test sync_failover_to_primary returns 0 without tracker."""
+        manager = VectorStoreFailoverManager()
+
+        result = await manager.sync_failover_to_primary()
+
+        assert result == 0
+
+    @pytest.mark.asyncio
+    async def test_sync_failover_returns_zero_without_indexer(self, tmp_path: Path):
+        """Test sync_failover_to_primary returns 0 without primary indexer."""
+        from codeweaver.engine.failover_tracker import FileChangeTracker
+
+        manager = VectorStoreFailoverManager()
+        manager._change_tracker = FileChangeTracker(project_path=tmp_path)
+
+        result = await manager.sync_failover_to_primary()
+
+        assert result == 0
+
+    @pytest.mark.asyncio
+    async def test_sync_failover_returns_zero_with_no_failover_files(self, tmp_path: Path):
+        """Test sync_failover_to_primary returns 0 with no failover files."""
+        from codeweaver.engine.failover_tracker import FileChangeTracker
+
+        manager = VectorStoreFailoverManager()
+        manager._change_tracker = FileChangeTracker(project_path=tmp_path)
+        manager._indexer = MagicMock()
+
+        result = await manager.sync_failover_to_primary()
+
+        assert result == 0
+
+    @pytest.mark.asyncio
+    async def test_status_includes_change_tracker_info(self, tmp_path: Path):
+        """Test that status includes change tracker information."""
+        from codeweaver.engine.failover_tracker import FileChangeTracker
+
+        manager = VectorStoreFailoverManager()
+        tracker = FileChangeTracker(project_path=tmp_path)
+        tracker.pending_changes = {"a.py", "b.py"}
+        tracker.failover_indexed = {"c.py"}
+        manager._change_tracker = tracker
+
+        status = manager.get_status()
+
+        assert "change_tracker" in status
+        assert status["change_tracker"]["pending_changes"] == 2
+        assert status["change_tracker"]["failover_indexed"] == 1
+        assert status["change_tracker"]["needs_backup_sync"] is True
+        assert status["change_tracker"]["needs_primary_recovery"] is True
+
+
 class TestGetStatus:
     """Tests for get_status method with Phase 2 additions."""
 

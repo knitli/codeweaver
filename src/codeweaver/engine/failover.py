@@ -1,3 +1,4 @@
+# sourcery skip: no-complex-if-expressions
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -22,8 +23,11 @@ from typing import TYPE_CHECKING, Annotated, Any, NoReturn, cast
 
 from fastmcp import Context
 from pydantic import Field, PrivateAttr
+from qdrant_client.http.models.models import CollectionInfo
 
 from codeweaver.common.logging import log_to_client_or_fallback
+from codeweaver.config.profiles import _backup_profile, get_profile
+from codeweaver.config.providers import ProviderSettingsDict
 from codeweaver.core.types.models import BasedModel
 from codeweaver.engine.resource_estimation import estimate_backup_memory_requirements
 from codeweaver.providers.vector_stores.base import CircuitBreakerState
@@ -31,11 +35,35 @@ from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
 
 
 if TYPE_CHECKING:
+    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
+    from codeweaver.engine.failover_tracker import FileChangeTracker
     from codeweaver.engine.indexer.indexer import Indexer
     from codeweaver.providers.vector_stores.base import VectorStoreProvider
     from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
 
 logger = logging.getLogger(__name__)
+
+
+def _get_collection_name(*, secondary: bool) -> str:
+    """Get the collection name for primary or backup vector store.
+
+    Args:
+        secondary: Whether to get the backup collection name
+
+    Returns:
+        The collection name for the primary or backup vector store.
+    """
+    if secondary:
+        return _backup_profile()["vector_store"]["provider_settings"]["collection_name"]
+    from codeweaver.common.registry.provider import get_provider_config_for
+
+    if (config := get_provider_config_for("vector_store")) and (
+        collection_name := config["provider_settings"].get("collection_name")
+    ):
+        return f"{collection_name}-backup" if secondary else collection_name
+    from codeweaver.common.utils.utils import generate_collection_name
+
+    return generate_collection_name(is_backup=secondary)
 
 
 class VectorStoreFailoverManager(BasedModel):
@@ -76,22 +104,31 @@ class VectorStoreFailoverManager(BasedModel):
 
     # Performance tuning
     health_check_interval: int = Field(
-        default=30, ge=5, description="Seconds between health checks when primary is healthy"
+        default=60, ge=5, description="Seconds between health checks when primary is healthy"
     )
     health_check_interval_failing: int = Field(
-        default=5, ge=1, description="Seconds between health checks when primary is failing"
+        default=15, ge=1, description="Seconds between health checks when primary is failing"
     )
     sync_only_on_changes: bool = Field(
         default=True, description="Only sync backup when data has changed since last sync"
     )
+    primary_collection: CollectionInfo | None = Field(
+        default=None, description="Information about the primary vector store collection"
+    )
+    backup_collection: CollectionInfo | None = Field(
+        default=None, description="Information about the backup vector store collection"
+    )
+    backup_profile: ProviderSettingsDict | None = Field(default_factory=_backup_profile)
 
-    def _telemetry_keys(self) -> dict[str, str] | None:
-        """Telemetry keys for privacy-preserving data collection.
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        """Keys to process for telemetry privacy."""
+        from codeweaver.core.types.aliases import FilteredKey
+        from codeweaver.core.types.enum import AnonymityConversion
 
-        Returns:
-            None - no sensitive data to filter in this model
-        """
-        return None
+        return {
+            FilteredKey("primary_collection"): AnonymityConversion.BOOLEAN,
+            FilteredKey("backup_collection"): AnonymityConversion.BOOLEAN,
+        }
 
     # Runtime state (private)
     _primary_store: Annotated[VectorStoreProvider | None, PrivateAttr()] = None
@@ -118,13 +155,11 @@ class VectorStoreFailoverManager(BasedModel):
         None  # When estimate was cached
     )
 
-    # Chunk ID indexes to avoid scrolling operations
-    _backup_chunk_index: Annotated[dict[str, set[str]], PrivateAttr()] = PrivateAttr(
-        default_factory=dict
-    )  # collection_name -> set of chunk IDs
-    _primary_chunk_index: Annotated[dict[str, set[str]], PrivateAttr()] = PrivateAttr(
-        default_factory=dict
-    )  # collection_name -> set of chunk IDs
+    # File change tracking for backup sync
+    _change_tracker: Annotated[FileChangeTracker | None, PrivateAttr()] = None
+
+    # Backup indexer (separate instance with backup providers and chunk settings)
+    _backup_indexer: Annotated[Indexer | None, PrivateAttr()] = None
 
     async def initialize(
         self,
@@ -139,18 +174,35 @@ class VectorStoreFailoverManager(BasedModel):
             project_path: Project root path for backup persistence
             indexer: Optional indexer reference for stats
         """
+        from codeweaver.engine.failover_tracker import FileChangeTracker
+        from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
+
         self._primary_store = primary_store
         self._active_store = primary_store
         self._project_path = project_path
         self._indexer = indexer
+        self._profile = get_profile("backup", "local")
+
+        # Initialize file change tracker
+        self._change_tracker = FileChangeTracker.load(project_path)
+        logger.debug(
+            "Loaded file change tracker: %d files tracked, %d pending changes",
+            len(self._change_tracker.file_hashes),
+            self._change_tracker.pending_count,
+        )
 
         # Initialize chunk indexes
-        await self._build_chunk_indexes()
-
+        primary_collection_name = _get_collection_name(secondary=False)
+        backup_collection_name = _get_collection_name(secondary=True)
         # Initialize _last_indexed_count to current state to avoid skipping first sync
         if indexer and indexer.stats:
             self._last_indexed_count = indexer.stats.chunks_indexed
             logger.debug("Initialized _last_indexed_count to %d", self._last_indexed_count)
+        self.primary_collection = (
+            await cast(QdrantBaseProvider, primary_store).get_collection(primary_collection_name)
+            if primary_store
+            else None
+        )
 
         if self.backup_enabled and primary_store:
             logger.info("Initializing vector store failover support")
@@ -158,14 +210,24 @@ class VectorStoreFailoverManager(BasedModel):
             import asyncio
 
             self._circuit_monitor_task = asyncio.create_task(
-                self._monitor_primary_health(), name="vector_store_circuit_monitor"
+                self._monitor_primary_health(),
+                name="vector_store_circuit_monitor",  # ty:ignore[unresolved-attribute]
             )
             # Start periodic backup sync task
             self._backup_sync_task = asyncio.create_task(
-                self._sync_backup_periodically(), name="vector_store_backup_sync"
+                self._sync_backup_periodically(),
+                name="vector_store_backup_sync",  # ty:ignore[unresolved-attribute]
             )
+            if self._backup_store and not self.backup_collection:
+                self.backup_collection = await self._backup_store.get_collection(
+                    backup_collection_name
+                )
         else:
             logger.debug("Backup failover disabled or no primary store")
+        if primary_store and isinstance(primary_store, QdrantBaseProvider):
+            primary_store.create_payload_index(primary_collection_name, "chunk_id", "uuid")
+        if self._backup_store and isinstance(self._backup_store, QdrantBaseProvider):
+            self._backup_store.create_payload_index(backup_collection_name, "chunk_id", "uuid")
 
     async def shutdown(self) -> None:
         """Gracefully shutdown failover manager."""
@@ -180,6 +242,13 @@ class VectorStoreFailoverManager(BasedModel):
             with contextlib.suppress(asyncio.CancelledError):
                 await self._backup_sync_task
 
+        # Save file change tracker state
+        if self._change_tracker:
+            if self._change_tracker.save():
+                logger.info("Saved file change tracker state on shutdown")
+            else:
+                logger.warning("Failed to save file change tracker on shutdown")
+
         # Persist backup state if active
         if self._failover_active and self._backup_store:
             try:
@@ -188,6 +257,47 @@ class VectorStoreFailoverManager(BasedModel):
             except Exception as e:
                 logger.warning("Failed to persist backup on shutdown", exc_info=e)
 
+    @property
+    def change_tracker(self) -> FileChangeTracker | None:
+        """Get the file change tracker for recording indexed files."""
+        return self._change_tracker
+
+    @property
+    def backup_indexer(self) -> Indexer | None:
+        """Get the backup indexer for failover indexing operations."""
+        return self._backup_indexer
+
+    def record_file_indexed(self, discovered_file: Any) -> None:
+        """Record that a file was successfully indexed by the primary.
+
+        This should be called by the Indexer after successful indexing.
+
+        Args:
+            discovered_file: The DiscoveredFile that was indexed
+        """
+        if self._change_tracker:
+            self._change_tracker.record_file_indexed(discovered_file)
+
+    def record_file_deleted(self, path: Path) -> None:
+        """Record that a file was deleted.
+
+        Args:
+            path: Path of the deleted file
+        """
+        if self._change_tracker:
+            self._change_tracker.record_file_deleted(path)
+
+    def record_file_indexed_during_failover(self, path: Path) -> None:
+        """Record that a file was indexed during failover mode.
+
+        These files will need primary re-indexing on recovery.
+
+        Args:
+            path: Path of the file indexed during failover
+        """
+        if self._change_tracker:
+            self._change_tracker.record_file_indexed_during_failover(path)
+
     def set_context(self, context: Context | None) -> None:
         """Set the MCP context for client notifications.
 
@@ -195,129 +305,6 @@ class VectorStoreFailoverManager(BasedModel):
             context: FastMCP context from current request
         """
         self._last_context = context
-
-    async def _build_chunk_indexes(self) -> None:
-        """Build initial chunk ID indexes for primary and backup stores.
-
-        This avoids the need to scroll through all points later. Indexes are built
-        once during initialization and then maintained incrementally as chunks are added/removed.
-
-        OPTIMIZATION: Replaces expensive scroll operations with O(1) lookups.
-        """
-        try:
-            # Build primary index if available
-            if self._primary_store:
-                collections = await self._primary_store.list_collections()
-                if collections:
-                    for collection_name in collections:
-                        self._primary_chunk_index[collection_name] = await self._get_collection_ids(
-                            self._primary_store, collection_name
-                        )
-                    logger.debug(
-                        "Built primary chunk index for %d collections with %d total chunks",
-                        len(self._primary_chunk_index),
-                        sum(len(ids) for ids in self._primary_chunk_index.values()),
-                    )
-
-            # Build backup index if available
-            if self._backup_store:
-                collections = await self._backup_store.list_collections()
-                if collections:
-                    for collection_name in collections:
-                        self._backup_chunk_index[collection_name] = await self._get_collection_ids(
-                            self._backup_store, collection_name
-                        )
-                    logger.debug(
-                        "Built backup chunk index for %d collections with %d total chunks",
-                        len(self._backup_chunk_index),
-                        sum(len(ids) for ids in self._backup_chunk_index.values()),
-                    )
-        except Exception as e:
-            logger.warning("Failed to build chunk indexes: %s - will build lazily", e)
-            # Continue anyway - indexes will be built lazily as needed
-
-    async def _get_collection_ids(
-        self, store: VectorStoreProvider, collection_name: str
-    ) -> set[str]:
-        """Get all point IDs from a collection (one-time operation during initialization).
-
-        Args:
-            store: Vector store to query
-            collection_name: Name of collection
-
-        Returns:
-            Set of chunk IDs in the collection
-        """
-        chunk_ids: set[str] = set()
-        offset = None
-        while True:
-            result = await store._client.scroll(  # type: ignore[union-attr]
-                collection_name=collection_name,
-                limit=100,
-                offset=offset,
-                with_payload=False,  # Only need IDs
-                with_vectors=False,
-            )
-            if not result[0]:
-                break
-
-            for point in result[0]:
-                chunk_ids.add(str(point.id))  # type: ignore[attr-defined]
-
-            offset = result[1]
-            if offset is None:
-                break
-
-        return chunk_ids
-
-    def _update_index_on_upsert(
-        self, collection_name: str, chunk_ids: list[str], *, is_backup: bool
-    ) -> None:
-        """Update chunk index when chunks are upserted.
-
-        NOTE: Currently not hooked up to actual upsert operations. Indexes are rebuilt
-        on-demand before use to ensure accuracy. This method is available for future
-        optimization where indexes are maintained incrementally in real-time.
-
-        Args:
-            collection_name: Name of collection
-            chunk_ids: List of chunk IDs being upserted
-            is_backup: Whether this is for backup store (vs primary)
-        """
-        index = self._backup_chunk_index if is_backup else self._primary_chunk_index
-        if collection_name not in index:
-            index[collection_name] = set()
-        index[collection_name].update(chunk_ids)
-
-    def _update_index_on_delete(
-        self, collection_name: str, chunk_ids: list[str], *, is_backup: bool
-    ) -> None:
-        """Update chunk index when chunks are deleted.
-
-        NOTE: Currently not hooked up to actual delete operations. Indexes are rebuilt
-        on-demand before use to ensure accuracy. This method is available for future
-        optimization where indexes are maintained incrementally in real-time.
-
-        Args:
-            collection_name: Name of collection
-            chunk_ids: List of chunk IDs being deleted
-            is_backup: Whether this is for backup store (vs primary)
-        """
-        index = self._backup_chunk_index if is_backup else self._primary_chunk_index
-        if collection_name in index:
-            index[collection_name].difference_update(chunk_ids)
-
-    def _get_all_chunk_ids(self, *, is_backup: bool) -> set[str]:
-        """Get all chunk IDs from index across all collections.
-
-        Args:
-            is_backup: Whether to get IDs from backup store (vs primary)
-
-        Returns:
-            Set of all chunk IDs
-        """
-        index = self._backup_chunk_index if is_backup else self._primary_chunk_index
-        return set().union(*index.values()) if index else set()
 
     @property
     def active_store(self) -> VectorStoreProvider | None:
@@ -457,7 +444,14 @@ class VectorStoreFailoverManager(BasedModel):
                     # Update tracked count
                     self._last_indexed_count = current_indexed
 
-                # Perform backup sync
+                # Check if backup sync should be triggered using FileChangeTracker
+                if self.should_sync_backup():
+                    logger.debug("Starting file-based backup sync")
+                    synced_count = await self.sync_pending_to_backup()
+                    if synced_count > 0:
+                        logger.info("✓ File-based backup sync completed: %d files synced", synced_count)
+
+                # Also perform legacy vector store backup sync
                 logger.debug("Starting periodic backup sync")
                 await self._sync_primary_to_backup()
                 self._last_backup_sync = datetime.now(UTC)
@@ -561,9 +555,20 @@ class VectorStoreFailoverManager(BasedModel):
             logger.exception("Failed to initialize backup store")
             return
 
+        # Step 2b: Initialize backup indexer with appropriate chunk sizes
+        try:
+            if not self._backup_indexer:
+                logger.info("Initializing backup indexer with backup model constraints")
+                self._backup_indexer = await self._create_backup_indexer()
+        except Exception:
+            logger.exception("Failed to initialize backup indexer")
+            # Continue without backup indexer - store can still work for queries
+
         # Step 3: Attempt to restore from persistence
         if self._backup_store and self._project_path:
-            backup_file = self._project_path / ".codeweaver" / "backup" / "vector_store.json"
+            from codeweaver.common.utils.utils import get_user_config_dir
+
+            backup_file = get_user_config_dir() / "codeweaver" / "backup" / "vector_store.json"
             if backup_file.exists():
                 # Validate backup file before restoring
                 is_valid = await self._validate_backup_file(backup_file)
@@ -672,8 +677,13 @@ class VectorStoreFailoverManager(BasedModel):
         logger.info("Restoring to primary vector store with sync-back")
 
         try:
-            # Step 1: Sync changes from backup to primary
-            await self._sync_back_to_primary()
+            # Step 1: Re-index files that were indexed during failover to primary
+            if self._change_tracker and self._change_tracker.has_failover_files:
+                synced = await self.sync_failover_to_primary()
+                logger.info("Re-indexed %d failover files to primary", synced)
+            else:
+                # Fallback to legacy chunk-by-chunk sync if no tracker
+                await self._sync_back_to_primary()
 
             # Step 2: Verify primary is working after sync
             await self._verify_primary_health()
@@ -724,21 +734,8 @@ class VectorStoreFailoverManager(BasedModel):
             return
 
         try:
-            # Rebuild the backup index to ensure it's current
-            # This is necessary because the index is not automatically updated on upsert/delete
-            collections = await self._backup_store.list_collections()
-            if collections:
-                for collection_name in collections:
-                    self._backup_chunk_index[collection_name] = await self._get_collection_ids(
-                        self._backup_store, collection_name
-                    )
-                logger.debug(
-                    "Rebuilt backup index for snapshot: %d collections with %d total chunks",
-                    len(self._backup_chunk_index),
-                    sum(len(ids) for ids in self._backup_chunk_index.values()),
-                )
-
             # Use index to get all chunk IDs
+            # This doesn't exist anymore -- needs to be replaced with a as-indexed tracker for ids
             self._failover_chunks = self._get_all_chunk_ids(is_backup=True).copy()
 
             # Cache the snapshot for use within this failover session
@@ -777,6 +774,7 @@ class VectorStoreFailoverManager(BasedModel):
             collections = await self._backup_store.list_collections()
             if collections:
                 for collection_name in collections:
+                    # these don't exist anymore -- need to be replaced with the as-indexed id tracker
                     self._backup_chunk_index[collection_name] = await self._get_collection_ids(
                         self._backup_store, collection_name
                     )
@@ -890,7 +888,7 @@ class VectorStoreFailoverManager(BasedModel):
                     return
 
                 # Upsert to primary with new embeddings
-                await self._primary_store.upsert([chunk])
+                await self._primary_store.upsert([chunk], for_backup=False)
 
                 logger.debug("✓ Synced chunk %s to primary with re-embedding", chunk_id)
                 return
@@ -965,7 +963,6 @@ class VectorStoreFailoverManager(BasedModel):
         Raises:
             Exception: If backup store creation fails
         """
-        from codeweaver.config.profiles import _backup_profile
         from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
 
         # Get backup configuration
@@ -984,6 +981,278 @@ class VectorStoreFailoverManager(BasedModel):
 
         logger.debug("Created in-memory backup vector store")
         return memory_provider
+
+    async def _create_backup_indexer(self) -> Indexer:
+        """Create a separate Indexer instance for backup indexing.
+
+        Creates an Indexer with:
+        - Fresh BlakeStore to avoid dedup conflicts with primary
+        - ChunkGovernor configured for backup model constraints
+        - Backup embedding/reranking providers (from backup profile)
+
+        This indexer operates independently of the primary indexer,
+        using smaller chunk sizes appropriate for the backup models.
+
+        Returns:
+            Initialized Indexer configured for backup operations
+
+        Raises:
+            Exception: If backup indexer creation fails
+        """
+        from codeweaver.common.registry import get_provider_registry
+        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core.stores import make_blake_store
+        from codeweaver.engine.chunker.base import ChunkGovernor
+        from codeweaver.engine.chunking_service import ChunkingService
+        from codeweaver.engine.indexer.indexer import Indexer
+
+        # Get backup configuration
+        backup_config = _backup_profile()
+
+        # Create ChunkGovernor with backup model constraints
+        # This ensures chunks are sized for the backup models (e.g., 512 tokens)
+        backup_governor = ChunkGovernor.from_backup_profile(backup_config)
+        logger.info(
+            "Backup indexer chunk limit: %d tokens (vs primary which may be much larger)",
+            backup_governor.chunk_limit,
+        )
+
+        # Create chunking service with backup governor
+        backup_chunking_service = ChunkingService(backup_governor)
+
+        # Create fresh BlakeStore to avoid dedup conflicts with primary
+        backup_store = make_blake_store(value_type=DiscoveredFile)
+
+        # Create the backup indexer
+        backup_indexer = Indexer(
+            walker=None,  # Files will be provided directly
+            store=backup_store,
+            chunking_service=backup_chunking_service,
+            auto_initialize_providers=False,  # We'll initialize manually
+            project_path=self._project_path,
+        )
+
+        # Initialize backup providers from profile
+        # Get provider registry and create instances for backup
+        registry = get_provider_registry()
+
+        # Initialize embedding provider from backup profile
+        if embedding_settings := backup_config.get("embedding"):
+            if isinstance(embedding_settings, tuple) and len(embedding_settings) > 0:
+                first_setting = embedding_settings[0]
+                provider_enum = first_setting.provider
+                model_name = getattr(first_setting.model_settings, "model", None)
+                try:
+                    embedding_provider = registry.create_provider(
+                        provider_enum,
+                        "embedding",
+                        model=model_name,
+                    )
+                    backup_indexer._embedding_provider = embedding_provider
+                    logger.debug(
+                        "Initialized backup embedding provider: %s (%s)",
+                        provider_enum,
+                        model_name,
+                    )
+                except Exception as e:
+                    logger.warning("Failed to create backup embedding provider: %s", e)
+
+        # Initialize sparse embedding provider from backup profile
+        if sparse_settings := backup_config.get("sparse_embedding"):
+            if isinstance(sparse_settings, tuple) and len(sparse_settings) > 0:
+                first_setting = sparse_settings[0]
+                provider_enum = first_setting.provider
+                model_name = getattr(first_setting.model_settings, "model", None)
+                try:
+                    sparse_provider = registry.create_provider(
+                        provider_enum,
+                        "sparse_embedding",
+                        model=model_name,
+                    )
+                    backup_indexer._sparse_provider = sparse_provider
+                    logger.debug(
+                        "Initialized backup sparse embedding provider: %s (%s)",
+                        provider_enum,
+                        model_name,
+                    )
+                except Exception as e:
+                    logger.warning("Failed to create backup sparse provider: %s", e)
+
+        # Set the backup vector store
+        backup_indexer._vector_store = self._backup_store
+        backup_indexer._providers_initialized = True
+
+        logger.info(
+            "Created backup indexer with chunk limit %d tokens",
+            backup_governor.chunk_limit,
+        )
+        return backup_indexer
+
+    async def sync_pending_to_backup(self) -> int:
+        """Sync pending file changes to the backup store using the backup indexer.
+
+        Uses the FileChangeTracker to identify files that have changed since
+        the last backup sync, then re-indexes them with the backup indexer
+        (which uses smaller chunk sizes appropriate for backup models).
+
+        Returns:
+            Number of files synced to backup.
+        """
+        if not self._change_tracker:
+            logger.debug("No change tracker available for backup sync")
+            return 0
+
+        if not self._backup_indexer:
+            logger.debug("No backup indexer available for backup sync")
+            return 0
+
+        if not self._change_tracker.has_pending_changes:
+            logger.debug("No pending changes to sync to backup")
+            return 0
+
+        files_to_index, files_to_delete = self._change_tracker.get_files_needing_backup()
+        total_operations = len(files_to_index) + len(files_to_delete)
+
+        if total_operations == 0:
+            return 0
+
+        logger.info(
+            "Syncing %d files to backup (%d to index, %d to delete)",
+            total_operations,
+            len(files_to_index),
+            len(files_to_delete),
+        )
+
+        synced_count = 0
+
+        # Index changed files with backup indexer
+        for file_path in files_to_index:
+            if not file_path.exists():
+                logger.debug("Skipping non-existent file: %s", file_path)
+                continue
+
+            try:
+                # Use the backup indexer's batch indexing for the file
+                await self._backup_indexer.index_files([file_path])
+                synced_count += 1
+                logger.debug("Synced file to backup: %s", file_path)
+            except Exception as e:
+                logger.warning("Failed to sync file to backup: %s - %s", file_path, e)
+
+        # Handle deletions
+        for file_path in files_to_delete:
+            try:
+                await self._backup_indexer._delete_file(file_path)
+                synced_count += 1
+                logger.debug("Deleted file from backup: %s", file_path)
+            except Exception as e:
+                logger.warning("Failed to delete file from backup: %s - %s", file_path, e)
+
+        # Mark backup sync complete
+        self._change_tracker.mark_backup_complete()
+
+        # Save tracker state
+        self._change_tracker.save()
+
+        logger.info("Backup sync complete: %d/%d operations successful", synced_count, total_operations)
+        return synced_count
+
+    def should_sync_backup(self, *, time_threshold_seconds: float = 300, volume_threshold: int = 50) -> bool:
+        """Check if backup sync should be triggered based on thresholds.
+
+        Args:
+            time_threshold_seconds: Minimum seconds since last sync (default 5 minutes)
+            volume_threshold: Minimum pending changes to trigger sync (default 50)
+
+        Returns:
+            True if sync should be triggered.
+        """
+        if not self._change_tracker:
+            return False
+
+        if not self._change_tracker.has_pending_changes:
+            return False
+
+        # Check volume threshold
+        if self._change_tracker.pending_count >= volume_threshold:
+            logger.debug(
+                "Backup sync triggered by volume: %d pending >= %d threshold",
+                self._change_tracker.pending_count,
+                volume_threshold,
+            )
+            return True
+
+        # Check time threshold
+        time_since_sync = self._change_tracker.time_since_last_sync()
+        if time_since_sync is None or time_since_sync >= time_threshold_seconds:
+            logger.debug(
+                "Backup sync triggered by time: %.1fs since last sync >= %.1fs threshold",
+                time_since_sync or 0,
+                time_threshold_seconds,
+            )
+            return True
+
+        return False
+
+    async def sync_failover_to_primary(self) -> int:
+        """Re-index files that were indexed during failover to the primary.
+
+        Uses the primary indexer to re-index files that were only indexed
+        to the backup during failover. This ensures the primary has all
+        content with proper embeddings.
+
+        Returns:
+            Number of files successfully re-indexed to primary.
+        """
+        if not self._change_tracker:
+            logger.debug("No change tracker available for primary recovery")
+            return 0
+
+        if not self._indexer:
+            logger.debug("No primary indexer available for primary recovery")
+            return 0
+
+        if not self._change_tracker.has_failover_files:
+            logger.debug("No failover files to sync to primary")
+            return 0
+
+        failover_files = self._change_tracker.get_failover_indexed_files()
+
+        if not failover_files:
+            return 0
+
+        logger.info(
+            "Re-indexing %d files to primary that were indexed during failover",
+            len(failover_files),
+        )
+
+        synced_count = 0
+
+        for file_path in failover_files:
+            if not file_path.exists():
+                logger.debug("Skipping non-existent failover file: %s", file_path)
+                continue
+
+            try:
+                # Use the primary indexer to re-index the file
+                await self._indexer.index_files([file_path])
+                synced_count += 1
+                logger.debug("Re-indexed failover file to primary: %s", file_path)
+            except Exception as e:
+                logger.warning("Failed to re-index failover file to primary: %s - %s", file_path, e)
+
+        # Mark primary recovery complete
+        self._change_tracker.mark_primary_recovery_complete()
+
+        # Save tracker state
+        self._change_tracker.save()
+
+        logger.info(
+            "Primary recovery complete: %d/%d files re-indexed",
+            synced_count,
+            len(failover_files),
+        )
+        return synced_count
 
     async def _sync_primary_to_backup(self) -> None:
         """Sync primary vector store to backup JSON file.
@@ -1212,6 +1481,19 @@ class VectorStoreFailoverManager(BasedModel):
             status["backup_file_exists"] = backup_file.exists()
             if backup_file.exists():
                 status["backup_file_size_bytes"] = backup_file.stat().st_size
+
+        # Add change tracker status
+        if self._change_tracker:
+            tracker_status = self._change_tracker.get_status()
+            status["change_tracker"] = {
+                "pending_changes": tracker_status["pending_changes"],
+                "pending_deletions": tracker_status["pending_deletions"],
+                "failover_indexed": tracker_status["failover_indexed"],
+                "needs_backup_sync": tracker_status["needs_sync"],
+                "needs_primary_recovery": tracker_status["needs_primary_recovery"],
+            }
+            if tracker_status["last_sync_time"]:
+                status["change_tracker"]["last_sync_time"] = tracker_status["last_sync_time"]
 
         return status
 

@@ -18,16 +18,18 @@ from typing import Any, Literal, NoReturn
 from fastembed.sparse.sparse_embedding_base import SparseEmbedding
 from pydantic import UUID7
 from qdrant_client import AsyncQdrantClient
-from qdrant_client.http.models import (
+from qdrant_client.http.models.models import (
     BinaryQuantization,
+    CollectionInfo,
+    CollectionsResponse,
     Datatype,
     Distance,
     PointStruct,
+    QueryResponse,
     SparseIndexParams,
     SparseVectorParams,
     VectorParams,
 )
-from qdrant_client.http.models.models import CollectionInfo
 from typing_extensions import TypeIs
 
 from codeweaver.agent_api.find_code.results import SearchResult
@@ -100,7 +102,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         """
         return client is not None and isinstance(client, AsyncQdrantClient)
 
-    def _generate_metadata(self) -> CollectionMetadata:
+    def _generate_metadata(self, *, for_backup: bool = False) -> CollectionMetadata:
         """Generate collection metadata from current provider configuration.
 
         Returns:
@@ -130,7 +132,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             else Datatype.UINT8
         )
         quantization_config = BinaryQuantization() if self.dense_dtype == "binary" else None
-        if self.dense_dtype in ("binary", "int8"):
+        if self.dense_dtype in ("binary", "int8") or for_backup:
             datatype = Datatype.UINT8
         return CollectionMetadata.model_validate({
             "provider": self._provider.variable,
@@ -138,7 +140,18 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             "project_name": project_name,
             "vector_config": {
                 "dense": VectorParams(
-                    size=self.dense_dimension or 768,
+                    size=getattr(self._embedding_caps["backup_dense"], "dimension", 384)
+                    if for_backup
+                    else (
+                        self._settings.get("dense", {}).get("dimension") or dense_dim
+                        if (
+                            dense_dim := getattr(
+                                self._embedding_caps.get("dense"), "dimension", None
+                            )
+                        )
+                        is not None
+                        else 768
+                    ),
                     distance=distance,
                     quantization_config=quantization_config,
                     datatype=datatype,
@@ -149,8 +162,13 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             },
             "collection_name": self.config.get("collection_name")
             or self._default_collection_name(),
-            "dense_model": self.dense_model,
-            "sparse_model": self.sparse_model,
+            "is_backup": for_backup,
+            "dense_model": getattr(self._embedding_caps["backup_dense"], "name", None)
+            if for_backup
+            else self.dense_model,
+            "sparse_model": getattr(self._embedding_caps["backup_sparse"], "name", None)
+            if for_backup
+            else self.sparse_model,
         })
 
     def _default_collection_name(self) -> str:
@@ -255,20 +273,25 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         except Exception as e:
             raise ProviderError(f"Search operation failed: {e}") from e
 
-    async def _ensure_collection(self, collection_name: str, dense_dim: int | None = None) -> None:
+    async def _ensure_collection(
+        self, collection_name: str, dense_dim: int | None = None, *, for_backup: bool = False
+    ) -> None:
         """Ensure collection exists, creating it if necessary.
 
         Args:
             collection_name: Name of the collection to ensure exists.
             dense_dim: Dimension of dense vectors (deprecated - config is source of truth).
         """
+        for_backup = for_backup or collection_name.endswith("backup")
         if not self._client:
             raise ProviderError("Qdrant client is not initialized")
         collections = await self._client.get_collections()
         collection_names = [col.name for col in collections.collections]
         if collection_name not in collection_names:
             # Create new collection from config
-            _ = await self._client.create_collection(**self._generate_metadata().to_collection())
+            _ = await self._client.create_collection(
+                **self._generate_metadata(for_backup=for_backup).to_collection()
+            )
         else:
             # Validate existing collection matches current config
             await self._validate_collection_config(collection_name)
@@ -356,6 +379,42 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                 "Could not validate collection config for '%s'", collection_name, exc_info=e
             )
 
+    async def create_payload_index(
+        self,
+        collection_name: str,
+        field_name: str,
+        key_type: Literal["keyword", "integer", "float", "geo", "text", "datetime", "bool", "uuid"],
+    ) -> CollectionsResponse:
+        """Create a payload index on the specified field.
+
+        Args:
+            collection_name: Name of the collection.
+            field_name: Name of the payload field to index.
+            key_type: field value's data or schema type (what kind of data will be indexed)
+
+        Raises:
+            ProviderError: Qdrant operation failed.
+
+        Returns:
+            CollectionsResponse: Response from Qdrant after creating the index.
+        """
+        self._ensure_client(self._client)
+        if not self._client:
+            raise ProviderError("Qdrant client is not initialized")
+        self._ensure_collection(collection_name=collection_name)
+        try:
+            return await self._client.create_payload_index(
+                collection_name=collection_name, field_name=field_name, key_type=key_type
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to create payload index on '%s' in collection '%s'",
+                field_name,
+                collection_name,
+                extra={"error": str(e)},
+            )
+            raise ProviderError(f"Failed to create payload index on '{field_name}': {e}") from e
+
     async def _execute_search_query(
         self, vector: StrategizedQuery, collection_name: str
     ) -> list[Any] | Any:
@@ -370,54 +429,20 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         """
         qdrant_filter = None
 
-        # Hybrid search uses query_points with FusionQuery
-        if vector.is_hybrid():
-            response = await self._client.query_points(
-                **vector.to_hybrid_query(
-                    query_kwargs={
-                        "limit": 100,
-                        "with_payload": True,
-                        "with_vectors": False,
-                        "query_filter": qdrant_filter or None,
-                        "consistency": "quorum",
-                    },
-                    kwargs={"collection_name": collection_name},
-                )  # type: ignore
-            )
-            # query_points returns QueryResponse with .points attribute
-            return response.points if hasattr(response, "points") else response
-
-        # Sparse-only search uses query_points with SparseVector
-        if vector.has_sparse() and not vector.has_dense():
-            response = await self._client.query_points(
-                **vector.to_query(
-                    kwargs={
-                        "collection_name": collection_name,
-                        "limit": 100,
-                        "with_payload": True,
-                        "with_vectors": False,
-                        "query_filter": qdrant_filter or None,
-                        "consistency": "quorum",
-                    }
-                )  # type: ignore
-            )
-            # query_points returns QueryResponse with .points attribute
-            return response.points if hasattr(response, "points") else response
-
-        # Dense-only search uses query_points API (consistent with sparse and hybrid)
+        args = {
+            "limit": 100,
+            "with_payload": True,
+            "query_filter": qdrant_filter or None,
+            "with_vectors": False,
+        }
         response = await self._client.query_points(
-            **vector.to_query(
-                kwargs={
-                    "collection_name": collection_name,
-                    "limit": 100,
-                    "with_payload": True,
-                    "with_vectors": False,
-                    "query_filter": qdrant_filter or None,
-                    "consistency": "quorum",
-                }
-            )  # type: ignore
+            **vector.to_hybrid_query(  # ty: ignore[invalid-argument-type]
+                query_kwargs=args, kwargs={"collection_name": collection_name}
+            )
+            if vector.is_hybrid()
+            else vector.to_query(kwargs=args | {"collection_name": collection_name})
         )
-        # query_points returns QueryResponse with .points attribute
+
         return response.points if hasattr(response, "points") else response
 
     def _normalize_vector_input(
@@ -490,8 +515,6 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Returns:
             List of SearchResult objects.
         """
-        from qdrant_client.http.models import QueryResponse
-
         from codeweaver.agent_api.find_code.results import SearchResult
 
         # Handle both query_points (QueryResponse) and search (list) results
@@ -551,7 +574,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
 
         return vectors
 
-    def _create_payload(self, chunk: CodeChunk) -> HybridVectorPayload:
+    def _create_payload(self, chunk: CodeChunk, *, for_backup: bool = False) -> HybridVectorPayload:
         """Create payload for a code chunk.
 
         Args:
@@ -569,7 +592,8 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             line_end=chunk.line_range.end,
             indexed_at=datetime.now(UTC).isoformat(),
             hash=chunk.blake_hash,
-            provider="memory",
+            provider=self._provider.variable,
+            is_backup=for_backup,
             embedding_complete=bool(chunk.dense_batch_key and chunk.sparse_batch_key),
         )
 
@@ -718,7 +742,9 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         # Trigger persistence
         await self.handle_persistence()
 
-    def _chunks_to_points(self, chunks: list[CodeChunk]) -> list[PointStruct]:
+    def _chunks_to_points(
+        self, chunks: list[CodeChunk], *, for_backup: bool = False
+    ) -> list[PointStruct]:
         """Convert code chunks to Qdrant points.
 
         Args:
@@ -731,7 +757,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
 
         for chunk in chunks:
             vectors = self._prepare_vectors(chunk)
-            payload = self._create_payload(chunk)
+            payload = self._create_payload(chunk, for_backup=for_backup)
             serialized_payload = payload.model_dump(mode="json", exclude_none=True, round_trip=True)
 
             points.append(
@@ -744,11 +770,12 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
 
         return points
 
-    async def upsert(self, chunks: list[CodeChunk]) -> None:
+    async def upsert(self, chunks: list[CodeChunk], *, for_backup: bool = False) -> None:
         """Insert or update code chunks with hybrid embeddings.
 
         Args:
             chunks: List of code chunks with embeddings to store.
+            for_backup: Whether these chunks are being upserted as part of a backup process.
 
         Raises:
             CollectionNotFoundError: Collection doesn't exist.
@@ -764,10 +791,10 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             raise ProviderError("No collection configured")
 
         # Ensure collection exists
-        await self._ensure_collection(collection_name)
+        await self._ensure_collection(collection_name, for_backup=for_backup)
 
         # Convert chunks to Qdrant points
-        points = self._chunks_to_points(chunks)
+        points = self._chunks_to_points(chunks, for_backup=for_backup)
 
         # Upsert points
         _result = await self._client.upsert(collection_name=collection_name, points=points)

@@ -9,6 +9,7 @@ Helper functions for CodeWeaver utilities.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import sys
@@ -22,7 +23,8 @@ from pydantic import UUID7
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types import CategoryName, LiteralStringT
+    from codeweaver.config.types import CodeWeaverSettingsDict
+    from codeweaver.core.types import CategoryName, DictView, LiteralStringT
 
 
 logger = logging.getLogger(__name__)
@@ -185,6 +187,60 @@ def asyncio_or_uvloop() -> object:
     import asyncio
 
     return asyncio
+
+
+def _try_for_settings() -> DictView[CodeWeaverSettingsDict] | None:
+    """Try to import and return the settings map if available."""
+    with contextlib.suppress(Exception):
+        from codeweaver.config.settings import get_settings_map
+
+        if (settings_map := get_settings_map()) is not None:
+            from codeweaver.core.types.sentinel import Unset
+
+            if not isinstance(settings_map, Unset):
+                return settings_map
+    return None
+
+
+def _get_project_name() -> str:
+    """Get the project name from settings or fallback to the project path name."""
+    from codeweaver.common.utils.git import get_project_path
+    from codeweaver.core.types.sentinel import Unset
+
+    project_name = None
+    if (
+        (settings_map := _try_for_settings()) is not None
+        and (project_name := settings_map.get("project_name"))
+        and project_name is not Unset
+    ):
+        return project_name
+    return get_project_path().name
+
+
+def backup_file_path(*, project_name: str | None = None, project_path: Path | None = None) -> Path:
+    """Get the default backup file path for the vector store."""
+    return (
+        get_user_config_dir()
+        / ".vectors"
+        / "backup"
+        / f"{generate_collection_name(is_backup=True, project_name=project_name, project_path=project_path)}.json"
+    )
+
+
+def generate_collection_name(
+    *, is_backup: bool = False, project_name: str | None = None, project_path: Path | None = None
+) -> str:
+    """Generate a collection name based on whether it's for backup embeddings."""
+    project_name = project_name or _get_project_name()
+    collection_suffix = "-backup" if is_backup else ""
+    if not project_path:
+        from codeweaver.common.utils.git import get_project_path
+
+        project_path = get_project_path()
+    from codeweaver.core.stores import get_blake_hash
+
+    blake_hash = get_blake_hash(str(project_path.absolute()).encode("utf-8"))[:8]
+    return f"{project_name}-{blake_hash}{collection_suffix}"
 
 
 __all__ = (

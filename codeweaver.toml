@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # "$schema" = "https://raw.githubusercontent.com/knitli/codeweaver/refs/heads/main/schema/codeweaver.schema.json"
-project_path = "/home/runner/work/codeweaver/codeweaver"
+project_path = "."
 project_name = "codeweaver"
 token_limit = 30000
 max_file_size = 1048576

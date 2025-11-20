@@ -722,6 +722,8 @@ class ProviderRegistry(BasedModel):
         Returns:
             Configured client instance
         """
+        from urllib.parse import urlparse
+
         # Handle special cases first
         if provider_kind == ProviderKind.UNSET:
             raise ConfigurationError(
@@ -752,12 +754,18 @@ class ProviderRegistry(BasedModel):
                     merged_opts = (client_options or {}) | qdrant_client_settings
                     # Also remove collection_name from client_options if present
                     merged_opts = {k: v for k, v in merged_opts.items() if k != "collection_name"}
+                    if merged_opts.get("url") and urlparse(merged_opts["url"]).netloc.endswith(
+                        "qdrant.io"
+                    ):
+                        # it likes to complain about being unable to check compatibility with qdrant.io
+                        merged_opts["check_compatibility"] = False
                     client = client_class(**merged_opts)
                 except Exception as e:
                     logger.warning("Failed to create Qdrant client: %s", e)
                     logger.info("Falling back to in-memory mode")
                     # For in-memory fallback, remove ALL connection-related options
                     # Only keep generic client options like timeout, grpc_port, etc.
+                    # qdrant_client also does this, but better safe than sorry
                     clean_opts = {}
                     return client_class(location=":memory:", **clean_opts)
                 else:
@@ -1014,7 +1022,12 @@ class ProviderRegistry(BasedModel):
         # 🔧 NEW: Create client instance if not provided
         if "client" not in kwargs:
             # Extract settings for client creation
-            provider_settings = kwargs.get("provider_settings")
+            # For vector stores, settings are in "config" key (from _prepare_vector_store_kwargs)
+            # For other providers, settings are in "provider_settings" key
+            if self._is_literal_vector_store_kind(provider_kind):
+                provider_settings = kwargs.get("config")
+            else:
+                provider_settings = kwargs.get("provider_settings")
             client_options = kwargs.get("client_options")
 
             # Create appropriate client using CLIENT_MAP

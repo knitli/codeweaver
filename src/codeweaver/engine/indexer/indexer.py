@@ -589,7 +589,10 @@ class Indexer(BasedModel):
 
             # 5. Index to vector store (if available)
             if self._vector_store:
-                await self._vector_store.upsert(updated_chunks)
+                is_backup = (
+                    self._failover_manager.is_failover_active if self._failover_manager else False
+                )
+                await self._vector_store.upsert(updated_chunks, for_backup=is_backup)
                 self._stats.chunks_indexed += len(updated_chunks)
 
                 await log_to_client_or_fallback(
@@ -620,6 +623,10 @@ class Indexer(BasedModel):
 
             # Track successful indexing in session statistics
             self._session_statistics.add_file_from_discovered(discovered_file, "indexed")
+
+            # Track for backup sync via failover manager
+            if self._failover_manager:
+                self._failover_manager.record_file_indexed(discovered_file)
 
             # 6. Update file manifest with successful indexing
             # Only update if all critical operations succeeded and we have chunks
@@ -786,6 +793,10 @@ class Indexer(BasedModel):
                         )
                 except ValueError as e:
                     logger.warning("Failed to remove file from manifest: %s - %s", relative_path, e)
+
+            # Track deletion for backup sync via failover manager
+            if self._failover_manager:
+                self._failover_manager.record_file_deleted(path)
         except Exception:
             logger.exception("Failed to delete file %s", path)
 
@@ -1355,7 +1366,10 @@ class Indexer(BasedModel):
             return
 
         try:
-            await self._vector_store.upsert(chunks)
+            is_backup = (
+                self._failover_manager.is_failover_active if self._failover_manager else False
+            )
+            await self._vector_store.upsert(chunks, for_backup=is_backup)
             self._stats.chunks_indexed = len(chunks)
             logger.info("Indexed %d chunks to vector store", len(chunks))
         except Exception:

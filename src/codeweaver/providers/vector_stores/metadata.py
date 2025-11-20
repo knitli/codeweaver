@@ -35,10 +35,16 @@ class HybridVectorPayload(BasedModel):
     line_start: Annotated[int, Field(description="Start line number of the code chunk")]
     line_end: Annotated[int, Field(description="End line number of the code chunk")]
     indexed_at: Annotated[
-        str, Field(description="ISO 8601 datetime string when the chunk was indexed")
+        datetime,
+        Field(
+            description="Datetime object when the chunk was indexed. We use datetime here because qdrant can filter by datetime."
+        ),
     ]
     chunked_on: Annotated[
-        str, Field(description="ISO 8601 datetime string when the chunk was created")
+        datetime,
+        Field(
+            description="Datetime object when the chunk was created. We use datetime here because qdrant can filter by datetime."
+        ),
     ]
     hash: Annotated[str, Field(description="blake 3 hash of the code chunk")]
     provider: Annotated[str, Field(description="Provider name for the vector store")]
@@ -48,6 +54,12 @@ class HybridVectorPayload(BasedModel):
             description="Whether the chunk has been fully embedded with both sparse and dense embeddings"
         ),
     ]
+    is_backup: Annotated[
+        bool,
+        Field(
+            description="Whether the vector was created as part of a backup chunking/embedding/memory storage process"
+        ),
+    ] = False
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types.aliases import FilteredKey
@@ -88,7 +100,9 @@ class CollectionMetadata(BasedModel):
         None
     )
     collection_name: Annotated[str, Field(description="Name of the collection")] = ""
-
+    is_backup: Annotated[
+        bool, Field(description="Whether this collection is for backup embeddings")
+    ] = False
     version: Annotated[str, Field(description="Metadata schema version")] = "1.0.0"
 
     def to_collection(self) -> dict[str, Any]:
@@ -100,6 +114,7 @@ class CollectionMetadata(BasedModel):
             round_trip=True,
             exclude={
                 "created_at",
+                "is_backup",
                 "project_name",
                 "version",
                 "provider",

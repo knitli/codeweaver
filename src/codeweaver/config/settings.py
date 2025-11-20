@@ -55,6 +55,7 @@ from pydantic_settings import (
     YamlConfigSettingsSource,
 )
 
+from codeweaver.common.utils.checks import is_test_environment
 from codeweaver.common.utils.lazy_importer import lazy_import
 from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.chunker import ChunkerSettings, DefaultChunkerSettings
@@ -655,7 +656,7 @@ class CodeWeaverSettings(BaseSettings):
             - .codeweaver/codeweaver.local.{toml,yaml,yml,json}
             - .codeweaver/codeweaver.{toml,yaml,yml,json}
             - SYSTEM_USER_CONFIG_DIR/codeweaver/codeweaver.{toml,yaml,yml,json}
-        5. file_secret_settings - Secret files SYSTEM_USER_CONFIG_DIR/codeweaver/secrets/
+        5. file_secret_settings - Secret files SYSTEM_USER_CONFIG_DIR/codeweaver/.secrets/
            (see https://docs.pydantic.dev/latest/concepts/pydantic_settings/#secrets for more info)
         6. If available and configured:
             - AWS Secrets Manager
@@ -664,7 +665,7 @@ class CodeWeaverSettings(BaseSettings):
         """
         config_files: list[PydanticBaseSettingsSource] = []
         user_config_dir = get_user_config_dir()
-        secrets_dir = user_config_dir / "secrets"
+        secrets_dir = user_config_dir / ".secrets"
         if not user_config_dir.exists():
             user_config_dir.mkdir(parents=True, exist_ok=True)
             user_config_dir.chmod(0o700)
@@ -672,9 +673,7 @@ class CodeWeaverSettings(BaseSettings):
             secrets_dir.mkdir(parents=True, exist_ok=True)
             secrets_dir.chmod(0o700)
         # Check if we're in test mode - prioritize test configs
-        is_test_mode = os.environ.get("CODEWEAVER_TEST_MODE") == "1" or os.environ.get(
-            "PYTEST_CURRENT_TEST"
-        )
+        is_test_mode = is_test_environment()
 
         locations: list[str] = []
         if is_test_mode:
@@ -687,17 +686,17 @@ class CodeWeaverSettings(BaseSettings):
                 ".codeweaver/codeweaver.test.local",
                 ".codeweaver/codeweaver.test",
             ])
-
-        # Standard config locations
-        locations.extend([
-            "codeweaver.local",
-            "codeweaver",
-            ".codeweaver.local",
-            ".codeweaver",
-            ".codeweaver/codeweaver.local",
-            ".codeweaver/codeweaver",
-            f"{user_config_dir!s}/codeweaver",
-        ])
+        else:
+            # Standard config locations
+            locations.extend([
+                "codeweaver.local",
+                "codeweaver",
+                ".codeweaver.local",
+                ".codeweaver",
+                ".codeweaver/codeweaver.local",
+                ".codeweaver/codeweaver",
+                f"{user_config_dir!s}/codeweaver",
+            ])
         for _class in (
             TomlConfigSettingsSource,
             YamlConfigSettingsSource,

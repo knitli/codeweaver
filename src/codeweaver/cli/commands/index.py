@@ -111,13 +111,11 @@ def _derive_collection_name(
     Returns:
         Derived collection name string
     """
+    from codeweaver.common.utils.utils import generate_collection_name
     from codeweaver.config.providers import ProviderSettings
-    from codeweaver.core.stores import get_blake_hash
 
     # Default collection name
-    collection_name = f"{
-        settings.project_name if isinstance(settings.project_name, str) else project_path.name
-    }-{get_blake_hash(str(project_path).encode('utf-8'))[:8]}"
+    collection_name = generate_collection_name()
 
     # Check checkpoint file
     if checkpoint_file := checkpoint_mgr.checkpoint_file:
@@ -131,10 +129,7 @@ def _derive_collection_name(
         and vector_settings is not None
         and (vector_provider_config := vector_settings.get("provider_settings"))
     ):
-        collection_name = vector_provider_config.get(
-            "collection_name",
-            settings.project_name if isinstance(settings.project_name, str) else project_path.name,
-        )
+        collection_name = vector_provider_config.get("collection_name", collection_name)
 
     return collection_name
 

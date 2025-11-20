@@ -46,11 +46,15 @@ type MixedQueryInput = (
 class EmbeddingCapsDict(TypedDict):
     dense: EmbeddingModelCapabilities | None
     sparse: SparseEmbeddingModelCapabilities | None
+    backup_dense: EmbeddingModelCapabilities | None
+    backup_sparse: SparseEmbeddingModelCapabilities | None
 
 
 class EmbeddingSettingsDict(TypedDict):
     dense: EmbeddingModelSettings | None
     sparse: SparseEmbeddingModelSettings | None
+    backup_dense: EmbeddingModelSettings | None
+    backup_sparse: SparseEmbeddingModelSettings | None
 
 
 # Lock for thread-safe initialization of class-level embedding capabilities
@@ -70,11 +74,15 @@ class CircuitBreakerOpenError(Exception):
 
 
 @overload
-def _get_caps(*, sparse: Literal[False] = False) -> EmbeddingModelCapabilities | None: ...
-@overload
-def _get_caps(*, sparse: Literal[True]) -> SparseEmbeddingModelCapabilities | None: ...
 def _get_caps(
-    *, sparse: bool = False
+    *, sparse: Literal[False] = False, backup: bool = False
+) -> EmbeddingModelCapabilities | None: ...
+@overload
+def _get_caps(
+    *, sparse: Literal[True], backup: bool = False
+) -> SparseEmbeddingModelCapabilities | None: ...
+def _get_caps(
+    *, sparse: bool = False, backup: bool = False
 ) -> EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities | None:
     """Get embedding capabilities for in-memory provider.
 
@@ -87,6 +95,20 @@ def _get_caps(
     from codeweaver.common.registry import get_model_registry
 
     registry = get_model_registry()
+    if backup:
+        from codeweaver.config.profiles import get_profile
+
+        profile = get_profile("backup", "local")
+        if sparse_model := registry.get_embedding_capabilities(
+            provider=profile["sparse_embedding"][0]["provider"],
+            name=profile["sparse_embedding"][0]["model_settings"]["model"],
+        ):  # type: ignore
+            return sparse_model  # type: ignore
+        if dense_model := registry.get_embedding_capabilities(
+            provider=profile["embedding"][0]["provider"],
+            name=profile["embedding"][0]["model_settings"]["model"],
+        ):  # type: ignore
+            return dense_model  # type: ignore
     if sparse and (sparse_settings := registry.configured_models_for_kind(kind="sparse_embedding")):
         return sparse_settings[0] if isinstance(sparse_settings, tuple) else sparse_settings  # type: ignore
     if not sparse and (dense_settings := registry.configured_models_for_kind(kind="embedding")):
@@ -101,19 +123,28 @@ def _get_embedding_settings() -> EmbeddingSettingsDict:
         Embedding model settings dictionary.
     """
     from codeweaver.common.registry.provider import get_provider_registry
+    from codeweaver.config.profiles import get_profile
 
+    profile = get_profile("backup", "local")
     registry = get_provider_registry()
     dense = registry.get_configured_provider_settings("embedding")
     sparse = registry.get_configured_provider_settings("sparse_embedding")
     return EmbeddingSettingsDict(
         dense=dense.get("model_settings") if dense else None,
         sparse=sparse.get("model_settings") if sparse else None,
+        backup_dense=profile["embedding"][0]["model_settings"],
+        backup_sparse=profile["sparse_embedding"][0]["model_settings"],
     )
 
 
 def _default_embedding_caps() -> EmbeddingCapsDict:
     """Default factory for embedding capabilities. Evaluated lazily at instance creation."""
-    return EmbeddingCapsDict(dense=_get_caps(), sparse=_get_caps(sparse=True))
+    return EmbeddingCapsDict(
+        dense=_get_caps(),
+        sparse=_get_caps(sparse=True),
+        backup_dense=_get_caps(backup=True),
+        backup_sparse=_get_caps(sparse=True, backup=True),
+    )
 
 
 class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
@@ -485,7 +516,9 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         retry=retry_if_exception_type((ConnectionError, TimeoutError, OSError)),
         reraise=True,
     )
-    async def _upsert_with_retry(self, chunks: list[CodeChunk], context: Any = None) -> None:
+    async def _upsert_with_retry(
+        self, chunks: list[CodeChunk], context: Any = None, *, for_backup: bool = False
+    ) -> None:
         """Wrapper around upsert with retry logic and circuit breaker."""
         from codeweaver.common.logging import log_to_client_or_fallback
 
@@ -501,7 +534,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         )
 
         try:
-            await self.upsert(chunks)
+            await self.upsert(chunks, for_backup=for_backup)
             self._record_success()
 
             await log_to_client_or_fallback(
@@ -548,7 +581,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
             raise
 
     @abstractmethod
-    async def upsert(self, chunks: list[CodeChunk]) -> None:
+    async def upsert(self, chunks: list[CodeChunk], *, for_backup: bool = False) -> None:
         """Insert or update code chunks with their embeddings.
 
         Args:
@@ -557,6 +590,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                 - Each chunk must have at least one embedding (sparse or dense).
                 - Embedding dimensions must match collection configuration.
                 - Maximum 1000 chunks per batch.
+            for_backup: Whether these chunks are being upserted as part of a backup process.
 
         Raises:
             CollectionNotFoundError: Collection doesn't exist.

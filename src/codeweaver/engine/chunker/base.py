@@ -187,6 +187,95 @@ class ChunkGovernor(BasedModel):
         logger.warning("Could not determine capabilities from settings, using default chunk limits")
         return cls(capabilities=(), settings=settings)
 
+    @classmethod
+    def from_backup_profile(
+        cls, backup_profile: dict[str, Any], settings: ChunkerSettings | None = None
+    ) -> ChunkGovernor:
+        """Create a ChunkGovernor from backup profile settings.
+
+        This method creates a governor with capabilities derived from the backup
+        profile's embedding and reranking model settings. This is used to ensure
+        chunks are sized appropriately for the backup models.
+
+        Args:
+            backup_profile: ProviderSettingsDict from get_profile("backup", "local")
+            settings: Optional ChunkerSettings to use
+
+        Returns:
+            A ChunkGovernor instance configured for backup model constraints.
+        """
+        from codeweaver.providers.embedding.capabilities import (
+            load_default_capabilities as load_embedding_caps,
+        )
+        from codeweaver.providers.reranking.capabilities import (
+            load_default_capabilities as load_reranking_caps,
+        )
+
+        embedding_caps: EmbeddingModelCapabilities | None = None
+        reranking_caps: RerankingModelCapabilities | None = None
+
+        # Extract embedding model name from profile
+        if (
+            (embedding_settings := backup_profile.get("embedding"))
+            and isinstance(embedding_settings, tuple)
+            and len(embedding_settings) > 0
+        ):
+            first_setting = embedding_settings[0]
+            if (model_settings := getattr(first_setting, "model_settings", None)) and (
+                model_name := getattr(model_settings, "model", None)
+            ):
+                # Find matching capability
+                for cap in load_embedding_caps():
+                    if cap.name == model_name:
+                        embedding_caps = cap
+                        break
+
+        # Extract reranking model name from profile
+        if (
+            (reranking_settings := backup_profile.get("reranking"))
+            and isinstance(reranking_settings, tuple)
+            and len(reranking_settings) > 0
+        ):
+            first_setting = reranking_settings[0]
+            if (model_settings := getattr(first_setting, "model_settings", None)) and (
+                model_name := getattr(model_settings, "model", None)
+            ):
+                # Find matching capability
+                for cap in load_reranking_caps():
+                    if cap.name == model_name:
+                        reranking_caps = cap
+                        break
+
+        # Build capabilities tuple
+        if embedding_caps and reranking_caps:
+            capabilities: (
+                tuple[()]
+                | tuple[EmbeddingModelCapabilities]
+                | tuple[EmbeddingModelCapabilities, RerankingModelCapabilities]
+            ) = (embedding_caps, reranking_caps)
+            logger.debug(
+                "Creating backup ChunkGovernor with embedding caps: %s (ctx: %d) "
+                "and reranking caps: %s (ctx: %d)",
+                embedding_caps.name,
+                embedding_caps.context_window,
+                reranking_caps.name,
+                reranking_caps.context_window,
+            )
+        elif embedding_caps:
+            capabilities = (embedding_caps,)
+            logger.debug(
+                "Creating backup ChunkGovernor with embedding caps only: %s (ctx: %d)",
+                embedding_caps.name,
+                embedding_caps.context_window,
+            )
+        else:
+            capabilities = ()
+            logger.warning(
+                "Could not determine backup capabilities from profile, using default chunk limits"
+            )
+
+        return cls(capabilities=capabilities, settings=settings or ChunkerSettings())
+
 
 class BaseChunker(ABC):
     """Base class for chunkers."""

@@ -84,7 +84,11 @@ def _get_registry() -> EmbeddingRegistry:
 
 
 class BatchKeyIndex(NamedTuple):
-    """Tuple representing the index of a chunk within a batch."""
+    """Tuple representing the index of a chunk within a batch.
+
+    NOTE: While a CodeChunk can hypothetically have both primary and secondary batch keys for both dense and sparse embeddings,
+    in practice, it's unlikely. The secondary/backup embedding process uses ultralightweight models with narrower context windows than most users will have by default. Consequently, the chunkers will produce smaller chunks that fit within these context windows, and these chunks will be embedded separately from the primary embeddings.
+    """
 
     primary_dense: BatchKeys | None = None
     primary_sparse: BatchKeys | None = None
@@ -259,6 +263,11 @@ class CodeChunk(BasedModel):
             "source",
             "chunk_version",
         )
+
+    @property
+    def embeddings(self) -> BatchKeyIndex | None:
+        """Get the embedding batch key index, if available."""
+        return self._embedding_index
 
     @computed_field
     @property
