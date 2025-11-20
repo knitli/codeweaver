@@ -854,7 +854,7 @@ class ProviderRegistry(BasedModel):
 
         # Get model name (kwargs override config)
         model_name = kwargs.get("model") or self._get_default_model_for_provider(
-            provider, capabilities
+            provider, capabilities[0]
         )
 
         # Get base URL (kwargs override defaults)
@@ -871,7 +871,7 @@ class ProviderRegistry(BasedModel):
         return cast(OpenAIEmbeddingBase, factory_class).get_provider_class(
             model_name=model_name,
             provider=provider,
-            capabilities=capabilities,
+            capabilities=capabilities[0],
             base_url=base_url,
             provider_kwargs=provider_kwargs,
             client=client,

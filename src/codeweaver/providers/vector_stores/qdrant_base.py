@@ -440,11 +440,11 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
 
         sparse, dense = None, None
         if isinstance(vector, dict):
-            if "indices" in vector and "values" in vector:  # type: ignore
+            if "indices" in vector and "values" in vector:
                 sparse = SparseEmbedding(
-                    indices=vector["indices"],
-                    values=[float(x) if isinstance(x, int) else x for x in vector["values"]],
-                )  # type: ignore
+                    indices=vector["indices"],  # ty: ignore[invalid-argument-type]
+                    values=[float(x) if isinstance(x, int) else x for x in vector["values"]],  # ty:ignore[invalid-argument-type]
+                )
             elif "sparse" in vector:
                 sparse = SparseEmbedding(
                     indices=vector["sparse"].get("indices", []),  # type: ignore
@@ -454,12 +454,12 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                         if vector["sparse"].get("values", [])
                     ],  # type: ignore
                 )
-            if "dense" in vector:  # type: ignore
+            if "dense" in vector:
                 dense = [
                     float(x) if isinstance(x, int) else x
                     for x in vector["dense"]
                     if vector["dense"]
-                ]  # type: ignore
+                ]
         elif isinstance(vector, list | tuple):
             dense = [float(x) if isinstance(x, int) else x for x in vector]
 
