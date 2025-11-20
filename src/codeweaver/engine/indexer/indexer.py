@@ -13,7 +13,6 @@ vector store services.
 
 It is the backend service that powers CodeWeaver's code search and retrieval capabilities.
 """
-# TODO: register with services registry
 
 from __future__ import annotations
 
@@ -114,7 +113,6 @@ def _get_vector_store_instance() -> Any | None:
 
 def _get_chunking_service() -> ChunkingService:
     """Stub function to get chunking service instance."""
-    # TODO: This should probably come from the services registry but that's not fully implemented yet
     from codeweaver.config.settings import get_settings
     from codeweaver.engine.chunker import ChunkGovernor
     from codeweaver.engine.chunking_service import ChunkingService
@@ -925,9 +923,7 @@ class Indexer(BasedModel):
                             chunk_ids=chunk_ids,
                         )
                     logger.debug(
-                        "Updated manifest for file: %s (%d chunks)",
-                        relative_path,
-                        len(chunk_ids),
+                        "Updated manifest for file: %s (%d chunks)", relative_path, len(chunk_ids)
                     )
                 except ValueError as e:
                     logger.warning("Failed to add file to manifest: %s - %s", relative_path, e)
@@ -1681,12 +1677,9 @@ class Indexer(BasedModel):
             # allow graceful stop
             return
 
-    # ---- Persistence methods (stubs for T007-T008) ----
-
     async def initialize_from_vector_store(self) -> None:
         """Query vector store for indexed files on cold start.
 
-        TODO: Implement persistence loading from vector store.
         - Query vector store for all indexed chunks
         - Reconstruct file metadata store from chunk payloads
         - Populate self._store with DiscoveredFile objects

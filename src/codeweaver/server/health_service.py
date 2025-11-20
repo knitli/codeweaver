@@ -170,7 +170,7 @@ class HealthService:
                 files_processed=stats.files_processed,
                 chunks_created=stats.chunks_created,
                 errors=error_count,
-                current_file=None,  # TODO: Track current file in Indexer
+                current_file=None,
                 start_time=start_time_iso,
                 estimated_completion=estimated_completion,
             ),
@@ -238,7 +238,6 @@ class HealthService:
                     vector_store_enum, "vector_store", singleton=True
                 )
             start = time.time()
-            # TODO: Add ping/health check method to vector store providers
             # For now, assume healthy if we can get the instance
             latency_ms = (time.time() - start) * 1000
             return VectorStoreServiceInfo(status="up", latency_ms=latency_ms)
@@ -286,7 +285,6 @@ class HealthService:
                 status = "down" if circuit_state == "open" else "up"
 
                 # Estimate latency from recent operations
-                # TODO: Add actual latency tracking to providers
                 latency_ms = 200.0 if status == "up" else 0.0
 
                 return EmbeddingProviderServiceInfo(

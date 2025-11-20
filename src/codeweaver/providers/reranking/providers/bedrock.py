@@ -340,7 +340,7 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
         if client is None:
             client = boto3_client(  # ty: ignore[invalid-assignment]
                 "bedrock-agent-runtime",
-                **bedrock_settings,  # ty: ignore[invalid-argument-type]
+                **bedrock_settings,  # type: ignore
             )
 
         final_caps = caps or get_amazon_reranking_capabilities()[0]

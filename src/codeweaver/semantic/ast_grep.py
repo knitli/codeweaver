@@ -443,7 +443,6 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     def symbol(self) -> str:
         """Get a symbolic representation of the node."""
         # Return the node's text as a simple symbol representation
-        # TODO: This is clearly not the right answer... this can't be hard -- many libraries use tree-sitter to identify symbols. Needs research.
         return self.text
 
     @computed_field

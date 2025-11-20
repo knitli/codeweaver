@@ -17,9 +17,8 @@ from codeweaver.common.registry.types import Feature, ServiceCard, ServiceCardDi
 from codeweaver.core.types.models import BasedModel
 
 
-#! TODO: Not fully implemented.
 class ServicesRegistry(BasedModel):
-    """Registry for managing available services."""
+    """Registry for managing available services... or, the shell of one."""
 
     model_config = BasedModel.model_config | ConfigDict(
         arbitrary_types_allowed=True, validate_assignment=True, defer_build=True

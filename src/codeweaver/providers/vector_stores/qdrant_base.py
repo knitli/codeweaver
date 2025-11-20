@@ -368,7 +368,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Returns:
             Raw search results from Qdrant.
         """
-        qdrant_filter = None  # TODO: Convert Filter to Qdrant filter when needed
+        qdrant_filter = None
 
         # Hybrid search uses query_points with FusionQuery
         if vector.is_hybrid():

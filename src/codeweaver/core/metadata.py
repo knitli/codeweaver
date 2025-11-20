@@ -108,7 +108,6 @@ class SemanticMetadata(BasedModel):
     ]
     thing: Any = None  # AstThing[SgNode] | None - using Any to avoid forward reference issues
     positional_connections: Any = ()  # tuple[AstThing[SgNode], ...] - using Any to avoid forward reference issues
-    # TODO: Logic for symbol extraction from AST nodes
     symbol: Annotated[
         str | None,
         Field(description="""The symbol represented by the node""", default_factory=_set_symbol),
@@ -692,8 +691,6 @@ class ExtKind(NamedTuple):
             "kind": str(self.kind.as_title),
         }
 
-
-# TODO: Add DevTool class -- probably in a separate module -- to capture common developer tooling file types, language associations, function/purpose, etc.
 
 __all__ = (
     "ChunkKind",

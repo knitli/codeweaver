@@ -44,7 +44,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# TODO: Convert provider TypedDicts to Pydantic models. That gives us: 1) automatic env variables for free (pydantic-settings), 2) better validation, 3) Flexibility to put more validation, default, and other logic in the models.
 # We chose TypedDicts originally for speed. They can be substantially faster than Pydantic models (according to Pydantic: https://docs.pydantic.dev/2.12/concepts/performance/#use-typeddict-over-nested-models) But we lose a lot of benefits of Pydantic models.
 
 # ===========================================================================

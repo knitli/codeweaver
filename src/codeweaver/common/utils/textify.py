@@ -5,7 +5,6 @@
 
 """Text processing utilities for code snippets."""
 
-# TODO: Integrate into the delimiter based chunker.
 from __future__ import annotations
 
 import re

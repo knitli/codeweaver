@@ -611,7 +611,6 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
                 # Let users know these aren't fully available
                 is_package_available = registry.is_provider_available(provider, kind)
                 has_auth = provider.has_env_auth or provider.is_local_provider
-                # TODO: Unblock when these provider types are fully supported
                 if kind in {ProviderKind.DATA, ProviderKind.AGENT}:
                     tested_providers.append(
                         _report_unimplemented_status(

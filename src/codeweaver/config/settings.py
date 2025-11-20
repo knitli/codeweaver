@@ -325,7 +325,6 @@ class CodeWeaverSettings(BaseSettings):
     5. Global config (/etc/codeweaver.toml (or .yaml, .yml, .json))
     6. Defaults
 
-    # TODO: flatten the config structure. It's a bit too much when using env vars for nested models, particularly for provider settings.
     """
 
     model_config = SettingsConfigDict(

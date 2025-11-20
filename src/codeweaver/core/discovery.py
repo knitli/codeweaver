@@ -162,7 +162,6 @@ class DiscoveredFile(DataclassSerializationMixin):
         """Return the blake3 hash of the file contents, if available."""
         if self._file_hash is not None:
             return self._file_hash
-        # TODO: Use ast() to compute hash for semantic files
         # We can look at Difftastic to see how they do AST-based diffs/hashes
         # Try to compute hash if file exists
         if self.path.exists() and self.path.is_file():
@@ -179,7 +178,6 @@ class DiscoveredFile(DataclassSerializationMixin):
 
         The other can be in a different location (paths not the same), useful for checking if a file has been moved or copied, or deduping files (we can just point to one copy).
         """
-        # TODO: A better approach for files that we can semantically analyze is to hash the AST or structure instead of the raw file contents and compare those.
         if other_path.is_file() and other_path.exists():
             file = type(self).from_path(other_path)
             return bool(file and file.file_hash() == self.file_hash())
@@ -199,7 +197,8 @@ class DiscoveredFile(DataclassSerializationMixin):
         except Exception:
             return False
         else:
-            return bool(nontext) / len(chunk) > 0.30
+            # Empty files are not binary
+            return False if len(chunk) == 0 else bool(nontext) / len(chunk) > 0.30
 
     @computed_field
     @cached_property

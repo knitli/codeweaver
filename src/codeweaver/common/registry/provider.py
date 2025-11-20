@@ -371,7 +371,6 @@ class ProviderRegistry(BasedModel):
         # Register embedding providers dynamically
         for provider_kind, prov_map in self._provider_map.items():
             if provider_kind == ProviderKind.AGENT:
-                # TODO: Agent registration not implemented yet, v.20 task
                 continue
             for provider, module_importer in prov_map.items():
                 if (  # these need special handling

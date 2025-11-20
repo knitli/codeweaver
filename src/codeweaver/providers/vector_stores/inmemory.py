@@ -161,7 +161,6 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
                             from codeweaver.providers.vector_stores.utils import resolve_dimensions
 
                             dense_size = resolve_dimensions()
-                # TODO: this should be a CollectionMetadata instance
                 collections_data[col.name] = {
                     "metadata": {"provider": "memory", "created_at": datetime.now(UTC).isoformat()},
                     "vectors_config": {"dense": {"size": dense_size, "distance": "Cosine"}},

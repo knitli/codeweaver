@@ -24,7 +24,6 @@ from codeweaver.exceptions import ConfigurationError
 # by default, we do basic NFKC normalization and strip known invisible/control chars
 # this is to avoid issues with fullwidth chars, zero-width spaces, etc.
 # We plan to add more advanced sanitization options in the future, which users can opt into.
-# TODO: Add Rebuff.ai integration, and/or other advanced sanitization options. Probably as middleware.
 
 NORMALIZE_FORM = "NFKC"
 
@@ -56,10 +55,7 @@ def sanitize_unicode(
     text: str | bytes | bytearray,
     normalize_form: Literal["NFC", "NFKC", "NFD", "NFKD"] = NORMALIZE_FORM,
 ) -> str:
-    """Sanitize unicode text by normalizing and removing invisible/control characters.
-
-    TODO: Need to add a mechanism to override or customize the injection patterns.
-    """
+    """Sanitize unicode text by normalizing and removing invisible/control characters."""
     if isinstance(text, bytes | bytearray):
         text = text.decode("utf-8", errors="ignore")
     if not text.strip():

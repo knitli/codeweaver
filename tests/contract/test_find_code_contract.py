@@ -369,27 +369,20 @@ class TestParameterValidation:
 
     def test_token_limit_constraints(self):
         """Verify token_limit is validated per contract (min: 1000, max: 100000)."""
-        # Note: This tests the contract expectation. The function signature shows
-        # default=10000, but contract specifies min/max. In practice, the function
-        # doesn't enforce these limits yet, but the contract test documents the requirement.
-
-        # Contract specifies: minimum 1000, maximum 100000
-        # This is a reminder that validation should be added if not present
-        sig = inspect.signature(find_code)
-        params = {p.name: p for p in sig.parameters.values()}
-
-        # Document expected constraints per contract
-        assert params["token_limit"].default == 10000, "token_limit default must be 10000"
-        # TODO: Add validation in find_code to enforce min=1000, max=100000
+        self._test_find_code_min_max_constraints(
+            "token_limit", 10000, "token_limit default must be 10000"
+        )
 
     def test_max_results_constraints(self):
         """Verify max_results is validated per contract (min: 1, max: 100)."""
+        self._test_find_code_min_max_constraints(
+            "max_results", 50, "max_results default must be 50"
+        )
+
+    def _test_find_code_min_max_constraints(self, constraint: str, bound: int, statement: str):
         sig = inspect.signature(find_code)
         params = {p.name: p for p in sig.parameters.values()}
-
-        # Contract specifies: minimum 1, maximum 100, default 50
-        assert params["max_results"].default == 50, "max_results default must be 50"
-        # TODO: Add validation in find_code to enforce min=1, max=100
+        assert params[constraint].default == bound, statement
 
     def test_query_min_length(self):
         """Verify query string has minimum length per contract (minLength: 1)."""

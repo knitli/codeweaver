@@ -63,7 +63,6 @@ def _trigger_server_reindex(*, force: bool) -> bool:
     """
     # For v0.1, we don't have an admin endpoint yet
     # The server auto-indexes on startup, so just inform user
-    # TODO: Add admin endpoint in future for manual re-index trigger
     return False
 
 

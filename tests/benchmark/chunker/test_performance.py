@@ -108,7 +108,7 @@ class TestChunkerPerformance:
 
         Current measured: ~700ms per file (~1.4 files/second)
         Regression threshold: < 1000ms per file (allows 40% margin)
-        Architectural target: 5ms per file (200 files/second) - TODO: optimize
+        Architectural target: 5ms per file (200 files/second)
         """
         content = generate_python_file(500)
         file_path = Path("benchmark_test.py")
@@ -183,7 +183,7 @@ class TestChunkerPerformance:
 
         Current baseline: ~3.95s mean per file (measured)
         Regression threshold: < 5.5s per file (baseline + 40% margin for CI variability)
-        Architectural target (3000 lines): 20ms per file (50 files/second) - TODO: optimize
+        Architectural target (3000 lines): 20ms per file (50 files/second)
         Note: File size reduced from 3000 to 1500 lines to stay within 30s timeout
         """
         content = generate_python_file(1500)
@@ -219,7 +219,7 @@ class TestChunkerPerformance:
 
         Current baseline: ~6.74s mean per file (measured)
         Regression threshold: < 9.5s per file (baseline + 40% margin for CI variability)
-        Architectural target (7000 lines): 100ms per file (10 files/second) - TODO: optimize
+        Architectural target (7000 lines): 100ms per file (10 files/second)
         Note: File size reduced from 7000 to 2000 lines to stay within 30s chunker timeout
         """
         content = generate_python_file(2000)
@@ -318,7 +318,7 @@ class TestChunkerPerformance:
 
         Current baseline: ~0.2 files/second (measured with large files)
         Regression threshold: > 0.15 files/second (baseline - 25% tolerance for CI)
-        Architectural target: 50 files/second - TODO: optimize
+        Architectural target: 50 files/second
         Note: Reduced file sizes to prevent timeout issues
         """
         test_files = [

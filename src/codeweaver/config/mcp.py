@@ -59,10 +59,6 @@ from codeweaver.exceptions import MissingValueError
 
 
 if TYPE_CHECKING:
-    pass
-
-
-if TYPE_CHECKING:
     from codeweaver.core.types.aliases import FilteredKeyT
     from codeweaver.core.types.enum import AnonymityConversion
 

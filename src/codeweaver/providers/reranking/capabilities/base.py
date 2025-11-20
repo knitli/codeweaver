@@ -113,7 +113,6 @@ class RerankingModelCapabilities(BasedModel):
         self, input_chunks: Sequence[str]
     ) -> tuple[bool, NonNegativeInt]:
         """Process max_input using the specified tokenizer."""
-        # TODO: We need to handle the case where the first chunk is larger than the max_input.
         # we can prevent it if we pass the max_input down to the chunker, but we should also handle it here.
         if not self.max_input or not isinstance(self.max_input, int):
             return True, 0

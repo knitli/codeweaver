@@ -83,7 +83,6 @@ def test_provider_switch_warning(caplog):
     Then: System logs warning suggesting reindex but continues
     """
     import logging
-    # TODO: This isn't testing the correct thing. The warning should raise if the *embedding provider changes but the model doesn't*
 
     caplog.set_level(logging.WARNING)
 

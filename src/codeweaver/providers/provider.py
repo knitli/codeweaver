@@ -116,7 +116,6 @@ class Provider(BaseEnum):
         with contextlib.suppress(AttributeError, KeyError, ValueError):
             if value_in_self := cls.from_string(value.strip()):
                 return value_in_self
-        # TODO: We need to allow for dynamic providers in the future, we would check if there's a provider class registered for the value, then register the provider here with `cls.add_member("NEW_PROVIDER", "new_provider")`.
         raise ConfigurationError(f"Invalid provider: {value}")
 
     @property

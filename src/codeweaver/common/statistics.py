@@ -685,7 +685,6 @@ class FileStatistics(DataclassSerializationMixin):
 
     def add_other_files(self, *files: Path) -> None:
         """Add files to the 'other' category."""
-        # TODO: We'd ideally want to make sure these are pushed to the indexer, unless we receive these in the same action
         self._other_files.update(files)
 
     @property

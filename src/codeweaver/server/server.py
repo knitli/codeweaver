@@ -165,7 +165,6 @@ class AppState(DataclassSerializationMixin):
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {
-            # TODO: These can all be boolean but need to differentiate from defaults vs set values
             # We'd need to make broader use of the Unset sentinel for that to work well
             FilteredKey("config_path"): AnonymityConversion.BOOLEAN,
             FilteredKey("project_path"): AnonymityConversion.HASH,
@@ -296,7 +295,6 @@ async def _run_background_indexing(
 
         # Calculate averages
         avg_chunks_per_file = chunks_created / files_processed if files_processed > 0 else 0
-        # TODO: Calculate actual token average from chunks when we have access to them
         avg_tokens_per_chunk = 150  # Placeholder estimate
 
         # Show index summary

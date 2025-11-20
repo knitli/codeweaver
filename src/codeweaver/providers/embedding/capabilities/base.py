@@ -207,7 +207,6 @@ def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:
             "_available": HAS_FASTEMBED,
         },
         """
-        # TODO: Disabled until we work out the bugs on adding custom sparse models to FastEmbed
         "prithivida/Splade-PP_en_v2": {
             "name": "prithivida/Splade-PP_en_v2",
             "multilingual": False,

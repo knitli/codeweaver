@@ -51,8 +51,6 @@ if TYPE_CHECKING:
     from codeweaver.config.providers import ProviderSettingsDict
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
-# TODO: Replace most defaults with Unset, to better track user-set vs default values. We just need to ensure we don't pass Unset to places that don't accept it. I'm not sure what the best way to do that is yet. My thought is that we could possibly modify pydantic serialization to convert Unset to None or missing values, but *not* do that for telemetry serialization.
-
 
 # ===========================================================================
 # *        TypedDict Representations of Top-Level Settings Models
@@ -166,9 +164,7 @@ class UvicornServerSettings(BasedModel):
     access_log: bool = True
     use_colors: bool | None = None
     interface: InterfaceType = "auto"
-    reload: bool = (
-        False  # TODO: We should add hot reload, but we need to manage handling it mid-request.
-    )
+    reload: bool = False
     reload_dirs: list[str] | str | None = None
     reload_delay: PositiveFloat = 0.25
     reload_includes: list[str] | str | None = None

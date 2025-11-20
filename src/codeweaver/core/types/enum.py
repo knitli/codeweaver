@@ -36,17 +36,6 @@ extend_enum: EnumExtend = extend_enum
 # *          Base Enum Classes
 # ================================================
 
-# TODO: For our larger enums with lots of property methods, like `SemanticSearchLanguage`, it probably makes sense to define it as an enum with type `dataclass` members, where most of the properties are defined on the dataclass, and the enum just holds instances of that dataclass. This would make it easier to manage and extend the enum members. See https://docs.python.org/3/howto/enum.html#dataclass-support. This would also make it easier to add new members without having to add the member to the enum methods themselves. Since attributes and properties are accessed the same way, we could do this without it being a breaking change. Classes that would benefit from this treatment:
-# *  - `SemanticSearchLanguage`
-# *  - `ConfigLanguage`
-# *  - `Chunker`
-# *  - `Provider`
-# *  - [X] `AgentTask`
-# *  - `LanguageFamily`
-# *  - Not currently an enum, but the `Capabilities` types could also benefit from this treatment (`EmbeddingModelCapabilities`, `RerankingModelCapabilities`), where the member is the model name and the dataclass holds the capabilities.
-#
-# * Here's the base implementation:
-
 
 @dataclass(config=DATACLASS_CONFIG, order=True, frozen=True)
 class BaseEnumData(DataclassSerializationMixin):

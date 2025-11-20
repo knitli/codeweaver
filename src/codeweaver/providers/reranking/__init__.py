@@ -38,8 +38,6 @@ if TYPE_CHECKING:
     )
 
 
-# TODO: Implement the same system we have for Embedding models
-
 type KnownRerankModelName = Literal[
     "voyage:voyage-rerank-2.5",
     "voyage:voyage-rerank-2.5-lite",

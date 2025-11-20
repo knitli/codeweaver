@@ -29,11 +29,6 @@ class EmbeddingRegistry(UUIDStore[ChunkEmbeddings]):
 
     Since vectors are large, the `size_limit` defaults to 100 MB.
 
-    TODO: Make size_limit configurable by users in settings.
-
-    TODO: Should we make `EmbeddingRegistry`'s size dynamic based on conditions? For example, if we are getting service errors from the vector store, we could increase the size_limit temporarily as a queue.
-
-    TODO: Save the store to disk to persist across restarts. Ideally we'd use a contextmanager to load/save the store automatically. The parent class, `SimpleTypedStore` already has `load` and `save` methods we could leverage.
     """
 
     def __init__(self, *, size_limit: int = 100 * 1024 * 1024) -> None:

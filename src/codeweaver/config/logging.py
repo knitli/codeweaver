@@ -103,9 +103,6 @@ class SerializableLoggingFilter(BasedModel, logging.Filter):
 
     include_pattern: Annotated[
         re.Pattern[str] | None,
-        # NOTE: `include_pattern` and `exclude_pattern` are prime candidates for Python 3.14's `template strings`.
-        # TODO: Once they become more available, we should use `raw template strings` here
-        # See 👁️ https://docs.python.org/3.14/library/string.templatelib.html#template-strings
         BeforeValidator(validate_regex_pattern),
         Field(
             description="""Regex pattern to filter the body text of log messages. Records matching this pattern will be *included* in log output."""

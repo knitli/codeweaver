@@ -410,6 +410,12 @@ class IndexerSettings(BasedModel):
         """Constructs the filter function for rignore's `should_exclude_entry` parameter.
 
         Returns *True* for paths that should **not** be included (i.e., excluded paths).
+
+        This filter should only handle special cases where we want to override rignore's
+        default behavior. In particular:
+        - When ignore_hidden=True but we want to include specific tooling directories,
+          we return False (don't exclude) for those paths.
+        - For all other paths, we return False to let rignore's natural filtering apply.
         """
 
         def filter_func(settings: IndexerSettings, path: Path | str) -> bool:
@@ -418,18 +424,18 @@ class IndexerSettings(BasedModel):
             if settings.ignore_hidden and (
                 settings.include_github_dir or settings.include_tooling_dirs
             ):
-                # We need to check for .github/ and tooling dirs first
+                # Check if this is a tooling directory we want to force-include despite ignore_hidden
                 if settings.include_github_dir and (
                     path_obj.match("**/.github/**") or path_obj.match("**/.circleci/**")
                 ):
-                    return False
+                    return False  # Don't exclude - force include this path
                 if settings.include_tooling_dirs:
                     from codeweaver.core.file_extensions import (
                         COMMON_LLM_TOOLING_PATHS,
                         COMMON_TOOLING_PATHS,
                     )
 
-                    # filter for tooling dirs that are hidden (i.e., start with .)
+                    # Check if path matches any tooling directory patterns
                     if {
                         p
                         for p in {
@@ -450,8 +456,10 @@ class IndexerSettings(BasedModel):
                             and ("." not in p.name[1:] or "." not in p.parts[0][1:])
                         )
                     }:
-                        return False
-                return True
+                        return False  # Don't exclude - force include this tooling path
+                # For all other paths, let rignore's natural filtering apply
+                # Don't exclude them here
+                return False
             return False
 
         return partial(filter_func, self)

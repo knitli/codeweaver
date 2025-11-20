@@ -362,7 +362,6 @@ class SemanticSearchLanguage(str, BaseEnum):
         """
         Returns the LanguageConfigFiles associated with this language.
 
-        TODO: Validate the `dependency_key_paths` for each config file to ensure they are correct. If you use these languages, please let us know if you find any issues with the `dependency_key_paths` in the config files. Some are probably incorrect.
         # We haven't implemented dependency extraction yet, but when we do, we want to make sure these paths are correct.
         """
         match self:
@@ -873,8 +872,6 @@ class SemanticSearchLanguage(str, BaseEnum):
         ):
             return None
         if config_file.name in ("Makefile", "build.gradle.kts"):
-            # there's language ambiguity here. TODO: Add check to resolve this ambiguity
-            # for now, we make an educated guess
             if config_file.name == "Makefile":
                 # C++ is more popular... no other reasoning here
 
@@ -1489,8 +1486,6 @@ def languages_present_from_configs() -> tuple[SemanticSearchLanguage, ...] | Non
 
     Returns:
         A tuple of SemanticSearchLanguage objects.
-
-    TODO: Integrate into indexing and search services to use these languages.
     """
     # We get the Path for each config file that exists and then map it to the corresponding SemanticSearchLanguage.
     if (config_paths := find_config_paths()) and (

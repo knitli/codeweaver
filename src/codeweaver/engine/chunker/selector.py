@@ -69,7 +69,7 @@ class ChunkerSelector:
         2. If language is in SemanticSearchLanguage enum:
            - Attempt to create SemanticChunker
            - On ParseError or NotImplementedError, log warning and fall back
-        3. Fall back to DelimiterChunker (TODO: not yet implemented)
+        3. Fall back to DelimiterChunker
         4. Return fresh chunker instance (never reused across files)
     """
 
@@ -158,7 +158,6 @@ class ChunkerSelector:
                     )
                     # Return empty chunker or raise exception
                     # For now, return semantic chunker which will handle it gracefully
-                    # TODO: Consider returning a NullChunker or raising FileTooLargeError
             except OSError as e:
                 logger.warning(
                     "Could not stat file %s: %s",
