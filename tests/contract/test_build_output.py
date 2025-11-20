@@ -74,12 +74,12 @@ def test_validate_build_output(clean_dist: Path):
     sdist = sdists[0]
 
     # Filenames must follow conventions
-    assert wheel.name.startswith("codeweaver_mcp-"), (
+    assert wheel.name.startswith("codeweaver-"), (
         f"Wheel name must start with package name, got: {wheel.name}"
     )
     assert "-py3-none-any.whl" in wheel.name, f"Wheel must be pure Python, got: {wheel.name}"
 
-    assert sdist.name.startswith("codeweaver_mcp-"), (
+    assert sdist.name.startswith("codeweaver-"), (
         f"Sdist name must start with package name, got: {sdist.name}"
     )
     assert sdist.name.endswith(".tar.gz"), f"Sdist must be .tar.gz, got: {sdist.name}"
