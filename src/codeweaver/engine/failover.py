@@ -114,7 +114,9 @@ class VectorStoreFailoverManager(BasedModel):
     _last_indexed_count: Annotated[int, PrivateAttr()] = 0  # Track changes for smart sync
     _cached_snapshot: Annotated[set[str] | None, PrivateAttr()] = None  # Cache snapshot state
     _cached_memory_estimate: Annotated[Any | None, PrivateAttr()] = None  # Cache resource estimate
-    _estimate_cache_time: Annotated[datetime | None, PrivateAttr()] = None  # When estimate was cached
+    _estimate_cache_time: Annotated[datetime | None, PrivateAttr()] = (
+        None  # When estimate was cached
+    )
 
     # Chunk ID indexes to avoid scrolling operations
     _backup_chunk_index: Annotated[dict[str, set[str]], PrivateAttr()] = PrivateAttr(
@@ -268,7 +270,9 @@ class VectorStoreFailoverManager(BasedModel):
 
         return chunk_ids
 
-    def _update_index_on_upsert(self, collection_name: str, chunk_ids: list[str], *, is_backup: bool) -> None:
+    def _update_index_on_upsert(
+        self, collection_name: str, chunk_ids: list[str], *, is_backup: bool
+    ) -> None:
         """Update chunk index when chunks are upserted.
 
         NOTE: Currently not hooked up to actual upsert operations. Indexes are rebuilt
@@ -285,7 +289,9 @@ class VectorStoreFailoverManager(BasedModel):
             index[collection_name] = set()
         index[collection_name].update(chunk_ids)
 
-    def _update_index_on_delete(self, collection_name: str, chunk_ids: list[str], *, is_backup: bool) -> None:
+    def _update_index_on_delete(
+        self, collection_name: str, chunk_ids: list[str], *, is_backup: bool
+    ) -> None:
         """Update chunk index when chunks are deleted.
 
         NOTE: Currently not hooked up to actual delete operations. Indexes are rebuilt
@@ -445,7 +451,7 @@ class VectorStoreFailoverManager(BasedModel):
                     if current_indexed == self._last_indexed_count:
                         logger.debug(
                             "No data changes since last sync (%d chunks) - skipping backup sync",
-                            current_indexed
+                            current_indexed,
                         )
                         continue
                     # Update tracked count
@@ -495,14 +501,17 @@ class VectorStoreFailoverManager(BasedModel):
             self._cached_memory_estimate is not None
             and self._estimate_cache_time is not None
             and (datetime.now(UTC) - self._estimate_cache_time).total_seconds() < 300
-            and abs(current_chunks - self._cached_memory_estimate.estimated_chunks) < (current_chunks * 0.1)  # Within 10%
+            and abs(current_chunks - self._cached_memory_estimate.estimated_chunks)
+            < (current_chunks * 0.1)  # Within 10%
         )
 
         if cache_valid:
             memory_estimate = self._cached_memory_estimate
-            logger.debug("Using cached memory estimate (age: %.1fs, chunks: %d)",
-                        (datetime.now(UTC) - self._estimate_cache_time).total_seconds(),
-                        memory_estimate.estimated_chunks)
+            logger.debug(
+                "Using cached memory estimate (age: %.1fs, chunks: %d)",
+                (datetime.now(UTC) - self._estimate_cache_time).total_seconds(),
+                memory_estimate.estimated_chunks,
+            )
         else:
             memory_estimate = estimate_backup_memory_requirements(
                 project_path=self._project_path, stats=stats
@@ -737,7 +746,7 @@ class VectorStoreFailoverManager(BasedModel):
 
             logger.debug(
                 "Snapshotted %d existing chunks before failover (from rebuilt index)",
-                len(self._failover_chunks)
+                len(self._failover_chunks),
             )
 
         except Exception as e:

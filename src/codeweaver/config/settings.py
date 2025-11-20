@@ -39,7 +39,7 @@ from pydantic import (
     field_validator,
 )
 from pydantic.fields import ComputedFieldInfo, FieldInfo
-from pydantic_core import from_json
+from pydantic_core import from_json, to_json
 from pydantic_settings import (
     AWSSecretsManagerSettingsSource,
     AzureKeyVaultSettingsSource,
@@ -81,7 +81,7 @@ from codeweaver.config.types import (
 from codeweaver.core.types.aliases import FilteredKeyT
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.enum import AnonymityConversion
-from codeweaver.core.types.models import BasedModel
+from codeweaver.core.types.models import BasedModel, clean_sentinel_from_schema
 from codeweaver.core.types.sentinel import UNSET, Unset
 
 
@@ -335,6 +335,7 @@ class CodeWeaverSettings(BaseSettings):
             Callable[[str, FieldInfo | ComputedFieldInfo], str],
             BasedModel.model_config["field_title_generator"],  # type: ignore
         ),
+        json_schema_extra=clean_sentinel_from_schema,
         nested_model_default_partial_update=True,
         from_attributes=True,
         env_ignore_empty=True,
@@ -542,6 +543,25 @@ class CodeWeaverSettings(BaseSettings):
             FilteredKey("project_name"): AnonymityConversion.BOOLEAN,
             FilteredKey("config_file"): AnonymityConversion.HASH,
         }
+
+    @classmethod
+    def json_schema(cls) -> bytes:
+        """Get the JSON validation schema for the settings model."""
+        schema = cls.model_json_schema()
+        # until we get around to putting in a proper schema store
+        schema = {
+            "$schema": "https://raw.githubusercontent.com/knitli/codeweaver/refs/heads/main/schema/codeweaver.schema.json",
+            **schema,
+        }
+        return to_json(schema, indent=2)
+
+    @classmethod
+    def save_schema(cls, path: Path | None = None) -> int:
+        """Save the JSON validation schema to a file."""
+        if path is None:
+            path = Path(__file__).parent.parent.parent.parent / "schema" / "codeweaver.schema.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path.write_bytes(cls.json_schema())
 
     @classmethod
     def _defaults(cls) -> CodeWeaverSettingsDict:

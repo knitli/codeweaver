@@ -26,7 +26,6 @@ from codeweaver.providers.provider import Provider
 pytestmark = [pytest.mark.integration]
 
 
-
 pytestmark = pytest.mark.integration
 
 

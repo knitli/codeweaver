@@ -274,7 +274,9 @@ def build_query_vector(query_result: QueryResult, query: str) -> StrategizedQuer
     """
     if query_result.dense:
         # Unwrap batch results (embed_query returns list[list[float]], we need list[float])
-        dense_vector = query_result.dense[0] if isinstance(query_result.dense[0], list) else query_result.dense
+        dense_vector = (
+            query_result.dense[0] if isinstance(query_result.dense[0], list) else query_result.dense
+        )
 
         if query_result.sparse:
             return StrategizedQuery(

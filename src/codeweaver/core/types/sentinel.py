@@ -15,10 +15,21 @@ from types import FrameType
 from typing import Any, Self, cast
 
 from pydantic import ConfigDict, GetCoreSchemaHandler
+from pydantic.annotated_handlers import GetJsonSchemaHandler
+from pydantic.json_schema import GenerateJsonSchema, JsonSchemaValue
 from pydantic_core import core_schema
+from pydantic_core._pydantic_core import PydanticOmit
 
 from codeweaver.core.types.aliases import LiteralStringT, SentinelName, SentinelNameT
-from codeweaver.core.types.models import BasedModel
+from codeweaver.core.types.models import BasedModel, clean_sentinel_from_schema
+
+
+class DontGenerateJsonSchema(GenerateJsonSchema):
+    """GenerateJsonSchema implementation that disables JSON Schema generation."""
+
+    def generate(self, _schema: core_schema.CoreSchema, _error_info: str) -> JsonSchemaValue:
+        """Disable JSON Schema generation by raising an error."""
+        raise PydanticOmit
 
 
 def _get_parent_frame() -> FrameType:
@@ -70,6 +81,13 @@ class Sentinel(BasedModel):
             ),
         )
         # spellchecker:on
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        """Provide JSON Schema generation for Sentinel."""
+        return DontGenerateJsonSchema().generate(schema, repr(cls))
 
     def __new__(cls, name: SentinelName | None = None, module_name: str | None = None) -> Self:
         """Create a new ."""
@@ -161,4 +179,4 @@ class Unset(Sentinel):
 UNSET: Unset = Unset(name="Unset", module_name=Sentinel._get_module_name_generator()())  # type: ignore
 
 
-__all__ = ("UNSET", "Sentinel", "SentinelName", "Unset")
+__all__ = ("UNSET", "Sentinel", "SentinelName", "Unset", "clean_sentinel_from_schema")

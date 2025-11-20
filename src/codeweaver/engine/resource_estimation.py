@@ -84,8 +84,12 @@ def estimate_file_count(project_path: Path, max_depth: int = 5) -> int:
     if project_path in _file_count_cache:
         cached_count, cache_time = _file_count_cache[project_path]
         if now - cache_time < _CACHE_EXPIRY:
-            logger.debug("Using cached file count for %s: %d (age: %.1fs)",
-                        project_path, cached_count, (now - cache_time).total_seconds())
+            logger.debug(
+                "Using cached file count for %s: %d (age: %.1fs)",
+                project_path,
+                cached_count,
+                (now - cache_time).total_seconds(),
+            )
             return cached_count
 
     try:

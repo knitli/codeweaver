@@ -96,7 +96,11 @@ def _chunk_single_file(
                 extra={"file_path": str(file.path), "error_type": type(e).__name__},
             )
             # Create delimiter chunker as fallback
-            language = file.ext_kind.language.variable if file.ext_kind and hasattr(file.ext_kind.language, 'variable') else "unknown"
+            language = (
+                file.ext_kind.language.variable
+                if file.ext_kind and hasattr(file.ext_kind.language, "variable")
+                else "unknown"
+            )
             fallback_chunker = DelimiterChunker(governor, language=language)
             chunks = fallback_chunker.chunk(content, file=file)
 
@@ -111,10 +115,7 @@ def _chunk_single_file(
         )
         # Log full traceback only at debug level
         logger.debug(
-            "Full error for %s",
-            file.path,
-            exc_info=True,
-            extra={"file_path": str(file.path)},
+            "Full error for %s", file.path, exc_info=True, extra={"file_path": str(file.path)}
         )
         return (file.path, None)
     else:

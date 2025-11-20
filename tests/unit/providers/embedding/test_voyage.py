@@ -19,7 +19,6 @@ from codeweaver.providers.provider import Provider
 pytestmark = [pytest.mark.unit]
 
 
-
 @pytest.fixture(autouse=True)
 def reset_embedding_registry():
     """Reset the global embedding registry and hash stores between tests to avoid state pollution."""

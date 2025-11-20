@@ -26,7 +26,6 @@ from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvide
 pytestmark = [pytest.mark.validation]
 
 
-
 pytestmark = pytest.mark.unit
 
 

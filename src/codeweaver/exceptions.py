@@ -12,7 +12,6 @@ are organized into five primary categories.
 
 from __future__ import annotations
 
-import os
 import sys
 
 from typing import Any, ClassVar, NamedTuple
@@ -77,14 +76,6 @@ def _get_issue_information() -> tuple[str, ...]:
 def _get_reporting_info(detail_parts: list[str]) -> str:
     """Generate issue reporting information."""
     detail_parts = detail_parts or []
-    if not os.environ.get("CODEWEAVER_TEST_MODE", False) and _is_tty():
-        return "\n".join((
-            "[magenta]Include the following information when reporting issues:[/magenta]",
-            "- [bold][red]Error[/red] Details:[/bold] " + ", ".join(detail_parts)
-            if detail_parts
-            else "- [bold]Details:[/bold] No additional details provided.",
-            "",
-        ))
     return "\n".join((
         "Include the following information when reporting issues:",
         "- Details: " + ", ".join(detail_parts)

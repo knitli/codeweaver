@@ -13,11 +13,10 @@ try:
     from fastembed.common.model_description import (
         DenseModelDescription,
         ModelSource,
-        PoolingType,
         #    SparseModelDescription,
     )
     from fastembed.sparse import SparseTextEmbedding
-    from fastembed.text import TextEmbedding, custom_text_embedding
+    from fastembed.text import TextEmbedding
 
 except ImportError as e:
     from codeweaver.exceptions import ConfigurationError

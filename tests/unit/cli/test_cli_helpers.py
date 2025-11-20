@@ -20,6 +20,8 @@ import pytest
 
 
 pytestmark = [pytest.mark.unit]
+
+
 class CliResult:
     """Result from a CLI command execution."""
 

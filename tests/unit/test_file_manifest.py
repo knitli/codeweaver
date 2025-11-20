@@ -18,7 +18,6 @@ from codeweaver.engine.indexer.manifest import FileManifestManager, IndexFileMan
 pytestmark = [pytest.mark.unit]
 
 
-
 @pytest.fixture
 def temp_project_dir():
     """Create a temporary project directory."""

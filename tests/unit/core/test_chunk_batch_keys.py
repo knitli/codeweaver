@@ -27,7 +27,6 @@ from codeweaver.core.spans import Span
 pytestmark = [pytest.mark.unit]
 
 
-
 @pytest.fixture
 def sample_chunk() -> CodeChunk:
     """Create a sample CodeChunk for testing."""

@@ -226,6 +226,65 @@ def generate_field_title(name: str, info: FieldInfo | ComputedFieldInfo) -> str:
     return textcase.sentence(name)
 
 
+def clean_sentinel_from_schema(schema: dict[str, Any]) -> None:  # noqa: C901
+    """Remove Sentinel/Unset artifacts from JSON schema.
+
+    Use this as a `json_schema_extra` callback in models that use Sentinel/Unset
+    as default values. This function:
+    - Removes 'Unset' default values
+    - Fixes empty anyOf arrays (invalid JSON Schema)
+    - Simplifies single-item anyOf arrays
+
+    Example:
+        model_config = ConfigDict(
+            json_schema_extra=clean_sentinel_from_schema,
+            ...
+        )
+    """
+
+    def _clean_property(prop_schema: dict[str, Any]) -> None:
+        """Clean a single property schema."""
+        # Remove 'Unset' default values
+        if prop_schema.get("default") == "Unset":
+            del prop_schema["default"]
+
+        # Handle anyOf arrays
+        if "anyOf" in prop_schema:
+            any_of = prop_schema["anyOf"]
+            if any_of == []:
+                # Empty anyOf is invalid JSON Schema, remove it
+                del prop_schema["anyOf"]
+            elif len(any_of) == 1:
+                # Single item anyOf can be simplified - merge the schema
+                single_schema = any_of[0]
+                del prop_schema["anyOf"]
+                # Preserve existing keys like title, description, default
+                for key, value in single_schema.items():
+                    if key not in prop_schema:
+                        prop_schema[key] = value
+
+        # Recursively clean nested properties
+        if "properties" in prop_schema:
+            for nested_prop in prop_schema["properties"].values():
+                _clean_property(nested_prop)
+
+        # Also clean items in arrays
+        if "items" in prop_schema and isinstance(prop_schema["items"], dict):
+            _clean_property(prop_schema["items"])
+
+    # Clean top-level properties
+    if "properties" in schema:
+        for prop_schema in schema["properties"].values():
+            _clean_property(prop_schema)
+
+    # Clean $defs for nested model definitions
+    if "$defs" in schema:
+        for def_schema in schema["$defs"].values():
+            if "properties" in def_schema:
+                for prop_schema in def_schema["properties"].values():
+                    _clean_property(prop_schema)
+
+
 DATACLASS_CONFIG = ConfigDict(
     arbitrary_types_allowed=True,
     cache_strings="keys",
@@ -242,7 +301,9 @@ DATACLASS_CONFIG = ConfigDict(
 # *      Pydantic Base Implementations
 # ================================================
 
-BASEDMODEL_CONFIG = DATACLASS_CONFIG | ConfigDict(cache_strings="all")
+BASEDMODEL_CONFIG = DATACLASS_CONFIG | ConfigDict(
+    cache_strings="all", json_schema_extra=clean_sentinel_from_schema
+)
 FROZEN_BASEDMODEL_CONFIG = BASEDMODEL_CONFIG | ConfigDict(frozen=True)
 
 

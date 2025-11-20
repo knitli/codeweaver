@@ -18,7 +18,6 @@ from codeweaver.engine.indexer.manifest import IndexFileManifest
 pytestmark = [pytest.mark.unit]
 
 
-
 @pytest.fixture
 def manifest():
     """Create a manifest for testing."""

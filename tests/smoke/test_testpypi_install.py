@@ -16,7 +16,6 @@ import pytest
 pytestmark = [pytest.mark.e2e]
 
 
-
 @pytest.mark.external_api
 @pytest.mark.network
 @pytest.mark.skip(reason="Requires package published to TestPyPI - run manually after publish")
