@@ -105,3 +105,8 @@ forced_includes = [
   "**/.claude/**",
   "**/.stylelintrc/**",
 ]
+excludes = [
+  "tests/fixtures/deep_nesting.py",
+  "tests/fixtures/malformed.py",
+  "tests/fixtures/sample.go",
+]

@@ -417,8 +417,7 @@ class CodeWeaverSettings(BaseSettings):
     ] = UNSET
 
     indexer: Annotated[
-        IndexerSettings | Unset,
-        Field(description="""File filtering settings""", validate_default=False),
+        IndexerSettings | Unset, Field(description="""Indexer settings""", validate_default=False)
     ] = UNSET
 
     chunker: Annotated[

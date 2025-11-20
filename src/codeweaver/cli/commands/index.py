@@ -281,7 +281,7 @@ def _check_and_print_server_status(display: StatusDisplay):
         "  • Initial indexing runs on server startup if the index is missing or incomplete."
     )
     display.console.print(
-        "  • CodeWeaver indexes most codebases in a few seconds. Extremely large codebases may take a minute or two (1M+ lines of code)."
+        "  • CodeWeaver indexes most codebases in under a minute (meaning discovering, parsing, and chunking files), but the biggest factor is your choice of embedding provider. If you're generating embeddings locally, go get lunch if you want to wait until it's done. 🍔"
     )
     display.console.print(
         "  • While CodeWeaver runs, it continuously monitors your codebase for changes and updates the index in real-time. It also picks up changes when the server restarts."

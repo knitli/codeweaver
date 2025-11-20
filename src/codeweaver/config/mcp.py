@@ -104,7 +104,7 @@ class CodeWeaverMCPConfig(BasedModel, FastMCPRemoteMCPServer):
 
 
 class StdioCodeWeaverConfig(BasedModel, FastMCPStdioMCPServer):
-    """Configuration model for CodeWeaver mxp.json files using stdio communication."""
+    """Configuration model for CodeWeaver mcp.json files using stdio communication."""
 
     command: str = "cw server --transport stdio"
     type: Literal["stdio"] | None = "stdio"

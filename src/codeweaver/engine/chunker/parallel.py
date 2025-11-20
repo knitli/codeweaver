@@ -41,6 +41,8 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_compl
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from codeweaver.engine.chunker.delimiter import DelimiterChunker
+from codeweaver.engine.chunker.exceptions import ChunkingError
 from codeweaver.engine.chunker.selector import ChunkerSelector
 
 
@@ -56,7 +58,7 @@ logger = logging.getLogger(__name__)
 def _chunk_single_file(
     file: DiscoveredFile, governor: ChunkGovernor
 ) -> tuple[Path, list[CodeChunk]] | tuple[Path, None]:
-    """Chunk a single file using appropriate chunker.
+    """Chunk a single file using appropriate chunker with graceful fallback.
 
     This function is designed to be called in worker processes/threads.
     It creates a fresh chunker instance to ensure isolation and avoid
@@ -73,6 +75,7 @@ def _chunk_single_file(
     Notes:
         - Creates fresh ChunkerSelector and chunker instances
         - Reads file content directly from disk
+        - Gracefully falls back to delimiter chunking on parse errors
         - Handles all exceptions internally with logging
         - Never raises exceptions to caller
     """
@@ -80,13 +83,38 @@ def _chunk_single_file(
         selector = ChunkerSelector(governor)
         chunker = selector.select_for_file(file)
         content = file.path.read_text(encoding="utf-8", errors="ignore")
-        chunks = chunker.chunk(content, file=file)
+
+        try:
+            chunks = chunker.chunk(content, file=file)
+        except ChunkingError as e:
+            # Graceful fallback to delimiter chunking for parse errors
+            # This is expected behavior for malformed files - not an error to report
+            logger.debug(
+                "Semantic chunking failed for %s, falling back to delimiter: %s",
+                file.path,
+                type(e).__name__,
+                extra={"file_path": str(file.path), "error_type": type(e).__name__},
+            )
+            # Create delimiter chunker as fallback
+            language = file.ext_kind.language.variable if file.ext_kind and hasattr(file.ext_kind.language, 'variable') else "unknown"
+            fallback_chunker = DelimiterChunker(governor, language=language)
+            chunks = fallback_chunker.chunk(content, file=file)
+
         logger.debug("Chunked %s: %d chunks generated", file.path, len(chunks))
     except Exception:
-        logger.exception(
-            "Failed to chunk file %s",
+        # Only log at warning level - these are operational issues, not critical errors
+        # The file is simply skipped, server continues normally
+        logger.warning(
+            "Skipping file %s: chunking failed",
             file.path,
             extra={"file_path": str(file.path), "ext_kind": file.ext_kind or "unknown"},
+        )
+        # Log full traceback only at debug level
+        logger.debug(
+            "Full error for %s",
+            file.path,
+            exc_info=True,
+            extra={"file_path": str(file.path)},
         )
         return (file.path, None)
     else:

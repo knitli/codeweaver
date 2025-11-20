@@ -20,6 +20,7 @@ from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.voyage import VoyageRerankingProvider
 
+
 pytestmark = [pytest.mark.unit]
 
 

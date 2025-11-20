@@ -64,3 +64,9 @@ __all__ = (
 
 def __dir__() -> list[str]:
     return list(__all__)
+
+
+if __name__ == "__main__":
+    from codeweaver.cli.__main__ import main
+
+    main()

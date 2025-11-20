@@ -127,7 +127,7 @@ def decide_fastembed_runtime(
             from warnings import warn
 
             warn(
-                f"It looks like you requested GPU usage for Fastembed, but cuda is not available. Make sure to provide your device_ids in your CodeWeaver settings if you have GPUs available, installed the `codeweaver[provider-fastembed-gpu]` extra, and followed Fastembed's [gpu setup instructions](https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/). Our checks returned this message: {decision[2]}",
+                f"It looks like you requested GPU usage for Fastembed, but cuda is not available. Make sure to provide your device_ids in your CodeWeaver settings if you have GPUs available, installed the `codeweaver[fastembed-gpu]` extra, and followed Fastembed's [gpu setup instructions](https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/). Our checks returned this message: {decision[2]}",
                 stacklevel=2,
             )
             return "cpu"

@@ -271,9 +271,9 @@ def _list_embedding_models(
         display.console.print(table)
 
     except ImportError as e:
-        display.print_warning(f"Cannot list models for {provider.value}: {e}")
+        display.print_warning(f"Cannot list models for {provider.variable.replace('_', '-')}: {e}")
         display.print_info(
-            f"Install provider dependencies: pip install 'codeweaver[provider-{provider.value}]'"
+            f"Install provider dependencies: pip install 'codeweaver[{provider.variable.replace('_', '-')}']"
         )
 
 
@@ -304,7 +304,7 @@ def _list_reranking_models(
     except ImportError as e:
         display.print_warning(f"Cannot list models for {provider.value}: {e}")
         display.print_info(
-            f"Install provider dependencies: pip install 'codeweaver[provider-{provider.variable}]'"
+            f"Install provider dependencies: pip install 'codeweaver[{provider.variable.replace('_', '-')}']"
         )
 
 
@@ -333,7 +333,7 @@ def _list_sparse_embedding_models(
     except ImportError as e:
         display.print_warning(f"Cannot list models for {provider.value}: {e}")
         display.print_info(
-            f"Install provider dependencies: pip install 'codeweaver[provider-{provider.value}]'"
+            f"Install provider dependencies: pip install 'codeweaver[{provider.variable.replace('_', '-')}']'"
         )
 
 

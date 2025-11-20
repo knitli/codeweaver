@@ -14,6 +14,7 @@ import pytest
 from codeweaver.core.stores import get_blake_hash
 from codeweaver.engine.indexer.manifest import IndexFileManifest
 
+
 pytestmark = [pytest.mark.unit]
 
 

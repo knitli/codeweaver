@@ -16,6 +16,7 @@ import pytest
 from codeweaver.engine.failover import VectorStoreFailoverManager
 from codeweaver.providers.vector_stores.base import CircuitBreakerState
 
+
 pytestmark = [pytest.mark.unit]
 
 

@@ -150,7 +150,7 @@ class DataclassSerializationMixin:
                 computed_field_names := type(self).__pydantic_decorators__.computed_fields.keys()  # type: ignore
             ):
                 # Add computed fields to the fields dict (keys only, values don't matter for iteration)
-                fields = {**fields, **{k: None for k in computed_field_names}}  # type: ignore
+                fields = {**fields, **dict.fromkeys(computed_field_names)}  # type: ignore
             for field in cast(dict[str, Any], self.__pydantic_fields__):  # type: ignore
                 if (attr := getattr(self, field, None)) and hasattr(attr, "serialize_for_cli"):
                     self_map[field] = attr.serialize_for_cli()

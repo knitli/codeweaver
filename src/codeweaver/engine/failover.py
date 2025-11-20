@@ -144,7 +144,7 @@ class VectorStoreFailoverManager(BasedModel):
 
         # Initialize chunk indexes
         await self._build_chunk_indexes()
-        
+
         # Initialize _last_indexed_count to current state to avoid skipping first sync
         if indexer and indexer.stats:
             self._last_indexed_count = indexer.stats.chunks_indexed
@@ -490,7 +490,7 @@ class VectorStoreFailoverManager(BasedModel):
         # Reuse cached estimate if it's less than 5 minutes old AND chunk count hasn't changed significantly
         stats = self._indexer.stats if self._indexer else None
         current_chunks = stats.chunks_indexed if stats else 0
-        
+
         cache_valid = (
             self._cached_memory_estimate is not None
             and self._estimate_cache_time is not None

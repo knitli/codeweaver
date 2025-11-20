@@ -609,11 +609,13 @@ def __setup_interim_logger(
             ),
             level,
         )
-    # No console output - just set up basic logging
+    # No console output - just set up basic logging without any handlers
     logger = logging.getLogger("codeweaver")
     logger.setLevel(level)
     # Clear any existing handlers
     logger.handlers.clear()
+    # Disable propagation to root logger to prevent output leakage
+    logger.propagate = False
     return (logger, level)
 
 
