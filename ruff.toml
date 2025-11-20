@@ -248,6 +248,9 @@ convention = "google"
 "src/codeweaver/engine/indexer/indexer.py" = [
   "C901",  # too complex - indexing orchestration is inherently complex
 ]
+"src/codeweaver/engine/resource_estimation.py" = [
+  "C901",  # too complex - file counting has many edge cases and depth handling
+]
 # Server components have complex lifecycle and health check logic
 "src/codeweaver/server/health_service.py" = [
   "C901",  # too complex - health checks have many conditions

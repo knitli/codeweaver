@@ -298,7 +298,6 @@ build-backend = "hatchling.build"
 
 [tool.coverage.run]
 omit = ["scripts/*", "mise-tasks/*", "typings/*", ".venv/*"]
-include = ["src/codeweaver/*", "tests/*"]
 
 [tool.hatch.build.hooks.version]
 additionalProperties = true
