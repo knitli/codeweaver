@@ -404,8 +404,8 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             # query_points returns QueryResponse with .points attribute
             return response.points if hasattr(response, "points") else response
 
-        # Dense-only search uses search API (returns list directly)
-        return await self._client.search(
+        # Dense-only search uses query_points API (consistent with sparse and hybrid)
+        response = await self._client.query_points(
             **vector.to_query(
                 kwargs={
                     "collection_name": collection_name,
@@ -417,6 +417,8 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                 }
             )  # type: ignore
         )
+        # query_points returns QueryResponse with .points attribute
+        return response.points if hasattr(response, "points") else response
 
     def _normalize_vector_input(
         self, vector: StrategizedQuery | MixedQueryInput

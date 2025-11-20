@@ -404,7 +404,7 @@ class StrategizedQuery(NamedTuple):
         """Convert to a query dict based on available embeddings.
 
         For sparse-only queries, returns query_points parameters.
-        For dense-only queries, returns search parameters.
+        For dense-only queries, returns query_points parameters.
         For hybrid queries, delegates to to_hybrid_query.
         """
         from codeweaver.exceptions import QueryError
@@ -425,13 +425,12 @@ class StrategizedQuery(NamedTuple):
             )
         if self.is_hybrid():
             return self.to_hybrid_query({}, kwargs)
-        from qdrant_client.http.models import NamedVector, SparseVector
+        from qdrant_client.http.models import SparseVector
 
         if self.has_dense():
-            # Dense-only: Use NamedVector for search API
+            # Dense-only: Use query_points API with dense vector and using="dense"
             assert self.dense is not None  # noqa: S101
-            dense_vector = NamedVector(name="dense", vector=list(self.dense))
-            return {"query_vector": dense_vector, **kwargs}
+            return {"query": list(self.dense), "using": "dense", **kwargs}
 
         # Sparse-only: Use SparseVector with query_points API
         assert self.sparse is not None  # noqa: S101
