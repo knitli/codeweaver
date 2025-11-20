@@ -23,6 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
     strategy:
       matrix:
         python-version:
