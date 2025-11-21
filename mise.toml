@@ -68,9 +68,6 @@ _.path = [
 [hooks.enter]
 script = "mise run enter"
 
-# NOTE: Between here and the `scripts` directory, our tasks are getting a bit crowded.
-# TODO: We should combine the scripts/ and these tasks into the `mise-tasks` directory as standalone scripts.
-
 [tasks]
 [tasks.enter]
 shell = "zsh -c"

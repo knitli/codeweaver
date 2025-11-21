@@ -515,7 +515,7 @@ def generate_capabilities_file(models: list[SimplifiedModelMeta], model_maker: M
     header = [
         "# THIS FILE IS AUTO-GENERATED - DO NOT EDIT MANUALLY. The `mteb_to_codeweaver.py` script is used to generate this file.",
         f'"""Capabilities for {model_maker} embedding models."""',
-        "# SPDX-FileCopyrightText: 2025 (c) 2025 Knitli Inc.",
+        "# SPDX-FileCopyrightText: 2025 Knitli Inc.",
         "# SPDX-License-Identifier: MIT OR Apache-2.0",
         "# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>",
         # REUSE-IgnoreEnd

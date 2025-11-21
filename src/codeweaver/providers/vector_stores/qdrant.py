@@ -68,7 +68,7 @@ class QdrantVectorStoreProvider(QdrantBaseProvider):
 
         # Check if API key is required for cloud instances
         is_cloud_url = (
-            url and isinstance(url, str) and urlparse(url).hostname.endswith("cloud.qdrant.io")
+            url and isinstance(url, str) and urlparse(url).hostname.endswith(".cloud.qdrant.io")
         )
         if is_cloud_url and not api_key:
             raise ProviderError(
