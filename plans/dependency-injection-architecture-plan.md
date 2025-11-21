@@ -9,7 +9,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 **Status**: Planning / Analysis  
 **Created**: 2025-10-31  
-**Target**: v0.2 or v0.3 release
+**Target**: 2nd or 3rd alpha feature release
 
 ## Executive Summary
 
