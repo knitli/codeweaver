@@ -444,7 +444,7 @@ class Indexer(BasedModel):
                     "  - Authentication credentials are valid\n"
                 )
             else:
-                logger.exception("Could not initialize vector store with failover")
+                logger.exception("Could not initialize vector store.")
 
             self._vector_store = None
             self._failover_manager = None

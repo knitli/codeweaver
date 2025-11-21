@@ -49,13 +49,29 @@ class QdrantVectorStoreProvider(QdrantBaseProvider):
     async def _build_client(self) -> AsyncQdrantClient:
         """Build Qdrant client based on configuration."""
         url = self.config.get("url", "http://localhost:6333")
-        if api_key := self.config.get("api_key") or self.config.get("client_options", {}).get(
-            "api_key"
-        ):
-            api_key = api_key.get_secret_value() if isinstance(api_key, SecretStr) else api_key
+        api_key = None
+
+        # DEBUG: Print self.config state
+        print(f"[DEBUG _build_client] self.config type: {type(self.config)}")
+        print(f"[DEBUG _build_client] self.config keys: {list(self.config.keys()) if self.config else 'None'}")
+        print(f"[DEBUG _build_client] url from self.config: {url}")
+
+        # Try to get API key from config first
+        if config_api_key := self.config.get("api_key") or self.config.get("client_options", {}).get("api_key"):
+            api_key = config_api_key.get_secret_value() if isinstance(config_api_key, SecretStr) else config_api_key
+            print(f"[DEBUG _build_client] Got api_key from config: {api_key[:8]}..." if api_key else "[DEBUG _build_client] api_key from config is empty")
+
+        # Fall back to environment variable if not in config
+        if not api_key:
+            print(f"[DEBUG _build_client] self._provider = {self._provider}, type = {type(self._provider)}")
+            print(f"[DEBUG _build_client] Provider.QDRANT = {Provider.QDRANT}")
+            print(f"[DEBUG _build_client] api_key_env_vars = {self._provider.api_key_env_vars if hasattr(self._provider, 'api_key_env_vars') else 'N/A'}")
+            api_key = self._provider.get_env_api_key()
+            print(f"[DEBUG _build_client] Got api_key from env: {api_key[:8]}..." if api_key else "[DEBUG _build_client] api_key from env is None")
 
         # Build client kwargs based on connection type
         client_kwargs: dict[str, Any] = {"url": url, "api_key": api_key}
+        print(f"[DEBUG _build_client] Final client_kwargs: url={url}, api_key={'set' if api_key else 'None'}")
 
         client = AsyncQdrantClient(**client_kwargs)
         # Store client before calling _ensure_collection (which needs self._client)

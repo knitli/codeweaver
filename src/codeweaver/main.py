@@ -223,7 +223,7 @@ async def run(
 
 
 if __name__ == "__main__":
-    from codeweaver.common.utils.utils import asyncio_or_uvloop
+    from codeweaver.common.utils.proc import asyncio_or_uvloop
 
     asyncio = asyncio_or_uvloop()
     try:

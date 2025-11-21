@@ -17,6 +17,10 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
 
+import rignore
+
+from pydantic import NonNegativeFloat, NonNegativeInt
+
 
 if TYPE_CHECKING:
     from codeweaver.engine.indexer.indexer import IndexingStats
@@ -26,51 +30,72 @@ logger = logging.getLogger(__name__)
 # Cache for file count estimates (path -> (count, timestamp))
 # Using a bounded cache with LRU-like behavior to prevent unbounded growth
 _file_count_cache: dict[Path, tuple[int, datetime]] = {}
-_CACHE_EXPIRY = timedelta(minutes=10)  # Cache file counts for 10 minutes
+_CACHE_EXPIRY = timedelta(minutes=20)  # Cache file counts for 20 minutes
 _MAX_CACHE_SIZE = 100  # Maximum number of paths to cache
 
 
 class MemoryEstimate(NamedTuple):
     """Memory estimation result for backup activation."""
 
-    estimated_bytes: int
+    estimated_bytes: NonNegativeInt
     """Estimated memory required in bytes"""
 
-    available_bytes: int
+    available_bytes: NonNegativeInt
     """Available system memory in bytes"""
 
-    required_bytes: int
+    required_bytes: NonNegativeInt
     """Required memory with safety buffer in bytes"""
 
     is_safe: bool
     """Whether it's safe to activate backup"""
 
-    estimated_chunks: int
+    estimated_chunks: NonNegativeInt
     """Estimated number of chunks"""
 
     zone: str
     """Memory zone: 'green', 'yellow', or 'red'"""
 
     @property
-    def estimated_gb(self) -> float:
+    def estimated_gb(self) -> NonNegativeFloat:
         """Estimated memory in GB."""
         return self.estimated_bytes / 1e9
 
     @property
-    def available_gb(self) -> float:
+    def available_gb(self) -> NonNegativeFloat:
         """Available memory in GB."""
         return self.available_bytes / 1e9
 
     @property
-    def required_gb(self) -> float:
+    def required_gb(self) -> NonNegativeFloat:
         """Required memory in GB."""
         return self.required_bytes / 1e9
 
 
-def estimate_file_count(project_path: Path, max_depth: int = 5) -> int:
+_walker: rignore.Walker | None = None
+
+
+def get_walker() -> rignore.Walker:
+    """Get a singleton rignore.Walker instance."""
+    global _walker_instance
+    if _walker_instance is None:
+        from codeweaver.config.indexer import DefaultIndexerSettings
+        from codeweaver.config.settings import get_settings
+        from codeweaver.core.types import Unset
+
+        settings = get_settings()
+        index_settings = (
+            DefaultIndexerSettings if isinstance(settings.indexer, Unset) else settings.indexer
+        )
+        import rignore
+
+        _walker_instance = rignore.Walker(**index_settings.to_settings())
+    return _walker_instance
+
+
+def estimate_file_count(project_path: Path | None = None) -> NonNegativeInt:
     """Quickly estimate the number of indexable files in a project.
 
-    OPTIMIZATION: Caches results for 10 minutes to avoid repeated file system scans.
+    OPTIMIZATION: Caches results to avoid repeated file system scans.
 
     Args:
         project_path: Root path of the project
@@ -79,6 +104,27 @@ def estimate_file_count(project_path: Path, max_depth: int = 5) -> int:
     Returns:
         Estimated file count
     """
+    if project_path is None:
+        from codeweaver.common.utils.git import get_project_path
+        from codeweaver.config.settings import get_settings
+        from codeweaver.core.types import Unset
+
+        settings = get_settings()
+        project_path = (
+            get_project_path()
+            if isinstance(settings.project_path, Unset)
+            else settings.project_path
+        )
+
+    from codeweaver.common.statistics import get_statistics
+
+    if (
+        (statistics := get_statistics())
+        and (index_stats := statistics.index_statistics)
+        and (file_count := index_stats.total_file_count) > 0
+    ):
+        logger.debug("Using indexing statistics for file count: %d files", file_count)
+        return file_count
     # Check cache first
     now = datetime.now(UTC)
     if project_path in _file_count_cache:
@@ -92,41 +138,15 @@ def estimate_file_count(project_path: Path, max_depth: int = 5) -> int:
             )
             return cached_count
 
-    try:
-        # Check if path exists
-        if not project_path.exists():
-            logger.warning("Project path does not exist: %s", project_path)
-            return 1000  # Conservative default
-
-        # Quick estimation by sampling directories
-        total_files = 0
-        scanned_dirs = 0
-        max_scan = 100  # Scan at most 100 directories
-
-        for item in project_path.rglob("*"):
-            if scanned_dirs >= max_scan:
-                break
-
-            if item.is_file():
-                total_files += 1
-            elif item.is_dir():
-                scanned_dirs += 1
-
-        # Extrapolate if we hit the scan limit
-        if scanned_dirs >= max_scan:
-            # Conservative multiplier
-            total_files = int(total_files * 1.5)
-
-        # If we found very few files, return at least default
-        result = 1000 if total_files < 10 else total_files
-
         # Evict oldest entries if cache is full
         if len(_file_count_cache) >= _MAX_CACHE_SIZE:
             # Remove the oldest entry
             oldest_path = min(_file_count_cache.items(), key=lambda x: x[1][1])[0]
             del _file_count_cache[oldest_path]
             logger.debug("Evicted oldest cache entry for %s", oldest_path)
-
+    try:
+        walker = get_walker()
+        result = sum(bool(p and p.is_file()) for p in walker.walk())
         # Cache the result
         _file_count_cache[project_path] = (result, now)
         logger.debug("Cached file count estimate for %s: %d files", project_path, result)
@@ -143,6 +163,13 @@ def estimate_file_count(project_path: Path, max_depth: int = 5) -> int:
     return result
 
 
+def _get_backup_profile():
+    """Get the backup configuration profile."""
+    from codeweaver.config.profiles import get_profile
+
+    return get_profile("backup", "local")
+
+
 def estimate_backup_memory_requirements(
     project_path: Path | None = None, stats: IndexingStats | None = None
 ) -> MemoryEstimate:
@@ -152,18 +179,20 @@ def estimate_backup_memory_requirements(
     chunks that will be stored in the backup. It uses either provided
     indexing statistics or performs a quick file scan to estimate.
 
+    The current backup profile uses an in-memory Qdrant vector store,
+    with very lightweight models for embeddings. Dense embeddings are quantized to uint8, and sparse to float16.
+
     Memory estimation:
-    - Per-chunk overhead: ~5KB (text content + embeddings + metadata)
-    - Dense embedding: 768 dimensions x 4 bytes = 3,072 bytes
-    - Sparse embedding: ~1KB average
-    - Text content: ~500 bytes average
-    - Metadata: ~500 bytes
-    - Total per chunk: ~5KB
+    - Chunks on backup models are about 450 tokens each, or ~2KB of text.
+    - Per-chunk overhead: add 1KB for metadata and indexing overhead.
+    - Dense embedding: 384 dimensions x 1 byte = ~384 bytes
+    - Sparse embedding: ~100 non-zero dimensions x 2 bytes = ~200... let's call it 300 bytes
+    - Total per-chunk: ~4KB rounded up from 3.5KB because 🤷‍♂️
 
     Safety zones:
-    - Green (<100K chunks, ~500MB): Always safe
-    - Yellow (100K-500K chunks, 500MB-2.5GB): Check available memory
-    - Red (>500K chunks, >2.5GB): Warn user, require confirmation
+    - Green (<125K chunks, ~500MB): Always safe
+    - Yellow (125K-625K chunks, ~500MB-2.5GB): Check available memory
+    - Red (>625K chunks, >2.5GB): Warn user, require confirmation
 
     Args:
         project_path: Path to the project (for file count estimation)
@@ -176,6 +205,19 @@ def estimate_backup_memory_requirements(
         import psutil
     except ImportError:
         logger.warning("psutil not available, cannot estimate memory")
+        # we'll estimate by file count
+        from codeweaver.config.indexer import DefaultIndexerSettings
+        from codeweaver.config.settings import get_settings
+        from codeweaver.core.types import Unset
+
+        settings = get_settings()
+        index_settings = (
+            DefaultIndexerSettings if isinstance(settings.indexer, Unset) else settings.indexer
+        )
+        import rignore
+
+        walker = rignore.Walker(**index_settings.to_settings())
+        file_count = len([p for p in walker if p and p.is_file()])
         # Return safe default to avoid blocking
         return MemoryEstimate(
             estimated_bytes=500_000_000,  # 500MB

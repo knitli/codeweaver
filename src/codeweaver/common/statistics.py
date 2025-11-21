@@ -655,6 +655,18 @@ class FileStatistics(DataclassSerializationMixin):
                 language_name, operation, discovered_file.path
             )
 
+    @computed_field
+    @property
+    def file_count_by_category(self) -> dict[ChunkKind, NonNegativeInt]:
+        """Get the file count by category."""
+        return {category: cat_stats.unique_count for category, cat_stats in self.categories.items()}
+
+    @computed_field
+    @property
+    def total_file_count(self) -> NonNegativeInt:
+        """Get the total file count across all categories."""
+        return sum(self.file_count_by_category.values())
+
     def add_chunk_from_codechunk(
         self,
         chunk: CodeChunk,  # type: ignore[name-defined]

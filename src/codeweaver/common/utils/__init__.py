@@ -36,6 +36,7 @@ if TYPE_CHECKING:
         try_git_rev_parse,
     )
     from codeweaver.common.utils.normalize import normalize_ext, sanitize_unicode
+    from codeweaver.common.utils.proc import asyncio_or_uvloop
     from codeweaver.common.utils.textify import (
         format_docstring,
         format_signature,
@@ -45,8 +46,10 @@ if TYPE_CHECKING:
         to_tokens,
     )
     from codeweaver.common.utils.utils import (
+        backup_file_path,
         ensure_iterable,
         estimate_tokens,
+        generate_collection_name,
         get_possible_env_vars,
         get_user_config_dir,
         rpartial,
@@ -54,12 +57,15 @@ if TYPE_CHECKING:
     )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "asyncio_or_uvloop": (__spec__.parent, "proc"),
+    "backup_file_path": (__spec__.parent, "utils"),
     "ensure_iterable": (__spec__.parent, "utils"),
     "estimate_tokens": (__spec__.parent, "utils"),
     "file_is_binary": (__spec__.parent, "checks"),
     "format_docstring": (__spec__.parent, "textify"),
     "format_signature": (__spec__.parent, "textify"),
     "format_snippet_name": (__spec__.parent, "textify"),
+    "generate_collection_name": (__spec__.parent, "utils"),
     "get_git_branch": (__spec__.parent, "git"),
     "get_git_revision": (__spec__.parent, "git"),
     "get_possible_env_vars": (__spec__.parent, "utils"),
@@ -90,6 +96,8 @@ __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
     "LazyImport",
+    "asyncio_or_uvloop",
+    "backup_file_path",
     "create_lazy_getattr",
     "ensure_iterable",
     "estimate_tokens",
@@ -97,6 +105,7 @@ __all__ = (
     "format_docstring",
     "format_signature",
     "format_snippet_name",
+    "generate_collection_name",
     "get_git_branch",
     "get_git_revision",
     "get_possible_env_vars",

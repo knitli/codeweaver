@@ -747,13 +747,20 @@ class ProviderRegistry(BasedModel):
                     # Merge options, with provider_settings taking precedence
                     # But exclude provider-specific settings that aren't client parameters
                     qdrant_client_settings = {
-                        k: v
+                        k: v.get_secret_value() if isinstance(v, SecretStr) else v
                         for k, v in (provider_settings or {}).items()
                         if k not in ("collection_name", "provider")
                     }
                     merged_opts = (client_options or {}) | qdrant_client_settings
                     # Also remove collection_name from client_options if present
                     merged_opts = {k: v for k, v in merged_opts.items() if k != "collection_name"}
+
+                    # Fall back to environment variable for API key if not in config
+                    if not merged_opts.get("api_key") and (
+                        env_api_key := provider.get_env_api_key()
+                    ):
+                        merged_opts["api_key"] = env_api_key
+
                     if merged_opts.get("url") and urlparse(merged_opts["url"]).netloc.endswith(
                         "qdrant.io"
                     ):
@@ -1457,7 +1464,19 @@ class ProviderRegistry(BasedModel):
         kwargs: dict[str, Any] = {}
 
         if provider_settings := config.get("provider_settings"):
-            kwargs["config"] = provider_settings
+            # Start with provider_settings (QdrantConfig/MemoryConfig)
+            merged_config = dict(provider_settings)
+
+            # Merge in root-level api_key if not already in provider_settings
+            if config.get("api_key") and not merged_config.get("api_key"):
+                merged_config["api_key"] = config["api_key"]
+
+            # Merge in root-level client_options
+            if root_client_options := config.get("client_options"):
+                existing_client_options = merged_config.get("client_options", {})
+                merged_config["client_options"] = root_client_options | existing_client_options
+
+            kwargs["config"] = merged_config
 
         # User kwargs override
         kwargs |= user_kwargs

@@ -15,7 +15,6 @@ import os
 import sys
 
 from collections.abc import Callable, Iterable
-from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -168,27 +167,6 @@ def get_user_config_dir(*, base_only: bool = False) -> Path:
     return config_dir if base_only else config_dir / "codeweaver"
 
 
-@cache
-def asyncio_or_uvloop() -> object:
-    """Set uvloop as the event loop policy if available and appropriate."""
-    import platform
-    import sys
-
-    from importlib.util import find_spec
-
-    if (
-        sys.platform not in {"win32", "cygwin", "wasi", "ios"}
-        and platform.python_implementation() == "CPython"
-        and find_spec("uvloop") is not None
-    ):
-        import uvloop
-
-        return uvloop
-    import asyncio
-
-    return asyncio
-
-
 def _try_for_settings() -> DictView[CodeWeaverSettingsDict] | None:
     """Try to import and return the settings map if available."""
     with contextlib.suppress(Exception):
@@ -244,8 +222,10 @@ def generate_collection_name(
 
 
 __all__ = (
+    "backup_file_path",
     "ensure_iterable",
     "estimate_tokens",
+    "generate_collection_name",
     "get_possible_env_vars",
     "get_user_config_dir",
     "rpartial",

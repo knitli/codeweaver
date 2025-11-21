@@ -482,6 +482,14 @@ class Provider(BaseEnum):
 
         return ProviderKind.RERANKING in get_provider_kinds(cast(LiteralProvider, self))
 
+    def get_env_api_key(self) -> str | None:
+        """Get the API key from environment variables, if set."""
+        if env_vars := self.api_key_env_vars:
+            for env_var in env_vars:
+                if api_key := os.getenv(env_var):
+                    return api_key
+        return None
+
     @property
     def has_env_auth(self) -> bool:
         """Check if API key or TLS certs are set for the provider."""

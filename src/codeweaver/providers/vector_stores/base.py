@@ -93,20 +93,48 @@ def _get_caps(
         Embedding capabilities or None.
     """
     from codeweaver.common.registry import get_model_registry
+    from codeweaver.core.types import Unset
 
     registry = get_model_registry()
     if backup:
         from codeweaver.config.profiles import get_profile
 
         profile = get_profile("backup", "local")
-        if sparse_model := registry.get_embedding_capabilities(
-            provider=profile["sparse_embedding"][0]["provider"],
-            name=profile["sparse_embedding"][0]["model_settings"]["model"],
+        if not profile:
+            return None
+        if (
+            sparse
+            and (sparse_profile := profile["sparse_embedding"])
+            and (
+                sparse_settings := sparse_profile[0]
+                if isinstance(sparse_profile, tuple) and len(sparse_profile) > 0
+                else None
+                if isinstance(sparse_profile, Unset)
+                else sparse_profile
+            )
+            and (
+                sparse_model := registry.get_embedding_capabilities(
+                    provider=sparse_settings["provider"],
+                    name=sparse_settings["model_settings"]["model"],
+                )
+            )
         ):  # type: ignore
             return sparse_model  # type: ignore
-        if dense_model := registry.get_embedding_capabilities(
-            provider=profile["embedding"][0]["provider"],
-            name=profile["embedding"][0]["model_settings"]["model"],
+        if (
+            (dense_profile := profile["embedding"])
+            and (
+                dense_settings := dense_profile[0]
+                if isinstance(dense_profile, tuple) and len(dense_profile) > 0
+                else None
+                if isinstance(dense_profile, Unset)
+                else dense_profile
+            )
+            and (
+                dense_model := registry.get_embedding_capabilities(
+                    provider=dense_settings["provider"],
+                    name=dense_settings["model_settings"]["model"],
+                )
+            )
         ):  # type: ignore
             return dense_model  # type: ignore
     if sparse and (sparse_settings := registry.configured_models_for_kind(kind="sparse_embedding")):

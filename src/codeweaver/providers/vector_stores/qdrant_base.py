@@ -189,14 +189,18 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
 
     async def _initialize(self) -> None:
         """Initialize the Qdrant provider with configurations."""
-        # Use explicitly provided config if available, otherwise fetch from registry
-        if self.config is not None:
-            # Config was provided (e.g., in tests) - use it directly
-            qdrant_config = self.config
-        else:
-            # No config provided - fetch from global registry (production path)
-            config = self._fetch_config()
-            qdrant_config = config["provider_settings"]
+        # Always fetch from registry to get the full configuration
+        # The registry merges env vars and config files properly
+        config = self._fetch_config()
+        qdrant_config = config["provider_settings"]
+
+        # DEBUG: Print what we got from registry
+        print(f"[DEBUG _initialize] qdrant_config keys: {list(qdrant_config.keys()) if qdrant_config else 'None'}")
+        print(f"[DEBUG _initialize] url from config: {qdrant_config.get('url')}")
+        print(f"[DEBUG _initialize] api_key in config: {'yes' if qdrant_config.get('api_key') else 'no'}")
+
+        # Update self.config so _build_client can use it
+        object.__setattr__(self, "config", qdrant_config)
         collection_name = qdrant_config.get("collection_name") or self._default_collection_name()
         base_url = qdrant_config.get("url") if self._provider == Provider.QDRANT else ":memory:"
         object.__setattr__(self, "_collection", collection_name)

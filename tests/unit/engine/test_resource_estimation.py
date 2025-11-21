@@ -15,7 +15,6 @@ import pytest
 from codeweaver.engine.resource_estimation import (
     MemoryEstimate,
     estimate_backup_memory_requirements,
-    estimate_file_count,
 )
 
 
@@ -28,32 +27,6 @@ class MockIndexingStats:
     def __init__(self, chunks_created: int = 0, files_discovered: int = 0):
         self.chunks_created = chunks_created
         self.files_discovered = files_discovered
-
-
-class TestEstimateFileCount:
-    """Tests for estimate_file_count function."""
-
-    def test_estimates_file_count_in_directory(self, tmp_path: Path):
-        """Test file count estimation on a real directory."""
-        # Create some test files
-        (tmp_path / "file1.py").touch()
-        (tmp_path / "file2.py").touch()
-        subdir = tmp_path / "subdir"
-        subdir.mkdir()
-        (subdir / "file3.py").touch()
-
-        count = estimate_file_count(tmp_path)
-        assert count >= 3  # At least the 3 files we created
-
-    def test_handles_empty_directory(self, tmp_path: Path):
-        """Test estimation on empty directory."""
-        count = estimate_file_count(tmp_path)
-        assert count >= 0
-
-    def test_handles_missing_directory(self):
-        """Test estimation on non-existent directory."""
-        count = estimate_file_count(Path("/nonexistent/directory"))
-        assert count == 1000  # Default fallback
 
 
 class TestEstimateBackupMemoryRequirements:

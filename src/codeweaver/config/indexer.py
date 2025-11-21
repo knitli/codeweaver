@@ -16,9 +16,19 @@ import logging
 import re
 
 from collections.abc import Callable
-from functools import partial
+from functools import cached_property, partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, NotRequired, TypedDict, cast
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Literal,
+    NamedTuple,
+    NotRequired,
+    TypedDict,
+    cast,
+    overload,
+)
 
 from fastmcp.server.middleware import MiddlewareContext
 from pydantic import DirectoryPath, Field, FilePath, PrivateAttr, computed_field
@@ -30,6 +40,8 @@ from codeweaver.core.types.sentinel import UNSET, Unset
 
 if TYPE_CHECKING:
     from codeweaver.config.settings import CodeWeaverSettings
+    from codeweaver.config.types import CodeWeaverSettingsDict
+    from codeweaver.core.types import DictView
     from codeweaver.core.types.aliases import FilteredKeyT
     from codeweaver.core.types.enum import AnonymityConversion
 
@@ -81,8 +93,18 @@ class IndexerSettingsDict(TypedDict, total=False):
     only_index_on_command: NotRequired[bool]
 
 
-def _get_settings() -> CodeWeaverSettings | None:
+@overload
+def get_settings_map(*, view: Literal[False]) -> CodeWeaverSettings | None: ...
+@overload
+def get_settings_map(*, view: Literal[True]) -> DictView[CodeWeaverSettingsDict] | None: ...
+def _get_settings(
+    *, view: bool = False
+) -> CodeWeaverSettings | DictView[CodeWeaverSettingsDict] | None:
     """Get the current CodeWeaver settings."""
+    if view:
+        from codeweaver.config.settings import get_settings_map
+
+        return get_settings_map()
     from codeweaver.config.settings import get_settings
 
     return get_settings()
@@ -229,7 +251,7 @@ class IndexerSettings(BasedModel):
         Field(
             description="""Whether to read *other* ignore files (besides .gitignore) for filtering"""
         ),
-    ] = False
+    ] = True
     ignore_hidden: Annotated[
         bool,
         Field(description="""Whether to ignore hidden files (starting with .) for filtering"""),
@@ -280,7 +302,7 @@ class IndexerSettings(BasedModel):
         """Post-initialization processing."""
         self._inc_exc_set = False
         if self.include_github_dir:
-            self.forced_includes |= {"**/.github/**"}
+            self.forced_includes |= {"**/.github/**", "**/.circleci/**"}
         if self.include_tooling_dirs:
             from codeweaver.core.file_extensions import (
                 COMMON_LLM_TOOLING_PATHS,
@@ -376,13 +398,13 @@ class IndexerSettings(BasedModel):
         ) | ({} if isinstance(self.rignore_options, Unset) else self.rignore_options)
         if project_path is None:
             # Try to get from global settings without triggering recursion
-            _settings = _get_settings()
+            _settings = _get_settings(view=True)
             if (
                 _settings is not None
-                and hasattr(_settings, "project_path")
-                and not isinstance(_settings.project_path, Unset)
+                and _settings["project_path"]
+                and not isinstance(_settings["project_path"], Unset)
             ):
-                project_path = _settings.project_path
+                project_path = _settings["project_path"]
             else:
                 # Fallback to our method for trying to identify it directly
                 # this finds the git root or uses the current working directory as a last resort
@@ -396,15 +418,37 @@ class IndexerSettings(BasedModel):
         rignore_settings["read_ignore_files"] = self.use_other_ignore_files
         rignore_settings["read_git_ignore"] = self.use_gitignore
         rignore_settings["additional_ignore_paths"] = [
-            str(p) for p in self.excludes if not any(char for char in ("*?[]") if char in str(p))
+            stringed_path
+            for p in self.excludes
+            if (stringed_path := str(p)) not in self.forced_includes
         ]
         rignore_settings["additional_ignores"] = [
-            str(p)
+            stringed_path
             for p in self.excludes
-            if str(p) not in cast(list[str], rignore_settings["additional_ignore_paths"])
+            if (stringed_path := str(p))
+            not in cast(list[str], rignore_settings["additional_ignore_paths"])
         ]
         rignore_settings["should_exclude_entry"] = self.filter
         return RignoreSettings(rignore_settings)
+
+    @cached_property
+    def hidden_tool_paths(self) -> set[Path]:
+        """Get common hidden tooling paths to consider for forced-includes."""
+        from codeweaver.core.file_extensions import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
+
+        return {
+            path
+            for tool in COMMON_TOOLING_PATHS
+            for path in tool[1]
+            if (str(path).startswith(".") or path.name.startswith("."))
+            and ("." not in path.name[1:] or "." not in path.parts[0][1:])
+        } | {
+            path
+            for tool in COMMON_LLM_TOOLING_PATHS
+            for path in tool[1]
+            if (str(path).startswith(".") or path.name.startswith("."))
+            and ("." not in path.name[1:] or "." not in path.parts[0][1:])
+        }
 
     def construct_filter(self) -> Callable[[Path], bool]:
         """Constructs the filter function for rignore's `should_exclude_entry` parameter.
@@ -429,34 +473,10 @@ class IndexerSettings(BasedModel):
                     path_obj.match("**/.github/**") or path_obj.match("**/.circleci/**")
                 ):
                     return False  # Don't exclude - force include this path
-                if settings.include_tooling_dirs:
-                    from codeweaver.core.file_extensions import (
-                        COMMON_LLM_TOOLING_PATHS,
-                        COMMON_TOOLING_PATHS,
-                    )
-
-                    # Check if path matches any tooling directory patterns
-                    if {
-                        p
-                        for p in {
-                            path
-                            for tool in COMMON_TOOLING_PATHS
-                            for path in tool[1]
-                            if path_obj.match(f"**/{path}/**")
-                        }
-                        | {
-                            path
-                            for tool in COMMON_LLM_TOOLING_PATHS
-                            for path in tool[1]
-                            if path_obj.match(f"**/{path}/**")
-                        }
-                        if p
-                        and (
-                            (str(p).startswith(".") or p.name.startswith("."))
-                            and ("." not in p.name[1:] or "." not in p.parts[0][1:])
-                        )
-                    }:
-                        return False  # Don't exclude - force include this tooling path
+                if settings.include_tooling_dirs and any(
+                    path_obj.match(f"**/{tool}/**") for tool in settings.hidden_tool_paths
+                ):
+                    return False  # Don't exclude - force include this tooling path
                 # For all other paths, let rignore's natural filtering apply
                 # Don't exclude them here
                 return False
