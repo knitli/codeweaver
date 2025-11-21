@@ -51,27 +51,25 @@ class QdrantVectorStoreProvider(QdrantBaseProvider):
         url = self.config.get("url", "http://localhost:6333")
         api_key = None
 
-        # DEBUG: Print self.config state
-        print(f"[DEBUG _build_client] self.config type: {type(self.config)}")
-        print(f"[DEBUG _build_client] self.config keys: {list(self.config.keys()) if self.config else 'None'}")
-        print(f"[DEBUG _build_client] url from self.config: {url}")
-
         # Try to get API key from config first
         if config_api_key := self.config.get("api_key") or self.config.get("client_options", {}).get("api_key"):
             api_key = config_api_key.get_secret_value() if isinstance(config_api_key, SecretStr) else config_api_key
-            print(f"[DEBUG _build_client] Got api_key from config: {api_key[:8]}..." if api_key else "[DEBUG _build_client] api_key from config is empty")
 
         # Fall back to environment variable if not in config
         if not api_key:
-            print(f"[DEBUG _build_client] self._provider = {self._provider}, type = {type(self._provider)}")
-            print(f"[DEBUG _build_client] Provider.QDRANT = {Provider.QDRANT}")
-            print(f"[DEBUG _build_client] api_key_env_vars = {self._provider.api_key_env_vars if hasattr(self._provider, 'api_key_env_vars') else 'N/A'}")
             api_key = self._provider.get_env_api_key()
-            print(f"[DEBUG _build_client] Got api_key from env: {api_key[:8]}..." if api_key else "[DEBUG _build_client] api_key from env is None")
+
+        # Check if API key is required for cloud instances
+        is_cloud_url = url and isinstance(url, str) and "cloud.qdrant.io" in url
+        if is_cloud_url and not api_key:
+            raise ProviderError(
+                f"API key required for Qdrant Cloud connection to {url}. "
+                "Please set the QDRANT__SERVICE__API_KEY environment variable or "
+                "add api_key to provider_settings in your configuration file."
+            )
 
         # Build client kwargs based on connection type
         client_kwargs: dict[str, Any] = {"url": url, "api_key": api_key}
-        print(f"[DEBUG _build_client] Final client_kwargs: url={url}, api_key={'set' if api_key else 'None'}")
 
         client = AsyncQdrantClient(**client_kwargs)
         # Store client before calling _ensure_collection (which needs self._client)

@@ -194,11 +194,6 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         config = self._fetch_config()
         qdrant_config = config["provider_settings"]
 
-        # DEBUG: Print what we got from registry
-        print(f"[DEBUG _initialize] qdrant_config keys: {list(qdrant_config.keys()) if qdrant_config else 'None'}")
-        print(f"[DEBUG _initialize] url from config: {qdrant_config.get('url')}")
-        print(f"[DEBUG _initialize] api_key in config: {'yes' if qdrant_config.get('api_key') else 'no'}")
-
         # Update self.config so _build_client can use it
         object.__setattr__(self, "config", qdrant_config)
         collection_name = qdrant_config.get("collection_name") or self._default_collection_name()
