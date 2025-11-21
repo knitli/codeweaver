@@ -1,4 +1,3 @@
-# sourcery skip: no-complex-if-expressions
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -23,9 +22,33 @@ import logging
 import signal
 import time
 
-from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, ClassVar, TypedDict, cast
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Protocol, TypedDict, cast
+
+
+class ProgressCallback(Protocol):
+    """Protocol for progress callback functions.
+
+    Supports both the legacy phase-transition style and granular updates.
+    """
+
+    def __call__(
+        self,
+        phase: str,
+        current: int,
+        total: int,
+        *,
+        extra: dict[str, Any] | None = None,
+    ) -> None:
+        """Report progress update.
+
+        Args:
+            phase: Current phase (discovery, chunking, embedding, indexing)
+            current: Current progress count
+            total: Total items to process
+            extra: Optional extra data (e.g., chunks_created for chunking phase)
+        """
+        ...
 
 import rignore
 
@@ -1071,13 +1094,13 @@ class Indexer(BasedModel):
     async def _perform_batch_indexing_async(
         self,
         files_to_index: list[Path],
-        progress_callback: Callable[[IndexingStats, str | None], None] | None,
+        progress_callback: ProgressCallback | None,
     ) -> None:
         """Execute batch indexing for discovered files.
 
         Args:
             files_to_index: List of files to process
-            progress_callback: Optional progress reporting callback
+            progress_callback: Optional callback for granular progress updates
         """
         try:
             await self._index_files_batch(files_to_index, progress_callback)
@@ -1112,7 +1135,7 @@ class Indexer(BasedModel):
         self,
         *,
         force_reindex: bool = False,
-        progress_callback: Callable[[IndexingStats, str | None], None] | None = None,
+        progress_callback: ProgressCallback | None = None,
         status_display: Any | None = None,
     ) -> int:
         """Perform an initial indexing pass using the configured rignore walker.
@@ -1121,7 +1144,7 @@ class Indexer(BasedModel):
 
         Args:
             force_reindex: If True, skip persistence checks and reindex everything
-            progress_callback: Optional callback to report progress (receives stats and phase)
+            progress_callback: Optional callback for granular progress updates
             status_display: Optional StatusDisplay instance for clean user-facing output
 
         Returns:
@@ -1165,7 +1188,11 @@ class Indexer(BasedModel):
 
         # Report discovery phase complete
         if progress_callback:
-            progress_callback(self._stats, "discovery")
+            progress_callback(
+                "discovery",
+                self._stats.files_discovered,
+                self._stats.files_discovered,
+            )
 
         # Index files in batch
         await self._perform_batch_indexing_async(files_to_index, progress_callback)
@@ -1324,22 +1351,40 @@ class Indexer(BasedModel):
         return all_chunks
 
     async def _embed_chunks_in_batches(
-        self, chunks: list[CodeChunk], batch_size: int = 100
+        self,
+        chunks: list[CodeChunk],
+        batch_size: int = 100,
+        progress_callback: ProgressCallback | None = None,
     ) -> None:
         """Embed chunks in batches.
 
         Args:
             chunks: List of chunks to embed
             batch_size: Number of chunks per batch
+            progress_callback: Optional callback for progress updates
         """
-        for i in range(0, len(chunks), batch_size):
-            batch = chunks[i : i + batch_size]
-            try:
-                await self._embed_chunks(batch)
-                self._stats.chunks_embedded += len(batch)
-                logger.debug("Embedded batch %d-%d (%d chunks)", i, i + len(batch), len(batch))
-            except Exception:
-                logger.exception("Failed to embed batch %d-%d", i, i + len(batch))
+        from codeweaver.common.utils.proc import low_priority
+
+        total_chunks = len(chunks)
+
+        # Run embedding at low priority to avoid starving the system
+        with low_priority():
+            for i in range(0, len(chunks), batch_size):
+                batch = chunks[i : i + batch_size]
+                try:
+                    await self._embed_chunks(batch)
+                    self._stats.chunks_embedded += len(batch)
+                    logger.debug("Embedded batch %d-%d (%d chunks)", i, i + len(batch), len(batch))
+
+                    # Report progress after each batch
+                    if progress_callback:
+                        progress_callback(
+                            "embedding",
+                            self._stats.chunks_embedded,
+                            total_chunks,
+                        )
+                except Exception:
+                    logger.exception("Failed to embed batch %d-%d", i, i + len(batch))
 
     def _retrieve_embedded_chunks(self, chunks: list[CodeChunk]) -> list[CodeChunk]:
         """Retrieve embedded chunks from registry, falling back to originals if needed.
@@ -1403,7 +1448,7 @@ class Indexer(BasedModel):
     async def _phase_embed_and_index(
         self,
         all_chunks: list[CodeChunk],
-        progress_callback: Callable[[IndexingStats, str | None], None] | None,
+        progress_callback: ProgressCallback | None,
         context: Any,
     ) -> None:
         """Execute embedding and indexing phases if providers are initialized."""
@@ -1437,7 +1482,7 @@ class Indexer(BasedModel):
             },
         )
 
-        await self._embed_chunks_in_batches(all_chunks)
+        await self._embed_chunks_in_batches(all_chunks, progress_callback=progress_callback)
 
         # Get registry to check actual embeddings created
         from codeweaver.providers.embedding.registry import get_embedding_registry
@@ -1462,7 +1507,11 @@ class Indexer(BasedModel):
         )
 
         if progress_callback:
-            progress_callback(self._stats, "embedding")
+            progress_callback(
+                "embedding",
+                self._stats.chunks_embedded,
+                len(all_chunks),
+            )
 
         # Phase 4: Retrieve embedded chunks from registry
         updated_chunks = self._retrieve_embedded_chunks(all_chunks)
@@ -1495,12 +1544,16 @@ class Indexer(BasedModel):
         )
 
         if progress_callback:
-            progress_callback(self._stats, "indexing")
+            progress_callback(
+                "indexing",
+                self._stats.chunks_indexed,
+                len(updated_chunks),
+            )
 
     async def _phase_discovery(
         self,
         files: list[Path],
-        progress_callback: Callable[[IndexingStats, str | None], None] | None,
+        progress_callback: ProgressCallback | None,
         context: Any,
     ) -> list[DiscoveredFile]:
         """Execute discovery phase and return discovered files."""
@@ -1520,14 +1573,18 @@ class Indexer(BasedModel):
         discovered_files = self._discover_files_for_batch(files)
 
         if progress_callback:
-            progress_callback(self._stats, "discovery")
+            progress_callback(
+                "discovery",
+                len(discovered_files),
+                len(files),
+            )
 
         return discovered_files
 
     async def _phase_chunking(
         self,
         discovered_files: list[DiscoveredFile],
-        progress_callback: Callable[[IndexingStats, str | None], None] | None,
+        progress_callback: ProgressCallback | None,
         context: Any,
     ) -> list[CodeChunk]:
         """Execute chunking phase and return chunks."""
@@ -1569,21 +1626,26 @@ class Indexer(BasedModel):
         )
 
         if progress_callback:
-            progress_callback(self._stats, "chunking")
+            progress_callback(
+                "chunking",
+                len(discovered_files),
+                len(discovered_files),
+                extra={"chunks_created": len(all_chunks)},
+            )
 
         return all_chunks
 
     async def _index_files_batch(
         self,
         files: list[Path],
-        progress_callback: Callable[[IndexingStats, str | None], None] | None = None,
+        progress_callback: ProgressCallback | None = None,
         context: Any = None,
     ) -> None:
         """Index multiple files in batch using the chunking service.
 
         Args:
             files: List of file paths to index
-            progress_callback: Optional callback to report progress (receives stats and phase)
+            progress_callback: Optional callback for granular progress updates
             context: Optional FastMCP context for structured logging
         """
         if not files:

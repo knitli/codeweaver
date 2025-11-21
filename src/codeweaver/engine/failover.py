@@ -58,12 +58,12 @@ def _get_collection_name(*, secondary: bool) -> str:
         if vector_store := backup_config.get("vector_store"):
             # Handle tuple or single VectorStoreProviderSettings
             settings = vector_store[0] if isinstance(vector_store, tuple) else vector_store
-            return settings.provider_settings.get("collection_name", "codeweaver-backup")  # type: ignore[union-attr]
+            return settings.get("provider_settings", {}).get("collection_name", "codeweaver-backup")  # type: ignore[union-attr]
         return "codeweaver-backup"
     from codeweaver.common.registry.provider import get_provider_config_for
 
     if (config := get_provider_config_for("vector_store")) and (
-        collection_name := config["provider_settings"].get("collection_name")
+        collection_name := config.get("provider_settings", {}).get("collection_name")
     ):
         return f"{collection_name}-backup" if secondary else collection_name
     from codeweaver.common.utils.utils import generate_collection_name

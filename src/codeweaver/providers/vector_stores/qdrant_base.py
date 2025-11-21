@@ -18,6 +18,7 @@ from typing import Any, Literal, NoReturn
 from fastembed.sparse.sparse_embedding_base import SparseEmbedding
 from pydantic import UUID7
 from qdrant_client import AsyncQdrantClient
+from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.http.models.models import (
     BinaryQuantization,
     CollectionInfo,
@@ -284,13 +285,20 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         for_backup = for_backup or collection_name.endswith("backup")
         if not self._client:
             raise ProviderError("Qdrant client is not initialized")
-        collections = await self._client.get_collections()
-        collection_names = [col.name for col in collections.collections]
-        if collection_name not in collection_names:
-            # Create new collection from config
-            _ = await self._client.create_collection(
-                **self._generate_metadata(for_backup=for_backup).to_collection()
-            )
+        try:
+            if not await self._client.collection_exists(collection_name):
+                _ = await self._client.create_collection(
+                    **self._generate_metadata(for_backup=for_backup).to_collection()
+                )
+        except UnexpectedResponse:
+            try:
+                _ = await self._client.create_collection(
+                    **self._generate_metadata(for_backup=for_backup).to_collection()
+                )
+
+            except Exception as e:
+                logger.exception("Failed to check or create collection")
+                raise ProviderError(f"Failed to ensure collection: {e}") from e
         else:
             # Validate existing collection matches current config
             await self._validate_collection_config(collection_name)
@@ -680,6 +688,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         if not self._ensure_client(self._client):
             raise ProviderError("Qdrant client not initialized")
         try:
+            await self._ensure_collection(collection_name=collection_name)
             return await self._client.get_collection(collection_name=collection_name)
         except Exception as e:
             raise ProviderError(

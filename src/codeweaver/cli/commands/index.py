@@ -17,7 +17,7 @@ import cyclopts
 from cyclopts import App
 from pydantic import FilePath
 
-from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
+from codeweaver.cli.ui import CLIErrorHandler, IndexingProgress, StatusDisplay, get_display
 from codeweaver.common.utils.git import get_project_path
 from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.types import CodeWeaverSettingsDict
@@ -309,21 +309,44 @@ async def _run_standalone_indexing(
     Raises:
         CodeWeaverError: If indexing fails
     """
-    from codeweaver.engine.indexer import Indexer, IndexingProgressTracker
+    from typing import Any
+
+    from codeweaver.engine.indexer import Indexer
 
     display.print_info("Initializing indexer...")
     indexer = await Indexer.from_settings_async(
         settings=settings if isinstance(settings, DictView) else DictView(settings.model_dump())
     )
 
-    progress_tracker = IndexingProgressTracker(console=display.console)
+    # Create progress tracker with the new unified interface
+    progress_tracker = IndexingProgress(console=display.console)
+
+    # Create callback that maps to the new IndexingProgress methods
+    def progress_callback(
+        phase: str,
+        current: int,
+        total: int,
+        *,
+        extra: dict[str, Any] | None = None,
+    ) -> None:
+        if phase == "discovery":
+            progress_tracker.update_discovery(current, total)
+        elif phase == "chunking":
+            chunks_created = extra.get("chunks_created", 0) if extra else 0
+            progress_tracker.update_chunking(current, total, chunks_created)
+        elif phase == "embedding":
+            progress_tracker.update_embedding(current, total)
+        elif phase == "indexing":
+            progress_tracker.update_indexing(current, total)
 
     display.print_success("Starting indexing process...")
 
-    _ = await indexer.prime_index(
-        force_reindex=force_reindex,
-        progress_callback=lambda stats, phase: progress_tracker.update(stats, phase),
-    )
+    with progress_tracker:
+        _ = await indexer.prime_index(
+            force_reindex=force_reindex,
+            progress_callback=progress_callback,
+        )
+        progress_tracker.complete()
 
     # Display final summary
     stats = indexer.stats

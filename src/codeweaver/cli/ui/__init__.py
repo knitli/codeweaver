@@ -12,11 +12,12 @@ from codeweaver.common.utils.lazy_importer import create_lazy_getattr
 
 if TYPE_CHECKING:
     from codeweaver.cli.ui.error_handler import CLIErrorHandler
-    from codeweaver.cli.ui.status_display import StatusDisplay, get_display
+    from codeweaver.cli.ui.status_display import IndexingProgress, StatusDisplay, get_display
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "CLIErrorHandler": (__spec__.parent, "error_handler"),
+    "IndexingProgress": (__spec__.parent, "status_display"),
     "StatusDisplay": (__spec__.parent, "status_display"),
     "get_display": (__spec__.parent, "status_display"),
 })
@@ -24,7 +25,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
 
 __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
-__all__ = ("CLIErrorHandler", "StatusDisplay", "get_display")
+__all__ = ("CLIErrorHandler", "IndexingProgress", "StatusDisplay", "get_display")
 
 
 def __dir__() -> list[str]:

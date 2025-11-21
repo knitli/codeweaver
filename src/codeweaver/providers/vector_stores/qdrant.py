@@ -52,8 +52,14 @@ class QdrantVectorStoreProvider(QdrantBaseProvider):
         api_key = None
 
         # Try to get API key from config first
-        if config_api_key := self.config.get("api_key") or self.config.get("client_options", {}).get("api_key"):
-            api_key = config_api_key.get_secret_value() if isinstance(config_api_key, SecretStr) else config_api_key
+        if config_api_key := self.config.get("api_key") or self.config.get(
+            "client_options", {}
+        ).get("api_key"):
+            api_key = (
+                config_api_key.get_secret_value()
+                if isinstance(config_api_key, SecretStr)
+                else config_api_key
+            )
 
         # Fall back to environment variable if not in config
         if not api_key:

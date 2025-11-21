@@ -426,23 +426,25 @@ class IndexerSettings(BasedModel):
         return RignoreSettings(rignore_settings)
 
     @cached_property
-    def hidden_tool_paths(self) -> set[Path]:
+    def hidden_tool_paths(self) -> set[str]:
         """Get common hidden tooling paths to consider for forced-includes."""
         from codeweaver.core.file_extensions import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
 
-        return {
-            path
-            for tool in COMMON_TOOLING_PATHS
-            for path in tool[1]
-            if (str(path).startswith(".") or path.name.startswith("."))
-            and ("." not in path.name[1:] or "." not in path.parts[0][1:])
-        } | {
-            path
-            for tool in COMMON_LLM_TOOLING_PATHS
-            for path in tool[1]
-            if (str(path).startswith(".") or path.name.startswith("."))
-            and ("." not in path.name[1:] or "." not in path.parts[0][1:])
-        }
+        result: set[str] = set()
+        for tool in COMMON_TOOLING_PATHS:
+            for path_str in tool[1]:
+                path = Path(path_str) if isinstance(path_str, str) else path_str
+                # Include hidden paths that aren't files with extensions
+                if (str(path).startswith(".") or path.name.startswith(".")) and "." not in path.name[1:]:
+                    result.add(str(path))
+
+        for tool in COMMON_LLM_TOOLING_PATHS:
+            for path_str in tool[1]:
+                path = Path(path_str) if isinstance(path_str, str) else path_str
+                if (str(path).startswith(".") or path.name.startswith(".")) and "." not in path.name[1:]:
+                    result.add(str(path))
+
+        return result
 
     def construct_filter(self) -> Callable[[Path], bool]:
         """Constructs the filter function for rignore's `should_exclude_entry` parameter.
