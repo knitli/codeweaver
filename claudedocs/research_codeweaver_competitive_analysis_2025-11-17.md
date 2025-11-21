@@ -185,7 +185,7 @@ The competitive landscape splits into three categories:
 |----------|-----------|-------|
 | **CodeWeaver** | **3.2s for 77k LOC** | Excludes embedding (provider-dependent) |
 | | | Remote: ~5s total; Local: ~20s total |
-| Visual Studio C++ | 2.5-6x faster than VS 2019 | Large projects (UE5: 1 min, Chromium: 5 min) |
+| Visual Studio C++ | 2.5-6x faster than VS 2019 | Large projects (UnrealEngine 5: 1 min, Chromium: 5 min) |
 | Meilisearch | 7x faster than Elasticsearch | General search indexing |
 | Elasticsearch | Baseline | Industry standard |
 | Bloop | "Fast" (unspecified) | Rust-based, Tantivy + Qdrant |

@@ -435,13 +435,17 @@ class IndexerSettings(BasedModel):
             for path_str in tool[1]:
                 path = Path(path_str) if isinstance(path_str, str) else path_str
                 # Include hidden paths that aren't files with extensions
-                if (str(path).startswith(".") or path.name.startswith(".")) and "." not in path.name[1:]:
+                if (
+                    str(path).startswith(".") or path.name.startswith(".")
+                ) and "." not in path.name[1:]:
                     result.add(str(path))
 
         for tool in COMMON_LLM_TOOLING_PATHS:
             for path_str in tool[1]:
                 path = Path(path_str) if isinstance(path_str, str) else path_str
-                if (str(path).startswith(".") or path.name.startswith(".")) and "." not in path.name[1:]:
+                if (
+                    str(path).startswith(".") or path.name.startswith(".")
+                ) and "." not in path.name[1:]:
                     result.add(str(path))
 
         return result

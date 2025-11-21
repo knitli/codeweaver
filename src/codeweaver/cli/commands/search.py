@@ -12,7 +12,7 @@ import sys
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 import cyclopts
 
@@ -100,9 +100,13 @@ async def _run_search_indexing(
         # Create progress tracker for live feedback
         progress_tracker = IndexingProgressTracker(console=display.console)
 
+        def progress_callback(
+            phase: str, current: int, total: int, *, extra: dict[str, Any] | None = None
+        ) -> None:
+            progress_tracker.update(indexer.stats, phase)  # ty: ignore[invalid-argument-type]
+
         await indexer.prime_index(
-            force_reindex=False,
-            progress_callback=lambda stats, phase: progress_tracker.update(stats, phase),
+            force_reindex=False, progress_callback=progress_callback, status_display=display
         )
 
         # Show quick summary

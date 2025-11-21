@@ -1,3 +1,4 @@
+# sourcery skip: no-complex-if-expressions
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -33,12 +34,7 @@ class ProgressCallback(Protocol):
     """
 
     def __call__(
-        self,
-        phase: str,
-        current: int,
-        total: int,
-        *,
-        extra: dict[str, Any] | None = None,
+        self, phase: str, current: int, total: int, *, extra: dict[str, Any] | None = None
     ) -> None:
         """Report progress update.
 
@@ -49,6 +45,7 @@ class ProgressCallback(Protocol):
             extra: Optional extra data (e.g., chunks_created for chunking phase)
         """
         ...
+
 
 import rignore
 
@@ -1092,9 +1089,7 @@ class Indexer(BasedModel):
         return files_to_index
 
     async def _perform_batch_indexing_async(
-        self,
-        files_to_index: list[Path],
-        progress_callback: ProgressCallback | None,
+        self, files_to_index: list[Path], progress_callback: ProgressCallback | None
     ) -> None:
         """Execute batch indexing for discovered files.
 
@@ -1189,9 +1184,7 @@ class Indexer(BasedModel):
         # Report discovery phase complete
         if progress_callback:
             progress_callback(
-                "discovery",
-                self._stats.files_discovered,
-                self._stats.files_discovered,
+                "discovery", self._stats.files_discovered, self._stats.files_discovered
             )
 
         # Index files in batch
@@ -1249,10 +1242,7 @@ class Indexer(BasedModel):
             )
 
         walker_settings = index_settings.to_settings()
-        return cls(
-            walker_settings=walker_settings,
-            project_path=settings_map["project_path"],
-        )
+        return cls(walker_settings=walker_settings, project_path=settings_map["project_path"])
 
     @classmethod
     async def from_settings_async(
@@ -1301,10 +1291,7 @@ class Indexer(BasedModel):
             logger.debug("inc_exc patterns initialized for project: %s", project_path_value)
 
         walker_settings = index_settings.to_settings()
-        indexer = cls(
-            walker_settings=walker_settings,
-            project_path=settings_map["project_path"],
-        )
+        indexer = cls(walker_settings=walker_settings, project_path=settings_map["project_path"])
 
         # Initialize providers asynchronously
         await indexer._initialize_providers_async()
@@ -1378,11 +1365,7 @@ class Indexer(BasedModel):
 
                     # Report progress after each batch
                     if progress_callback:
-                        progress_callback(
-                            "embedding",
-                            self._stats.chunks_embedded,
-                            total_chunks,
-                        )
+                        progress_callback("embedding", self._stats.chunks_embedded, total_chunks)
                 except Exception:
                     logger.exception("Failed to embed batch %d-%d", i, i + len(batch))
 
@@ -1446,10 +1429,7 @@ class Indexer(BasedModel):
             logger.exception("Failed to index to vector store")
 
     async def _phase_embed_and_index(
-        self,
-        all_chunks: list[CodeChunk],
-        progress_callback: ProgressCallback | None,
-        context: Any,
+        self, all_chunks: list[CodeChunk], progress_callback: ProgressCallback | None, context: Any
     ) -> None:
         """Execute embedding and indexing phases if providers are initialized."""
         if not (self._embedding_provider or self._sparse_provider or self._vector_store):
@@ -1507,11 +1487,7 @@ class Indexer(BasedModel):
         )
 
         if progress_callback:
-            progress_callback(
-                "embedding",
-                self._stats.chunks_embedded,
-                len(all_chunks),
-            )
+            progress_callback("embedding", self._stats.chunks_embedded, len(all_chunks))
 
         # Phase 4: Retrieve embedded chunks from registry
         updated_chunks = self._retrieve_embedded_chunks(all_chunks)
@@ -1544,17 +1520,10 @@ class Indexer(BasedModel):
         )
 
         if progress_callback:
-            progress_callback(
-                "indexing",
-                self._stats.chunks_indexed,
-                len(updated_chunks),
-            )
+            progress_callback("indexing", self._stats.chunks_indexed, len(updated_chunks))
 
     async def _phase_discovery(
-        self,
-        files: list[Path],
-        progress_callback: ProgressCallback | None,
-        context: Any,
+        self, files: list[Path], progress_callback: ProgressCallback | None, context: Any
     ) -> list[DiscoveredFile]:
         """Execute discovery phase and return discovered files."""
         await log_to_client_or_fallback(
@@ -1573,11 +1542,7 @@ class Indexer(BasedModel):
         discovered_files = self._discover_files_for_batch(files)
 
         if progress_callback:
-            progress_callback(
-                "discovery",
-                len(discovered_files),
-                len(files),
-            )
+            progress_callback("discovery", len(discovered_files), len(files))
 
         return discovered_files
 

@@ -795,7 +795,10 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         """
         if not chunks:
             return
-        if not self._ensure_client(self._client, for_backup=for_backup):
+        if not self._ensure_client(self._client) or not self._ensure_collection(
+            collection_name=self._collection or self._default_collection_name(),
+            for_backup=for_backup,
+        ):
             raise ProviderError("Qdrant client not initialized")
 
         collection_name = self.collection

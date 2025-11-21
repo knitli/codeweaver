@@ -241,16 +241,20 @@ async def _run_background_indexing(
         # Track progress with callback for live updates
         progress_update = None
         total_files = 0
+        files_processed = 0
 
-        def progress_callback(stats: Any, phase: str | None) -> None:
-            """Handle progress updates from indexer."""
-            nonlocal progress_update, total_files
+        def progress_callback(
+            phase: str, current: int, total: int, *, extra: dict[str, Any] | None = None
+        ) -> None:
+            nonlocal progress_update, total_files, files_processed
             if phase == "discovery":
-                # Discovery complete, store total for progress bar
-                total_files = stats.files_discovered
-            elif phase == "chunking" and progress_update:
-                # Update progress bar during chunking
-                progress_update(stats.files_processed)
+                total_files = max(total_files, total, current)
+            elif phase == "chunking":
+                files_processed = min(files_processed + current, total_files or total)
+                if progress_update:
+                    progress_update(files_processed)
+            elif phase == "indexing" and progress_update:
+                progress_update(total_files or total)
 
         # Prime index (initial indexing) with progress tracking
         start_time = time.time()

@@ -323,11 +323,7 @@ async def _run_standalone_indexing(
 
     # Create callback that maps to the new IndexingProgress methods
     def progress_callback(
-        phase: str,
-        current: int,
-        total: int,
-        *,
-        extra: dict[str, Any] | None = None,
+        phase: str, current: int, total: int, *, extra: dict[str, Any] | None = None
     ) -> None:
         if phase == "discovery":
             progress_tracker.update_discovery(current, total)
@@ -343,8 +339,7 @@ async def _run_standalone_indexing(
 
     with progress_tracker:
         _ = await indexer.prime_index(
-            force_reindex=force_reindex,
-            progress_callback=progress_callback,
+            force_reindex=force_reindex, progress_callback=progress_callback
         )
         progress_tracker.complete()
 

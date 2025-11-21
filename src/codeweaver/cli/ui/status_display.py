@@ -92,24 +92,16 @@ class IndexingProgress:
 
         # Create tasks for each phase - initially hidden except discovery
         self._discovery_task = self.progress.add_task(
-            "[cyan]Discovering files...",
-            total=total_files or 0,
-            visible=True,
+            "[cyan]Discovering files...", total=total_files or 0, visible=True
         )
         self._chunking_task = self.progress.add_task(
-            "[blue]Chunking files...",
-            total=0,
-            visible=False,
+            "[blue]Chunking files...", total=0, visible=False
         )
         self._embedding_task = self.progress.add_task(
-            "[magenta]Embedding chunks...",
-            total=0,
-            visible=False,
+            "[magenta]Embedding chunks...", total=0, visible=False
         )
         self._indexing_task = self.progress.add_task(
-            "[green]Indexing to store...",
-            total=0,
-            visible=False,
+            "[green]Indexing to store...", total=0, visible=False
         )
 
         self.progress.start()
@@ -134,17 +126,10 @@ class IndexingProgress:
         if self._discovery_task is not None:
             if total is not None:
                 self.progress.update(
-                    self._discovery_task,
-                    completed=current,
-                    total=total,
-                    visible=True,
+                    self._discovery_task, completed=current, total=total, visible=True
                 )
             else:
-                self.progress.update(
-                    self._discovery_task,
-                    completed=current,
-                    visible=True,
-                )
+                self.progress.update(self._discovery_task, completed=current, visible=True)
 
     def update_chunking(self, files_processed: int, total_files: int, chunks_created: int) -> None:
         """Update chunking phase progress.
@@ -195,18 +180,13 @@ class IndexingProgress:
             task = self.progress.tasks[self._chunking_task]
             if task.total and task.total > 0:
                 self.progress.update(
-                    self._chunking_task,
-                    completed=task.total,
-                    description="[blue]✓ Files chunked",
+                    self._chunking_task, completed=task.total, description="[blue]✓ Files chunked"
                 )
 
         # Update embedding progress
         if self._embedding_task is not None:
             self.progress.update(
-                self._embedding_task,
-                completed=chunks_embedded,
-                total=total_chunks,
-                visible=True,
+                self._embedding_task, completed=chunks_embedded, total=total_chunks, visible=True
             )
 
     def update_indexing(self, chunks_indexed: int, total_chunks: int) -> None:
@@ -234,10 +214,7 @@ class IndexingProgress:
         # Update indexing progress
         if self._indexing_task is not None:
             self.progress.update(
-                self._indexing_task,
-                completed=chunks_indexed,
-                total=total_chunks,
-                visible=True,
+                self._indexing_task, completed=chunks_indexed, total=total_chunks, visible=True
             )
 
     def complete(self) -> None:
