@@ -29,7 +29,7 @@ This checklist tracks the implementation of the Dependency Injection architectur
 
 ---
 
-## Phase 1: Foundation (v0.2 Early)
+## Phase 1: Foundation (next Alpha feature release Early)
 
 **Goal**: Core DI infrastructure without breaking existing code
 
@@ -80,7 +80,7 @@ This checklist tracks the implementation of the Dependency Injection architectur
 
 ---
 
-## Phase 2: Integration (v0.2 Mid)
+## Phase 2: Integration (next Alpha feature release Mid)
 
 **Goal**: Migrate core services to use DI
 
@@ -126,7 +126,7 @@ This checklist tracks the implementation of the Dependency Injection architectur
 
 ---
 
-## Phase 3: pydantic-ai Integration (v0.2 Late / v0.3 Early)
+## Phase 3: pydantic-ai Integration (next Alpha feature release Late / 3rd alpha feature release Early)
 
 **Goal**: Integrate pydantic-ai providers into DI system
 
@@ -165,7 +165,7 @@ This checklist tracks the implementation of the Dependency Injection architectur
 
 ---
 
-## Phase 4: Advanced Features (v0.3)
+## Phase 4: Advanced Features (3rd alpha feature release)
 
 **Goal**: Leverage DI for advanced capabilities
 
@@ -209,7 +209,7 @@ This checklist tracks the implementation of the Dependency Injection architectur
 
 ---
 
-## Phase 5: Cleanup (v0.3 Late)
+## Phase 5: Cleanup (3rd alpha feature release Late)
 
 **Goal**: Finalize migration and deprecate old patterns
 
@@ -287,11 +287,11 @@ This checklist tracks the implementation of the Dependency Injection architectur
 - [ ] Integration tests passing
 - [ ] pydantic-ai patterns documented
 
-### Overall Success (v0.3)
+### Overall Success (3rd alpha feature release)
 - [ ] All provider types work via DI
 - [ ] Test code 50% less verbose (measured)
 - [ ] New provider integration takes < 1 hour (documented)
-- [ ] Zero breaking changes from v0.2 to v0.3
+- [ ] Zero breaking changes from next Alpha feature release to 3rd alpha feature release
 - [ ] Architecture documentation complete
 - [ ] Migration guide published
 - [ ] Performance within 5% of v0.1
@@ -326,9 +326,9 @@ This checklist tracks the implementation of the Dependency Injection architectur
 - **pydantic-ai integration**: Expose directly, don't wrap
 
 ### Questions Awaiting Answers
-- [ ] **Timing**: Phase 1-2 in v0.2, or different split?
+- [ ] **Timing**: Phase 1-2 in next Alpha feature release, or different split?
 - [ ] **pydantic-ai priority**: Fast-track Phase 3?
-- [ ] **Breaking changes**: Deprecate v0.3, remove v0.4 OK?
+- [ ] **Breaking changes**: Deprecate 3rd alpha feature release, remove v0.4 OK?
 - [ ] **DI mandate**: Required after Phase 1?
 - [ ] **Multi-tenancy**: Near-term requirement?
 - [ ] **Plugin system**: Custom providers via DI in Phase 4 or later?
@@ -350,8 +350,8 @@ This checklist tracks the implementation of the Dependency Injection architectur
 
 **Current Status**: Planning Complete ✅  
 **Next Milestone**: User approval and PoC  
-**Target v0.2 Release**: Phase 1 + 2 complete  
-**Target v0.3 Release**: Phase 3 + 4 + 5 complete
+**Target next Alpha feature release**: Phase 1 + 2 complete  
+**Target 3rd alpha feature release Release**: Phase 3 + 4 + 5 complete
 
 ---
 

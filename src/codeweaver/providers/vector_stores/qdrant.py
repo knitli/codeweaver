@@ -64,9 +64,12 @@ class QdrantVectorStoreProvider(QdrantBaseProvider):
         # Fall back to environment variable if not in config
         if not api_key:
             api_key = self._provider.get_env_api_key()
+        from urllib.parse import urlparse
 
         # Check if API key is required for cloud instances
-        is_cloud_url = url and isinstance(url, str) and "cloud.qdrant.io" in url
+        is_cloud_url = (
+            url and isinstance(url, str) and urlparse(url).hostname.endswith("cloud.qdrant.io")
+        )
         if is_cloud_url and not api_key:
             raise ProviderError(
                 f"API key required for Qdrant Cloud connection to {url}. "

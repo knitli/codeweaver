@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Literal
 
 from typing_extensions import TypeIs
 
@@ -50,11 +50,11 @@ class Tokenizers(Tokenizer[TokenizersTokenizer]):
 
     def encode(self, text: str | bytes, **kwargs: Any) -> list[int]:
         """Encode text into a list of token IDs."""
-        return self._encoder.encode(self._to_string(text), **kwargs)
+        return self._encoder.encode(self._to_string(text), **kwargs).num_tokens
 
     def encode_batch(self, texts: Sequence[str | bytes], **kwargs: Any) -> Sequence[Sequence[int]]:
         """Encode a batch of texts into a list of token ID lists."""
-        return self._encoder.encode_batch([self._to_string(txt) for txt in texts], **kwargs)
+        return [self._encoder.encode(self._to_string(txt), **kwargs).num_tokens for txt in texts]
 
     def decode(self, tokens: Sequence[int], **kwargs: Any) -> str:
         """Decode a list of token IDs back into text."""
@@ -65,12 +65,12 @@ class Tokenizers(Tokenizer[TokenizersTokenizer]):
         return self._encoder.decode_batch(token_lists, **kwargs)
 
     @staticmethod
-    def encoders() -> Sequence[str]:
+    def encoders() -> Sequence[Literal["BPE", "WordPiece", "WordLevel", "Unigram"]]:
         """List all available encoder names.
 
         The Tokenizers library can load any Hugging Face tokenizer, but they're all based on four models, so we return those.
         """
-        return ["BPE", "WordPiece", "WordLevel", "Unigram"]
+        return ("BPE", "WordPiece", "WordLevel", "Unigram")
 
 
 __all__ = ("Tokenizers",)

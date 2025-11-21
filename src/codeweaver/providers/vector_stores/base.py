@@ -194,6 +194,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
     _client: VectorStoreClient | None
     _embedding_caps: EmbeddingCapsDict = PrivateAttr(default_factory=_default_embedding_caps)
     _settings: EmbeddingSettingsDict = PrivateAttr(default_factory=_get_embedding_settings)
+    _known_collections: set[str] = PrivateAttr(default_factory=set)
 
     _provider: ClassVar[Provider] = Provider.NOT_SET
 

@@ -283,6 +283,8 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             dense_dim: Dimension of dense vectors (deprecated - config is source of truth).
         """
         for_backup = for_backup or collection_name.endswith("backup")
+        if collection_name in self._known_collections:
+            return
         if not self._client:
             raise ProviderError("Qdrant client is not initialized")
         try:
@@ -290,6 +292,8 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                 _ = await self._client.create_collection(
                     **self._generate_metadata(for_backup=for_backup).to_collection()
                 )
+            if collection_name not in self._known_collections:
+                self._known_collections.add(collection_name)
         except UnexpectedResponse:
             try:
                 _ = await self._client.create_collection(
@@ -791,15 +795,12 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         """
         if not chunks:
             return
-        if not self._ensure_client(self._client):
+        if not self._ensure_client(self._client, for_backup=for_backup):
             raise ProviderError("Qdrant client not initialized")
 
         collection_name = self.collection
         if not collection_name:
             raise ProviderError("No collection configured")
-
-        # Ensure collection exists
-        await self._ensure_collection(collection_name, for_backup=for_backup)
 
         # Convert chunks to Qdrant points
         points = self._chunks_to_points(chunks, for_backup=for_backup)

@@ -140,7 +140,7 @@ def estimate_file_count(project_path: Path | None = None) -> NonNegativeInt:
             logger.debug("Evicted oldest cache entry for %s", oldest_path)
     try:
         walker = get_walker()
-        result = sum(bool(p and p.is_file()) for p in walker.walk())
+        result = sum(bool(p and p.is_file()) for p in walker)
         # Cache the result
         _file_count_cache[project_path] = (result, now)
         logger.debug("Cached file count estimate for %s: %d files", project_path, result)
@@ -203,8 +203,8 @@ def estimate_backup_memory_requirements(
     if stats and stats.chunks_created > 0:
         estimated_chunks = stats.chunks_created
     elif stats and stats.files_discovered > 0:
-        # Conservative estimate: 10 chunks per file
-        estimated_chunks = stats.files_discovered * 10
+        chunks_per_file = 3250 / 450  # Average tokens per file divided by tokens per chunk
+        estimated_chunks = int(stats.files_discovered * chunks_per_file)
     elif project_path:
         file_count = estimate_file_count(project_path)
         # Conservative estimate: 10 chunks per file
@@ -272,13 +272,19 @@ def _estimate_memory_fallback():
 
     walker = rignore.Walker(**index_settings.to_settings())
     file_count = len([p for p in walker if p and p.is_file()])
+    tokens_per_file = (
+        3250  # This is the average for codeweaver over its 770 files with recognized extensions
+    )
+    chunks_per_file = tokens_per_file / 450  # 450 tokens per chunk
     # Return safe default to avoid blocking
+    chunks = int(file_count * chunks_per_file)
+    est_bytes = int(chunks * 4000)
     return MemoryEstimate(
-        estimated_bytes=500_000_000,  # 500MB
-        available_bytes=4_000_000_000,  # 4GB assumed
-        required_bytes=1_500_000_000,  # 1.5GB
-        is_safe=True,
-        estimated_chunks=100_000,
+        estimated_bytes=est_bytes,
+        available_bytes=4_000_000_000,
+        required_bytes=est_bytes + 500_000_000,
+        is_safe=est_bytes < 3_500_000_000,
+        estimated_chunks=chunks,
         zone="green",
     )
 
