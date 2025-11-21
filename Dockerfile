@@ -59,8 +59,8 @@ ARG VCS_REF
 
 # Add image metadata
 LABEL org.opencontainers.image.version="${VERSION}" \
-      org.opencontainers.image.created="${BUILD_DATE}" \
-      org.opencontainers.image.revision="${VCS_REF}"
+    org.opencontainers.image.created="${BUILD_DATE}" \
+    org.opencontainers.image.revision="${VCS_REF}"
 
 # Install runtime dependencies
 # hadolint ignore=DL3008
@@ -79,6 +79,7 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /app/src /app/src
+COPY docker/entrypoint.sh /entrypoint.sh
 
 # Set up environment
 ENV PYTHONUNBUFFERED=1 \
@@ -91,7 +92,8 @@ ENV PYTHONUNBUFFERED=1 \
 
 # Create directories for data persistence
 RUN mkdir -p /app/data /app/config /app/.codeweaver && \
-    chown -R codeweaver:codeweaver /app
+    chown -R codeweaver:codeweaver /app && \
+    chmod +x /entrypoint.sh
 
 # Switch to non-root user
 USER codeweaver
@@ -105,4 +107,5 @@ EXPOSE 9328
 
 # Default command: start the CodeWeaver MCP server
 # Users can override this with custom config via docker-compose or docker run
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["codeweaver", "server", "--host", "0.0.0.0", "--port", "9328"]

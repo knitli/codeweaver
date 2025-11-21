@@ -50,6 +50,7 @@ git push origin v0.1.0-beta.1
 The build will create packages with version `0.1.0b1` (Python normalizes `-beta.1` to `b1`).
 
 ### Pre-Release (Development)
+<!-- Note: This is the correct pep440 syntax for release candidates (`rcN` not `rc.N`). While you may commonly see `rc.N` in the wild, it is not valid pep440. -->
 **Format**: `X.Y.ZrcN+gHASH` (where `rcN` is concatenated, e.g., `rc295`)
 **Example**: `0.1.0rc295+gfc4f90a`
 

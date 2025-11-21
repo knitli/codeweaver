@@ -230,9 +230,11 @@ class VectorStoreFailoverManager(BasedModel):
         else:
             logger.debug("Backup failover disabled or no primary store")
         if primary_store and isinstance(primary_store, QdrantBaseProvider):
-            primary_store.create_payload_index(primary_collection_name, "chunk_id", "uuid")
+            await primary_store.create_payload_index(primary_collection_name, "chunk_id", "uuid")
         if self._backup_store and isinstance(self._backup_store, QdrantBaseProvider):
-            self._backup_store.create_payload_index(backup_collection_name, "chunk_id", "uuid")
+            await self._backup_store.create_payload_index(
+                backup_collection_name, "chunk_id", "uuid"
+            )
 
     async def shutdown(self) -> None:
         """Gracefully shutdown failover manager."""

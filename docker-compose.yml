@@ -59,7 +59,7 @@ services:
       - CODEWEAVER_VECTOR_STORE_PROVIDER=qdrant
       - CODEWEAVER_VECTOR_STORE_URL=http://qdrant:6333
       - CODEWEAVER_VECTOR_STORE_COLLECTION_NAME=${COLLECTION_NAME:-codeweaver}
-      - CODEWEAVER_VECTOR_STORE_PREFER_GRPC=true
+      - CODEWEAVER_VECTOR_STORE_PREFER_GRPC=false
       # Embedding Provider (VoyageAI default)
       # NOTE: VOYAGE_API_KEY is required for VoyageAI embedding provider. Set this in your environment or in a .env file.
       - VOYAGE_API_KEY=${VOYAGE_API_KEY}

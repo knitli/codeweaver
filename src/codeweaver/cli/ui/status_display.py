@@ -118,18 +118,27 @@ class IndexingProgress:
 
         Args:
             current: Number of files discovered so far
-            total: Total files expected (None if still discovering)
+            total: Total files expected (None or 0 if still discovering)
         """
         if not self._started:
-            self.start(total)
+            self.start(total if total else None)
 
         if self._discovery_task is not None:
-            if total is not None:
+            if total and total > 0:
+                # Known total - show determinate progress
                 self.progress.update(
                     self._discovery_task, completed=current, total=total, visible=True
                 )
             else:
-                self.progress.update(self._discovery_task, completed=current, visible=True)
+                # Unknown total - show indeterminate progress with count
+                # Set total to current to keep bar moving, update description with count
+                self.progress.update(
+                    self._discovery_task,
+                    completed=current,
+                    total=current + 1,  # Always one more than current to show activity
+                    visible=True,
+                    description=f"[cyan]Discovering files... ({current} found)",
+                )
 
     def update_chunking(self, files_processed: int, total_files: int, chunks_created: int) -> None:
         """Update chunking phase progress.

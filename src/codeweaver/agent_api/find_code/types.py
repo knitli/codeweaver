@@ -358,7 +358,7 @@ class StrategizedQuery(NamedTuple):
         self, query_kwargs: dict[str, Any], kwargs: dict[str, Any]
     ) -> dict[str, FusionQuery | list[Prefetch] | Any]:
         """Convert to a FusionQuery for hybrid search."""
-        from qdrant_client.http.models import Fusion, FusionQuery, Prefetch, SparseVector
+        from qdrant_client.http.models import Prefetch, Rrf, RrfQuery, SparseVector
 
         from codeweaver.exceptions import QueryError
 
@@ -392,7 +392,7 @@ class StrategizedQuery(NamedTuple):
         }
 
         return {
-            "query": FusionQuery(fusion=Fusion.RRF),
+            "query": RrfQuery(rrf=Rrf(k=2)),
             "prefetch": [
                 Prefetch(query=self.dense, using="dense", **prefetch_params),
                 Prefetch(query=sparse_vector, using="sparse", **prefetch_params),

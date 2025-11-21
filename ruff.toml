@@ -223,6 +223,7 @@ convention = "google"
   "SIM",
   "SLF001",  # Private member accessed
 ]
+#! The wall of shame for complex files that need to be gradually improved
 # CLI commands are complex by nature due to argument parsing and validation
 "src/codeweaver/cli/commands/*.py" = [
   "C901",  # too complex - CLI commands have inherent complexity
@@ -257,6 +258,9 @@ convention = "google"
 ]
 "src/codeweaver/server/server.py" = [
   "C901",  # too complex - server lifecycle has complex orchestration
+]
+"src/codeweaver/engine/chunker/base.py" = [
+  "C901",  # too complex - `from_backup_profile` has complex branching
 ]
 
 [lint.isort]

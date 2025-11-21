@@ -174,19 +174,9 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
 
     def _default_collection_name(self) -> str:
         """Generate a default collection name based on the provider settings."""
-        from codeweaver.common.utils.git import get_project_path
-        from codeweaver.config.settings import get_settings_map
-        from codeweaver.core.stores import get_blake_hash
-        from codeweaver.core.types.sentinel import Unset
+        from codeweaver.common.utils.utils import generate_collection_name
 
-        settings_map = get_settings_map()
-        project_path = get_project_path()
-        project_name = (
-            project_path.name
-            if isinstance(settings_map.get("project_name"), Unset)
-            else settings_map.get("project_name")
-        )
-        return f"{project_name}_{get_blake_hash(str(project_path).encode('utf-8'))[:8]}"
+        return generate_collection_name(is_backup=False)
 
     async def _initialize(self) -> None:
         """Initialize the Qdrant provider with configurations."""
@@ -288,18 +278,25 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         if not self._client:
             raise ProviderError("Qdrant client is not initialized")
         try:
-            if not await self._client.collection_exists(collection_name):
-                _ = await self._client.create_collection(
-                    **self._generate_metadata(for_backup=for_backup).to_collection()
-                )
-            if collection_name not in self._known_collections:
+            if await self._client.collection_exists(collection_name):
                 self._known_collections.add(collection_name)
+                return
+            await self._client.create_collection(
+                **self._generate_metadata(for_backup=for_backup).to_collection()
+            )
+            self._known_collections.add(collection_name)
+            return  # we don't need to validate because it's new
         except UnexpectedResponse:
             try:
-                _ = await self._client.create_collection(
-                    **self._generate_metadata(for_backup=for_backup).to_collection()
-                )
-
+                if collections := await self._client.get_collections():
+                    self._known_collections |= {col.name for col in collections.collections}
+                if collection_name not in self._known_collections:
+                    await self._client.create_collection(
+                        **self._generate_metadata(for_backup=for_backup).to_collection()
+                    )
+                    self._known_collections.add(collection_name)
+                    return  # we don't need to validate because it's new
+                await self._validate_collection_config(collection_name)
             except Exception as e:
                 logger.exception("Failed to check or create collection")
                 raise ProviderError(f"Failed to ensure collection: {e}") from e
@@ -394,7 +391,9 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         self,
         collection_name: str,
         field_name: str,
-        key_type: Literal["keyword", "integer", "float", "geo", "text", "datetime", "bool", "uuid"],
+        field_schema: Literal[
+            "keyword", "integer", "float", "geo", "text", "datetime", "bool", "uuid"
+        ],
     ) -> CollectionsResponse:
         """Create a payload index on the specified field.
 
@@ -412,10 +411,10 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         self._ensure_client(self._client)
         if not self._client:
             raise ProviderError("Qdrant client is not initialized")
-        self._ensure_collection(collection_name=collection_name)
+        await self._ensure_collection(collection_name=collection_name)
         try:
             return await self._client.create_payload_index(
-                collection_name=collection_name, field_name=field_name, key_type=key_type
+                collection_name=collection_name, field_name=field_name, field_schema=field_schema
             )
         except Exception as e:
             logger.warning(
@@ -795,10 +794,12 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         """
         if not chunks:
             return
-        if not self._ensure_client(self._client) or not self._ensure_collection(
+        self._ensure_client(self._client)
+        await self._ensure_collection(
             collection_name=self._collection or self._default_collection_name(),
             for_backup=for_backup,
-        ):
+        )
+        if not self._client:
             raise ProviderError("Qdrant client not initialized")
 
         collection_name = self.collection

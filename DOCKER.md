@@ -63,6 +63,8 @@ CODEWEAVER_PORT=9328
 QDRANT_PORT=6333
 ```
 
+> **Important:** When the Voyage provider remains selected (the default), the Docker entrypoint now fails fast if `VOYAGE_API_KEY` is missing so you get clear guidance before the server starts.
+
 ### 3. Start the Services
 
 ```bash
@@ -130,43 +132,27 @@ The Docker setup includes two services:
 
 #### Required
 
-- `VOYAGE_API_KEY` - Your VoyageAI API key for embeddings and reranking
 
 #### Project Settings
 
-- `PROJECT_PATH` - Path to your codebase to index (default: `.`)
-- `COLLECTION_NAME` - Qdrant collection name (default: `codeweaver`)
 
 #### Service Ports
 
-- `CODEWEAVER_PORT` - CodeWeaver server port (default: `9328`)
-- `QDRANT_PORT` - Qdrant REST API port (default: `6333`)
-- `QDRANT_GRPC_PORT` - Qdrant gRPC port (default: `6334`)
 
 #### Provider Configuration
 
 ##### Embedding Provider
-- `EMBEDDING_PROVIDER` - Provider name (default: `voyage`)
-- `EMBEDDING_MODEL` - Model name (default: `voyage-code-3`)
 
 Supported providers: `voyage`, `openai`, `cohere`, `fastembed`, `sentence-transformers`
 
 ##### Sparse Embedding Provider
-- `SPARSE_EMBEDDING_PROVIDER` - Provider name (default: `fastembed`)
-- `SPARSE_EMBEDDING_MODEL` - Model name (default: `prithivida/Splade_PP_en_v1`)
 
 Note: FastEmbed runs locally, no API key needed.
 
 ##### Reranking Provider
-- `RERANKING_PROVIDER` - Provider name (default: `voyage`)
-- `RERANKING_MODEL` - Model name (default: `voyage-rerank-2.5`)
 
 #### Operational Settings
 
-- `ENABLE_TELEMETRY` - Enable usage analytics (default: `false`)
-- `LOG_LEVEL` - Logging verbosity (default: `INFO`)
-- `MAX_CHUNK_SIZE` - Max tokens per chunk (default: `800`)
-- `TOKEN_LIMIT` - Max response tokens (default: `10000`)
 
 ### Using Alternative Providers
 

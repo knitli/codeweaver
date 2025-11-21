@@ -17,7 +17,6 @@ It is the backend service that powers CodeWeaver's code search and retrieval cap
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import dataclasses
 import logging
 import signal
@@ -999,11 +998,16 @@ class Indexer(BasedModel):
             logger.debug("Could not restore from persistence: %s", e)
         return False
 
-    def _discover_files_to_index(self) -> list[Path]:
+    def _discover_files_to_index(
+        self, progress_callback: ProgressCallback | None = None
+    ) -> list[Path]:
         """Discover files to index using the configured walker settings.
 
         Creates a fresh walker each time to avoid generator exhaustion issues.
         With incremental indexing, only returns files that are new or modified.
+
+        Args:
+            progress_callback: Optional callback for progress updates during discovery
 
         Returns:
             List of file paths to index
@@ -1016,8 +1020,15 @@ class Indexer(BasedModel):
         try:
             # Create a fresh walker each time - walkers are generators and get exhausted
             walker = rignore.Walker(**self._walker_settings)
-            with contextlib.suppress(StopIteration):
-                all_files.extend(p for p in walker if p and p.is_file())
+            file_count = 0
+            for p in walker:
+                if p and p.is_file():
+                    all_files.append(p)
+                    file_count += 1
+                    # Report progress every 50 files during discovery
+                    # Use 0 as total to indicate indeterminate progress
+                    if progress_callback and file_count % 50 == 0:
+                        progress_callback("discovery", file_count, 0)
         except Exception:
             logger.exception("Failure during file discovery")
             return []
@@ -1035,8 +1046,9 @@ class Indexer(BasedModel):
         # Filter to only new or modified files
         files_to_index: list[Path] = []
         unchanged_count = 0
+        total_to_check = len(all_files)
 
-        for path in all_files:
+        for idx, path in enumerate(all_files):
             try:
                 # Compute current hash (path is absolute from walker)
                 current_hash = get_blake_hash(path.read_bytes())
@@ -1061,6 +1073,10 @@ class Indexer(BasedModel):
             except Exception:
                 logger.exception("Error checking file %s, will index it", path)
                 files_to_index.append(path)
+
+            # Report progress every 100 files during filtering
+            if progress_callback and (idx + 1) % 100 == 0:
+                progress_callback("discovery", idx + 1, total_to_check)
 
         # Detect deleted files (in manifest but not on disk)
         # Convert all discovered files to relative paths for comparison
@@ -1167,7 +1183,7 @@ class Indexer(BasedModel):
         self._reset_duplicate_counts()
 
         # Discover files to index (with incremental filtering if manifest exists)
-        files_to_index = self._discover_files_to_index()
+        files_to_index = self._discover_files_to_index(progress_callback)
 
         # Clean up deleted files first (before indexing new/modified files)
         if self._deleted_files:
