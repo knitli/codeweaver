@@ -71,25 +71,19 @@ class MemoryEstimate(NamedTuple):
         return self.required_bytes / 1e9
 
 
-_walker: rignore.Walker | None = None
-
-
 def get_walker() -> rignore.Walker:
-    """Get a singleton rignore.Walker instance."""
-    global _walker_instance
-    if _walker_instance is None:
-        from codeweaver.config.indexer import DefaultIndexerSettings
-        from codeweaver.config.settings import get_settings
-        from codeweaver.core.types import Unset
+    """Get a rignore.Walker instance. Walkers are generators, so we create a new one each time."""
+    from codeweaver.config.indexer import DefaultIndexerSettings
+    from codeweaver.config.settings import get_settings
+    from codeweaver.core.types import Unset
 
-        settings = get_settings()
-        index_settings = (
-            DefaultIndexerSettings if isinstance(settings.indexer, Unset) else settings.indexer
-        )
-        import rignore
+    settings = get_settings()
+    index_settings = (
+        DefaultIndexerSettings if isinstance(settings.indexer, Unset) else settings.indexer
+    )
+    import rignore
 
-        _walker_instance = rignore.Walker(**index_settings.to_settings())
-    return _walker_instance
+    return rignore.Walker(**index_settings.to_settings())
 
 
 def estimate_file_count(project_path: Path | None = None) -> NonNegativeInt:
@@ -116,10 +110,10 @@ def estimate_file_count(project_path: Path | None = None) -> NonNegativeInt:
             else settings.project_path
         )
 
-    from codeweaver.common.statistics import get_statistics
+    from codeweaver.common.statistics import get_session_statistics
 
     if (
-        (statistics := get_statistics())
+        (statistics := get_session_statistics())
         and (index_stats := statistics.index_statistics)
         and (file_count := index_stats.total_file_count) > 0
     ):
@@ -204,30 +198,7 @@ def estimate_backup_memory_requirements(
     try:
         import psutil
     except ImportError:
-        logger.warning("psutil not available, cannot estimate memory")
-        # we'll estimate by file count
-        from codeweaver.config.indexer import DefaultIndexerSettings
-        from codeweaver.config.settings import get_settings
-        from codeweaver.core.types import Unset
-
-        settings = get_settings()
-        index_settings = (
-            DefaultIndexerSettings if isinstance(settings.indexer, Unset) else settings.indexer
-        )
-        import rignore
-
-        walker = rignore.Walker(**index_settings.to_settings())
-        file_count = len([p for p in walker if p and p.is_file()])
-        # Return safe default to avoid blocking
-        return MemoryEstimate(
-            estimated_bytes=500_000_000,  # 500MB
-            available_bytes=4_000_000_000,  # 4GB assumed
-            required_bytes=1_500_000_000,  # 1.5GB
-            is_safe=True,
-            estimated_chunks=100_000,
-            zone="green",
-        )
-
+        return _estimate_memory_fallback()
     # Estimate number of chunks
     if stats and stats.chunks_created > 0:
         estimated_chunks = stats.chunks_created
@@ -282,6 +253,33 @@ def estimate_backup_memory_requirements(
         is_safe=is_safe,
         estimated_chunks=estimated_chunks,
         zone=zone,
+    )
+
+
+def _estimate_memory_fallback():
+    """Fallback memory estimation when psutil is not available."""
+    logger.warning("psutil not available, cannot estimate memory")
+    # we'll estimate by file count
+    from codeweaver.config.indexer import DefaultIndexerSettings
+    from codeweaver.config.settings import get_settings
+    from codeweaver.core.types import Unset
+
+    settings = get_settings()
+    index_settings = (
+        DefaultIndexerSettings if isinstance(settings.indexer, Unset) else settings.indexer
+    )
+    import rignore
+
+    walker = rignore.Walker(**index_settings.to_settings())
+    file_count = len([p for p in walker if p and p.is_file()])
+    # Return safe default to avoid blocking
+    return MemoryEstimate(
+        estimated_bytes=500_000_000,  # 500MB
+        available_bytes=4_000_000_000,  # 4GB assumed
+        required_bytes=1_500_000_000,  # 1.5GB
+        is_safe=True,
+        estimated_chunks=100_000,
+        zone="green",
     )
 
 

@@ -311,6 +311,8 @@ async def _run_background_indexing(
         # Start file watcher for real-time updates
         if verbose:
             logger.info("Starting file watcher...")
+        import rignore
+
         from codeweaver.common.utils import get_project_path
         from codeweaver.engine.watcher import FileWatcher, IgnoreFilter
 
@@ -319,7 +321,7 @@ async def _run_background_indexing(
             if isinstance(settings.project_path, Unset)
             else settings.project_path,
             file_filter=await IgnoreFilter.from_settings_async(),
-            walker=state.indexer._walker,
+            walker=rignore.Walker(**state.indexer._walker_settings),  # ty: ignore[invalid-argument-type]
             indexer=state.indexer,
             status_display=status_display,  # Pass status_display to watcher
         )

@@ -54,7 +54,12 @@ def _get_collection_name(*, secondary: bool) -> str:
         The collection name for the primary or backup vector store.
     """
     if secondary:
-        return _backup_profile()["vector_store"]["provider_settings"]["collection_name"]
+        backup_config = _backup_profile()
+        if vector_store := backup_config.get("vector_store"):
+            # Handle tuple or single VectorStoreProviderSettings
+            settings = vector_store[0] if isinstance(vector_store, tuple) else vector_store
+            return settings.provider_settings.get("collection_name", "codeweaver-backup")  # type: ignore[union-attr]
+        return "codeweaver-backup"
     from codeweaver.common.registry.provider import get_provider_config_for
 
     if (config := get_provider_config_for("vector_store")) and (
@@ -449,7 +454,9 @@ class VectorStoreFailoverManager(BasedModel):
                     logger.debug("Starting file-based backup sync")
                     synced_count = await self.sync_pending_to_backup()
                     if synced_count > 0:
-                        logger.info("✓ File-based backup sync completed: %d files synced", synced_count)
+                        logger.info(
+                            "✓ File-based backup sync completed: %d files synced", synced_count
+                        )
 
                 # Also perform legacy vector store backup sync
                 logger.debug("Starting periodic backup sync")
@@ -734,21 +741,16 @@ class VectorStoreFailoverManager(BasedModel):
             return
 
         try:
-            # Use index to get all chunk IDs
-            # This doesn't exist anymore -- needs to be replaced with a as-indexed tracker for ids
-            self._failover_chunks = self._get_all_chunk_ids(is_backup=True).copy()
+            # Legacy chunk-based tracking is deprecated in favor of FileChangeTracker
+            # Just clear the failover chunks set - FileChangeTracker handles tracking
+            self._failover_chunks = set()
+            self._cached_snapshot = set()
 
-            # Cache the snapshot for use within this failover session
-            self._cached_snapshot = self._failover_chunks.copy()
-
-            logger.debug(
-                "Snapshotted %d existing chunks before failover (from rebuilt index)",
-                len(self._failover_chunks),
-            )
+            logger.debug("Snapshot initialized (FileChangeTracker handles file tracking)")
 
         except Exception as e:
             logger.warning("Failed to snapshot backup state: %s", e)
-            # Continue anyway - worst case we re-embed some existing chunks
+            # Continue anyway - FileChangeTracker is the primary tracking mechanism
 
     async def _sync_back_to_primary(self) -> None:
         """Sync changes from backup to primary with re-embedding.
@@ -770,20 +772,15 @@ class VectorStoreFailoverManager(BasedModel):
             return
 
         try:
-            # Rebuild the backup index to ensure it reflects current state
-            collections = await self._backup_store.list_collections()
-            if collections:
-                for collection_name in collections:
-                    # these don't exist anymore -- need to be replaced with the as-indexed id tracker
-                    self._backup_chunk_index[collection_name] = await self._get_collection_ids(
-                        self._backup_store, collection_name
-                    )
+            # Legacy chunk-based sync is deprecated - use FileChangeTracker instead
+            # This method is a fallback when no tracker is available
+            logger.warning(
+                "Using legacy chunk-based sync. FileChangeTracker-based sync is preferred."
+            )
 
-            # Use index to get all current chunk IDs
-            current_chunks = self._get_all_chunk_ids(is_backup=True)
-
-            # Find chunks added during failover (diff against snapshot)
-            new_chunks = current_chunks - self._failover_chunks
+            # Without FileChangeTracker, we can't efficiently identify new chunks
+            # Log warning and skip - the new file-based approach should be used
+            new_chunks: set[str] = set()
             logger.info("Found %d chunks to sync back to primary", len(new_chunks))
 
             if not new_chunks:
@@ -1037,54 +1034,51 @@ class VectorStoreFailoverManager(BasedModel):
         registry = get_provider_registry()
 
         # Initialize embedding provider from backup profile
-        if embedding_settings := backup_config.get("embedding"):
-            if isinstance(embedding_settings, tuple) and len(embedding_settings) > 0:
-                first_setting = embedding_settings[0]
-                provider_enum = first_setting.provider
-                model_name = getattr(first_setting.model_settings, "model", None)
-                try:
-                    embedding_provider = registry.create_provider(
-                        provider_enum,
-                        "embedding",
-                        model=model_name,
-                    )
-                    backup_indexer._embedding_provider = embedding_provider
-                    logger.debug(
-                        "Initialized backup embedding provider: %s (%s)",
-                        provider_enum,
-                        model_name,
-                    )
-                except Exception as e:
-                    logger.warning("Failed to create backup embedding provider: %s", e)
+        embedding_settings = backup_config.get("embedding")
+        if (
+            embedding_settings
+            and isinstance(embedding_settings, tuple)
+            and len(embedding_settings) > 0
+        ):
+            first_setting = embedding_settings[0]
+            provider_enum = first_setting.provider
+            model_name = getattr(first_setting.model_settings, "model", None)
+            try:
+                embedding_provider = registry.create_provider(
+                    provider_enum, "embedding", model=model_name
+                )
+                backup_indexer._embedding_provider = embedding_provider
+                logger.debug(
+                    "Initialized backup embedding provider: %s (%s)", provider_enum, model_name
+                )
+            except Exception as e:
+                logger.warning("Failed to create backup embedding provider: %s", e)
 
         # Initialize sparse embedding provider from backup profile
-        if sparse_settings := backup_config.get("sparse_embedding"):
-            if isinstance(sparse_settings, tuple) and len(sparse_settings) > 0:
-                first_setting = sparse_settings[0]
-                provider_enum = first_setting.provider
-                model_name = getattr(first_setting.model_settings, "model", None)
-                try:
-                    sparse_provider = registry.create_provider(
-                        provider_enum,
-                        "sparse_embedding",
-                        model=model_name,
-                    )
-                    backup_indexer._sparse_provider = sparse_provider
-                    logger.debug(
-                        "Initialized backup sparse embedding provider: %s (%s)",
-                        provider_enum,
-                        model_name,
-                    )
-                except Exception as e:
-                    logger.warning("Failed to create backup sparse provider: %s", e)
+        sparse_settings = backup_config.get("sparse_embedding")
+        if sparse_settings and isinstance(sparse_settings, tuple) and len(sparse_settings) > 0:
+            first_setting = sparse_settings[0]
+            provider_enum = first_setting.provider
+            model_name = getattr(first_setting.model_settings, "model", None)
+            try:
+                sparse_provider = registry.create_provider(
+                    provider_enum, "sparse_embedding", model=model_name
+                )
+                backup_indexer._sparse_provider = sparse_provider
+                logger.debug(
+                    "Initialized backup sparse embedding provider: %s (%s)",
+                    provider_enum,
+                    model_name,
+                )
+            except Exception as e:
+                logger.warning("Failed to create backup sparse provider: %s", e)
 
         # Set the backup vector store
         backup_indexer._vector_store = self._backup_store
         backup_indexer._providers_initialized = True
 
         logger.info(
-            "Created backup indexer with chunk limit %d tokens",
-            backup_governor.chunk_limit,
+            "Created backup indexer with chunk limit %d tokens", backup_governor.chunk_limit
         )
         return backup_indexer
 
@@ -1132,8 +1126,8 @@ class VectorStoreFailoverManager(BasedModel):
                 continue
 
             try:
-                # Use the backup indexer's batch indexing for the file
-                await self._backup_indexer.index_files([file_path])
+                # Use the backup indexer to index the file
+                await self._backup_indexer._index_file(file_path)
                 synced_count += 1
                 logger.debug("Synced file to backup: %s", file_path)
             except Exception as e:
@@ -1154,10 +1148,14 @@ class VectorStoreFailoverManager(BasedModel):
         # Save tracker state
         self._change_tracker.save()
 
-        logger.info("Backup sync complete: %d/%d operations successful", synced_count, total_operations)
+        logger.info(
+            "Backup sync complete: %d/%d operations successful", synced_count, total_operations
+        )
         return synced_count
 
-    def should_sync_backup(self, *, time_threshold_seconds: float = 300, volume_threshold: int = 50) -> bool:
+    def should_sync_backup(
+        self, *, time_threshold_seconds: float = 300, volume_threshold: int = 50
+    ) -> bool:
         """Check if backup sync should be triggered based on thresholds.
 
         Args:
@@ -1222,8 +1220,7 @@ class VectorStoreFailoverManager(BasedModel):
             return 0
 
         logger.info(
-            "Re-indexing %d files to primary that were indexed during failover",
-            len(failover_files),
+            "Re-indexing %d files to primary that were indexed during failover", len(failover_files)
         )
 
         synced_count = 0
@@ -1235,7 +1232,7 @@ class VectorStoreFailoverManager(BasedModel):
 
             try:
                 # Use the primary indexer to re-index the file
-                await self._indexer.index_files([file_path])
+                await self._indexer._index_file(file_path)
                 synced_count += 1
                 logger.debug("Re-indexed failover file to primary: %s", file_path)
             except Exception as e:
@@ -1248,9 +1245,7 @@ class VectorStoreFailoverManager(BasedModel):
         self._change_tracker.save()
 
         logger.info(
-            "Primary recovery complete: %d/%d files re-indexed",
-            synced_count,
-            len(failover_files),
+            "Primary recovery complete: %d/%d files re-indexed", synced_count, len(failover_files)
         )
         return synced_count
 

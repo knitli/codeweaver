@@ -94,9 +94,9 @@ class IndexerSettingsDict(TypedDict, total=False):
 
 
 @overload
-def get_settings_map(*, view: Literal[False]) -> CodeWeaverSettings | None: ...
+def _get_settings(*, view: Literal[False]) -> CodeWeaverSettings | None: ...
 @overload
-def get_settings_map(*, view: Literal[True]) -> DictView[CodeWeaverSettingsDict] | None: ...
+def _get_settings(*, view: Literal[True]) -> DictView[CodeWeaverSettingsDict] | None: ...
 def _get_settings(
     *, view: bool = False
 ) -> CodeWeaverSettings | DictView[CodeWeaverSettingsDict] | None:
@@ -113,24 +113,18 @@ def _get_settings(
 def _get_project_name() -> str:
     """Get the current project name from settings."""
     # Avoid circular dependency: check if settings exist without triggering initialization
-    if globals().get("_init", False) is False:
-        settings = _get_settings()
-        if settings is not None:
-            with contextlib.suppress(AttributeError, ValueError):
-                if (
-                    hasattr(settings, "project_name")
-                    and settings.project_name
-                    and not isinstance(settings.project_name, Unset)
-                ):
-                    return settings.project_name
-                if hasattr(settings, "project_path") and not isinstance(
-                    settings.project_path, Unset
-                ):
-                    return settings.project_path.name
-                if hasattr(settings, "project_name") and not isinstance(
-                    settings.project_name, Unset
-                ):
-                    return settings.project_name
+    if globals().get("_init", False) is False and (settings := _get_settings(view=False)):
+        with contextlib.suppress(AttributeError, ValueError):
+            if (
+                hasattr(settings, "project_name")
+                and settings.project_name
+                and not isinstance(settings.project_name, Unset)
+            ):
+                return cast(str, settings.project_name)
+            if hasattr(settings, "project_path") and not isinstance(settings.project_path, Unset):
+                return cast(Path, settings.project_path).name
+            if hasattr(settings, "project_name") and not isinstance(settings.project_name, Unset):
+                return cast(str, settings.project_name)
     with contextlib.suppress(Exception):
         from codeweaver.common.utils.git import get_project_path
 

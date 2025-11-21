@@ -160,8 +160,18 @@ def _get_embedding_settings() -> EmbeddingSettingsDict:
     return EmbeddingSettingsDict(
         dense=dense.get("model_settings") if dense else None,
         sparse=sparse.get("model_settings") if sparse else None,
-        backup_dense=profile["embedding"][0]["model_settings"],
-        backup_sparse=profile["sparse_embedding"][0]["model_settings"],
+        backup_dense=profile["embedding"][0]["model_settings"]
+        if profile
+        and profile["embedding"]
+        and isinstance(profile["embedding"], tuple)
+        and len(profile["embedding"]) > 0
+        else None,
+        backup_sparse=profile["sparse_embedding"][0]["model_settings"]
+        if profile
+        and profile["sparse_embedding"]
+        and isinstance(profile["sparse_embedding"], tuple)
+        and len(profile["sparse_embedding"]) > 0
+        else None,
     )
 
 

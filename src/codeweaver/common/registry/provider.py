@@ -762,7 +762,7 @@ class ProviderRegistry(BasedModel):
                         merged_opts["api_key"] = env_api_key
 
                     if merged_opts.get("url") and urlparse(merged_opts["url"]).netloc.endswith(
-                        "qdrant.io"
+                        ".qdrant.io"
                     ):
                         # it likes to complain about being unable to check compatibility with qdrant.io
                         merged_opts["check_compatibility"] = False

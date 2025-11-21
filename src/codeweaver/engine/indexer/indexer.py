@@ -166,7 +166,7 @@ class Indexer(BasedModel):
     """Main indexer class. Wraps a DiscoveredFilestore and chunkers."""
 
     _store: Annotated[BlakeStore[DiscoveredFile] | None, PrivateAttr()] = None
-    _walker: Annotated[rignore.Walker | None, PrivateAttr()] = None
+    _walker_settings: Annotated[dict[str, Any] | None, PrivateAttr()] = None
     _project_root: Annotated[DirectoryPath | None, PrivateAttr()] = None
     _checkpoint_manager: Annotated[CheckpointManager | None, PrivateAttr()] = None
     _checkpoint: Annotated[IndexingCheckpoint | None, PrivateAttr()] = None
@@ -192,16 +192,18 @@ class Indexer(BasedModel):
         auto_initialize_providers: bool = True,
         project_path: Path | None = None,
         project_root: Path | None = None,
+        walker_settings: dict[str, Any] | None = None,
     ) -> None:
         """Initialize the Indexer with optional pipeline components.
 
         Args:
-            walker: rignore walker for file discovery
+            walker: rignore walker for file discovery (deprecated, use walker_settings)
             store: Store for discovered file metadata
             chunking_service: Service for chunking files (optional)
             auto_initialize_providers: Auto-initialize providers from global registry
             project_path: Project path for checkpoint management (preferred)
             project_root: Alias for project_path (deprecated, use project_path)
+            walker_settings: Settings dict for creating rignore.Walker instances
         """
         from codeweaver.common.utils.git import get_project_path
 
@@ -209,14 +211,32 @@ class Indexer(BasedModel):
         if project_root is not None and project_path is None:
             project_path = project_root
 
-        # Auto-create walker if project_path is provided but walker is not
-        if walker is None and project_path is not None:
-            walker = rignore.Walker(project_path)
-            logger.debug("Auto-created walker for project_path: %s", project_path)
+        # Store walker settings for creating fresh walkers
+        # If walker is provided but not settings, extract settings from project_path
+        if walker_settings is not None:
+            self._walker_settings = walker_settings
+        elif walker is not None:
+            # Legacy: walker provided directly - store minimal settings
+            # Note: This means we can only recreate with default settings
+            if project_path is not None:
+                self._walker_settings = {"path": str(project_path)}
+            else:
+                # Can't recreate without project_path - store None
+                self._walker_settings = None
+                logger.warning(
+                    "Walker provided without walker_settings or project_path - "
+                    "cannot recreate walker if exhausted"
+                )
+        elif project_path is not None:
+            # Auto-create walker settings from project_path
+            self._walker_settings = {"path": str(project_path)}
+            logger.debug("Auto-created walker settings for project_path: %s", project_path)
+        else:
+            self._walker_settings = None
+
         from codeweaver.core.discovery import DiscoveredFile
 
         self._store = store or make_blake_store(value_type=DiscoveredFile)
-        self._walker = walker
         self._project_root = project_path
         self._chunking_service = chunking_service or _get_chunking_service()
         self._stats = IndexingStats()
@@ -960,21 +980,24 @@ class Indexer(BasedModel):
         return False
 
     def _discover_files_to_index(self) -> list[Path]:
-        """Discover files to index using the configured walker.
+        """Discover files to index using the configured walker settings.
 
+        Creates a fresh walker each time to avoid generator exhaustion issues.
         With incremental indexing, only returns files that are new or modified.
 
         Returns:
             List of file paths to index
         """
-        if not self._walker:
-            logger.warning("No walker configured, cannot prime index")
+        if not self._walker_settings:
+            logger.warning("No walker settings configured, cannot prime index")
             return []
 
         all_files: list[Path] = []
         try:
+            # Create a fresh walker each time - walkers are generators and get exhausted
+            walker = rignore.Walker(**self._walker_settings)
             with contextlib.suppress(StopIteration):
-                all_files.extend(p for p in self._walker if p and p.is_file())
+                all_files.extend(p for p in walker if p and p.is_file())
         except Exception:
             logger.exception("Failure during file discovery")
             return []
@@ -1198,10 +1221,11 @@ class Indexer(BasedModel):
                 "Use from_settings_async() for full initialization."
             )
 
-        walker = rignore.Walker(
-            **(index_settings.to_settings())  # type: ignore
+        walker_settings = index_settings.to_settings()
+        return cls(
+            walker_settings=walker_settings,
+            project_path=settings_map["project_path"],
         )
-        return cls(walker=walker, project_path=settings_map["project_path"])
 
     @classmethod
     async def from_settings_async(
@@ -1249,10 +1273,11 @@ class Indexer(BasedModel):
             await index_settings.set_inc_exc(project_path_value)
             logger.debug("inc_exc patterns initialized for project: %s", project_path_value)
 
-        walker = rignore.Walker(
-            **(index_settings.to_settings())  # type: ignore
+        walker_settings = index_settings.to_settings()
+        indexer = cls(
+            walker_settings=walker_settings,
+            project_path=settings_map["project_path"],
         )
-        indexer = cls(walker=walker, project_path=settings_map["project_path"])
 
         # Initialize providers asynchronously
         await indexer._initialize_providers_async()
