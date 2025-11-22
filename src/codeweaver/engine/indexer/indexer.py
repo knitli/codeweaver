@@ -162,14 +162,9 @@ class IndexingStats:
     chunks_embedded: int = 0
     chunks_indexed: int = 0
     start_time: float = dataclasses.field(default_factory=time.time)
-    files_with_errors: ClassVar[
-        Annotated[
-            list[Path],
-            Field(description="""List of file paths that encountered errors during indexing."""),
-        ]
-    ] = []
+    files_with_errors: list[Path] = dataclasses.field(default_factory=list)
     # Structured error tracking (new in v1.1.0)
-    structured_errors: ClassVar[list[IndexingError]] = []
+    structured_errors: list[IndexingError] = dataclasses.field(default_factory=list)
 
     def elapsed_time(self) -> float:
         """Calculate elapsed time since indexing started."""
@@ -183,8 +178,8 @@ class IndexingStats:
 
     @property
     def total_errors(self) -> int:
-        """Total number of files with errors."""
-        return len(self.files_with_errors)
+        """Total number of files with errors (based on structured error tracking)."""
+        return len(self.structured_errors)
 
     @property
     def total_files_discovered(self) -> int:
