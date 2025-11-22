@@ -16,14 +16,14 @@
   },
   "python.terminal.activateEnvironment": false,
   "debug.javascript.defaultRuntimeExecutable": {
-    "pwa-node": "/home/knitli/.local/share/mise/shims/node"
+    "pwa-node": "${userHome}/.local/share/mise/shims/node"
   },
   "ruff.path": [
-    "/home/knitli/.local/share/mise/shims/ruff"
+    "${userHome}/.local/share/mise/shims/ruff"
   ],
   "ruff.interpreter": [
-    "/home/knitli/.local/share/mise/shims/python"
+    "${userHome}/.local/share/mise/shims/python"
   ],
-  "python.defaultInterpreterPath": "/home/knitli/.local/share/mise/installs/python/3.13.9/bin/python",
-  "shellcheck.executablePath": "/home/knitli/.local/share/mise/shims/shellcheck"
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv",
+  "shellcheck.executablePath": "${userHome}/.local/share/mise/shims/shellcheck"
 }

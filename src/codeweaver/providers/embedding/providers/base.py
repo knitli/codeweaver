@@ -281,7 +281,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         if not chunks:
             return []
 
-        max_tokens = max_tokens or self.caps.max_batch_tokens
+        # Use getattr for sparse embeddings that don't have max_batch_tokens
+        # Default to 1M tokens (effectively unlimited) for local models
+        max_tokens = max_tokens or getattr(self.caps, 'max_batch_tokens', 1_000_000)
         tokenizer = self.tokenizer
 
         batches: list[list[CodeChunk]] = []
@@ -433,8 +435,10 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     ) -> EmbeddingErrorInfo:
         """Handle errors that occur during embedding."""
         logger.warning(
-            "Error occurred during document embedding. Batch ID: %s failed during `embed_documents`",
+            "Error occurred during document embedding. Batch ID: %s failed during `embed_documents`: %s (%s)",
             batch_id,
+            str(error),
+            type(error).__name__,
             extra={"documents": documents, "batch_id": batch_id},
         )
         if queries:

@@ -18,6 +18,16 @@ if TYPE_CHECKING:
     from codeweaver.providers.embedding.capabilities.types import EmbeddingCapabilitiesDict
 
 
+def _determine_max_batch_tokens(fields: dict[str, Any]) -> PositiveInt:
+    """Determine the maximum batch tokens from the provided fields."""
+    if provider := fields.get("provider"):
+        if provider.always_local:
+            return 1_000_000
+        if provider == Provider.VOYAGE:
+            return 120_000
+    return 100_000
+
+
 class EmbeddingModelCapabilities(BasedModel):
     """Describes the capabilities of an embedding model, such as the default dimension."""
 
@@ -62,12 +72,12 @@ class EmbeddingModelCapabilities(BasedModel):
     ] = None
     is_normalized: bool = False
     context_window: Annotated[PositiveInt, Field(ge=256)] = 512
-    max_batch_tokens: Annotated[
-        PositiveInt,
-        Field(
-            description="""Maximum tokens allowed per API batch request. Voyage AI allows 120K, so default is 100K for safety margin."""
-        ),
-    ] = 100_000
+    max_batch_tokens: PositiveInt = Field(
+        default_factory=_determine_max_batch_tokens,
+        description="""Maximum tokens allowed per batch.""",
+        ge=10_000,
+        le=1_000_000,
+    )
     supports_context_chunk_embedding: bool = False
     tokenizer: Literal["tokenizers", "tiktoken"] | None = None
     tokenizer_model: Annotated[
@@ -181,6 +191,12 @@ class SparseEmbeddingModelCapabilities(BasedModel):
         Literal["float32", "float16", "int8"],
         Field(description="""The default data type of the model."""),
     ] = "float16"
+    max_batch_tokens: PositiveInt = Field(
+        default_factory=_determine_max_batch_tokens,
+        description="""Maximum tokens allowed per batch.""",
+        ge=10_000,
+        le=1_000_000,
+    )
 
     _available: Annotated[
         bool, Field(description="""Whether the model is available for use.""")

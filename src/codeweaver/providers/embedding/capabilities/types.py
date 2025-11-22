@@ -34,6 +34,7 @@ type PartialCapabilities = dict[
         "other",
         "is_normalized",
         "hf_name",
+        "max_batch_tokens",
         "name",
         "output_dimensions",
         "output_dtypes",
@@ -75,6 +76,7 @@ class EmbeddingCapabilitiesDict(TypedDict, total=False):
     output_dtypes: NotRequired[tuple[str, ...] | None]
     is_normalized: NotRequired[bool]
     context_window: NotRequired[PositiveInt]
+    max_batch_tokens: NotRequired[PositiveInt]
     supports_context_chunk_embedding: NotRequired[bool]
     tokenizer: NotRequired[Literal["tokenizers", "tiktoken"]]
     tokenizer_model: NotRequired[str]

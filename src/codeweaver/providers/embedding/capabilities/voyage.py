@@ -44,6 +44,7 @@ def _get_shared_capabilities() -> PartialCapabilities:
         "context_window": 32_000,
         "tokenizer": "tokenizers",
         "tokenizer_model": "voyageai/",
+        "max_batch_tokens": 120_000,
         "preferred_metrics": ("dot",),
         # All voyageai models are normalized to length 1, so dot product will produce identical results to cosine similarity or Euclidean distance -- but is faster to compute.
     }
