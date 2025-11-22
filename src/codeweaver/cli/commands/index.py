@@ -463,7 +463,7 @@ async def index(
 
     if is_wsl_vscode():
         display.print_warning(
-            "It looks like you're running CodeWeaver inside WSL in a VSCode terminal. In our testing, we found indexing in that environment would cause the vscode server to crash. Until we can resolve this, we recommend running CodeWeaver either directly in a WSL terminal (outside vscode), in a native Linux or Windows environment, for a better experience. **You can use Codeweaver with vscode** -- just run it outside a vscode terminal."
+            "It looks like you're running CodeWeaver inside WSL in a VSCode terminal. In our testing, we found indexing in that environment would cause the vscode server to crash. Until we can resolve this, we recommend running CodeWeaver either directly in a WSL terminal (outside vscode), in a native Linux or Windows environment, for a better experience. **You can use Codeweaver with vscode** -- just run it outside a vscode terminal.  See issue [#135](https://github.com/knitli/codeweaver/issues/135)."
         )
         display.print_info("If you have already indexed your codebase, you'll probably be OK.")
 
