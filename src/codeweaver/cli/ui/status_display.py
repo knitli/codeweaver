@@ -97,7 +97,17 @@ class IndexingProgress:
             total_files: Total files across all batches
             has_sparse: Override sparse embedding display (uses init value if None)
         """
+        if not total_batches or total_batches < 1:
+            total_batches = 1
         if self._started:
+            # Already started - just update batch count if provided
+            if total_batches > 1 and self._batch_task is not None:
+                self._total_batches = total_batches
+                self.progress.update(
+                    self._batch_task,
+                    total=total_batches,
+                    description=f"[bold white]Batch 0/{total_batches}",
+                )
             return
 
         self._total_batches = total_batches
@@ -113,9 +123,7 @@ class IndexingProgress:
         self._checking_task = self.progress.add_task(
             "[cyan]Checking files...", total=0, visible=True
         )
-        self._chunking_task = self.progress.add_task(
-            "[blue]Chunking...", total=0, visible=True
-        )
+        self._chunking_task = self.progress.add_task("[blue]Chunking...", total=0, visible=True)
         self._dense_task = self.progress.add_task(
             "[magenta]Dense embedding...", total=0, visible=True
         )
@@ -123,9 +131,7 @@ class IndexingProgress:
             self._sparse_task = self.progress.add_task(
                 "[magenta]Sparse embedding...", total=0, visible=True
             )
-        self._indexing_task = self.progress.add_task(
-            "[green]Indexing...", total=0, visible=True
-        )
+        self._indexing_task = self.progress.add_task("[green]Indexing...", total=0, visible=True)
 
         self.progress.start()
         self._started = True
@@ -145,6 +151,9 @@ class IndexingProgress:
         """
         if not self._started:
             self.start(total_batches=1)
+
+        if not files_in_batch:
+            return
 
         self._current_batch = batch_num
 
@@ -190,6 +199,8 @@ class IndexingProgress:
         """
         if not self._started:
             self.start()
+        if not total or total <= 0:
+            return
 
         if self._checking_task is not None:
             self.progress.update(
@@ -263,6 +274,8 @@ class IndexingProgress:
             total_chunks: Total chunks to embed
         """
         if not self._started or self._sparse_task is None:
+            return
+        if not total_chunks or total_chunks <= 0:
             return
 
         self.progress.update(
@@ -456,6 +469,8 @@ class StatusDisplay:
             duration_seconds: Time taken in seconds
             files_per_second: Processing rate
         """
+        if not files_indexed or files_indexed <= 0:
+            return
         self.print_completion(
             f"Indexed {files_indexed} files, {chunks_created} chunks",
             details=f"({duration_seconds:.1f}s, {files_per_second:.1f} files/sec)",
@@ -587,6 +602,9 @@ class StatusDisplay:
             total: Total value
             message: Progress message
         """
+        if not total or total <= 0:
+            self.console.print(f"  [{current}/?] {message}")
+            return
         percentage = (current / total * 100) if total > 0 else 0
         self.console.print(f"  [{current}/{total}] ({percentage:.0f}%) {message}")
 
@@ -621,6 +639,9 @@ class StatusDisplay:
         Yields:
             Function to update progress (call with current count)
         """
+        if not total or total <= 0:
+            yield lambda current: None
+            return
         progress = Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -668,10 +689,10 @@ class StatusDisplay:
                     language_breakdown.items(), key=lambda x: x[1], reverse=True
                 )
             ]
-            lang_str = ", ".join(lang_parts[:5])  # Show top 5
+            lang_name = ", ".join(lang_parts[:5])  # Show top 5
             if len(language_breakdown) > 5:
-                lang_str += f", +{len(language_breakdown) - 5} more"
-            self.console.print(f"  Languages: {lang_str}")
+                lang_name += f", +{len(language_breakdown) - 5} more"
+            self.console.print(f"  Languages: {lang_name}")
 
         if avg_chunks_per_file is not None and avg_tokens_per_chunk is not None:
             self.console.print(
