@@ -67,9 +67,13 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
         # Detect if this is a context model
         self._is_context_model = "context" in caps.name
 
+        # Use get_dimension() to respect model_settings["dimension"] override
+        # This allows users to configure matryoshka dimension (e.g., 768 instead of default 1024)
+        configured_dimension = self.get_dimension()
+
         shared_kwargs = {
             "model": caps.name,
-            "output_dimension": caps.default_dimension,
+            "output_dimension": configured_dimension,
             "output_dtype": "float",
         }
         self.doc_kwargs |= shared_kwargs

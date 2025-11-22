@@ -10,6 +10,7 @@ from __future__ import annotations
 import inspect
 import logging
 import os
+import platform
 import sys
 
 from importlib import metadata, util
@@ -118,6 +119,28 @@ def is_test_environment() -> bool:
     return pytest_loaded or (pytest_flagged and (test_mode_disabled or pytest_current_test))
 
 
+def is_wsl() -> bool:
+    """Check if the code is running inside Windows Subsystem for Linux (WSL)."""
+    if sys.platform != "linux":
+        return False
+    return (
+        "microsoft" in platform.uname().release.lower()
+        or "WSL" in platform.uname().version
+        or any(
+            v
+            for v in ("WSL_INTEROP", "WSL_DISTRO_NAME", "WSLENV", "WSL2_GUI_APPS_ENABLED")
+            if v in os.environ
+        )
+    )
+
+
+def is_wsl_vscode() -> bool:
+    """Check if the code is running inside WSL with VSCode integration."""
+    from codeweaver.cli.utils import we_are_in_vscode
+
+    return is_wsl() and we_are_in_vscode()
+
+
 __all__ = (
     "file_is_binary",
     "has_package",
@@ -127,4 +150,6 @@ __all__ = (
     "is_pydantic_basemodel",
     "is_test_environment",
     "is_typeadapter",
+    "is_wsl",
+    "is_wsl_vscode",
 )

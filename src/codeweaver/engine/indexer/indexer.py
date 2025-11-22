@@ -1441,7 +1441,7 @@ class Indexer(BasedModel):
             batch_size: Number of chunks per batch
             progress_callback: Optional callback for progress updates
         """
-        from codeweaver.common.utils.proc import low_priority
+        from codeweaver.common.utils.procs import low_priority
         from codeweaver.providers.embedding.registry import get_embedding_registry
 
         total_chunks = len(chunks)
@@ -1475,10 +1475,6 @@ class Indexer(BasedModel):
                             )
                         else:
                             dense_embedded += len(batch)
-
-                        # Report dense embedding progress
-                        if progress_callback:
-                            progress_callback("dense_embedding", dense_embedded, total_chunks)
                     except ValueError as e:
                         if "already set" not in str(e):
                             raise
@@ -1491,6 +1487,11 @@ class Indexer(BasedModel):
                             i + len(batch),
                             exc_info=True,
                         )
+                        dense_embedded += len(batch)  # Still count as processed
+
+                    # Report dense embedding progress (always, even after exceptions)
+                    if progress_callback:
+                        progress_callback("dense_embedding", dense_embedded, total_chunks)
 
                 # Sparse embeddings
                 if self._sparse_provider:
@@ -1511,10 +1512,6 @@ class Indexer(BasedModel):
                             )
                         else:
                             sparse_embedded += len(batch)
-
-                        # Report sparse embedding progress
-                        if progress_callback:
-                            progress_callback("sparse_embedding", sparse_embedded, total_chunks)
                     except ValueError as e:
                         if "already set" not in str(e):
                             raise
@@ -1527,6 +1524,11 @@ class Indexer(BasedModel):
                             i + len(batch),
                             exc_info=True,
                         )
+                        sparse_embedded += len(batch)  # Still count as processed
+
+                    # Report sparse embedding progress (always, even after exceptions)
+                    if progress_callback:
+                        progress_callback("sparse_embedding", sparse_embedded, total_chunks)
 
                 # Update overall stats
                 self._stats.chunks_embedded += len(batch)
@@ -1586,8 +1588,8 @@ class Indexer(BasedModel):
                 self._failover_manager.is_failover_active if self._failover_manager else False
             )
             await self._vector_store.upsert(chunks, for_backup=is_backup)
-            self._stats.chunks_indexed = len(chunks)
-            logger.info("Indexed %d chunks to vector store", len(chunks))
+            self._stats.chunks_indexed += len(chunks)
+            logger.info("Indexed %d chunks to vector store (total: %d)", len(chunks), self._stats.chunks_indexed)
         except Exception:
             logger.warning("Failed to index to vector store", exc_info=True)
 

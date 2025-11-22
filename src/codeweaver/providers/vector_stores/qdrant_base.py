@@ -141,13 +141,13 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             "project_name": project_name,
             "vector_config": {
                 "dense": VectorParams(
-                    size=getattr(self._embedding_caps["backup_dense"], "dimension", 384)
+                    size=getattr(self._embedding_caps["backup_dense"], "default_dimension", 384)
                     if for_backup
                     else (
                         self._settings.get("dense", {}).get("dimension") or dense_dim
                         if (
                             dense_dim := getattr(
-                                self._embedding_caps.get("dense"), "dimension", None
+                                self._embedding_caps.get("dense"), "default_dimension", None
                             )
                         )
                         is not None

@@ -62,6 +62,12 @@ class EmbeddingModelCapabilities(BasedModel):
     ] = None
     is_normalized: bool = False
     context_window: Annotated[PositiveInt, Field(ge=256)] = 512
+    max_batch_tokens: Annotated[
+        PositiveInt,
+        Field(
+            description="""Maximum tokens allowed per API batch request. Voyage AI allows 120K, so default is 100K for safety margin."""
+        ),
+    ] = 100_000
     supports_context_chunk_embedding: bool = False
     tokenizer: Literal["tokenizers", "tiktoken"] | None = None
     tokenizer_model: Annotated[

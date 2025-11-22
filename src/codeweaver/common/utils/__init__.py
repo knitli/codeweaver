@@ -25,6 +25,8 @@ if TYPE_CHECKING:
         is_pydantic_basemodel,
         is_test_environment,
         is_typeadapter,
+        is_wsl,
+        is_wsl_vscode,
     )
     from codeweaver.common.utils.git import (
         get_git_branch,
@@ -36,7 +38,12 @@ if TYPE_CHECKING:
         try_git_rev_parse,
     )
     from codeweaver.common.utils.normalize import normalize_ext, sanitize_unicode
-    from codeweaver.common.utils.proc import asyncio_or_uvloop
+    from codeweaver.common.utils.procs import (
+        asyncio_or_uvloop,
+        get_optimal_workers,
+        low_priority,
+        very_low_priority,
+    )
     from codeweaver.common.utils.textify import (
         format_docstring,
         format_signature,
@@ -68,6 +75,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "generate_collection_name": (__spec__.parent, "utils"),
     "get_git_branch": (__spec__.parent, "git"),
     "get_git_revision": (__spec__.parent, "git"),
+    "get_optimal_workers": (__spec__.parent, "procs"),
     "get_possible_env_vars": (__spec__.parent, "utils"),
     "get_project_path": (__spec__.parent, "git"),
     "get_user_config_dir": (__spec__.parent, "utils"),
@@ -81,6 +89,9 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "is_pydantic_basemodel": (__spec__.parent, "checks"),
     "is_test_environment": (__spec__.parent, "checks"),
     "is_typeadapter": (__spec__.parent, "checks"),
+    "is_wsl": (__spec__.parent, "checks"),
+    "is_wsl_vscode": (__spec__.parent, "checks"),
+    "low_priority": (__spec__.parent, "procs"),
     "normalize_ext": (__spec__.parent, "normalize"),
     "rpartial": (__spec__.parent, "utils"),
     "sanitize_unicode": (__spec__.parent, "normalize"),
@@ -89,6 +100,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "to_tokens": (__spec__.parent, "textify"),
     "try_git_rev_parse": (__spec__.parent, "git"),
     "uuid7": (__spec__.parent, "utils"),
+    "very_low_priority": (__spec__.parent, "procs"),
 })
 
 
@@ -108,6 +120,7 @@ __all__ = (
     "generate_collection_name",
     "get_git_branch",
     "get_git_revision",
+    "get_optimal_workers",
     "get_possible_env_vars",
     "get_project_path",
     "get_user_config_dir",
@@ -121,7 +134,10 @@ __all__ = (
     "is_pydantic_basemodel",
     "is_test_environment",
     "is_typeadapter",
+    "is_wsl",
+    "is_wsl_vscode",
     "lazy_import",
+    "low_priority",
     "normalize_ext",
     "rpartial",
     "sanitize_unicode",
@@ -130,6 +146,7 @@ __all__ = (
     "to_tokens",
     "try_git_rev_parse",
     "uuid7",
+    "very_low_priority",
 )
 
 

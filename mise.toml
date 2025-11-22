@@ -53,7 +53,7 @@ REMOTE_ORIGIN_URL = '''http://github.com/knitli/codeweaver.git'''
 PROJECT_NAME = "{{ config_root | basename }}"
 CODEWEAVER_PROJECT_PATH = '''{{ config_root }}'''
 CODEWEAVER_VERSION = '''{{ read_file(path='src/codeweaver/_version.py') | split(pat=' = "') | nth(n=1) | split(pat='"') | nth(n=0) | trim }}'''
-CI = '''{{ exec(command='sh -c "if [ -z \"$GITHUB_ACTIONS\" ]; then echo \"false\"; else echo \"true\"; fi"') }}'''
+CI = '''{% if get_env(name="GITHUB_ACTIONS", default="") != "" %}true{% else %}false{% endif %}'''
 _.path = [
   "scripts/dev-env",
   "scripts/code-quality",
@@ -84,13 +84,16 @@ case "$python_path" in
 esac
 '''
 run_windows = '''
-$pythonPath = $env:python_path
-if ($pythonPath -notlike "*.venv\Scripts\python*") {
-    # Not in venv or python not found, source it
-    if (Test-Path .venv\Scripts\Activate.ps1) {
-        .venv\Scripts\Activate.ps1 2>$null
-    }
-}
+@echo off
+set "pythonPath=%python_path%"
+if not "%pythonPath%"=="%pythonPath:.venv\Scripts\python=%" (
+    rem Already in venv, do nothing
+) else (
+    rem Not in venv or python not found, source it
+    if exist .venv\Scripts\activate.bat (
+        call .venv\Scripts\activate.bat 2>NUL
+    )
+)
 '''
 
 [tasks.enter.env]
@@ -105,8 +108,8 @@ echo "Project: $PROJECT_NAME"
 echo "Virtual Environment: $VIRTUAL_ENV"
 '''
 run_windows = '''
-Write-Host "Project: $env:PROJECT_NAME"
-Write-Host "Virtual Environment: $env:VIRTUAL_ENV"
+echo Project: %PROJECT_NAME%
+echo Virtual Environment: %VIRTUAL_ENV%
 '''
 
 [tasks.sync]
@@ -117,7 +120,7 @@ echo "Syncing dependencies..."
 uv sync --extra full --group dev --group docs --group build --group test
 '''
 run_windows = '''
-Write-Host "Syncing dependencies..."
+echo Syncing dependencies...
 uv sync --extra full --group dev --group docs --group build --group test
 '''
 
@@ -130,7 +133,7 @@ print -P "%F{209}[codeweaver]%f Updating dependencies..."
 uv sync --extra full --group dev --group docs --group build --group test -U
 '''
 run_windows = '''
-Write-Host "[codeweaver] Updating dependencies..." -ForegroundColor DarkYellow
+echo [codeweaver] Updating dependencies...
 uv sync --extra full --group dev --group docs --group build --group test -U
 '''
 
@@ -143,9 +146,9 @@ git rev-parse --show-toplevel || true
 source .venv/bin/activate
 '''
 run_windows = '''
-Write-Host "[codeweaver] Sourcing virtual environment..." -ForegroundColor DarkYellow
+echo [codeweaver] Sourcing virtual environment...
 git rev-parse --show-toplevel
-.venv\Scripts\Activate.ps1
+.venv\Scripts\activate.bat
 '''
 
 [tasks.update]
@@ -161,12 +164,12 @@ run = [
   "print -P \"%F{209}[codeweaver]%f ✅ Tools updated! 🧰\"",
 ]
 run_windows = [
-  "Write-Host '[codeweaver] Updating tools...' -ForegroundColor DarkYellow",
+  "echo [codeweaver] Updating tools...",
   "mise -y upgrade",
   "mise -y self-update",
   "mise -y reshim",
   "mise -y prune",
-  "Write-Host '[codeweaver] ✅ Tools updated! 🧰' -ForegroundColor DarkYellow",
+  "echo [codeweaver] Tools updated!",
 ]
 
 [tasks.setup]
@@ -187,18 +190,18 @@ run = [
   "eval \"$(mise activate zsh)\" &>/dev/null",
 ]
 run_windows = [
-  "Write-Host '[codeweaver] Setting up development environment for the first time...' -ForegroundColor DarkYellow",
-  "mise set > $null",
-  "mise -y trust > $null",
-  "mise -y install > $null",
-  "mise -y venv > $null",
-  "mise run sync > $null",
-  "mise env > $null",
-  "git config include.path .gitconfig > $null",
-  "Add-Content -Path .git/info/exclude -Value 'src/codeweaver/_version.py'",
-  "Add-Content -Path .git/info/exclude -Value 'coverage.xml'",
-  "New-Item -ItemType SymbolicLink -Path CLAUDE.md -Target AGENTS.md -Force > $null",
-  "(&mise activate pwsh) | Out-String | Invoke-Expression",
+  "echo [codeweaver] Setting up development environment for the first time...",
+  "mise set > NUL 2>&1",
+  "mise -y trust > NUL 2>&1",
+  "mise -y install > NUL 2>&1 || echo.",
+  "mise -y venv > NUL 2>&1",
+  "mise run sync > NUL 2>&1",
+  "mise env > NUL 2>&1",
+  "git config include.path .gitconfig > NUL 2>&1",
+  "echo src/codeweaver/_version.py >> .git\\info\\exclude",
+  "echo coverage.xml >> .git\\info\\exclude",
+  "mklink CLAUDE.md AGENTS.md > NUL 2>&1",
+  "mise activate cmd",
 ]
 silent = "stdout"
 
@@ -211,8 +214,8 @@ run = [
   "uvx ruff check --fix --unsafe-fixes \"${usage_dir}\"",
 ]
 run_windows = [
-  "uvx ruff format \"$env:usage_dir\"",
-  "uvx ruff check --fix --unsafe-fixes \"$env:usage_dir\"",
+  "uvx ruff format .",
+  "uvx ruff check --fix --unsafe-fixes .",
 ]
 file = "scripts/code-quality/fix-ruff-patterns.sh"
 sources = ["{src,scripts,tests}/*.py"]
@@ -235,7 +238,7 @@ print -P "%F{209}[codeweaver]%f Running quality checks..."
 hk check
 '''
 run_windows = '''
-Write-Host "[codeweaver] Running quality checks..." -ForegroundColor DarkYellow
+echo [codeweaver] Running quality checks...
 hk check
 '''
 
@@ -251,12 +254,12 @@ else
 fi
 '''
 run_windows = '''
-Write-Host "Running linting checks..."
-if ($env:CI -eq "true") {
+echo Running linting checks...
+if "%CI%"=="true" (
     uv run ruff check . --output-format=github
-} else {
+) else (
     uv run ruff check .
-}
+)
 '''
 
 [tasks.format]
@@ -266,7 +269,7 @@ print -P "%F{209}[codeweaver]%f Running formatting checks..."
 hk check
 '''
 run_windows = '''
-Write-Host "[codeweaver] Running formatting checks..." -ForegroundColor DarkYellow
+echo [codeweaver] Running formatting checks...
 hk check
 '''
 
@@ -288,16 +291,14 @@ if [ -n "$files" ]; then
 fi
 '''
 run_windows = '''
-Write-Host "[codeweaver] Applying formatting...hold onto your butts 🚬...🦖 " -ForegroundColor DarkYellow
+echo [codeweaver] Applying formatting...hold onto your butts 🚬...🦖 
 uv run ruff format .
-$files = git ls-files "*.yaml","*.yml","*.json" 2>$null
-if ($files) {
-    $files | ForEach-Object { yq -iP --indent=2 "." $_ 2>$null }
-}
-$files = git ls-files "*.toml" 2>$null
-if ($files) {
-    tombi format $files 2>$null
-}
+for /f "delims=" %%f in ('git ls-files "*.yaml" "*.yml" "*.json" 2^>NUL') do (
+    yq -iP --indent=2 "." "%%f" 2>NUL
+)
+for /f "delims=" %%f in ('git ls-files "*.toml" 2^>NUL') do (
+    tombi format "%%f" 2>NUL
+)
 '''
 
 [tasks.graph]
@@ -305,7 +306,7 @@ usage = '''
 arg "[dir]" help="python directory to generate a graph for" default="src"
 '''
 run = '''mise x -- ruff analyze graph --target-version py312 --python .venv/bin/python "${usage_dir:-src/}"'''
-run_windows = '''mise x -- ruff analyze graph --target-version py312 --python .venv\Scripts\python.exe "$env:usage_dir"'''
+run_windows = '''mise x -- ruff analyze graph --target-version py312 --python .venv\Scripts\python.exe .'''
 
 [tasks.tree]
 run = '''uv tree --no-dev --group full'''
@@ -321,17 +322,17 @@ print -P "%F{209}[codeweaver]%f Running dependency sync..."
 mise run sync &
 '''
 run_windows = '''
-Write-Host "[codeweaver] Setting up Python virtual environment..." -ForegroundColor DarkYellow
+echo [codeweaver] Setting up Python virtual environment...
 uv venv --allow-existing --seed --keyring-provider subprocess --python 3.13 --refresh .venv
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "[codeweaver] ✅ Virtual environment is ready!" -ForegroundColor DarkYellow
-    .venv\Scripts\Activate.ps1
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "[codeweaver] ⚠️  Failed to source virtual environment." -ForegroundColor Red
-    }
-}
-Write-Host "[codeweaver] Running dependency sync..." -ForegroundColor DarkYellow
-Start-Job -ScriptBlock { mise run sync }
+if %ERRORLEVEL% equ 0 (
+    echo [codeweaver] Virtual environment is ready!
+    call .venv\Scripts\activate.bat
+    if %ERRORLEVEL% neq 0 (
+        echo [codeweaver] WARNING: Failed to source virtual environment.
+    )
+)
+echo [codeweaver] Running dependency sync...
+start /b mise run sync
 '''
 
 [tasks.test]
@@ -347,7 +348,7 @@ echo "Running tests..."
 uv run pytest
 '''
 run_windows = '''
-Write-Host "Running tests..."
+echo Running tests...
 uv run pytest
 '''
 
@@ -358,7 +359,7 @@ echo "Running tests with coverage..."
 uv run pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v
 '''
 run_windows = '''
-Write-Host "Running tests with coverage..."
+echo Running tests with coverage...
 uv run pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v
 '''
 
@@ -369,7 +370,7 @@ echo "Running tests in watch mode..."
 uv run pytest tests/ -f --tb=short
 '''
 run_windows = '''
-Write-Host "Running tests in watch mode..."
+echo Running tests in watch mode...
 uv run pytest tests/ -f --tb=short
 '''
 
@@ -382,11 +383,11 @@ uv build &&
 echo "✅ Package built successfully!"
 '''
 run_windows = '''
-Write-Host "Building package..."
+echo Building package...
 uv build
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "✅ Package built successfully!"
-}
+if %ERRORLEVEL% equ 0 (
+    echo Package built successfully!
+)
 '''
 
 [tasks.clean]
@@ -399,11 +400,15 @@ find . -type f -name "*.pyc" -delete &&
 echo "✅ Build artifacts cleaned!"
 '''
 run_windows = '''
-Write-Host "Cleaning build artifacts..."
-Remove-Item -Recurse -Force -ErrorAction SilentlyContinue dist/,build/,*.egg-info/,.coverage,test-results.xml
-Get-ChildItem -Recurse -Directory -Filter __pycache__ | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-Get-ChildItem -Recurse -Filter *.pyc | Remove-Item -Force -ErrorAction SilentlyContinue
-Write-Host "✅ Build artifacts cleaned!"
+echo Cleaning build artifacts...
+if exist dist rd /s /q dist
+if exist build rd /s /q build
+if exist *.egg-info rd /s /q *.egg-info
+if exist .coverage del .coverage
+if exist test-results.xml del test-results.xml
+for /d /r . %%d in (__pycache__) do @if exist "%%d" rd /s /q "%%d"
+del /s /q *.pyc 2>NUL
+echo Build artifacts cleaned!
 '''
 
 # Documentation
@@ -415,7 +420,7 @@ print -P "%F{209}[codeweaver]%f Starting %F{209}CodeWeaver%f documentation serve
 uv run --group docs mkdocs serve
 '''
 run_windows = '''
-Write-Host "[codeweaver] Starting CodeWeaver documentation server..." -ForegroundColor DarkYellow
+echo [codeweaver] Starting CodeWeaver documentation server...
 uv run --group docs mkdocs serve
 '''
 
@@ -427,7 +432,7 @@ echo "Building documentation..."
 uv run --group docs mkdocs build
 '''
 run_windows = '''
-Write-Host "Building documentation..."
+echo Building documentation...
 uv run --group docs mkdocs build
 '''
 
@@ -441,11 +446,10 @@ print -P "%F{209}[codeweaver]%f 🐍 Python version: $(python --version)"
 print -P "%F{209}[codeweaver]%f 🌞 UV version: $(uv --version)"
 '''
 run_windows = '''
-Write-Host "[codeweaver] CodeWeaver version information:" -ForegroundColor DarkYellow
-$version = uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])"
-Write-Host "[codeweaver] 📦 Package version: $version" -ForegroundColor DarkYellow
-Write-Host "[codeweaver] 🐍 Python version: $(python --version)" -ForegroundColor DarkYellow
-Write-Host "[codeweaver] 🌞 UV version: $(uv --version)" -ForegroundColor DarkYellow
+echo [codeweaver] CodeWeaver version information:
+for /f "delims=" %%v in ('uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])"') do echo [codeweaver] Package version: %%v
+for /f "delims=" %%v in ('python --version') do echo [codeweaver] Python version: %%v
+for /f "delims=" %%v in ('uv --version') do echo [codeweaver] UV version: %%v
 '''
 
 [tasks.changelog]
@@ -455,7 +459,7 @@ print -P "%F{209}[codeweaver]%f Generating changelog..."
 npm exec changeset version
 '''
 run_windows = '''
-Write-Host "[codeweaver] Generating changelog..." -ForegroundColor DarkYellow
+echo [codeweaver] Generating changelog...
 npm exec changeset version
 '''
 
@@ -480,20 +484,20 @@ run = [
   "print -P \"%F{209}[codeweaver]%f ✅ %F{green}All pre-commit checks passed! You're awesome!%f 🎉 ... and they said the Kobiyashi Maru was unwinnable! 🖖\"",
 ]
 run_windows = '''
-Write-Host "[codeweaver] Running CodeWeaver pre-commit checks 🪝... Thanks for your contributions! You're pretty cool. 🚀" -ForegroundColor DarkYellow
+echo [codeweaver] Running CodeWeaver pre-commit checks... Thanks for your contributions! You're pretty cool. 🚀
 hk fix
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "[codeweaver] ⚠️  You need to fix some issues before committing. Do not pass go, do not collect `$200. 💸 😦" -ForegroundColor Red
-    exit 1
-}
+if %ERRORLEVEL% neq 0 (
+    echo [codeweaver] WARNING: You need to fix some issues before committing.
+    exit /b 1
+)
 git add .
 hk check
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "[codeweaver] ⚠️  You need to fix some issues before committing. Almost there!" -ForegroundColor Red
-    exit 1
-}
+if %ERRORLEVEL% neq 0 (
+    echo [codeweaver] WARNING: You need to fix some issues before committing. Almost there!
+    exit /b 1
+)
 git add .
-Write-Host "[codeweaver] ✅ All pre-commit checks passed! You're awesome! 🎉 ... and they said the Kobiyashi Maru was unwinnable! 🖖" -ForegroundColor Green
+echo [codeweaver] All pre-commit checks passed! You're awesome!
 '''
 
 #! SECTION Aliases/Shortcuts for Scripts in scripts/ directory
@@ -506,8 +510,8 @@ echo "Running ruff pattern fixer..."
 ./scripts/code-quality/fix-ruff-patterns.sh "${*}"
 '''
 run_windows = '''
-Write-Host "Running ruff pattern fixer..."
-bash scripts/code-quality/fix-ruff-patterns.sh $args
+echo Running ruff pattern fixer...
+bash scripts/code-quality/fix-ruff-patterns.sh %*
 '''
 
 [tasks.update-licenses]
@@ -517,8 +521,8 @@ print -P "%F{209}[codeweaver]%f Updating %F{209}CodeWeaver%f license headers :..
 uv run -s scripts/code-quality/update-licenses.py --interactive "${*}"
 '''
 run_windows = '''
-Write-Host "[codeweaver] Updating CodeWeaver license headers..." -ForegroundColor DarkYellow
-uv run -s scripts/code-quality/update-licenses.py --interactive $args
+echo [codeweaver] Updating CodeWeaver license headers...
+uv run -s scripts/code-quality/update-licenses.py --interactive %*
 '''
 
 [tasks.dev-shell-init]
@@ -549,7 +553,7 @@ print -P "%F{209}[codeweaver]%f Adding 'plaintext' to unmarked code blocks in ma
 uv run -s scripts/docs/add-plaintext-to-codeblock.py
 '''
 run_windows = '''
-Write-Host "[codeweaver] Adding 'plaintext' to unmarked code blocks in markdown files..." -ForegroundColor DarkYellow
+echo [codeweaver] Adding 'plaintext' to unmarked code blocks in markdown files...
 uv run -s scripts/docs/add-plaintext-to-codeblock.py
 '''
 
@@ -560,7 +564,7 @@ print -P "%F{209}[codeweaver]%f Generating docs reference pages..."
 uv run -s scripts/docs/gen-ref-pages.py
 '''
 run_windows = '''
-Write-Host "[codeweaver] Generating docs reference pages..." -ForegroundColor DarkYellow
+echo [codeweaver] Generating docs reference pages...
 uv run -s scripts/docs/gen-ref-pages.py
 '''
 
@@ -571,7 +575,7 @@ print -P "%F{209}[codeweaver]%f Analyzing grammar structure..."
 uv run -s scripts/language-support/analyze-grammar-structure.py
 '''
 run_windows = '''
-Write-Host "[codeweaver] Analyzing grammar structure..." -ForegroundColor DarkYellow
+echo [codeweaver] Analyzing grammar structure...
 uv run -s scripts/language-support/analyze-grammar-structure.py
 '''
 
@@ -582,7 +586,7 @@ print -P "%F{209}[codeweaver]%f Building language mappings..."
 uv run -s scripts/language-support/build-language-mappings.py
 '''
 run_windows = '''
-Write-Host "[codeweaver] Building language mappings..." -ForegroundColor DarkYellow
+echo [codeweaver] Building language mappings...
 uv run -s scripts/language-support/build-language-mappings.py
 '''
 
@@ -593,7 +597,7 @@ print -P "%F{209}[codeweaver]%f Comparing delimiters..."
 uv run -s scripts/language-support/compare-delimiters.py
 '''
 run_windows = '''
-Write-Host "[codeweaver] Comparing delimiters..." -ForegroundColor DarkYellow
+echo [codeweaver] Comparing delimiters...
 uv run -s scripts/language-support/compare-delimiters.py
 '''
 
@@ -604,8 +608,8 @@ print -P "%F{209}[codeweaver]%f Downloading tree-sitter grammars..."
 uv run -s scripts/language-support/download-ts-grammars.py "${*}"
 '''
 run_windows = '''
-Write-Host "[codeweaver] Downloading tree-sitter grammars..." -ForegroundColor DarkYellow
-uv run -s scripts/language-support/download-ts-grammars.py $args
+echo [codeweaver] Downloading tree-sitter grammars...
+uv run -s scripts/language-support/download-ts-grammars.py %*
 '''
 
 [tasks.generate-supported-languages]
@@ -615,7 +619,7 @@ print -P "%F{209}[codeweaver]%f Generating supported languages..."
 uv run -s scripts/build/generate-supported-languages.py
 '''
 run_windows = '''
-Write-Host "[codeweaver] Generating supported languages..." -ForegroundColor DarkYellow
+echo [codeweaver] Generating supported languages...
 uv run -s scripts/build/generate-supported-languages.py
 '''
 
@@ -626,8 +630,8 @@ print -P "%F{209}[codeweaver]%f Converting MTEB model data to CodeWeaver format.
 uv run -s scripts/model-data/mteb-to-codeweaver.py "${*}"
 '''
 run_windows = '''
-Write-Host "[codeweaver] Converting MTEB model data to CodeWeaver format..." -ForegroundColor DarkYellow
-uv run -s scripts/model-data/mteb-to-codeweaver.py $args
+echo [codeweaver] Converting MTEB model data to CodeWeaver format...
+uv run -s scripts/model-data/mteb-to-codeweaver.py %*
 '''
 
 [tasks.apply-test-marks]
@@ -637,8 +641,8 @@ print -P "%F{209}[codeweaver]%f Applying test marks to tests..."
 uv run -s scripts/testing/apply-test-marks.py "${*}"
 '''
 run_windows = '''
-Write-Host "[codeweaver] Applying test marks to tests..." -ForegroundColor DarkYellow
-uv run -s scripts/testing/apply-test-marks.py $args
+echo [codeweaver] Applying test marks to tests...
+uv run -s scripts/testing/apply-test-marks.py %*
 '''
 
 [tasks.benchmark-detection]
@@ -648,8 +652,8 @@ print -P "%F{209}[codeweaver]%f Running benchmark detection..."
 uv run -s scripts/testing/benchmark-detection.py "${*}"
 '''
 run_windows = '''
-Write-Host "[codeweaver] Running benchmark detection..." -ForegroundColor DarkYellow
-uv run -s scripts/testing/benchmark-detection.py $args
+echo [codeweaver] Running benchmark detection...
+uv run -s scripts/testing/benchmark-detection.py %*
 '''
 
 [tasks.ansi-color-tests]
@@ -659,8 +663,8 @@ print -P "%F{209}[codeweaver]%f Checking ANSI color codes..."
 uv run -s scripts/utils/ansi-color-tests.py "${*}"
 '''
 run_windows = '''
-Write-Host "[codeweaver] Checking ANSI color codes..." -ForegroundColor DarkYellow
-uv run -s scripts/utils/ansi-color-tests.py $args
+echo [codeweaver] Checking ANSI color codes...
+uv run -s scripts/utils/ansi-color-tests.py %*
 '''
 
 [tasks.check-imports]
@@ -670,8 +674,8 @@ print -P "%F{209}[codeweaver]%f Checking imports..."
 uv run -s scripts/utils/check-imports.py "${*}"
 '''
 run_windows = '''
-Write-Host "[codeweaver] Checking imports..." -ForegroundColor DarkYellow
-uv run -s scripts/utils/check-imports.py $args
+echo [codeweaver] Checking imports...
+uv run -s scripts/utils/check-imports.py %*
 '''
 
 [tasks.get-all-exceptions]
@@ -681,11 +685,11 @@ print -P "%F{209}[codeweaver]%f Getting all exceptions..."
 uv run -s scripts/utils/get-all-exceptions.py "${*}"
 '''
 run_windows = '''
-Write-Host "[codeweaver] Getting all exceptions..." -ForegroundColor DarkYellow
-uv run -s scripts/utils/get-all-exceptions.py $args
+echo [codeweaver] Getting all exceptions...
+uv run -s scripts/utils/get-all-exceptions.py %*
 '''
 
 [tasks.activate]
 run = '''eval "$(mise activate zsh)" &>/dev/null'''
-run_windows = '''(&mise activate pwsh) | Out-String | Invoke-Expression'''
+run_windows = '''mise activate cmd'''
 hide = true

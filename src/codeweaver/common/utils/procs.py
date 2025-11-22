@@ -8,17 +8,78 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
+import platform
 import sys
 
 from contextlib import contextmanager
 from functools import cache
 from typing import TYPE_CHECKING
 
+from pydantic import PositiveInt
+
 
 if TYPE_CHECKING:
     from collections.abc import Generator
 
 logger = logging.getLogger(__name__)
+
+
+def python_version() -> tuple[str, str, str]:
+    """Get the current Python version tuple.
+
+    Returns:
+        Python version tuple
+    """
+    return platform.python_version_tuple()
+
+
+def get_cpu_count() -> PositiveInt:
+    """Get the number of CPUs available on the system.
+
+    NOTE: For most use cases, use `effective_cpu_count` instead to account for cgroup and other resource limits.
+
+    Returns:
+        Number of CPUs as a positive integer
+    """
+    # we can't use a trinary here because it will error if they're running 3.12
+    if python_version() >= ("3", "13", "0"):  # noqa: SIM108
+        cpu_func = os.process_cpu_count  # ty: ignore[unresolved-attribute]
+    else:
+        cpu_func = os.cpu_count
+    return cpu_func()  # ty: ignore[invalid-return-type]
+
+
+def effective_cpu_count() -> PositiveInt:
+    """Get the effective number of CPUs available, considering cgroup limits.
+
+    Returns:
+        Effective number of CPUs as a positive integer
+    """
+    try:
+        import psutil
+
+        cpu_count = get_cpu_count()
+        cgroup_limits = psutil.Process().cpu_affinity()
+        effective_count = min(len(cgroup_limits), cpu_count)  # type: ignore[arg-type]
+        # WSL reports full CPU count, but will sometimes hang or crash if all are used
+        return _wsl_count(effective_count)
+    except ImportError:
+        return _wsl_count(get_cpu_count())
+
+
+def _wsl_count(count: PositiveInt) -> PositiveInt:
+    """Adjust CPU count for WSL environments.
+
+    Args:
+        count: Original CPU count
+
+    Returns:
+        Adjusted CPU count for WSL environments
+    """
+    from codeweaver.common.utils.checks import is_wsl
+
+    return max(int(count / 2), 1) if is_wsl() else count
 
 
 @cache
@@ -172,11 +233,9 @@ def get_optimal_workers(task_type: str = "cpu") -> int:
     Returns:
         Recommended number of workers
     """
-    import os
+    cpu_count = effective_cpu_count()
 
-    cpu_count = os.cpu_count() or 4
-
-    return min(cpu_count * 2, 32) if task_type == "io" else max(cpu_count - 1, 1)
+    return min(cpu_count * 2, 16) if task_type == "io" else max(cpu_count - 1, 1)
 
 
 __all__ = ("asyncio_or_uvloop", "get_optimal_workers", "low_priority", "very_low_priority")

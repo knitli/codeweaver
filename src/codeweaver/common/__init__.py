@@ -50,6 +50,7 @@ if TYPE_CHECKING:
         generate_collection_name,
         get_git_branch,
         get_git_revision,
+        get_optimal_workers,
         get_possible_env_vars,
         get_project_path,
         has_package,
@@ -61,7 +62,10 @@ if TYPE_CHECKING:
         is_pydantic_basemodel,
         is_test_environment,
         is_typeadapter,
+        is_wsl,
+        is_wsl_vscode,
         lazy_import,
+        low_priority,
         normalize_ext,
         rpartial,
         sanitize_unicode,
@@ -70,6 +74,7 @@ if TYPE_CHECKING:
         to_tokens,
         try_git_rev_parse,
         uuid7,
+        very_low_priority,
     )
 
 
@@ -107,6 +112,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "generate_collection_name": (__spec__.parent, "utils"),
     "get_git_branch": (__spec__.parent, "utils"),
     "get_git_revision": (__spec__.parent, "utils"),
+    "get_optimal_workers": (__spec__.parent, "utils"),
     "get_possible_env_vars": (__spec__.parent, "utils"),
     "get_project_path": (__spec__.parent, "utils"),
     "get_session_statistics": (__spec__.parent, "statistics"),
@@ -120,8 +126,11 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "is_pydantic_basemodel": (__spec__.parent, "utils"),
     "is_test_environment": (__spec__.parent, "utils"),
     "is_typeadapter": (__spec__.parent, "utils"),
+    "is_wsl": (__spec__.parent, "checks"),
+    "is_wsl_vscode": (__spec__.parent, "checks"),
     "lazy_import": (__spec__.parent, "utils"),
     "log_to_client_or_fallback": (__spec__.parent, "logging"),
+    "low_priority": (__spec__.parent, "utils"),
     "normalize_ext": (__spec__.parent, "utils"),
     "record_timed_http_request": (__spec__.parent, "statistics"),
     "rpartial": (__spec__.parent, "utils"),
@@ -133,6 +142,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "to_tokens": (__spec__.parent, "textify"),
     "try_git_rev_parse": (__spec__.parent, "utils"),
     "uuid7": (__spec__.parent, "utils"),
+    "very_low_priority": (__spec__.parent, "utils"),
 })
 """Dynamically import submodules and classes for the common package.
 
@@ -184,6 +194,7 @@ __all__ = (
     "generate_collection_name",
     "get_git_branch",
     "get_git_revision",
+    "get_optimal_workers",
     "get_possible_env_vars",
     "get_project_path",
     "get_session_statistics",
@@ -197,8 +208,11 @@ __all__ = (
     "is_pydantic_basemodel",
     "is_test_environment",
     "is_typeadapter",
+    "is_wsl",
+    "is_wsl_vscode",
     "lazy_import",
     "log_to_client_or_fallback",
+    "low_priority",
     "normalize_ext",
     "record_timed_http_request",
     "rpartial",
@@ -210,6 +224,7 @@ __all__ = (
     "to_tokens",
     "try_git_rev_parse",
     "uuid7",
+    "very_low_priority",
 )
 
 

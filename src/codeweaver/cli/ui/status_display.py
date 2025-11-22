@@ -69,6 +69,7 @@ class IndexingProgress:
         )
 
         # Task IDs for each phase
+        self._overall_task: int | None = None  # Total files progress
         self._batch_task: int | None = None
         self._checking_task: int | None = None
         self._chunking_task: int | None = None
@@ -79,13 +80,13 @@ class IndexingProgress:
         # Batch tracking
         self._current_batch = 0
         self._total_batches = 0
+        self._total_files = 0
         self._started = False
 
         # Cumulative totals across batches
-        self._total_files_processed = 0
-        self._total_chunks_created = 0
-        self._total_chunks_embedded = 0
-        self._total_chunks_indexed = 0
+        self._cumulative_files_processed = 0
+        self._cumulative_chunks_created = 0
+        self._batch_chunks = 0  # Chunks in current batch
 
     def start(
         self, total_batches: int = 1, total_files: int = 0, *, has_sparse: bool | None = None
@@ -100,7 +101,7 @@ class IndexingProgress:
         if not total_batches or total_batches < 1:
             total_batches = 1
         if self._started:
-            # Already started - just update batch count if provided
+            # Already started - just update counts if provided
             if total_batches > 1 and self._batch_task is not None:
                 self._total_batches = total_batches
                 self.progress.update(
@@ -108,30 +109,49 @@ class IndexingProgress:
                     total=total_batches,
                     description=f"[bold white]Batch 0/{total_batches}",
                 )
+            if total_files > 0 and self._overall_task is not None:
+                self._total_files = total_files
+                self.progress.update(
+                    self._overall_task,
+                    total=total_files,
+                    description=f"[bold cyan]Files 0/{total_files}",
+                )
             return
 
         self._total_batches = total_batches
+        self._total_files = total_files
         if has_sparse is not None:
             self._has_sparse = has_sparse
 
-        # Batch progress (overall)
+        # Overall files progress
+        self._overall_task = self.progress.add_task(
+            f"[bold cyan]Files 0/{total_files}", total=total_files or 1, visible=True
+        )
+
+        # Batch progress
         self._batch_task = self.progress.add_task(
             f"[bold white]Batch 0/{total_batches}", total=total_batches, visible=True
         )
 
         # Per-batch phases - all visible from start
+        # Use total=1 for inactive tasks to show 0% (grey bar) instead of 100%
         self._checking_task = self.progress.add_task(
-            "[cyan]Checking files...", total=0, visible=True
+            "[dim]  Checking...[/dim]", total=1, visible=True
         )
-        self._chunking_task = self.progress.add_task("[blue]Chunking...", total=0, visible=True)
+        self._chunking_task = self.progress.add_task(
+            "[dim]  Chunking...[/dim]", total=1, visible=True
+        )
         self._dense_task = self.progress.add_task(
-            "[magenta]Dense embedding...", total=0, visible=True
+            "[dim]  Dense embed...[/dim]", total=1, visible=True
         )
         if self._has_sparse:
             self._sparse_task = self.progress.add_task(
-                "[magenta]Sparse embedding...", total=0, visible=True
+                "[dim]  Sparse embed...[/dim]", total=1, visible=True
             )
-        self._indexing_task = self.progress.add_task("[green]Indexing...", total=0, visible=True)
+        # Indexing is atomic - just show spinner, no bar progress
+        self._indexing_task = self.progress.add_task(
+            "[dim]  Indexing...[/dim]", total=1, visible=True
+        )
 
         self.progress.start()
         self._started = True
@@ -165,29 +185,51 @@ class IndexingProgress:
                 description=f"[bold white]Batch {batch_num}/{self._total_batches}",
             )
 
-        # Reset per-batch tasks for new batch
+        # Reset per-batch tasks for new batch (reset timers and state)
+        self._batch_chunks = 0
+
+        # Reset and update checking task
         if self._checking_task is not None:
+            self.progress.reset(self._checking_task)
             self.progress.update(
                 self._checking_task,
                 completed=0,
                 total=files_in_batch,
-                description="[cyan]Checking files...",
+                description="[cyan]  Checking...",
             )
+
+        # Reset other tasks to inactive state (dim, 0/1 for grey bar)
         if self._chunking_task is not None:
+            self.progress.reset(self._chunking_task)
             self.progress.update(
-                self._chunking_task, completed=0, total=0, description="[blue]Chunking..."
+                self._chunking_task,
+                completed=0,
+                total=1,
+                description="[dim]  Chunking...[/dim]",
             )
         if self._dense_task is not None:
+            self.progress.reset(self._dense_task)
             self.progress.update(
-                self._dense_task, completed=0, total=0, description="[magenta]Dense embedding..."
+                self._dense_task,
+                completed=0,
+                total=1,
+                description="[dim]  Dense embed...[/dim]",
             )
         if self._sparse_task is not None:
+            self.progress.reset(self._sparse_task)
             self.progress.update(
-                self._sparse_task, completed=0, total=0, description="[magenta]Sparse embedding..."
+                self._sparse_task,
+                completed=0,
+                total=1,
+                description="[dim]  Sparse embed...[/dim]",
             )
         if self._indexing_task is not None:
+            self.progress.reset(self._indexing_task)
             self.progress.update(
-                self._indexing_task, completed=0, total=0, description="[green]Indexing..."
+                self._indexing_task,
+                completed=0,
+                total=1,
+                description="[dim]  Indexing...[/dim]",
             )
 
     def update_checking(self, current: int, total: int) -> None:
@@ -207,7 +249,7 @@ class IndexingProgress:
                 self._checking_task,
                 completed=current,
                 total=total,
-                description=f"[cyan]Checking files... ({current}/{total})",
+                description=f"[cyan]  Checking... ({current}/{total})",
             )
 
     def update_chunking(self, files_processed: int, total_files: int, chunks_created: int) -> None:
@@ -221,13 +263,17 @@ class IndexingProgress:
         if not self._started:
             self.start()
 
-        # Mark checking complete
+        # Track batch chunks for embedding progress
+        self._batch_chunks = chunks_created
+
+        # Mark checking complete (use original total from checking task, not chunking total)
         if self._checking_task is not None:
+            task = self.progress.tasks[self._checking_task]
+            original_total = int(task.total) if task.total else total_files
             self.progress.update(
                 self._checking_task,
-                completed=total_files,
-                total=total_files,
-                description=f"[cyan]✓ Checked ({total_files} files)",
+                completed=original_total,
+                description=f"[cyan]  ✓ Checked ({original_total})",
             )
 
         if self._chunking_task is not None:
@@ -235,7 +281,7 @@ class IndexingProgress:
                 self._chunking_task,
                 completed=files_processed,
                 total=total_files,
-                description=f"[blue]Chunking... ({chunks_created} chunks)",
+                description=f"[blue]  Chunking... ({chunks_created} chunks)",
             )
 
     def update_dense_embedding(self, chunks_embedded: int, total_chunks: int) -> None:
@@ -247,15 +293,27 @@ class IndexingProgress:
         """
         if not self._started:
             self.start()
+        if not total_chunks or total_chunks <= 0:
+            return
 
-        # Mark chunking complete on first embedding update
+        # Mark checking and chunking complete on first embedding update
+        if self._checking_task is not None:
+            task = self.progress.tasks[self._checking_task]
+            if task.total and task.total > 0 and task.completed < task.total:
+                self.progress.update(
+                    self._checking_task,
+                    completed=task.total,
+                    total=task.total,
+                )
+
         if self._chunking_task is not None:
             task = self.progress.tasks[self._chunking_task]
             if task.total and task.total > 0:
                 self.progress.update(
                     self._chunking_task,
                     completed=task.total,
-                    description=f"[blue]✓ Chunked ({int(task.total)} files)",
+                    total=task.total,
+                    description=f"[blue]  ✓ Chunked ({self._batch_chunks})",
                 )
 
         if self._dense_task is not None:
@@ -263,7 +321,7 @@ class IndexingProgress:
                 self._dense_task,
                 completed=chunks_embedded,
                 total=total_chunks,
-                description=f"[magenta]Dense embedding... ({chunks_embedded}/{total_chunks})",
+                description=f"[magenta]  Dense... ({chunks_embedded}/{total_chunks})",
             )
 
     def update_sparse_embedding(self, chunks_embedded: int, total_chunks: int) -> None:
@@ -282,60 +340,98 @@ class IndexingProgress:
             self._sparse_task,
             completed=chunks_embedded,
             total=total_chunks,
-            description=f"[magenta]Sparse embedding... ({chunks_embedded}/{total_chunks})",
+            description=f"[magenta]  Sparse... ({chunks_embedded}/{total_chunks})",
         )
 
     def update_indexing(self, chunks_indexed: int, total_chunks: int) -> None:
         """Update indexing phase progress.
 
+        Indexing is atomic (single upsert), so we just show spinner + text.
+
         Args:
-            chunks_indexed: Chunks indexed so far
+            chunks_indexed: Chunks indexed (usually equals total when called)
             total_chunks: Total chunks to index
         """
         if not self._started:
             self.start()
+        if not total_chunks or total_chunks <= 0:
+            return
 
         # Mark embedding complete
         if self._dense_task is not None:
             task = self.progress.tasks[self._dense_task]
-            if task.total and task.total > 0:
+            if task.total and task.total > 1:  # > 1 means it was active
                 self.progress.update(
                     self._dense_task,
                     completed=task.total,
-                    description=f"[magenta]✓ Dense ({int(task.total)} chunks)",
+                    description=f"[magenta]  ✓ Dense ({int(task.total)})",
                 )
         if self._sparse_task is not None:
             task = self.progress.tasks[self._sparse_task]
-            if task.total and task.total > 0:
+            if task.total and task.total > 1:  # > 1 means it was active
                 self.progress.update(
                     self._sparse_task,
                     completed=task.total,
-                    description=f"[magenta]✓ Sparse ({int(task.total)} chunks)",
+                    description=f"[magenta]  ✓ Sparse ({int(task.total)})",
                 )
 
+        # Indexing is atomic - just show it's complete (spinner-only, no bar progress)
         if self._indexing_task is not None:
-            self.progress.update(
-                self._indexing_task,
-                completed=chunks_indexed,
-                total=total_chunks,
-                description=f"[green]Indexing... ({chunks_indexed}/{total_chunks})",
-            )
-
-    def complete_batch(self) -> None:
-        """Mark current batch as complete."""
-        # Mark indexing complete
-        if self._indexing_task is not None:
-            task = self.progress.tasks[self._indexing_task]
-            if task.total and task.total > 0:
+            if chunks_indexed >= total_chunks:
+                # Complete - show checkmark
                 self.progress.update(
                     self._indexing_task,
-                    completed=task.total,
-                    description=f"[green]✓ Indexed ({int(task.total)} chunks)",
+                    completed=1,
+                    total=1,
+                    description=f"[green]  ✓ Indexed ({total_chunks})",
+                )
+            else:
+                # In progress - show spinner with text (keep 0/1 for no bar fill)
+                self.progress.update(
+                    self._indexing_task,
+                    completed=0,
+                    total=1,
+                    description=f"[green]  Indexing... ({total_chunks} chunks)",
+                )
+
+    def complete_batch(self, files_in_batch: int = 0) -> None:
+        """Mark current batch as complete.
+
+        Args:
+            files_in_batch: Number of files processed in this batch
+        """
+        # Mark indexing complete (if it was active - total > 1)
+        if self._indexing_task is not None:
+            task = self.progress.tasks[self._indexing_task]
+            # Only mark complete if indexing actually happened (description changed from dim)
+            if task.total == 1 and "[green]" in str(task.description):
+                self.progress.update(
+                    self._indexing_task,
+                    completed=1,
+                    total=1,
+                    description=f"[green]  ✓ Indexed ({self._batch_chunks})",
                 )
 
         # Update batch counter
         if self._batch_task is not None:
             self.progress.update(self._batch_task, completed=self._current_batch)
+
+        # Update overall files progress
+        if files_in_batch > 0:
+            self._cumulative_files_processed += files_in_batch
+        else:
+            # Estimate from checking task if not provided
+            if self._checking_task is not None:
+                task = self.progress.tasks[self._checking_task]
+                if task.total and task.total > 0:
+                    self._cumulative_files_processed += int(task.total)
+
+        if self._overall_task is not None and self._total_files > 0:
+            self.progress.update(
+                self._overall_task,
+                completed=self._cumulative_files_processed,
+                description=f"[bold cyan]Files {self._cumulative_files_processed}/{self._total_files}",
+            )
 
     def complete(self) -> None:
         """Mark all batches as complete."""

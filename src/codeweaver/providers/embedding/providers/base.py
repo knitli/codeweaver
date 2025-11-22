@@ -266,6 +266,71 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     def base_url(self) -> str | None:
         """Get the base URL of the embedding provider, if any."""
 
+    def _split_by_tokens(
+        self, chunks: Sequence[CodeChunk], max_tokens: int | None = None
+    ) -> list[list[CodeChunk]]:
+        """Split chunks into batches that respect token limits.
+
+        Args:
+            chunks: Sequence of chunks to split
+            max_tokens: Maximum tokens per batch (default: model's max_batch_tokens)
+
+        Returns:
+            List of chunk batches, each within the token limit
+        """
+        if not chunks:
+            return []
+
+        max_tokens = max_tokens or self.caps.max_batch_tokens
+        tokenizer = self.tokenizer
+
+        batches: list[list[CodeChunk]] = []
+        current_batch: list[CodeChunk] = []
+        current_tokens = 0
+
+        for chunk in chunks:
+            # Estimate tokens for this chunk
+            chunk_text = chunk.content
+            chunk_tokens = tokenizer.estimate(chunk_text)
+
+            # If single chunk exceeds limit, log warning and include it anyway
+            # (the API will handle the error, but we shouldn't silently drop it)
+            if chunk_tokens > max_tokens:
+                logger.warning(
+                    "Single chunk exceeds max batch tokens (%d > %d), including anyway",
+                    chunk_tokens,
+                    max_tokens,
+                )
+                if current_batch:
+                    batches.append(current_batch)
+                    current_batch = []
+                    current_tokens = 0
+                batches.append([chunk])
+                continue
+
+            # If adding this chunk would exceed limit, start new batch
+            if current_tokens + chunk_tokens > max_tokens and current_batch:
+                batches.append(current_batch)
+                current_batch = []
+                current_tokens = 0
+
+            current_batch.append(chunk)
+            current_tokens += chunk_tokens
+
+        # Don't forget the last batch
+        if current_batch:
+            batches.append(current_batch)
+
+        if len(batches) > 1:
+            logger.debug(
+                "Split %d chunks into %d token-aware batches (max %d tokens/batch)",
+                len(chunks),
+                len(batches),
+                max_tokens,
+            )
+
+        return batches
+
     def _check_circuit_breaker(self) -> None:
         """Check circuit breaker state before making API calls.
 
@@ -439,12 +504,31 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         )
 
         try:
-            # Use retry wrapper instead of calling _embed_documents directly
-            results: (
-                Sequence[Sequence[float]]
-                | Sequence[Sequence[int]]
-                | Sequence[dict[str, list[int] | list[float]]]
-            ) = await self._embed_documents_with_retry(chunks, for_backup=for_backup, **kwargs)
+            # Split chunks into token-aware batches to avoid exceeding API limits
+            token_batches = self._split_by_tokens(chunks)
+
+            all_results: list[Sequence[float] | Sequence[int] | dict[str, list[int] | list[float]]] = []
+
+            for batch_idx, token_batch in enumerate(token_batches):
+                if len(token_batches) > 1:
+                    logger.debug(
+                        "Processing token batch %d/%d (%d chunks)",
+                        batch_idx + 1,
+                        len(token_batches),
+                        len(token_batch),
+                    )
+
+                # Use retry wrapper instead of calling _embed_documents directly
+                batch_results: (
+                    Sequence[Sequence[float]]
+                    | Sequence[Sequence[int]]
+                    | Sequence[dict[str, list[int] | list[float]]]
+                ) = await self._embed_documents_with_retry(
+                    token_batch, for_backup=for_backup, **kwargs
+                )
+                all_results.extend(batch_results)
+
+            results = all_results
         except CircuitBreakerOpenError as e:
             # Circuit breaker open - return error immediately
             await log_to_client_or_fallback(
@@ -805,6 +889,30 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             or isinstance(embeddings[0], SparseEmbedding)
         )
         attr = "sparse" if is_sparse else "dense"
+
+        # Validate embedding dimensions for dense embeddings
+        if not is_sparse and embeddings:
+            expected_dim = self.get_dimension(sparse=False, backup=for_backup)
+            first_embedding = embeddings[0]
+            if not isinstance(first_embedding, SparseEmbedding):
+                actual_dim = len(first_embedding)
+                if actual_dim != expected_dim:
+                    raise CodeWeaverValidationError(
+                        f"Embedding dimension mismatch: expected {expected_dim}, got {actual_dim}",
+                        details={
+                            "expected_dimension": expected_dim,
+                            "actual_dimension": actual_dim,
+                            "model_name": self.model_name,
+                            "provider": type(self)._provider.value if hasattr(type(self), "_provider") else "unknown",
+                            "for_backup": for_backup,
+                        },
+                        suggestions=[
+                            f"Check that your embedding model '{self.model_name}' is configured with dimension={actual_dim}",
+                            "If using matryoshka embeddings, ensure the dimension parameter matches your config",
+                            "Verify the model in your config matches the model being used by your embedding provider",
+                            "Run 'cw index --clear' to rebuild the collection with the correct dimensions",
+                        ],
+                    )
 
         chunk_infos: list[EmbeddingBatchInfo] = []
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings, strict=True)):

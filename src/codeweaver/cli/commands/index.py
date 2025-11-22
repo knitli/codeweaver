@@ -333,6 +333,9 @@ async def _run_standalone_indexing(
     # Create progress tracker with batch support
     progress_tracker = IndexingProgress(console=display.console, has_sparse=has_sparse)
 
+    # Track files in current batch for complete_batch
+    current_batch_files = [0]  # Use list to allow mutation in closure
+
     # Create callback that maps to the new IndexingProgress methods
     def progress_callback(
         phase: str, current: int, total: int, *, extra: dict[str, Any] | None = None
@@ -345,9 +348,11 @@ async def _run_standalone_indexing(
             else:
                 # Start of a specific batch
                 files_in_batch = extra.get("files_in_batch", 0) if extra else 0
+                current_batch_files[0] = files_in_batch
                 progress_tracker.start_batch(current, files_in_batch)
         elif phase == "batch_complete":
-            progress_tracker.complete_batch()
+            progress_tracker.complete_batch(current_batch_files[0])
+            current_batch_files[0] = 0
         elif phase == "discovery":
             # Legacy discovery callback - maps to checking
             progress_tracker.update_discovery(current, total)
@@ -385,7 +390,21 @@ async def _run_standalone_indexing(
     display.console.print(
         f"  Processing rate: [cyan]{stats.processing_rate():.2f}[/cyan] files/sec"
     )
-    display.console.print(f"  Time elapsed: [cyan]{stats.elapsed_time():.2f}[/cyan] seconds")
+
+    # Format elapsed time in human-readable format
+    elapsed = stats.elapsed_time()
+    if elapsed >= 3600:
+        hours = int(elapsed // 3600)
+        minutes = int((elapsed % 3600) // 60)
+        seconds = int(elapsed % 60)
+        time_str = f"{hours}h {minutes}m {seconds}s"
+    elif elapsed >= 60:
+        minutes = int(elapsed // 60)
+        seconds = int(elapsed % 60)
+        time_str = f"{minutes}m {seconds}s"
+    else:
+        time_str = f"{elapsed:.1f}s"
+    display.console.print(f"  Time elapsed: [cyan]{time_str}[/cyan]")
 
     if stats.total_errors > 0:
         display.console.print(f"  [yellow]Files with errors: {stats.total_errors}[/yellow]")
@@ -440,6 +459,13 @@ async def index(
     """
     display = _display or get_display()
     error_handler = CLIErrorHandler(display, verbose=False, debug=False)
+    from codeweaver.common.utils import is_wsl_vscode
+
+    if is_wsl_vscode():
+        display.print_warning(
+            "It looks like you're running CodeWeaver inside WSL in a VSCode terminal. In our testing, we found indexing in that environment would cause the vscode server to crash. Until we can resolve this, we recommend running CodeWeaver either directly in a WSL terminal (outside vscode), in a native Linux or Windows environment, for a better experience. **You can use Codeweaver with vscode** -- just run it outside a vscode terminal."
+        )
+        display.print_info("If you have already indexed your codebase, you'll probably be OK.")
 
     try:
         # Handle --clear flag

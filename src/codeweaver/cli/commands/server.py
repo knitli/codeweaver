@@ -79,6 +79,13 @@ async def server(
     """Start CodeWeaver MCP server."""
     display = StatusDisplay()
     error_handler = CLIErrorHandler(display, verbose=verbose, debug=debug)
+    from codeweaver.common.utils import is_wsl_vscode
+
+    if is_wsl_vscode():
+        display.print_warning(
+            "It looks like you're running CodeWeaver inside WSL in a VSCode terminal. In our testing, we found indexing in that environment would cause the vscode server to crash. Until we can resolve this, we recommend running CodeWeaver either directly in a WSL terminal (outside vscode), in a native Linux or Windows environment, for a better experience. **You can use Codeweaver with vscode** -- just run it outside a vscode terminal."
+        )
+        display.print_info("If you have already indexed your codebase, you'll probably be OK.")
 
     try:
         await _run_server(
