@@ -64,7 +64,7 @@ excludes = [
   "tests/fixtures/deep_nesting.py",
   "tests/fixtures/malformed.py",
   "tests/fixtures/sample.go",
-  "data/*",
-  "specs/*",
-  "plans/*",
+  "data/**",
+  "specs/**",
+  "plans/**",
 ]

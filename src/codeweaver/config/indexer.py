@@ -100,7 +100,7 @@ class IndexerSettingsDict(TypedDict, total=False):
     use_gitignore: NotRequired[bool]
     use_other_ignore_files: NotRequired[bool]
     ignore_hidden: NotRequired[bool]
-    index_storage_path: NotRequired[Path | None]
+    _index_cache_dir: NotRequired[Path | None]
     include_github_dir: NotRequired[bool]
     include_tooling_dirs: NotRequired[bool]
     rignore_options: NotRequired[RignoreSettings | Unset]
@@ -389,23 +389,23 @@ class IndexerSettings(BasedModel):
     @property
     def cache_dir(self) -> DirectoryPath:
         """Effective storage directory for index data."""
-        # with the validation and serialization alias, `index_storage_path` maps to `_index_cache_dir`
-        if not self.index_storage_path:
-            path = self.index_storage_path
+        # with the validation and serialization alias, `_index_cache_dir` maps to `_index_cache_dir`
+        if not self._index_cache_dir:
+            path = self._index_cache_dir
             # Get the parent directory (cache_dir should be a directory, not a file)
             dir_path = path.parent if path and path.is_file() else path or get_storage_path()
             if not dir_path.exists():
                 dir_path.mkdir(parents=True, exist_ok=True)
-            self.index_storage_path = dir_path
-        return self.index_storage_path
+            self._index_cache_dir = dir_path
+        return self._index_cache_dir
 
     @computed_field
     @property
     def storage_file(self) -> FilePath:
         """Effective storage file path for index data."""
         project_name = _get_project_name()
-        if self.index_storage_path:
-            return self.index_storage_path / f"{project_name}_index.json"
+        if self._index_cache_dir:
+            return self._index_cache_dir / f"{project_name}_index.json"
         return self.cache_dir / f"{project_name}_index.json"
 
     @computed_field
