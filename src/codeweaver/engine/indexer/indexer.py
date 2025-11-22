@@ -492,6 +492,45 @@ class Indexer(BasedModel):
 
         self._providers_initialized = True
 
+    def _get_current_embedding_models(self) -> dict[str, str | None]:
+        """Get current embedding model configuration.
+
+        Returns:
+            Dictionary with current dense and sparse model info
+        """
+        result: dict[str, str | None] = {
+            "dense_provider": None,
+            "dense_model": None,
+            "sparse_provider": None,
+            "sparse_model": None,
+        }
+        
+        # Get dense embedding provider info
+        if self._embedding_provider:
+            provider_name = type(self._embedding_provider).__name__.replace("Provider", "").lower()
+            result["dense_provider"] = provider_name
+            # Try to get model name from provider
+            if hasattr(self._embedding_provider, "model"):
+                result["dense_model"] = str(self._embedding_provider.model)
+            elif hasattr(self._embedding_provider, "model_name"):
+                result["dense_model"] = str(self._embedding_provider.model_name)
+            elif hasattr(self._embedding_provider, "_model"):
+                result["dense_model"] = str(self._embedding_provider._model)
+        
+        # Get sparse embedding provider info
+        if self._sparse_provider:
+            provider_name = type(self._sparse_provider).__name__.replace("Provider", "").lower()
+            result["sparse_provider"] = provider_name
+            # Try to get model name from provider
+            if hasattr(self._sparse_provider, "model"):
+                result["sparse_model"] = str(self._sparse_provider.model)
+            elif hasattr(self._sparse_provider, "model_name"):
+                result["sparse_model"] = str(self._sparse_provider.model_name)
+            elif hasattr(self._sparse_provider, "_model"):
+                result["sparse_model"] = str(self._sparse_provider._model)
+        
+        return result
+
     async def _index_file(self, path: Path, context: Any = None) -> None:
         """Execute full pipeline for a single file: discover → chunk → embed → index.
 
@@ -672,11 +711,20 @@ class Indexer(BasedModel):
                 chunk_ids = [str(chunk.chunk_id) for chunk in updated_chunks]
                 if relative_path := set_relative_path(path):
                     try:
+                        # Get current embedding model info
+                        model_info = self._get_current_embedding_models()
+                        
                         async with self._manifest_lock:
                             self._file_manifest.add_file(
                                 path=relative_path,
                                 content_hash=discovered_file.file_hash,
                                 chunk_ids=chunk_ids,
+                                dense_embedding_provider=model_info["dense_provider"],
+                                dense_embedding_model=model_info["dense_model"],
+                                sparse_embedding_provider=model_info["sparse_provider"],
+                                sparse_embedding_model=model_info["sparse_model"],
+                                has_dense_embeddings=bool(self._embedding_provider),
+                                has_sparse_embeddings=bool(self._sparse_provider),
                             )
                         logger.debug(
                             "Updated manifest for file: %s (%d chunks)",
@@ -965,11 +1013,20 @@ class Indexer(BasedModel):
 
             if relative_path := set_relative_path(discovered_file.path):
                 try:
+                    # Get current embedding model info
+                    model_info = self._get_current_embedding_models()
+                    
                     async with self._manifest_lock:
                         self._file_manifest.add_file(
                             path=relative_path,
                             content_hash=discovered_file.file_hash,
                             chunk_ids=chunk_ids,
+                            dense_embedding_provider=model_info["dense_provider"],
+                            dense_embedding_model=model_info["dense_model"],
+                            sparse_embedding_provider=model_info["sparse_provider"],
+                            sparse_embedding_model=model_info["sparse_model"],
+                            has_dense_embeddings=bool(self._embedding_provider),
+                            has_sparse_embeddings=bool(self._sparse_provider),
                         )
                     logger.debug(
                         "Updated manifest for file: %s (%d chunks)", relative_path, len(chunk_ids)
@@ -1045,7 +1102,11 @@ class Indexer(BasedModel):
         # Filter to only new or modified files
         files_to_index: list[Path] = []
         unchanged_count = 0
+        model_changed_count = 0
         total_to_check = len(all_files)
+        
+        # Get current embedding model configuration for comparison
+        current_models = self._get_current_embedding_models()
 
         for idx, path in enumerate(all_files):
             try:
@@ -1060,9 +1121,21 @@ class Indexer(BasedModel):
                     continue
 
                 try:
-                    # Check if file is new or changed
-                    if self._file_manifest.file_changed(relative_path, current_hash):
+                    # Check if file needs reindexing (content or embedding model changed)
+                    needs_reindex, reason = self._file_manifest.file_needs_reindexing(
+                        relative_path,
+                        current_hash,
+                        current_dense_provider=current_models["dense_provider"],
+                        current_dense_model=current_models["dense_model"],
+                        current_sparse_provider=current_models["sparse_provider"],
+                        current_sparse_model=current_models["sparse_model"],
+                    )
+                    
+                    if needs_reindex:
                         files_to_index.append(path)
+                        if "model_changed" in reason:
+                            model_changed_count += 1
+                            logger.debug("File needs reindexing due to %s: %s", reason, relative_path)
                     else:
                         unchanged_count += 1
                 except ValueError as e:
@@ -1094,10 +1167,11 @@ class Indexer(BasedModel):
                 self._deleted_files = []
 
         logger.info(
-            "Incremental indexing: %d new/modified, %d unchanged, %d deleted",
+            "Incremental indexing: %d new/modified, %d unchanged, %d deleted%s",
             len(files_to_index),
             unchanged_count,
             len(deleted_files) if deleted_files else 0,
+            f", {model_changed_count} due to embedding model changes" if model_changed_count > 0 else "",
         )
 
         self._stats.files_discovered = len(files_to_index)

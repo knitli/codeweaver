@@ -37,17 +37,29 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class FileManifestEntry(TypedDict):
+class FileManifestEntry(TypedDict, total=False):
     """Single file entry in the manifest.
 
-    Tracks file path, content hash, and indexing metadata.
+    Tracks file path, content hash, and indexing metadata including embedding models used.
+    
+    Note: Uses total=False to support backward compatibility with v1.0.0 manifests
+    that don't have embedding metadata fields.
     """
 
+    # Required fields (present in all versions)
     path: str  # Relative path from project root
     content_hash: str  # Blake3 hash of file content
     indexed_at: str  # ISO8601 timestamp when file was last indexed
     chunk_count: int  # Number of chunks created from this file
     chunk_ids: list[str]  # UUIDs of chunks in vector store
+    
+    # Optional fields (added in v1.1.0 for embedding tracking)
+    dense_embedding_provider: str | None  # Provider used for dense embeddings (e.g., "openai", "voyage")
+    dense_embedding_model: str | None  # Model used for dense embeddings (e.g., "text-embedding-3-large")
+    sparse_embedding_provider: str | None  # Provider used for sparse embeddings
+    sparse_embedding_model: str | None  # Model used for sparse embeddings
+    has_dense_embeddings: bool  # Whether file chunks have dense embeddings
+    has_sparse_embeddings: bool  # Whether file chunks have sparse embeddings
 
 
 class FileManifestStats(TypedDict):
@@ -79,15 +91,33 @@ class IndexFileManifest(BasedModel):
     total_chunks: Annotated[
         NonNegativeInt, Field(ge=0, description="Total chunks across all files")
     ] = 0
-    manifest_version: Annotated[str, Field(description="Manifest format version")] = "1.0.0"
+    manifest_version: Annotated[str, Field(description="Manifest format version")] = "1.1.0"
 
-    def add_file(self, path: Path, content_hash: BlakeHashKey, chunk_ids: list[str]) -> None:
+    def add_file(
+        self,
+        path: Path,
+        content_hash: BlakeHashKey,
+        chunk_ids: list[str],
+        *,
+        dense_embedding_provider: str | None = None,
+        dense_embedding_model: str | None = None,
+        sparse_embedding_provider: str | None = None,
+        sparse_embedding_model: str | None = None,
+        has_dense_embeddings: bool = False,
+        has_sparse_embeddings: bool = False,
+    ) -> None:
         """Add or update a file in the manifest.
 
         Args:
             path: Relative path from project root
             content_hash: Blake3 hash of file content
             chunk_ids: List of chunk UUID7 strings for this file
+            dense_embedding_provider: Provider name for dense embeddings (e.g., "openai")
+            dense_embedding_model: Model name for dense embeddings (e.g., "text-embedding-3-large")
+            sparse_embedding_provider: Provider name for sparse embeddings
+            sparse_embedding_model: Model name for sparse embeddings
+            has_dense_embeddings: Whether chunks have dense embeddings
+            has_sparse_embeddings: Whether chunks have sparse embeddings
 
         Raises:
             ValueError: If path is None, empty, absolute, or contains path traversal
@@ -110,13 +140,19 @@ class IndexFileManifest(BasedModel):
             self.total_chunks -= old_entry["chunk_count"]
             self.total_files -= 1
 
-        # Add new entry
+        # Add new entry with embedding metadata
         self.files[raw_path] = FileManifestEntry(
             path=raw_path,
             content_hash=str(content_hash),
             indexed_at=datetime.now(UTC).isoformat(),
             chunk_count=len(chunk_ids),
             chunk_ids=chunk_ids,
+            dense_embedding_provider=dense_embedding_provider,
+            dense_embedding_model=dense_embedding_model,
+            sparse_embedding_provider=sparse_embedding_provider,
+            sparse_embedding_model=sparse_embedding_model,
+            has_dense_embeddings=has_dense_embeddings,
+            has_sparse_embeddings=has_sparse_embeddings,
         )
         self.total_files += 1
         self.total_chunks += len(chunk_ids)
@@ -222,6 +258,91 @@ class IndexFileManifest(BasedModel):
             Set of Path objects for all files in manifest
         """
         return {Path(raw_path) for raw_path in self.files}
+
+    def file_needs_reindexing(
+        self,
+        path: Path,
+        current_hash: BlakeHashKey,
+        *,
+        current_dense_provider: str | None = None,
+        current_dense_model: str | None = None,
+        current_sparse_provider: str | None = None,
+        current_sparse_model: str | None = None,
+    ) -> tuple[bool, str]:
+        """Check if file needs reindexing due to content or embedding model changes.
+
+        Args:
+            path: Relative path from project root
+            current_hash: Current Blake3 hash of file content
+            current_dense_provider: Current dense embedding provider name
+            current_dense_model: Current dense embedding model name
+            current_sparse_provider: Current sparse embedding provider name
+            current_sparse_model: Current sparse embedding model name
+
+        Returns:
+            Tuple of (needs_reindexing, reason) where reason explains why
+
+        Raises:
+            ValueError: If path is None
+        """
+        if path is None:
+            raise ValueError("Path cannot be None")
+
+        entry = self.get_file(path)
+        
+        # New file - needs indexing
+        if entry is None:
+            return True, "new_file"
+        
+        # Content changed - needs reindexing
+        if entry["content_hash"] != str(current_hash):
+            return True, "content_changed"
+        
+        # Check for embedding model changes (v1.1.0+ manifests)
+        # Dense model changed
+        if current_dense_provider and current_dense_model:
+            manifest_dense_provider = entry.get("dense_embedding_provider")
+            manifest_dense_model = entry.get("dense_embedding_model")
+            if manifest_dense_provider != current_dense_provider or manifest_dense_model != current_dense_model:
+                return True, "dense_embedding_model_changed"
+        
+        # Sparse model changed  
+        if current_sparse_provider and current_sparse_model:
+            manifest_sparse_provider = entry.get("sparse_embedding_provider")
+            manifest_sparse_model = entry.get("sparse_embedding_model")
+            if manifest_sparse_provider != current_sparse_provider or manifest_sparse_model != current_sparse_model:
+                return True, "sparse_embedding_model_changed"
+        
+        # File up-to-date
+        return False, "unchanged"
+
+    def get_embedding_model_info(self, path: Path) -> dict[str, str | bool | None]:
+        """Get embedding model information for a file.
+
+        Args:
+            path: Relative path from project root
+
+        Returns:
+            Dictionary with embedding model info, empty dict if file not in manifest
+
+        Raises:
+            ValueError: If path is None
+        """
+        if path is None:
+            raise ValueError("Path cannot be None")
+
+        entry = self.get_file(path)
+        if not entry:
+            return {}
+        
+        return {
+            "dense_provider": entry.get("dense_embedding_provider"),
+            "dense_model": entry.get("dense_embedding_model"),
+            "sparse_provider": entry.get("sparse_embedding_provider"),
+            "sparse_model": entry.get("sparse_embedding_model"),
+            "has_dense": entry.get("has_dense_embeddings", False),
+            "has_sparse": entry.get("has_sparse_embeddings", False),
+        }
 
     @computed_field
     def get_stats(self) -> FileManifestStats:

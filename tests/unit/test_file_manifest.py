@@ -171,7 +171,7 @@ class TestIndexFileManifest:
 
         assert stats["total_files"] == 2
         assert stats["total_chunks"] == 3
-        assert stats["manifest_version"] == "1.0.0"  # It's a string
+        assert stats["manifest_version"] == "1.1.0"  # Updated to v1.1.0 for embedding metadata
 
 
 class TestFileManifestManager:
