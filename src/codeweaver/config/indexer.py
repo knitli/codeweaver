@@ -219,7 +219,7 @@ class FilteredPaths(NamedTuple):
                 if file.suffix == ext and file not in specifically_included_files
             }
         excludes: set[Path] = set()
-        excluded_files = settings.get("excluded_files", set())
+        excluded_files = settings.get("excludes", set())
         for exclude in excluded_files:
             if exclude:
                 excludes |= _resolve_globs(exclude, repo_root)
