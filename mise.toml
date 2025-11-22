@@ -608,17 +608,6 @@ Write-Host "[codeweaver] Downloading tree-sitter grammars..." -ForegroundColor D
 uv run -s scripts/language-support/download-ts-grammars.py $args
 '''
 
-[tasks.generate-delimiters]
-run = '''
-#!/usr/bin/env zsh
-print -P "%F{209}[codeweaver]%f Generating delimiters..."
-uv run -s scripts/language-support/generate-delimiters.py
-'''
-run_windows = '''
-Write-Host "[codeweaver] Generating delimiters..." -ForegroundColor DarkYellow
-uv run -s scripts/language-support/generate-delimiters.py
-'''
-
 [tasks.generate-supported-languages]
 run = '''
 #!/usr/bin/env zsh

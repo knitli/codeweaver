@@ -280,20 +280,6 @@ Analyzes grammar structure patterns across all supported languages.
 ./scripts/language-support/analyze-grammar-structure.py
 ```
 
-### generate-delimiters.py
-
-**Location:** `scripts/language-support/generate-delimiters.py`
-
-Generates language delimiter definitions from patterns.
-
-**Usage:**
-```bash
-uv run -s scripts/language-support/generate-delimiters.py
-```
-
-**Features:**
-- PEP 723 inline dependencies: `rich`
-
 ### compare-delimiters.py
 
 **Location:** `scripts/language-support/compare-delimiters.py`

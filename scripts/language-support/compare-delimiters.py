@@ -50,7 +50,7 @@ def delimiter_dict_to_delimiter(d: DelimiterDict) -> DelimiterPattern:
 
 
 def generate_language_delimiters(language: str) -> tuple[DelimiterPattern, ...]:
-    """Generate delimiters for a language (copied from generate_delimiters.py)."""
+    """Generate delimiters for a language."""
     # Auto-detect family
     family = LanguageFamily.from_known_language(language)
 

@@ -55,7 +55,6 @@ scripts/
 ├── language-support/                  # Tree-sitter and language mappings
 │   ├── download-ts-grammars.py
 │   ├── build-language-mappings.py
-│   ├── generate-delimiters.py
 │   ├── compare-delimiters.py
 │   └── analyze-grammar-structure.py
 │
