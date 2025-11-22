@@ -447,7 +447,7 @@ def setup_middleware(
     result: set[Middleware] = set()
 
     # Apply middleware settings
-    # pyright gets very confused here, so we ignore most issues
+    # ty gets very confused here, so we ignore most issues
     for mw in middleware:  # type: ignore
         mw: type[Middleware]  # type: ignore
         match mw.__name__:  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]

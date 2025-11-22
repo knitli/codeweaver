@@ -106,8 +106,9 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
                     lambda: self._update_token_stats(token_count=cast(int, response.total_tokens))
                 )
         except genai_errors.APIError:
-            logger.exception(
-                "Error requesting token stats from Google. Falling back to local tokenizer for approximation."
+            logger.warning(
+                "Error requesting token stats from Google. Falling back to local tokenizer for approximation.",
+                exc_info=True,
             )
             _ = self._fire_and_forget(
                 lambda: self._update_token_stats(

@@ -350,7 +350,7 @@ async def _run_background_indexing(
         raise
     except Exception as e:
         status_display.print_error("Background indexing error", details=str(e))
-        logger.exception("Background indexing error")
+        logger.warning("Background indexing error", exc_info=True)
     finally:
         # Ensure watcher task is cancelled on any exit
         if watcher_task and not watcher_task.done():

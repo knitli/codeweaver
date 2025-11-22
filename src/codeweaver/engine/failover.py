@@ -387,7 +387,7 @@ class VectorStoreFailoverManager(BasedModel):
                 logger.debug("Circuit monitor task cancelled")
                 break
             except Exception:
-                logger.exception("Error in circuit monitor task")
+                logger.warning("Error in circuit monitor task", exc_info=True)
                 # Continue monitoring despite errors
 
     async def _sync_backup_periodically(self) -> None:
@@ -470,7 +470,9 @@ class VectorStoreFailoverManager(BasedModel):
                 logger.debug("Backup sync task cancelled")
                 break
             except Exception:
-                logger.exception("Error in backup sync task - will retry next interval")
+                logger.warning(
+                    "Error in backup sync task - will retry next interval", exc_info=True
+                )
                 # Continue syncing despite errors
 
     async def _activate_failover(self) -> None:
@@ -545,7 +547,7 @@ class VectorStoreFailoverManager(BasedModel):
             return
 
         if not memory_estimate.is_safe:
-            logger.exception(
+            logger.warning(
                 "❌ BACKUP ACTIVATION FAILED - Insufficient memory. "
                 "Required: %.2fGB, "
                 "Available: %.2fGB",
@@ -561,7 +563,7 @@ class VectorStoreFailoverManager(BasedModel):
                 logger.info("Initializing in-memory backup vector store")
                 self._backup_store = await self._create_backup_store()
         except Exception:
-            logger.exception("Failed to initialize backup store")
+            logger.warning("Failed to initialize backup store", exc_info=True)
             return
 
         # Step 2b: Initialize backup indexer with appropriate chunk sizes
@@ -570,7 +572,7 @@ class VectorStoreFailoverManager(BasedModel):
                 logger.info("Initializing backup indexer with backup model constraints")
                 self._backup_indexer = await self._create_backup_indexer()
         except Exception:
-            logger.exception("Failed to initialize backup indexer")
+            logger.warning("Failed to initialize backup indexer", exc_info=True)
             # Continue without backup indexer - store can still work for queries
 
         # Step 3: Attempt to restore from persistence
@@ -726,7 +728,9 @@ class VectorStoreFailoverManager(BasedModel):
                 )
 
         except Exception:
-            logger.exception("Failed to restore to primary. Staying in backup mode for safety.")
+            logger.warning(
+                "Failed to restore to primary. Staying in backup mode for safety.", exc_info=True
+            )
             # Stay in backup mode if sync-back fails
 
     async def _snapshot_backup_state(self) -> None:
@@ -816,7 +820,7 @@ class VectorStoreFailoverManager(BasedModel):
                 )
 
         except Exception:
-            logger.exception("Sync-back failed")
+            logger.warning("Sync-back failed", exc_info=True)
             raise
 
     async def _sync_chunk_to_primary(self, chunk_id: str) -> None:
@@ -895,7 +899,7 @@ class VectorStoreFailoverManager(BasedModel):
             logger.warning("Chunk %s not found in any backup collection", chunk_id)
 
         except Exception:
-            logger.exception("Failed to sync chunk %s", chunk_id)
+            logger.warning("Failed to sync chunk %s", chunk_id, exc_info=True)
             raise
 
     async def _verify_primary_health(self) -> None:
@@ -947,7 +951,7 @@ class VectorStoreFailoverManager(BasedModel):
             logger.info("✓ Primary health verification passed")
 
         except Exception:
-            logger.exception("Primary health verification failed")
+            logger.warning("Primary health verification failed", exc_info=True)
             raise
 
     async def _create_backup_store(self) -> MemoryVectorStoreProvider:
@@ -1357,7 +1361,7 @@ class VectorStoreFailoverManager(BasedModel):
             )
 
         except Exception:
-            logger.exception("Failed to sync primary to backup")
+            logger.warning("Failed to sync primary to backup", exc_info=True)
             raise
 
     async def _validate_backup_file(self, backup_file: Path) -> bool:
@@ -1493,6 +1497,29 @@ class VectorStoreFailoverManager(BasedModel):
                 status["change_tracker"]["last_sync_time"] = tracker_status["last_sync_time"]
 
         return status
+
+    async def delete_and_clear(self) -> None:
+        """Delete all data from both primary and backup vector stores."""
+        from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
+
+        try:
+            if self._primary_store:
+                await cast(QdrantBaseProvider, self._primary_store).delete_collection(
+                    self._primary_store.collection
+                )
+                logger.info("Deleted all data from primary vector store")
+        except Exception:
+            logger.warning("Failed to delete data from primary vector store", exc_info=True)
+
+        try:
+            if self._backup_store:
+                await cast(QdrantBaseProvider, self._backup_store).delete_collection(
+                    self._backup_store.collection
+                )
+
+            logger.info("Deleted all data from backup vector store")
+        except Exception:
+            logger.warning("Failed to delete data from backup vector store", exc_info=True)
 
 
 __all__ = ["VectorStoreFailoverManager"]

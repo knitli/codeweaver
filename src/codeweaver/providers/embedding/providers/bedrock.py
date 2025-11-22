@@ -431,8 +431,9 @@ try:
 
 
 except ImportError as e:
-    logger.exception(
-        "Failed to import boto3. Bedrock embedding provider will not work. You should install boto3."
+    logger.warning(
+        "Failed to import boto3. Bedrock embedding provider will not work. You should install boto3.",
+        exc_info=True,
     )
     raise ConfigurationError(
         "Failed to import boto3. You need to install the boto3 package, you can do this by running 'pip install codeweaver[bedrock]'"

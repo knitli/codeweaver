@@ -221,7 +221,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             collections = await self._client.get_collections()
             return [col.name for col in collections.collections]
         except Exception as e:
-            logger.exception("Failed to list collections from Qdrant")
+            logger.warning("Failed to list collections from Qdrant")
             raise ProviderError(f"Failed to list collections: {e}") from e
 
     async def search(
@@ -298,7 +298,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                     return  # we don't need to validate because it's new
                 await self._validate_collection_config(collection_name)
             except Exception as e:
-                logger.exception("Failed to check or create collection")
+                logger.warning("Failed to check or create collection", exc_info=True)
                 raise ProviderError(f"Failed to ensure collection: {e}") from e
         else:
             # Validate existing collection matches current config

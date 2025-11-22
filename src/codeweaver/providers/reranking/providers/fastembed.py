@@ -25,7 +25,9 @@ try:
     from fastembed.rerank.cross_encoder import TextCrossEncoder
 
 except ImportError as e:
-    logger.exception("Failed to import TextCrossEncoder from fastembed.rerank.cross_encoder")
+    logger.warning(
+        "Failed to import TextCrossEncoder from fastembed.rerank.cross_encoder", exc_info=True
+    )
     from codeweaver.exceptions import ConfigurationError
 
     raise ConfigurationError(

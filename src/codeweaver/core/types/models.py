@@ -144,7 +144,7 @@ class DataclassSerializationMixin:
         """Serialize the model for CLI output."""
         self_map: dict[str, Any] = {}
         if hasattr(type(self), "__pydantic_fields__"):
-            # pyright won't like this because the attributes only exist on the inherited subclasses
+            # ty won't like this because the attributes only exist on the inherited subclasses
             fields: dict[str, Any] = type(self).__pydantic_fields__  # type: ignore
             if hasattr(self, "__pydantic_decorators__") and (
                 computed_field_names := type(self).__pydantic_decorators__.computed_fields.keys()  # type: ignore

@@ -314,7 +314,7 @@ class CheckpointManager:
         )
         self.checkpoint_file: Path = (
             self.checkpoint_dir
-            / f"checkpoint_{settings['project_name'] if isinstance(settings['project_name'], str) else self.project_path.name}-{get_blake_hash(str(self.project_path).encode('utf-8')[:8])}.json"
+            / f"checkpoint_{settings['project_name'] if isinstance(settings['project_name'], str) else self.project_path.name}-{get_blake_hash(str(self.project_path).encode('utf-8'))[:8]}.json"
         )
 
     @property
@@ -364,7 +364,7 @@ class CheckpointManager:
                 checkpoint.chunks_created,
             )
         except OSError:
-            logger.exception("Failed to save checkpoint")
+            logger.warning("Failed to save checkpoint", exc_info=True)
 
     def load(self) -> IndexingCheckpoint | None:
         """Load checkpoint from disk if available.

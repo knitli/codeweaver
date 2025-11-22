@@ -118,7 +118,7 @@ class PostHogClient:
                 self.enabled = False
                 self._client = None
             except Exception:
-                self.logger.exception("Failed to initialize PostHog client")
+                self.logger.warning("Failed to initialize PostHog client")
                 self.enabled = False
                 self._client = None
         else:
@@ -190,7 +190,7 @@ class PostHogClient:
         except Exception:
             # Never fail application due to telemetry
             # Just log and continue
-            self.logger.exception("Failed to send telemetry event '%s'", event)
+            self.logger.warning("Failed to send telemetry event '%s'", event)
 
     def capture_from_event(self, event_obj: Any) -> None:
         """
@@ -203,7 +203,7 @@ class PostHogClient:
             event_name, properties = event_obj.to_posthog_event()
             self.capture(event_name, properties)
         except Exception:
-            self.logger.exception("Failed to capture event from object")
+            self.logger.warning("Failed to capture event from object")
 
     def capture_with_serialization(
         self, event: str, data_obj: Any, *, distinct_id: UUID7HexT = SESSION_ID
@@ -231,7 +231,7 @@ class PostHogClient:
                     event,
                 )
         except Exception:
-            self.logger.exception("Failed to capture event with serialization for '%s'", event)
+            self.logger.warning("Failed to capture event with serialization for '%s'", event)
 
     def shutdown(self) -> None:
         """
@@ -245,7 +245,7 @@ class PostHogClient:
                 self._client.flush()
                 self.logger.info("PostHog client shut down successfully")
             except Exception:
-                self.logger.exception("Error during PostHog client shutdown")
+                self.logger.warning("Error during PostHog client shutdown")
 
     def __enter__(self) -> Self:
         """Context manager entry."""

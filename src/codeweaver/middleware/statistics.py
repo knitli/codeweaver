@@ -169,11 +169,12 @@ class StatisticsMiddleware(Middleware):
         except Exception:
             duration_ms = (time.perf_counter() - start_time) * 1000
             self.statistics.add_failed_request(request_id=request_id)
-            self.logger.exception(
+            self.logger.warning(
                 "Operation in %s failed after %.2fms",
                 operation_name,
                 duration_ms,
                 extra={"failed_operation": operation_name, "duration_ms": duration_ms},
+                exc_info=True,
             )
             raise
         else:

@@ -212,7 +212,9 @@ async def _perform_clear_operation(
         provider_config = dict(vector_provider_config)
         # Add api_key from parent level if present
         if api_key := vector_settings.get("api_key"):
-            provider_config["api_key"] = api_key
+            provider_config["api_key"] = (
+                api_key if isinstance(api_key, str) else api_key.get_secret_value()
+            )
 
     store = registry.create_provider(provider, "vector_store", config=provider_config)  # type: ignore
 
@@ -232,6 +234,13 @@ async def _perform_clear_operation(
 
     display.print_success("Clear operation complete")
     display.console.print()
+    backups_dir = indexes_dir.parent / ".vectors" / "backups"
+    if backups_dir.exists() and (files := list(backups_dir.iterdir())):
+        for file in files:
+            file.unlink()
+        display.print_success(
+            f"Deleted {len(files)} files for the failsafe vector store from '{backups_dir}'"
+        )
 
 
 async def _handle_server_status(*, standalone: bool, display: StatusDisplay) -> bool:
@@ -276,13 +285,13 @@ def _check_and_print_server_status(display: StatusDisplay):
         "  • Initial indexing runs on server startup if the index is missing or incomplete."
     )
     display.console.print(
-        "  • CodeWeaver indexes most codebases in under a minute (meaning discovering, parsing, and chunking files), but the biggest factor is your choice of embedding provider. If you're generating embeddings locally, go get lunch if you want to wait until it's done. 🍔"
+        "  • CodeWeaver indexes most codebases in under a minute (meaning discovering, parsing, and chunking files), but the biggest factor is your choice of embedding provider. If you're generating embeddings locally and want indexing to finish quickly, consider getting lunch while you wait. 🍔"
     )
     display.console.print(
-        "  • While CodeWeaver runs, it continuously monitors your codebase for changes and updates the index in real-time. It also picks up changes when the server restarts."
+        "  • While CodeWeaver runs, it continuously monitors your codebase for changes, and updates the index in real-time. It also picks up changes when the server restarts."
     )
     display.console.print()
-    display.console.print("[cyan]To check indexing status:[/cyan]")
+    display.console.print("[cyan]To check indexing status while the server is running:[/cyan]")
     display.console.print()
     display.console.print("   run: 'cw status'")
     display.console.print(f"  curl {_get_url()}/health | jq '.indexer'")

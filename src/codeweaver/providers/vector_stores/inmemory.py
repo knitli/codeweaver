@@ -310,7 +310,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
             await self._persist_to_disk()
         except Exception:
             # Log but don't raise on shutdown
-            logger.exception("Final persistence on shutdown failed")
+            logger.warning("Final persistence on shutdown failed", exc_info=True)
 
         # Close client
         if self._client:

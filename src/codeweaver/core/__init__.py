@@ -2,7 +2,6 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-# pyright: reportUnsupportedDunderAll=none
 """Global type definitions for CodeWeaver.
 
 We usually try to keep types close to where they are used, but some types

@@ -65,7 +65,7 @@ async def get_health() -> HealthResponse | Any:
         )
 
     except Exception:
-        logger.exception("Health check failed with error")
+        logger.warning("Health check failed with error", exc_info=True)
         # Return unhealthy status on error
 
         from codeweaver.server.health_models import (

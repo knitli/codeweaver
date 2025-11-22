@@ -316,7 +316,7 @@ class FileManifestManager:
                 manifest.total_chunks,
             )
         except OSError:
-            logger.exception("Failed to save file manifest")
+            logger.warning("Failed to save file manifest", exc_info=True)
             return False
         else:
             return True

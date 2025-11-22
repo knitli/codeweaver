@@ -343,7 +343,7 @@ async def find_code(
         )
 
     except Exception as e:
-        logger.exception("find_code failed")
+        logger.warning("find_code failed")
         # Return empty response on failure (graceful degradation)
         execution_time_ms = (time.time() - start_time) * 1000
         return build_error_response(e, intent, execution_time_ms)

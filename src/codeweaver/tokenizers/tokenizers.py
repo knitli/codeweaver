@@ -23,7 +23,9 @@ logger = logging.getLogger(__name__)
 try:
     from tokenizers import Tokenizer as TokenizersTokenizer
 except ImportError as e:
-    logger.exception("Failed to import 'tokenizers' package, you may need to install it.")
+    logger.warning(
+        "Failed to import 'tokenizers' package, you may need to install it.", exc_info=True
+    )
     raise ImportError(
         "The 'tokenizers' package is required for this module. Please install it with 'pip install tokenizers'."
     ) from e
@@ -43,7 +45,6 @@ class Tokenizers(Tokenizer[TokenizersTokenizer]):
 
     def __init__(self, encoder: str, **kwargs: dict[str, Any] | None) -> None:
         """Initialize tokenizers encoder."""
-        # pyright can't handle the dynamic import of tokenizers, even with `TypeIs`, so we use a few ignores here
         self._encoder = TokenizersTokenizer.from_pretrained(encoder, **(kwargs or {}))
         if not _is_tokenizer(self._encoder):
             raise TypeError(f"Expected a Tokenizers instance, got {type(self._encoder)}")

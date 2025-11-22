@@ -470,20 +470,20 @@ class Indexer(BasedModel):
                     e,
                 )
             elif "timeout" in error_msg or "timed out" in error_msg:
-                logger.exception(
+                logger.warning(
                     "Qdrant connection timed out. Please verify:\n"
                     "  - Qdrant server is responsive\n"
                     "  - Network latency is acceptable\n"
                     "  - Consider increasing timeout settings\n"
                 )
             elif "unauthorized" in error_msg or "authentication" in error_msg:
-                logger.exception(
+                logger.warning(
                     "Qdrant authentication failed. Please verify:\n"
                     "  - API key is correctly configured\n"
                     "  - Authentication credentials are valid\n"
                 )
             else:
-                logger.exception("Could not initialize vector store.")
+                logger.warning("Could not initialize vector store.", exc_info=True)
 
             self._vector_store = None
             self._failover_manager = None
@@ -707,7 +707,7 @@ class Indexer(BasedModel):
             )
 
         except Exception as e:
-            logger.exception("Failed to index file %s", path)
+            logger.warning("Failed to index file %s", path, exc_info=True)
             self._stats.files_with_errors.append(path)
 
             await log_to_client_or_fallback(
@@ -765,7 +765,7 @@ class Indexer(BasedModel):
                 else:
                     raise
             except Exception:
-                logger.exception("Dense embedding failed")
+                logger.warning("Dense embedding failed", exc_info=True)
 
         # Sparse embeddings
         if self._sparse_provider:
@@ -791,7 +791,7 @@ class Indexer(BasedModel):
                 else:
                     raise
             except Exception:
-                logger.exception("Sparse embedding failed")
+                logger.warning("Sparse embedding failed", exc_info=True)
 
     async def _delete_file(self, path: Path) -> None:
         """Remove file from store and vector store.
@@ -813,7 +813,7 @@ class Indexer(BasedModel):
                     await self._vector_store.delete_by_file(path)
                     logger.debug("Removed chunks from vector store for: %s", path)
                 except Exception:
-                    logger.exception("Failed to remove from vector store")
+                    logger.warning("Failed to remove from vector store", exc_info=True)
 
             # Remove from file manifest (use relative path)
             if (
@@ -837,7 +837,7 @@ class Indexer(BasedModel):
             if self._failover_manager:
                 self._failover_manager.record_file_deleted(path)
         except Exception:
-            logger.exception("Failed to delete file %s", path)
+            logger.warning("Failed to delete file %s", path, exc_info=True)
 
     async def _cleanup_deleted_files(self) -> None:
         """Clean up files that were deleted from the repository.
@@ -864,7 +864,7 @@ class Indexer(BasedModel):
         try:
             change_type, raw_path = change
         except Exception:
-            logger.exception("Invalid FileChange tuple received: %r", change)
+            logger.warning("Invalid FileChange tuple received: %r", change, exc_info=True)
             return
 
         path = Path(raw_path)
@@ -1030,7 +1030,7 @@ class Indexer(BasedModel):
                     if progress_callback and file_count % 50 == 0:
                         progress_callback("discovery", file_count, 0)
         except Exception:
-            logger.exception("Failure during file discovery")
+            logger.warning("Failure during file discovery", exc_info=True)
             return []
 
         if not all_files:
@@ -1071,7 +1071,7 @@ class Indexer(BasedModel):
                     logger.warning("Invalid path %s: %s, will index it", relative_path, e)
                     files_to_index.append(path)
             except Exception:
-                logger.exception("Error checking file %s, will index it", path)
+                logger.warning("Error checking file %s, will index it", path, exc_info=True)
                 files_to_index.append(path)
 
             # Report progress every 100 files during filtering
@@ -1116,7 +1116,7 @@ class Indexer(BasedModel):
         try:
             await self._index_files_batch(files_to_index, progress_callback)
         except Exception:
-            logger.exception("Failure during batch indexing")
+            logger.warning("Failure during batch indexing", exc_info=True)
 
     def _finalize_indexing(self) -> None:
         """Log final statistics, save checkpoint and manifest, and cleanup."""
@@ -1190,7 +1190,7 @@ class Indexer(BasedModel):
             try:
                 await self._cleanup_deleted_files()
             except Exception:
-                logger.exception("Failed to clean up deleted files")
+                logger.warning("Failed to clean up deleted files", exc_info=True)
 
         if not files_to_index:
             logger.info("No files to index (all up to date)")
@@ -1331,7 +1331,7 @@ class Indexer(BasedModel):
                     discovered_files.append(discovered_file)
                     self._store.set(discovered_file.file_hash, discovered_file)
             except Exception:
-                logger.exception("Failed to discover file %s", path)
+                logger.warning("Failed to discover file %s", path, exc_info=True)
                 self._stats.files_with_errors.append(path)
         return discovered_files
 
@@ -1383,7 +1383,7 @@ class Indexer(BasedModel):
                     if progress_callback:
                         progress_callback("embedding", self._stats.chunks_embedded, total_chunks)
                 except Exception:
-                    logger.exception("Failed to embed batch %d-%d", i, i + len(batch))
+                    logger.warning("Failed to embed batch %d-%d", i, i + len(batch), exc_info=True)
 
     def _retrieve_embedded_chunks(self, chunks: list[CodeChunk]) -> list[CodeChunk]:
         """Retrieve embedded chunks from registry, falling back to originals if needed.
@@ -1442,7 +1442,7 @@ class Indexer(BasedModel):
             self._stats.chunks_indexed = len(chunks)
             logger.info("Indexed %d chunks to vector store", len(chunks))
         except Exception:
-            logger.exception("Failed to index to vector store")
+            logger.warning("Failed to index to vector store", exc_info=True)
 
     async def _phase_embed_and_index(
         self, all_chunks: list[CodeChunk], progress_callback: ProgressCallback | None, context: Any
@@ -1737,7 +1737,7 @@ class Indexer(BasedModel):
                     to_delete.append(key)
             except Exception:
                 # defensive: malformed entry shouldn't break cleanup
-                logger.exception("Error checking stored item for deletion")
+                logger.warning("Error checking stored item for deletion", exc_info=True)
                 continue
         for key in to_delete:
             self._store.delete(key)

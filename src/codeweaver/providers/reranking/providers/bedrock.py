@@ -6,7 +6,7 @@
 # sourcery skip: avoid-single-character-names-variables, no-complex-if-expressions
 """Bedrock reranking provider.
 
-Pydantic models and provider class for Bedrock reranking. Excuse the many pyright ignores -- boto3 is boto3.
+Pydantic models and provider class for Bedrock reranking. Excuse the many ty ignores -- boto3 is boto3.
 """
 
 from __future__ import annotations
@@ -221,7 +221,7 @@ try:
     from types_boto3_bedrock_agent_runtime.client import AgentsforBedrockRuntimeClient
 
 except ImportError as e:
-    logger.exception("Failed to import boto3")
+    logger.warning("Failed to import boto3", exc_info=True)
     raise ImportError("boto3 is not installed. Please install it with `pip install boto3`.") from e
 
 
@@ -284,7 +284,7 @@ def bedrock_reranking_output_transformer(
     parsed_response = BedrockRerankingResult.model_validate_json(cast(bytes, response))
     results: list[RerankingResult] = []
     for item in parsed_response.results:
-        # pyright doesn't know that this will always be CodeChunk-as-JSON because that's what we send.
+        # ty doesn't know that this will always be CodeChunk-as-JSON because that's what we send.
         chunk = CodeChunk.model_validate_json(item.document.json_document)
         results.append(
             RerankingResult(

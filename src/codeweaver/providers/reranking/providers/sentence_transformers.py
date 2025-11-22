@@ -29,7 +29,7 @@ try:
     from sentence_transformers import CrossEncoder
 
 except ImportError as e:
-    logger.exception("Failed to import CrossEncoder from sentence_transformers")
+    logger.warning("Failed to import CrossEncoder from sentence_transformers", exc_info=True)
     from codeweaver.exceptions import ConfigurationError
 
     raise ConfigurationError(

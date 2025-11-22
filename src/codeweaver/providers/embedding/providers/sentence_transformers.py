@@ -225,7 +225,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
     @property
     def st_pooling_config(self) -> dict[str, Any]:
         """The pooling configuration for the SentenceTransformer."""
-        # pyright doesn't like these because the model doesn't exist statically
+        # ty doesn't like these because the model doesn't exist statically
         if isinstance(self.client, SentenceTransformer) and callable(self.client[1]):  # type: ignore
             return self.client[1].get_config_dict()  # type: ignore
         return {}

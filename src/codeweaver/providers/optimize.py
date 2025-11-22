@@ -89,7 +89,7 @@ def _decide_fastembed_runtime(
             logger.info("ONNX Runtime GPU package detected. Attempting to preload DLLs...")
             ort.preload_dlls(cuda=True, cudnn=True, msvc=platform.system() == "Windows")
         except Exception:
-            logger.exception("ONNX Runtime CUDA not usable despite being installed.")
+            logger.warning("ONNX Runtime CUDA not usable despite being installed.", exc_info=True)
             cuda_usable = False
 
     # Honor explicit user choice but guard against impossible states

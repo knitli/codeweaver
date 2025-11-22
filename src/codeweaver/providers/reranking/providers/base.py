@@ -94,7 +94,7 @@ def default_reranking_input_transformer(documents: StructuredDataInput) -> Itera
     try:
         yield from CodeChunk.dechunkify(documents, for_embedding=True)
     except (PydanticValidationError, ValueError) as e:
-        logger.exception("Error in default_reranking_input_transformer: ")
+        logger.warning("Error in default_reranking_input_transformer: ", exc_info=True)
         raise RerankingProviderError(
             "Error in default_reranking_input_transformer",
             details={"input": documents},
@@ -311,7 +311,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
             raise
         except Exception:
             # Non-retryable errors don't affect circuit breaker
-            logger.exception("Non-retryable error in reranking")
+            logger.warning("Non-retryable error in reranking", exc_info=True)
             raise
         else:
             return result
@@ -348,11 +348,11 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
             # Return empty results when circuit breaker is open
             return []
         except RetryError:
-            logger.exception("All retry attempts exhausted for reranking")
+            logger.warning("All retry attempts exhausted for reranking", exc_info=True)
             # Return empty results when all retries exhausted
             return []
         except Exception:
-            logger.exception("Reranking failed with error")
+            logger.warning("Reranking failed with error", exc_info=True)
             # Return empty results on other errors
             return []
 
@@ -506,7 +506,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         try:
             return adapter.validate_python({**python_obj, "_client": client, **kwargs})
         except PydanticValidationError as e:
-            logger.exception("Error in RerankingProvider.from_json: ")
+            logger.warning("Error in RerankingProvider.from_json: ", exc_info=True)
             raise ValidationError(
                 "RerankingProvider received invalid JSON input that it couldn't deserialize.",
                 details={"json_input": input_data, "client": client, "kwargs": kwargs},

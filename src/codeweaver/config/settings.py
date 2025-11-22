@@ -4,7 +4,6 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # We need to override our generic models with specific types, and type overrides for narrower values is a good thing.
-# pyright: reportIncompatibleMethodOverride=false,reportIncompatibleVariableOverride=false
 """Unified configuration system for CodeWeaver.
 
 Provides a centralized settings system using pydantic-settings with
@@ -787,7 +786,7 @@ class CodeWeaverSettings(BaseSettings):
         try:
             self.__init__(**kwargs)  # type: ignore # Unpack doesn't extend to nested dicts
         except ValidationError:
-            logger.exception(
+            logger.warning(
                 "`CodeWeaverSettings` received invalid settings for an update. The settings failed to validate. We did not update the settings."
             )
             return self
@@ -816,7 +815,7 @@ class CodeWeaverSettings(BaseSettings):
             try:
                 self._map = DictView(self.model_dump(exclude_computed_fields=True))  # type: ignore
             except Exception:
-                logger.exception("Failed to create settings map view")
+                logger.warning("Failed to create settings map view")
                 _ = type(self).model_rebuild()
                 self._map = DictView(self.model_dump())  # type: ignore
         if not self._map:
@@ -990,7 +989,7 @@ def update_settings(**kwargs: CodeWeaverSettingsDict) -> DictView[CodeWeaverSett
         try:
             _settings = get_settings()
         except Exception:
-            logger.exception("Failed to get settings: ")
+            logger.warning("Failed to get settings: ")
             _ = CodeWeaverSettings.model_rebuild()
             _settings = get_settings()
     _settings = _settings._update_settings(**kwargs)  # type: ignore
@@ -1008,7 +1007,7 @@ def get_settings_map() -> DictView[CodeWeaverSettingsDict]:
     try:
         settings = _settings or get_settings()
     except Exception:
-        logger.exception("Failed to get settings: ")
+        logger.warning("Failed to get settings: ")
         _ = CodeWeaverSettings.model_rebuild()
         settings = get_settings()
     if _mapped_settings is None or _mapped_settings != settings.view:

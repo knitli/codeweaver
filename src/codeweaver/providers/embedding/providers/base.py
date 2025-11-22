@@ -348,7 +348,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             raise
         except Exception:
             # Non-retryable errors don't affect circuit breaker
-            logger.exception("Non-retryable error in embedding")
+            logger.warning("Non-retryable error in embedding", exc_info=True)
             raise
         else:
             return result  # ty: ignore[invalid-return-type]
@@ -367,7 +367,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         queries: Sequence[str] | None,
     ) -> EmbeddingErrorInfo:
         """Handle errors that occur during embedding."""
-        logger.exception(
+        logger.warning(
             "Error occurred during document embedding. Batch ID: %s failed during `embed_documents`",
             batch_id,
             extra={"documents": documents, "batch_id": batch_id},
@@ -550,7 +550,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             )
             raise
         except Exception:
-            logger.exception("Non-retryable error in query embedding")
+            logger.warning("Non-retryable error in query embedding", exc_info=True)
             raise
         else:
             return result
@@ -576,7 +576,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             logger.warning("Circuit breaker open for query embedding")
             return self._handle_embedding_error(e, batch_id=None, documents=None, queries=queries)
         except RetryError as e:
-            logger.exception("All retry attempts exhausted for query embedding")
+            logger.warning("All retry attempts exhausted for query embedding", exc_info=True)
             return self._handle_embedding_error(e, batch_id=None, documents=None, queries=queries)
         except Exception as e:
             return self._handle_embedding_error(e, batch_id=None, documents=None, queries=queries)

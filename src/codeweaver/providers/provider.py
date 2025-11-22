@@ -15,7 +15,6 @@ such as `embedding`, `sparse_embedding`, `reranking`, `vector_store`, `agent`, a
 The `Provider` enum also includes methods for retrieving some provider-specific information, such as environment variables used by the provider's client that are not part of CodeWeaver's settings.
 """
 
-# pyright: reportArgumentType=false
 # ===========================================================================
 # *     PROVIDER ENUM - main provider enum for all CodeWeaver providers
 # ===========================================================================
@@ -512,7 +511,7 @@ class ProviderKind(BaseEnum):
     SPARSE_EMBEDDING = "sparse_embedding"
     """Provider for sparse text embedding (traditional indexed search, more-or-less).
 
-    Sparse embeddings tend to be very fast and lightweight. We only support local providers (currently Fastembed and Sentence Transformers), because you probably won't know they're running.
+    Sparse embeddings tend to be fast and lightweight. We only support local providers (currently Fastembed and Sentence Transformers).
     While vector embeddings are more powerful and flexible, sparse embeddings can be a force multiplier that improves overall results when used in combination with vector embeddings.
     Our default vectorstore, Qdrant, supports storing multiple vectors on a "point", which allows you to combine sparse and dense embeddings in a single search.
     """

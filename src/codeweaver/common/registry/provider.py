@@ -666,7 +666,7 @@ class ProviderRegistry(BasedModel):
         try:
             client_class = matching_client.client._resolve()  # type: ignore
         except Exception as e:
-            logger.exception(
+            logger.warning(
                 "Failed to resolve client import for provider '%s' (%s)", provider, provider_kind
             )
             raise ConfigurationError(
@@ -697,7 +697,7 @@ class ProviderRegistry(BasedModel):
                 provider, provider_kind, client_class, provider_settings, opts
             )
         except Exception as e:
-            logger.exception(
+            logger.warning(
                 "Failed to create client for provider '%s' (%s)", provider, provider_kind
             )
             raise ConfigurationError(f"Provider '{provider}' client creation failed: {e}") from e

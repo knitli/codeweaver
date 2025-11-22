@@ -206,7 +206,7 @@ class FileWatcher:
         except KeyboardInterrupt:
             logger.info("FileWatcher interrupted by user.")
         except Exception:
-            logger.exception("Something happened...")
+            logger.warning("Something happened...", exc_info=True)
             raise
 
         return instance

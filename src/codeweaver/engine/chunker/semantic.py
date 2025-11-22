@@ -193,8 +193,15 @@ class SemanticChunker(BaseChunker):
                 # Track statistics and metrics
                 self._track_statistics(file_path, statistics, unique_chunks, start_time)
 
-            except ParseError:
-                logger.exception("Parse error in %s", file_path)
+            except ParseError as e:
+                # Log at debug level - this is an expected condition for malformed files
+                # The caller (parallel.py or chunking_service.py) will handle fallback to delimiter chunking
+                logger.debug(
+                    "Parse error in %s: %s - caller will handle fallback",
+                    file_path,
+                    type(e).__name__,
+                    extra={"file_path": str(file_path) if file_path else None},
+                )
                 self._track_skipped_file(file_path, statistics)
                 raise
             else:
@@ -493,7 +500,7 @@ class SemanticChunker(BaseChunker):
         except ParseError:
             raise
         except Exception as e:
-            logger.exception("Failed to parse %s", file_path or "content")
+            logger.warning("Failed to parse %s", file_path or "content", exc_info=True)
             raise_parse_error(
                 f"Failed to parse {file_path or 'content'}",
                 e=e,

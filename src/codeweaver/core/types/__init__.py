@@ -2,7 +2,6 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-# pyright: reportUnsupportedDunderAll=none
 """Type aliases and base models used throughout the CodeWeaver project."""
 
 from __future__ import annotations

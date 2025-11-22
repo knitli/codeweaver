@@ -10,7 +10,6 @@ After some frustrating experiences with Tree-Sitter's built-in node types, we de
 
 The package also includes serializable wrappers around `Ast-Grep`'s core types, which we use for parsing and analyzing code. These wrappers provide a more user-friendly interface for working with ASTs, add additional functionality, like integration with our classification and scoring systems, and make for easy serialization and deserialization of ASTs.
 """
-# pyright: reportUnsupportedDunderAll=none
 
 from __future__ import annotations
 
