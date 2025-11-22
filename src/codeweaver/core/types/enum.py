@@ -25,6 +25,7 @@ from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializatio
 
 
 if TYPE_CHECKING:
+    from codeweaver.core.stores import BlakeHashKey
     from codeweaver.core.types.aliases import FilteredKeyT
 
 
@@ -443,6 +444,13 @@ type FilteredCallable = Callable[[Any], bool] | Callable[[Any], int] | Callable[
 type FilteredReturn = bool | int | dict[Any, int] | None
 
 
+def _hash_it(value: Any) -> BlakeHashKey:
+    """Hash a value using Blake2b and return the hex digest."""
+    from codeweaver.core.stores import get_blake_hash
+
+    return get_blake_hash(str(value).encode("utf-8")).hexdigest()
+
+
 class AnonymityConversion(BaseEnum):
     """Enumeration of anonymity conversion methods for telemetry data.
 
@@ -467,18 +475,18 @@ class AnonymityConversion(BaseEnum):
 
     def filtered(self, values: Any) -> FilteredReturn:
         """Process values according to the anonymity conversion method."""
-        functions: MappingProxyType[AnonymityConversion, FilteredCallable] = MappingProxyType({  # type: ignore
-            AnonymityConversion.BOOLEAN: lambda v: bool(v),  # type: ignore
-            AnonymityConversion.COUNT: lambda v: len(v) if isinstance(v, list) else 1,  # type: ignore
+        functions: MappingProxyType[AnonymityConversion, FilteredCallable] = MappingProxyType({
+            AnonymityConversion.BOOLEAN: lambda v: bool(v),
+            AnonymityConversion.COUNT: lambda v: len(v) if isinstance(v, list) else 1,
             AnonymityConversion.DISTRIBUTION: lambda v: {item: v.count(item) for item in set(v)}  # type: ignore
             if (isinstance(v, Sequence) and not isinstance(v, str))
             else {v: 1},  # type: ignore
             AnonymityConversion.AGGREGATE: lambda v: sum(v) if isinstance(v, list) else v,  # type: ignore
-            AnonymityConversion.HASH: lambda v: hash(v),  # type: ignore
+            AnonymityConversion.HASH: lambda v: _hash_it(v),
             AnonymityConversion.TEXT_COUNT: lambda v: len(v) if isinstance(v, str) else 0,
             AnonymityConversion.FORBIDDEN: lambda v: None,  # Accept value but return None
         })
-        return functions.get(self, lambda v: v)(values)  # type: ignore
+        return functions.get(self, lambda v: v)(values)
 
 
 __all__ = ("AnonymityConversion", "BaseDataclassEnum", "BaseEnum", "BaseEnumData")
