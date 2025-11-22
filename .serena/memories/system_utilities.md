@@ -111,7 +111,7 @@ git root                # Show repository root path
 ## Environment Variables
 
 ### Auto-Configured (mise.toml)
-- `GH_REPO` - Repository path (config_root)
+- `GH_REPO` - Remote repository github relative path ('knitli/codeweaver' for github.com/knitli/codeweaver)
 - `PROJECT_NAME` - "codeweaver"
 - `CODEWEAVER_PROJECT_PATH` - Project root path
 - `CODEWEAVER_VERSION` - Current version from _version.py

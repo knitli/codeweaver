@@ -37,14 +37,25 @@
 - Tsx
 - Yaml
 
-### Languages with Basic Parsing Support
+### Languages with Smart Delimiter Support
 
+These languages are parsed with our delimiter-based approach. We identify patterns common to families of languages to extract meaningful semantic-like structures and data:
+
+- Cmake
+- Groovy
+- Ini
+- Make
+- Properties
+- Toml
+- Xml
 - Asciidoc
 - Assembly
 - Assemblyscript
 - Astro
+- Bash
 - Batch
 - Beef
+- C
 - Carbon
 - Chapel
 - Clojure
@@ -53,8 +64,11 @@
 - Coffeescript
 - Confluence
 - Coq
+- Cpp
 - Creole
 - Crystal
+- Csharp
+- Css
 - Csv
 - Cuda
 - Cue
@@ -72,6 +86,7 @@
 - Dyck
 - Ecl
 - Eiffel
+- Elixir
 - Elm
 - Elvish
 - Emacs
@@ -83,30 +98,40 @@
 - Frege
 - Fsharp
 - Gleam
+- Go
 - Gosu
 - Graphql
 - Groovy
 - Hack
+- Haskell
+- Hcl
 - Help
 - Hjson
 - Hlsl
+- Html
 - Idris
 - Imba
 - Info
 - Io
 - Janet
+- Java
+- Javascript
 - Jelly
 - Jinja
+- Json
+- Jsx
 - Jule
 - Julia
 - Jupyter
 - Just
+- Kotlin
 - Lagda
 - Latex
 - Less
 - Lhs
 - Lisp
 - Livescript
+- Lua
 - Lucee
 - Make
 - Man
@@ -117,6 +142,7 @@
 - Move
 - Newick
 - Nimble
+- Nix
 - Nushell
 - Nw
 - Objective C
@@ -126,12 +152,14 @@
 - Pascal
 - Perl
 - Pharo
+- Php
 - Pkl
 - Pod
 - Pony
 - Powershell
 - Protobuf
 - Purescript
+- Python
 - Qb 64
 - Qml
 - R
@@ -148,19 +176,26 @@
 - Rmd
 - Rnw
 - Rtf
+- Ruby
+- Rust
 - Sas
 - Sass
+- Scala
 - Scheme
 - Scss
 - Smali
 - Sml
+- Solidity
 - Sql
 - Svelte
+- Swift
 - Texinfo
 - Text
 - Textile
 - Toml
 - Tsv
+- Tsx
+- Typescript
 - Vala
 - Vale
 - Vbscript
@@ -172,6 +207,7 @@
 - Wiki
 - Xml
 - Xonsh
+- Yaml
 - Yard
 - Zig
 - Zsh

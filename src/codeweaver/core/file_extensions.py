@@ -509,6 +509,7 @@ CODE_FILES_EXTENSIONS: tuple[ExtLangPair, ...] = (
 # spellchecker:on
 """A tuple of `ExtLangPair` for common programming languages."""
 
+
 TEST_DIR_NAMES: tuple[DirectoryNameT, ...] = (
     DirectoryName("__tests__"),
     DirectoryName("__specs__"),

@@ -94,7 +94,7 @@ if ($pythonPath -notlike "*.venv\Scripts\python*") {
 '''
 
 [tasks.enter.env]
-GH_REPO = '''{{ env.GH_REPO | default(value=config_root) }}'''
+GH_REPO = '''knitli/codeweaver'''
 ACTIVE_SHELL = '''{{ exec(command='basename "$SHELL" 2>/dev/null || echo zsh') }}'''
 python_path = '''{{ exec(command='command -v python 2>/dev/null || echo ""') }}'''
 

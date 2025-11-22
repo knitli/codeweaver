@@ -512,14 +512,14 @@ def to_camel(s: str) -> str:
 def generate_capabilities_file(models: list[SimplifiedModelMeta], model_maker: ModelMaker) -> str:
     """Generate a capabilities module from MTEB models."""
     # We use REUSE ignore markers to bracket this because it's not licensing *for this script* but licensing *for the generated modules*. Without it, REUSE would view it as additional (or duplicate) license information.
+    # REUSE-IgnoreStart
     header = [
-        # REUSE-IgnoreStart
         "# THIS FILE IS AUTO-GENERATED - DO NOT EDIT MANUALLY. The `mteb_to_codeweaver.py` script is used to generate this file.",
         f'"""Capabilities for {model_maker} embedding models."""',
         "# SPDX-FileCopyrightText: 2025 Knitli Inc.",
         "# SPDX-License-Identifier: MIT OR Apache-2.0",
         "# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>",
-        # REUSE-IgnoreEnd
+        "",
         "from __future__ import annotations",
         "",
         "from typing import Literal",
@@ -529,6 +529,8 @@ def generate_capabilities_file(models: list[SimplifiedModelMeta], model_maker: M
         "",
         "",
     ]
+    # REUSE-IgnoreEnd
+
     cap_partials = [mteb_to_capabilities(model) for model in models]
     for cap_partial in cap_partials:
         if not isinstance(cap_partial["output_dtypes"], tuple):

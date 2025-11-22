@@ -58,9 +58,9 @@ _init: bool = True
 
 class RignoreSettings(TypedDict, total=False):
     """Settings for the rignore library.
-    
+
     Maps to parameters of rignore.Walker. See https://pypi.org/project/rignore/
-    
+
     Key parameters:
     - path: Root directory to walk
     - ignore_hidden: If True, ignore hidden files/directories (starting with .)
@@ -171,9 +171,9 @@ def _get_known_extensions() -> set[str]:
     from codeweaver.core.metadata import get_ext_lang_pairs
 
     return (
-        {ext.ext for ext in get_ext_lang_pairs()}
-        | {ext for lang in SemanticSearchLanguage for ext in lang.extensions}  # ty: ignore[not-iterable]
-        | {ext for lang in ConfigLanguage for ext in lang.extensions}
+        {ext.ext.lower() for ext in get_ext_lang_pairs()}
+        | {ext.lower() for lang in SemanticSearchLanguage for ext in lang.extensions}  # ty: ignore[not-iterable]
+        | {ext.lower() for lang in ConfigLanguage for ext in lang.extensions}
     )
 
 
@@ -236,36 +236,36 @@ class IndexerSettings(BasedModel):
     """Settings for indexing and file filtering.
 
     ## How File Filtering Works
-    
-    CodeWeaver uses the `rignore` library (a Python wrapper for Rust's `ignore` crate) to 
-    efficiently walk directories while respecting various ignore rules. The filtering 
+
+    CodeWeaver uses the `rignore` library (a Python wrapper for Rust's `ignore` crate) to
+    efficiently walk directories while respecting various ignore rules. The filtering
     happens in this order:
-    
+
     1. **Override patterns** (highest priority): Whitelist patterns for tooling dirs,
-       ignore patterns for excluded dirs
+       ignore patterns for excluded dirs (note: any positive whitelist here -- meaning not beginning with a `!` -- is treated as an *only* -- files not matching them will be ignored entirely.)
     2. **Ignore files**: .gitignore, .ignore, .git/info/exclude, global gitignore
     3. **Hidden files**: Files/dirs starting with . are ignored by default
     4. **Extension filter**: Only files with known extensions are included
-    
+
     ## Default Behavior
-    
+
     With default settings, CodeWeaver will:
     - Respect .gitignore files (including parent directories and global gitignore)
     - Ignore hidden files and directories
     - Include .github, .circleci, and common tooling dirs (.vscode, .claude, etc.)
     - Exclude common build/cache dirs (node_modules, __pycache__, .git, etc.)
     - Only index files with known extensions (~360 supported file types)
-    
+
     ## Key Settings
-    
+
     - `use_gitignore`: Respect .gitignore rules (default: True)
     - `ignore_hidden`: Ignore hidden files/dirs (default: True)
     - `include_tooling_dirs`: Whitelist common tooling dirs despite ignore_hidden (default: True)
     - `excludes`: Additional directories to exclude (default: common build/cache dirs)
     - `excluded_extensions`: File extensions to exclude (default: binaries, media, etc.)
-    
+
     ## Path Resolution
-    
+
     All paths should be relative to the project root. CodeWeaver deconflicts paths:
     - Files in `forced_includes` are always included, even if they match excludes
     - Tooling directories are whitelisted via overrides, still respecting .gitignore
@@ -288,12 +288,15 @@ class IndexerSettings(BasedModel):
         frozenset[str], Field(description="""File extensions to exclude from search and indexing""")
     ] = DEFAULT_EXCLUDED_EXTENSIONS
     use_gitignore: Annotated[
-        bool, Field(description="""Whether to use .gitignore for filtering. Enabled by default.""")
+        bool,
+        Field(
+            description="""Whether to use .gitignore for filtering. Enabled by default and strongly recommended. Disabling would cause CodeWeaver to index your entire git history, including all ignored files, which is usually not desired. We can't think of a use case where you'd want this disabled, but it's here if you need it."""
+        ),
     ] = True
     use_other_ignore_files: Annotated[
         bool,
         Field(
-            description="""Whether to read *other* ignore files (besides .gitignore) for filtering"""
+            description="""Whether to read any `.ignore` files (besides .gitignore) for filtering"""
         ),
     ] = True
     ignore_hidden: Annotated[
@@ -315,7 +318,7 @@ class IndexerSettings(BasedModel):
     rignore_options: Annotated[
         RignoreSettings | Unset,
         Field(
-            description="""Other kwargs to pass to `rignore`. See <https://pypi.org/project/rignore/>. By default we set max_filesize to 5MB and same_file_system to True."""
+            description="""Other kwargs to pass to `rignore`. See <https://pypi.org/project/rignore/>. By default we set same_file_system to True."""
         ),
     ] = UNSET
 
@@ -330,7 +333,7 @@ class IndexerSettings(BasedModel):
         Path | None,
         Field(
             description=r"""\
-            Path to store index data locally. The default is in your user configuration directory (like ~/.config/codeweaver/indexes or c:\Users\your_username\AppData\Roaming\codeweaver\indexes\).  If not set, CodeWeaver will use the default path.
+            Path to store index data locally. The default is in your user configuration directory (like ~/.config/codeweaver/.indexes or c:\Users\your_username\AppData\Roaming\codeweaver\.indexes\).  If not set, CodeWeaver will use the default path.
 
             Developer Note: We set the default lazily after initialization to avoid circular import issues. Internally, we use the `cache_dir` property to get the effective storage path. We recommend you do too if you need to programmatically access this value. We only keep this field public for user configuration.
             """,
@@ -386,22 +389,23 @@ class IndexerSettings(BasedModel):
     @property
     def cache_dir(self) -> DirectoryPath:
         """Effective storage directory for index data."""
-        if not self._index_cache_dir:
-            path = self._index_cache_dir
+        # with the validation and serialization alias, `index_storage_path` maps to `_index_cache_dir`
+        if not self.index_storage_path:
+            path = self.index_storage_path
             # Get the parent directory (cache_dir should be a directory, not a file)
             dir_path = path.parent if path and path.is_file() else path or get_storage_path()
             if not dir_path.exists():
                 dir_path.mkdir(parents=True, exist_ok=True)
-            self._index_cache_dir = dir_path
-        return self._index_cache_dir
+            self.index_storage_path = dir_path
+        return self.index_storage_path
 
     @computed_field
     @property
     def storage_file(self) -> FilePath:
         """Effective storage file path for index data."""
         project_name = _get_project_name()
-        if self._index_cache_dir:
-            return self._index_cache_dir / f"{project_name}_index.json"
+        if self.index_storage_path:
+            return self.index_storage_path / f"{project_name}_index.json"
         return self.cache_dir / f"{project_name}_index.json"
 
     @computed_field
@@ -437,14 +441,14 @@ class IndexerSettings(BasedModel):
 
     def _as_settings(self, project_path: Path | None = None) -> RignoreSettings:
         """Convert IndexerSettings to kwargs for rignore.Walker.
-        
+
         This method configures rignore to:
         1. Include hidden files (ignore_hidden=False) so we can selectively include tooling dirs
         2. Exclude unwanted hidden directories via override ignore patterns
-        3. Exclude configured directories via override ignore patterns  
+        3. Exclude configured directories via override ignore patterns
         4. Filter to only known file extensions via should_exclude_entry
         5. Filter hidden files not in tooling directories via should_exclude_entry
-        
+
         Note: We set ignore_hidden=False because ignore_hidden=True would prevent the
         walker from even visiting tooling directories like .github and .vscode. Instead,
         we use the filter to exclude unwanted hidden files/directories.
@@ -456,9 +460,9 @@ class IndexerSettings(BasedModel):
             # rignore to bypass the filter callback for files. Users can set it via
             # rignore_options if they need filesize filtering (at the cost of extension
             # filtering not working properly).
-            same_file_system=True
+            same_file_system=True,
         ) | ({} if isinstance(self.rignore_options, Unset) else self.rignore_options)
-        
+
         if project_path is None:
             # Try to get from global settings without triggering recursion
             _settings = _get_settings(view=True)
@@ -475,14 +479,14 @@ class IndexerSettings(BasedModel):
 
                 project_path = get_project_path()
         rignore_settings["path"] = project_path
-        
+
         # Configure .gitignore and other ignore file reading
         rignore_settings["read_ignore_files"] = self.use_other_ignore_files
         rignore_settings["read_git_ignore"] = self.use_gitignore
-        
+
         # Build override patterns - ONLY ignore patterns (with ! prefix)
         overrides: list[str] = []
-        
+
         # Add exclude patterns (directories to ignore)
         for exclude in self.excludes:
             exclude_str = str(exclude)
@@ -496,12 +500,12 @@ class IndexerSettings(BasedModel):
             else:
                 # Directory name - make it a glob
                 overrides.append(f"!**/{exclude_str}/**")
-        
+
         rignore_settings["overrides"] = overrides
-        
+
         # Set the filter for extension checking AND hidden file handling
         rignore_settings["should_exclude_entry"] = self.filter
-        
+
         return RignoreSettings(rignore_settings)
 
     @cached_property
@@ -529,11 +533,11 @@ class IndexerSettings(BasedModel):
 
         return result
 
-    def construct_filter(self) -> Callable[[Path], bool]:
+    def construct_filter(self) -> Callable[[Path], bool]:  # noqa: C901 # it is what it is
         """Construct the filter function for rignore's `should_exclude_entry` parameter.
 
         Returns a function that returns True for paths that should be EXCLUDED.
-        
+
         This filter:
         1. Allows directories to pass through (rignore handles dir filtering)
         2. Allows files in whitelisted tooling directories
@@ -543,24 +547,25 @@ class IndexerSettings(BasedModel):
         """
         known_extensions = _get_known_extensions()
         excluded_extensions = {
-            ext if ext.startswith(".") else f".{ext}" 
-            for ext in self.excluded_extensions
+            ext if ext.startswith(".") else f".{ext}" for ext in self.excluded_extensions
         }
-        
+
         # Build set of tooling directory names for fast lookup
         tooling_dirs: set[str] = set()
         if self.include_github_dir:
             tooling_dirs.update({".github", ".circleci"})
         if self.include_tooling_dirs:
             tooling_dirs.update(self.hidden_tool_paths)
-        
+
+        double_suffix_extensions = tuple({ext for ext in known_extensions if ext.count(".") > 1})
+
         # Cache for seen extensions to avoid repeated lookups
         seen: dict[str, bool] = {}
 
         def filter_func(path: Path | str) -> bool:
             """Return True to EXCLUDE the path, False to INCLUDE it."""
             path_obj = Path(path) if isinstance(path, str) else path
-            
+
             # Allow directories to pass through - rignore handles directory filtering
             # via ignore rules and overrides
             if path_obj.is_dir():
@@ -570,32 +575,35 @@ class IndexerSettings(BasedModel):
                     if name.startswith(".") and name not in tooling_dirs:
                         return True  # Exclude this hidden directory
                 return False
-            
+
             # Check if file is in a tooling directory (allow hidden files in tooling dirs)
             in_tooling_dir = any(part in tooling_dirs for part in path_obj.parts)
-            
+
             # Exclude hidden files not in tooling directories
-            if self.ignore_hidden and not in_tooling_dir:
-                if path_obj.name.startswith("."):
-                    return True  # Exclude hidden file
-            
-            ext = path_obj.suffix.lower()
-            
+            if self.ignore_hidden and not in_tooling_dir and path_obj.name.startswith("."):
+                return True  # Exclude hidden file
+
+            ext = (
+                next((ex for ex in double_suffix_extensions if path_obj.name.endswith(ex)), None)
+                or path_obj.suffix
+                or path_obj.name
+            ).lower()
+
             # Check cache first
             if ext in seen:
                 return seen[ext]
-            
+
             # Check if extension is in excluded list
             if ext in excluded_extensions:
                 seen[ext] = True
                 return True
-            
+
             # Check if extension is in known extensions list
             # Also check the full filename for extensionless files like Makefile
             if ext in known_extensions or path_obj.name in known_extensions:
                 seen[ext] = False
                 return False
-            
+
             # Unknown extension - exclude by default
             # CodeWeaver only indexes known file types
             seen[ext] = True
