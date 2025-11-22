@@ -1589,7 +1589,11 @@ class Indexer(BasedModel):
             )
             await self._vector_store.upsert(chunks, for_backup=is_backup)
             self._stats.chunks_indexed += len(chunks)
-            logger.info("Indexed %d chunks to vector store (total: %d)", len(chunks), self._stats.chunks_indexed)
+            logger.info(
+                "Indexed %d chunks to vector store (total: %d)",
+                len(chunks),
+                self._stats.chunks_indexed,
+            )
         except Exception:
             logger.warning("Failed to index to vector store", exc_info=True)
 

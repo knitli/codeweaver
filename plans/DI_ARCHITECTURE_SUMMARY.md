@@ -65,17 +65,17 @@ class Indexer:
 
 ## Implementation Phases
 
-### Phase 1: Foundation (v0.2 Early)
+### Phase 1: Foundation (2nd alpha feature release)
 - Core DI infrastructure
 - No production changes yet
 - **Risk**: Low
 
-### Phase 2: Integration (v0.2 Mid)
+### Phase 2: Integration (2nd alpha feature release)
 - Migrate core services
 - Old pattern still works
 - **Risk**: Medium
 
-### Phase 3: pydantic-ai (v0.2 Late / v0.3)
+### Phase 3: pydantic-ai (2nd alpha feature release / 3rd alpha feature release)
 - Integrate pydantic-ai providers
 - Data sources (Tavily, DuckDuckGo)
 - **Risk**: Medium
@@ -87,11 +87,11 @@ class Indexer:
 
 ## Migration Strategy
 
-**v0.2**: DI available, old pattern works  
-**v0.3**: Old pattern deprecated  
-**v0.4**: Old pattern removed
+**2nd alpha**: DI available, old pattern works  
+**3rd alpha**: Old pattern deprecated  
+**4th alpha**: Old pattern removed
 
-**Zero breaking changes until v0.4**
+**Zero breaking changes until 4th alpha feature release**
 
 ## Code Comparison
 

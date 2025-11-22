@@ -511,7 +511,8 @@ def to_camel(s: str) -> str:
 
 def generate_capabilities_file(models: list[SimplifiedModelMeta], model_maker: ModelMaker) -> str:
     """Generate a capabilities module from MTEB models."""
-    # We use REUSE ignore markers to bracket this because it's not licensing *for this script* but licensing *for the generated modules*. Without it, REUSE would view it as additional (or duplicate) license information.
+    # These license headers are intended for the generated code, not for this generator script.
+    # We use REUSE-IgnoreStart/End markers to prevent REUSE from treating these as duplicate license statements.
     # REUSE-IgnoreStart
     header = [
         "# THIS FILE IS AUTO-GENERATED - DO NOT EDIT MANUALLY. The `mteb_to_codeweaver.py` script is used to generate this file.",

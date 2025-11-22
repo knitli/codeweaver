@@ -102,7 +102,8 @@ def generate_markdown_list(languages: list[LanguageNameT]) -> str:
 
 def generate_markdown_file(languages: list[LanguageNameT], path: Path) -> None:
     """Generate the supported languages markdown file."""
-    # We use REUSE ignore markers to bracket this because it's not licensing *for this script* but licensing *for the generated modules*. Without it, REUSE would view it as additional (or duplicate) license information.
+    # These license headers are intended for the generated code, not for this generator script.
+    # We use REUSE-IgnoreStart/End markers to prevent REUSE from treating these as duplicate license statements.
     # REUSE-IgnoreStart
     content = dedent(f"""<!--
         SPDX-FileCopyrightText: 2025 Knitli Inc.

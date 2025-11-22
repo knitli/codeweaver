@@ -441,7 +441,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             return EmbeddingErrorInfo(error=str(error), queries=queries)
         return EmbeddingErrorInfo(error=str(error), batch_id=batch_id, documents=documents)
 
-    async def embed_documents(
+    async def embed_documents(  # noqa: C901
         self,
         documents: Sequence[CodeChunk],  # type: ignore # intentionally obscurred
         *,
@@ -507,7 +507,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             # Split chunks into token-aware batches to avoid exceeding API limits
             token_batches = self._split_by_tokens(chunks)
 
-            all_results: list[Sequence[float] | Sequence[int] | dict[str, list[int] | list[float]]] = []
+            all_results: list[
+                Sequence[float] | Sequence[int] | dict[str, list[int] | list[float]]
+            ] = []
 
             for batch_idx, token_batch in enumerate(token_batches):
                 if len(token_batches) > 1:
@@ -903,7 +905,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                             "expected_dimension": expected_dim,
                             "actual_dimension": actual_dim,
                             "model_name": self.model_name,
-                            "provider": type(self)._provider.value if hasattr(type(self), "_provider") else "unknown",
+                            "provider": type(self)._provider.value
+                            if hasattr(type(self), "_provider")
+                            else "unknown",
                             "for_backup": for_backup,
                         },
                         suggestions=[

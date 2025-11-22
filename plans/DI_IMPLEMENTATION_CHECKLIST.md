@@ -248,12 +248,12 @@ This checklist tracks the implementation of the Dependency Injection architectur
 
 ---
 
-## Post-Implementation (v0.4+)
+## Post-Implementation (4th alpha feature release or later)
 
-### Breaking Changes (v0.4)
+### Breaking Changes
 - [ ] Remove old pattern entirely
 - [ ] Breaking change communicated
-- [ ] Migration period complete (12+ months)
+- [ ] Migration period complete
 - [ ] Final cleanup
 
 ### Monitoring
@@ -328,7 +328,7 @@ This checklist tracks the implementation of the Dependency Injection architectur
 ### Questions Awaiting Answers
 - [ ] **Timing**: Phase 1-2 in next Alpha feature release, or different split?
 - [ ] **pydantic-ai priority**: Fast-track Phase 3?
-- [ ] **Breaking changes**: Deprecate 3rd alpha feature release, remove v0.4 OK?
+- [ ] **Breaking changes**: Deprecate 3rd alpha feature release, remove 4th alpha?
 - [ ] **DI mandate**: Required after Phase 1?
 - [ ] **Multi-tenancy**: Near-term requirement?
 - [ ] **Plugin system**: Custom providers via DI in Phase 4 or later?

@@ -205,7 +205,7 @@ async def _ensure_index_ready(context: Any | None) -> None:
         # Don't fail find_code - let it try to search anyway
 
 
-async def find_code(
+async def find_code(  # noqa: C901
     query: str,
     *,
     intent: IntentType | None = None,
@@ -346,10 +346,11 @@ async def find_code(
         # Step 12: Capture search telemetry
         try:
             settings = _get_settings(context)
-            tools_before_privacy = getattr(settings, 'tools_before_privacy', False)
+            tools_before_privacy = getattr(settings, "tools_before_privacy", False)
 
             # Get feature flags for A/B testing
             from codeweaver.common.telemetry import get_telemetry_client
+
             client = get_telemetry_client()
             feature_flags = {
                 "search-ranking-v2": client.get_feature_flag("search-ranking-v2"),
@@ -368,8 +369,6 @@ async def find_code(
         except Exception:
             # Never fail find_code due to telemetry
             logger.debug("Failed to capture search telemetry")
-
-        return response
 
     except Exception as e:
         logger.warning("find_code failed")
@@ -392,6 +391,8 @@ async def find_code(
             logger.debug("Failed to capture error search telemetry")
 
         return error_response
+    else:
+        return response
 
 
 __all__ = ("MatchedSection", "find_code")

@@ -40,7 +40,6 @@ models.
 
 This build also uses a local qdrant vector store to minimize setup time. However, for some of the same reasons, we recommend using a [qdrant cloud instance](https://qdrant.io/cloud). Like Voyage, the free tier is generous and should be sufficient for most use cases.
 
-Docs: https://docs.knitli.com/codeweaver/  <-- I don't exist yet because I'm a baby alpha release! 🍼 Coming soon. 😄
 EOF
                 exit 78
         fi

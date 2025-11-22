@@ -17,10 +17,8 @@ from __future__ import annotations
 import hashlib
 import statistics
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Protocol, Self
-
-from pydantic import NonNegativeFloat, NonNegativeInt
 
 
 if TYPE_CHECKING:
@@ -121,24 +119,19 @@ class SessionEvent:
 
         properties: dict[str, Any] = {
             # PostHog special properties for person tracking
-            "$set_once": {
-                "first_seen": datetime.now().isoformat(),
-            },
+            "$set_once": {"first_seen": datetime.now(UTC).isoformat()},
             "$set": {
-                "last_active": datetime.now().isoformat(),
+                "last_active": datetime.now(UTC).isoformat(),
                 "codeweaver_version": self._version,
             },
-
             # Session duration
             "duration_seconds": round(self._duration_seconds, 2),
-
             # Setup success metrics (primary interest for identifying trouble spots)
             "setup": {
                 "success": self._setup_success,
                 "attempts": self._setup_attempts,
                 "errors": self._config_errors,
             },
-
             # Request statistics (from computed properties, always safe)
             "requests": {
                 "total": stats.total_requests,
@@ -146,7 +139,6 @@ class SessionEvent:
                 "failed": stats.failed_requests,
                 "success_rate": round(stats.success_rate, 3),
             },
-
             # HTTP request statistics
             "http_requests": {
                 "total": stats.total_http_requests,
@@ -157,23 +149,31 @@ class SessionEvent:
         }
 
         # Add timing statistics if available (from anonymized base data)
-        if "timing_statistics" in base_data and base_data["timing_statistics"]:
+        if base_data.get("timing_statistics"):
             timing_data = base_data["timing_statistics"]
             if "timing_summary" in timing_data:
                 timing_summary = timing_data["timing_summary"]
                 properties["timing"] = {
                     "tool_calls": {
-                        "avg_ms": timing_summary.get("averages", {}).get("on_call_tool_requests", {}).get("combined", 0.0),
-                        "count": timing_summary.get("counts", {}).get("on_call_tool_requests", {}).get("combined", 0),
+                        "avg_ms": timing_summary.get("averages", {})
+                        .get("on_call_tool_requests", {})
+                        .get("combined", 0.0),
+                        "count": timing_summary.get("counts", {})
+                        .get("on_call_tool_requests", {})
+                        .get("combined", 0),
                     },
                     "http": {
-                        "health_avg_ms": timing_summary.get("averages", {}).get("http_requests", {}).get("health", 0.0),
-                        "health_count": timing_summary.get("counts", {}).get("http_requests", {}).get("health", 0),
+                        "health_avg_ms": timing_summary.get("averages", {})
+                        .get("http_requests", {})
+                        .get("health", 0.0),
+                        "health_count": timing_summary.get("counts", {})
+                        .get("http_requests", {})
+                        .get("health", 0),
                     },
                 }
 
         # Add token statistics if available (from anonymized base data)
-        if "token_statistics" in base_data and base_data["token_statistics"]:
+        if base_data.get("token_statistics"):
             tokens = base_data["token_statistics"]
             properties["tokens"] = {
                 "embedding": tokens.get("total_generated", 0),
@@ -183,7 +183,7 @@ class SessionEvent:
             }
 
         # Add index/file statistics if available (from anonymized base data)
-        if "index_statistics" in base_data and base_data["index_statistics"]:
+        if base_data.get("index_statistics"):
             idx = base_data["index_statistics"]
             properties["index"] = {
                 "total_files": idx.get("total_file_count", 0),
@@ -193,13 +193,14 @@ class SessionEvent:
             }
 
         # Add failover statistics if available (from anonymized base data)
-        if "failover_statistics" in base_data and base_data["failover_statistics"]:
-            fo = base_data["failover_statistics"]
+        if base_data.get("failover_statistics"):
+            failover = base_data["failover_statistics"]
             properties["failover"] = {
-                "occurred": fo.get("failover_active", False) or fo.get("failover_count", 0) > 0,
-                "count": fo.get("failover_count", 0),
-                "time_seconds": round(fo.get("total_failover_time_seconds", 0.0), 2),
-                "active_store": fo.get("active_store_type"),
+                "occurred": failover.get("failover_active", False)
+                or failover.get("failover_count", 0) > 0,
+                "count": failover.get("failover_count", 0),
+                "time_seconds": round(failover.get("total_failover_time_seconds", 0.0), 2),
+                "active_store": failover.get("active_store_type"),
             }
 
         return (self.EVENT_NAME, properties)
@@ -266,55 +267,57 @@ class SearchEvent:
 
         properties: dict[str, Any] = {
             # Core search info
-            "intent": self._intent_type.value if hasattr(self._intent_type, 'value') else str(self._intent_type),
-            "strategies": [s.value if hasattr(s, 'value') else str(s) for s in self._strategies],
+            "intent": self._intent_type.value
+            if hasattr(self._intent_type, "value")
+            else str(self._intent_type),
+            "strategies": [s.value if hasattr(s, "value") else str(s) for s in self._strategies],
             "search_mode": base_data.get("search_mode"),
-
             # Timing
             "execution_time_ms": round(self._execution_time_ms, 2),
-
             # Results (from anonymized data)
             "results": {
                 "candidates": base_data.get("total_matches", 0),
                 "returned": base_data.get("total_results", 0),
                 "token_count": base_data.get("token_count", 0),
             },
-
             # Status
             "status": base_data.get("status", "unknown"),
             "has_warnings": bool(base_data.get("warnings")),
             "warning_count": len(base_data.get("warnings", [])),
-
             # Index state
             "index": {
                 "state": base_data.get("indexing_state"),
-                "coverage": round(base_data.get("index_coverage", 0), 2) if base_data.get("index_coverage") else None,
+                "coverage": round(base_data.get("index_coverage", 0), 2)
+                if base_data.get("index_coverage")
+                else None,
             },
-
             # Language distribution (count only for privacy)
             "language_count": len(base_data.get("languages_found", [])),
-
             # Summary is anonymized to TEXT_COUNT by _telemetry_keys()
-            "summary_length": base_data.get("summary", 0) if isinstance(base_data.get("summary"), int) else len(str(base_data.get("summary", ""))),
+            "summary_length": base_data.get("summary", 0)
+            if isinstance(base_data.get("summary"), int)
+            else len(str(base_data.get("summary", ""))),
         }
 
-        # Add match quality metrics from anonymized matches
-        matches_data = base_data.get("matches", [])
-        if matches_data:
-            scores = [m.get("relevance_score", 0) for m in matches_data if m.get("relevance_score") is not None]
-            if scores:
-                properties["quality"] = {
-                    "avg_score": round(statistics.mean(scores), 3),
-                    "min_score": round(min(scores), 3),
-                    "max_score": round(max(scores), 3),
-                    "median_score": round(statistics.median(scores), 3),
-                }
+        if (matches_data := base_data.get("matches", [])) and (
+            scores := [
+                m.get("relevance_score", 0)
+                for m in matches_data
+                if m.get("relevance_score") is not None
+            ]
+        ):
+            properties["quality"] = {
+                "avg_score": round(statistics.mean(scores), 3),
+                "min_score": round(min(scores), 3),
+                "max_score": round(max(scores), 3),
+                "median_score": round(statistics.median(scores), 3),
+            }
 
             # Match type distribution
             match_types: dict[str, int] = {}
             for match in matches_data:
                 mt = match.get("match_type", "unknown")
-                if hasattr(mt, 'value'):
+                if hasattr(mt, "value"):
                     mt = mt.value
                 match_types[str(mt)] = match_types.get(str(mt), 0) + 1
             properties["match_types"] = match_types

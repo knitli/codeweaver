@@ -202,34 +202,22 @@ class IndexingProgress:
         if self._chunking_task is not None:
             self.progress.reset(self._chunking_task)
             self.progress.update(
-                self._chunking_task,
-                completed=0,
-                total=1,
-                description="[dim]  Chunking...[/dim]",
+                self._chunking_task, completed=0, total=1, description="[dim]  Chunking...[/dim]"
             )
         if self._dense_task is not None:
             self.progress.reset(self._dense_task)
             self.progress.update(
-                self._dense_task,
-                completed=0,
-                total=1,
-                description="[dim]  Dense embed...[/dim]",
+                self._dense_task, completed=0, total=1, description="[dim]  Dense embed...[/dim]"
             )
         if self._sparse_task is not None:
             self.progress.reset(self._sparse_task)
             self.progress.update(
-                self._sparse_task,
-                completed=0,
-                total=1,
-                description="[dim]  Sparse embed...[/dim]",
+                self._sparse_task, completed=0, total=1, description="[dim]  Sparse embed...[/dim]"
             )
         if self._indexing_task is not None:
             self.progress.reset(self._indexing_task)
             self.progress.update(
-                self._indexing_task,
-                completed=0,
-                total=1,
-                description="[dim]  Indexing...[/dim]",
+                self._indexing_task, completed=0, total=1, description="[dim]  Indexing...[/dim]"
             )
 
     def update_checking(self, current: int, total: int) -> None:
@@ -300,11 +288,7 @@ class IndexingProgress:
         if self._checking_task is not None:
             task = self.progress.tasks[self._checking_task]
             if task.total and task.total > 0 and task.completed < task.total:
-                self.progress.update(
-                    self._checking_task,
-                    completed=task.total,
-                    total=task.total,
-                )
+                self.progress.update(self._checking_task, completed=task.total, total=task.total)
 
         if self._chunking_task is not None:
             task = self.progress.tasks[self._chunking_task]

@@ -23,7 +23,7 @@ This document shows concrete examples of how each provider type will work before
 
 ## 1. Dense Embedding Providers
 
-### Current (v0.1) - Manual
+### Current (alpha1) - Manual
 
 ```python
 # codeweaver/engine/indexer.py
