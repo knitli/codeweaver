@@ -32,32 +32,29 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Generator
     from typing import Self
 
-    from codeweaver.engine.indexer.progress import IndexingStats
-
 
 class IndexingProgress:
-    """Unified progress tracker for indexing operations.
+    """Unified progress tracker for batch-through-pipeline indexing.
 
-    Provides real-time progress updates across all indexing phases:
-    - Discovery: Finding files to index
-    - Chunking: Breaking files into code chunks
-    - Embedding: Generating vector embeddings
-    - Indexing: Storing in vector database
-
-    This replaces the separate IndexingProgressTracker with a StatusDisplay-integrated
-    approach that properly updates during batch operations.
+    Provides real-time progress updates with batch tracking:
+    - Batch X of Y header
+    - Per-batch phases: Checking → Chunking → Dense/Sparse Embedding → Indexing
+    - Shows all phases from start, updates granularly (every 5-10 items)
+    - Dense/sparse embedding split shown only when both providers configured
     """
 
-    def __init__(self, console: Console | None = None) -> None:
+    def __init__(self, console: Console | None = None, *, has_sparse: bool = False) -> None:
         """Initialize the indexing progress tracker.
 
         Args:
             console: Optional Rich console instance
+            has_sparse: Whether sparse embeddings are configured
         """
         import sys
 
         is_interactive = sys.stdin.isatty() if hasattr(sys.stdin, "isatty") else False
         self.console = console or Console(markup=True, emoji=True, force_interactive=is_interactive)
+        self._has_sparse = has_sparse
 
         self.progress = Progress(
             SpinnerColumn(),
@@ -72,36 +69,62 @@ class IndexingProgress:
         )
 
         # Task IDs for each phase
-        self._discovery_task: int | None = None
+        self._batch_task: int | None = None
+        self._checking_task: int | None = None
         self._chunking_task: int | None = None
-        self._embedding_task: int | None = None
+        self._dense_task: int | None = None
+        self._sparse_task: int | None = None
         self._indexing_task: int | None = None
 
-        # Track current phase for visibility management
-        self._current_phase: str = "discovery"
+        # Batch tracking
+        self._current_batch = 0
+        self._total_batches = 0
         self._started = False
 
-    def start(self, total_files: int | None = None) -> None:
-        """Start the progress display.
+        # Cumulative totals across batches
+        self._total_files_processed = 0
+        self._total_chunks_created = 0
+        self._total_chunks_embedded = 0
+        self._total_chunks_indexed = 0
+
+    def start(
+        self, total_batches: int = 1, total_files: int = 0, *, has_sparse: bool | None = None
+    ) -> None:
+        """Start the progress display with all phases visible.
 
         Args:
-            total_files: Total number of files to process (None if unknown)
+            total_batches: Total number of batches to process
+            total_files: Total files across all batches
+            has_sparse: Override sparse embedding display (uses init value if None)
         """
         if self._started:
             return
 
-        # Create tasks for each phase - initially hidden except discovery
-        self._discovery_task = self.progress.add_task(
-            "[cyan]Discovering files...", total=total_files or 0, visible=True
+        self._total_batches = total_batches
+        if has_sparse is not None:
+            self._has_sparse = has_sparse
+
+        # Batch progress (overall)
+        self._batch_task = self.progress.add_task(
+            f"[bold white]Batch 0/{total_batches}", total=total_batches, visible=True
+        )
+
+        # Per-batch phases - all visible from start
+        self._checking_task = self.progress.add_task(
+            "[cyan]Checking files...", total=0, visible=True
         )
         self._chunking_task = self.progress.add_task(
-            "[blue]Chunking files...", total=0, visible=False
+            "[blue]Chunking...", total=0, visible=True
         )
-        self._embedding_task = self.progress.add_task(
-            "[magenta]Embedding chunks...", total=0, visible=False
+        self._dense_task = self.progress.add_task(
+            "[magenta]Dense embedding...", total=0, visible=True
         )
+        if self._has_sparse:
+            self._sparse_task = self.progress.add_task(
+                "[magenta]Sparse embedding...", total=0, visible=True
+            )
         self._indexing_task = self.progress.add_task(
-            "[green]Indexing to store...", total=0, visible=False
+            "[green]Indexing...", total=0, visible=True
         )
 
         self.progress.start()
@@ -113,156 +136,224 @@ class IndexingProgress:
             self.progress.stop()
             self._started = False
 
-    def update_discovery(self, current: int, total: int | None = None) -> None:
-        """Update discovery phase progress.
+    def start_batch(self, batch_num: int, files_in_batch: int) -> None:
+        """Signal start of a new batch.
 
         Args:
-            current: Number of files discovered so far
-            total: Total files expected (None or 0 if still discovering)
+            batch_num: Current batch number (1-indexed)
+            files_in_batch: Number of files in this batch
         """
         if not self._started:
-            self.start(total if total else None)
+            self.start(total_batches=1)
 
-        if self._discovery_task is not None:
-            if total and total > 0:
-                # Known total - we're filtering/checking files
-                self.progress.update(
-                    self._discovery_task,
-                    completed=current,
-                    total=total,
-                    visible=True,
-                    description=f"[cyan]Checking files... ({current}/{total})",
-                )
-            else:
-                # Unknown total - we're scanning for files
-                self.progress.update(
-                    self._discovery_task,
-                    completed=current,
-                    total=current + 1,  # Always one more than current to show activity
-                    visible=True,
-                    description=f"[cyan]Scanning files... ({current} found)",
-                )
+        self._current_batch = batch_num
+
+        # Update batch counter
+        if self._batch_task is not None:
+            self.progress.update(
+                self._batch_task,
+                completed=batch_num - 1,
+                description=f"[bold white]Batch {batch_num}/{self._total_batches}",
+            )
+
+        # Reset per-batch tasks for new batch
+        if self._checking_task is not None:
+            self.progress.update(
+                self._checking_task,
+                completed=0,
+                total=files_in_batch,
+                description="[cyan]Checking files...",
+            )
+        if self._chunking_task is not None:
+            self.progress.update(
+                self._chunking_task, completed=0, total=0, description="[blue]Chunking..."
+            )
+        if self._dense_task is not None:
+            self.progress.update(
+                self._dense_task, completed=0, total=0, description="[magenta]Dense embedding..."
+            )
+        if self._sparse_task is not None:
+            self.progress.update(
+                self._sparse_task, completed=0, total=0, description="[magenta]Sparse embedding..."
+            )
+        if self._indexing_task is not None:
+            self.progress.update(
+                self._indexing_task, completed=0, total=0, description="[green]Indexing..."
+            )
+
+    def update_checking(self, current: int, total: int) -> None:
+        """Update checking/identification phase progress.
+
+        Args:
+            current: Files checked so far in this batch
+            total: Total files to check in this batch
+        """
+        if not self._started:
+            self.start()
+
+        if self._checking_task is not None:
+            self.progress.update(
+                self._checking_task,
+                completed=current,
+                total=total,
+                description=f"[cyan]Checking files... ({current}/{total})",
+            )
 
     def update_chunking(self, files_processed: int, total_files: int, chunks_created: int) -> None:
         """Update chunking phase progress.
 
         Args:
-            files_processed: Number of files chunked so far
-            total_files: Total files to chunk
-            chunks_created: Total chunks created so far
+            files_processed: Files chunked so far in this batch
+            total_files: Total files to chunk in this batch
+            chunks_created: Chunks created so far in this batch
         """
         if not self._started:
-            self.start(total_files)
+            self.start()
 
-        self._current_phase = "chunking"
-
-        # Mark discovery complete
-        if self._discovery_task is not None:
+        # Mark checking complete
+        if self._checking_task is not None:
             self.progress.update(
-                self._discovery_task,
+                self._checking_task,
                 completed=total_files,
                 total=total_files,
-                description="[cyan]✓ Files discovered",
+                description=f"[cyan]✓ Checked ({total_files} files)",
             )
 
-        # Update chunking progress
         if self._chunking_task is not None:
             self.progress.update(
                 self._chunking_task,
                 completed=files_processed,
                 total=total_files,
-                visible=True,
-                description=f"[blue]Chunking files... ({chunks_created} chunks)",
+                description=f"[blue]Chunking... ({chunks_created} chunks)",
             )
 
-    def update_embedding(self, chunks_embedded: int, total_chunks: int) -> None:
-        """Update embedding phase progress.
+    def update_dense_embedding(self, chunks_embedded: int, total_chunks: int) -> None:
+        """Update dense embedding phase progress.
 
         Args:
-            chunks_embedded: Number of chunks embedded so far
+            chunks_embedded: Chunks embedded so far
             total_chunks: Total chunks to embed
         """
         if not self._started:
             self.start()
 
-        self._current_phase = "embedding"
-
-        # Mark chunking complete if we have chunking task
+        # Mark chunking complete on first embedding update
         if self._chunking_task is not None:
             task = self.progress.tasks[self._chunking_task]
             if task.total and task.total > 0:
                 self.progress.update(
-                    self._chunking_task, completed=task.total, description="[blue]✓ Files chunked"
+                    self._chunking_task,
+                    completed=task.total,
+                    description=f"[blue]✓ Chunked ({int(task.total)} files)",
                 )
 
-        # Update embedding progress
-        if self._embedding_task is not None:
+        if self._dense_task is not None:
             self.progress.update(
-                self._embedding_task, completed=chunks_embedded, total=total_chunks, visible=True
+                self._dense_task,
+                completed=chunks_embedded,
+                total=total_chunks,
+                description=f"[magenta]Dense embedding... ({chunks_embedded}/{total_chunks})",
             )
+
+    def update_sparse_embedding(self, chunks_embedded: int, total_chunks: int) -> None:
+        """Update sparse embedding phase progress.
+
+        Args:
+            chunks_embedded: Chunks embedded so far
+            total_chunks: Total chunks to embed
+        """
+        if not self._started or self._sparse_task is None:
+            return
+
+        self.progress.update(
+            self._sparse_task,
+            completed=chunks_embedded,
+            total=total_chunks,
+            description=f"[magenta]Sparse embedding... ({chunks_embedded}/{total_chunks})",
+        )
 
     def update_indexing(self, chunks_indexed: int, total_chunks: int) -> None:
         """Update indexing phase progress.
 
         Args:
-            chunks_indexed: Number of chunks indexed so far
+            chunks_indexed: Chunks indexed so far
             total_chunks: Total chunks to index
         """
         if not self._started:
             self.start()
 
-        self._current_phase = "indexing"
-
         # Mark embedding complete
-        if self._embedding_task is not None:
-            task = self.progress.tasks[self._embedding_task]
+        if self._dense_task is not None:
+            task = self.progress.tasks[self._dense_task]
             if task.total and task.total > 0:
                 self.progress.update(
-                    self._embedding_task,
+                    self._dense_task,
                     completed=task.total,
-                    description="[magenta]✓ Chunks embedded",
+                    description=f"[magenta]✓ Dense ({int(task.total)} chunks)",
+                )
+        if self._sparse_task is not None:
+            task = self.progress.tasks[self._sparse_task]
+            if task.total and task.total > 0:
+                self.progress.update(
+                    self._sparse_task,
+                    completed=task.total,
+                    description=f"[magenta]✓ Sparse ({int(task.total)} chunks)",
                 )
 
-        # Update indexing progress
         if self._indexing_task is not None:
             self.progress.update(
-                self._indexing_task, completed=chunks_indexed, total=total_chunks, visible=True
+                self._indexing_task,
+                completed=chunks_indexed,
+                total=total_chunks,
+                description=f"[green]Indexing... ({chunks_indexed}/{total_chunks})",
             )
 
-    def complete(self) -> None:
-        """Mark all phases as complete."""
+    def complete_batch(self) -> None:
+        """Mark current batch as complete."""
+        # Mark indexing complete
         if self._indexing_task is not None:
             task = self.progress.tasks[self._indexing_task]
             if task.total and task.total > 0:
                 self.progress.update(
                     self._indexing_task,
                     completed=task.total,
-                    description="[green]✓ Indexing complete",
+                    description=f"[green]✓ Indexed ({int(task.total)} chunks)",
                 )
 
-    def update_from_stats(self, stats: IndexingStats, phase: str | None = None) -> None:
-        """Update progress from IndexingStats object.
+        # Update batch counter
+        if self._batch_task is not None:
+            self.progress.update(self._batch_task, completed=self._current_batch)
 
-        This provides compatibility with the existing callback pattern while
-        enabling more granular updates.
-
-        Args:
-            stats: Current indexing statistics
-            phase: Current phase name (discovery, chunking, embedding, indexing)
-        """
-        if phase == "discovery" or (phase is None and stats.files_discovered > 0):
-            self.update_discovery(stats.files_discovered, stats.files_discovered)
-
-        if phase == "chunking" or (phase is None and stats.files_processed > 0):
-            self.update_chunking(
-                stats.files_processed, stats.files_discovered, stats.chunks_created
+    def complete(self) -> None:
+        """Mark all batches as complete."""
+        self.complete_batch()
+        if self._batch_task is not None:
+            self.progress.update(
+                self._batch_task,
+                completed=self._total_batches,
+                description=f"[bold green]✓ Complete ({self._total_batches} batches)",
             )
 
-        if phase == "embedding" or (phase is None and stats.chunks_embedded > 0):
-            self.update_embedding(stats.chunks_embedded, stats.chunks_created)
+    # Legacy compatibility methods
+    def update_discovery(self, current: int, total: int | None = None) -> None:
+        """Legacy method for discovery updates - maps to update_checking."""
+        if total and total > 0:
+            self.update_checking(current, total)
+        else:
+            # Scanning phase - no total known yet
+            if not self._started:
+                self.start()
+            if self._checking_task is not None:
+                self.progress.update(
+                    self._checking_task,
+                    completed=current,
+                    total=current + 1,
+                    description=f"[cyan]Scanning files... ({current} found)",
+                )
 
-        if phase == "indexing" or (phase is None and stats.chunks_indexed > 0):
-            self.update_indexing(stats.chunks_indexed, stats.chunks_created)
+    def update_embedding(self, chunks_embedded: int, total_chunks: int) -> None:
+        """Legacy method for embedding updates - maps to update_dense_embedding."""
+        self.update_dense_embedding(chunks_embedded, total_chunks)
 
     def __enter__(self) -> Self:
         """Context manager entry."""

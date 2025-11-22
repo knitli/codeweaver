@@ -69,6 +69,7 @@ from codeweaver.agent_api.find_code.scoring import (
     process_unranked_results,
 )
 from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary, SearchStrategy
+from codeweaver.common.telemetry.events import capture_search_event
 from codeweaver.core.spans import Span
 from codeweaver.semantic.classifications import AgentTask
 
@@ -332,7 +333,7 @@ async def find_code(
         # Step 11: Build response
         execution_time_ms = (time.time() - start_time) * 1000
 
-        return build_success_response(
+        response = build_success_response(
             code_matches=code_matches,
             query=query,
             intent_type=intent_type,
@@ -342,11 +343,55 @@ async def find_code(
             strategies_used=strategies_used,
         )
 
+        # Step 12: Capture search telemetry
+        try:
+            settings = _get_settings(context)
+            tools_before_privacy = getattr(settings, 'tools_before_privacy', False)
+
+            # Get feature flags for A/B testing
+            from codeweaver.common.telemetry import get_telemetry_client
+            client = get_telemetry_client()
+            feature_flags = {
+                "search-ranking-v2": client.get_feature_flag("search-ranking-v2"),
+                "rerank-strategy": client.get_feature_flag("rerank-strategy"),
+            }
+
+            capture_search_event(
+                response=response,
+                query=query,
+                intent_type=intent_type,
+                strategies=strategies_used,
+                execution_time_ms=execution_time_ms,
+                tools_before_privacy=tools_before_privacy,
+                feature_flags=feature_flags,
+            )
+        except Exception:
+            # Never fail find_code due to telemetry
+            logger.debug("Failed to capture search telemetry")
+
+        return response
+
     except Exception as e:
         logger.warning("find_code failed")
         # Return empty response on failure (graceful degradation)
         execution_time_ms = (time.time() - start_time) * 1000
-        return build_error_response(e, intent, execution_time_ms)
+        error_response = build_error_response(e, intent, execution_time_ms)
+
+        # Capture error telemetry
+        try:
+            capture_search_event(
+                response=error_response,
+                query=query,
+                intent_type=intent or IntentType.UNDERSTAND,
+                strategies=strategies_used,
+                execution_time_ms=execution_time_ms,
+                tools_before_privacy=False,
+                feature_flags=None,
+            )
+        except Exception:
+            logger.debug("Failed to capture error search telemetry")
+
+        return error_response
 
 
 __all__ = ("MatchedSection", "find_code")

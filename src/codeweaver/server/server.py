@@ -367,6 +367,8 @@ def _initialize_app_state(
     if hasattr(app, "state"):
         return cast(AppState, app.state)
 
+    telemetry_client = PostHogClient.from_settings()
+
     state = AppState(  # type: ignore
         initialized=False,
         settings=settings,
@@ -381,13 +383,21 @@ def _initialize_app_state(
         middleware_stack=tuple(getattr(app, "middleware", ())),
         health_service=None,  # Initialize as None, will be set after AppState construction
         failover_manager=None,  # Initialize as None, will be set after AppState construction
-        telemetry=PostHogClient.from_settings(),
+        telemetry=telemetry_client,
         indexer=Indexer.from_settings(),
         startup_time=time.time(),
     )
     object.__setattr__(app, "state", state)
     # Now that AppState is constructed and _state is set, create the HealthService
     state.health_service = _get_health_service()
+
+    # Start telemetry session with metadata
+    if telemetry_client and telemetry_client.enabled:
+        telemetry_client.start_session({
+            "codeweaver_version": version,
+            "index_backend": "qdrant",  # TODO: get from settings
+        })
+
     return state
 
 
@@ -424,10 +434,29 @@ async def _cleanup_state(
             if verbose:
                 logger.info("Background indexing stopped")
 
-    # Shutdown telemetry client to flush pending events
-    if state.telemetry:
+    # Capture session telemetry event before shutdown
+    if state.telemetry and state.telemetry.enabled:
         try:
-            state.telemetry.shutdown()
+            from codeweaver.common.telemetry.events import capture_session_event
+
+            # Calculate session duration
+            duration_seconds = time.time() - state.startup_time
+
+            # Capture session event with statistics
+            capture_session_event(
+                state.statistics,
+                version=version,
+                setup_success=state.initialized,
+                setup_attempts=1,  # TODO: track actual attempts
+                config_errors=None,  # TODO: track config errors
+                duration_seconds=duration_seconds,
+            )
+        except Exception:
+            logging.getLogger(__name__).exception("Error capturing session telemetry event")
+
+        # End telemetry session (closes context and flushes events)
+        try:
+            state.telemetry.end_session()
         except Exception:
             logging.getLogger(__name__).exception("Error shutting down telemetry client")
 

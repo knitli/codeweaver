@@ -327,19 +327,41 @@ async def _run_standalone_indexing(
         settings=settings if isinstance(settings, DictView) else DictView(settings.model_dump())
     )
 
-    # Create progress tracker with the new unified interface
-    progress_tracker = IndexingProgress(console=display.console)
+    # Check if sparse embeddings are configured
+    has_sparse = indexer._sparse_provider is not None
+
+    # Create progress tracker with batch support
+    progress_tracker = IndexingProgress(console=display.console, has_sparse=has_sparse)
 
     # Create callback that maps to the new IndexingProgress methods
     def progress_callback(
         phase: str, current: int, total: int, *, extra: dict[str, Any] | None = None
     ) -> None:
-        if phase == "discovery":
+        if phase == "batch_start":
+            if current == 0:
+                # Initial setup - start with total batches
+                total_files = extra.get("total_files", 0) if extra else 0
+                progress_tracker.start(total_batches=total, total_files=total_files)
+            else:
+                # Start of a specific batch
+                files_in_batch = extra.get("files_in_batch", 0) if extra else 0
+                progress_tracker.start_batch(current, files_in_batch)
+        elif phase == "batch_complete":
+            progress_tracker.complete_batch()
+        elif phase == "discovery":
+            # Legacy discovery callback - maps to checking
             progress_tracker.update_discovery(current, total)
+        elif phase == "checking":
+            progress_tracker.update_checking(current, total)
         elif phase == "chunking":
             chunks_created = extra.get("chunks_created", 0) if extra else 0
             progress_tracker.update_chunking(current, total, chunks_created)
+        elif phase == "dense_embedding":
+            progress_tracker.update_dense_embedding(current, total)
+        elif phase == "sparse_embedding":
+            progress_tracker.update_sparse_embedding(current, total)
         elif phase == "embedding":
+            # Legacy embedding callback - maps to dense
             progress_tracker.update_embedding(current, total)
         elif phase == "indexing":
             progress_tracker.update_indexing(current, total)

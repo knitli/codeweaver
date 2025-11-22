@@ -104,6 +104,65 @@ def low_priority() -> Generator[None, None, None]:
                     logger.debug("Restored process nice value to %d", original_nice)
 
 
+@contextmanager
+def very_low_priority() -> Generator[None, None, None]:
+    """Context manager to run code at very low process priority.
+
+    Sets the absolute lowest priority (nice 19 on Unix, IDLE_PRIORITY_CLASS on Windows)
+    for background operations like backup syncing that should never interfere with
+    normal system operation.
+
+    Priority is automatically restored when exiting the context.
+
+    Example:
+        with very_low_priority():
+            await sync_to_backup_store(chunks)
+
+    Yields:
+        None
+    """
+    original_nice: int | None = None
+    original_priority_class: int | None = None
+
+    try:
+        import psutil
+
+        process = psutil.Process()
+
+        if sys.platform == "win32":
+            # Windows: Use IDLE priority class (lowest)
+            original_priority_class = process.nice()
+            process.nice(psutil.IDLE_PRIORITY_CLASS)
+            logger.debug("Set process priority to IDLE")
+        else:
+            # Unix: Set to absolute lowest (nice 19)
+            original_nice = process.nice()
+            process.nice(19)
+            logger.debug("Set process nice value to 19 (was %d)", original_nice)
+
+    except ImportError:
+        logger.debug("psutil not available, running at normal priority")
+    except (psutil.AccessDenied, OSError) as e:
+        logger.debug("Could not set process priority: %s", e)
+
+    try:
+        yield
+    finally:
+        # Restore original priority
+        with contextlib.suppress(Exception):
+            if original_nice is not None or original_priority_class is not None:
+                import psutil
+
+                process = psutil.Process()
+
+                if sys.platform == "win32" and original_priority_class is not None:
+                    process.nice(original_priority_class)
+                    logger.debug("Restored process priority class")
+                elif original_nice is not None:
+                    process.nice(original_nice)
+                    logger.debug("Restored process nice value to %d", original_nice)
+
+
 def get_optimal_workers(task_type: str = "cpu") -> int:
     """Get optimal number of worker threads/processes for a task type.
 
@@ -117,12 +176,7 @@ def get_optimal_workers(task_type: str = "cpu") -> int:
 
     cpu_count = os.cpu_count() or 4
 
-    if task_type == "io":
-        # I/O bound tasks can use more workers
-        return min(cpu_count * 2, 32)
-    # CPU bound tasks should match core count
-    # Leave one core free for system responsiveness
-    return max(cpu_count - 1, 1)
+    return min(cpu_count * 2, 32) if task_type == "io" else max(cpu_count - 1, 1)
 
 
-__all__ = ("asyncio_or_uvloop", "get_optimal_workers", "low_priority")
+__all__ = ("asyncio_or_uvloop", "get_optimal_workers", "low_priority", "very_low_priority")

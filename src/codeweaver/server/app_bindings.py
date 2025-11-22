@@ -18,8 +18,8 @@ from typing import TYPE_CHECKING, Any, cast
 from fastmcp import Context
 from fastmcp.server.middleware.middleware import Middleware
 from fastmcp.tools import Tool
+from mcp.server.session import ServerSession
 from mcp.shared.context import RequestContext
-from mcp.shared.session import BaseSession
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, TypeAdapter
 from pydantic_core import to_json
@@ -121,7 +121,7 @@ async def find_code_tool(
                 and hasattr(context, "request_context")
                 and (request_context := context.request_context)  # type: ignore
             ):
-                request_context: RequestContext[BaseSession[Any, Any, Any, Any, Any], Any, Any]
+                request_context: RequestContext[ServerSession, Any, Request]
                 request_id = request_context.request_id
                 statistics().add_successful_request(request_id)
 

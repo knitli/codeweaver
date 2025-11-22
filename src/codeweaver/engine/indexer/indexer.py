@@ -25,27 +25,6 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Protocol, TypedDict, cast
 
-
-class ProgressCallback(Protocol):
-    """Protocol for progress callback functions.
-
-    Supports both the legacy phase-transition style and granular updates.
-    """
-
-    def __call__(
-        self, phase: str, current: int, total: int, *, extra: dict[str, Any] | None = None
-    ) -> None:
-        """Report progress update.
-
-        Args:
-            phase: Current phase (discovery, chunking, embedding, indexing)
-            current: Current progress count
-            total: Total items to process
-            extra: Optional extra data (e.g., chunks_created for chunking phase)
-        """
-        ...
-
-
 import rignore
 
 from pydantic import DirectoryPath, Field, NonNegativeFloat, NonNegativeInt, PrivateAttr
@@ -81,6 +60,26 @@ if TYPE_CHECKING:
     from codeweaver.config.types import CodeWeaverSettingsDict
     from codeweaver.core.chunks import CodeChunk
     from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+
+
+class ProgressCallback(Protocol):
+    """Protocol for progress callback functions.
+
+    Supports both the legacy phase-transition style and granular updates.
+    """
+
+    def __call__(
+        self, phase: str, current: int, total: int, *, extra: dict[str, Any] | None = None
+    ) -> None:
+        """Report progress update.
+
+        Args:
+            phase: Current phase (discovery, chunking, embedding, indexing)
+            current: Current progress count
+            total: Total items to process
+            extra: Optional extra data (e.g., chunks_created for chunking phase)
+        """
+        ...
 
 
 class UserProviderSelectionDict(TypedDict):
@@ -1107,16 +1106,73 @@ class Indexer(BasedModel):
     async def _perform_batch_indexing_async(
         self, files_to_index: list[Path], progress_callback: ProgressCallback | None
     ) -> None:
-        """Execute batch indexing for discovered files.
+        """Execute batch-through-pipeline indexing for discovered files.
+
+        Processes files in batches of 50, each batch flowing through the complete
+        pipeline (check → chunk → embed → index) before starting the next batch.
+        This provides faster time-to-usable results and lower memory usage.
 
         Args:
             files_to_index: List of files to process
             progress_callback: Optional callback for granular progress updates
         """
-        try:
-            await self._index_files_batch(files_to_index, progress_callback)
-        except Exception:
-            logger.warning("Failure during batch indexing", exc_info=True)
+        import math
+
+        batch_size = 50
+        total_batches = math.ceil(len(files_to_index) / batch_size)
+
+        logger.info(
+            "Starting batch-through-pipeline indexing: %d files in %d batches",
+            len(files_to_index),
+            total_batches,
+        )
+
+        # Signal batch processing start
+        if progress_callback:
+            progress_callback(
+                "batch_start",
+                0,
+                total_batches,
+                extra={"total_files": len(files_to_index), "batch_size": batch_size},
+            )
+
+        for batch_num in range(1, total_batches + 1):
+            start_idx = (batch_num - 1) * batch_size
+            end_idx = min(start_idx + batch_size, len(files_to_index))
+            batch = files_to_index[start_idx:end_idx]
+
+            logger.debug(
+                "Processing batch %d/%d: %d files (indices %d-%d)",
+                batch_num,
+                total_batches,
+                len(batch),
+                start_idx,
+                end_idx - 1,
+            )
+
+            # Signal batch start
+            if progress_callback:
+                progress_callback(
+                    "batch_start", batch_num, total_batches, extra={"files_in_batch": len(batch)}
+                )
+
+            try:
+                await self._index_files_batch(batch, progress_callback)
+            except Exception:
+                logger.warning(
+                    "Failure during batch %d/%d indexing", batch_num, total_batches, exc_info=True
+                )
+
+            # Signal batch complete
+            if progress_callback:
+                progress_callback("batch_complete", batch_num, total_batches)
+
+            # Checkpoint after each batch
+            if self._checkpoint_manager:
+                self.save_checkpoint()
+                logger.debug("Checkpoint saved after batch %d/%d", batch_num, total_batches)
+
+        logger.info("Batch-through-pipeline indexing complete: %d batches processed", total_batches)
 
     def _finalize_indexing(self) -> None:
         """Log final statistics, save checkpoint and manifest, and cleanup."""
@@ -1353,12 +1409,12 @@ class Indexer(BasedModel):
             self._chunking_service = _get_chunking_service()
         all_chunks: list[CodeChunk] = []
         total_files = len(discovered_files)
-        files_chunked = 0
 
-        for file_path, chunks in self._chunking_service.chunk_files(discovered_files):
+        for files_chunked, (file_path, chunks) in enumerate(
+            self._chunking_service.chunk_files(discovered_files), start=1
+        ):
             all_chunks.extend(chunks)
             self._stats.chunks_created += len(chunks)
-            files_chunked += 1
             logger.debug("Chunked %s: %d chunks", file_path, len(chunks))
 
             # Report progress for each file chunked
@@ -1378,7 +1434,7 @@ class Indexer(BasedModel):
         batch_size: int = 100,
         progress_callback: ProgressCallback | None = None,
     ) -> None:
-        """Embed chunks in batches.
+        """Embed chunks in batches with separate dense/sparse progress reporting.
 
         Args:
             chunks: List of chunks to embed
@@ -1386,23 +1442,95 @@ class Indexer(BasedModel):
             progress_callback: Optional callback for progress updates
         """
         from codeweaver.common.utils.proc import low_priority
+        from codeweaver.providers.embedding.registry import get_embedding_registry
 
         total_chunks = len(chunks)
+        registry = get_embedding_registry()
+
+        # Track dense and sparse separately
+        dense_embedded = 0
+        sparse_embedded = 0
 
         # Run embedding at low priority to avoid starving the system
         with low_priority():
             for i in range(0, len(chunks), batch_size):
                 batch = chunks[i : i + batch_size]
-                try:
-                    await self._embed_chunks(batch)
-                    self._stats.chunks_embedded += len(batch)
-                    logger.debug("Embedded batch %d-%d (%d chunks)", i, i + len(batch), len(batch))
 
-                    # Report progress after each batch
-                    if progress_callback:
-                        progress_callback("embedding", self._stats.chunks_embedded, total_chunks)
-                except Exception:
-                    logger.warning("Failed to embed batch %d-%d", i, i + len(batch), exc_info=True)
+                # Dense embeddings
+                if self._embedding_provider:
+                    try:
+                        if chunks_needing_dense := [
+                            chunk
+                            for chunk in batch
+                            if chunk.chunk_id not in registry
+                            or not registry[chunk.chunk_id].has_dense
+                        ]:
+                            await self._embedding_provider.embed_documents(chunks_needing_dense)
+                            dense_embedded += len(chunks_needing_dense)
+                            logger.debug(
+                                "Dense embedded batch %d-%d (%d chunks)",
+                                i,
+                                i + len(batch),
+                                len(chunks_needing_dense),
+                            )
+                        else:
+                            dense_embedded += len(batch)
+
+                        # Report dense embedding progress
+                        if progress_callback:
+                            progress_callback("dense_embedding", dense_embedded, total_chunks)
+                    except ValueError as e:
+                        if "already set" not in str(e):
+                            raise
+                        self._duplicate_dense_count += 1
+                        dense_embedded += len(batch)
+                    except Exception:
+                        logger.warning(
+                            "Dense embedding failed for batch %d-%d",
+                            i,
+                            i + len(batch),
+                            exc_info=True,
+                        )
+
+                # Sparse embeddings
+                if self._sparse_provider:
+                    try:
+                        if chunks_needing_sparse := [
+                            chunk
+                            for chunk in batch
+                            if chunk.chunk_id not in registry
+                            or not registry[chunk.chunk_id].has_sparse
+                        ]:
+                            await self._sparse_provider.embed_documents(chunks_needing_sparse)
+                            sparse_embedded += len(chunks_needing_sparse)
+                            logger.debug(
+                                "Sparse embedded batch %d-%d (%d chunks)",
+                                i,
+                                i + len(batch),
+                                len(chunks_needing_sparse),
+                            )
+                        else:
+                            sparse_embedded += len(batch)
+
+                        # Report sparse embedding progress
+                        if progress_callback:
+                            progress_callback("sparse_embedding", sparse_embedded, total_chunks)
+                    except ValueError as e:
+                        if "already set" not in str(e):
+                            raise
+                        self._duplicate_sparse_count += 1
+                        sparse_embedded += len(batch)
+                    except Exception:
+                        logger.warning(
+                            "Sparse embedding failed for batch %d-%d",
+                            i,
+                            i + len(batch),
+                            exc_info=True,
+                        )
+
+                # Update overall stats
+                self._stats.chunks_embedded += len(batch)
+                logger.debug("Embedded batch %d-%d (%d chunks)", i, i + len(batch), len(batch))
 
     def _retrieve_embedded_chunks(self, chunks: list[CodeChunk]) -> list[CodeChunk]:
         """Retrieve embedded chunks from registry, falling back to originals if needed.
@@ -1521,8 +1649,7 @@ class Indexer(BasedModel):
             },
         )
 
-        if progress_callback:
-            progress_callback("embedding", self._stats.chunks_embedded, len(all_chunks))
+        # Note: Progress callbacks for dense/sparse are already fired in _embed_chunks_in_batches
 
         # Phase 4: Retrieve embedded chunks from registry
         updated_chunks = self._retrieve_embedded_chunks(all_chunks)
@@ -1577,7 +1704,7 @@ class Indexer(BasedModel):
         discovered_files = self._discover_files_for_batch(files)
 
         if progress_callback:
-            progress_callback("discovery", len(discovered_files), len(files))
+            progress_callback("checking", len(discovered_files), len(files))
 
         return discovered_files
 

@@ -143,7 +143,7 @@ async def test_server_starts_without_errors(indexer: Indexer):
     """
     # Verify indexer initialized
     assert indexer._project_root is not None
-    assert indexer._walker is not None
+    assert indexer._walker_settings is not None
 
     # Verify providers initialized (if available)
     # Note: May be None if API keys not configured, that's acceptable
