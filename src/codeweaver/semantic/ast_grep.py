@@ -441,8 +441,22 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     @computed_field
     @property
     def symbol(self) -> str:
-        """Get a symbolic representation of the node."""
-        # Return the node's text as a simple symbol representation
+        """Get a symbolic representation of the node.
+
+        For structured nodes (functions, classes, variables), extracts the identifier
+        from the 'name' field. For simple tokens, returns the node's text.
+
+        This follows the standard tree-sitter pattern used by LSP implementations
+        and code intelligence tools, where semantic fields like 'name' contain
+        the identifier for structured constructs.
+        """
+        # Try to extract symbol from the 'name' field for structured nodes
+        # This is the standard approach used across tree-sitter grammars
+        with contextlib.suppress(Exception):
+            if name_node := self._node.field("name"):
+                return name_node.text()
+
+        # Fallback to the node's text for tokens and unnamed structures
         return self.text
 
     @computed_field
