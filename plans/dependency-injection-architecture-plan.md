@@ -13,7 +13,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 ## Executive Summary
 
-This document provides a comprehensive analysis of CodeWeaver's current dependency management approach and proposes a FastAPI-inspired dependency injection (DI) architecture for v0.2/v0.3. The goal is to create a clean, extensible system that can elegantly handle the growing complexity of providers (embedding, reranking, vector stores, agents, data sources) while maintaining constitutional principles.
+This document provides a comprehensive analysis of CodeWeaver's current dependency management approach and proposes a FastAPI-inspired dependency injection (DI) architecture for A2/3 (feature release, not bug fixes). The goal is to create a clean, extensible system that can elegantly handle the growing complexity of providers (embedding, reranking, vector stores, agents, data sources) while maintaining constitutional principles.
 
 ---
 
@@ -186,7 +186,7 @@ Our DI architecture must satisfy these constitutional principles:
 7. **Settings Integration**: Seamless pydantic-settings integration
 8. **Provider Agnostic**: Works uniformly across all provider types
 9. **Async First**: Native async/await support
-10. **Minimal Breaking Changes**: Phase in without disrupting v0.1
+10. **Minimal Breaking Changes**: Phase in without disrupting alpha 1.
 
 ---
 
@@ -474,7 +474,7 @@ async def get_pydantic_agent() -> Agent:
 
 ## Implementation Phases
 
-### Phase 1: Foundation (v0.2 Early)
+### Phase 1: Foundation
 
 **Goal**: Core DI infrastructure without breaking existing code
 
@@ -507,7 +507,7 @@ async def get_pydantic_agent() -> Agent:
 
 **Risk**: Low (isolated new code, no changes to existing)
 
-### Phase 2: Integration (v0.2 Mid)
+### Phase 2: Integration
 
 **Goal**: Migrate core services to use DI
 
@@ -535,7 +535,7 @@ async def get_pydantic_agent() -> Agent:
 
 **Risk**: Medium (changing production code, need careful testing)
 
-### Phase 3: pydantic-ai Integration (v0.2 Late / v0.3 Early)
+### Phase 3: pydantic-ai Integration
 
 **Goal**: Integrate pydantic-ai providers into DI system
 
@@ -563,7 +563,7 @@ async def get_pydantic_agent() -> Agent:
 
 **Risk**: Medium (new territory, need to understand pydantic-ai patterns)
 
-### Phase 4: Advanced Features (v0.3)
+### Phase 4: Advanced Features
 
 **Goal**: Leverage DI for advanced capabilities
 
@@ -592,7 +592,7 @@ async def get_pydantic_agent() -> Agent:
 
 **Risk**: Low (building on proven foundation)
 
-### Phase 5: Cleanup (v0.3 Late)
+### Phase 5: Cleanup
 
 **Goal**: Remove old patterns, finalize API
 
@@ -628,26 +628,26 @@ async def get_pydantic_agent() -> Agent:
 
 **Goal**: No breaking changes in v0.2, deprecated in v0.3, removed in v0.4
 
-#### v0.2: Co-existence
+#### 2nd feature alpha release: Co-existence
 - Old pattern still works
 - New pattern available
 - Documentation shows both
 - New features use DI
 
-#### v0.3: Migration
+#### 3rd feature alpha release: Migration
 - Old pattern deprecated (warnings)
 - All core code uses DI
 - Migration guide published
 - Support for questions
 
-#### v0.4: Removal
+#### 4th feature alpha release: Removal
 - Old pattern removed
 - DI is the only way
 - Breaking change properly communicated
 
 ### Migration Examples
 
-#### Before (v0.1)
+#### Before alpha1
 ```python
 def _get_embedding_instance() -> EmbeddingProvider:
     from codeweaver.common.registry import get_provider_registry
@@ -661,7 +661,7 @@ class Indexer:
         self.vector_store = _get_vector_store_instance()
 ```
 
-#### After (v0.2+)
+#### After (alpha 2+)
 ```python
 from codeweaver.di.providers import EmbeddingDep, VectorStoreDep
 
@@ -748,8 +748,8 @@ def test_indexer(container):
 **Mitigation**:
 - Strict phase boundaries
 - Phase 1 must be complete before Phase 2
-- Can ship v0.2 after Phase 2
-- Phase 3+ can be v0.3
+- Can ship alpha2 after Phase 2
+- Phase 3+ can be alpha 3+
 
 #### Risk 2: Breaking Changes
 **Likelihood**: Low (with migration strategy)  
@@ -789,10 +789,10 @@ def test_indexer(container):
 - [ ] All provider types work via DI
 - [ ] Test code 50% less verbose (measured)
 - [ ] New provider integration takes < 1 hour (documented)
-- [ ] Zero breaking changes from v0.2 to v0.3
+- [ ] Zero breaking changes from A2 to A3
 - [ ] Architecture documentation complete
 - [ ] Migration guide published
-- [ ] Performance within 5% of v0.1
+- [ ] Performance within 5% of A1
 
 ---
 
@@ -904,22 +904,6 @@ def test_indexer(container):
 - [ ] Complete migration
 - [ ] Registry cleanup
 - [ ] Documentation overhaul
-
----
-
-## Questions for User
-
-1. **Timing**: Should this be v0.2 or v0.3? Or phase it: Phase 1-2 in v0.2, Phase 3+ in v0.3?
-
-2. **pydantic-ai integration priority**: How important is pydantic-ai provider integration for v0.1 release? Should we fast-track Phase 3?
-
-3. **Breaking changes tolerance**: Are you comfortable with deprecation in v0.3, removal in v0.4? Or prefer longer timeline?
-
-4. **Testing philosophy**: Should we require DI usage for all new code immediately after Phase 1, or wait until Phase 5?
-
-5. **Plugin system**: Do you envision users creating custom providers that use DI? Should that be Phase 4 or later?
-
-6. **Multi-tenancy**: Is this a near-term requirement? Affects container scoping design.
 
 ---
 
@@ -1090,7 +1074,7 @@ This DI architecture will:
 5. ✅ **Maintain simplicity** - Complex logic hidden in factories (Constitutional Principle V)
 6. ✅ **Support evidence-based development** - Incremental, testable (Constitutional Principle III)
 
-**Recommendation**: Implement Phases 1-2 in v0.2, evaluate before committing to Phases 3+.
+**Recommendation**: Implement Phases 1-2 in feature alpha 2 evaluate before committing to Phases 3+.
 
 **Next Steps**:
 1. Review and discuss this plan

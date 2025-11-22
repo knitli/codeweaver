@@ -155,18 +155,18 @@ def test_indexer(container):
 
 ## Questions for Discussion
 
-1. **Timing**: v0.2, v0.3, or split across both?
+1. **Timing**: next (2nd) alpha feature release, 3rd?, or split across both?
 2. **pydantic-ai priority**: Fast-track Phase 3?
-3. **Breaking changes**: Deprecate in v0.3, remove in v0.4 OK?
+3. **Breaking changes**: Deprecate in alpha 3, remove in alpha 4 OK?
 4. **DI mandate**: Require for new code after Phase 1?
 
 ## Recommendation
 
-**Implement Phases 1-2 in v0.2** (foundation + core migration)
+**Implement Phases 1-2 in alpha 2** (foundation + core migration)
 - Low risk, high value
 - Can evaluate before committing to Phase 3+
 - Maintains backward compatibility
-- Positions us well for v0.3 expansion
+- Positions us well for alpha 3+ expansion
 
 ## Next Steps
 

@@ -114,7 +114,7 @@ This checklist tracks the implementation of the Dependency Injection architectur
 ### Validation
 - [ ] All existing tests pass
 - [ ] No breaking changes
-- [ ] Performance within 5% of v0.1
+- [ ] Performance within 5% of alpha 1
 - [ ] Old pattern still works (coexistence)
 
 **Acceptance Criteria**:
@@ -294,7 +294,7 @@ This checklist tracks the implementation of the Dependency Injection architectur
 - [ ] Zero breaking changes from next Alpha feature release to 3rd alpha feature release
 - [ ] Architecture documentation complete
 - [ ] Migration guide published
-- [ ] Performance within 5% of v0.1
+- [ ] Performance within 5% of alpha 1
 
 ---
 

@@ -36,46 +36,8 @@ This directory contains planning, architecture, and specification documents for 
 
 **Overview**: Proposes FastAPI-inspired dependency injection to replace manual provider instantiation. Aims to reduce boilerplate by 60-70%, improve testability, and scale gracefully to 100+ providers.
 
-**Target**: v0.2 (foundation + core migration) and v0.3 (advanced features)
+**Target**: 2nd alpha feature release (foundation + core migration) and 3rd alpha feature release (advanced features)
 
----
-
-### General Implementation
-
-4. **[IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md)** (14KB)
-   - Overall project roadmap
-   - Feature priorities
-   - Release planning
-
----
-
-### Feature Specifications
-
-5. **[flexible-extension-system-spec.md](./flexible-extension-system-spec.md)** (24KB)
-   - Extension and plugin system design
-   - Custom provider integration
-   - API extensibility
-
-6. **[node_type_parser_implementation_spec.md](./node_type_parser_implementation_spec.md)** (43KB)
-   - AST node type parsing specification
-   - Language support details
-   - Parser implementation guide
-
----
-
-### Telemetry & Monitoring
-
-7. **[telemetry-integration-checklist.md](./telemetry-integration-checklist.md)** (11KB)
-   - Telemetry integration tasks
-   - Implementation checklist
-   - Testing requirements
-
-8. **[telemetry-metrics-implementation-plan.md](./telemetry-metrics-implementation-plan.md)** (37KB)
-   - Comprehensive telemetry design
-   - Metrics collection strategy
-   - Privacy and compliance considerations
-
----
 
 ## Document Status Legend
 
@@ -121,18 +83,6 @@ This directory contains planning, architecture, and specification documents for 
    - Assess FastAPI pattern alignment
    - Verify backward compatibility plan
    - Consider scaling implications
-
-### For Product Planning
-
-1. **Release planning**
-   - Consult `IMPLEMENTATION_PLAN.md` for roadmap
-   - Review DI plan for v0.2/v0.3 scope
-   - Consider dependencies between features
-
-2. **Feature prioritization**
-   - Specs here represent significant engineering investment
-   - DI architecture is foundational for future expansion
-   - Balance quick wins vs. long-term architecture
 
 ---
 
@@ -191,4 +141,4 @@ Brief overview of what this document covers.
 
 ---
 
-**Maintenance**: This README should be updated whenever new planning documents are added or significant changes are made to existing ones.
+**Maintenance**: This README should be updated whenever new planning documents are added or significant changes are made to existing ones. Outdated or obsolete documents should be removed.

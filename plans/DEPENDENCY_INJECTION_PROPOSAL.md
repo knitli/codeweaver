@@ -19,9 +19,9 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 **Solution**: FastAPI-inspired DI reduces boilerplate by 70-80%, makes testing trivial, scales gracefully
 
-**Timeline**: Phase 1-2 in v0.2 (foundation + core), Phase 3-5 in v0.3 (advanced)
+**Timeline**: Phase 1-2 in v0.2 (foundation + core), Phase 3-5 in 3rd alpha feature release (advanced)
 
-**Impact**: Zero breaking changes in v0.2-v0.3, removal in v0.4 (12+ months notice)
+**Impact**: Zero breaking changes in alpha feat 2 to 3, removal in 4th alpha feature release. Low user expectations for stable API during alpha phase.
 
 ---
 
@@ -73,7 +73,7 @@ class Indexer:
 - ✅ **Full type safety**
 - ✅ **Scales to 100+ providers**
 - ✅ **FastAPI-aligned patterns**
-- ✅ **Zero breaking changes** (v0.2-v0.3)
+- ✅ **Zero breaking changes**
 
 ---
 
@@ -90,25 +90,25 @@ class Indexer:
 
 ## 🗓️ Implementation Plan
 
-### Phase 1: Foundation (v0.2 Early) - ~1-2 weeks
+### Phase 1: Foundation - ~1-2 weeks
 - Core DI infrastructure
 - No production changes
 - **Risk**: Low
 
-### Phase 2: Integration (v0.2 Mid) - ~2-3 weeks
+### Phase 2: Integration - ~2-3 weeks
 - Migrate core services
 - Old pattern still works
 - **Risk**: Medium
 
-### Phase 3: pydantic-ai (v0.2 Late / v0.3) - ~2-3 weeks
+### Phase 3: pydantic-ai - ~2-3 weeks
 - Integrate pydantic-ai ecosystem
 - **Risk**: Medium
 
-### Phase 4: Advanced (v0.3) - ~2-3 weeks
+### Phase 4: Advanced - ~2-3 weeks
 - Health checks, telemetry, plugins
 - **Risk**: Low
 
-### Phase 5: Cleanup (v0.3 Late) - ~1-2 weeks
+### Phase 5: Cleanup - ~1-2 weeks
 - Deprecate old patterns
 - **Risk**: Low
 
@@ -125,9 +125,9 @@ class Indexer:
 
 ## ❓ Questions for Discussion
 
-1. **Timing**: Phase 1-2 in v0.2 (recommended), or different split?
+1. **Timing**: Phase 1-2 in alpha 2 (recommended), or different split?
 2. **pydantic-ai priority**: Fast-track Phase 3?
-3. **Breaking changes**: Deprecate v0.3, remove v0.4 OK?
+3. **Breaking changes**: Deprecate alpha 3, remove alpha 4 OK?
 4. **DI mandate**: Required after Phase 1?
 5. **Multi-tenancy**: Near-term need?
 
@@ -161,13 +161,13 @@ See [DI_PROVIDER_EXAMPLES.md](./plans/DI_PROVIDER_EXAMPLES.md) for real code exa
 
 ## 📝 Recommendation
 
-**Implement Phases 1-2 in v0.2:**
+**Implement Phases 1-2 in alpha 2:**
 - Foundation + core service migration
 - Low/medium risk, high value
 - Backward compatible
 - Evaluate before Phase 3+
 
-**Defer Phases 3-5 to v0.3:**
+**Defer Phases 3-5 to alpha 3:**
 - pydantic-ai integration
 - Advanced features
 - Cleanup and deprecation

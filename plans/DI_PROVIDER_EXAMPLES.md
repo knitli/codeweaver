@@ -58,7 +58,7 @@ def test_indexer(tmp_path):
     # test...
 ```
 
-### Proposed (v0.2+) - DI
+### Proposed (alpha2+) - DI
 
 ```python
 # codeweaver/di/providers.py

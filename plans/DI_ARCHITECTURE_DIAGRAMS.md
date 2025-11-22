@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 # DI Architecture Diagrams
 
-## Current Architecture (v0.1)
+## Current Architecture (alpha 1)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -68,7 +68,7 @@ Problems:
 ❌ Circular dependency risks
 ```
 
-## Proposed Architecture (v0.2+)
+## Proposed Architecture (alpha2+)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -335,37 +335,39 @@ EmbeddingDep = Annotated[EmbeddingProvider, Depends(get_embedding_provider)]
 
 ## Migration Timeline
 
+Because of the nature of alpha releases, we anticipate there will be many bug fix releases between feature releases. The alpha numbers here represent these more major feature releases.
+
 ```
-v0.1 (Current)
+A1 (Current)
 ├─ Manual dependency fetching
 └─ Registry pattern
 
-v0.2 Early (Phase 1)
+A2 (Phase 1)
 ├─ DI infrastructure added
 ├─ Old pattern still works
 └─ New pattern available
 
-v0.2 Mid (Phase 2)
+A2 Mid (Phase 2)
 ├─ Core services use DI
 ├─ Old pattern still works
 └─ Both patterns documented
 
-v0.2 Late (Phase 3 - Optional)
+A2 Late (Phase 3 - Optional)
 ├─ pydantic-ai integrated
 ├─ Data sources via DI
 └─ Old pattern still works
 
-v0.3 Early (Phase 4)
+A3 Early (Phase 4)
 ├─ Advanced DI features
 ├─ Old pattern deprecated (warnings)
 └─ Migration guide published
 
-v0.3 Late (Phase 5)
+A3 Late (Phase 5)
 ├─ All code uses DI
 ├─ Registry simplified
 └─ Old pattern still works (deprecated)
 
-v0.4 (Future)
+A4+ (Future)
 ├─ Old pattern removed
 └─ Breaking change release
 ```
