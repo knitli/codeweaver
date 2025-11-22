@@ -1335,11 +1335,16 @@ class Indexer(BasedModel):
                 self._stats.files_with_errors.append(path)
         return discovered_files
 
-    def _chunk_discovered_files(self, discovered_files: list[DiscoveredFile]) -> list[CodeChunk]:
+    def _chunk_discovered_files(
+        self,
+        discovered_files: list[DiscoveredFile],
+        progress_callback: ProgressCallback | None = None,
+    ) -> list[CodeChunk]:
         """Chunk discovered files using the chunking service.
 
         Args:
             discovered_files: List of discovered files to chunk
+            progress_callback: Optional callback for progress updates
 
         Returns:
             List of code chunks created from the files
@@ -1347,10 +1352,24 @@ class Indexer(BasedModel):
         if not self._chunking_service:
             self._chunking_service = _get_chunking_service()
         all_chunks: list[CodeChunk] = []
+        total_files = len(discovered_files)
+        files_chunked = 0
+
         for file_path, chunks in self._chunking_service.chunk_files(discovered_files):
             all_chunks.extend(chunks)
             self._stats.chunks_created += len(chunks)
+            files_chunked += 1
             logger.debug("Chunked %s: %d chunks", file_path, len(chunks))
+
+            # Report progress for each file chunked
+            if progress_callback:
+                progress_callback(
+                    "chunking",
+                    files_chunked,
+                    total_files,
+                    extra={"chunks_created": len(all_chunks)},
+                )
+
         return all_chunks
 
     async def _embed_chunks_in_batches(
@@ -1590,7 +1609,7 @@ class Indexer(BasedModel):
             },
         )
 
-        all_chunks = self._chunk_discovered_files(discovered_files)
+        all_chunks = self._chunk_discovered_files(discovered_files, progress_callback)
 
         await log_to_client_or_fallback(
             context,

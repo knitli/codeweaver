@@ -223,10 +223,8 @@ class FilteredPaths(NamedTuple):
         for exclude in excluded_files:
             if exclude:
                 excludes |= _resolve_globs(exclude, repo_root)
-        excludes |= specifically_included_files
-        other_files -= {
-            exclude for exclude in excludes if exclude not in specifically_included_files
-        }
+        excludes -= specifically_included_files
+        other_files -= excludes
         other_files -= {None, Path(), Path("./"), Path("./.")}
         excludes -= {None, Path(), Path("./"), Path("./.")}
         return FilteredPaths(frozenset(other_files), frozenset(excludes))

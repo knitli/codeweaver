@@ -125,19 +125,22 @@ class IndexingProgress:
 
         if self._discovery_task is not None:
             if total and total > 0:
-                # Known total - show determinate progress
+                # Known total - we're filtering/checking files
                 self.progress.update(
-                    self._discovery_task, completed=current, total=total, visible=True
+                    self._discovery_task,
+                    completed=current,
+                    total=total,
+                    visible=True,
+                    description=f"[cyan]Checking files... ({current}/{total})",
                 )
             else:
-                # Unknown total - show indeterminate progress with count
-                # Set total to current to keep bar moving, update description with count
+                # Unknown total - we're scanning for files
                 self.progress.update(
                     self._discovery_task,
                     completed=current,
                     total=current + 1,  # Always one more than current to show activity
                     visible=True,
-                    description=f"[cyan]Discovering files... ({current} found)",
+                    description=f"[cyan]Scanning files... ({current} found)",
                 )
 
     def update_chunking(self, files_processed: int, total_files: int, chunks_created: int) -> None:
