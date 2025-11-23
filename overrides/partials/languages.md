@@ -39,8 +39,9 @@
 
 ### Languages with Smart Delimiter Support
 
-These languages are parsed with our delimiter-based approach. We identify patterns common to families of languages to extract meaningful semantic-like structures and data:
+These languages are parsed with our delimiter-based approach. We identify patterns common to families of languages to extract meaningful semantic-like structures and data.
 
+**Note:** Some languages (e.g., Bash, C, Cpp, Go, Java, etc.) appear in both the semantic and delimiter-based lists. For these languages, semantic parsing is preferred when available; otherwise, delimiter-based parsing is used as a fallback.
 - Cmake
 - Groovy
 - Ini
