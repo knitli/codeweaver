@@ -103,7 +103,13 @@ If automated submission fails, you can submit manually:
 
 ```bash
 # Install mcp-publisher
-curl -L "https://github.com/modelcontextprotocol/registry/releases/download/v1.0.0/mcp-publisher_1.0.0_linux_amd64.tar.gz" | tar xz
+curl -L "https://github.com/modelcontextprotocol/registry/releases/download/v1.0.0/mcp-publisher_1.0.0_linux_amd64.tar.gz" \
+  -o mcp-publisher.tar.gz
+
+# TODO: Verify checksum when official checksums are published by registry maintainers
+# Example: sha256sum -c mcp-publisher.tar.gz.sha256
+
+tar xz < mcp-publisher.tar.gz
 sudo mv mcp-publisher /usr/local/bin/
 
 # Initialize (creates server.json template)
@@ -115,6 +121,8 @@ mcp-publisher validate server.json
 # Submit to registry
 mcp-publisher submit server.json
 ```
+
+**Security Note**: The mcp-publisher binary is downloaded from the official MCP registry repository. When checksum files become available, verify downloads before installation.
 
 ### Using Web Interface
 

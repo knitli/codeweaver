@@ -149,17 +149,24 @@ jobs:
           exit 1
       
       - name: Install mcp-publisher CLI
+        env:
+          MCP_PUBLISHER_VERSION: "v1.0.0"
         run: |
           ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
           OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-          VERSION="v1.0.0"
+          VERSION="${MCP_PUBLISHER_VERSION}"
           
-          echo "Downloading mcp-publisher for ${OS}/${ARCH}..."
+          echo "Downloading mcp-publisher ${VERSION} for ${OS}/${ARCH}..."
           curl -L "https://github.com/modelcontextprotocol/registry/releases/download/${VERSION}/mcp-publisher_1.0.0_${OS}_${ARCH}.tar.gz" \
-            | tar xz mcp-publisher
+            -o mcp-publisher.tar.gz
           
+          # TODO: Add checksum verification when official checksums are published
+          # Example: sha256sum -c mcp-publisher.tar.gz.sha256
+          
+          tar xz < mcp-publisher.tar.gz mcp-publisher
           sudo mv mcp-publisher /usr/local/bin/
           chmod +x /usr/local/bin/mcp-publisher
+          rm mcp-publisher.tar.gz
           
           echo "✓ mcp-publisher installed"
           mcp-publisher --version || echo "Version check not available"
@@ -185,30 +192,47 @@ jobs:
         run: |
           echo "Submitting to MCP Registry..."
           
-          # The submission process requires GitHub authentication
-          # The exact command may vary based on mcp-publisher implementation
+          # Note: The exact submission process depends on mcp-publisher CLI implementation
+          # and may require manual intervention if the API/CLI has changed.
+          # The following attempts multiple submission methods in order of preference.
           
-          # Option 1: Direct submission via mcp-publisher
-          if mcp-publisher submit server.json --token "${GITHUB_TOKEN}" 2>&1; then
-            echo "✓ Successfully submitted to MCP Registry"
-            exit 0
+          # Method 1: Try mcp-publisher submit command (if available)
+          if command -v mcp-publisher &> /dev/null; then
+            echo "Attempting submission via mcp-publisher CLI..."
+            if mcp-publisher submit server.json --token "${GITHUB_TOKEN}" 2>&1; then
+              echo "✓ Successfully submitted via CLI"
+              exit 0
+            fi
+            echo "CLI submission not available or failed, trying API..."
           fi
           
-          # Option 2: If mcp-publisher doesn't support submit, use API directly
+          # Method 2: Direct API submission
           echo "Attempting direct API submission..."
           
-          curl -X POST \
+          RESPONSE=$(curl -X POST \
             -H "Authorization: Bearer ${GITHUB_TOKEN}" \
             -H "Content-Type: application/json" \
             -d @server.json \
-            https://registry.modelcontextprotocol.io/v0/servers \
-            --fail-with-body || {
-              echo "ERROR: Failed to submit to MCP Registry"
-              echo "This may require manual submission via the registry web interface"
-              exit 1
-            }
+            -w "\n%{http_code}" \
+            https://registry.modelcontextprotocol.io/v0/servers 2>&1)
           
-          echo "✓ Successfully submitted to MCP Registry"
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+            echo "✓ Successfully submitted to MCP Registry (HTTP ${HTTP_CODE})"
+            exit 0
+          fi
+          
+          # Submission failed - provide helpful error message
+          echo "ERROR: Failed to submit to MCP Registry (HTTP ${HTTP_CODE})"
+          echo "Response: ${BODY}"
+          echo ""
+          echo "This may require manual submission via:"
+          echo "  1. The registry web interface at https://registry.modelcontextprotocol.io"
+          echo "  2. The mcp-publisher CLI tool"
+          echo "  3. Contact registry maintainers for assistance"
+          exit 1
       
       - name: Summary
         if: always()
