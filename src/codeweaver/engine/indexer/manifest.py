@@ -357,6 +357,10 @@ class IndexFileManifest(BasedModel):
 
         This is for selective reindexing where we add missing embeddings
         without reprocessing the entire file.
+        
+        Note: If a file needs both dense and sparse embeddings, it will be
+        categorized under 'dense_only' (processed first). This prioritization
+        ensures dense embeddings are added before sparse embeddings.
 
         Args:
             current_dense_provider: Current dense embedding provider name

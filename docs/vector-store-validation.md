@@ -188,7 +188,9 @@ class FileManifestEntry(TypedDict):
 
 ### Batch Updates
 
-The selective reindexing uses Qdrant's `batch_update_points` API to efficiently update vectors without recreating points. This is significantly faster than full reindexing.
+The selective reindexing uses Qdrant's `update_vectors` API to efficiently update vectors without recreating points. Updates are performed per-chunk to provide granular error handling.
+
+For improved performance with large files, future enhancements could batch multiple vector updates together.
 
 ### Phase Tracking
 
