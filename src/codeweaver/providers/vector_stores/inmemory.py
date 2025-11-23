@@ -73,6 +73,7 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         object.__setattr__(self, "_periodic_task", None)
         object.__setattr__(self, "_shutdown", False)
         object.__setattr__(self, "_collection_metadata", {})
+        object.__setattr__(self, "_collection_metadata_lock", asyncio.Lock())
 
         # Create in-memory Qdrant client
         self._client = AsyncQdrantClient(
