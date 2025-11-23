@@ -2440,13 +2440,14 @@ class Indexer(BasedModel):
                                 )
                 
                 files_processed += 1
-                
+                # Save manifest after each successful file processing
+                self._save_file_manifest()
             except Exception as e:
                 error_msg = f"{file_path}: {e}"
                 logger.error("Error adding embeddings to file %s: %s", file_path, e, exc_info=True)
                 errors.append(error_msg)
         
-        # Save updated manifest
+        # Final manifest save (optional, for completeness)
         self._save_file_manifest()
         
         logger.info(
