@@ -77,6 +77,29 @@ jobs:
           print(f'Updated server.json to version ${VERSION}')
           "
       
+      - name: Update tools.json with release version
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # Update the version fields in tools.json
+          python -c "
+          import json
+          import sys
+          
+          with open('tools.json', 'r') as f:
+              tools_data = json.load(f)
+          
+          # Update top-level version
+          tools_data['version'] = '${VERSION}'
+          # Update server version if present
+          if 'server' in tools_data:
+              tools_data['server']['version'] = '${VERSION}'
+          
+          with open('tools.json', 'w') as f:
+              json.dump(tools_data, f, indent=2)
+          
+          print(f'Updated tools.json to version ${VERSION}')
+          "
+      
       - name: Validate server.json format
         run: |
           python -c "
