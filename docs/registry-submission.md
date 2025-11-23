@@ -99,6 +99,9 @@ Before CodeWeaver can be submitted to the MCP Registry:
 2. **MCP Label**: Dockerfile must include `LABEL io.modelcontextprotocol.server-name="io.github.knitli/codeweaver"`
 3. **Version Tags**: Docker images must be tagged with version numbers matching `server.json`
 4. **Health Check**: Container must expose health endpoint at `/health/`
+   - CodeWeaver exposes monitoring endpoints: `/health/`, `/state/`, `/metrics/`, `/version/`, `/settings/`
+   - MCP server endpoint: `/mcp/` (default)
+   - Dockerfile includes HEALTHCHECK using `/health/` endpoint
 
 #### General:
 1. **Namespace Ownership**: GitHub authentication proves ownership of `io.github.knitli` namespace
@@ -134,13 +137,24 @@ If automated submission fails, you can submit manually:
 
 ### Using mcp-publisher CLI
 
+⚠️ **SECURITY WARNING**: The following instructions download and execute a binary with sudo privileges without cryptographic verification. This poses a supply chain security risk.
+
+**Recommended approach**: Wait for official checksums to be published by the MCP registry maintainers, or use the web interface for submission instead.
+
+**If you must use the CLI**:
+
 ```bash
 # Install mcp-publisher
 curl -L "https://github.com/modelcontextprotocol/registry/releases/download/v1.0.0/mcp-publisher_1.0.0_linux_amd64.tar.gz" \
   -o mcp-publisher.tar.gz
 
-# TODO: Verify checksum when official checksums are published by registry maintainers
-# Example: sha256sum -c mcp-publisher.tar.gz.sha256
+# IMPORTANT: Verify checksum when official checksums are published
+# Until then, you are downloading an unverified binary
+# Check https://github.com/modelcontextprotocol/registry/releases for checksums
+# Example verification (when checksums are available):
+# curl -L "https://github.com/modelcontextprotocol/registry/releases/download/v1.0.0/mcp-publisher_1.0.0_linux_amd64.tar.gz.sha256" \
+#   -o mcp-publisher.tar.gz.sha256
+# sha256sum -c mcp-publisher.tar.gz.sha256
 
 tar xzf mcp-publisher.tar.gz
 sudo mv mcp-publisher /usr/local/bin/
@@ -155,7 +169,12 @@ mcp-publisher validate server.json
 mcp-publisher submit server.json
 ```
 
-**Security Note**: The mcp-publisher binary is downloaded from the official MCP registry repository. When checksum files become available, verify downloads before installation.
+**Security Best Practices**:
+1. Only download from the official MCP registry repository
+2. Verify checksums when available
+3. Review the binary with security tools before execution
+4. Consider using the automated GitHub Actions workflow instead
+5. Report any security concerns to the MCP registry maintainers
 
 ### Using Web Interface
 
@@ -238,6 +257,19 @@ docker run --rm \
   -p 9328:9328 \
   knitli/codeweaver:latest
 ```
+
+**Container Endpoints:**
+
+CodeWeaver's Docker container exposes several HTTP endpoints on port 9328:
+
+- **MCP Server**: `/mcp/` - Main Model Context Protocol endpoint
+- **Health Check**: `/health/` - Service health status (used by Docker HEALTHCHECK)
+- **State**: `/state/` - Current server state and status
+- **Metrics**: `/metrics/` - Prometheus-compatible metrics
+- **Version**: `/version/` - Server version information
+- **Settings**: `/settings/` - Current configuration settings
+
+The Dockerfile includes a HEALTHCHECK that monitors the `/health/` endpoint every 30 seconds to ensure the service is running properly.
 
 ### Command-Line Arguments
 
