@@ -2448,7 +2448,11 @@ class Indexer(BasedModel):
                                     has_dense_embeddings=True if add_dense else entry.get("has_dense_embeddings", False),
                                     has_sparse_embeddings=True if add_sparse else entry.get("has_sparse_embeddings", False),
                                 )
-                
+                else:
+                    logger.warning(
+                        "Manifest update skipped for file %s because manifest lock is None. This may lead to inconsistent state.",
+                        file_path,
+                    )
                 files_processed += 1
                 # Save manifest after each successful file processing
                 self._save_file_manifest()
