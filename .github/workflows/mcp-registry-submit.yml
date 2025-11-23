@@ -183,14 +183,20 @@ jobs:
           echo "Downloading mcp-publisher ${VERSION} for ${OS}/${ARCH}..."
           curl -L "https://github.com/modelcontextprotocol/registry/releases/download/${VERSION}/mcp-publisher_1.0.0_${OS}_${ARCH}.tar.gz" \
             -o mcp-publisher.tar.gz
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/download/${VERSION}/mcp-publisher_1.0.0_${OS}_${ARCH}.tar.gz.sha256" \
+            -o mcp-publisher.tar.gz.sha256
           
-          # TODO: Add checksum verification when official checksums are published
-          # Example: sha256sum -c mcp-publisher.tar.gz.sha256
+          echo "Verifying checksum for mcp-publisher.tar.gz..."
+          sha256sum -c mcp-publisher.tar.gz.sha256
+          if [ $? -ne 0 ]; then
+            echo "ERROR: Checksum verification failed for mcp-publisher.tar.gz"
+            exit 1
+          fi
           
-          tar xzf mcp-publisher.tar.gz mcp-publisher
+          tar xz < mcp-publisher.tar.gz mcp-publisher
           sudo mv mcp-publisher /usr/local/bin/
           chmod +x /usr/local/bin/mcp-publisher
-          rm mcp-publisher.tar.gz
+          rm mcp-publisher.tar.gz mcp-publisher.tar.gz.sha256
           
           echo "✓ mcp-publisher installed"
           mcp-publisher --version || echo "Version check not available"
