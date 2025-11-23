@@ -147,6 +147,177 @@
           "isRequired": false
         }
       ]
+    },
+    {
+      "registryType": "oci",
+      "registryBaseUrl": "https://docker.io",
+      "identifier": "knitli/codeweaver",
+      "version": "0.0.1rc778",
+      "runtimeHint": "docker",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeArguments": [
+        {
+          "type": "named",
+          "name": "--rm",
+          "description": "Automatically remove container when it exits"
+        },
+        {
+          "type": "named",
+          "name": "-v",
+          "value": "{workspace}:/workspace:ro",
+          "description": "Mount workspace directory as read-only",
+          "variables": {
+            "workspace": {
+              "description": "Path to your codebase to index and search",
+              "required": true
+            }
+          }
+        },
+        {
+          "type": "named",
+          "name": "-e",
+          "value": "CODEWEAVER_REPO_PATH=/workspace",
+          "description": "Set repository path inside container"
+        },
+        {
+          "type": "named",
+          "name": "-e",
+          "value": "VOYAGE_API_KEY={voyage_api_key}",
+          "description": "Voyage AI API key for embeddings",
+          "variables": {
+            "voyage_api_key": {
+              "description": "Your Voyage AI API key",
+              "required": false
+            }
+          }
+        },
+        {
+          "type": "named",
+          "name": "-e",
+          "value": "CODEWEAVER_EMBEDDING_PROVIDER={embedding_provider}",
+          "description": "Embedding provider selection",
+          "variables": {
+            "embedding_provider": {
+              "description": "Provider to use for embeddings",
+              "default": "voyage",
+              "choices": ["voyage", "cohere", "openai", "fastembed", "sentence_transformers"]
+            }
+          }
+        },
+        {
+          "type": "named",
+          "name": "-p",
+          "value": "{host_port}:9328",
+          "description": "Port mapping for MCP server",
+          "variables": {
+            "host_port": {
+              "description": "Host port to expose MCP server",
+              "default": "9328"
+            }
+          }
+        },
+        {
+          "type": "named",
+          "name": "--network",
+          "value": "{network}",
+          "description": "Docker network for Qdrant connectivity",
+          "variables": {
+            "network": {
+              "description": "Docker network name (use 'host' for local Qdrant or custom network)",
+              "default": "bridge"
+            }
+          }
+        }
+      ],
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "server",
+          "description": "Start CodeWeaver MCP server"
+        },
+        {
+          "type": "named",
+          "name": "--host",
+          "value": "0.0.0.0",
+          "description": "Bind to all interfaces in container"
+        },
+        {
+          "type": "named",
+          "name": "--port",
+          "value": "9328",
+          "description": "MCP server port inside container"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "CODEWEAVER_REPO_PATH",
+          "description": "Repository path inside container",
+          "default": "/workspace",
+          "isRequired": true
+        },
+        {
+          "name": "CODEWEAVER_EMBEDDING_PROVIDER",
+          "description": "Embedding provider to use",
+          "default": "voyage",
+          "isRequired": false
+        },
+        {
+          "name": "VOYAGE_API_KEY",
+          "description": "API key for Voyage AI",
+          "isSecret": true,
+          "isRequired": false
+        },
+        {
+          "name": "COHERE_API_KEY",
+          "description": "API key for Cohere",
+          "isSecret": true,
+          "isRequired": false
+        },
+        {
+          "name": "OPENAI_API_KEY",
+          "description": "API key for OpenAI",
+          "isSecret": true,
+          "isRequired": false
+        },
+        {
+          "name": "QDRANT_URL",
+          "description": "Qdrant server URL (e.g., http://qdrant:6333)",
+          "default": "http://localhost:6333",
+          "isRequired": false
+        },
+        {
+          "name": "QDRANT_API_KEY",
+          "description": "API key for Qdrant cloud",
+          "isSecret": true,
+          "isRequired": false
+        },
+        {
+          "name": "CODEWEAVER_HOST",
+          "description": "Host address for MCP server",
+          "default": "0.0.0.0",
+          "isRequired": false
+        },
+        {
+          "name": "CODEWEAVER_PORT",
+          "description": "Port for MCP server",
+          "default": "9328",
+          "isRequired": false
+        },
+        {
+          "name": "LOG_LEVEL",
+          "description": "Logging verbosity",
+          "default": "info",
+          "isRequired": false
+        },
+        {
+          "name": "CODEWEAVER_TELEMETRY_ENABLED",
+          "description": "Enable/disable telemetry",
+          "default": "false",
+          "isRequired": false
+        }
+      ]
     }
   ],
   "_meta": {

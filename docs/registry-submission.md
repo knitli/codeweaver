@@ -15,10 +15,33 @@ The `server.json` file in the repository root is the metadata descriptor for MCP
 **Key sections:**
 
 - **Metadata**: Name, description, version, repository URL
-- **Packages**: PyPI distribution configuration with stdio transport
+- **Packages**: Multiple distribution methods
+  - **PyPI**: Python package distribution with stdio transport
+  - **Docker (OCI)**: Container-based deployment with runtime arguments
 - **Arguments**: Command-line arguments for server configuration
 - **Environment Variables**: Configuration via environment variables (including API keys)
 - **Capabilities**: Extended metadata describing supported features
+
+### `tools.json`
+
+The `tools.json` file describes the MCP tools exposed by CodeWeaver. It follows the [MCP Tools Schema 2025-09-16](https://static.modelcontextprotocol.io/schemas/2025-09-16/tools.schema.json) specification.
+
+**Contents:**
+- **find_code tool**: Complete schema for the primary semantic search tool
+  - Input parameters with validation
+  - Output schema with result structure
+  - Usage examples
+  - Tool annotations (read-only, idempotent)
+
+### `Dockerfile`
+
+The Dockerfile includes the required MCP registry label for Docker image validation:
+
+```dockerfile
+LABEL io.modelcontextprotocol.server-name="io.github.knitli/codeweaver"
+```
+
+This label enables the MCP registry to verify ownership and link the Docker image to the server metadata.
 
 ### GitHub Actions Workflows
 
@@ -66,10 +89,20 @@ Validates `server.json` configuration on pull requests and pushes.
 
 Before CodeWeaver can be submitted to the MCP Registry:
 
+#### For PyPI Package:
 1. **PyPI Publication**: Package must exist on PyPI at the specified version
 2. **README Metadata**: PyPI package must include `mcp-name: codeweaver` in README or package description
 3. **Version Alignment**: Versions in `server.json`, `pyproject.toml`, and PyPI must match
-4. **Namespace Ownership**: GitHub authentication proves ownership of `io.github.knitli` namespace
+
+#### For Docker Image:
+1. **Docker Hub Publication**: Image must be pushed to Docker Hub at `knitli/codeweaver`
+2. **MCP Label**: Dockerfile must include `LABEL io.modelcontextprotocol.server-name="io.github.knitli/codeweaver"`
+3. **Version Tags**: Docker images must be tagged with version numbers matching `server.json`
+4. **Health Check**: Container must expose health endpoint at `/health/`
+
+#### General:
+1. **Namespace Ownership**: GitHub authentication proves ownership of `io.github.knitli` namespace
+2. **Version Consistency**: All package versions must match across PyPI, Docker, and `server.json`
 
 ### Version Format
 
@@ -149,7 +182,11 @@ curl -X POST \
 
 ### Package Configuration
 
-CodeWeaver is distributed via PyPI and runs locally using stdio transport:
+CodeWeaver supports multiple deployment methods:
+
+#### PyPI Package
+
+Distributed via PyPI and runs locally using stdio transport:
 
 ```json
 {
@@ -166,6 +203,41 @@ CodeWeaver is distributed via PyPI and runs locally using stdio transport:
 **Runtime Hint**: `uvx` indicates the recommended execution method (uv's package runner)
 
 **Transport**: `stdio` means the server communicates via standard input/output streams
+
+#### Docker (OCI) Container
+
+Distributed via Docker Hub as a containerized deployment:
+
+```json
+{
+  "registryType": "oci",
+  "identifier": "knitli/codeweaver",
+  "version": "0.0.1rc778",
+  "runtimeHint": "docker",
+  "transport": {
+    "type": "stdio"
+  }
+}
+```
+
+**Runtime Hint**: `docker` indicates container execution
+
+**Runtime Arguments**: The Docker package includes comprehensive runtime arguments for:
+- Volume mounting (`-v {workspace}:/workspace:ro`)
+- Environment variables (`-e VOYAGE_API_KEY={voyage_api_key}`)
+- Port mapping (`-p {host_port}:9328`)
+- Network configuration (`--network {network}`)
+
+**Example Docker usage:**
+
+```bash
+docker run --rm \
+  -v /path/to/your/code:/workspace:ro \
+  -e VOYAGE_API_KEY=your_key \
+  -e CODEWEAVER_REPO_PATH=/workspace \
+  -p 9328:9328 \
+  knitli/codeweaver:latest
+```
 
 ### Command-Line Arguments
 
