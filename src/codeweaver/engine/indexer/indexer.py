@@ -2242,12 +2242,18 @@ class Indexer(BasedModel):
                     "files_with_missing_chunks": [],
                 }
             
-            retrieved = await self._vector_store.client.retrieve(
-                collection_name=collection_name,
-                ids=point_ids,
-                with_payload=False,
-                with_vectors=False,
-            )
+            # Batch retrieval to avoid Qdrant limits (e.g., 1000 IDs per batch)
+            BATCH_SIZE = 1000
+            retrieved = []
+            for i in range(0, len(point_ids), BATCH_SIZE):
+                batch_ids = point_ids[i:i+BATCH_SIZE]
+                batch_retrieved = await self._vector_store.client.retrieve(
+                    collection_name=collection_name,
+                    ids=batch_ids,
+                    with_payload=False,
+                    with_vectors=False,
+                )
+                retrieved.extend(batch_retrieved)
             
             # Check which chunks are missing
             retrieved_ids = {str(point.id) for point in retrieved}
