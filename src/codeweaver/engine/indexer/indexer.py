@@ -162,7 +162,7 @@ class IndexingStats:
     chunks_embedded: int = 0
     chunks_indexed: int = 0
     start_time: float = dataclasses.field(default_factory=time.time)
-    files_with_errors: list[Path] = dataclasses.field(default_factory=list)
+    files_with_errors: set[Path] = dataclasses.field(default_factory=set)
     # Structured error tracking (new in v1.1.0)
     structured_errors: list[IndexingError] = dataclasses.field(default_factory=list)
 
@@ -196,7 +196,7 @@ class IndexingStats:
         """
         from datetime import UTC, datetime
         
-        self.files_with_errors.append(file_path)
+        self.files_with_errors.add(file_path)  # Set automatically deduplicates
         self.structured_errors.append(IndexingError(
             file_path=str(file_path),
             error_type=type(error).__name__,
@@ -559,17 +559,21 @@ class Indexer(BasedModel):
         if self._embedding_provider:
             provider_name = type(self._embedding_provider).__name__.replace("Provider", "").lower()
             result["dense_provider"] = provider_name
-            # Try to get model name from provider
-            # Use standardized model_identifier property
-            result["dense_model"] = getattr(self._embedding_provider, "model_identifier", None)
+            # Try to get model name from provider - use model_name property if available
+            if hasattr(self._embedding_provider, "model_name"):
+                result["dense_model"] = str(self._embedding_provider.model_name)
+            elif hasattr(self._embedding_provider, "model"):
+                result["dense_model"] = str(self._embedding_provider.model)
         
         # Get sparse embedding provider info
         if self._sparse_provider:
             provider_name = type(self._sparse_provider).__name__.replace("Provider", "").lower()
             result["sparse_provider"] = provider_name
-            # Try to get model name from provider
-            # Use standardized model_identifier property
-            result["sparse_model"] = getattr(self._sparse_provider, "model_identifier", None)
+            # Try to get model name from provider - use model_name property if available
+            if hasattr(self._sparse_provider, "model_name"):
+                result["sparse_model"] = str(self._sparse_provider.model_name)
+            elif hasattr(self._sparse_provider, "model"):
+                result["sparse_model"] = str(self._sparse_provider.model)
         
         return result
 
@@ -586,6 +590,7 @@ class Indexer(BasedModel):
 
         try:
             # 1. Discover and store file metadata
+            self._last_indexing_phase = "discovery"
             discovered_file = DiscoveredFile.from_path(path)
             if not discovered_file or not discovered_file.is_text:
                 logger.debug("Skipping non-text file: %s", path)
@@ -621,6 +626,7 @@ class Indexer(BasedModel):
             )
 
             # 2. Chunk via ChunkingService (if available)
+            self._last_indexing_phase = "chunking"
             if not self._chunking_service:
                 logger.warning("No chunking service configured, skipping file: %s", path)
                 return
@@ -647,6 +653,7 @@ class Indexer(BasedModel):
             )
 
             # 3. Embed chunks (if embedding providers available)
+            self._last_indexing_phase = "embedding"
             if self._embedding_provider or self._sparse_provider:
                 await self._embed_chunks(chunks)
                 self._stats.chunks_embedded += len(chunks)
@@ -707,6 +714,7 @@ class Indexer(BasedModel):
                 updated_chunks = chunks
 
             # 5. Index to vector store (if available)
+            self._last_indexing_phase = "storage"
             if self._vector_store:
                 is_backup = (
                     self._failover_manager.is_failover_active if self._failover_manager else False
@@ -1318,9 +1326,10 @@ class Indexer(BasedModel):
             logger.warning("Errors by phase: %s", error_summary["by_phase"])
             logger.warning("Errors by type: %s", error_summary["by_type"])
             
-            # Log first few errors for debugging
+            # Log first 2 errors at WARNING for visibility, rest at DEBUG
             for i, error in enumerate(self._stats.structured_errors[:5]):
-                logger.debug(
+                log_func = logger.warning if i < 2 else logger.debug
+                log_func(
                     "Error %d/%d: %s in %s - %s: %s",
                     i + 1,
                     error_summary["total_errors"],
@@ -2177,6 +2186,301 @@ class Indexer(BasedModel):
             checkpoint.chunks_created,
         )
         return True
+
+    async def validate_manifest_with_vector_store(self) -> dict[str, Any]:
+        """Validate that chunks in manifest exist in vector store.
+
+        Returns:
+            Dictionary with validation results including:
+            - total_chunks: Total chunks in manifest
+            - missing_chunks: Number of chunks not found in vector store
+            - missing_chunk_ids: List of missing chunk IDs
+            - files_with_missing_chunks: List of file paths with missing chunks
+        """
+        if not self._file_manifest:
+            return {
+                "error": "No manifest loaded",
+                "total_chunks": 0,
+                "missing_chunks": 0,
+                "missing_chunk_ids": [],
+                "files_with_missing_chunks": [],
+            }
+
+        if not self._vector_store:
+            return {
+                "error": "No vector store configured",
+                "total_chunks": self._file_manifest.total_chunks,
+                "missing_chunks": 0,
+                "missing_chunk_ids": [],
+                "files_with_missing_chunks": [],
+            }
+
+        from qdrant_client.models import UUID
+
+        # Get all chunk IDs from manifest
+        manifest_chunk_ids = self._file_manifest.get_all_chunk_ids()
+        
+        logger.info("Validating %d chunks from manifest against vector store", len(manifest_chunk_ids))
+        
+        # Try to retrieve chunks from vector store
+        missing_chunk_ids: list[str] = []
+        files_with_missing: set[str] = set()
+        
+        # Batch retrieve chunks (Qdrant supports retrieving multiple points)
+        try:
+            # Convert string UUIDs to Qdrant UUID format
+            point_ids = [UUID(chunk_id) for chunk_id in manifest_chunk_ids]
+            
+            # Retrieve points from vector store
+            collection_name = self._vector_store.collection
+            if not collection_name:
+                return {
+                    "error": "No collection name configured",
+                    "total_chunks": len(manifest_chunk_ids),
+                    "missing_chunks": 0,
+                    "missing_chunk_ids": [],
+                    "files_with_missing_chunks": [],
+                }
+            
+            # Batch retrieval to avoid Qdrant limits (e.g., 1000 IDs per batch)
+            BATCH_SIZE = 1000
+            retrieved = []
+            for i in range(0, len(point_ids), BATCH_SIZE):
+                batch_ids = point_ids[i:i+BATCH_SIZE]
+                batch_retrieved = await self._vector_store.client.retrieve(
+                    collection_name=collection_name,
+                    ids=batch_ids,
+                    with_payload=False,
+                    with_vectors=False,
+                )
+                retrieved.extend(batch_retrieved)
+            
+            # Check which chunks are missing
+            retrieved_ids = {str(point.id) for point in retrieved}
+            missing_chunk_ids = [cid for cid in manifest_chunk_ids if cid not in retrieved_ids]
+            
+            # Find files with missing chunks
+            if missing_chunk_ids:
+                for path_str, entry in self._file_manifest.files.items():
+                    chunk_ids = entry["chunk_ids"]
+                    if any(cid in missing_chunk_ids for cid in chunk_ids):
+                        files_with_missing.add(path_str)
+            
+            logger.info(
+                "Validation complete: %d/%d chunks found, %d missing",
+                len(retrieved_ids),
+                len(manifest_chunk_ids),
+                len(missing_chunk_ids),
+            )
+            
+        except Exception as e:
+            logger.error("Error validating chunks against vector store: %s", e, exc_info=True)
+            return {
+                "error": f"Validation failed: {e}",
+                "total_chunks": len(manifest_chunk_ids),
+                "missing_chunks": 0,
+                "missing_chunk_ids": [],
+                "files_with_missing_chunks": [],
+            }
+        
+        return {
+            "total_chunks": len(manifest_chunk_ids),
+            "missing_chunks": len(missing_chunk_ids),
+            "missing_chunk_ids": missing_chunk_ids[:100],  # Limit to first 100 for logging
+            "files_with_missing_chunks": sorted(files_with_missing),
+        }
+
+    async def add_missing_embeddings_to_existing_chunks(
+        self,
+        *,
+        add_dense: bool = False,
+        add_sparse: bool = False,
+    ) -> dict[str, Any]:
+        """Add missing embedding types to existing chunks without reprocessing files.
+
+        This performs selective reindexing by adding sparse or dense embeddings
+        to chunks that already exist in the vector store but lack certain embedding types.
+
+        Args:
+            add_dense: Whether to add dense embeddings to chunks that don't have them
+            add_sparse: Whether to add sparse embeddings to chunks that don't have them
+
+        Returns:
+            Dictionary with operation results including:
+            - files_processed: Number of files processed
+            - chunks_updated: Number of chunks updated
+            - errors: List of errors encountered
+        """
+        if not self._file_manifest:
+            return {"error": "No manifest loaded", "files_processed": 0, "chunks_updated": 0}
+
+        if not self._vector_store:
+            return {"error": "No vector store configured", "files_processed": 0, "chunks_updated": 0}
+
+        if not (add_dense or add_sparse):
+            return {"error": "Must specify add_dense or add_sparse", "files_processed": 0, "chunks_updated": 0}
+
+        if add_dense and not self._embedding_provider:
+            return {"error": "Dense embedding provider is not configured", "files_processed": 0, "chunks_updated": 0}
+        if add_sparse and not self._sparse_provider:
+            return {"error": "Sparse embedding provider is not configured", "files_processed": 0, "chunks_updated": 0}
+        # Get current embedding configuration
+        current_models = self._get_current_embedding_models()
+        
+        # Find files needing embeddings
+        files_needing = self._file_manifest.get_files_needing_embeddings(
+            current_dense_provider=current_models["dense_provider"],
+            current_dense_model=current_models["dense_model"],
+            current_sparse_provider=current_models["sparse_provider"],
+            current_sparse_model=current_models["sparse_model"],
+        )
+        
+        files_to_process: list[Path] = []
+        if add_dense and self._embedding_provider:
+            files_to_process.extend(files_needing["dense_only"])
+            logger.info("Found %d files needing dense embeddings", len(files_needing["dense_only"]))
+        
+        if add_sparse and self._sparse_provider:
+            files_to_process.extend(files_needing["sparse_only"])
+            logger.info("Found %d files needing sparse embeddings", len(files_needing["sparse_only"]))
+        
+        # Deduplicate files to avoid double processing
+        files_to_process = list(set(files_to_process))
+        if not files_to_process:
+            logger.info("No files need embedding updates")
+            return {"files_processed": 0, "chunks_updated": 0, "errors": []}
+        
+        # Process each file: retrieve chunks, add embeddings, update vector store
+        from qdrant_client.models import UUID
+
+        files_processed = 0
+        chunks_updated = 0
+        errors: list[str] = []
+        
+        for file_path in files_to_process:
+            try:
+                # Get chunk IDs for this file from manifest
+                chunk_ids = self._file_manifest.get_chunk_ids_for_file(file_path)
+                if not chunk_ids:
+                    continue
+                
+                # Retrieve points from vector store to get payloads
+                point_ids = [UUID(cid) for cid in chunk_ids]
+                collection_name = self._vector_store.collection
+                if not collection_name:
+                    errors.append(f"{file_path}: No collection name")
+                    continue
+                
+                retrieved = await self._vector_store.client.retrieve(
+                    collection_name=collection_name,
+                    ids=point_ids,
+                    with_payload=True,
+                    with_vectors=False,
+                )
+                
+                # For each retrieved point, generate the missing embedding
+                updates: list[tuple[str, dict[str, list[float]]]] = []
+                for point in retrieved:
+                    # Reconstruct CodeChunk from payload (simplified - may need adjustment)
+                    payload = point.payload
+                    if not payload:
+                        continue
+                    
+                    # Generate missing embeddings
+                    vectors_to_add: dict[str, list[float]] = {}
+                    
+                    if add_dense and self._embedding_provider:
+                        # Generate dense embedding for this chunk's text
+                        chunk_text = payload.get("text", "")
+                        if chunk_text:
+                            # Use embedding provider to generate dense embedding
+                            dense_emb = await self._embedding_provider.embed_document([chunk_text])
+                            if dense_emb and len(dense_emb) > 0:
+                                # Use empty string for default dense vector
+                                vectors_to_add[""] = dense_emb[0]
+                    
+                    if add_sparse and self._sparse_provider:
+                        # Generate sparse embedding
+                        chunk_text = payload.get("text", "")
+                        if chunk_text:
+                            sparse_emb = await self._sparse_provider.embed_document([chunk_text])
+                            if sparse_emb and len(sparse_emb) > 0:
+                                # Sparse vector name
+                                vectors_to_add["sparse"] = sparse_emb[0]
+                    
+                    if vectors_to_add:
+                        updates.append((str(point.id), vectors_to_add))
+                
+                # Update vectors in vector store using update_vectors
+                if updates:
+                    try:
+                        # Batch update: collect all point IDs and vectors
+                        batch_points = [UUID(point_id) for point_id, _ in updates]
+                        batch_vectors = [vectors for _, vectors in updates]
+                        await self._vector_store.client.update_vectors(
+                            collection_name=collection_name,
+                            points=batch_points,
+                            vectors=batch_vectors,
+                        )
+                        chunks_updated += len(updates)
+                        
+                        # Only update manifest if vector store update succeeded
+                        if self._manifest_lock:
+                            async with self._manifest_lock:
+                                relative_path = set_relative_path(file_path)
+                                if relative_path:
+                                    entry = self._file_manifest.get_file(relative_path)
+                                    if entry:
+                                        # Update the entry to reflect new embeddings
+                                        self._file_manifest.add_file(
+                                            path=relative_path,
+                                            content_hash=entry["content_hash"],
+                                            chunk_ids=entry["chunk_ids"],
+                                            dense_embedding_provider=current_models["dense_provider"] if add_dense else entry.get("dense_embedding_provider"),
+                                            dense_embedding_model=current_models["dense_model"] if add_dense else entry.get("dense_embedding_model"),
+                                            sparse_embedding_provider=current_models["sparse_provider"] if add_sparse else entry.get("sparse_embedding_provider"),
+                                            sparse_embedding_model=current_models["sparse_model"] if add_sparse else entry.get("sparse_embedding_model"),
+                                            has_dense_embeddings=True if add_dense else entry.get("has_dense_embeddings", False),
+                                            has_sparse_embeddings=True if add_sparse else entry.get("has_sparse_embeddings", False),
+                                        )
+                        else:
+                            logger.warning(
+                                "Manifest update skipped for file %s because manifest lock is None. This may lead to inconsistent state.",
+                                file_path,
+                            )
+                        
+                        files_processed += 1
+                        # Save manifest after each successful file processing
+                        self._save_file_manifest()
+                        
+                    except Exception as update_error:
+                        logger.error(
+                            "Failed to batch update vectors for file %s: %s",
+                            file_path,
+                            update_error,
+                        )
+                        errors.append(f"{file_path}: {update_error}")
+                        # Skip this file - don't update manifest or increment counter
+            except Exception as e:
+                error_msg = f"{file_path}: {e}"
+                logger.error("Error adding embeddings to file %s: %s", file_path, e, exc_info=True)
+                errors.append(error_msg)
+        
+        # Final manifest save (optional, for completeness)
+        self._save_file_manifest()
+        
+        logger.info(
+            "Selective reindexing complete: %d files processed, %d chunks updated, %d errors",
+            files_processed,
+            chunks_updated,
+            len(errors),
+        )
+        
+        return {
+            "files_processed": files_processed,
+            "chunks_updated": chunks_updated,
+            "errors": errors[:10],  # Limit errors in response
+        }
 
 
 __all__ = ("Indexer",)

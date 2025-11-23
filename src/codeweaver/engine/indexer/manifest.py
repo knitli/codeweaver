@@ -18,7 +18,7 @@ import logging
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, NotRequired, Required, TypedDict
 
 from pydantic import Field, NonNegativeInt, computed_field
 from pydantic_core import from_json
@@ -37,29 +37,29 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class FileManifestEntry(TypedDict, total=False):
+class FileManifestEntry(TypedDict):
     """Single file entry in the manifest.
 
     Tracks file path, content hash, and indexing metadata including embedding models used.
     
-    Note: Uses total=False to support backward compatibility with v1.0.0 manifests
+    Uses Required and NotRequired to support backward compatibility with v1.0.0 manifests
     that don't have embedding metadata fields.
     """
 
     # Required fields (present in all versions)
-    path: str  # Relative path from project root
-    content_hash: str  # Blake3 hash of file content
-    indexed_at: str  # ISO8601 timestamp when file was last indexed
-    chunk_count: int  # Number of chunks created from this file
-    chunk_ids: list[str]  # UUIDs of chunks in vector store
+    path: Required[str]  # Relative path from project root
+    content_hash: Required[str]  # Blake3 hash of file content
+    indexed_at: Required[str]  # ISO8601 timestamp when file was last indexed
+    chunk_count: Required[int]  # Number of chunks created from this file
+    chunk_ids: Required[list[str]]  # UUIDs of chunks in vector store
     
     # Optional fields (added in v1.1.0 for embedding tracking)
-    dense_embedding_provider: str | None  # Provider used for dense embeddings (e.g., "openai", "voyage")
-    dense_embedding_model: str | None  # Model used for dense embeddings (e.g., "text-embedding-3-large")
-    sparse_embedding_provider: str | None  # Provider used for sparse embeddings
-    sparse_embedding_model: str | None  # Model used for sparse embeddings
-    has_dense_embeddings: bool  # Whether file chunks have dense embeddings
-    has_sparse_embeddings: bool  # Whether file chunks have sparse embeddings
+    dense_embedding_provider: NotRequired[str | None]  # Provider used for dense embeddings (e.g., "openai", "voyage")
+    dense_embedding_model: NotRequired[str | None]  # Model used for dense embeddings (e.g., "text-embedding-3-large")
+    sparse_embedding_provider: NotRequired[str | None]  # Provider used for sparse embeddings
+    sparse_embedding_model: NotRequired[str | None]  # Model used for sparse embeddings
+    has_dense_embeddings: NotRequired[bool]  # Whether file chunks have dense embeddings
+    has_sparse_embeddings: NotRequired[bool]  # Whether file chunks have sparse embeddings
 
 
 class FileManifestStats(TypedDict):
@@ -344,6 +344,103 @@ class IndexFileManifest(BasedModel):
             "has_dense": entry.get("has_dense_embeddings", False),
             "has_sparse": entry.get("has_sparse_embeddings", False),
         }
+
+    def get_files_needing_embeddings(
+        self,
+        *,
+        current_dense_provider: str | None = None,
+        current_dense_model: str | None = None,
+        current_sparse_provider: str | None = None,
+        current_sparse_model: str | None = None,
+    ) -> dict[str, list[Path]]:
+        """Get files that need specific embedding types added.
+
+        This is for selective reindexing where we add missing embeddings
+        without reprocessing the entire file.
+        
+        Note: If a file needs both dense and sparse embeddings, it will be
+        categorized under 'dense_only' (processed first). This prioritization
+        ensures dense embeddings are added before sparse embeddings.
+
+        Args:
+            current_dense_provider: Current dense embedding provider name
+            current_dense_model: Current dense embedding model name
+            current_sparse_provider: Current sparse embedding provider name
+            current_sparse_model: Current sparse embedding model name
+
+        Returns:
+            Dictionary with keys 'dense_only' and 'sparse_only' containing
+            lists of paths that need those embeddings added
+        """
+        result: dict[str, list[Path]] = {
+            "dense_only": [],
+            "sparse_only": [],
+        }
+
+        for path_str, entry in self.files.items():
+            path = Path(path_str)
+            
+            # Check if file needs dense embeddings added
+            # Criteria: dense provider configured BUT file doesn't have dense embeddings
+            if current_dense_provider and current_dense_model:
+                has_dense = entry.get("has_dense_embeddings", False)
+                if not has_dense:
+                    result["dense_only"].append(path)
+                    continue  # Skip sparse check if already needs dense
+            
+            # Check if file needs sparse embeddings added
+            # Criteria: sparse provider configured BUT file doesn't have sparse embeddings
+            if current_sparse_provider and current_sparse_model:
+                has_sparse = entry.get("has_sparse_embeddings", False)
+                if not has_sparse:
+                    result["sparse_only"].append(path)
+
+        return result
+
+    def get_all_chunk_ids(self) -> set[str]:
+        """Get all chunk IDs from all files in the manifest.
+
+        Returns:
+            Set of all chunk UUID strings across all files
+        """
+        chunk_ids: set[str] = set()
+        for entry in self.files.values():
+            chunk_ids.update(entry["chunk_ids"])
+        return chunk_ids
+
+    def get_files_by_embedding_config(
+        self,
+        *,
+        has_dense: bool | None = None,
+        has_sparse: bool | None = None,
+    ) -> list[Path]:
+        """Get files matching specific embedding configuration.
+
+        Args:
+            has_dense: Filter by dense embedding presence (None = don't filter)
+            has_sparse: Filter by sparse embedding presence (None = don't filter)
+
+        Returns:
+            List of paths matching the criteria
+        """
+        matching_files: list[Path] = []
+        
+        for path_str, entry in self.files.items():
+            # Check dense criteria
+            if has_dense is not None:
+                entry_has_dense = entry.get("has_dense_embeddings", False)
+                if entry_has_dense != has_dense:
+                    continue
+            
+            # Check sparse criteria
+            if has_sparse is not None:
+                entry_has_sparse = entry.get("has_sparse_embeddings", False)
+                if entry_has_sparse != has_sparse:
+                    continue
+            
+            matching_files.append(Path(path_str))
+        
+        return matching_files
 
     @computed_field
     def get_stats(self) -> FileManifestStats:
