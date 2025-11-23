@@ -104,7 +104,15 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
             if isinstance(caps, tuple) and len(caps) > 0:
                 caps = caps[0]
         if not caps:
-            raise ConfigurationError("Reranking model capabilities must be provided.")
+            from codeweaver.providers.reranking.capabilities.voyage import (
+                get_voyage_reranking_capabilities,
+            )
+
+            voyage_caps = get_voyage_reranking_capabilities()
+            caps = (
+                next((cap for cap in voyage_caps if cap.name == "rerank-2.5"), None)
+                or voyage_caps[0]
+            )
         if client is None:
             if api_key := kwargs.pop("api_key", None) or os.getenv("VOYAGE_API_KEY"):
                 if isinstance(api_key, SecretStr):

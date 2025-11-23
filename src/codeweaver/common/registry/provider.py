@@ -45,7 +45,6 @@ if TYPE_CHECKING:
     from codeweaver.common.registry.types import (
         LiteralDataKinds,
         LiteralKinds,
-        LiteralModelKinds,
         LiteralVectorStoreKinds,
     )
     from codeweaver.config.providers import (
@@ -1013,10 +1012,10 @@ class ProviderRegistry(BasedModel):
         Returns:
             An initialized provider instance
         """
-        provider_kind = (
+        provider_kind = (  # ty: ignore[invalid-assignment]
             provider_kind
             if isinstance(provider_kind, ProviderKind)
-            else ProviderKind.from_string(provider_kind)
+            else ProviderKind(provider_kind)  # type: ignore
         )
         retrieved_cls = None
         if self._is_literal_model_kind(provider_kind):
@@ -1339,7 +1338,7 @@ class ProviderRegistry(BasedModel):
             else ProviderKind.from_string(provider_kind)
         )
         if self._is_literal_model_kind(provider_kind):
-            return self._prepare_model_provider_kwargs(config, **user_kwargs)  # type: ignore
+            return self._prepare_model_provider_kwargs(provider_kind, config, **user_kwargs)  # type: ignore
         if self._is_literal_vector_store_kind(provider_kind):
             return self._prepare_vector_store_kwargs(config, **user_kwargs)  # type: ignore
         if self._is_literal_data_kind(provider_kind):
@@ -1348,6 +1347,7 @@ class ProviderRegistry(BasedModel):
 
     def _prepare_model_provider_kwargs(
         self,
+        provider_kind: LiteralKinds,
         config: (
             DictView[EmbeddingProviderSettings]
             | DictView[SparseEmbeddingProviderSettings]
@@ -1360,6 +1360,7 @@ class ProviderRegistry(BasedModel):
         """Prepare kwargs for model providers (embedding, sparse, reranking, agent).
 
         Args:
+            provider_kind: The type of provider
             config: Model provider configuration
             **user_kwargs: User-provided kwargs
 
@@ -1372,7 +1373,7 @@ class ProviderRegistry(BasedModel):
         kwargs: dict[str, Any] = {}
 
         # Extract model settings
-        self._add_model_settings_to_kwargs(config, kwargs, user_kwargs)
+        self._add_model_settings_to_kwargs(provider_kind, config, kwargs, user_kwargs)
 
         # Extract provider settings and merge into client_options
         self._add_provider_settings_to_kwargs(config, kwargs)
@@ -1382,7 +1383,11 @@ class ProviderRegistry(BasedModel):
         return kwargs
 
     def _add_model_settings_to_kwargs(
-        self, config: DictView[Any], kwargs: dict[str, Any], user_kwargs: dict[str, Any]
+        self,
+        provider_kind: LiteralKinds,
+        config: DictView[Any],
+        kwargs: dict[str, Any],
+        user_kwargs: dict[str, Any],
     ) -> None:
         """Add model settings to kwargs."""
         model_settings = config.get("model_settings")
@@ -1393,6 +1398,47 @@ class ProviderRegistry(BasedModel):
             caps := self._get_capabilities_for_model(model_name, config["provider"])
         ):
             kwargs["caps"] = caps
+        else:
+            # Create minimal capability object when none is found in registry
+            # This allows new models to work even if not pre-registered
+            provider_kind_enum = (
+                provider_kind
+                if isinstance(provider_kind, ProviderKind)
+                else ProviderKind.from_string(provider_kind)
+            )
+            if provider_kind_enum == ProviderKind.SPARSE_EMBEDDING:
+                from codeweaver.providers.embedding.capabilities.base import (
+                    SparseEmbeddingModelCapabilities,
+                )
+
+                kwargs["caps"] = SparseEmbeddingModelCapabilities(
+                    name=model_name, provider=config["provider"], other={}
+                )
+            elif provider_kind_enum == ProviderKind.RERANKING:
+                from codeweaver.providers.reranking.capabilities.base import (
+                    RerankingModelCapabilities,
+                )
+
+                kwargs["caps"] = RerankingModelCapabilities(
+                    name=model_name, provider=config["provider"]
+                )
+            else:
+                from codeweaver.providers.embedding.capabilities.base import (
+                    EmbeddingModelCapabilities,
+                )
+
+                # Create minimal dense embedding capability
+                kwargs["caps"] = EmbeddingModelCapabilities(
+                    name=model_name,
+                    provider=config["provider"],
+                    default_dimension=model_settings.get("dimension", 768),
+                )
+            logger.debug(
+                "Created minimal capability for model '%s' (provider: %s, kind: %s)",
+                model_name,
+                config["provider"],
+                provider_kind_enum,
+            )
 
         # Collect model-specific settings into nested kwargs dict
         # These will be passed as the 'kwargs' parameter to EmbeddingProvider.__init__
@@ -1402,6 +1448,8 @@ class ProviderRegistry(BasedModel):
                 provider_kwargs[key] = value
 
         # Always set kwargs parameter (required by EmbeddingProvider.__init__)
+        # Pass empty dict if no settings, as the parameter doesn't have a default
+        kwargs["kwargs"] = provider_kwargs or {}
         # Pass empty dict if no settings, as the parameter doesn't have a default
         kwargs["kwargs"] = provider_kwargs or {}
 
@@ -1770,14 +1818,26 @@ class ProviderRegistry(BasedModel):
         )  # type: ignore
 
     @overload
-    def get_provider_enum_for(self, kind: LiteralDataKinds) -> tuple[Provider, ...] | None: ...
+    def get_provider_enum_for(
+        self, kind: Literal[ProviderKind.EMBEDDING, "embedding"]
+    ) -> Provider | None: ...
     @overload
     def get_provider_enum_for(
-        self, kind: LiteralModelKinds | LiteralVectorStoreKinds
+        self, kind: Literal[ProviderKind.SPARSE_EMBEDDING, "sparse_embedding"]
     ) -> Provider | None: ...
+    @overload
     def get_provider_enum_for(
-        self, kind: LiteralModelKinds | LiteralVectorStoreKinds | LiteralDataKinds
-    ) -> Provider | tuple[Provider, ...] | None:
+        self, kind: Literal[ProviderKind.RERANKING, "reranking"]
+    ) -> Provider | None: ...
+    @overload
+    def get_provider_enum_for(self, kind: LiteralVectorStoreKinds) -> Provider | None: ...
+    @overload
+    def get_provider_enum_for(
+        self, kind: Literal[ProviderKind.AGENT, "agent"]
+    ) -> Provider | None: ...
+    @overload
+    def get_provider_enum_for(self, kind: LiteralDataKinds) -> tuple[Provider, ...] | None: ...
+    def get_provider_enum_for(self, kind: LiteralKinds) -> Provider | tuple[Provider, ...] | None:
         """Get the provider enum for a given provider kind."""
         if kind in (ProviderKind.DATA, "data"):
             configs = self.get_configured_provider_settings(

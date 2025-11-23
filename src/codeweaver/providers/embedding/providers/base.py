@@ -281,9 +281,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         if not chunks:
             return []
 
-        # Use getattr for sparse embeddings that don't have max_batch_tokens
-        # Default to 1M tokens (effectively unlimited) for local models
-        max_tokens = max_tokens or getattr(self.caps, 'max_batch_tokens', 1_000_000)
+        max_tokens = max_tokens or self.caps.max_batch_tokens
         tokenizer = self.tokenizer
 
         batches: list[list[CodeChunk]] = []
@@ -371,7 +369,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         self._failure_count += 1
         self._last_failure_time = time.time()
 
-        if self._failure_count >= 3:  # 3 failures threshold as per spec FR-008a
+        if self._failure_count >= 3:  # 3 failures threshold
             logger.warning(
                 "Circuit breaker opening for %s after %d consecutive failures",
                 type(self)._provider,

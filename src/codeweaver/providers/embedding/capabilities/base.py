@@ -197,6 +197,14 @@ class SparseEmbeddingModelCapabilities(BasedModel):
         ge=10_000,
         le=1_000_000,
     )
+    tokenizer: Literal["tokenizers", "tiktoken"] | None = "tokenizers"
+    tokenizer_model: Annotated[
+        str | None,
+        Field(
+            min_length=3,
+            description="""The tokenizer model used by the embedding model. If the tokenizer is `tokenizers`, this should be the full name of the tokenizer or model (if it's listed by its model name), *including the organization*. Like: `voyageai/voyage-code-3`""",
+        ),
+    ] = None
 
     _available: Annotated[
         bool, Field(description="""Whether the model is available for use.""")
@@ -214,12 +222,18 @@ class SparseEmbeddingModelCapabilities(BasedModel):
 def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:
     """Get sparse embedding model capabilities."""
     caps = {  # type: ignore
-        "Qdrant/bm25": {"name": "Qdrant/bm25", "multilingual": True},
+        # Qdrant's bm25 model has no tokenizer, so we'll just use the same tokenizer as their other sparse model
+        "Qdrant/bm25": {
+            "name": "Qdrant/bm25",
+            "multilingual": True,
+            "tokenizer_model": "Qdrant/all_miniLM_L6_v2_with_attentions",
+        },
         "Qdrant/bm42-all-minilm-l6-v2-attentions": {
             "name": "Qdrant/bm42-all-minilm-l6-v2-attentions",
             "multilingual": False,
             "other": {},
             "_available": HAS_FASTEMBED,
+            "tokenizer_model": "Qdrant/all_miniLM_L6_v2_with_attentions",
         },
         "prithivida/Splade_PP_en_v1": {
             "name": "prithivida/Splade_PP_en_v1",
@@ -228,15 +242,13 @@ def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:
             "other": {},
             "_available": HAS_FASTEMBED,
         },
-        """
         "prithivida/Splade-PP_en_v2": {
             "name": "prithivida/Splade-PP_en_v2",
             "multilingual": False,
             "hf_name": None,
             "other": {},
-            "_available": HAS_FASTEMBED or HAS_ST,
+            "_available": HAS_ST,
         },
-        """
         "ibm-granite/granite-embedding-30m-sparse": {
             "name": "ibm-granite/granite-embedding-30m-sparse",
             "multilingual": False,
@@ -263,12 +275,22 @@ def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:
         },
     }
     fastembed_caps = tuple(
-        SparseEmbeddingModelCapabilities.model_validate(cap | {"provider": Provider.FASTEMBED})
+        SparseEmbeddingModelCapabilities.model_validate(
+            cap
+            | {
+                "provider": Provider.FASTEMBED,
+                "tokenizer_model": cap.get("tokenizer_model") or cap["name"],
+            }
+        )
         for cap in list(caps.values())[:3]  # type: ignore
     )
     st_caps = tuple(
         SparseEmbeddingModelCapabilities.model_validate(
-            cap | {"provider": Provider.SENTENCE_TRANSFORMERS}
+            cap
+            | {
+                "provider": Provider.SENTENCE_TRANSFORMERS,
+                "tokenizer_model": cap.get("tokenizer_model") or cap["name"],
+            }
         )
         for cap in list(caps.values())[2:]  # type: ignore
     )
