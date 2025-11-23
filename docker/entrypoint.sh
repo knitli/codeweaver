@@ -6,11 +6,11 @@ RERANK_PROVIDER="${CODEWEAVER_RERANKING_PROVIDER:-}"
 DEFAULT_PROVIDER="voyage"
 
 normalize_provider() {
-    if [ -n "$1" ]; then  
-        printf '%s' "$1" | tr '[:upper:]' '[:lower:]'  
-    else  
-        printf '%s' "$2"  
-    fi  
+    if [ -n "$1" ]; then
+        printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+    else
+        printf '%s' "$2"
+    fi
 }
 
 # Normalize provider names to lowercase for leniency
