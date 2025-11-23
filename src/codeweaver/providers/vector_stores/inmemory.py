@@ -284,9 +284,8 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
                 )
 
                 # Store collection metadata if it exists (protected by lock)
-                async with self._collection_metadata_lock:  # type: ignore
-                    if "metadata" in collection_data:
-                        self._collection_metadata[collection_name] = collection_data["metadata"]  # type: ignore
+                if "metadata" in collection_data:
+                    self._collection_metadata[collection_name] = collection_data["metadata"]  # type: ignore
 
                 # Restore points in batches
                 points_data = collection_data.get("points", [])
