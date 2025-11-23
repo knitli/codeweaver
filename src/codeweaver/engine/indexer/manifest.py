@@ -18,7 +18,7 @@ import logging
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, NotRequired, Required, TypedDict
 
 from pydantic import Field, NonNegativeInt, computed_field
 from pydantic_core import from_json
@@ -37,29 +37,29 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class FileManifestEntry(TypedDict, total=False):
+class FileManifestEntry(TypedDict):
     """Single file entry in the manifest.
 
     Tracks file path, content hash, and indexing metadata including embedding models used.
     
-    Note: Uses total=False to support backward compatibility with v1.0.0 manifests
+    Uses Required and NotRequired to support backward compatibility with v1.0.0 manifests
     that don't have embedding metadata fields.
     """
 
     # Required fields (present in all versions)
-    path: str  # Relative path from project root
-    content_hash: str  # Blake3 hash of file content
-    indexed_at: str  # ISO8601 timestamp when file was last indexed
-    chunk_count: int  # Number of chunks created from this file
-    chunk_ids: list[str]  # UUIDs of chunks in vector store
+    path: Required[str]  # Relative path from project root
+    content_hash: Required[str]  # Blake3 hash of file content
+    indexed_at: Required[str]  # ISO8601 timestamp when file was last indexed
+    chunk_count: Required[int]  # Number of chunks created from this file
+    chunk_ids: Required[list[str]]  # UUIDs of chunks in vector store
     
     # Optional fields (added in v1.1.0 for embedding tracking)
-    dense_embedding_provider: str | None  # Provider used for dense embeddings (e.g., "openai", "voyage")
-    dense_embedding_model: str | None  # Model used for dense embeddings (e.g., "text-embedding-3-large")
-    sparse_embedding_provider: str | None  # Provider used for sparse embeddings
-    sparse_embedding_model: str | None  # Model used for sparse embeddings
-    has_dense_embeddings: bool  # Whether file chunks have dense embeddings
-    has_sparse_embeddings: bool  # Whether file chunks have sparse embeddings
+    dense_embedding_provider: NotRequired[str | None]  # Provider used for dense embeddings (e.g., "openai", "voyage")
+    dense_embedding_model: NotRequired[str | None]  # Model used for dense embeddings (e.g., "text-embedding-3-large")
+    sparse_embedding_provider: NotRequired[str | None]  # Provider used for sparse embeddings
+    sparse_embedding_model: NotRequired[str | None]  # Model used for sparse embeddings
+    has_dense_embeddings: NotRequired[bool]  # Whether file chunks have dense embeddings
+    has_sparse_embeddings: NotRequired[bool]  # Whether file chunks have sparse embeddings
 
 
 class FileManifestStats(TypedDict):

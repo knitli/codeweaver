@@ -162,7 +162,7 @@ class IndexingStats:
     chunks_embedded: int = 0
     chunks_indexed: int = 0
     start_time: float = dataclasses.field(default_factory=time.time)
-    files_with_errors: list[Path] = dataclasses.field(default_factory=list)
+    files_with_errors: set[Path] = dataclasses.field(default_factory=set)
     # Structured error tracking (new in v1.1.0)
     structured_errors: list[IndexingError] = dataclasses.field(default_factory=list)
 
@@ -196,7 +196,7 @@ class IndexingStats:
         """
         from datetime import UTC, datetime
         
-        self.files_with_errors.append(file_path)
+        self.files_with_errors.add(file_path)  # Set automatically deduplicates
         self.structured_errors.append(IndexingError(
             file_path=str(file_path),
             error_type=type(error).__name__,
@@ -559,17 +559,21 @@ class Indexer(BasedModel):
         if self._embedding_provider:
             provider_name = type(self._embedding_provider).__name__.replace("Provider", "").lower()
             result["dense_provider"] = provider_name
-            # Try to get model name from provider
-            # Use standardized model_identifier property
-            result["dense_model"] = getattr(self._embedding_provider, "model_identifier", None)
+            # Try to get model name from provider - use model_name property if available
+            if hasattr(self._embedding_provider, "model_name"):
+                result["dense_model"] = str(self._embedding_provider.model_name)
+            elif hasattr(self._embedding_provider, "model"):
+                result["dense_model"] = str(self._embedding_provider.model)
         
         # Get sparse embedding provider info
         if self._sparse_provider:
             provider_name = type(self._sparse_provider).__name__.replace("Provider", "").lower()
             result["sparse_provider"] = provider_name
-            # Try to get model name from provider
-            # Use standardized model_identifier property
-            result["sparse_model"] = getattr(self._sparse_provider, "model_identifier", None)
+            # Try to get model name from provider - use model_name property if available
+            if hasattr(self._sparse_provider, "model_name"):
+                result["sparse_model"] = str(self._sparse_provider.model_name)
+            elif hasattr(self._sparse_provider, "model"):
+                result["sparse_model"] = str(self._sparse_provider.model)
         
         return result
 
@@ -586,6 +590,7 @@ class Indexer(BasedModel):
 
         try:
             # 1. Discover and store file metadata
+            self._last_indexing_phase = "discovery"
             discovered_file = DiscoveredFile.from_path(path)
             if not discovered_file or not discovered_file.is_text:
                 logger.debug("Skipping non-text file: %s", path)
@@ -621,6 +626,7 @@ class Indexer(BasedModel):
             )
 
             # 2. Chunk via ChunkingService (if available)
+            self._last_indexing_phase = "chunking"
             if not self._chunking_service:
                 logger.warning("No chunking service configured, skipping file: %s", path)
                 return
@@ -647,6 +653,7 @@ class Indexer(BasedModel):
             )
 
             # 3. Embed chunks (if embedding providers available)
+            self._last_indexing_phase = "embedding"
             if self._embedding_provider or self._sparse_provider:
                 await self._embed_chunks(chunks)
                 self._stats.chunks_embedded += len(chunks)
@@ -707,6 +714,7 @@ class Indexer(BasedModel):
                 updated_chunks = chunks
 
             # 5. Index to vector store (if available)
+            self._last_indexing_phase = "storage"
             if self._vector_store:
                 is_backup = (
                     self._failover_manager.is_failover_active if self._failover_manager else False
@@ -1318,9 +1326,10 @@ class Indexer(BasedModel):
             logger.warning("Errors by phase: %s", error_summary["by_phase"])
             logger.warning("Errors by type: %s", error_summary["by_type"])
             
-            # Log first few errors for debugging
+            # Log first 2 errors at WARNING for visibility, rest at DEBUG
             for i, error in enumerate(self._stats.structured_errors[:5]):
-                logger.debug(
+                log_func = logger.warning if i < 2 else logger.debug
+                log_func(
                     "Error %d/%d: %s in %s - %s: %s",
                     i + 1,
                     error_summary["total_errors"],
