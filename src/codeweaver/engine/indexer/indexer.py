@@ -2339,7 +2339,7 @@ class Indexer(BasedModel):
             return {"files_processed": 0, "chunks_updated": 0, "errors": []}
         
         # Process each file: retrieve chunks, add embeddings, update vector store
-        from qdrant_client.models import UUID, PointVectors
+        from qdrant_client.models import UUID
 
         files_processed = 0
         chunks_updated = 0
@@ -2367,7 +2367,7 @@ class Indexer(BasedModel):
                 )
                 
                 # For each retrieved point, generate the missing embedding
-                updates: list[PointVectors] = []
+                updates: list[tuple[str, dict[str, list[float]]]] = []
                 for point in retrieved:
                     # Reconstruct CodeChunk from payload (simplified - may need adjustment)
                     payload = point.payload
@@ -2375,7 +2375,7 @@ class Indexer(BasedModel):
                         continue
                     
                     # Generate missing embeddings
-                    vectors_to_add: dict[str, list[float] | Any] = {}
+                    vectors_to_add: dict[str, list[float]] = {}
                     
                     if add_dense and self._embedding_provider:
                         # Generate dense embedding for this chunk's text
@@ -2384,7 +2384,8 @@ class Indexer(BasedModel):
                             # Use embedding provider to generate dense embedding
                             dense_emb = await self._embedding_provider.embed_document([chunk_text])
                             if dense_emb and len(dense_emb) > 0:
-                                vectors_to_add[""] = dense_emb[0]  # Default vector name
+                                # Use empty string for default dense vector
+                                vectors_to_add[""] = dense_emb[0]
                     
                     if add_sparse and self._sparse_provider:
                         # Generate sparse embedding
@@ -2392,24 +2393,31 @@ class Indexer(BasedModel):
                         if chunk_text:
                             sparse_emb = await self._sparse_provider.embed_document([chunk_text])
                             if sparse_emb and len(sparse_emb) > 0:
-                                # Sparse embedding format
+                                # Sparse vector name
                                 vectors_to_add["sparse"] = sparse_emb[0]
                     
                     if vectors_to_add:
-                        updates.append(PointVectors(
-                            id=point.id,
-                            vector=vectors_to_add,
-                        ))
+                        updates.append((str(point.id), vectors_to_add))
                 
-                # Batch update points in vector store
+                # Update vectors in vector store using update_vectors
                 if updates:
-                    await self._vector_store.client.batch_update_points(
-                        collection_name=collection_name,
-                        update_operations=[],  # Will be filled with actual operations
-                    )
-                    # Note: The actual batch_update_points API may differ
-                    # This is a placeholder - need to check Qdrant API docs
-                    chunks_updated += len(updates)
+                    for point_id, vectors in updates:
+                        try:
+                            await self._vector_store.client.update_vectors(
+                                collection_name=collection_name,
+                                points=[
+                                    UUID(point_id)
+                                ],
+                                vectors=vectors,
+                            )
+                            chunks_updated += 1
+                        except Exception as update_error:
+                            logger.error(
+                                "Failed to update vectors for point %s: %s",
+                                point_id,
+                                update_error,
+                            )
+                            errors.append(f"{file_path} chunk {point_id}: {update_error}")
                 
                 # Update manifest to reflect new embeddings
                 if self._manifest_lock:
