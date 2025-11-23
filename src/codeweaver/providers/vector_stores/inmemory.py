@@ -120,6 +120,8 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         """
         from qdrant_client.http.models import PointStruct
 
+        from codeweaver.providers.vector_stores.metadata import CollectionMetadata
+
         if not self._ensure_client(self._client):
             raise ProviderError("Qdrant client not initialized")
         try:
@@ -127,51 +129,71 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
             collections_response = await self._client.get_collections()
             collections_data = {}
 
-            for col in collections_response.collections:
-                # Get collection info
-                col_info = await self._client.get_collection(collection_name=col.name)
+            async with self._collection_metadata_lock:  # type: ignore
+                for col in collections_response.collections:
+                    # Get collection info
+                    col_info = await self._client.get_collection(collection_name=col.name)
 
-                # Scroll all points
-                points: list[PointStruct] = []
-                offset = None
-                while True:
-                    result = await self._client.scroll(
-                        collection_name=col.name,
-                        limit=100,
-                        offset=offset,
-                        with_payload=True,
-                        with_vectors=True,
-                    )
-                    if not result[0]:  # No more points
-                        break
-                    points.extend(result[0])
-                    offset = result[1]  # Next offset
-                    if offset is None:  # Reached end
-                        break
-                # Serialize collection data
-                # Extract dense vector config (vectors is a dict[str, VectorParams])
-                vectors_data = col_info.config.params.vectors  # type: ignore
-                # Try to get dimension from collection first, fall back to model config
-                dense_size = 768  # Default dimension
-                if isinstance(vectors_data, dict) and "dense" in vectors_data:
-                    dense_params = vectors_data["dense"]
-                    if hasattr(dense_params, "size"):
-                        dense_size = dense_params.size
+                    # Scroll all points
+                    points: list[PointStruct] = []
+                    offset = None
+                    while True:
+                        result = await self._client.scroll(
+                            collection_name=col.name,
+                            limit=100,
+                            offset=offset,
+                            with_payload=True,
+                            with_vectors=True,
+                        )
+                        if not result[0]:  # No more points
+                            break
+                        points.extend(result[0])
+                        offset = result[1]  # Next offset
+                        if offset is None:  # Reached end
+                            break
+                    # Serialize collection data
+                    # Extract dense vector config (vectors is a dict[str, VectorParams])
+                    vectors_data = col_info.config.params.vectors  # type: ignore
+                    # Try to get dimension from collection first, fall back to model config
+                    dense_size = 768  # Default dimension
+                    if isinstance(vectors_data, dict) and "dense" in vectors_data:
+                        dense_params = vectors_data["dense"]
+                        if hasattr(dense_params, "size"):
+                            dense_size = dense_params.size
+                        else:
+                            # Only call resolve_dimensions if we can't get size from collection
+                            with contextlib.suppress(ValueError):
+                                from codeweaver.providers.vector_stores.utils import (
+                                    resolve_dimensions,
+                                )
+
+                                dense_size = resolve_dimensions()
+
+                    # Get metadata from stored metadata or create default
+                    metadata_dict = self._collection_metadata.get(col.name)  # type: ignore
+                    if metadata_dict:
+                        metadata = CollectionMetadata.model_validate(metadata_dict)
                     else:
-                        # Only call resolve_dimensions if we can't get size from collection
-                        with contextlib.suppress(ValueError):
-                            from codeweaver.providers.vector_stores.utils import resolve_dimensions
+                        # Create minimal metadata if not stored
+                        from qdrant_client.http.models import SparseVectorParams, VectorParams
 
-                            dense_size = resolve_dimensions()
-                collections_data[col.name] = {
-                    "metadata": metadata.model_dump(mode="json"),
-                    "vectors_config": {"dense": {"size": dense_size, "distance": "Cosine"}},
-                    "sparse_vectors_config": {"sparse": {}},
-                    "points": [
-                        {"id": str(point.id), "vector": point.vector, "payload": point.payload}
-                        for point in points
-                    ],
-                }
+                        metadata = CollectionMetadata(
+                            provider=str(self._provider),
+                            project_name=_get_project_name(),
+                            collection_name=col.name,
+                            vector_config={"dense": VectorParams(size=dense_size)},
+                            sparse_config={"sparse": SparseVectorParams()},
+                        )
+
+                    collections_data[col.name] = {
+                        "metadata": metadata.model_dump(mode="json"),
+                        "vectors_config": {"dense": {"size": dense_size, "distance": "Cosine"}},
+                        "sparse_vectors_config": {"sparse": {}},
+                        "points": [
+                            {"id": str(point.id), "vector": point.vector, "payload": point.payload}
+                            for point in points
+                        ],
+                    }
 
             # Create persistence data
             persistence_data = {
@@ -261,9 +283,10 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
                     sparse_vectors_config={"sparse": {}},  # type: ignore
                 )
 
-                # Store collection metadata if it exists
-                if "metadata" in collection_data:
-                    self._collection_metadata[collection_name] = collection_data["metadata"]  # type: ignore
+                # Store collection metadata if it exists (protected by lock)
+                async with self._collection_metadata_lock:  # type: ignore
+                    if "metadata" in collection_data:
+                        self._collection_metadata[collection_name] = collection_data["metadata"]  # type: ignore
 
                 # Restore points in batches
                 points_data = collection_data.get("points", [])
@@ -294,9 +317,9 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
                     await self._persist_to_disk()
             except asyncio.CancelledError:
                 break
-            except Exception:
-                # Log error but continue (using print for now, should use logger)
-                print(f"Periodic persistence failed: {e}")  # noqa: F821
+            except Exception as exc:
+                # Log error but continue to avoid data loss
+                logger.exception("Periodic persistence failed: %s", exc)
 
     async def _on_shutdown(self) -> None:
         """Cleanup handler for graceful shutdown.
