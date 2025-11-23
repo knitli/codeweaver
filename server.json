@@ -4,7 +4,7 @@
   "title": "CodeWeaver - Semantic Code Search",
   "description": "Extensible MCP server for hybrid semantic code search using vector databases and AST parsing. Supports 170+ programming languages with intelligent chunking, multi-provider embeddings (Voyage, Cohere, OpenAI, etc.), and pluggable architecture. Delivers precise, agent-aware context to reduce token waste by 60-80%.",
   "status": "active",
-  "version": "0.0.1-rc778",
+  "version": "0.0.1rc778",
   "websiteUrl": "https://github.com/knitli/codeweaver",
   "repository": {
     "url": "https://github.com/knitli/codeweaver",
