@@ -13,250 +13,418 @@ This guide explains how to run CodeWeaver using Docker and Docker Compose, provi
 
 ### Prerequisites
 
-- Docker Engine 20.10+ 
+- Docker Engine 20.10+
 - Docker Compose v2.0+
-- VoyageAI API key (get one at [voyageai.com](https://www.voyageai.com/))
 - At least 4GB RAM available
 - Your codebase to index
 
-### 1. Get the Configuration Files
+### Zero-Config Quick Start
 
-If you're using the CodeWeaver Docker image from Docker Hub:
+The fastest way to get started uses the `quickstart` profile with free, local models:
 
 ```bash
-# Download the example docker-compose.yml
+# 1. Get the configuration files
 curl -O https://raw.githubusercontent.com/knitli/codeweaver/main/docker-compose.yml
-
-# Download the example .env file
 curl -O https://raw.githubusercontent.com/knitli/codeweaver/main/.env.example
 cp .env.example .env
 
-# Optional: Download and run the setup validator
-curl -O https://raw.githubusercontent.com/knitli/codeweaver/main/scripts/docker/validate-setup.sh
-chmod +x validate-setup.sh
-./validate-setup.sh
-```
-
-Or if you've cloned the repository:
-```bash
-git clone https://github.com/knitli/codeweaver.git
-cd codeweaver
-cp .env.example .env
-
-# Optional: Validate your setup
-./scripts/docker/validate-setup.sh
-```
-
-### 2. Configure Your Environment
-
-Edit the `.env` file with your settings:
-
-```bash
-# Required: Your VoyageAI API key
-VOYAGE_API_KEY=your-actual-api-key-here
-
-# Path to your codebase (relative to docker-compose.yml)
-PROJECT_PATH=/path/to/your/codebase
-
-# Optional: Customize ports if needed
-CODEWEAVER_PORT=9328
-QDRANT_PORT=6333
-```
-
-> **Important:** When the Voyage provider remains selected (the default), the Docker entrypoint now fails fast if `VOYAGE_API_KEY` is missing so you get clear guidance before the server starts.
-
-### 3. Start the Services
-
-```bash
-# Start both CodeWeaver and Qdrant
+# 2. Start services (uses free local models by default)
 docker compose up -d
 
-# View logs
-docker compose logs -f
-
-# Check service health
+# 3. Check health
 curl http://localhost:9328/health/
 ```
 
-### 4. Use CodeWeaver
+That's it! CodeWeaver will index the current directory using free, local embedding models.
 
-Once the services are running:
+### With Cloud Providers (Higher Quality)
 
-```bash
-# Search your codebase via CLI (inside container)
-docker compose exec codeweaver codeweaver search "authentication logic"
-
-# Or access via HTTP for MCP integration
-curl http://localhost:9328/health/
-```
-
-### 5. Stop the Services
+For better search quality, use the `recommended` profile with Voyage AI:
 
 ```bash
-# Stop services (preserves data)
-docker compose stop
+# Set your API key and profile
+export VOYAGE_API_KEY=your-voyage-api-key
+export CODEWEAVER_PROFILE=recommended
 
-# Stop and remove containers (preserves volumes)
-docker compose down
-
-# Stop and remove everything including indexed data
-docker compose down -v
+docker compose up -d
 ```
 
-## Architecture
+Get a free Voyage API key at [voyageai.com](https://www.voyageai.com/).
 
-The Docker setup includes two services:
+## Configuration Profiles
 
-```
-┌─────────────────────────────────────────────┐
-│  CodeWeaver Container                        │
-│  - MCP Server (port 9328)                   │
-│  - Indexing Engine                           │
-│  - Search API                                │
-│  └──────────────────────────────────────────┤
-│     Connects to ↓                            │
-└─────────────────────────────────────────────┘
-                    │
-                    ↓
-┌─────────────────────────────────────────────┐
-│  Qdrant Container                            │
-│  - Vector Database (port 6333)              │
-│  - gRPC API (port 6334)                     │
-│  - Persistent Storage                        │
-└─────────────────────────────────────────────┘
-```
+CodeWeaver uses profiles to simplify configuration. Each profile pre-configures providers and models:
 
-## Configuration
+| Profile | Description | API Keys Required | Use Case |
+|---------|-------------|-------------------|----------|
+| `quickstart` | FastEmbed/Sentence Transformers (free, local) | None | Getting started, offline use |
+| `recommended` | Voyage AI (high-quality cloud models) | `VOYAGE_API_KEY` | Production, best quality |
+| `backup` | Lightest local models + in-memory vectors | None | Testing, minimal resources |
 
-### Environment Variables
+### Setting the Profile
 
-#### Required
+```bash
+# Via environment variable
+CODEWEAVER_PROFILE=quickstart docker compose up -d
 
-
-#### Project Settings
-
-
-#### Service Ports
-
-
-#### Provider Configuration
-
-##### Embedding Provider
-
-Supported providers: `voyage`, `openai`, `cohere`, `fastembed`, `sentence-transformers`
-
-##### Sparse Embedding Provider
-
-Note: FastEmbed runs locally, no API key needed.
-
-##### Reranking Provider
-
-#### Operational Settings
-
-
-### Using Alternative Providers
-
-#### OpenAI Embeddings
-
-```env
-EMBEDDING_PROVIDER=openai
-EMBEDDING_MODEL=text-embedding-3-large
-OPENAI_API_KEY=your-openai-key
+# Or in .env file
+CODEWEAVER_PROFILE=recommended
 ```
 
-#### Cohere Embeddings
+### Profile Details
 
-```env
-EMBEDDING_PROVIDER=cohere
-EMBEDDING_MODEL=embed-english-v3.0
-COHERE_API_KEY=your-cohere-key
+#### Quickstart Profile (Default)
+- **Embeddings**: FastEmbed or Sentence Transformers (local)
+- **Reranking**: FastEmbed or Sentence Transformers (local)
+- **Vector Store**: Qdrant (local container)
+- **Best for**: Getting started quickly, offline development
+
+#### Recommended Profile
+- **Embeddings**: Voyage AI `voyage-code-3`
+- **Reranking**: Voyage AI `voyage-rerank-2.5`
+- **Vector Store**: Qdrant (local container)
+- **Best for**: Production use, highest search quality
+
+#### Backup Profile
+- **Embeddings**: Lightest available local model
+- **Reranking**: Lightest available local model
+- **Vector Store**: In-memory (no Qdrant needed)
+- **Best for**: Testing, CI/CD, minimal resource usage
+
+## Mounting Your Codebase
+
+### How It Works
+
+CodeWeaver uses Docker bind mounts to access your codebase:
+
+- **Live sync**: Changes you make locally appear instantly in the container
+- **Read-only**: The `:ro` flag prevents CodeWeaver from modifying your code
+- **Direct access**: No copying - CodeWeaver reads your actual files
+- **File watching**: CodeWeaver monitors for changes and re-indexes automatically
+
+### Basic Setup
+
+Set `PROJECT_PATH` in your `.env` file:
+
+```bash
+# Absolute path (recommended)
+PROJECT_PATH=/home/user/projects/my-app
+
+# Relative path (relative to docker-compose.yml)
+PROJECT_PATH=../my-app
+
+# Current directory
+PROJECT_PATH=.
 ```
 
-#### Local-Only Setup (No API Keys)
+The codebase is mounted at `/workspace` inside the container.
 
-```env
-EMBEDDING_PROVIDER=fastembed
-EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
-SPARSE_EMBEDDING_PROVIDER=fastembed
-SPARSE_EMBEDDING_MODEL=prithivida/Splade_PP_en_v1
-RERANKING_PROVIDER=fastembed
-RERANKING_MODEL=BAAI/bge-reranker-base
+### Common Patterns
+
+#### Pattern 1: Index a Specific Project
+
+```bash
+# .env
+PROJECT_PATH=/home/user/projects/my-app
 ```
 
-Note: Local models have lower accuracy but require no API keys.
+```bash
+# Or via command line
+PROJECT_PATH=/home/user/projects/my-app docker compose up -d
+```
 
-## Volume Mounts
+#### Pattern 2: Devcontainer-Style (Compose Inside Repo)
 
-### Persistent Volumes
+Keep docker-compose.yml in your project directory:
 
-The setup creates three Docker volumes:
+```
+my-project/
+├── docker-compose.yml
+├── .env
+├── src/
+└── ...
+```
 
-1. **qdrant_storage** - Vector database data
-2. **codeweaver_data** - CodeWeaver application data
-3. **codeweaver_cache** - Indexing cache and temporary files
+```bash
+# .env
+PROJECT_PATH=.
+```
 
-### Mounted Directories
+This mirrors devcontainer behavior where the compose file lives with your code.
 
-1. **Project Source** - Your codebase (read-only)
-   ```yaml
-   volumes:
-     - ${PROJECT_PATH}:/workspace:ro
-   ```
+#### Pattern 3: Monorepo with Specific Subdirectory
 
-2. **Configuration** (optional) - Custom config file
-   ```yaml
-   volumes:
-     - ./codeweaver.toml:/app/config/codeweaver.toml:ro
-   ```
+```bash
+# Index only the backend
+PROJECT_PATH=/home/user/monorepo/packages/backend
+```
+
+### Live Indexing & File Watching
+
+CodeWeaver continuously monitors your codebase while the server is running:
+
+- **New files**: Automatically indexed
+- **Modified files**: Re-indexed on detection
+- **Deleted files**: Removed from index
+
+This happens automatically - no action required.
+
+#### Manual Re-indexing
+
+Force a full re-index if needed:
+
+```bash
+# Via CLI
+docker compose exec codeweaver codeweaver index --force
+
+# Check indexing status
+curl http://localhost:9328/health/ | jq '.indexing'
+```
+
+### Platform-Specific Notes
+
+#### Windows
+
+Use forward slashes or escaped backslashes:
+
+```bash
+# .env (Windows)
+PROJECT_PATH=C:/Users/me/projects/my-app
+```
+
+**WSL2 users**: For best performance, keep your code in the Linux filesystem:
+```bash
+PROJECT_PATH=/home/user/projects/my-app  # Fast
+# Not: PROJECT_PATH=/mnt/c/Users/...     # Slow
+```
+
+#### macOS
+
+Docker Desktop for Mac uses gRPC-FUSE for mounts. For large codebases:
+
+1. Enable VirtioFS in Docker Desktop settings
+2. Configure exclude patterns (see Performance section)
+
+#### Linux
+
+Native bind mounts - best performance. Ensure the Docker user can read your files:
+
+```bash
+chmod -R o+r /path/to/your/project
+```
+
+## Persistent Data & Checkpoints
+
+### Why Persistence Matters
+
+CodeWeaver stores critical data that must persist between container restarts:
+
+- **Index checkpoints**: Resume indexing after restart (avoid re-indexing from scratch)
+- **Project state**: Track which files have been indexed
+- **Generated config**: Profile-based configuration file
+- **Secrets**: API keys configured via `cw init`
+
+### Volume Configuration
+
+The docker-compose.yml configures persistence via `XDG_CONFIG_HOME`:
+
+```yaml
+environment:
+  - XDG_CONFIG_HOME=/app/config
+
+volumes:
+  - codeweaver_config:/app/config   # Checkpoints, config, secrets
+  - codeweaver_data:/app/data       # Application data
+```
+
+**Important**: Without this persistence, CodeWeaver re-indexes from scratch on every restart. For large codebases, this can take significant time.
+
+### Checking Checkpoint Status
+
+```bash
+# View checkpoint data
+docker compose exec codeweaver ls -la /app/config/codeweaver/
+
+# Check index status
+curl http://localhost:9328/health/ | jq '.indexing'
+```
+
+### Resetting Checkpoints
+
+To force a fresh re-index:
+
+```bash
+# Remove checkpoint data
+docker compose exec codeweaver rm -rf /app/config/codeweaver/checkpoints/
+
+# Restart to re-index
+docker compose restart codeweaver
+```
+
+### Data Locations
+
+| Data Type | Container Path | Mounted Volume |
+|-----------|----------------|----------------|
+| Config & Checkpoints | `/app/config/codeweaver/` | `codeweaver_config` |
+| Application Data | `/app/data/` | `codeweaver_data` |
+| Vector Database | (Qdrant container) | `qdrant_storage` |
 
 ## Custom Configuration File
 
-If you prefer a TOML configuration file over environment variables:
+For full control beyond profiles, create your own `codeweaver.toml`.
 
-1. Create `codeweaver.toml`:
-   ```toml
-   project_name = "my-project"
-   project_path = "/workspace"
-   token_limit = 10000
-   max_chunk_size = 800
-   
-   [provider.embedding]
-   provider = "voyage"
-   model_settings = { model = "voyage-code-3" }
-   
-   [provider.vector_store]
-   provider = "qdrant"
-   provider_settings = { 
-     url = "http://qdrant:6333",
-     collection_name = "my-collection"
-   }
-   ```
+### Config Auto-Discovery
 
-2. Update docker-compose.yml:
-   ```yaml
-   volumes:
-     - ./codeweaver.toml:/app/config/codeweaver.toml:ro
-   ```
+CodeWeaver automatically finds configuration files in these locations (in order of precedence):
 
-3. Set the config path in the command:
-   ```yaml
-   command: ["codeweaver", "server", "--config", "/app/config/codeweaver.toml"]
-   ```
+**In your project (mounted at `/workspace`):**
+- `codeweaver.local.toml` / `.yaml` / `.json`
+- `codeweaver.toml` / `.yaml` / `.json`
+- `.codeweaver.local.toml` / `.yaml` / `.json`
+- `.codeweaver.toml` / `.yaml` / `.json`
+- `.codeweaver/codeweaver.local.toml` / `.yaml` / `.json`
+- `.codeweaver/codeweaver.toml` / `.yaml` / `.json`
 
-## Building the Image Locally
+**User config directory (`/app/config/codeweaver/` in Docker):**
+- `codeweaver.toml` / `.yaml` / `.json`
 
-If you want to build the Docker image yourself:
+The entrypoint generates config to the user config dir. You can override by placing a config in your project root.
+
+### Method 1: Generate Locally First
 
 ```bash
-# From the repository root
-docker build -t codeweaver:local .
+# Install CodeWeaver locally (or use pipx)
+pipx install codeweaver
 
-# Test the build
-docker run --rm codeweaver:local codeweaver --version
+# Generate a config file
+cw init config --profile quickstart --config-path ./codeweaver.toml
 
-# Update docker-compose.yml to use local image
-# Change: image: knitli/codeweaver:latest
-# To:     image: codeweaver:local
+# Edit as needed
+vim codeweaver.toml
+
+# Mount in docker-compose.yml
+```
+
+### Method 2: Extract from Container
+
+```bash
+# Start container (generates config from profile)
+docker compose up -d
+
+# Copy config out
+docker cp codeweaver-server:/app/config/codeweaver/codeweaver.toml ./codeweaver.toml
+
+# Edit locally
+vim codeweaver.toml
+```
+
+### Using Your Config
+
+**Option 1: Place in project root (recommended)**
+
+Simply add `codeweaver.toml` to your project - CodeWeaver auto-discovers it:
+
+```
+my-project/
+├── codeweaver.toml    # Auto-discovered!
+├── src/
+└── ...
+```
+
+**Option 2: Mount to user config location**
+
+For config outside your project, mount explicitly in docker-compose.yml:
+
+```yaml
+volumes:
+  - ${PROJECT_PATH:-.}:/workspace:ro
+  - codeweaver_config:/app/config
+  - ./my-config.toml:/app/config/codeweaver/codeweaver.toml:ro  # Add this
+```
+
+### Example Configuration
+
+```toml
+project_name = "my-project"
+project_path = "/workspace"
+token_limit = 30000
+
+[provider.embedding]
+provider = "voyage"
+model_settings = { model = "voyage-code-3" }
+
+[provider.vector_store]
+provider = "qdrant"
+provider_settings = {
+  url = "http://qdrant:6333",  # Docker network hostname
+  collection_name = "my-collection"
+}
+
+[indexer]
+exclude_patterns = ["node_modules", ".git", "dist", "__pycache__"]
+```
+
+**Important**: When using the local Qdrant container, use `http://qdrant:6333` (Docker network hostname), not `localhost`.
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│  CodeWeaver Container                           │
+│  ├─ MCP Server (port 9328)                     │
+│  ├─ Live File Watcher                          │
+│  ├─ Indexing Engine                            │
+│  └─ Search API                                 │
+│     Connects to ↓                              │
+└─────────────────────────────────────────────────┘
+                    │
+                    ↓
+┌─────────────────────────────────────────────────┐
+│  Qdrant Container                               │
+│  ├─ Vector Database (port 6333)                │
+│  ├─ gRPC API (port 6334)                       │
+│  └─ Persistent Storage                         │
+└─────────────────────────────────────────────────┘
+```
+
+## Performance Optimization
+
+### Large Codebases
+
+For repositories with >10,000 files:
+
+1. **Configure exclude patterns** in your `codeweaver.toml`:
+   ```toml
+   [indexer]
+   exclude_patterns = [
+     "node_modules",
+     ".git",
+     "dist",
+     "build",
+     "__pycache__",
+     "*.pyc",
+     "vendor",
+     ".venv"
+   ]
+   ```
+
+2. **Increase container memory**:
+   ```yaml
+   deploy:
+     resources:
+       limits:
+         memory: 8G
+   ```
+
+3. **Use VirtioFS** on macOS Docker Desktop
+
+### Search Performance
+
+Adjust result limits if needed:
+
+```bash
+# In .env
+TOKEN_LIMIT=50000
 ```
 
 ## Troubleshooting
@@ -271,8 +439,8 @@ docker info | grep -i memory
 
 **View logs:**
 ```bash
-docker compose logs qdrant
 docker compose logs codeweaver
+docker compose logs qdrant
 ```
 
 ### Qdrant Connection Errors
@@ -284,52 +452,54 @@ curl http://localhost:6333/health
 
 **Check network connectivity:**
 ```bash
-docker compose exec codeweaver ping qdrant
-```
-
-### Indexing Takes Too Long
-
-**Check resource allocation:**
-```yaml
-# In docker-compose.yml, increase memory:
-deploy:
-  resources:
-    limits:
-      memory: 8G
-```
-
-**Monitor progress:**
-```bash
-curl http://localhost:9328/health/ | jq '.indexing'
+docker compose exec codeweaver curl http://qdrant:6333/health
 ```
 
 ### API Key Issues
 
-**Verify environment variable is set:**
+**Check the profile and key:**
 ```bash
+# View current profile
+docker compose exec codeweaver env | grep CODEWEAVER_PROFILE
+
+# Verify API key is passed
 docker compose exec codeweaver env | grep VOYAGE_API_KEY
 ```
 
-**Test API key manually:**
+**Switch to quickstart profile** (no API key needed):
 ```bash
-curl -H "Authorization: Bearer $VOYAGE_API_KEY" \
-  https://api.voyageai.com/v1/models
+CODEWEAVER_PROFILE=quickstart docker compose up -d
 ```
 
-### Out of Memory Errors
+### Files Not Being Indexed
 
-**Reduce chunk size and batch size:**
-```env
-MAX_CHUNK_SIZE=500
-TOKEN_LIMIT=5000
+**Check mount:**
+```bash
+docker compose exec codeweaver ls -la /workspace
 ```
 
-**Increase Docker memory limit:**
+**Verify exclude patterns** aren't blocking your files.
+
+**Check indexer logs:**
 ```bash
-# Update Docker Desktop settings or:
-docker compose down
-# Edit docker-compose.yml memory limits
-docker compose up -d
+docker compose logs codeweaver | grep -i "index\|watch"
+```
+
+### Changes Not Detected
+
+If file watching isn't picking up changes:
+
+1. Check the file is in an indexed path
+2. Verify it's not in an exclude pattern
+3. Restart the container: `docker compose restart codeweaver`
+
+### Permission Denied
+
+The container runs as user `codeweaver` (UID 1000). Ensure your files are readable:
+
+```bash
+# Check from inside container
+docker compose exec codeweaver ls -la /workspace
 ```
 
 ## Advanced Usage
@@ -339,18 +509,33 @@ docker compose up -d
 Run separate instances for different projects:
 
 ```bash
-# Project 1
-docker compose -f docker-compose.project1.yml up -d
+# Create project-specific compose files
+cp docker-compose.yml docker-compose.project1.yml
 
-# Project 2  
-docker compose -f docker-compose.project2.yml up -d
+# Edit to use different:
+# - Container names
+# - Ports
+# - Volume names
+
+docker compose -f docker-compose.project1.yml up -d
 ```
 
-Each compose file should use different:
-- Container names
-- Ports
-- Volume names
-- Collection names
+### Remote Qdrant
+
+To use Qdrant Cloud instead of the local container:
+
+1. Set the vector deployment and URL:
+   ```bash
+   VECTOR_DEPLOYMENT=cloud
+   VECTOR_URL=https://your-cluster.cloud.qdrant.io:6333
+   ```
+
+2. Remove or comment out the `qdrant` service in docker-compose.yml
+
+3. Set your Qdrant API key:
+   ```bash
+   QDRANT_API_KEY=your-qdrant-api-key
+   ```
 
 ### Production Deployment
 
@@ -361,28 +546,16 @@ For production use:
    image: knitli/codeweaver:v0.1.0
    ```
 
-2. **Enable health checks:**
-   ```yaml
-   healthcheck:
-     test: ["CMD", "curl", "-f", "http://localhost:9328/health/"]
-     interval: 30s
-     timeout: 10s
-     retries: 3
-   ```
-
-3. **Set resource limits:**
+2. **Set resource limits:**
    ```yaml
    deploy:
      resources:
        limits:
          cpus: '2.0'
          memory: 4G
-       reservations:
-         cpus: '1.0'
-         memory: 2G
    ```
 
-4. **Use secrets for API keys:**
+3. **Use secrets for API keys:**
    ```yaml
    secrets:
      - voyage_api_key
@@ -390,51 +563,10 @@ For production use:
      - VOYAGE_API_KEY_FILE=/run/secrets/voyage_api_key
    ```
 
-5. **Enable restart policies:**
+4. **Enable restart policies:**
    ```yaml
    restart: unless-stopped
    ```
-
-### Remote Qdrant
-
-To use a remote Qdrant instance instead of the local container:
-
-1. Remove the `qdrant` service from docker-compose.yml
-
-2. Update environment variables:
-   ```env
-   CODEWEAVER_VECTOR_STORE_URL=https://your-qdrant-instance.com:6333
-   # If using Qdrant Cloud, add API key:
-   QDRANT_API_KEY=your-qdrant-api-key
-   ```
-
-## Performance Tuning
-
-### Indexing Performance
-
-- **Parallel processing:** Default is optimized, but you can adjust:
-  ```env
-  # Increase for more cores (uses more memory)
-  CODEWEAVER_WORKERS=8
-  ```
-
-- **Batch size:** Control memory usage:
-  ```env
-  CODEWEAVER_BATCH_SIZE=50
-  ```
-
-### Search Performance
-
-- **Result limits:**
-  ```env
-  CODEWEAVER_MAX_RESULTS=50
-  ```
-
-- **Enable caching:**
-  ```env
-  CODEWEAVER_ENABLE_CACHE=true
-  CODEWEAVER_CACHE_TTL=3600
-  ```
 
 ## Monitoring
 
@@ -449,44 +581,48 @@ Response includes:
 - Indexing progress
 - Provider health
 - Memory usage
-- Error counts
-
-### Metrics Endpoint
-
-```bash
-curl http://localhost:9328/metrics
-```
-
-Provides Prometheus-compatible metrics for monitoring.
 
 ### Docker Stats
 
 ```bash
-# Monitor resource usage
 docker stats codeweaver-server codeweaver-qdrant
 ```
 
 ## Security Considerations
 
-1. **API Keys:** Never commit `.env` files with real API keys
-2. **Network:** Use internal networks for service communication
-3. **User:** Container runs as non-root user (`codeweaver`)
-4. **Volumes:** Use read-only mounts where possible
-5. **Updates:** Regularly update to latest image versions
+1. **API Keys**: Never commit `.env` files with real API keys
+2. **Network**: Services communicate on internal Docker network
+3. **User**: Container runs as non-root user (`codeweaver`, UID 1000)
+4. **Volumes**: Codebase is mounted read-only (`:ro`)
+5. **Updates**: Regularly update to latest image versions
 
-## Support
+## Building Locally
 
-- **Issues:** [GitHub Issues](https://github.com/knitli/codeweaver/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/knitli/codeweaver/discussions)
-- **Documentation:** [Main README](README.md)
+If you want to build the Docker image yourself:
+
+```bash
+# From the repository root
+docker build -t codeweaver:local .
+
+# Test the build
+docker run --rm codeweaver:local codeweaver --version
+
+# Use in docker-compose.yml
+# Change: image: knitli/codeweaver:latest
+# To:     build: .
+```
 
 ## Known Limitations
 
-- **PyPI Publishing:** CodeWeaver is in alpha; Docker images are built from source
-- **Resource Usage:** Indexing large codebases (>100k files) requires significant memory
-- **API Keys:** Default configuration requires VoyageAI API key (use local providers as alternative)
-- **Platform Support:** Currently tested on linux/amd64 and linux/arm64
-- **CI/CD SSL Issues:** Building in some CI environments may encounter SSL certificate issues. Use pre-built images from Docker Hub as a workaround. See [DOCKER_BUILD_NOTES.md](DOCKER_BUILD_NOTES.md) for details.
+- **Resource Usage**: Indexing large codebases (>100k files) requires significant memory
+- **Platform Support**: Tested on linux/amd64 and linux/arm64
+- **CI/CD SSL Issues**: Some CI environments have SSL certificate issues. Use pre-built images as a workaround. See [DOCKER_BUILD_NOTES.md](docs/docker/DOCKER_BUILD_NOTES.md).
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/knitli/codeweaver/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/knitli/codeweaver/discussions)
+- **Documentation**: [Main README](README.md)
 
 ## See Also
 

@@ -60,6 +60,8 @@ mise run format-fix
 mise run check
 ```
 
+> NOTE: This project uses the [`ty` typechecker](https://astral.sh/ty). `ty: ignore[some_rule]` statements are *not* typos
+
 ### Testing
 ```bash
 # Run tests
