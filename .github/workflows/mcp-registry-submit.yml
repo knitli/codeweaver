@@ -68,7 +68,8 @@ jobs:
           
           # Update package version
           if 'packages' in data and len(data['packages']) > 0:
-              data['packages'][0]['version'] = '${VERSION}'
+              for pkg in data['packages']:
+                  pkg['version'] = '${VERSION}'
           
           with open('server.json', 'w') as f:
               json.dump(data, f, indent=2)
