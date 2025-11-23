@@ -60,7 +60,8 @@ ARG VCS_REF
 # Add image metadata
 LABEL org.opencontainers.image.version="${VERSION}" \
     org.opencontainers.image.created="${BUILD_DATE}" \
-    org.opencontainers.image.revision="${VCS_REF}"
+    org.opencontainers.image.revision="${VCS_REF}" \
+    io.modelcontextprotocol.server-name="io.github.knitli/codeweaver"
 
 # Install runtime dependencies
 # hadolint ignore=DL3008

@@ -1,0 +1,359 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-16/server.schema.json",
+  "name": "io.github.knitli/codeweaver",
+  "title": "CodeWeaver - Semantic Code Search",
+  "description": "Extensible MCP server for hybrid semantic code search using vector databases and AST parsing. Supports 170+ programming languages with intelligent chunking, multi-provider embeddings (Voyage, Cohere, OpenAI, etc.), and pluggable architecture. Delivers precise, agent-aware context to reduce token waste by 60-80%.",
+  "status": "active",
+  "version": "0.0.1rc778",
+  "websiteUrl": "https://github.com/knitli/codeweaver",
+  "repository": {
+    "url": "https://github.com/knitli/codeweaver",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "codeweaver",
+      "version": "0.0.1rc778",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "named",
+          "name": "--repo-path",
+          "description": "Path to the code repository to index and search",
+          "valueHint": "path",
+          "isRequired": false
+        },
+        {
+          "type": "named",
+          "name": "--config",
+          "description": "Path to configuration file (TOML format)",
+          "valueHint": "path",
+          "isRequired": false
+        },
+        {
+          "type": "named",
+          "name": "--host",
+          "description": "Host address for MCP server",
+          "default": "127.0.0.1",
+          "isRequired": false
+        },
+        {
+          "type": "named",
+          "name": "--port",
+          "description": "Port for MCP server",
+          "default": "9328",
+          "format": "integer",
+          "isRequired": false
+        },
+        {
+          "type": "named",
+          "name": "--log-level",
+          "description": "Logging level",
+          "default": "info",
+          "choices": ["debug", "info", "warning", "error", "critical"],
+          "isRequired": false
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "CODEWEAVER_REPO_PATH",
+          "description": "Repository path (alternative to --repo-path argument)",
+          "isRequired": false
+        },
+        {
+          "name": "CODEWEAVER_CONFIG",
+          "description": "Configuration file path (alternative to --config argument)",
+          "isRequired": false
+        },
+        {
+          "name": "CODEWEAVER_EMBEDDING_PROVIDER",
+          "description": "Embedding provider to use (voyage, cohere, openai, fastembed, sentence_transformers, etc.)",
+          "default": "voyage",
+          "isRequired": false
+        },
+        {
+          "name": "CODEWEAVER_EMBEDDING_MODEL",
+          "description": "Specific embedding model to use (provider-dependent)",
+          "isRequired": false
+        },
+        {
+          "name": "CODEWEAVER_VECTOR_STORE",
+          "description": "Vector store backend (qdrant, inmemory)",
+          "default": "qdrant",
+          "isRequired": false
+        },
+        {
+          "name": "VOYAGE_API_KEY",
+          "description": "API key for Voyage AI embedding provider",
+          "isSecret": true,
+          "isRequired": false
+        },
+        {
+          "name": "COHERE_API_KEY",
+          "description": "API key for Cohere embedding provider",
+          "isSecret": true,
+          "isRequired": false
+        },
+        {
+          "name": "OPENAI_API_KEY",
+          "description": "API key for OpenAI embedding provider",
+          "isSecret": true,
+          "isRequired": false
+        },
+        {
+          "name": "MISTRAL_API_KEY",
+          "description": "API key for Mistral AI embedding provider",
+          "isSecret": true,
+          "isRequired": false
+        },
+        {
+          "name": "GOOGLE_API_KEY",
+          "description": "API key for Google AI embedding provider",
+          "isSecret": true,
+          "isRequired": false
+        },
+        {
+          "name": "HUGGINGFACE_API_KEY",
+          "description": "API key for HuggingFace embedding provider",
+          "isSecret": true,
+          "isRequired": false
+        },
+        {
+          "name": "QDRANT_URL",
+          "description": "Qdrant server URL for remote vector store",
+          "isRequired": false
+        },
+        {
+          "name": "QDRANT_API_KEY",
+          "description": "API key for Qdrant cloud/remote instances",
+          "isSecret": true,
+          "isRequired": false
+        },
+        {
+          "name": "CODEWEAVER_TELEMETRY_ENABLED",
+          "description": "Enable/disable anonymous telemetry (true/false)",
+          "default": "true",
+          "isRequired": false
+        },
+        {
+          "name": "LOG_LEVEL",
+          "description": "Logging level (alternative to --log-level argument)",
+          "default": "info",
+          "isRequired": false
+        }
+      ]
+    },
+    {
+      "registryType": "oci",
+      "registryBaseUrl": "https://docker.io",
+      "identifier": "knitli/codeweaver",
+      "version": "0.0.1rc778",
+      "runtimeHint": "docker",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeArguments": [
+        {
+          "type": "named",
+          "name": "--rm",
+          "description": "Automatically remove container when it exits"
+        },
+        {
+          "type": "named",
+          "name": "-v",
+          "value": "{workspace}:/workspace:ro",
+          "description": "Mount workspace directory as read-only",
+          "variables": {
+            "workspace": {
+              "description": "Path to your codebase to index and search",
+              "isRequired": true
+            }
+          }
+        },
+        {
+          "type": "named",
+          "name": "-e",
+          "value": "CODEWEAVER_REPO_PATH=/workspace",
+          "description": "Set repository path inside container"
+        },
+        {
+          "type": "named",
+          "name": "-e",
+          "value": "VOYAGE_API_KEY={voyage_api_key}",
+          "description": "Voyage AI API key for embeddings",
+          "variables": {
+            "voyage_api_key": {
+              "description": "Your Voyage AI API key",
+              "isRequired": false
+            }
+          }
+        },
+        {
+          "type": "named",
+          "name": "-e",
+          "value": "CODEWEAVER_EMBEDDING_PROVIDER={embedding_provider}",
+          "description": "Embedding provider selection",
+          "variables": {
+            "embedding_provider": {
+              "description": "Provider to use for embeddings",
+              "default": "voyage",
+              "choices": ["voyage", "cohere", "openai", "fastembed", "sentence_transformers"]
+            }
+          }
+        },
+        {
+          "type": "named",
+          "name": "-p",
+          "value": "{host_port}:9328",
+          "description": "Port mapping for MCP server",
+          "variables": {
+            "host_port": {
+              "description": "Host port to expose MCP server",
+              "default": "9328"
+            }
+          }
+        },
+        {
+          "type": "named",
+          "name": "--network",
+          "value": "{network}",
+          "description": "Docker network for Qdrant connectivity",
+          "variables": {
+            "network": {
+              "description": "Docker network name (use 'host' for local Qdrant or custom network)",
+              "default": "bridge"
+            }
+          }
+        }
+      ],
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "server",
+          "description": "Start CodeWeaver MCP server"
+        },
+        {
+          "type": "named",
+          "name": "--host",
+          "value": "0.0.0.0",
+          "description": "Bind to all interfaces in container"
+        },
+        {
+          "type": "named",
+          "name": "--port",
+          "value": "9328",
+          "description": "MCP server port inside container"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "CODEWEAVER_REPO_PATH",
+          "description": "Repository path inside container",
+          "default": "/workspace",
+          "isRequired": true
+        },
+        {
+          "name": "CODEWEAVER_EMBEDDING_PROVIDER",
+          "description": "Embedding provider to use",
+          "default": "voyage",
+          "isRequired": false
+        },
+        {
+          "name": "VOYAGE_API_KEY",
+          "description": "API key for Voyage AI",
+          "isSecret": true,
+          "isRequired": false
+        },
+        {
+          "name": "COHERE_API_KEY",
+          "description": "API key for Cohere",
+          "isSecret": true,
+          "isRequired": false
+        },
+        {
+          "name": "OPENAI_API_KEY",
+          "description": "API key for OpenAI",
+          "isSecret": true,
+          "isRequired": false
+        },
+        {
+          "name": "QDRANT_URL",
+          "description": "Qdrant server URL (e.g., http://qdrant:6333)",
+          "default": "http://localhost:6333",
+          "isRequired": false
+        },
+        {
+          "name": "QDRANT_API_KEY",
+          "description": "API key for Qdrant cloud",
+          "isSecret": true,
+          "isRequired": false
+        },
+        {
+          "name": "CODEWEAVER_HOST",
+          "description": "Host address for MCP server",
+          "default": "0.0.0.0",
+          "isRequired": false
+        },
+        {
+          "name": "CODEWEAVER_PORT",
+          "description": "Port for MCP server",
+          "default": "9328",
+          "isRequired": false
+        },
+        {
+          "name": "LOG_LEVEL",
+          "description": "Logging verbosity",
+          "default": "info",
+          "isRequired": false
+        },
+        {
+          "name": "CODEWEAVER_TELEMETRY_ENABLED",
+          "description": "Enable/disable telemetry",
+          "default": "false",
+          "isRequired": false
+        }
+      ]
+    }
+  ],
+  "_meta": {
+    "io.modelcontextprotocol.registry/publisher-provided": {
+      "tool": "manual",
+      "build_info": {
+        "python_version": ">=3.12",
+        "package_manager": "uv",
+        "framework": "fastmcp"
+      },
+      "capabilities": {
+        "languages_supported": 170,
+        "embedding_providers": [
+          "voyage",
+          "cohere",
+          "openai",
+          "mistral",
+          "google",
+          "huggingface",
+          "fastembed",
+          "sentence_transformers",
+          "bedrock"
+        ],
+        "vector_stores": ["qdrant", "inmemory"],
+        "search_types": ["semantic", "hybrid", "keyword"],
+        "chunking_strategies": ["semantic", "delimiter-based"]
+      },
+      "tags": [
+        "code-search",
+        "semantic-search",
+        "vector-database",
+        "embeddings",
+        "ast-parsing",
+        "multi-language",
+        "agent-tools"
+      ]
+    }
+  }
+}
