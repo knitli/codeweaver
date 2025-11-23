@@ -164,7 +164,7 @@ jobs:
           # TODO: Add checksum verification when official checksums are published
           # Example: sha256sum -c mcp-publisher.tar.gz.sha256
           
-          tar xz < mcp-publisher.tar.gz mcp-publisher
+          tar xzf mcp-publisher.tar.gz mcp-publisher
           sudo mv mcp-publisher /usr/local/bin/
           chmod +x /usr/local/bin/mcp-publisher
           rm mcp-publisher.tar.gz
