@@ -560,24 +560,16 @@ class Indexer(BasedModel):
             provider_name = type(self._embedding_provider).__name__.replace("Provider", "").lower()
             result["dense_provider"] = provider_name
             # Try to get model name from provider
-            if hasattr(self._embedding_provider, "model"):
-                result["dense_model"] = str(self._embedding_provider.model)
-            elif hasattr(self._embedding_provider, "model_name"):
-                result["dense_model"] = str(self._embedding_provider.model_name)
-            elif hasattr(self._embedding_provider, "_model"):
-                result["dense_model"] = str(self._embedding_provider._model)
+            # Use standardized model_identifier property
+            result["dense_model"] = getattr(self._embedding_provider, "model_identifier", None)
         
         # Get sparse embedding provider info
         if self._sparse_provider:
             provider_name = type(self._sparse_provider).__name__.replace("Provider", "").lower()
             result["sparse_provider"] = provider_name
             # Try to get model name from provider
-            if hasattr(self._sparse_provider, "model"):
-                result["sparse_model"] = str(self._sparse_provider.model)
-            elif hasattr(self._sparse_provider, "model_name"):
-                result["sparse_model"] = str(self._sparse_provider.model_name)
-            elif hasattr(self._sparse_provider, "_model"):
-                result["sparse_model"] = str(self._sparse_provider._model)
+            # Use standardized model_identifier property
+            result["sparse_model"] = getattr(self._sparse_provider, "model_identifier", None)
         
         return result
 
