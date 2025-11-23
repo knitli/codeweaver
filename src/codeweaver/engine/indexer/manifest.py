@@ -300,16 +300,17 @@ class IndexFileManifest(BasedModel):
         
         # Check for embedding model changes (v1.1.0+ manifests)
         # Dense model changed
-        if current_dense_provider and current_dense_model:
-            manifest_dense_provider = entry.get("dense_embedding_provider")
-            manifest_dense_model = entry.get("dense_embedding_model")
+        # Dense model changed, added, or removed
+        manifest_dense_provider = entry.get("dense_embedding_provider")
+        manifest_dense_model = entry.get("dense_embedding_model")
+        if current_dense_provider or manifest_dense_provider or current_dense_model or manifest_dense_model:
             if manifest_dense_provider != current_dense_provider or manifest_dense_model != current_dense_model:
                 return True, "dense_embedding_model_changed"
         
-        # Sparse model changed  
-        if current_sparse_provider and current_sparse_model:
-            manifest_sparse_provider = entry.get("sparse_embedding_provider")
-            manifest_sparse_model = entry.get("sparse_embedding_model")
+        # Sparse model changed, added, or removed
+        manifest_sparse_provider = entry.get("sparse_embedding_provider")
+        manifest_sparse_model = entry.get("sparse_embedding_model")
+        if current_sparse_provider or manifest_sparse_provider or current_sparse_model or manifest_sparse_model:
             if manifest_sparse_provider != current_sparse_provider or manifest_sparse_model != current_sparse_model:
                 return True, "sparse_embedding_model_changed"
         
