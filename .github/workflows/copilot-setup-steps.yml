@@ -82,6 +82,5 @@ jobs:
         run: |
           chmod -R +x scripts
           echo "Setting up mise..."
-          # Trust the mise configuration - simplified to avoid hanging
-          mise trust -y || echo "Warning: mise trust had issues, but continuing"
+          # Trust the mise configuration - already performed in Setup Mise step
           echo "Mise setup completed"
