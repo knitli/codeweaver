@@ -10,19 +10,22 @@ from __future__ import annotations
 import re
 
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
-from codeweaver.providers.provider import Provider
-from codeweaver.providers.reranking.capabilities.base import (
-    PartialRerankingCapabilities,
-    RerankingModelCapabilities,
-)
+
+if TYPE_CHECKING:
+    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
 def get_marco_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
     """
     Get the MS-Marco MiniLM reranking capabilities.
     """
-    shared_capabilities: PartialRerankingCapabilities = {
+    from codeweaver.providers.provider import Provider
+    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+    from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilitiesDict
+
+    shared_capabilities: PartialRerankingCapabilitiesDict = {
         "name": "Xenova/ms-marco-MiniLM-",
         "max_input": 512,
         "context_window": 512,
@@ -32,6 +35,16 @@ def get_marco_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
     }
     fastembed_models = ("L-6-v2", "L-12-v2")
     sentence_transformers_models = ("L6-v2", "L12-v2")
+
+    ultra_light: PartialRerankingCapabilitiesDict = {
+        "name": "cross-encoder/ms-marco-TinyBERT-L2-v2",
+        "provider": Provider.SENTENCE_TRANSFORMERS,
+        "max_input": 512,
+        "context_window": 512,
+        "tokenizer": "tokenizers",
+        "tokenizer_model": "cross-encoder/ms-marco-TinyBERT-L2-v2",
+        "supports_custom_prompt": False,
+    }
 
     assembled_capabilities: list[RerankingModelCapabilities] = []
     assembled_capabilities.extend(
@@ -49,6 +62,7 @@ def get_marco_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
         })
         for model in fastembed_models + sentence_transformers_models
     )
+    assembled_capabilities.append(RerankingModelCapabilities.model_validate(ultra_light))
     return assembled_capabilities
 
 

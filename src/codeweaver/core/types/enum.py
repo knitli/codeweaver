@@ -25,27 +25,17 @@ from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializatio
 
 
 if TYPE_CHECKING:
+    from codeweaver.core.stores import BlakeHashKey
     from codeweaver.core.types.aliases import FilteredKeyT
 
 
 type EnumExtend = Callable[[Enum, str], Enum]
-extend_enum: EnumExtend = extend_enum  # pyright: ignore[reportUnknownVariableType]
+extend_enum: EnumExtend = extend_enum
 
 
 # ================================================
 # *          Base Enum Classes
 # ================================================
-
-# TODO: For our larger enums with lots of property methods, like `SemanticSearchLanguage`, it probably makes sense to define it as an enum with type `dataclass` members, where most of the properties are defined on the dataclass, and the enum just holds instances of that dataclass. This would make it easier to manage and extend the enum members. See https://docs.python.org/3/howto/enum.html#dataclass-support. This would also make it easier to add new members without having to add the member to the enum methods themselves. Since attributes and properties are accessed the same way, we could do this without it being a breaking change. Classes that would benefit from this treatment:
-# *  - `SemanticSearchLanguage`
-# *  - `ConfigLanguage`
-# *  - `Chunker`
-# *  - `Provider`
-# *  - [X] `AgentTask`
-# *  - `LanguageFamily`
-# *  - Not currently an enum, but the `Capabilities` types could also benefit from this treatment (`EmbeddingModelCapabilities`, `RerankingModelCapabilities`), where the member is the model name and the dataclass holds the capabilities.
-#
-# * Here's the base implementation:
 
 
 @dataclass(config=DATACLASS_CONFIG, order=True, frozen=True)
@@ -181,7 +171,8 @@ class BaseDataclassEnum(Enum):
     @classmethod
     def add_member(cls, name: str, value: BaseEnumData) -> Self:
         """Dynamically add a new member to the enum."""
-        extend_enum(cls, textcase.upper(name), value)  # pyright: ignore[reportPrivateUsage, reportCallIssue, reportUnknownVariableType]
+        # The type stub signature is (cls, name, *args, **kwargs), but the function applies a tuple to single args (value -> (value,)). Bottom line: it works fine. This is much more clear.
+        extend_enum(cls, textcase.upper(name), value)  # ty: ignore[too-many-positional-arguments]
         return cls(value)
 
 
@@ -364,7 +355,9 @@ class BaseEnum(Enum):
             return NotImplemented
         if self.value_type is str and isinstance(other, str):
             return str(self).lower() < other.lower()
-        return self.value < other
+        # When comparing with another enum, extract its value
+        other_value = other.value if isinstance(other, self.__class__) else other
+        return self.value < other_value
 
     def __le__(self, other: Self) -> bool:
         """Less than or equal to comparison for enum members."""
@@ -438,7 +431,8 @@ class BaseEnum(Enum):
         if isinstance(value, str):
             name = cls._encode_name(name).upper()
             value = name.lower()
-        extend_enum(cls, name, value)  # pyright: ignore[reportCallIssue, reportUnknownVariableType]
+        # the signature here is (cls, name, *args, **kwargs), but the function applies a tuple to single args (value -> (value,)). Bottom line: it works fine. This is much more clear.
+        extend_enum(cls, name, value)  # ty: ignore[too-many-positional-arguments]
         return cls(value)
 
     def serialize_for_cli(self) -> str:
@@ -448,6 +442,13 @@ class BaseEnum(Enum):
 
 type FilteredCallable = Callable[[Any], bool] | Callable[[Any], int] | Callable[[], None]
 type FilteredReturn = bool | int | dict[Any, int] | None
+
+
+def _hash_it(value: Any) -> BlakeHashKey:
+    """Hash a value using Blake2b and return the hex digest."""
+    from codeweaver.core.stores import get_blake_hash
+
+    return get_blake_hash(str(value).encode("utf-8")).hexdigest()
 
 
 class AnonymityConversion(BaseEnum):
@@ -474,18 +475,18 @@ class AnonymityConversion(BaseEnum):
 
     def filtered(self, values: Any) -> FilteredReturn:
         """Process values according to the anonymity conversion method."""
-        functions: MappingProxyType[AnonymityConversion, FilteredCallable] = MappingProxyType({  # type: ignore
-            AnonymityConversion.BOOLEAN: lambda v: bool(v),  # type: ignore
-            AnonymityConversion.COUNT: lambda v: len(v) if isinstance(v, list) else 1,  # type: ignore
+        functions: MappingProxyType[AnonymityConversion, FilteredCallable] = MappingProxyType({
+            AnonymityConversion.BOOLEAN: lambda v: bool(v),
+            AnonymityConversion.COUNT: lambda v: len(v) if isinstance(v, list) else 1,
             AnonymityConversion.DISTRIBUTION: lambda v: {item: v.count(item) for item in set(v)}  # type: ignore
             if (isinstance(v, Sequence) and not isinstance(v, str))
             else {v: 1},  # type: ignore
             AnonymityConversion.AGGREGATE: lambda v: sum(v) if isinstance(v, list) else v,  # type: ignore
-            AnonymityConversion.HASH: lambda v: hash(v),  # type: ignore
+            AnonymityConversion.HASH: lambda v: _hash_it(v),
             AnonymityConversion.TEXT_COUNT: lambda v: len(v) if isinstance(v, str) else 0,
-            AnonymityConversion.FORBIDDEN: lambda: None,
+            AnonymityConversion.FORBIDDEN: lambda v: None,  # Accept value but return None
         })
-        return functions.get(self, lambda v: v)(values)  # type: ignore
+        return functions.get(self, lambda v: v)(values)
 
 
 __all__ = ("AnonymityConversion", "BaseDataclassEnum", "BaseEnum", "BaseEnumData")

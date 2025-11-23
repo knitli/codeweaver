@@ -9,22 +9,22 @@ Validates acceptance criteria spec.md:86
 """
 
 from pathlib import Path
-from uuid import uuid4
 
 import pytest
 
-from codeweaver.core.chunks import CodeChunk
+from codeweaver.common.utils.utils import uuid7
+from codeweaver.config.providers import QdrantConfig
 from codeweaver.core.language import SemanticSearchLanguage as Language
-from codeweaver.providers.vector_stores.qdrant import QdrantVectorStore
+from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+
+# sourcery skip: dont-import-test-modules
+from tests.conftest import create_test_chunk_with_embeddings
+
 
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
 
-
-
-
-
-async def test_incremental_updates():
+async def test_incremental_updates(qdrant_test_manager):
     """
     User Story: File updates only re-index changed chunks.
 
@@ -32,23 +32,24 @@ async def test_incremental_updates():
     When: File is re-indexed
     Then: System updates only affected embeddings in both sparse and dense indexes
     """
-    config = {
-        "url": "http://localhost:6333",
-        "collection_name": f"test_incremental_{uuid4().hex[:8]}",
-    }
-    provider = QdrantVectorStore(config=config)
+    # Create unique collection
+    collection_name = qdrant_test_manager.create_collection_name("incremental")
+    await qdrant_test_manager.create_collection(collection_name, dense_vector_size=768)
+
+    config = QdrantConfig(url=qdrant_test_manager.url, collection_name=collection_name)
+    provider = QdrantVectorStoreProvider(config=config)
     await provider._initialize()
 
     file_path = Path("src/updated_file.py")
 
     # Initial indexing
-    chunk_v1 = CodeChunk(
-        chunk_id=uuid4(),
+    chunk_v1 = create_test_chunk_with_embeddings(
+        chunk_id=uuid7(),
         chunk_name=f"{file_path}:func_v1",
         file_path=file_path,
         language=Language.PYTHON,
         content="def func(): return 1",
-        embeddings={"dense": [0.1] * 768},
+        dense_embedding=[0.1] * 768,
         line_start=1,
         line_end=1,
     )
@@ -58,13 +59,13 @@ async def test_incremental_updates():
     # File updated: Delete old chunks, insert new chunks
     await provider.delete_by_file(file_path)
 
-    chunk_v2 = CodeChunk(
-        chunk_id=uuid4(),
+    chunk_v2 = create_test_chunk_with_embeddings(
+        chunk_id=uuid7(),
         chunk_name=f"{file_path}:func_v2",
         file_path=file_path,
         language=Language.PYTHON,
         content="def func(): return 2",
-        embeddings={"dense": [0.9] * 768},
+        dense_embedding=[0.9] * 768,
         line_start=1,
         line_end=1,
     )
@@ -72,15 +73,20 @@ async def test_incremental_updates():
     await provider.upsert([chunk_v2])
 
     # Verify: Old chunk gone, new chunk present
-    results = await provider.search(vector={"dense": [0.9] * 768})
+    from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
+
+    results = await provider.search(
+        StrategizedQuery(
+            query="def func(): return 2",
+            strategy=SearchStrategy.DENSE_ONLY,
+            dense=[0.9] * 768,
+            sparse=None,
+        )
+    )
     assert len(results) > 0, "Should find updated chunk"
     assert results[0].chunk.chunk_name == f"{file_path}:func_v2"
     assert "func_v1" not in [r.chunk.chunk_name for r in results]
 
-    # Cleanup
-    try:
-        await provider._client.delete_collection(collection_name=config["collection_name"])
-    except Exception:
-        pass
+    # Cleanup handled by test manager
 
     print("✅ Scenario 5 PASSED: Incremental updates work correctly")

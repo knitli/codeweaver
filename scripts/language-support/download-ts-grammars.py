@@ -120,10 +120,12 @@ class TreeSitterGrammarResult:
                 response = await client.get(self.url, headers=get_request_headers())
                 _ = response.raise_for_status()
                 response_data = response.json()
-                return response_data.get("content", "")
         except httpx.HTTPError as e:
             console.print(f"[red]Failed to fetch node types for {self.language.value}:[/red] {e}")
             return None
+
+        else:
+            return response_data.get("content", "")
 
     async def get_grammar_file(self) -> str:
         """Returns the grammar file content."""
@@ -150,11 +152,13 @@ class TreeSitterGrammarResult:
                         return content
                     else:
                         return decoded_content
-                return content
         except httpx.HTTPStatusError as e:
             raise GrammarRetrievalError(
                 f"Failed to retrieve grammar file from {self.url}: {e}"
             ) from e
+
+        else:
+            return content
 
     async def save(
         self, content: str | bytes | None = None, save_dir: Path = GRAMMAR_SAVE_DIR
@@ -508,7 +512,7 @@ class AstGrepSupportedLanguage(Enum):
         return self.value
 
     @classmethod
-    def from_str(cls, value: str) -> AstGrepSupportedLanguage:  # noqa: C901
+    def from_str(cls, value: str) -> AstGrepSupportedLanguage:
         """Returns the enum member from a string."""
         try:
             normalized_value = value.strip().replace("-", "_").lower()
@@ -535,6 +539,7 @@ class AstGrepSupportedLanguage(Enum):
                 # everything else
                 case _:
                     return cls.__members__[normalized_value.upper()]
+
         except KeyError as e:
             # __members__ raises KeyError on missing item
             raise ValueError(f"{value} is not a valid AstGrepSupportedLanguage.") from e
@@ -778,7 +783,7 @@ def normalize_grammars() -> None:
 
 
 @app.command(name="fetch", help="Fetch grammars from GitHub.")
-async def fetch_grammars(  # noqa: C901
+async def fetch_grammars(
     *,
     gh_username: Annotated[
         str | None,
@@ -890,7 +895,7 @@ async def fetch_grammars(  # noqa: C901
         if normalize:
             normalize_grammars()
         try:
-            grammars.serialize(save_dir=save_dir)  # pyright: ignore[reportOptionalMemberAccess]
+            grammars.serialize(save_dir=save_dir)
         except Exception as e:
             console.print(f"[red]Failed to serialize grammars:[/red] {e}")
         if grammars:

@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run -s
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["rignore", "cyclopts", "reuse"]
+# dependencies = ["rignore", "cyclopts", "pydantic-core", "reuse"]
 # ///
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
@@ -11,7 +11,6 @@
 # ruff: noqa: S603
 """Update licenses for files in the repository."""
 
-import json
 import shutil
 import subprocess
 import sys
@@ -25,6 +24,7 @@ from typing import Annotated, NamedTuple
 import rignore
 
 from cyclopts import App, Group, Parameter, validators
+from pydantic_core._pydantic_core import from_json
 
 
 BASE_PATH = Path(__file__).parent.parent.parent
@@ -81,8 +81,8 @@ BASE_CMD = [
     years(),
     "--copyright",
     "Knitli Inc. <knitli@knit.li>",
-    "--fallback-dot-license",
     "--merge-copyrights",
+    "--fallback-dot-license",
     "--skip-existing",
 ]
 REUSE_PATH = shutil.which("reuse")
@@ -105,6 +105,7 @@ NON_CODE_EXTS = {
     "cts",
     "fish",
     "gitattributes",
+    "gitconfig",
     "gitmodules",
     "html",
     "htmx",
@@ -221,7 +222,7 @@ def get_files_with_missing() -> list[Path] | None:
         result = subprocess.run(
             CHECK_CMD, capture_output=True, text=True
         )  # reuse returns a non-zero exit code if there are non-compliant files, so we don't use check=True
-        output = json.loads(result.stdout.strip("%\n "))
+        output = from_json.loads(result.stdout.strip("%\n "))
         missing_files: list[str] = []
         if (non_compliant_report := output.get("non_compliant", {})) and (
             missing_files := non_compliant_report.get("missing_copyright_info", [])
@@ -268,14 +269,46 @@ def process_contributors(contributors: list[str]) -> list[str]:
     return list(processed)
 
 
+@app.command(help="Use git user information to add license and contributors as a pre-commit hook.")
+def pre_commit() -> bool:
+    """Use git user information to add license and contributors as a pre-commit hook.
+
+    The equivalent bash command is:
+    ```bash
+    git diff --name-only --cached | xargs -I {} reuse annotate -c "$(git config --get user.name) <$(git config --get user.email)>" "{}"
+    ```
+    """
+    if not (git_path := shutil.which("git")):
+        print("Git is not installed or not found in PATH.")
+        return False
+    try:
+        if not (staged_files := get_staged_files()):
+            print("No staged files found.")
+            return True
+        user_name_result = subprocess.run(
+            [git_path, "config", "--get", "user.name"], capture_output=True, text=True, check=True
+        )
+        user_email_result = subprocess.run(
+            [git_path, "config", "--get", "user.email"], capture_output=True, text=True, check=True
+        )
+        contributor = f"{user_name_result.stdout.strip()} <{user_email_result.stdout.strip()}>"
+        cmds = [
+            [REUSE_PATH, "annotate", "--contributor", contributor, str(BASE_PATH / file)]
+            for file in staged_files
+        ]
+        with ThreadPoolExecutor() as executor:
+            _ = executor.map(subprocess.run, cmds)
+    except subprocess.CalledProcessError as e:
+        print(f"Error processing pre-commit hook: {e}")
+        return False
+    return True
+
+
 def get_contributor() -> str:
     """Get a contributor from the user."""
     # first check if we're in an interactive shell
     if not sys.stdin.isatty():
-        print(
-            "Not in an interactive shell. Please provide contributors via command line arguments."
-        )
-        sys.exit(1)
+        pre_commit()
     # if we are, prompt for the contributor
     if contributor := input(
         "What's your name and email? (e.g. 'Adam Poulemanos <adam@knit.li>' (the default)): "

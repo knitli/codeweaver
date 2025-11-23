@@ -2,11 +2,88 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-# pyright: reportUnsupportedDunderAll=none
 """Configuration module for CodeWeaver."""
 
 from importlib import import_module
 from types import MappingProxyType
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    # Import everything for IDE and type checker support
+    # These imports are never executed at runtime, only during type checking
+    from codeweaver.config.chunker import (
+        ChunkerSettings,
+        ChunkerSettingsDict,
+        CustomDelimiter,
+        CustomLanguage,
+    )
+    from codeweaver.config.indexer import IndexerSettings, IndexerSettingsDict, RignoreSettings
+    from codeweaver.config.logging import (
+        FilterID,
+        FiltersDict,
+        FormatterID,
+        FormattersDict,
+        HandlerID,
+        HandlersDict,
+        LoggerName,
+        LoggersDict,
+        LoggingConfigDict,
+        LoggingSettings,
+        SerializableLoggingFilter,
+    )
+    from codeweaver.config.mcp import (
+        CodeWeaverMCPConfig,
+        CodeWeaverMCPConfigDict,
+        MCPConfig,
+        MCPConfigDict,
+        StdioCodeWeaverConfig,
+        StdioCodeWeaverConfigDict,
+    )
+    from codeweaver.config.middleware import (
+        AVAILABLE_MIDDLEWARE,
+        ErrorHandlingMiddlewareSettings,
+        LoggingMiddlewareSettings,
+        MiddlewareOptions,
+        RateLimitingMiddlewareSettings,
+        RetryMiddlewareSettings,
+    )
+    from codeweaver.config.providers import (
+        AgentModelSettings,
+        AgentProviderSettings,
+        AWSProviderSettings,
+        AzureCohereProviderSettings,
+        AzureOpenAIProviderSettings,
+        ConnectionConfiguration,
+        ConnectionRateLimitConfig,
+        DataProviderSettings,
+        EmbeddingModelSettings,
+        EmbeddingProviderSettings,
+        FastembedGPUProviderSettings,
+        ModelString,
+        ProviderSettingsDict,
+        ProviderSettingsView,
+        ProviderSpecificSettings,
+        RerankingModelSettings,
+        RerankingProviderSettings,
+        SparseEmbeddingModelSettings,
+        VectorStoreProviderSettings,
+    )
+    from codeweaver.config.settings import (
+        CodeWeaverSettings,
+        CodeWeaverSettingsDict,
+        FastMcpServerSettings,
+        get_settings,
+        get_settings_map,
+        update_settings,
+    )
+    from codeweaver.config.telemetry import TelemetrySettings, get_telemetry_settings
+    from codeweaver.config.types import (
+        FastMcpHttpRunArgs,
+        FastMcpServerSettingsDict,
+        UvicornServerSettings,
+        UvicornServerSettingsDict,
+    )
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
@@ -19,9 +96,15 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ChunkerSettings": (__spec__.parent, "chunker"),
     "ChunkerSettingsDict": (__spec__.parent, "chunker"),
     "CodeWeaverSettings": (__spec__.parent, "settings"),
-    "CodeWeaverSettingsDict": (__spec__.parent, "settings"),
-    "ConnectionConfiguration": (__spec__.parent, "types"),
-    "ConnectionRateLimitConfig": (__spec__.parent, "types"),
+    "CodeWeaverMCPConfig": (__spec__.parent, "mcp"),
+    "CodeWeaverMCPConfigDict": (__spec__.parent, "mcp"),
+    "MCPConfig": (__spec__.parent, "mcp"),
+    "MCPConfigDict": (__spec__.parent, "mcp"),
+    "StdioCodeWeaverConfig": (__spec__.parent, "mcp"),
+    "StdioCodeWeaverConfigDict": (__spec__.parent, "mcp"),
+    "CodeWeaverSettingsDict": (__spec__.parent, "types"),
+    "ConnectionConfiguration": (__spec__.parent, "providers"),
+    "ConnectionRateLimitConfig": (__spec__.parent, "providers"),
     "CustomDelimiter": (__spec__.parent, "chunker"),
     "CustomLanguage": (__spec__.parent, "chunker"),
     "DataProviderSettings": (__spec__.parent, "providers"),
@@ -32,7 +115,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "FastMcpServerSettings": (__spec__.parent, "settings"),
     "FastMcpServerSettingsDict": (__spec__.parent, "types"),
     "FastembedGPUProviderSettings": (__spec__.parent, "providers"),
-    "FileFilterSettingsDict": (__spec__.parent, "types"),
+    "IndexerSettings": (__spec__.parent, "indexer"),
+    "IndexerSettingsDict": (__spec__.parent, "indexer"),
     "FilterID": (__spec__.parent, "logging"),
     "FiltersDict": (__spec__.parent, "logging"),
     "FormatterID": (__spec__.parent, "logging"),
@@ -53,11 +137,14 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "RerankingModelSettings": (__spec__.parent, "providers"),
     "RerankingProviderSettings": (__spec__.parent, "providers"),
     "RetryMiddlewareSettings": (__spec__.parent, "middleware"),
-    "RignoreSettings": (__spec__.parent, "types"),
+    "RignoreSettings": (__spec__.parent, "indexer"),
     "SerializableLoggingFilter": (__spec__.parent, "logging"),
+    "SparseEmbeddingModelSettings": (__spec__.parent, "providers"),
+    "TelemetrySettings": (__spec__.parent, "telemetry"),
+    "get_telemetry_settings": (__spec__.parent, "telemetry"),
     "UvicornServerSettings": (__spec__.parent, "types"),
     "UvicornServerSettingsDict": (__spec__.parent, "types"),
-    "default_config_file_locations": (__spec__.parent, "types"),
+    "VectorStoreProviderSettings": (__spec__.parent, "providers"),
     "get_settings": (__spec__.parent, "settings"),
     "get_settings_map": (__spec__.parent, "settings"),
     "update_settings": (__spec__.parent, "settings"),
@@ -90,6 +177,8 @@ __all__ = (
     "AzureOpenAIProviderSettings",
     "ChunkerSettings",
     "ChunkerSettingsDict",
+    "CodeWeaverMCPConfig",
+    "CodeWeaverMCPConfigDict",
     "CodeWeaverSettings",
     "CodeWeaverSettingsDict",
     "ConnectionConfiguration",
@@ -104,19 +193,21 @@ __all__ = (
     "FastMcpServerSettings",
     "FastMcpServerSettingsDict",
     "FastembedGPUProviderSettings",
-    "FileFilterSettings",
-    "FileFilterSettingsDict",
     "FilterID",
     "FiltersDict",
     "FormatterID",
     "FormattersDict",
     "HandlerID",
     "HandlersDict",
+    "IndexerSettings",
+    "IndexerSettingsDict",
     "LoggerName",
     "LoggersDict",
     "LoggingConfigDict",
     "LoggingMiddlewareSettings",
     "LoggingSettings",
+    "MCPConfig",
+    "MCPConfigDict",
     "MiddlewareOptions",
     "ModelString",
     "ProviderSettingsDict",
@@ -128,15 +219,20 @@ __all__ = (
     "RetryMiddlewareSettings",
     "RignoreSettings",
     "SerializableLoggingFilter",
+    "SparseEmbeddingModelSettings",
+    "StdioCodeWeaverConfig",
+    "StdioCodeWeaverConfigDict",
+    "TelemetrySettings",
     "UvicornServerSettings",
     "UvicornServerSettingsDict",
-    "default_config_file_locations",
+    "VectorStoreProviderSettings",
     "get_settings",
     "get_settings_map",
+    "get_telemetry_settings",
     "update_settings",
 )
 
 
 def __dir__() -> list[str]:
-    """List available attributes for the semantic package."""
+    """List available attributes for the config package."""
     return list(__all__)

@@ -54,7 +54,7 @@ class StatisticsMiddleware(Middleware):
         self,
         statistics: SessionStatistics | None = None,
         logger: logging.Logger | None = None,
-        log_level: int = logging.INFO,
+        log_level: int = logging.WARNING,
     ) -> None:
         """Initialize statistics middleware.
 
@@ -66,7 +66,7 @@ class StatisticsMiddleware(Middleware):
         self.statistics = statistics or get_session_statistics()
         self.timing_statistics = self.statistics.timing_statistics
         self.logger = logger or logging.getLogger(__name__)
-        self.log_level = log_level or logging.INFO
+        self.log_level = log_level or logging.WARNING
         self._we_are_not_none()
 
     def _stats_is_stats(self, statistics: Any) -> TypeIs[SessionStatistics]:
@@ -169,11 +169,12 @@ class StatisticsMiddleware(Middleware):
         except Exception:
             duration_ms = (time.perf_counter() - start_time) * 1000
             self.statistics.add_failed_request(request_id=request_id)
-            self.logger.exception(
+            self.logger.warning(
                 "Operation in %s failed after %.2fms",
                 operation_name,
                 duration_ms,
                 extra={"failed_operation": operation_name, "duration_ms": duration_ms},
+                exc_info=True,
             )
             raise
         else:

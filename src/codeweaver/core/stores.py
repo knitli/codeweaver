@@ -13,6 +13,7 @@ import sys
 
 from collections.abc import Callable, ItemsView, Iterator, KeysView, ValuesView
 from functools import cached_property
+from pathlib import Path
 from types import MappingProxyType
 from typing import (
     TYPE_CHECKING,
@@ -102,13 +103,14 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
     - T is the value type for all items in the store.
 
     The store protects data integrity by copying data on get, pushes removed items to a trash heap for
-    potential recovery, and can optionally limit the total size (default is 3MB).
+    potential recovery, and can optionally limit the total size (default is 3MB). Over its size limit, it will push the oldest items to the weak-ref trash heap.
 
     As an added bonus, the store itself is:
 
         1. Entirely serializable. You can save and load it as JSON. Weakrefs are *not serialized*.
         2. Supports complex data types. You can store any picklable Python object, including nested structures.
-        3. Has an API that mimics a standard Python dictionary, making it easy to use.
+        3. API that mimics a standard Python dictionary, making it easy to use.
+        4. Type-safe: Enforces that all values are of the specified type T.
 
     Example:
     ```python
@@ -116,6 +118,13 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
     store = UUIDStore[list[str]](value_type=list)
     store["item1"] = ["value1"]
     ```
+
+    We don't intend for SimpleTypedStore to be used directly; instead, use UUIDStore or BlakeStore.
+    UUIDStore maps UUID7 keys to values, while BlakeStore maps Blake3 hash keys to values. Architecturally, we use UUIDStore for general-purpose storage and BlakeStore for deduplication scenarios. The embedding classes use both store types -- the UUID store for keeping embedding results, and the blake store keeps hashes of embedding inputs (mapped to the UUID storage keys) to avoid redundant computations.
+
+    Two gotchas to be aware of:
+    1. The keys are blake3 or UUID7 *objects*, not strings. This makes them more versatile, but you may need to convert them to strings for certain uses. Use `key.hexdigest()` for BlakeHashKey and `str(key)` or `key.hex` for UUID7.
+    2. If you store mutable objects (like lists or dicts), modifying them after retrieval will not affect the stored version. This is by design to maintain data integrity. You need to explicitly set the modified object back into the store.
 
     Hey, it started simple!
     """
@@ -221,9 +230,9 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
             # does it have a constructor that returns itself?
             if callable(item) and item(item) is item:
                 return "constructor"
-        if hasattr(item, "__iter__") and callable(item):
+        if hasattr(item, "__iter__") and callable(type(item)):
             with contextlib.suppress(Exception):
-                if item(iter(item)):  # pyright: ignore[reportCallIssue, reportArgumentType]
+                if type(item)(iter(item)):  # type: ignore[call-arg]
                     return "iter"
         return None
 
@@ -238,8 +247,12 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
                 sample_item = self.value_type()
         if not sample_item:
             return lambda item: item  # no-op copy
-        if isinstance(sample_item, list | set | tuple):
-            return lambda item: item.copy()  # pyright: ignore[reportUnknownMemberType, reportUnknownLambdaType, reportAttributeAccessIssue]
+        # Tuples (including NamedTuples) are immutable, no copy needed
+        if isinstance(sample_item, tuple):
+            return lambda item: item
+        # Lists and sets have .copy() method
+        if isinstance(sample_item, list | set):
+            return lambda item: item.copy()
         if copy_strategy := self._trial_and_error_copy(sample_item):
             if copy_strategy == "deepcopy":
                 return copy.deepcopy
@@ -258,7 +271,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         # Try to recover from trash first, then return default
         return self.store.get(key, default) if self.recover(key) else default
 
-    def __iter__(self) -> Iterator[KeyT]:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def __iter__(self) -> Iterator[KeyT]:
         """Return an iterator over the keys in the store."""
         return iter(self.store)
 
@@ -320,7 +333,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         if not value:
             rand = os.urandom(16)
             value = rand
-        return cast(KeyT, self._keygen(value))  # pyright: ignore[reportCallIssue]
+        return cast(KeyT, self._keygen(value))
 
     def keys(self) -> KeysView[KeyT]:
         """Return the keys in the store."""
@@ -361,11 +374,11 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         """
         if not self._validate_value(value):
             raise TypeError(f"Invalid value: {value}")
-        key: UUID7 | None = to_uuid() if self.keygen == to_uuid else None  # pyright: ignore[reportAssignmentType]
+        key: UUID7 | None = to_uuid() if self.keygen == to_uuid else None
         if key:
             return self._check_and_set(cast(KeyT, key), value)
         if hash_value:
-            blake_key: BlakeHashKey = (  # pyright: ignore[reportRedeclaration]
+            blake_key: BlakeHashKey = (
                 get_blake_hash(hash_value)
                 if isinstance(hash_value, bytes)
                 else get_blake_hash(bytes(hash_value))
@@ -452,9 +465,45 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
 
         return {FilteredKey("store"): AnonymityConversion.COUNT}
 
+    def save(self, path: Path) -> None:
+        """Persist the store to disk at the specified path."""
+        from pydantic_core import to_json
+
+        _ = path.write_bytes(
+            to_json(self.model_dump_json(indent=2, exclude={"_trash_heap"}, round_trip=True))
+        )
+
+    @classmethod
+    def load(cls, path: Path) -> _SimpleTypedStore[KeyT, T]:
+        """Load the store from disk at the specified path."""
+        return cls.model_validate_json(path.read_bytes())
+
 
 class UUIDStore[T](_SimpleTypedStore[UUID7, T]):
-    """Typed store specialized for UUID keys."""
+    """Typed store specialized for UUID keys.
+
+    UUIDStore is designed to map UUID7 keys to values, making it suitable for general-purpose storage scenarios where unique identifiers are required. It leverages the uniqueness and temporal ordering of UUID7 to ensure that each entry in the store can be reliably identified and retrieved.
+
+    Example:
+    ```python
+    # Create a UUIDStore for storing integers
+    from codeweaver.core.stores import make_uuid_store
+
+    int_uuid_store = make_uuid_store[int](
+        value_type=int, size_limit=5 * 1024 * 1024
+    )  # 5 MB limit
+
+    # Add an integer to the store
+    uuid_key = int_uuid_store.add(42)
+    print(f"UUID Key: {uuid_key}")
+    # prints something like: '0690f9b6-c5e5-7534-8000-7b873c2eed02'
+
+    # Retrieve the integer from the store
+    retrieved_value = int_uuid_store.get(uuid_key)
+    print(f"Retrieved Value: {retrieved_value}")
+    # prints: '42'
+    ```
+    """
 
     def __init__(self, **kwargs: Any) -> None:
         """Initialize the UUIDStore with UUID key generation."""
@@ -463,7 +512,28 @@ class UUIDStore[T](_SimpleTypedStore[UUID7, T]):
 
 
 class BlakeStore[T](_SimpleTypedStore[BlakeHashKey, T]):
-    """Typed store specialized for Blake3-hash keys."""
+    """Typed store specialized for Blake3-hash keys.
+
+    Used primarily for deduplication scenarios. Note that BlakeStore does not maintain a trash heap, at least with how we use it internally. If you need one, it's still there -- just pass a weakref dict to the constructor during initialization (and in that case, don't use `make_blake_store`).
+
+    BlakeStore is designed to map Blake3 hash keys to values, making it ideal for scenarios where deduplication is essential. It leverages the efficiency of Blake3 hashing to ensure that identical inputs yield the same key, allowing for effective storage and retrieval of unique data entries.
+
+    Example:
+    ```python
+    # Create a BlakeStore for storing strings
+    from codeweaver.core.stores import make_blake_store
+
+    str_blake_store = make_blake_store[str](
+        value_type=str, size_limit=5 * 1024 * 1024
+    )  # 5 MB limit
+
+    # Add a string to the store
+    input_string = "Hello, CodeWeaver!"
+    blake_key = str_blake_store.add(input_string.encode("utf-8"))
+    print(f"Blake3 Key: {blake_key.hexdigest()}")
+    # prints: '9ef97bd4f3bfa743877f024bad519269ae6f9757a81540475781e6f79e895dff'
+    ```
+    """
 
     def __init__(self, **kwargs: Any) -> None:
         """Initialize the BlakeStore with Blake3 key generation."""

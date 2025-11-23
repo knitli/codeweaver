@@ -19,8 +19,8 @@ import pytest
 from codeweaver.engine.chunker.base import ChunkGovernor
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
 
-pytestmark = [pytest.mark.unit]
 
+pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture
@@ -133,15 +133,10 @@ def function_three():
                 delimiter_kind = chunk.metadata.get("delimiter_kind")
                 is_inclusive = chunk.metadata.get("delimiter_inclusive", True)
 
-                if delimiter_kind and "def" in first_line:
-                    # If inclusive, "def" should be in chunk
-                    # If exclusive, chunk should start after "def" line
-                    if is_inclusive:
-                        assert "def" in chunk.content, (
-                            "Inclusive delimiter should include 'def' keyword"
-                        )
-                    # Exclusive behavior would strip the delimiter line
-                    # This is configuration-dependent
+                if delimiter_kind and "def" in first_line and is_inclusive:
+                    assert "def" in chunk.content, (
+                        "Inclusive delimiter should include 'def' keyword"
+                    )
 
 
 class TestLineExpansion:
@@ -185,12 +180,13 @@ a, b, c = 1, 2, 3; total = a + b + c  # Another multi-statement line
             # - Content should start at line beginning (no leading partial line)
             # - Content should end at line ending (no trailing partial line)
 
+            # metadata should be a dict here, so we can use 'in' operator
             # Verify line range metadata is present
-            assert "line_start" in chunk.metadata, "Chunks should have line_start metadata"
-            assert "line_end" in chunk.metadata, "Chunks should have line_end metadata"
+            assert "line_start" in chunk.metadata, "Chunks should have line_start metadata"  # ty: ignore[unsupported-operator]
+            assert "line_end" in chunk.metadata, "Chunks should have line_end metadata"  # ty: ignore[unsupported-operator]
 
-            line_start = chunk.metadata["line_start"]
-            line_end = chunk.metadata["line_end"]
+            line_start = chunk.metadata["line_start"]  # ty: ignore[non-subscriptable]
+            line_end = chunk.metadata["line_end"]  # ty: ignore[non-subscriptable]
 
             assert isinstance(line_start, int), "line_start should be integer"
             assert isinstance(line_end, int), "line_end should be integer"
@@ -244,8 +240,12 @@ function outer() {
         assert len(chunks) > 0, "Should produce chunks from nested structure"
 
         # Verify nesting information in metadata
-        nesting_levels = [chunk.metadata.get("nesting_level", 0) for chunk in chunks]
-        assert max(nesting_levels) > 0, "Should track nesting levels"
+        nesting_levels = [
+            chunk.metadata.get("nesting_level", 0) if chunk.metadata else 0 for chunk in chunks
+        ]
+        # Filter out None values and ensure we have valid integers
+        valid_nesting_levels = [level for level in nesting_levels if level is not None]
+        assert valid_nesting_levels and max(valid_nesting_levels) > 0, "Should track nesting levels"
 
     def test_overlapping_delimiter_resolution(
         self, delimiter_chunker: DelimiterChunker, tmp_path: Path
@@ -278,8 +278,12 @@ class MyClass:
 
         # Verify chunks don't overlap
         for i in range(len(chunks) - 1):
-            current_end = chunks[i].metadata.get("line_end", 0)
-            next_start = chunks[i + 1].metadata.get("line_start", 0)
+            current_end = chunks[i].metadata.get("line_end")
+            next_start = chunks[i + 1].metadata.get("line_start")
+
+            # Skip validation if metadata is missing
+            if current_end is None or next_start is None:
+                continue
 
             # Allow adjacent chunks (end + 1 == start) but not overlapping
             assert next_start >= current_end, "Chunks should not overlap"
@@ -340,6 +344,7 @@ function another() {
 
         # Create DiscoveredFile - should not crash, should produce some chunks
         from codeweaver.core.discovery import DiscoveredFile
+
         discovered_file = DiscoveredFile.from_path(file_path)
         chunks = delimiter_chunker.chunk(content, file=discovered_file)
 

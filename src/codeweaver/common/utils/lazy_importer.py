@@ -5,7 +5,7 @@
 """
 Lazy import utilities for deferred module loading.
 
-This module provides a LazyImport class inspired by cyclopts' CommandSpec pattern,
+This module provides a LazyImport class inspired by cyclopts' [CommandSpec pattern](https://github.com/BrianPugh/cyclopts/blob/main/cyclopts/command_spec.py) (thanks Brian!),
 enabling true lazy loading where both module import AND attribute access are deferred
 until the imported object is actually used.
 
@@ -18,7 +18,15 @@ from __future__ import annotations
 
 import threading
 
-from typing import Any
+from typing import Any, cast
+
+from jsonpatch import MappingProxyType
+
+from codeweaver.exceptions import CodeWeaverError
+
+
+class LazyImportError(CodeWeaverError):
+    """Exception raised for errors during lazy import resolution."""
 
 
 class LazyImport[Import: Any]:
@@ -64,7 +72,29 @@ class LazyImport[Import: Any]:
         ...     encoder = _tiktoken.get_encoding("gpt2")  # tiktoken imports NOW
     """
 
-    __slots__ = ("_attrs", "_lock", "_module_name", "_resolved")  # type: ignore
+    __slots__ = ("_attrs", "_lock", "_module_name", "_parent", "_resolved")  # type: ignore
+
+    # Introspection attributes that should resolve the object immediately
+    # rather than creating a new LazyImport child
+    _INTROSPECTION_ATTRS = frozenset({
+        "__annotations__",
+        "__class__",
+        "__closure__",
+        "__code__",
+        "__defaults__",
+        "__dict__",
+        "__doc__",
+        "__func__",
+        "__globals__",
+        "__kwdefaults__",
+        "__module__",
+        "__name__",
+        "__qualname__",
+        "__self__",
+        "__signature__",
+        "__text_signature__",
+        "__wrapped__",
+    })
 
     def __init__(self, module_name: str, *attrs: str) -> None:
         """
@@ -83,6 +113,7 @@ class LazyImport[Import: Any]:
         object.__setattr__(self, "_module_name", module_name)
         object.__setattr__(self, "_attrs", attrs)
         object.__setattr__(self, "_resolved", None)
+        object.__setattr__(self, "_parent", None)
         object.__setattr__(self, "_lock", threading.Lock())
 
     def _resolve(self) -> Import:
@@ -141,7 +172,35 @@ class LazyImport[Import: Any]:
                 raise AttributeError(msg) from e
 
         object.__setattr__(self, "_resolved", result)
-        return result
+        self._resolve_parents(default_to=True)
+        return cast(Import, result)
+
+    def _mark_resolved(self) -> None:
+        """
+        Mark this LazyImport as resolved without actually resolving it.
+
+        This is used to mark parent LazyImports as resolved when their children
+        are resolved, since accessing any attribute of a module means the module
+        itself has been imported.
+
+        This method is called recursively up the parent chain to ensure all
+        ancestors are marked as resolved.
+        """
+        # Already resolved, nothing to do
+        if object.__getattribute__(self, "_resolved") is not None:
+            return
+
+        self._resolve_parents(default_to=True)
+
+    def _resolve_parents(self, *, default_to: bool) -> None:
+        # Only set default if not already resolved to avoid overwriting the actual resolved object
+        current = object.__getattribute__(self, "_resolved")
+        if current is None:
+            object.__setattr__(self, "_resolved", default_to)
+
+        parent = object.__getattribute__(self, "_parent")
+        if parent is not None:
+            parent._mark_resolved()
 
     def __getattr__(self, name: str) -> LazyImport[Import]:
         """
@@ -151,15 +210,40 @@ class LazyImport[Import: Any]:
         This allows you to write: lazy_import("pkg").module.Class
         without triggering any imports until the final usage.
 
+        Special handling for introspection attributes: These attributes
+        (like __signature__, __wrapped__, etc.) are accessed by inspection
+        tools like pydantic. For these, we resolve the object first and
+        then access the attribute on it, raising AttributeError if it
+        doesn't exist.
+
         Args:
             name: Attribute name to access
 
         Returns:
-            New LazyImport with extended attribute chain
+            New LazyImport with extended attribute chain, or the actual
+            attribute value for introspection attributes
+
+        Raises:
+            AttributeError: If accessing an introspection attribute that
+                doesn't exist on the resolved object
         """
+        # Special handling for introspection attributes
+        if name in self._INTROSPECTION_ATTRS:
+            try:
+                resolved = self._resolve()
+                return getattr(resolved, name)
+            except AttributeError as e:
+                raise AttributeError(
+                    f"Attribute {name!r} not found in resolved object {resolved!r}"
+                ) from e
+
+        # Normal attribute chaining
         module_name = object.__getattribute__(self, "_module_name")
         attrs = object.__getattribute__(self, "_attrs")
-        return LazyImport(module_name, *attrs, name)
+        child: LazyImport[Import] = LazyImport(module_name, *attrs, name)
+        # Set parent reference so child can mark parent as resolved
+        object.__setattr__(child, "_parent", self)
+        return child
 
     def __call__(self, *args: Any, **kwargs: Any) -> Import:
         """
@@ -213,7 +297,6 @@ class LazyImport[Import: Any]:
         """
         return dir(self._resolve())
 
-    @property
     def is_resolved(self) -> bool:
         """
         Check if this lazy import has been resolved yet.
@@ -223,19 +306,21 @@ class LazyImport[Import: Any]:
 
         Examples:
             >>> lazy = lazy_import("os")
-            >>> lazy.is_resolved
+            >>> lazy.is_resolved()
             False
             >>> _ = lazy.path  # Access attribute
-            >>> lazy.is_resolved
+            >>> lazy.is_resolved()
             False  # Still not resolved! Just chained
             >>> result = lazy.path.join("a", "b")  # Call method
-            >>> lazy.is_resolved
+            >>> lazy.is_resolved()
             True  # NOW it's resolved
         """
         return object.__getattribute__(self, "_resolved") is not None
 
 
-def lazy_import[Import: Any](module_name: str, *attrs: str) -> LazyImport[Import]:  # pyright: ignore[reportInvalidTypeVarUse] # being explicit about return type
+def lazy_import[Import: Any](
+    module_name: str, *attrs: str
+) -> LazyImport[Import]:  # being explicit about return type
     """
     Create a lazy import that defers module loading until actual use.
 
@@ -245,7 +330,7 @@ def lazy_import[Import: Any](module_name: str, *attrs: str) -> LazyImport[Import
     triggering any imports until the final usage point.
 
     Args:
-        module_name: Module to import (e.g., "codeweaver.config")
+        module_name: Module to import (e.g., "codeweaver.config.settings")
         *attrs: Optional attribute path to access (e.g., "get_settings")
 
     Returns:
@@ -259,18 +344,18 @@ def lazy_import[Import: Any](module_name: str, *attrs: str) -> LazyImport[Import
 
         Specific function import:
 
-        >>> get_settings = lazy_import("codeweaver.config", "get_settings")
+        >>> get_settings = lazy_import("codeweaver.config.settings", "get_settings")
         >>> settings = get_settings()  # Imports NOW
 
         Attribute chaining:
 
-        >>> Settings = lazy_import("codeweaver.config").CodeWeaverSettings
+        >>> Settings = lazy_import("codeweaver.config.settings").CodeWeaverSettings
         >>> config = Settings()  # Imports NOW
 
         Global-level usage (main use case):
 
         >>> # At module level - no imports happen
-        >>> _settings = lazy_import("codeweaver.config").get_settings()
+        >>> _settings = lazy_import("codeweaver.config.settings").get_settings()
         >>> _tiktoken_encoder = lazy_import("tiktoken").get_encoding
         >>>
         >>> # Later in code - imports happen when called
@@ -278,8 +363,95 @@ def lazy_import[Import: Any](module_name: str, *attrs: str) -> LazyImport[Import
         ...     settings = _settings  # No import yet - it's the result of get_settings()
         ...     encoder = _tiktoken_encoder("gpt2")  # tiktoken imports NOW
 
+        IDE Support - Using TYPE_CHECKING pattern:
+
+        For full IDE autocomplete and type checking support, combine lazy_import
+        with TYPE_CHECKING blocks. This gives you both lazy loading at runtime
+        AND proper type information for your IDE:
+
+        >>> from typing import TYPE_CHECKING
+        >>>
+        >>> if TYPE_CHECKING:
+        ...     # IDE sees this - real imports for type checking
+        ...     from codeweaver.config import CodeWeaverSettings
+        ...     from tiktoken import Encoding
+        ... else:
+        ...     # Runtime uses this - lazy imports
+        ...     CodeWeaverSettings = lazy_import("codeweaver.config", "CodeWeaverSettings")
+        ...     Encoding = lazy_import("tiktoken", "Encoding")
+        >>>
+        >>> # Now your IDE knows the types, but imports are still lazy at runtime!
+        >>> def my_function() -> None:
+        ...     config: CodeWeaverSettings = CodeWeaverSettings()  # IDE autocomplete works!
+        ...     # Import only happens here when CodeWeaverSettings() is called
+
+        This pattern is used in codeweaver.core, codeweaver.config, and
+        codeweaver.common __init__.py modules to provide excellent IDE support
+        while maintaining lazy loading benefits.
+
     """
     return LazyImport(module_name, *attrs)
 
 
-__all__ = ("LazyImport", "lazy_import")
+def create_lazy_getattr(
+    dynamic_imports: MappingProxyType[str, tuple[str, str]],
+    module_globals: dict[str, object],
+    module_name: str,
+) -> object:
+    """
+    Create a standardized __getattr__ function for package lazy imports.
+
+    This eliminates duplicating __getattr__ logic across every package __init__.py.
+    The function handles dynamic imports, caching, and proper error messages.
+
+    Args:
+        dynamic_imports: Mapping of {attribute_name: (parent_module, submodule_name)}
+        module_globals: The globals() dict from the calling module (for caching)
+        module_name: The __name__ of the calling module (for error messages)
+
+    Returns:
+        A configured __getattr__ function ready for use
+
+    Examples:
+        In your package/__init__.py:
+
+        >>> from types import MappingProxyType
+        >>> from codeweaver.common.utils import create_lazy_getattr
+        >>>
+        >>> _dynamic_imports = MappingProxyType({
+        ...     "MyClass": (__spec__.parent, "module"),
+        ...     "my_function": (__spec__.parent, "helpers"),
+        ... })
+        >>>
+        >>> __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
+
+        Now importing from your package works with lazy loading:
+
+        >>> from mypackage import MyClass  # Only imports when accessed
+    """
+
+    def __getattr__(name: str) -> object:  # noqa: N807
+        """Dynamically import submodules and classes for the package."""
+        if name in dynamic_imports:
+            parent_module, submodule_name = dynamic_imports[name]
+            module = __import__(f"{parent_module}.{submodule_name}", fromlist=[""])
+            result = getattr(module, name)
+            if isinstance(result, LazyImport):
+                result = result._resolve()  # Force resolution if it's a LazyImport
+            module_globals[name] = result  # Cache for future access
+            return result
+
+        # Check if already cached
+        if name in module_globals:
+            return module_globals[name]
+
+        raise AttributeError(f"module {module_name!r} has no attribute {name!r}")
+
+    __getattr__.__module__ = module_name
+    __getattr__.__doc__ = f"""
+    Dynamic __getattr__ for lazy imports in module {module_name!r}."""
+
+    return __getattr__
+
+
+__all__ = ("LazyImport", "create_lazy_getattr", "lazy_import")

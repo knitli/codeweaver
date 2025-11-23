@@ -1,8 +1,29 @@
 {
+  "yaml.schemas": {
+    "https://json.schemastore.org/sourcery.json": [
+      ".sourcery.yaml"
+    ]
+  },
+  "yaml.customTags": [
+    "!ENV scalar",
+    "!ENV sequence"
+  ],
+  "yaml.validate": true,
   "terminal.integrated.defaultProfile.linux": "zsh",
   "terminal.integrated.env.linux": {
     "ZDOTDIR": "${workspaceFolder}/.vscode/zsh",
     "CODEWEAVER_IN_VSCODE": "1"
   },
-  "python.terminal.activateEnvironment": false
+  "python.terminal.activateEnvironment": false,
+  "debug.javascript.defaultRuntimeExecutable": {
+    "pwa-node": "/home/knitli/.local/share/mise/shims/node"
+  },
+  "ruff.path": [
+    "/home/knitli/.local/share/mise/shims/ruff"
+  ],
+  "ruff.interpreter": [
+    "/home/knitli/.local/share/mise/shims/python"
+  ],
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv",
+  "shellcheck.executablePath": "/home/knitli/.local/share/mise/shims/shellcheck"
 }

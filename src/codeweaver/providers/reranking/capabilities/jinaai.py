@@ -8,29 +8,34 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
-from codeweaver.providers.provider import Provider
-from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+
+if TYPE_CHECKING:
+    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
 def get_jinaai_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
     """Get the JinaAI reranking model capabilities."""
+    from codeweaver.providers.provider import Provider
+    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+
     capabilities = {
-        "jinaai/jina-reranker-v2-base-multilingual": {
+        "jinaai/jina-reranking-v2-base-multilingual": {
             "provider": Provider.FASTEMBED,
             "max_input": 8192,
             "context_window": 8192,
             "max_query_length": 512,
             "tokenizer": "tokenizers",
-            "tokenizer_model": "jinaai/jina-reranker-v2-base-multilingual",
+            "tokenizer_model": "jinaai/jina-reranking-v2-base-multilingual",
             "supports_custom_prompt": False,
         },
-        "jinaai/jina-reranker-m0": {
+        "jinaai/jina-reranking-m0": {
             "provider": Provider.SENTENCE_TRANSFORMERS,
             "max_input": 10_240,
             "context_window": 10_240,
             "tokenizer": "tokenizers",
-            "tokenizer_model": "jinaai/jina-reranker-m0",
+            "tokenizer_model": "jinaai/jina-reranking-m0",
             "supports_custom_prompt": False,
         },
     }

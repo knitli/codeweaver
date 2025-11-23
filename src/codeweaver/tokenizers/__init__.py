@@ -4,9 +4,27 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Entry point for CodeWeaver's tokenizer system. Provides the `get_tokenizer` function to retrieve the appropriate tokenizer class based on the specified type and model."""
 
-from typing import Any, Literal
+from __future__ import annotations
 
-from codeweaver.tokenizers.base import Tokenizer
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any, Literal
+
+from codeweaver.common.utils import create_lazy_getattr
+
+
+if TYPE_CHECKING:
+    from codeweaver.tokenizers.base import Tokenizer
+    from codeweaver.tokenizers.tiktoken import TiktokenTokenizer
+    from codeweaver.tokenizers.tokenizers import Tokenizers
+
+
+_dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "Tokenizer": (__spec__.parent, "base"),
+    "TiktokenTokenizer": (__spec__.parent, "tiktoken"),
+    "Tokenizers": (__spec__.parent, "tokenizers"),
+})
+
+__getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 
 def get_tokenizer(tokenizer: Literal["tiktoken", "tokenizers"], model: str) -> Tokenizer[Any]:
@@ -33,4 +51,8 @@ def get_tokenizer(tokenizer: Literal["tiktoken", "tokenizers"], model: str) -> T
     raise ValueError(f"Unsupported tokenizer type: {tokenizer}")
 
 
-__all__ = ("get_tokenizer",)
+__all__ = ("TiktokenTokenizer", "Tokenizer", "Tokenizers", "get_tokenizer")
+
+
+def __dir__() -> list[str]:
+    return list(__all__)

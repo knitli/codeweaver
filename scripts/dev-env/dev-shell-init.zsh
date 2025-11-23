@@ -37,18 +37,11 @@ REPO_ROOT="${REPO_ROOT:-$PWD}"
 _cw_repo_venv_path="${REPO_ROOT}/.venv"
 _cw_venv_activate="${_cw_repo_venv_path}/bin/activate"
 
-if [[ -f "${_cw_venv_activate}" ]]; then
-  # Only activate if not already active or if a different venv is active
-  if [[ -z "${VIRTUAL_ENV:-}" || "${VIRTUAL_ENV}" != "${_cw_repo_venv_path}" ]]; then
-    # shellcheck disable=SC1090
-    source "${_cw_venv_activate}"
-  fi
-else
-  # Helpful hint if .venv is missing (non-fatal)
-  if [[ -z "${CODEWEAVER_SILENT_SHELL:-}" ]]; then
-    print -P "%F{yellow}[codeweaver]%f .venv not found at %F{cyan}${_cw_repo_venv_path}%f"
-    print -P "%F{yellow}[codeweaver]%f Create it with: %F{green}uv venv "$REPO_ROOT/.venv" && uv sync%f  (requires uv)"
-  fi
+
+# Helpful hint if .venv is missing (non-fatal)
+if [[ ! -f "${_cw_venv_activate}" && -z "${CODEWEAVER_SILENT_SHELL:-}" ]]; then
+  print -P "%F{yellow}[codeweaver]%f .venv not found at %F{cyan}${_cw_repo_venv_path}%f"
+  print -P "%F{yellow}[codeweaver]%f Create it with: %F{green}mise run venv "$REPO_ROOT/.venv" %f"
 fi
 
 # Source optional workspace extras if provided

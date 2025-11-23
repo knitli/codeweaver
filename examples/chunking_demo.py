@@ -39,12 +39,13 @@ def main() -> None:
     if not test_dir.exists():
         test_dir = Path(__file__).parent.parent / "tests/fixtures"
 
-    files = []
     skip_files = {"__init__.py", "malformed.py", "empty.py", "whitespace_only.py"}
-    for file_path in test_dir.glob("*.py"):
-        if file_path.name not in skip_files:
-            if discovered := DiscoveredFile.from_path(file_path):
-                files.append(discovered)
+    files = [
+        discovered_file
+        for file_path in test_dir.glob("*.py")
+        if (discovered_file := DiscoveredFile.from_path(file_path))
+        and discovered_file.path.name not in skip_files
+    ]
 
     print(f"  Found {len(files)} files to chunk")
     for file in files[:5]:  # Show first 5
@@ -57,7 +58,7 @@ def main() -> None:
     print("Step 2: Configuring chunking service...")
 
     # Create capabilities (required for ChunkGovernor)
-    capabilities = EmbeddingModelCapabilities(context_window=8192, embedding_dimensions=1536)
+    capabilities = EmbeddingModelCapabilities(context_window=8192, default_dimension=1536)
 
     # Create settings with parallel processing config
     settings = ChunkerSettings(
@@ -132,10 +133,9 @@ def main() -> None:
         enable_parallel=False,  # Disable parallel
     )
 
-    seq_total_chunks = 0
-    for file_path, chunks in service_sequential.chunk_files(files[:3]):  # Just 3 files
-        seq_total_chunks += len(chunks)
-
+    seq_total_chunks = sum(
+        len(chunks) for _file_path, chunks in service_sequential.chunk_files(files[:3])
+    )
     print(f"  Sequential: {seq_total_chunks} chunks from 3 files")
     print("  (Both methods produce identical results)")
     print()

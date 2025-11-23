@@ -29,6 +29,8 @@ from pydantic_ai.toolsets import (
     WrapperToolset,
 )
 
+from codeweaver.exceptions import ConfigurationError
+
 
 if TYPE_CHECKING:
     from codeweaver.providers.provider import Provider
@@ -128,8 +130,44 @@ def get_agent_model_provider(provider: Provider) -> type[AgentProvider[Any]]:  #
         from pydantic_ai.providers.cerebras import CerebrasProvider as CerebrasAgentProvider
 
         return CerebrasAgentProvider
-    # pragma: no cover
-    raise ValueError(f"Unknown provider: {provider}")
+
+    # Get list of supported agent providers dynamically
+    supported_providers = [
+        p.value
+        for p in [
+            Provider.OPENAI,
+            Provider.DEEPSEEK,
+            Provider.OPENROUTER,
+            Provider.VERCEL,
+            Provider.AZURE,
+            Provider.BEDROCK,
+            Provider.GOOGLE,
+            Provider.GROQ,
+            Provider.X_AI,
+            Provider.ANTHROPIC,
+            Provider.MISTRAL,
+            Provider.COHERE,
+            Provider.MOONSHOT,
+            Provider.FIREWORKS,
+            Provider.TOGETHER,
+            Provider.HEROKU,
+            Provider.HUGGINGFACE_INFERENCE,
+            Provider.GITHUB,
+            Provider.OLLAMA,
+            Provider.LITELLM,
+            Provider.CEREBRAS,
+        ]
+    ]
+
+    raise ConfigurationError(
+        f"Unknown agent provider: {provider}",
+        details={"provided_provider": str(provider), "supported_providers": supported_providers},
+        suggestions=[
+            "Check provider name spelling in configuration",
+            "Install required agent provider package",
+            "Review supported providers in documentation",
+        ],
+    )
 
 
 def infer_agent_provider_class(provider: str | Provider) -> type[AgentProvider[Provider]]:
@@ -137,7 +175,7 @@ def infer_agent_provider_class(provider: str | Provider) -> type[AgentProvider[P
     from codeweaver.providers.provider import Provider
 
     if not isinstance(provider, Provider):
-        provider = Provider.from_string(provider)  # pyright: ignore[reportAssignmentType]
+        provider = Provider.from_string(provider)
     provider_class: type[AgentProvider[Provider]] = get_agent_model_provider(provider)  # type: ignore
     return provider_class
 

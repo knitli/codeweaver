@@ -14,6 +14,7 @@ Scripts are organized into functional categories:
 
 ```
 scripts/
+├── build/                # package-building related scripts
 ├── code-quality/          # Code formatting, linting, and licensing
 ├── dev-env/              # Development environment setup
 ├── docs/                 # Documentation generation
@@ -37,6 +38,43 @@ These scripts are called by project tooling (pyproject.toml, mise.toml, hk.pkl, 
 | **[dev-env/install-mise.sh](#install-misesh)** | Install mise task runner | .github/workflows |
 
 ---
+
+## Build
+
+### generate-supported-languages.py
+
+**Location:** `scripts/build/generate-supported-languages.py`
+
+Generates the list of supported languages for the build system and documentation.
+
+**Usage:**
+```bash
+uv run scripts/build/generate-supported-languages.py
+```
+
+**Features:**
+- PEP 723 inline dependencies: `black`, `textcase`
+- Updates build configuration
+
+
+### use_latest.py
+
+**Location** `scripts/build/git-merge-latest-version.py`
+
+A git driver that selects the latest version when two version files conflict (like `src/codeweaver/_version.py`)
+
+**Usage:**
+
+Add to your git config:
+```bash
+chmod +x scripts/build/git-merge-latest-version.py &&
+git config merge.latest_version.driver "./scripts/build/git-merge-latest-version.py %O %A %B"
+```
+
+**Features:**
+- It decides which file has the newest version, which means you don't have to deal with version conflicts during a merge
+- That is all
+
 
 ## Code Quality
 
@@ -230,35 +268,6 @@ uv run scripts/language-support/get-langs.py [languages...]
 - Fetches from GitHub repositories
 - Updates tree-sitter grammar files
 
-### build-language-mappings.py
-
-**Location:** `scripts/language-support/build-language-mappings.py`
-
-Builds language mapping files from tree-sitter `node-types.json` files.
-
-**Usage:**
-```bash
-uv run -s scripts/language-support/build-language-mappings.py
-```
-
-**Features:**
-- PEP 723 inline dependencies: `pydantic`
-- Generates language-specific mappings
-
-### generate-supported-languages.py
-
-**Location:** `scripts/language-support/generate-supported-languages.py`
-
-Generates the list of supported languages for the build system and documentation.
-
-**Usage:**
-```bash
-uv run scripts/language-support/generate-supported-languages.py
-```
-
-**Features:**
-- PEP 723 inline dependencies: `black`, `textcase`
-- Updates build configuration
 
 ### analyze-grammar-structure.py
 
@@ -270,20 +279,6 @@ Analyzes grammar structure patterns across all supported languages.
 ```bash
 ./scripts/language-support/analyze-grammar-structure.py
 ```
-
-### generate-delimiters.py
-
-**Location:** `scripts/language-support/generate-delimiters.py`
-
-Generates language delimiter definitions from patterns.
-
-**Usage:**
-```bash
-uv run -s scripts/language-support/generate-delimiters.py
-```
-
-**Features:**
-- PEP 723 inline dependencies: `rich`
 
 ### compare-delimiters.py
 

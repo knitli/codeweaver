@@ -80,7 +80,6 @@ class SourceIdRegistry(UUIDStore[DiscoveredFile]):
         Returns:
             True if the file was in the registry, False otherwise
         """
-        # TODO: We need to send a signal to vector stores to remove associated vectors
         if isinstance(value, DiscoveredFile):
             file = next((k for k, v in self.store.items() if v == value), None)
             if file is None:

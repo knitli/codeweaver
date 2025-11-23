@@ -8,22 +8,25 @@ From quickstart.md:228-284
 Validates acceptance criteria spec.md:78
 """
 
-import tempfile
+import tempfile  # noqa: I001
 
 from pathlib import Path
-from uuid import uuid4
 
 import pytest
 
-from codeweaver.core.chunks import CodeChunk
+from codeweaver.common.utils.utils import uuid7
 from codeweaver.core.language import SemanticSearchLanguage as Language
-from codeweaver.providers.vector_stores.inmemory import MemoryVectorStore
+from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
+from codeweaver.config.providers import MemoryConfig
+
+# sourcery skip: dont-import-test-modules
+from tests.conftest import create_test_chunk_with_embeddings
+from codeweaver.providers.provider import Provider
+
+pytestmark = [pytest.mark.integration]
+
 
 pytestmark = pytest.mark.integration
-
-
-
-
 
 
 async def test_inmemory_persistence():
@@ -36,19 +39,23 @@ async def test_inmemory_persistence():
     """
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_path = Path(tmpdir) / "test_memory.json"
-        config = {"persist_path": temp_path, "auto_persist": True, "collection_name": "test_memory"}
+        config = MemoryConfig(
+            persist_path=temp_path, auto_persist=True, collection_name="test_memory"
+        )
 
         # Phase 1: Create and populate
-        provider1 = MemoryVectorStore(config=config)
+        provider1 = MemoryVectorStoreProvider(_provider=Provider.MEMORY, config=config)
         await provider1._initialize()
 
-        chunk = CodeChunk(
-            chunk_id=uuid4(),
+        # Get the actual dimension from the created collection
+        # Default voyage-3-lite has 1024 dimensions
+        chunk = create_test_chunk_with_embeddings(
+            chunk_id=uuid7(),
             chunk_name="memory_test.py:func",
             file_path=Path("memory_test.py"),
             language=Language.PYTHON,
             content="test function",
-            embeddings={"dense": [0.7, 0.7, 0.7] * 256},
+            dense_embedding=[0.7] * 1024,  # Match voyage-3-lite dimension
             line_start=1,
             line_end=5,
         )
@@ -62,11 +69,20 @@ async def test_inmemory_persistence():
         assert temp_path.exists(), "Persistence file should be created"
 
         # Phase 2: Restore from disk
-        provider2 = MemoryVectorStore(config=config)
+        provider2 = MemoryVectorStoreProvider(_provider=Provider.MEMORY, config=config)
         await provider2._initialize()
 
         # Verify: Chunk restored from disk
-        results = await provider2.search(vector={"dense": [0.7, 0.7, 0.7] * 256})
+        from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
+
+        results = await provider2.search(
+            StrategizedQuery(
+                query="test function",
+                strategy=SearchStrategy.DENSE_ONLY,
+                dense=[0.7] * 1024,  # Match voyage-3-lite dimension
+                sparse=None,
+            )
+        )
         assert len(results) > 0, "Should restore chunks from persistence file"
         assert results[0].chunk.chunk_name == "memory_test.py:func"
 

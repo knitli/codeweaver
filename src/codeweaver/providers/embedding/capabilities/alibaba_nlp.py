@@ -8,16 +8,20 @@ from __future__ import annotations
 
 from typing import Literal
 
-from codeweaver.providers.embedding.capabilities.base import (
-    EmbeddingCapabilities,
-    EmbeddingModelCapabilities,
+from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+from codeweaver.providers.embedding.capabilities.types import (
+    EmbeddingCapabilitiesDict,
     PartialCapabilities,
 )
 from codeweaver.providers.provider import Provider
 
 
 type AlibabaNlpProvider = Literal[
-    Provider.GROQ, Provider.HUGGINGFACE_INFERENCE, Provider.SENTENCE_TRANSFORMERS, Provider.TOGETHER
+    Provider.GROQ,
+    Provider.HUGGINGFACE_INFERENCE,
+    Provider.SENTENCE_TRANSFORMERS,
+    Provider.TOGETHER,
+    Provider.FASTEMBED,
 ]
 
 CAP_MAP: dict[
@@ -29,6 +33,7 @@ CAP_MAP: dict[
         Provider.HUGGINGFACE_INFERENCE,
         Provider.SENTENCE_TRANSFORMERS,
         Provider.TOGETHER,
+        Provider.FASTEMBED,
     ),
     "Alibaba-NLP/gte-multilingual-base": (Provider.SENTENCE_TRANSFORMERS,),
 }
@@ -107,11 +112,14 @@ ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (
 
 def get_alibaba_nlp_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
     """Get the capabilities for Alibaba-NLP embedding models."""
-    capabilities: list[EmbeddingCapabilities] = []
+    capabilities: list[EmbeddingCapabilitiesDict] = []
     for cap in ALL_CAPABILITIES:
+        model_name = cap["name"]
+        assert isinstance(model_name, str)  # noqa: S101
+        assert model_name in CAP_MAP, f"Invalid model name: {model_name}"  # noqa: S101
         capabilities.extend([
-            EmbeddingCapabilities({**cap, "provider": provider})  # pyright: ignore[reportArgumentType]
-            for provider in CAP_MAP[cap["name"]]  # pyright: ignore[reportArgumentType]
+            EmbeddingCapabilitiesDict({**cap, "provider": provider})  # type: ignore[missing-typeddict-key]
+            for provider in CAP_MAP[model_name]  # ty: ignore[invalid-argument-type]
         ])
     return tuple(EmbeddingModelCapabilities.model_validate(cap) for cap in capabilities)
 

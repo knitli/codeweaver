@@ -7,6 +7,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+
+TEST_FILE_PATTERNS = ["*.test.*", "*.spec.*", "test/**/*", "spec/**/*"]
+
+_tooling_dirs: set[Path] | None = None
+
 
 def truncate_text(text: str, max_length: int = 100, ellipsis: str = "...") -> str:
     """
@@ -25,4 +32,21 @@ def truncate_text(text: str, max_length: int = 100, ellipsis: str = "...") -> st
     return text[: max_length - len(ellipsis)] + ellipsis
 
 
-__all__ = ("truncate_text",)
+def get_tooling_dirs() -> set[Path]:
+    """Get common tooling directories within the project root."""
+
+    def _is_hidden_dir(path: Path) -> bool:
+        return bool(str(path).startswith(".") and "." not in str(path)[1:])
+
+    global _tooling_dirs
+    if _tooling_dirs is None:
+        from codeweaver.core.file_extensions import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
+
+        tooling_paths = {
+            path for tool in COMMON_TOOLING_PATHS for path in tool[1] if _is_hidden_dir(path)
+        } | {path for tool in COMMON_LLM_TOOLING_PATHS for path in tool[1] if _is_hidden_dir(path)}
+        _tooling_dirs = tooling_paths
+    return _tooling_dirs
+
+
+__all__ = ("TEST_FILE_PATTERNS", "get_tooling_dirs", "truncate_text")

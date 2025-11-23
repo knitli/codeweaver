@@ -10,6 +10,7 @@ from __future__ import annotations
 import inspect
 import logging
 import os
+import platform
 import sys
 
 from importlib import metadata, util
@@ -67,6 +68,25 @@ def is_debug() -> bool:
     return explicit_true or has_debugger or repo_heuristic
 
 
+def is_ci() -> bool:
+    """Check if the code is running in a Continuous Integration environment."""
+    ci_indicators = [
+        "APPVEYOR",
+        "BUILDKITE",
+        "BUILD_NUMBER",
+        "CI",
+        "CIRCLECI",
+        "CONTINUOUS_INTEGRATION",
+        "GITHUB_ACTIONS",
+        "GITLAB_CI",
+        "JENKINS_URL",
+        "RUN_ID",
+        "TF_BUILD",
+        "TRAVIS",
+    ]
+    return any(os.getenv(var) for var in ci_indicators)
+
+
 def file_is_binary(file_path: Path) -> bool:
     """Check if a file is binary by reading its initial bytes."""
     try:
@@ -86,17 +106,50 @@ def file_is_binary(file_path: Path) -> bool:
 
 def is_test_environment() -> bool:
     """Check if the code is running in a test environment."""
-    return "pytest" in sys.modules or any(
-        arg.startswith("-m") and "pytest" in arg for arg in sys.argv
+    pytest_loaded = "pytest" in sys.modules
+    pytest_flagged = any(arg.startswith("-m") and "pytest" in arg for arg in sys.argv)
+    test_mode_disabled = os.environ.get("CODEWEAVER_TEST_MODE", "0") not in {
+        "1",
+        "true",
+        "True",
+        "TRUE",
+    }
+    pytest_current_test = bool(os.environ.get("PYTEST_CURRENT_TEST"))
+
+    return pytest_loaded or (pytest_flagged and (test_mode_disabled or pytest_current_test))
+
+
+def is_wsl() -> bool:
+    """Check if the code is running inside Windows Subsystem for Linux (WSL)."""
+    if sys.platform != "linux":
+        return False
+    return (
+        "microsoft" in platform.uname().release.lower()
+        or "WSL" in platform.uname().version
+        or any(
+            v
+            for v in ("WSL_INTEROP", "WSL_DISTRO_NAME", "WSLENV", "WSL2_GUI_APPS_ENABLED")
+            if v in os.environ
+        )
     )
+
+
+def is_wsl_vscode() -> bool:
+    """Check if the code is running inside WSL with VSCode integration."""
+    from codeweaver.cli.utils import we_are_in_vscode
+
+    return is_wsl() and we_are_in_vscode()
 
 
 __all__ = (
     "file_is_binary",
     "has_package",
+    "is_ci",
     "is_class",
     "is_debug",
     "is_pydantic_basemodel",
     "is_test_environment",
     "is_typeadapter",
+    "is_wsl",
+    "is_wsl_vscode",
 )

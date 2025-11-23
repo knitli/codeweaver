@@ -29,13 +29,8 @@ from typing import (
 from ast_grep_py import SgNode
 from pydantic import UUID7, ConfigDict, Field, PositiveFloat, SkipValidation
 
-from codeweaver.common.utils import normalize_ext, uuid7
-from codeweaver.core.language import (
-    ConfigLanguage,
-    SemanticSearchLanguage,
-    has_semantic_extension,
-    is_semantic_config_ext,
-)
+from codeweaver.common.utils import uuid7
+from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage, has_semantic_extension
 from codeweaver.core.types.aliases import (
     FileExt,
     FileExtensionT,
@@ -70,8 +65,8 @@ class ChunkKind(BaseEnum):
     @classmethod
     def from_path(cls, path: Path, *, include_data: bool = False) -> ChunkKind | None:
         """Create a ChunkKind from a file path."""
-        from codeweaver.core.metadata import get_ext_lang_pair_for_file
-
+        # Note: get_ext_lang_pair_for_file is defined later in this module
+        # Using forward reference to avoid circular import
         if ext_lang_pair := get_ext_lang_pair_for_file(path, include_data=include_data):
             return cls.from_string(ext_lang_pair.category)
         return None
@@ -84,6 +79,20 @@ class ChunkSource(BaseEnum):
     FILE = "file"  # the whole file is the chunk
     SEMANTIC = "semantic"  # semantic chunking, e.g. from AST nodes
     EXTERNAL = "external"  # from internet or similar external sources, not from code files
+
+
+def _set_symbol(data: Any) -> str | None:
+    """Helper function to set the symbol field based on the primary_thing."""
+    from codeweaver.semantic.ast_grep import AstThing
+
+    if (
+        (thing := data.get("thing")) is not None
+        and isinstance(thing, AstThing)
+        and thing.symbol
+        and (0 < len(thing.symbol.strip()) < 20)
+    ):
+        return thing.symbol
+    return None
 
 
 class SemanticMetadata(BasedModel):
@@ -99,15 +108,9 @@ class SemanticMetadata(BasedModel):
     ]
     thing: Any = None  # AstThing[SgNode] | None - using Any to avoid forward reference issues
     positional_connections: Any = ()  # tuple[AstThing[SgNode], ...] - using Any to avoid forward reference issues
-    # TODO: Logic for symbol extraction from AST nodes
     symbol: Annotated[
         str | None,
-        Field(
-            description="""The symbol represented by the node""",
-            default_factory=lambda data: data["primary_thing"].name
-            if data.get("primary_thing")
-            else None,
-        ),
+        Field(description="""The symbol represented by the node""", default_factory=_set_symbol),
     ]
     thing_id: UUID7 = uuid7()
     parent_thing_id: UUID7 | None = None
@@ -167,7 +170,7 @@ class SemanticMetadata(BasedModel):
         from codeweaver.semantic.ast_grep import AstThing
 
         if isinstance(thing, SgNode):
-            thing = AstThing.from_sg_node(thing, language=language)  # pyright: ignore[reportUnknownVariableType]
+            thing = AstThing.from_sg_node(thing, language=language)
         # Use model_construct to bypass validation since AstThing may not be fully defined yet
         return cls.model_construct(
             language=language or thing.language or "",
@@ -408,33 +411,40 @@ class ExtLangPair(NamedTuple):
 
 
 def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
-    """Determine the ExtKind based on validated data (`Metadata` extraction)."""
-    if "file_path" in validated_data:
+    """Determine the ExtKind based on validated data. Validated data here is the partially validated data field dictionary for a CodeChunk during pydantic model validation (i.e. what a default_factory can optionally receive)."""
+    if "file_path" in validated_data and validated_data["file_path"] is not None:
         return ExtKind.from_file(validated_data["file_path"])
-    source = (
-        validated_data.get("source")
-        or validated_data.get("metadata", {}).get("source")
-        or ChunkSource.TEXT_BLOCK
-    )
+    if (
+        source := (
+            validated_data.get("source")
+            or validated_data.get("metadata", {}).get("source")
+            or ChunkSource.TEXT_BLOCK
+        )
+    ) and source == ChunkSource.EXTERNAL:
+        return None
+    if (
+        source
+        and source == ChunkSource.TEXT_BLOCK
+        and (not (language := validated_data.get("language")))
+    ):
+        return None
     meta = validated_data.get("metadata", validated_data.get("semantic_meta", {}))
     if "semantic_meta" in meta:
         meta = meta["semantic_meta"]
-    if not meta:
-        return None
     if (language := meta.get("language") or validated_data.get("language")) and isinstance(
         language, SemanticSearchLanguage
     ):
         if language == SemanticSearchLanguage.KOTLIN:
             return ExtKind.from_language(language, ChunkKind.CODE_OR_CONFIG)
         return (
-            ExtKind.from_language(language, source or ChunkKind.CODE)
+            ExtKind.from_language(language, ChunkKind.CODE)
             if language
             not in (
                 SemanticSearchLanguage.JSON,
                 SemanticSearchLanguage.YAML,
                 SemanticSearchLanguage.HCL,
             )
-            else ExtKind.from_language(language, source or ChunkKind.CONFIG)
+            else ExtKind.from_language(language, ChunkKind.CONFIG)
         )
 
     if language and isinstance(language, ConfigLanguage):
@@ -471,7 +481,14 @@ def get_semantic_or_config_lang(
 ) -> SemanticSearchLanguage | ConfigLanguage | None:
     """Get the `SemanticSearchLanguage` or `ConfigLanguage` for a given file path."""
     is_file = isinstance(test_info, Path)
-    file_path = test_info if is_file else None
+    # This is probably an unnecessary guard, but it was added while hunting a bug
+    file_path = (
+        test_info
+        if is_file
+        else Path(str(test_info))
+        if test_info and Path(str(test_info)).exists()
+        else None
+    )
     language_name = test_info if test_info and not is_file else None
     if language_name is not None:
         with contextlib.suppress(KeyError, ValueError, AttributeError):
@@ -506,7 +523,7 @@ def get_ext_lang_pair_for_file(
         return ExtLangPair(
             ext=FileExt(cast(LiteralStringT, file_path.suffix or file_path.name)),
             language=get_semantic_or_config_lang(in_tests.language) or in_tests.language,  # type: ignore
-        )  # pyright: ignore[reportArgumentType]
+        )
     if config_lang := ConfigLanguage.from_extension(file_path.suffix or file_path.name):
         return ExtLangPair(
             ext=FileExt(cast(LiteralStringT, file_path.suffix or file_path.name)),
@@ -638,7 +655,10 @@ class ExtKind(NamedTuple):
         """
         Create an ExtKind from a file path.
         """
-        filename = Path(file).name if isinstance(file, str) else file.name
+        from codeweaver.core.language import language_from_path
+
+        file = Path(file) if isinstance(file, str) else file
+        filename = file.name
         # The order we do this in is important:
         if semantic_config_file := next(
             (
@@ -650,27 +670,15 @@ class ExtKind(NamedTuple):
         ):
             return cls(language=semantic_config_file.language, kind=ChunkKind.CONFIG)
 
-        filename_parts = tuple(part for part in filename.split(".") if part)
-        extension = (
-            normalize_ext(filename_parts[-1]) if filename_parts else filename_parts[0].lower()
-        )
-
-        if (
-            semantic_config_language := has_semantic_extension(extension)
-        ) and is_semantic_config_ext(extension):
-            return cls(language=semantic_config_language, kind=ChunkKind.CONFIG)
-
-        if semantic_language := has_semantic_extension(extension):
-            return cls(language=semantic_language, kind=ChunkKind.CODE)
-
-        return next(
-            (
-                cls(language=extpair.language, kind=ChunkKind.from_string(extpair.category))  # pyright: ignore[reportArgumentType]
-                for extpair in get_ext_lang_pairs()
-                if extpair.is_same(filename)
-            ),
-            None,
-        )
+        if language := language_from_path(file):
+            if isinstance(language, ConfigLanguage):
+                return cls(
+                    language=language.as_semantic_search_language or language, kind=ChunkKind.CONFIG
+                )
+            if not isinstance(language, SemanticSearchLanguage):
+                return cls(language=language, kind=_categorize_language(language))
+            return cls(language=language, kind=ChunkKind.CODE)
+        return None
 
     def serialize_for_cli(self) -> dict[str, Any]:
         """Serialize the ExtKind for CLI output."""

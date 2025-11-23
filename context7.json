@@ -1,32 +1,38 @@
 {
   "$schema": "https://context7.com/schema/context7.json",
-  "projectTitle": "CodeWeaver",
-  "description": "CodeWeaver-MCP is the context layer for MCP. Developers can add data, providers, backends, services from anywhere and bring them together to deliver intelligent context for AI coding assistants.",
-  "folders": [
-    "docs",
-    "src",
-    "tests",
-    "examples",
-    "config"
+  "description": "CodeWeaver-MCP is the context layer for MCP. It provides a modular and extensible framework for curating context data from any source, and providing it to LLMs from plain language requests.",
+  "excludeFiles": [
+    "codeweaver.toml",
+    "mcp.json",
+    ".mcp.json"
   ],
   "excludeFolders": [
     "plans",
-    "scripts"
+    "scripts",
+    ".github",
+    "claudedocs",
+    "specs",
+    ".specify",
+    ".roo",
+    ".claude"
   ],
-  "excludeFiles": [
-    ".codeweaver.toml"
-  ],
-  "rules": [
-    "CodeWeaver uses a factory pattern with DI for sources, providers, backends, services, and an NLP and LLM driven intent layer that resolves LLM-user needs into actionable context.",
-    "All components are fully configurable with CodeWeaver's TOML config system, built on pydantic-settings.",
-    "You can add new sources, providers, backends, and services by creating new classes that implement the required interfaces.",
-    "CodeWeaver supports multiple LLMs and NLP models, allowing you to choose the best fit for your use case.",
-    "Focus on types. CodeWeaver has a strong type system that ensures all components are type-safe and can be easily extended."
+  "folders": [
+    "docs",
+    "src",
+    "tests"
   ],
   "previousVersions": [
     {
       "tag": "v1.2.1",
       "title": "version 1.2.1"
     }
+  ],
+  "projectTitle": "CodeWeaver",
+  "rules": [
+    "All components are fully configurable with CodeWeaver's TOML config system, built on pydantic-settings.",
+    "Config files can also be YAML or JSON, use environment variables, .env files, Azure/GCP/AWS secrets, and any combination of these.",
+    "You can add new sources, providers, backends, and services by creating new classes that implement the required interfaces.",
+    "CodeWeaver supports multiple LLMs and NLP models, allowing you to choose the best fit for your use case.",
+    "Focus on types. CodeWeaver has a strong type system that ensures all components are type-safe and can be easily extended."
   ]
 }

@@ -8,17 +8,22 @@ from __future__ import annotations
 
 import os
 
-from collections.abc import Mapping, Sequence
-from typing import Any, cast
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, cast
 
-from codeweaver.core.chunks import CodeChunk
+from pydantic import SkipValidation
+
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 from codeweaver.providers.provider import Provider
 
 
-def try_for_heroku_endpoint(kwargs: Mapping[str, Any]) -> str:
+if TYPE_CHECKING:
+    from codeweaver.core.chunks import CodeChunk
+
+
+def try_for_heroku_endpoint(kwargs: Any) -> str:
     """Try to identify the Heroku endpoint."""
     if kwargs.get("base_url"):
         return kwargs["base_url"]
@@ -48,7 +53,7 @@ def parse_endpoint(endpoint: str, region: str | None = None) -> str:
     return f"https://{endpoint}.{region}.inference.ai.azure.com"
 
 
-def try_for_azure_endpoint(kwargs: Mapping[str, Any]) -> str:
+def try_for_azure_endpoint(kwargs: Any) -> str:
     """Try to identify the Azure endpoint.
 
     Azure uses this format: `https://<endpoint>.<region_name>.inference.ai.azure.com`,
@@ -84,68 +89,124 @@ try:
 
 except ImportError as e:
     raise ConfigurationError(
-        'Please install the `cohere` package to use the Cohere provider, \nyou can use the `cohere` optional group — `pip install "codeweaver[provider-cohere]"`'
+        'Please install the `cohere` package to use the Cohere provider, \nyou can use the `cohere` optional group — `pip install "codeweaver[cohere]"`'
     ) from e
 
 
 class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
     """Cohere embedding provider."""
 
-    _client: CohereClient
+    client: SkipValidation[CohereClient]
     _provider = Provider.COHERE  # can also be Heroku or Azure, but default to Cohere
-    _caps: EmbeddingModelCapabilities
+    caps: EmbeddingModelCapabilities
 
     def __init__(
         self, caps: EmbeddingModelCapabilities, _client: CohereClient | None = None, **kwargs: Any
     ) -> None:
         """Initialize the Cohere embedding provider."""
-        self._caps = caps
-        self._provider = caps.provider or self._provider
-        kwargs = kwargs or {}
-        self.client_options = kwargs.get("client_options", {}) or kwargs
-        self.client_options["client_name"] = "codeweaver"
-        if not self.client_options.get("api_key"):
-            if self._provider == Provider.COHERE:
-                self.client_options["api_key"] = kwargs.get("api_key") or os.getenv(
-                    "COHERE_API_KEY"
-                )
-            elif self._provider == Provider.AZURE:
-                self.client_options["api_key"] = (
-                    kwargs.get("api_key")
-                    or os.getenv("AZURE_COHERE_API_KEY")
-                    or os.getenv("COHERE_API_KEY")
-                )
-            else:  # Heroku
-                self.client_options["api_key"] = (
-                    kwargs.get("api_key")
-                    or os.getenv("HEROKU_API_KEY")
-                    or os.getenv("INFERENCE_KEY")
-                    or os.getenv("COHERE_API_KEY")
-                )
-            if not self.client_options.get("api_key"):
-                raise ConfigurationError(
-                    "Cohere API key not found in client_options or COHERE_API_KEY environment variable."
-                )
-        self.client_options["base_url"] = self.client_options.get("base_url") or self.base_url
-        self.client_options["model"] = self.model_name or caps.name
-        self._client = _client or CohereClient(**self.client_options)
-        super().__init__(self._client, caps, **self.client_options)
+        # Store kwargs for _initialize to use
+        config_kwargs = kwargs or {}
+
+        # Initialize client if not provided
+        if _client is None:
+            # Extract client_options if explicitly provided, otherwise use only known client params
+            if "client_options" in config_kwargs:
+                client_options = config_kwargs["client_options"].copy()
+            else:
+                # Only extract known Cohere client options from kwargs
+                known_client_options = {
+                    "api_key",
+                    "base_url",
+                    "timeout",
+                    "max_retries",
+                    "httpx_client",
+                }
+                client_options = {
+                    k: v for k, v in config_kwargs.items() if k in known_client_options
+                }
+            client_options["client_name"] = "codeweaver"
+
+            # Determine provider to get correct API key
+            provider = caps.provider or Provider.COHERE
+
+            if not client_options.get("api_key") or not kwargs.get("api_key"):
+                if provider == Provider.COHERE:
+                    client_options["api_key"] = config_kwargs.get("api_key") or os.getenv(
+                        "COHERE_API_KEY"
+                    )
+                elif provider == Provider.AZURE:
+                    client_options["api_key"] = (
+                        config_kwargs.get("api_key")
+                        or os.getenv("AZURE_COHERE_API_KEY")
+                        or os.getenv("COHERE_API_KEY")
+                    )
+                else:  # Heroku
+                    client_options["api_key"] = (
+                        config_kwargs.get("api_key")
+                        or os.getenv("HEROKU_API_KEY")
+                        or os.getenv("INFERENCE_KEY")
+                        or os.getenv("COHERE_API_KEY")
+                    )
+                if not client_options.get("api_key"):
+                    raise ConfigurationError(
+                        "Cohere API key not found in client_options or COHERE_API_KEY environment variable."
+                    )
+
+            # Get base URL based on provider (can't use self.base_url yet)
+            base_urls = {
+                Provider.COHERE: "https://api.cohere.com",
+                Provider.AZURE: try_for_azure_endpoint(client_options),
+                Provider.HEROKU: try_for_heroku_endpoint(client_options),
+            }
+            client_options["base_url"] = client_options.get("base_url") or base_urls[provider]
+            # Store model separately - it's not a client option but an embed() parameter
+            model = caps.name
+
+            _client = CohereClient(**client_options)
+            # Store client_options for later use (will be set after super().__init__)
+            client_opts_to_store = client_options | {"model": model}
+        else:
+            # Client was provided - extract or use default client_options
+            client_opts_to_store = config_kwargs.get(
+                "client_options", {"model": caps.name, "client_name": "codeweaver"}
+            )
+
+        # Call super with correct signature (client, caps, kwargs as dict)
+        # This initializes the Pydantic model and sets up all the attributes
+        super().__init__(client=_client, caps=caps, kwargs=config_kwargs)
+
+        # Now set client_options after super().__init__()
+        self.client_options = client_opts_to_store
+
+    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
+        """Initialize the Cohere embedding provider.
+
+        Sets up provider-specific configuration after Pydantic initialization.
+        """
+        # Set _caps at the start
+        self.caps = caps
+        type(self)._provider = caps.provider or type(self)._provider
+
+        # Client options were already configured in __init__
+        # Base class already copied _doc_kwargs and _query_kwargs class variables
 
     @property
     def base_url(self) -> str:
         """Get the base URL for the current provider."""
-        return self._base_urls()[self._provider]
+        return self._base_urls()[type(self)._provider]
 
     def _base_urls(self) -> dict[Provider, str]:
         """Get the base URLs for each provider."""
+        # Access client_options through self if available, otherwise use empty dict
+        client_opts = getattr(self, "client_options", {}) or {}
         return {
             Provider.COHERE: "https://api.cohere.com",
-            Provider.AZURE: try_for_azure_endpoint(self.client_options),
-            Provider.HEROKU: try_for_heroku_endpoint(self.client_options),
+            Provider.AZURE: try_for_azure_endpoint(client_opts),
+            Provider.HEROKU: try_for_heroku_endpoint(client_opts),
         }
 
     async def _fetch_embeddings(
-        self, texts: list[str], *, is_query: bool, **kwargs: Mapping[str, Any]
+        self, texts: list[str], *, is_query: bool, **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         """Fetch embeddings from the Cohere API."""
         embed_kwargs = {
@@ -154,15 +215,14 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
             "input_type": "search_query" if is_query else "search_document",
         }
         if self.model_name.endswith("4.0") and not embed_kwargs.get("embedding_types"):
-            embed_kwargs["embedding_types"] = ["float"]  # pyright: ignore[reportArgumentType]
+            embed_kwargs["embedding_types"] = ["float"]
             attr = "float"
         else:
-            attr = self.client_options.get("output_dtype") or self._caps.default_dtype or "float"
-        response = await self._client.embed(
-            texts=texts,
-            model=self.client_options["model"],
-            **embed_kwargs,  # pyright: ignore[reportArgumentType]
-        )
+            attr = self.client_options.get("output_dtype") or self.caps.default_dtype or "float"
+
+        # Extract model from embed_kwargs to avoid passing it twice
+        model = embed_kwargs.pop("model", self.model_name)
+        response = await self.client.embed(texts=texts, model=model, **embed_kwargs)
         embed_obj = response.embeddings
         embeddings = getattr(embed_obj, attr, None)
         tokens = (
@@ -177,7 +237,7 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
         return embeddings or [[]]
 
     async def _embed_documents(
-        self, documents: Sequence[CodeChunk], **kwargs: Mapping[str, Any]
+        self, documents: Sequence[CodeChunk], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         """Embed a list of documents."""
         kwargs = (
@@ -191,7 +251,7 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
         )
 
     async def _embed_query(
-        self, query: Sequence[str], **kwargs: Mapping[str, Any]
+        self, query: Sequence[str], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         """Embed a query or list of queries."""
         kwargs = (

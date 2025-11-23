@@ -15,10 +15,12 @@ from pydantic_ai.models import (
     override_allow_model_requests,
 )
 from pydantic_ai.models import KnownModelName as KnownAgentModelName
+from pydantic_ai.models import Model as AgentModel
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
 
 
 __all__ = (
+    "AgentModel",
     "AgentModelSettings",
     "DownloadedItem",
     "KnownAgentModelName",

@@ -493,7 +493,7 @@ class Span:
 
 **Project-Specific Types**:
 ```python
-from codeweaver.core import BasedModel, BaseEnum, DataclassSerializationMixin
+from codeweaver.core.types import BasedModel, BaseEnum, DataclassSerializationMixin
 
 # Use BasedModel instead of BaseModel
 class MyModel(BasedModel): ...

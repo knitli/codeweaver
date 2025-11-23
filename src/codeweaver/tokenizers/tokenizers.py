@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Literal
 
 from typing_extensions import TypeIs
 
@@ -23,7 +23,9 @@ logger = logging.getLogger(__name__)
 try:
     from tokenizers import Tokenizer as TokenizersTokenizer
 except ImportError as e:
-    logger.exception("Failed to import 'tokenizers' package, you may need to install it.")
+    logger.warning(
+        "Failed to import 'tokenizers' package, you may need to install it.", exc_info=True
+    )
     raise ImportError(
         "The 'tokenizers' package is required for this module. Please install it with 'pip install tokenizers'."
     ) from e
@@ -43,34 +45,33 @@ class Tokenizers(Tokenizer[TokenizersTokenizer]):
 
     def __init__(self, encoder: str, **kwargs: dict[str, Any] | None) -> None:
         """Initialize tokenizers encoder."""
-        # pyright can't handle the dynamic import of tokenizers, even with `TypeIs`, so we use a few ignores here
-        self._encoder = TokenizersTokenizer.from_pretrained(encoder, **(kwargs or {}))  # pyright: ignore[reportArgumentType, reportUnknownMemberType]
-        if not _is_tokenizer(self._encoder):  # pyright: ignore[reportUnknownMemberType]
-            raise TypeError(f"Expected a Tokenizers instance, got {type(self._encoder)}")  # pyright: ignore[reportUnknownArgumentType, reportUnknownMemberType]
+        self._encoder = TokenizersTokenizer.from_pretrained(encoder, **(kwargs or {}))
+        if not _is_tokenizer(self._encoder):
+            raise TypeError(f"Expected a Tokenizers instance, got {type(self._encoder)}")
 
     def encode(self, text: str | bytes, **kwargs: Any) -> list[int]:
         """Encode text into a list of token IDs."""
-        return self._encoder.encode(self._to_string(text), **kwargs)  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
+        return self._encoder.encode(self._to_string(text), **kwargs)
 
     def encode_batch(self, texts: Sequence[str | bytes], **kwargs: Any) -> Sequence[Sequence[int]]:
         """Encode a batch of texts into a list of token ID lists."""
-        return self._encoder.encode_batch((self._to_string(txt) for txt in texts), **kwargs)  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
+        return [self._encoder.encode(self._to_string(txt), **kwargs) for txt in texts]
 
     def decode(self, tokens: Sequence[int], **kwargs: Any) -> str:
         """Decode a list of token IDs back into text."""
-        return self._encoder.decode(tokens, **kwargs)  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
+        return self._encoder.decode(tokens, **kwargs)
 
     def decode_batch(self, token_lists: Sequence[Sequence[int]], **kwargs: Any) -> Sequence[str]:
         """Decode a batch of token ID lists back into texts."""
-        return self._encoder.decode_batch(token_lists, **kwargs)  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
+        return self._encoder.decode_batch(token_lists, **kwargs)
 
     @staticmethod
-    def encoders() -> Sequence[str]:
+    def encoders() -> Sequence[Literal["BPE", "WordPiece", "WordLevel", "Unigram"]]:
         """List all available encoder names.
 
         The Tokenizers library can load any Hugging Face tokenizer, but they're all based on four models, so we return those.
         """
-        return ["BPE", "WordPiece", "WordLevel", "Unigram"]
+        return ("BPE", "WordPiece", "WordLevel", "Unigram")
 
 
 __all__ = ("Tokenizers",)

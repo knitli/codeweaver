@@ -12,15 +12,32 @@ architecture spec §9.3:
 - Edge case events: chunking_edge_case
 """
 
+from __future__ import annotations
+
 import logging
 
 from pathlib import Path
 from typing import Any
 
-from codeweaver.engine.chunker.base import Chunker
+from codeweaver.engine.chunker.delimiter import DelimiterChunker
+from codeweaver.engine.chunker.semantic import SemanticChunker
 
+
+type Chunker = SemanticChunker | DelimiterChunker
 
 logger = logging.getLogger(__name__)
+
+
+def get_name(chunker: Chunker) -> str:
+    """Get the name of the chunker type.
+
+    Args:
+        chunker: The chunker instance
+
+    Returns:
+        The name of the chunker type as a string
+    """
+    return "SEMANTIC" if isinstance(chunker, SemanticChunker) else "DELIMITER"
 
 
 def log_chunking_completed(
@@ -47,7 +64,7 @@ def log_chunking_completed(
     extra = {
         "event": "chunking_completed",
         "file_path": str(file_path),
-        "chunker_type": chunker_type.name,
+        "chunker_type": get_name(chunker_type),
         "chunk_count": chunk_count,
         "duration_ms": duration_ms,
         "file_size_bytes": file_size_bytes,
@@ -56,7 +73,7 @@ def log_chunking_completed(
     }
 
     if extra_context:
-        extra.update(extra_context)
+        extra |= extra_context
 
     logger.info("Chunking completed successfully", extra=extra)
 
@@ -83,14 +100,14 @@ def log_chunking_failed(
     extra = {
         "event": "chunking_failed",
         "file_path": str(file_path),
-        "chunker_type": chunker_type.name,
+        "chunker_type": get_name(chunker_type),
         "error_type": error_type,
         "error_message": error_message,
         "fallback_triggered": fallback_triggered,
     }
 
     if extra_context:
-        extra.update(extra_context)
+        extra |= extra_context
 
     logger.error("Chunking failed", extra=extra)
 
@@ -118,7 +135,7 @@ def log_chunking_edge_case(
     }
 
     if extra_context:
-        extra.update(extra_context)
+        extra |= extra_context
 
     logger.debug("Edge case handled during chunking", extra=extra)
 
@@ -143,13 +160,13 @@ def log_chunking_fallback(
     extra = {
         "event": "chunking_fallback",
         "file_path": str(file_path),
-        "from_chunker": from_chunker.name,
-        "to_chunker": to_chunker.name,
+        "from_chunker": get_name(from_chunker),
+        "to_chunker": get_name(to_chunker),
         "reason": reason,
     }
 
     if extra_context:
-        extra.update(extra_context)
+        extra |= extra_context
 
     logger.warning("Chunker fallback triggered", extra=extra)
 
@@ -174,14 +191,14 @@ def log_chunking_performance_warning(
     extra = {
         "event": "chunking_performance_warning",
         "file_path": str(file_path),
-        "chunker_type": chunker_type.name,
+        "chunker_type": get_name(chunker_type),
         "duration_ms": duration_ms,
         "threshold_ms": threshold_ms,
         "slowdown_factor": duration_ms / threshold_ms if threshold_ms > 0 else 0,
     }
 
     if extra_context:
-        extra.update(extra_context)
+        extra |= extra_context
 
     logger.warning("Chunking operation slower than expected", extra=extra)
 
@@ -215,7 +232,7 @@ def log_chunking_resource_limit(
     }
 
     if extra_context:
-        extra.update(extra_context)
+        extra |= extra_context
 
     logger.error("Resource limit exceeded during chunking", extra=extra)
 
@@ -247,6 +264,6 @@ def log_chunking_deduplication(
     }
 
     if extra_context:
-        extra.update(extra_context)
+        extra |= extra_context
 
     logger.debug("Chunk deduplication completed", extra=extra)

@@ -248,4 +248,4 @@ Non-blocking Questions:
 [rignore-github | official | main | 4] - https://github.com/patrick91/rignore/
 [rignore-pypi | official | 0.6.4 | 4] - https://pypi.org/project/rignore/
 [rust-ignore-crate | underlying | latest | 5] - Rust ignore crate documentation (referenced by rignore)
-[existing-filtering-py | codebase | current | 5] - /home/knitli/codeweaver-mcp/src/codeweaver/middleware/filtering.py
+[existing-filtering-py | codebase | current | 5] - /home/knitli/codeweaver/src/codeweaver/middleware/filtering.py

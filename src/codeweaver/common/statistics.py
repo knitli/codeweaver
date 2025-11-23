@@ -51,11 +51,14 @@ from codeweaver.common.types import (
 from codeweaver.common.utils import uuid7
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.metadata import ChunkKind, ExtKind
+from codeweaver.core.types.aliases import LanguageName, LanguageNameT
 from codeweaver.core.types.enum import AnonymityConversion, BaseEnum
 from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
 
 
 if TYPE_CHECKING:
+    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core.discovery import DiscoveredFile
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
 
@@ -63,90 +66,56 @@ if TYPE_CHECKING:
 class TimingStatistics(DataclassSerializationMixin):
     """By-operation timing statistics for CodeWeaver operations."""
 
-    on_call_tool_requests: Annotated[
-        dict[ToolOrPromptName, list[PositiveFloat]],
-        Field(
-            default_factory=dict,
-            description="""Time taken for on_call_tool requests in milliseconds.""",
-        ),
-    ]
-    on_read_resource_requests: Annotated[
-        dict[ResourceUri, list[PositiveFloat]],
-        Field(
-            default_factory=dict,
-            description="""Time taken for on_read_resource requests in milliseconds.""",
-        ),
-    ]
-    on_get_prompt_requests: Annotated[
-        dict[ToolOrPromptName, list[PositiveFloat]],
-        Field(
-            default_factory=dict,
-            description="""Time taken for on_get_prompt requests in milliseconds.""",
-        ),
-    ]
-    on_list_tools_requests: Annotated[
-        list[PositiveFloat],
-        Field(
-            default_factory=list,
-            description="""Time taken for on_list_tools requests in milliseconds.""",
-        ),
-    ]
-    on_list_resources_requests: Annotated[
-        list[PositiveFloat],
-        Field(
-            default_factory=list,
-            description="""Time taken for on_list_resources requests in milliseconds.""",
-        ),
-    ]
-    on_list_resource_templates_requests: Annotated[
-        list[PositiveFloat],
-        Field(
-            default_factory=list,
-            description="""Time taken for on_list_resource_templates requests in milliseconds.""",
-        ),
-    ]
-    on_list_prompts_requests: Annotated[
-        list[PositiveFloat],
-        Field(
-            default_factory=list,
-            description="""Time taken for on_list_prompts requests in milliseconds.""",
-        ),
-    ]
-    health_http: Annotated[
-        list[PositiveFloat],
-        Field(
-            default_factory=list,
-            description="""Time taken for health status http requests in milliseconds.""",
-        ),
-    ]
-    version_http: Annotated[
-        list[PositiveFloat],
-        Field(
-            default_factory=list,
-            description="""Time taken for version check http requests in milliseconds.""",
-        ),
-    ]
-    state_http: Annotated[
-        list[PositiveFloat],
-        Field(
-            default_factory=list,
-            description="""Time taken for state http requests in milliseconds.""",
-        ),
-    ]
-    statistics_http: Annotated[
-        list[PositiveFloat],
-        Field(
-            default_factory=list,
-            description="""Time taken for statistics http requests in milliseconds.""",
-        ),
-    ]
-    settings_http: Annotated[
-        list[PositiveFloat],
-        Field(
-            default_factory=list,
-            description="""Time taken for settings http requests in milliseconds.""",
-        ),
-    ]
+    on_call_tool_requests: dict[ToolOrPromptName, list[PositiveFloat]] = Field(
+        default_factory=dict,
+        description="""Time taken for on_call_tool requests in milliseconds.""",
+    )
+    on_read_resource_requests: dict[ResourceUri, list[PositiveFloat]] = Field(
+        default_factory=dict,
+        description="""Time taken for on_read_resource requests in milliseconds.""",
+    )
+    on_get_prompt_requests: dict[ToolOrPromptName, list[PositiveFloat]] = Field(
+        default_factory=dict,
+        description="""Time taken for on_get_prompt requests in milliseconds.""",
+    )
+    on_list_tools_requests: list[PositiveFloat] = Field(
+        default_factory=list,
+        description="""Time taken for on_list_tools requests in milliseconds.""",
+    )
+    on_list_resources_requests: list[PositiveFloat] = Field(
+        default_factory=list,
+        description="""Time taken for on_list_resources requests in milliseconds.""",
+    )
+    on_list_resource_templates_requests: list[PositiveFloat] = Field(
+        default_factory=list,
+        description="""Time taken for on_list_resource_templates requests in milliseconds.""",
+    )
+    on_list_prompts_requests: list[PositiveFloat] = Field(
+        default_factory=list,
+        description="""Time taken for on_list_prompts requests in milliseconds.""",
+    )
+    health_http: list[PositiveFloat] = Field(
+        default_factory=list,
+        description="""Time taken for health status http requests in milliseconds.""",
+    )
+    version_http: list[PositiveFloat] = Field(
+        default_factory=list,
+        description="""Time taken for version http requests in milliseconds.""",
+    )
+    state_http: list[PositiveFloat] = Field(
+        default_factory=list, description="""Time taken for state http requests in milliseconds."""
+    )
+    statistics_http: list[PositiveFloat] = Field(
+        default_factory=list,
+        description="""Time taken for statistics http requests in milliseconds.""",
+    )
+    settings_http: list[PositiveFloat] = Field(
+        default_factory=list,
+        description="""Time taken for settings http requests in milliseconds.""",
+    )
+    status_http: list[PositiveFloat] = Field(
+        default_factory=list, description="""Time taken for status http requests in milliseconds."""
+    )
 
     def _telemetry_keys(self) -> None:
         return None
@@ -359,14 +328,38 @@ class _LanguageStatistics(DataclassSerializationMixin):
     skipped: Annotated[
         NonNegativeInt, Field(description="""Number of files skipped for this language.""")
     ] = 0
-    unique_files: ClassVar[
-        Annotated[set[Path], Field(default_factory=set, init=False, repr=False, exclude=True)]
-    ] = set()
+    unique_files: ClassVar[Annotated[set[Path], Field(init=False, repr=False, exclude=True)]] = (
+        set()
+    )
+
+    # Chunk tracking fields
+    chunks_created: Annotated[
+        NonNegativeInt, Field(description="""Total number of chunks created for this language.""")
+    ] = 0
+    semantic_chunks: Annotated[
+        NonNegativeInt,
+        Field(description="""Number of semantic/AST-based chunks created for this language."""),
+    ] = 0
+    delimiter_chunks: Annotated[
+        NonNegativeInt,
+        Field(description="""Number of delimiter/text-block chunks created for this language."""),
+    ] = 0
+    file_chunks: Annotated[
+        NonNegativeInt,
+        Field(description="""Number of whole-file chunks created for this language."""),
+    ] = 0
+    chunk_sizes: list[int] = Field(
+        default_factory=list,
+        description="""List of chunk content sizes (character counts) for statistics.""",
+    )
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
-        return {FilteredKey("unique_files"): AnonymityConversion.FORBIDDEN}
+        return {
+            FilteredKey("unique_files"): AnonymityConversion.FORBIDDEN,
+            FilteredKey("chunk_sizes"): AnonymityConversion.DISTRIBUTION,
+        }
 
     @computed_field
     @property
@@ -379,6 +372,18 @@ class _LanguageStatistics(DataclassSerializationMixin):
     def total_operations(self) -> NonNegativeInt:
         """Get the total number of operations for this language."""
         return self.indexed + self.retrieved + self.processed + self.reindexed + self.skipped
+
+    @computed_field
+    @property
+    def avg_chunk_size(self) -> float:
+        """Get the average chunk size in characters."""
+        return statistics.mean(self.chunk_sizes) if self.chunk_sizes else 0.0
+
+    @computed_field
+    @property
+    def total_chunk_content_size(self) -> NonNegativeInt:
+        """Get the total size of all chunk content in characters."""
+        return sum(self.chunk_sizes)
 
     def add_operation(self, operation: OperationsKey, path: Path | None = None) -> None:
         """Add an operation count and optionally track the file."""
@@ -397,18 +402,45 @@ class _LanguageStatistics(DataclassSerializationMixin):
         if path and path.is_file() and operation != "skipped":
             self.unique_files.add(path)
 
+    def add_chunk(self, chunk: CodeChunk, operation: OperationsKey = "processed") -> None:  # type: ignore[name-defined]
+        """Track a chunk creation, including its source type and size.
+
+        Args:
+            chunk: The CodeChunk to track
+            operation: The operation type (usually "processed" for chunk creation)
+        """
+        from codeweaver.core.metadata import ChunkSource
+
+        # Track overall chunk count
+        self.chunks_created += 1
+
+        # Track by chunk source type
+        if chunk.source == ChunkSource.SEMANTIC:
+            self.semantic_chunks += 1
+        elif chunk.source == ChunkSource.FILE:
+            self.file_chunks += 1
+        else:  # TEXT_BLOCK or other delimiter-based
+            self.delimiter_chunks += 1
+
+        # Track chunk size
+        self.chunk_sizes.append(len(chunk.content))
+
+        # Also track the file-level operation if path is available
+        if chunk.file_path:
+            self.add_operation(operation, chunk.file_path)
+
 
 LanguageSummary = dict[OperationsKey | SummaryKey, NonNegativeInt]
 
 
 @cache
-def normalize_language(language: str) -> str | SemanticSearchLanguage | ConfigLanguage:
+def normalize_language(language: str) -> LanguageNameT | SemanticSearchLanguage | ConfigLanguage:
     """Normalize a language string to a SemanticSearchLanguage or ConfigLanguage."""
     if language in SemanticSearchLanguage.values():
         return SemanticSearchLanguage.from_string(language)
     if language in ConfigLanguage.values():
         return ConfigLanguage.from_string(language)
-    return language
+    return LanguageName(language)
 
 
 @dataclass(config=DATACLASS_CONFIG | ConfigDict(extra="forbid", defer_build=True))
@@ -433,7 +465,7 @@ class _CategoryStatistics(DataclassSerializationMixin):
         return None
 
     def get_language_stats(
-        self, language: str | SemanticSearchLanguage | ConfigLanguage
+        self, language: LanguageNameT | SemanticSearchLanguage | ConfigLanguage
     ) -> _LanguageStatistics:
         """Get or create language statistics for this category."""
         if isinstance(language, str) and not isinstance(
@@ -534,7 +566,7 @@ class _CategoryStatistics(DataclassSerializationMixin):
 
     def add_operation(
         self,
-        language: str | SemanticSearchLanguage | ConfigLanguage,
+        language: LanguageNameT | SemanticSearchLanguage | ConfigLanguage,
         operation: OperationsKey,
         path: Path | None = None,
     ) -> None:
@@ -564,12 +596,12 @@ class FileStatistics(DataclassSerializationMixin):
         }
     )
 
-    _other_files: ClassVar[
-        Annotated[set[Path], Field(default_factory=set, init=False, repr=False, exclude=True)]
-    ] = set()
+    _other_files: ClassVar[Annotated[set[Path], Field(init=False, repr=False, exclude=True)]] = (
+        set()
+    )
 
-    def _telemetry_keys(self):
-        from codeweaver.core import AnonymityConversion, FilteredKey
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
 
         return {FilteredKey("_other_files"): AnonymityConversion.COUNT}
 
@@ -589,9 +621,82 @@ class FileStatistics(DataclassSerializationMixin):
             language_name = f".{path.stem}" if "." in path.name else path.name
             self.categories[ChunkKind.OTHER].add_operation(language_name, operation, path)
 
+    def add_file_from_discovered(
+        self,
+        discovered_file: DiscoveredFile,  # type: ignore[name-defined]
+        operation: OperationsKey,
+    ) -> None:
+        """Add a file operation using a DiscoveredFile (more efficient).
+
+        This method is more efficient than add_file() when you already have a
+        DiscoveredFile object, as it avoids redundant ExtKind.from_file() calls.
+
+        Args:
+            discovered_file: DiscoveredFile with pre-computed ext_kind
+            operation: Type of operation performed (indexed, retrieved, etc.)
+        """
+        # Skip non-text files
+        if not discovered_file.is_text:
+            return
+
+        # Use the already-computed ext_kind from DiscoveredFile
+        if ext_kind := discovered_file.ext_kind:
+            category = ext_kind.kind
+            language = ext_kind.language
+            self.categories[category].add_operation(language, operation, discovered_file.path)
+        elif self._other_files and discovered_file.path in self._other_files:
+            # Handle explicitly added "other" files
+            language_name = (
+                f".{discovered_file.path.stem}"
+                if "." in discovered_file.path.name
+                else discovered_file.path.name
+            )
+            self.categories[ChunkKind.OTHER].add_operation(
+                language_name, operation, discovered_file.path
+            )
+
+    @computed_field
+    @property
+    def file_count_by_category(self) -> dict[ChunkKind, NonNegativeInt]:
+        """Get the file count by category."""
+        return {category: cat_stats.unique_count for category, cat_stats in self.categories.items()}
+
+    @computed_field
+    @property
+    def total_file_count(self) -> NonNegativeInt:
+        """Get the total file count across all categories."""
+        return sum(self.file_count_by_category.values())
+
+    def add_chunk_from_codechunk(
+        self,
+        chunk: CodeChunk,  # type: ignore[name-defined]
+        operation: OperationsKey = "processed",
+    ) -> None:
+        """Add chunk statistics using a CodeChunk object (efficient).
+
+        This method tracks chunk creation statistics including chunk type
+        (semantic vs delimiter), size, and language. It uses pre-computed
+        information from the CodeChunk to avoid redundant operations.
+
+        Args:
+            chunk: CodeChunk with pre-computed ext_kind and metadata
+            operation: Type of operation performed (usually "processed" for chunks)
+        """
+        # Skip chunks without language/category information
+        if not chunk.ext_kind:
+            return
+
+        category = chunk.ext_kind.kind
+        language = chunk.ext_kind.language
+
+        # Get or create language stats for this category
+        lang_stats = self.categories[category].get_language_stats(language)
+
+        # Track the chunk
+        lang_stats.add_chunk(chunk, operation)
+
     def add_other_files(self, *files: Path) -> None:
         """Add files to the 'other' category."""
-        # TODO: We'd ideally want to make sure these are pushed to the indexer, unless we receive these in the same action
         self._other_files.update(files)
 
     @property
@@ -666,6 +771,8 @@ class TokenCategory(BaseEnum):
 
     EMBEDDING = "embedding"
     """Tokens generated for storing/using in embedding operations. Includes query tokens."""
+    SPARSE_EMBEDDING = "sparse_embedding"
+    """Tokens generated for storing/using in sparse embedding operations."""
     RERANKING = "reranking"
     """Embeddings generated for reranking search results."""
 
@@ -730,6 +837,7 @@ class TokenCounter(Counter[TokenCategory]):
         self.update({
             TokenCategory.EMBEDDING: 0,
             TokenCategory.RERANKING: 0,
+            TokenCategory.SPARSE_EMBEDDING: 0,
             TokenCategory.CONTEXT_AGENT: 0,
             TokenCategory.USER_AGENT: 0,
             TokenCategory.SEARCH_RESULTS: 0,
@@ -739,19 +847,23 @@ class TokenCounter(Counter[TokenCategory]):
     @property
     def total_generated(self) -> NonNegativeInt:
         """Get the total number of tokens generated across all operations."""
-        return sum((self[TokenCategory.EMBEDDING], self[TokenCategory.RERANKING]))
+        return sum((
+            self[TokenCategory.EMBEDDING],
+            self[TokenCategory.RERANKING],
+            self[TokenCategory.SPARSE_EMBEDDING],
+        ))
 
     @computed_field
     @property
     def total_used(self) -> NonNegativeInt:
-        """Get the total number of tokens used across all operations."""
+        """Get the total number of tokens used across all operations as a current snapshot."""
         return sum((self[TokenCategory.CONTEXT_AGENT], self[TokenCategory.USER_AGENT]))
 
     @computed_field
     @property
     def context_saved(self) -> NonNegativeInt:
         """
-        Get the total number of tokens that CodeWeaver saved from the user_agent.
+        Get the total number of tokens that CodeWeaver saved from the user_agent as a current snapshot.
 
         !!! note
             The number returned by `context_saved` is a low estimate of the actual number of tokens saved.
@@ -771,18 +883,18 @@ class TokenCounter(Counter[TokenCategory]):
     @property
     def money_saved(self) -> float:
         """
-        Estimate the money saved by using CodeWeaver based on token savings.
+        Estimate the money saved by using CodeWeaver based on token savings as a current snapshot.
 
-        This is a work in progress, and currently uses a simple heuristic to approximate savings.  Longter term we'd like to make it more accurate by pulling actual prices for models used, and ideally getting actual token counts from the user's agent (with their permission of course).
+        This is a work in progress, and currently uses a simple heuristic to approximate savings.  We'd eventually like to make it more accurate by pulling actual prices for models used, and ideally getting actual token counts from the user's agent (with their permission of course).
 
 
         For now we're using simple 'back-of-the-envelope' calculations. We assume:
-        - The average cost per 1,000 tokens for embedding models is $0.00018 (Voyage AI as of September 2025)
-        - The average cost per 1,000 tokens for reranking models is $0.00005 (Voyage AI as of September 2025)
+        - The average cost per 1,000 tokens for embedding models is $0.00018 (Voyage AI as of October 2025)
+        - The average cost per 1,000 tokens for reranking models is $0.00005 (Voyage AI as of October 2025)
         - Sparse models we consider `free` for this calculation, as compared to everything else, the costs to run them are miniscule.
         - CodeWeaver itself doesn't have control over what model is used for the context agent, but CodeWeaver does *recommend* models to the user's client. We choose light-weight, low-cost models because we don't need frontline models for the context agent to do its job well, and we want it to be fast.
-            - Assuming the user's client chooses to listen to our recommendation (a big assumption), we assume the selected model is GPT-5-mini. As of September 2025, GPT-5-mini is priced at $0.25/million tokens, or $0.00025/1,000 tokens for input, and $2/M tokens for output, or $0.002/1,000 tokens.
-        - We assume the user's agent is using a frontline model. As of September 2025, by far the most used model for coding is Anthropic's Claude 4 Sonnet. The costs for Sonnet are complex because they vary heavily based on context length and caching (for example, if the message is over 200,000 tokens, output cost jumps from $15/M to $22.5/M tokens).
+            - Assuming the user's client chooses to listen to our recommendation (a big assumption), we assume the selected model is Claude-Haiku-4.5. As of October 2025, Claude-Haiku-4.5 is priced at $0.25/million tokens, or $0.00025/1,000 tokens for input, and $2/M tokens for output, or $0.002/1,000 tokens.
+        - We assume the user's agent is using a frontline model. As of October 2025, by far the most used model for coding is Anthropic's Claude 4.5 Sonnet. The costs for Sonnet are complex because they vary heavily based on context length and caching (for example, if the message is over 200,000 tokens, output cost jumps from $15/M to $22.5/M tokens).
             - We assume the lower end of the pricing, which is $3/M input and $15/M output. Which is $0.003/1,000 tokens for input and $0.015/1,000 tokens for output.
             - Generally, about 80% of token use is for input, and 20% is for output, so we use that ratio to calculate an average cost per 1,000 tokens.
             - Any "savings" are calculated against this assumed cost.
@@ -790,7 +902,7 @@ class TokenCounter(Counter[TokenCategory]):
         """
         embedding_cost_per_1k = 0.00018
         reranking_cost_per_1k = 0.00005
-        _sparse_cost_per_1k = 0.0  # we don't track sparse token use because it's effectively free but it's here for clarity
+        _sparse_cost_per_1k = 0.0  # we don't track sparse token use because costs are negligible compared to everything else
         context_agent_cost_per_1k = 0.00025
         user_agent_cost_per_1k = (0.8 * 0.003) + (0.2 * 0.015)
 
@@ -833,6 +945,30 @@ class Identifier(NamedTuple):
         return datetime.fromtimestamp(self.timestamp / 1_000, tz=UTC)
 
 
+@dataclass(config=DATACLASS_CONFIG | ConfigDict(extra="forbid", defer_build=True))
+class FailoverStats(DataclassSerializationMixin):
+    """Statistics tracking for vector store failover operations."""
+
+    failover_active: bool = False
+    failover_count: int = 0
+    total_failover_time_seconds: float = 0.0
+    last_failover_time: str | None = None
+    backup_syncs_completed: int = 0
+    sync_back_operations: int = 0
+    chunks_synced_back: int = 0
+    active_store_type: str | None = None
+    primary_circuit_breaker_state: str | None = None
+    backup_file_exists: bool = False
+    backup_file_size_bytes: int = 0
+    chunks_in_failover: int = 0
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        """Define telemetry anonymization for failover statistics."""
+        # Most failover stats are safe to send as-is (counts, states)
+        # No identifying information in failover statistics
+        return {}
+
+
 @dataclass(kw_only=True, config=DATACLASS_CONFIG | ConfigDict(defer_build=True))
 class SessionStatistics(DataclassSerializationMixin):
     """Statistics for tracking session performance and usage."""
@@ -860,6 +996,13 @@ class SessionStatistics(DataclassSerializationMixin):
         Field(
             default=None,
             description="""Semantic category usage metrics. Uses UsageMetrics from semantic.classifications.""",
+        ),
+    ]
+    failover_statistics: Annotated[
+        FailoverStats | None,
+        Field(
+            default_factory=FailoverStats,
+            description="""Vector store failover statistics tracking backup operations and status.""",
         ),
     ]
 
@@ -893,6 +1036,8 @@ class SessionStatistics(DataclassSerializationMixin):
             except ImportError:
                 # If semantic module not available, leave as None
                 self.semantic_statistics = None
+        if not self.failover_statistics:
+            self.failover_statistics = FailoverStats()
         self.timing_statistics = TimingStatistics(
             on_call_tool_requests={},
             on_read_resource_requests={},
@@ -906,6 +1051,7 @@ class SessionStatistics(DataclassSerializationMixin):
             state_http=[],
             settings_http=[],
             statistics_http=[],
+            status_http=[],
         )
         for attr in (
             "_successful_http_request_log",
@@ -986,6 +1132,7 @@ class SessionStatistics(DataclassSerializationMixin):
             state_http=[],
             settings_http=[],
             statistics_http=[],
+            status_http=[],
         )
         return self.timing_statistics.timing_summary
 
@@ -1065,6 +1212,7 @@ class SessionStatistics(DataclassSerializationMixin):
         self,
         *,
         embedding_generated: NonNegativeInt = 0,
+        sparse_embedding_generated: NonNegativeInt = 0,
         reranking_generated: NonNegativeInt = 0,
         context_agent_used: NonNegativeInt = 0,
         user_agent_received: NonNegativeInt = 0,
@@ -1077,6 +1225,7 @@ class SessionStatistics(DataclassSerializationMixin):
 
         self.token_statistics[TokenCategory.EMBEDDING] += embedding_generated
         self.token_statistics[TokenCategory.RERANKING] += reranking_generated
+        self.token_statistics[TokenCategory.SPARSE_EMBEDDING] += sparse_embedding_generated
         self.token_statistics[TokenCategory.CONTEXT_AGENT] += context_agent_used
         self.token_statistics[TokenCategory.USER_AGENT] += user_agent_received
         self.token_statistics[TokenCategory.SEARCH_RESULTS] += search_results
@@ -1091,6 +1240,42 @@ class SessionStatistics(DataclassSerializationMixin):
         if not self.index_statistics:
             self.index_statistics = FileStatistics()
         self.index_statistics.add_file(path, operation)
+
+    def add_file_from_discovered(
+        self,
+        discovered_file: DiscoveredFile,  # type: ignore[name-defined]
+        operation: OperationsKey,
+    ) -> None:
+        """Add a file operation using a DiscoveredFile (more efficient).
+
+        This method is more efficient than add_file() when you already have a
+        DiscoveredFile object, as it avoids redundant ExtKind.from_file() calls.
+
+        Args:
+            discovered_file: DiscoveredFile with pre-computed ext_kind
+            operation: Type of operation performed (indexed, retrieved, etc.)
+        """
+        if not self.index_statistics:
+            self.index_statistics = FileStatistics()
+        self.index_statistics.add_file_from_discovered(discovered_file, operation)
+
+    def add_chunk_from_codechunk(
+        self,
+        chunk: CodeChunk,  # type: ignore[name-defined]
+        operation: OperationsKey = "processed",
+    ) -> None:
+        """Add chunk statistics using a CodeChunk object (efficient).
+
+        This method tracks chunk creation statistics at the session level,
+        including chunk type, size, and language distribution.
+
+        Args:
+            chunk: CodeChunk with pre-computed ext_kind and metadata
+            operation: Type of operation performed (usually "processed" for chunks)
+        """
+        if not self.index_statistics:
+            self.index_statistics = FileStatistics()
+        self.index_statistics.add_chunk_from_codechunk(chunk, operation)
 
     def add_file_operations_by_extkind(
         self, operations: Sequence[tuple[Path, ExtKind, OperationsKey]]
@@ -1112,6 +1297,68 @@ class SessionStatistics(DataclassSerializationMixin):
             self.index_statistics = FileStatistics()
         self.index_statistics.add_other_files(*files)
 
+    def update_failover_stats(
+        self,
+        *,
+        failover_active: bool | None = None,
+        increment_failover_count: bool = False,
+        failover_time_seconds: float | None = None,
+        last_failover_time: str | None = None,
+        increment_backup_syncs: bool = False,
+        increment_sync_back_ops: bool = False,
+        chunks_synced_back: int | None = None,
+        active_store_type: str | None = None,
+        primary_circuit_breaker_state: str | None = None,
+        backup_file_exists: bool | None = None,
+        backup_file_size_bytes: int | None = None,
+        chunks_in_failover: int | None = None,
+    ) -> None:
+        """Update failover statistics.
+
+        Args:
+            failover_active: Set failover active status
+            increment_failover_count: Increment the failover count
+            failover_time_seconds: Add to total failover time
+            last_failover_time: Set last failover timestamp
+            increment_backup_syncs: Increment backup sync counter
+            increment_sync_back_ops: Increment sync-back operations counter
+            chunks_synced_back: Add to chunks synced back count
+            active_store_type: Set active store type (primary/backup)
+            primary_circuit_breaker_state: Set circuit breaker state
+            backup_file_exists: Set backup file existence flag
+            backup_file_size_bytes: Set backup file size
+            chunks_in_failover: Set number of chunks in failover
+        """
+        if not self.failover_statistics:
+            self.failover_statistics = FailoverStats()
+
+        stats = self.failover_statistics
+
+        if failover_active is not None:
+            stats.failover_active = failover_active
+        if increment_failover_count:
+            stats.failover_count += 1
+        if failover_time_seconds is not None:
+            stats.total_failover_time_seconds += failover_time_seconds
+        if last_failover_time is not None:
+            stats.last_failover_time = last_failover_time
+        if increment_backup_syncs:
+            stats.backup_syncs_completed += 1
+        if increment_sync_back_ops:
+            stats.sync_back_operations += 1
+        if chunks_synced_back is not None:
+            stats.chunks_synced_back += chunks_synced_back
+        if active_store_type is not None:
+            stats.active_store_type = active_store_type
+        if primary_circuit_breaker_state is not None:
+            stats.primary_circuit_breaker_state = primary_circuit_breaker_state
+        if backup_file_exists is not None:
+            stats.backup_file_exists = backup_file_exists
+        if backup_file_size_bytes is not None:
+            stats.backup_file_size_bytes = backup_file_size_bytes
+        if chunks_in_failover is not None:
+            stats.chunks_in_failover = chunks_in_failover
+
     def reset(self) -> None:
         """Reset all statistics to their initial state."""
         self.timing_statistics = TimingStatistics(
@@ -1130,6 +1377,7 @@ class SessionStatistics(DataclassSerializationMixin):
         )
         self.index_statistics = FileStatistics()
         self.token_statistics = TokenCounter()
+        self.failover_statistics = FailoverStats()
 
     def report(self) -> bytes:
         """Generate a report of the current statistics."""
@@ -1194,6 +1442,7 @@ _statistics: SessionStatistics = SessionStatistics(
     index_statistics=FileStatistics(),
     token_statistics=TokenCounter(),
     semantic_statistics=None,
+    failover_statistics=FailoverStats(),
     _successful_request_log=[],
     _failed_request_log=[],
     _successful_http_request_log=[],
@@ -1237,7 +1486,7 @@ def get_session_statistics() -> SessionStatistics:
 
 
 def timed_http(
-    request_type: Literal["health", "version", "settings", "state", "statistics"],
+    request_type: Literal["health", "version", "settings", "state", "metrics", "status"],
 ) -> Callable[
     [Callable[..., Awaitable[PlainTextResponse]]], Callable[..., Awaitable[PlainTextResponse]]
 ]:

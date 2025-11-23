@@ -9,7 +9,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 ## Welcome to CodeWeaver!
 
-Thanks for wanting to help make CodeWeaver better! Before you start, please read this. If anything’s unclear, [email Adam](mailto:adam@knit.li) or post in the [forum](https://github.com/knitli/codeweaver-mcp/discussions). (Right now, Adam *is* Knitli.)
+Thanks for wanting to help make CodeWeaver better! Before you start, please read this. If anything’s unclear, [email Adam](mailto:adam@knit.li) or post in the [forum](https://github.com/knitli/codeweaver/discussions). (Right now, Adam *is* Knitli.)
 
 ---
 

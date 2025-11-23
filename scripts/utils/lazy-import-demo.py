@@ -35,20 +35,20 @@ def demo_basic_usage() -> None:
     # Create lazy import
     os_lazy = lazy_import("os")
     print(f"✓ Created: {os_lazy}")
-    print(f"  Is resolved: {os_lazy.is_resolved}")
+    print(f"  Is resolved: {os_lazy.is_resolved()}")
     print()
 
     # Chain attribute access WITHOUT triggering import
     path_lazy = os_lazy.path
     print(f"✓ Chained .path: {path_lazy}")
-    print(f"  Original os_lazy resolved: {os_lazy.is_resolved}")
+    print(f"  Original os_lazy resolved: {os_lazy.is_resolved()}")
     print(f"  path_lazy is still a LazyImport: {type(path_lazy).__name__}")
     print()
 
     # Actually use it - THIS triggers the import
     result = path_lazy.join("a", "b", "c")
     print(f"✓ Called path.join('a', 'b', 'c'): {result}")
-    print(f"  path_lazy is NOW resolved: {path_lazy.is_resolved}")
+    print(f"  path_lazy is NOW resolved: {path_lazy.is_resolved()}")
     print()
 
 
@@ -61,13 +61,13 @@ def demo_function_import() -> None:
     # Import specific function
     join = lazy_import("os.path", "join")
     print(f"✓ Created: {join}")
-    print(f"  Is resolved: {join.is_resolved}")
+    print(f"  Is resolved: {join.is_resolved()}")
     print()
 
     # Call it - import happens here
     result = join("home", "user", "documents")
     print(f"✓ Called join('home', 'user', 'documents'): {result}")
-    print(f"  Is resolved now: {join.is_resolved}")
+    print(f"  Is resolved now: {join.is_resolved()}")
     print()
 
 
@@ -80,7 +80,7 @@ def demo_class_import() -> None:
     # Import a class
     Path = lazy_import("pathlib", "Path")
     print(f"✓ Created: {Path}")
-    print(f"  Is resolved: {Path.is_resolved}")
+    print(f"  Is resolved: {Path.is_resolved()}")
     print()
 
     # Instantiate it - import happens here
@@ -88,7 +88,7 @@ def demo_class_import() -> None:
     print("✓ Instantiated: Path('/tmp/test')")
     print(f"  Result: {p}")
     print(f"  Type: {type(p)}")
-    print(f"  Is resolved now: {Path.is_resolved}")
+    print(f"  Is resolved now: {Path.is_resolved()}")
     print()
 
 
@@ -105,7 +105,7 @@ def demo_settings_pattern() -> None:
     # Global-level assignment
     _get_cwd = lazy_import("os").getcwd
     print("✓ Assigned at 'global' level: _get_cwd = lazy_import('os').getcwd")
-    print(f"  Is resolved: {_get_cwd.is_resolved}")
+    print(f"  Is resolved: {_get_cwd.is_resolved()}")
     print(f"  Type: {type(_get_cwd).__name__}")
     print()
 
@@ -114,7 +114,7 @@ def demo_settings_pattern() -> None:
     cwd = _get_cwd()
     print("✓ Called: _get_cwd()")
     print(f"  Result: {cwd}")
-    print(f"  Is resolved now: {_get_cwd.is_resolved}")
+    print(f"  Is resolved now: {_get_cwd.is_resolved()}")
     print()
 
 
@@ -142,13 +142,13 @@ def demo_type_checking_pattern() -> None:
     print("For runtime (non-annotation) use:")
     Path = lazy_import("pathlib", "Path")
     print("✓ Path = lazy_import('pathlib', 'Path')")
-    print(f"  Is resolved: {Path.is_resolved}")
+    print(f"  Is resolved: {Path.is_resolved()}")
     print()
 
     instance = Path("/home")
     print("✓ instance = Path('/home')")
     print(f"  Result: {instance}")
-    print(f"  Is resolved now: {Path.is_resolved}")
+    print(f"  Is resolved now: {Path.is_resolved()}")
     print()
 
 
@@ -166,7 +166,7 @@ def demo_comparison_old_vs_new() -> None:
     print("NEW (clean, natural syntax):")
     module = lazy_import("os")
     print("  module = lazy_import('os')")
-    print(f"  Is resolved: {module.is_resolved}")
+    print(f"  Is resolved: {module.is_resolved()}")
     result = module.path.join("a", "b")
     print("  result = module.path.join('a', 'b')")
     print(f"  Result: {result}")
@@ -179,10 +179,10 @@ def demo_comparison_old_vs_new() -> None:
     print("NEW (attribute access is STILL lazy):")
     Path = lazy_import("pathlib").Path
     print("  Path = lazy_import('pathlib').Path")
-    print(f"  Is resolved: {Path.is_resolved}  # ✅ Still lazy!")
+    print(f"  Is resolved: {Path.is_resolved()}  # ✅ Still lazy!")
     Path("/tmp")
     print("  instance = Path('/tmp')")
-    print(f"  Is resolved now: {Path.is_resolved}  # ✅ Imported when instantiated")
+    print(f"  Is resolved now: {Path.is_resolved()}  # ✅ Imported when instantiated")
     print()
 
 
@@ -205,7 +205,7 @@ def demo_thread_safety() -> None:
     threads = [threading.Thread(target=resolve_and_use) for _ in range(10)]
 
     print(f"✓ Created 10 threads to concurrently use: {join}")
-    print(f"  Is resolved before threads: {join.is_resolved}")
+    print(f"  Is resolved before threads: {join.is_resolved()}")
     print()
 
     # Start all threads
@@ -217,7 +217,7 @@ def demo_thread_safety() -> None:
         t.join()
 
     print("✓ All threads completed")
-    print(f"  Is resolved now: {join.is_resolved}")
+    print(f"  Is resolved now: {join.is_resolved()}")
     print(f"  All results identical: {all(r == results[0] for r in results)}")
     print(f"  Sample result: {results[0]}")
     print()

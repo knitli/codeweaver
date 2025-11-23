@@ -8,18 +8,21 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
-from codeweaver.providers.provider import Provider
-from codeweaver.providers.reranking.capabilities.base import (
-    PartialRerankingCapabilities,
-    RerankingModelCapabilities,
-)
+
+if TYPE_CHECKING:
+    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
 def get_baai_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
     """Get the BAAI reranking model capabilities."""
-    shared_capabilities: PartialRerankingCapabilities = {
-        "name": "BAAI/bge-reranker-",
+    from codeweaver.providers.provider import Provider
+    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+    from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilitiesDict
+
+    shared_capabilities: PartialRerankingCapabilitiesDict = {
+        "name": "BAAI/bge-reranking-",
         "tokenizer": "tokenizers",
         "supports_custom_prompt": False,
     }
