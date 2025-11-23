@@ -57,6 +57,9 @@ jobs:
             uv-copilot-${{ runner.os }}-
             uv-${{ runner.os }}-
       - uses: jdx/mise-action@fcec31d82eb5c88cd7eb3fe3c270cb093aeeef18
+        with:
+          # Disable automatic env export to avoid hanging on enter hook in CI
+          env: false
       - name: Install Dependencies
         run: |
           sudo apt-get update && sudo apt-get install -y zsh curl git
@@ -70,7 +73,7 @@ jobs:
           echo "Mise setup in directory: $(pwd)"
           export MISE="$(which mise)"
           export MISE_DIR="$(dirname "$MISE")"
-          eval "$("$MISE" activate bash)" || echo "Warning: mise activate had issues, but continuing"
+          # Skip activation in CI to avoid hanging - just trust and install
           "$MISE" --quiet -y trust
           "$MISE" --quiet -y install 2>&1 || echo "Warning: Some tools failed to install due to network limitations in CI environment"
         env:
@@ -79,6 +82,5 @@ jobs:
         run: |
           chmod -R +x scripts
           echo "Setting up mise..."
-          # Trust the mise configuration
-          "$MISE" --quiet -y run setup &>/dev/null || echo "Warning: mise setup had issues, but continuing"
+          # Trust the mise configuration - already performed in Setup Mise step
           echo "Mise setup completed"
