@@ -2344,6 +2344,8 @@ class Indexer(BasedModel):
             files_to_process.extend(files_needing["sparse_only"])
             logger.info("Found %d files needing sparse embeddings", len(files_needing["sparse_only"]))
         
+        # Deduplicate files to avoid double processing
+        files_to_process = list(set(files_to_process))
         if not files_to_process:
             logger.info("No files need embedding updates")
             return {"files_processed": 0, "chunks_updated": 0, "errors": []}
