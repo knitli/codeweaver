@@ -13,6 +13,6 @@ Beta software has bugs, probably lots of them, and some of those may be security
 
 ## Reporting a Security Concern
 
-If you think you identified a possible security vulnerability, or otherwise have a security concern **please report it using [Github security advisories at this link](https://github.com/knitli/codeweaver/security/advisories/new).**
+If you think you identified a possible security vulnerability, or otherwise have a security concern **please report it using [GitHub security advisories at this link](https://github.com/knitli/codeweaver/security/advisories/new).**
 
 That will help keep us all a little safer, thanks!
