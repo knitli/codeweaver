@@ -110,7 +110,7 @@ Files are reprocessed if:
 - `_discover_files_to_index()` uses new reindexing logic
 - Logs count of files needing reindexing due to model changes
 
-**Code:** `src/codeweaver/engine/indexer/indexer.py:526-563, 1107-1148`
+**Code:** `src/codeweaver/engine/indexer/indexer.py:545-582, 1113-1231`
 
 ### ✅ Structured Error Reporting
 
