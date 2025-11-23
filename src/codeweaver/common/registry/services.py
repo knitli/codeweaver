@@ -50,7 +50,7 @@ class ServicesRegistry(BasedModel):
             card: The service card to register
         """
         if isinstance(card, dict):
-            card = ServiceCard.from_dict(card)
+            card = ServiceCard.from_dict(card)  # ty: ignore[invalid-argument-type]
         self._services[card.feature].append(card)
 
     def is_service_enabled(self, feature: Feature) -> bool:

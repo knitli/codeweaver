@@ -39,7 +39,7 @@ class TestEmbeddingMetadataTracking:
         path = Path("test.py")
         content_hash = get_blake_hash(b"test content")
         chunk_ids = ["chunk1", "chunk2"]
-        
+
         manifest.add_file(
             path,
             content_hash,
@@ -48,7 +48,7 @@ class TestEmbeddingMetadataTracking:
             dense_embedding_model="text-embedding-3-large",
             has_dense_embeddings=True,
         )
-        
+
         entry = manifest.get_file(path)
         assert entry is not None
         assert entry["dense_embedding_provider"] == "openai"
@@ -61,7 +61,7 @@ class TestEmbeddingMetadataTracking:
         path = Path("test.py")
         content_hash = get_blake_hash(b"test content")
         chunk_ids = ["chunk1"]
-        
+
         manifest.add_file(
             path,
             content_hash,
@@ -70,7 +70,7 @@ class TestEmbeddingMetadataTracking:
             sparse_embedding_model="bm25",
             has_sparse_embeddings=True,
         )
-        
+
         entry = manifest.get_file(path)
         assert entry is not None
         assert entry["sparse_embedding_provider"] == "fastembed"
@@ -83,7 +83,7 @@ class TestEmbeddingMetadataTracking:
         path = Path("test.py")
         content_hash = get_blake_hash(b"test content")
         chunk_ids = ["chunk1", "chunk2"]
-        
+
         manifest.add_file(
             path,
             content_hash,
@@ -95,7 +95,7 @@ class TestEmbeddingMetadataTracking:
             has_dense_embeddings=True,
             has_sparse_embeddings=True,
         )
-        
+
         entry = manifest.get_file(path)
         assert entry is not None
         assert entry["dense_embedding_provider"] == "voyage"
@@ -110,10 +110,10 @@ class TestEmbeddingMetadataTracking:
         path = Path("legacy.py")
         content_hash = get_blake_hash(b"legacy content")
         chunk_ids = ["chunk1"]
-        
+
         # Add file without embedding metadata (simulating v1.0.0 entry)
         manifest.add_file(path, content_hash, chunk_ids)
-        
+
         entry = manifest.get_file(path)
         assert entry is not None
         assert entry["path"] == str(path)
@@ -130,9 +130,9 @@ class TestModelChangeDetection:
         """Test that new files need indexing."""
         path = Path("new_file.py")
         current_hash = get_blake_hash(b"new content")
-        
+
         needs_reindex, reason = manifest.file_needs_reindexing(path, current_hash)
-        
+
         assert needs_reindex is True
         assert reason == "new_file"
 
@@ -141,10 +141,10 @@ class TestModelChangeDetection:
         path = Path("test.py")
         original_hash = get_blake_hash(b"original content")
         manifest.add_file(path, original_hash, ["chunk1"])
-        
+
         new_hash = get_blake_hash(b"modified content")
         needs_reindex, reason = manifest.file_needs_reindexing(path, new_hash)
-        
+
         assert needs_reindex is True
         assert reason == "content_changed"
 
@@ -152,7 +152,7 @@ class TestModelChangeDetection:
         """Test that dense model changes trigger reindexing."""
         path = Path("test.py")
         content_hash = get_blake_hash(b"test content")
-        
+
         # Index with model A
         manifest.add_file(
             path,
@@ -162,7 +162,7 @@ class TestModelChangeDetection:
             dense_embedding_model="text-embedding-ada-002",
             has_dense_embeddings=True,
         )
-        
+
         # Check with different model
         needs_reindex, reason = manifest.file_needs_reindexing(
             path,
@@ -170,7 +170,7 @@ class TestModelChangeDetection:
             current_dense_provider="openai",
             current_dense_model="text-embedding-3-large",
         )
-        
+
         assert needs_reindex is True
         assert reason == "dense_embedding_model_changed"
 
@@ -178,7 +178,7 @@ class TestModelChangeDetection:
         """Test that sparse model changes trigger reindexing."""
         path = Path("test.py")
         content_hash = get_blake_hash(b"test content")
-        
+
         # Index with sparse model A
         manifest.add_file(
             path,
@@ -188,15 +188,12 @@ class TestModelChangeDetection:
             sparse_embedding_model="bm25",
             has_sparse_embeddings=True,
         )
-        
+
         # Check with different sparse model
         needs_reindex, reason = manifest.file_needs_reindexing(
-            path,
-            content_hash,
-            current_sparse_provider="fastembed",
-            current_sparse_model="bm42",
+            path, content_hash, current_sparse_provider="fastembed", current_sparse_model="bm42"
         )
-        
+
         assert needs_reindex is True
         assert reason == "sparse_embedding_model_changed"
 
@@ -204,7 +201,7 @@ class TestModelChangeDetection:
         """Test that files with same content and models don't need reindexing."""
         path = Path("test.py")
         content_hash = get_blake_hash(b"test content")
-        
+
         manifest.add_file(
             path,
             content_hash,
@@ -213,14 +210,11 @@ class TestModelChangeDetection:
             dense_embedding_model="voyage-code-2",
             has_dense_embeddings=True,
         )
-        
+
         needs_reindex, reason = manifest.file_needs_reindexing(
-            path,
-            content_hash,
-            current_dense_provider="voyage",
-            current_dense_model="voyage-code-2",
+            path, content_hash, current_dense_provider="voyage", current_dense_model="voyage-code-2"
         )
-        
+
         assert needs_reindex is False
         assert reason == "unchanged"
 
@@ -228,18 +222,15 @@ class TestModelChangeDetection:
         """Test backward compatibility: files without embedding metadata."""
         path = Path("test.py")
         content_hash = get_blake_hash(b"test content")
-        
+
         # Add file without embedding metadata (v1.0.0 style)
         manifest.add_file(path, content_hash, ["chunk1"])
-        
+
         # Check with current models - should trigger reindex due to model mismatch
         needs_reindex, reason = manifest.file_needs_reindexing(
-            path,
-            content_hash,
-            current_dense_provider="voyage",
-            current_dense_model="voyage-code-2",
+            path, content_hash, current_dense_provider="voyage", current_dense_model="voyage-code-2"
         )
-        
+
         # Should need reindexing because manifest has no model info
         assert needs_reindex is True
         assert reason == "dense_embedding_model_changed"
@@ -252,7 +243,7 @@ class TestGetEmbeddingModelInfo:
         """Test retrieving embedding model info for file with metadata."""
         path = Path("test.py")
         content_hash = get_blake_hash(b"test content")
-        
+
         manifest.add_file(
             path,
             content_hash,
@@ -264,9 +255,9 @@ class TestGetEmbeddingModelInfo:
             has_dense_embeddings=True,
             has_sparse_embeddings=True,
         )
-        
+
         info = manifest.get_embedding_model_info(path)
-        
+
         assert info["dense_provider"] == "openai"
         assert info["dense_model"] == "text-embedding-3-large"
         assert info["sparse_provider"] == "fastembed"
@@ -277,21 +268,21 @@ class TestGetEmbeddingModelInfo:
     def test_get_embedding_model_info_nonexistent_file(self, manifest):
         """Test retrieving model info for nonexistent file."""
         path = Path("nonexistent.py")
-        
+
         info = manifest.get_embedding_model_info(path)
-        
+
         assert info == {}
 
     def test_get_embedding_model_info_legacy_file(self, manifest):
         """Test retrieving model info for legacy file without metadata."""
         path = Path("legacy.py")
         content_hash = get_blake_hash(b"legacy content")
-        
+
         # Add file without embedding metadata
         manifest.add_file(path, content_hash, ["chunk1"])
-        
+
         info = manifest.get_embedding_model_info(path)
-        
+
         assert info["dense_provider"] is None
         assert info["dense_model"] is None
         assert info["sparse_provider"] is None
@@ -307,7 +298,7 @@ class TestManifestPersistence:
         """Test that embedding metadata persists across save/load."""
         manager = FileManifestManager(project_path=temp_project_dir)
         manifest = manager.create_new()
-        
+
         # Add file with embedding metadata
         path = Path("test.py")
         content_hash = get_blake_hash(b"test content")
@@ -319,15 +310,15 @@ class TestManifestPersistence:
             dense_embedding_model="voyage-code-2",
             has_dense_embeddings=True,
         )
-        
+
         # Save
         assert manager.save(manifest) is True
-        
+
         # Load
         loaded_manifest = manager.load()
         assert loaded_manifest is not None
         assert loaded_manifest.manifest_version == "1.1.0"
-        
+
         # Verify embedding metadata preserved
         entry = loaded_manifest.get_file(path)
         assert entry is not None

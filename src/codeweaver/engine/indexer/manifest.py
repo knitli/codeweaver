@@ -41,7 +41,7 @@ class FileManifestEntry(TypedDict):
     """Single file entry in the manifest.
 
     Tracks file path, content hash, and indexing metadata including embedding models used.
-    
+
     Uses Required and NotRequired to support backward compatibility with v1.0.0 manifests
     that don't have embedding metadata fields.
     """
@@ -52,10 +52,14 @@ class FileManifestEntry(TypedDict):
     indexed_at: Required[str]  # ISO8601 timestamp when file was last indexed
     chunk_count: Required[int]  # Number of chunks created from this file
     chunk_ids: Required[list[str]]  # UUIDs of chunks in vector store
-    
+
     # Optional fields (added in v1.1.0 for embedding tracking)
-    dense_embedding_provider: NotRequired[str | None]  # Provider used for dense embeddings (e.g., "openai", "voyage")
-    dense_embedding_model: NotRequired[str | None]  # Model used for dense embeddings (e.g., "text-embedding-3-large")
+    dense_embedding_provider: NotRequired[
+        str | None
+    ]  # Provider used for dense embeddings (e.g., "openai", "voyage")
+    dense_embedding_model: NotRequired[
+        str | None
+    ]  # Model used for dense embeddings (e.g., "text-embedding-3-large")
     sparse_embedding_provider: NotRequired[str | None]  # Provider used for sparse embeddings
     sparse_embedding_model: NotRequired[str | None]  # Model used for sparse embeddings
     has_dense_embeddings: NotRequired[bool]  # Whether file chunks have dense embeddings
@@ -289,31 +293,45 @@ class IndexFileManifest(BasedModel):
             raise ValueError("Path cannot be None")
 
         entry = self.get_file(path)
-        
+
         # New file - needs indexing
         if entry is None:
             return True, "new_file"
-        
+
         # Content changed - needs reindexing
         if entry["content_hash"] != str(current_hash):
             return True, "content_changed"
-        
+
         # Check for embedding model changes (v1.1.0+ manifests)
         # Dense model changed
         # Dense model changed, added, or removed
         manifest_dense_provider = entry.get("dense_embedding_provider")
         manifest_dense_model = entry.get("dense_embedding_model")
-        if current_dense_provider or manifest_dense_provider or current_dense_model or manifest_dense_model:
-            if manifest_dense_provider != current_dense_provider or manifest_dense_model != current_dense_model:
-                return True, "dense_embedding_model_changed"
-        
+        if (
+            current_dense_provider
+            or manifest_dense_provider
+            or current_dense_model
+            or manifest_dense_model
+        ) and (
+            manifest_dense_provider != current_dense_provider
+            or manifest_dense_model != current_dense_model
+        ):
+            return True, "dense_embedding_model_changed"
+
         # Sparse model changed, added, or removed
         manifest_sparse_provider = entry.get("sparse_embedding_provider")
         manifest_sparse_model = entry.get("sparse_embedding_model")
-        if current_sparse_provider or manifest_sparse_provider or current_sparse_model or manifest_sparse_model:
-            if manifest_sparse_provider != current_sparse_provider or manifest_sparse_model != current_sparse_model:
-                return True, "sparse_embedding_model_changed"
-        
+        if (
+            current_sparse_provider
+            or manifest_sparse_provider
+            or current_sparse_model
+            or manifest_sparse_model
+        ) and (
+            manifest_sparse_provider != current_sparse_provider
+            or manifest_sparse_model != current_sparse_model
+        ):
+            return True, "sparse_embedding_model_changed"
+
         # File up-to-date
         return False, "unchanged"
 
@@ -335,7 +353,7 @@ class IndexFileManifest(BasedModel):
         entry = self.get_file(path)
         if not entry:
             return {}
-        
+
         return {
             "dense_provider": entry.get("dense_embedding_provider"),
             "dense_model": entry.get("dense_embedding_model"),
@@ -357,7 +375,7 @@ class IndexFileManifest(BasedModel):
 
         This is for selective reindexing where we add missing embeddings
         without reprocessing the entire file.
-        
+
         Note: If a file needs both dense and sparse embeddings, it will be
         categorized under 'dense_only' (processed first). This prioritization
         ensures dense embeddings are added before sparse embeddings.
@@ -372,14 +390,11 @@ class IndexFileManifest(BasedModel):
             Dictionary with keys 'dense_only' and 'sparse_only' containing
             lists of paths that need those embeddings added
         """
-        result: dict[str, list[Path]] = {
-            "dense_only": [],
-            "sparse_only": [],
-        }
+        result: dict[str, list[Path]] = {"dense_only": [], "sparse_only": []}
 
         for path_str, entry in self.files.items():
             path = Path(path_str)
-            
+
             # Check if file needs dense embeddings added
             # Criteria: dense provider configured BUT file doesn't have dense embeddings
             if current_dense_provider and current_dense_model:
@@ -387,7 +402,7 @@ class IndexFileManifest(BasedModel):
                 if not has_dense:
                     result["dense_only"].append(path)
                     continue  # Skip sparse check if already needs dense
-            
+
             # Check if file needs sparse embeddings added
             # Criteria: sparse provider configured BUT file doesn't have sparse embeddings
             if current_sparse_provider and current_sparse_model:
@@ -409,10 +424,7 @@ class IndexFileManifest(BasedModel):
         return chunk_ids
 
     def get_files_by_embedding_config(
-        self,
-        *,
-        has_dense: bool | None = None,
-        has_sparse: bool | None = None,
+        self, *, has_dense: bool | None = None, has_sparse: bool | None = None
     ) -> list[Path]:
         """Get files matching specific embedding configuration.
 
@@ -424,22 +436,22 @@ class IndexFileManifest(BasedModel):
             List of paths matching the criteria
         """
         matching_files: list[Path] = []
-        
+
         for path_str, entry in self.files.items():
             # Check dense criteria
             if has_dense is not None:
                 entry_has_dense = entry.get("has_dense_embeddings", False)
                 if entry_has_dense != has_dense:
                     continue
-            
+
             # Check sparse criteria
             if has_sparse is not None:
                 entry_has_sparse = entry.get("has_sparse_embeddings", False)
                 if entry_has_sparse != has_sparse:
                     continue
-            
+
             matching_files.append(Path(path_str))
-        
+
         return matching_files
 
     @computed_field

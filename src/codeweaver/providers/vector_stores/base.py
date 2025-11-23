@@ -267,7 +267,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                     "Verify required dependencies are installed",
                 ],
             )
-        return self._client
+        return cast(VectorStoreClient, self._client)
 
     @property
     def name(self) -> Provider:

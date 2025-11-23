@@ -162,9 +162,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
                     else:
                         # Only call resolve_dimensions if we can't get size from collection
                         with contextlib.suppress(ValueError):
-                            from codeweaver.providers.vector_stores.utils import (
-                                resolve_dimensions,
-                            )
+                            from codeweaver.providers.vector_stores.utils import resolve_dimensions
 
                             dense_size = resolve_dimensions()
 

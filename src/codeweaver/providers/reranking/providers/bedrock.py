@@ -339,7 +339,8 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
         # Initialize client if not provided
         if client is None:
             client = boto3_client(  # ty: ignore[invalid-assignment,no-matching-overload]
-                "bedrock-agent-runtime", **bedrock_settings
+                "bedrock-agent-runtime",
+                **(bedrock_settings if isinstance(bedrock_settings, dict) else {}),  # ty: ignore[invalid-argument-type]
             )
 
         final_caps = caps or get_amazon_reranking_capabilities()[0]

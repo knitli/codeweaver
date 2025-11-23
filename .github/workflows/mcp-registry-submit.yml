@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to submit (leave empty to use latest release)'
+        description: "Version to submit (leave empty to use latest release)"
         required: false
         type: string
 
@@ -23,18 +23,18 @@ jobs:
   validate-and-submit:
     name: Validate and Submit to MCP Registry
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@b3498302c5c423fa896b97a26bb183df735d08f8
         with:
           ref: ${{ github.event.release.tag_name || github.ref }}
-      
+
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c
         with:
-          python-version: '3.12'
-      
+          python-version: "3.12"
+
       - name: Extract version information
         id: version
         run: |
@@ -48,10 +48,10 @@ jobs:
             # Fallback to reading from _version.py
             VERSION=$(grep -oP "__version__: Final\[str\] = \"\K[^\"]+" src/codeweaver/_version.py)
           fi
-          
+
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Detected version: ${VERSION}"
-      
+
       - name: Update server.json with release version
         run: |
           VERSION="${{ steps.version.outputs.version }}"
@@ -59,24 +59,24 @@ jobs:
           python -c "
           import json
           import sys
-          
+
           with open('server.json', 'r') as f:
               data = json.load(f)
-          
+
           # Update top-level version
           data['version'] = '${VERSION}'
-          
+
           # Update package version
           if 'packages' in data and len(data['packages']) > 0:
               for pkg in data['packages']:
                   pkg['version'] = '${VERSION}'
-          
+
           with open('server.json', 'w') as f:
               json.dump(data, f, indent=2)
-          
+
           print(f'Updated server.json to version ${VERSION}')
           "
-      
+
       - name: Update tools.json with release version
         run: |
           VERSION="${{ steps.version.outputs.version }}"
@@ -84,28 +84,28 @@ jobs:
           python -c "
           import json
           import sys
-          
+
           with open('tools.json', 'r') as f:
               tools_data = json.load(f)
-          
+
           # Update top-level version
           tools_data['version'] = '${VERSION}'
           # Update server version if present
           if 'server' in tools_data:
               tools_data['server']['version'] = '${VERSION}'
-          
+
           with open('tools.json', 'w') as f:
               json.dump(tools_data, f, indent=2)
-          
+
           print(f'Updated tools.json to version ${VERSION}')
           "
-      
+
       - name: Validate server.json format
         run: |
           python -c "
           import json
           import sys
-          
+
           try:
               with open('server.json', 'r') as f:
                   data = json.load(f)
@@ -140,16 +140,16 @@ jobs:
               print(f'ERROR: Validation failed: {e}')
               sys.exit(1)
           "
-      
+
       - name: Wait for PyPI package availability
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           MAX_ATTEMPTS=30
           SLEEP_TIME=60
-          
+
           echo "Waiting for codeweaver ${VERSION} to be available on PyPI..."
           echo "This may take up to 30 minutes after release publication"
-          
+
           for i in $(seq 1 $MAX_ATTEMPTS); do
             echo "Attempt $i/$MAX_ATTEMPTS..."
             
@@ -167,11 +167,11 @@ jobs:
               sleep $SLEEP_TIME
             fi
           done
-          
+
           echo "ERROR: Package not available on PyPI after ${MAX_ATTEMPTS} attempts"
           echo "Please verify that the package was successfully published"
           exit 1
-      
+
       - name: Install mcp-publisher CLI
         env:
           MCP_PUBLISHER_VERSION: "v1.0.0"
@@ -179,32 +179,32 @@ jobs:
           ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
           OS=$(uname -s | tr '[:upper:]' '[:lower:]')
           VERSION="${MCP_PUBLISHER_VERSION}"
-          
+
           echo "Downloading mcp-publisher ${VERSION} for ${OS}/${ARCH}..."
           curl -L "https://github.com/modelcontextprotocol/registry/releases/download/${VERSION}/mcp-publisher_1.0.0_${OS}_${ARCH}.tar.gz" \
             -o mcp-publisher.tar.gz
           curl -L "https://github.com/modelcontextprotocol/registry/releases/download/${VERSION}/mcp-publisher_1.0.0_${OS}_${ARCH}.tar.gz.sha256" \
             -o mcp-publisher.tar.gz.sha256
-          
+
           echo "Verifying checksum for mcp-publisher.tar.gz..."
           sha256sum -c mcp-publisher.tar.gz.sha256
           if [ $? -ne 0 ]; then
             echo "ERROR: Checksum verification failed for mcp-publisher.tar.gz"
             exit 1
           fi
-          
+
           tar xz < mcp-publisher.tar.gz mcp-publisher
           sudo mv mcp-publisher /usr/local/bin/
           chmod +x /usr/local/bin/mcp-publisher
           rm mcp-publisher.tar.gz mcp-publisher.tar.gz.sha256
-          
+
           echo "✓ mcp-publisher installed"
           mcp-publisher --version || echo "Version check not available"
-      
+
       - name: Validate server.json with mcp-publisher
         run: |
           echo "Validating server.json against MCP schema..."
-          
+
           # mcp-publisher validate should validate the server.json
           # Note: exact command may vary based on mcp-publisher version
           if command -v mcp-publisher &> /dev/null; then
@@ -215,17 +215,17 @@ jobs:
           else
             echo "WARNING: mcp-publisher validate command not available, skipping"
           fi
-      
+
       - name: Submit to MCP Registry
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Submitting to MCP Registry..."
-          
+
           # Note: The exact submission process depends on mcp-publisher CLI implementation
           # and may require manual intervention if the API/CLI has changed.
           # The following attempts multiple submission methods in order of preference.
-          
+
           # Method 1: Try mcp-publisher submit command (if available)
           if command -v mcp-publisher &> /dev/null; then
             echo "Attempting submission via mcp-publisher CLI..."
@@ -235,25 +235,25 @@ jobs:
             fi
             echo "CLI submission not available or failed, trying API..."
           fi
-          
+
           # Method 2: Direct API submission
           echo "Attempting direct API submission..."
-          
+
           RESPONSE=$(curl -X POST \
             -H "Authorization: Bearer ${GITHUB_TOKEN}" \
             -H "Content-Type: application/json" \
             -d @server.json \
             -w "\n%{http_code}" \
             https://registry.modelcontextprotocol.io/v0/servers 2>&1)
-          
+
           HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
           BODY=$(echo "$RESPONSE" | head -n -1)
-          
+
           if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
             echo "✓ Successfully submitted to MCP Registry (HTTP ${HTTP_CODE})"
             exit 0
           fi
-          
+
           # Submission failed - provide helpful error message
           echo "ERROR: Failed to submit to MCP Registry (HTTP ${HTTP_CODE})"
           echo "Response: ${BODY}"
@@ -263,7 +263,7 @@ jobs:
           echo "  2. The mcp-publisher CLI tool"
           echo "  3. Contact registry maintainers for assistance"
           exit 1
-      
+
       - name: Summary
         if: always()
         run: |
@@ -272,7 +272,7 @@ jobs:
           echo "- **Version**: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ "${{ job.status }}" = "success" ]; then
             echo "✅ Successfully submitted to MCP Registry" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
