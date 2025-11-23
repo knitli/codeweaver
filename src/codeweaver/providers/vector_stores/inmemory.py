@@ -169,7 +169,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
 
                                 dense_size = resolve_dimensions()
 
-                    if raw_metadata := self._collection_metadata.get(col.name):  # ty: ignore[unresolved-attribute]
+                    if raw_metadata := self._collection_metadata.get(col.name):  # type: ignore[unresolved-attribute]
                         metadata = CollectionMetadata.model_validate(raw_metadata)
                     else:
                         metadata = CollectionMetadata(
