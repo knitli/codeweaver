@@ -5,15 +5,23 @@ EMBED_PROVIDER="${CODEWEAVER_EMBEDDING_PROVIDER:-}"
 RERANK_PROVIDER="${CODEWEAVER_RERANKING_PROVIDER:-}"
 DEFAULT_PROVIDER="voyage"
 
+normalize_provider() {
+    if [ -n "$1" ]; then  
+        printf '%s' "$1" | tr '[:upper:]' '[:lower:]'  
+    else  
+        printf '%s' "$2"  
+    fi  
+}
+
 # Normalize provider names to lowercase for leniency
 if [ -n "$EMBED_PROVIDER" ]; then
-    EMBED_PROVIDER="$(printf '%s' "$EMBED_PROVIDER" | tr '[:upper:]' '[:lower:]')"
+    EMBED_PROVIDER="$(normalize_provider "$EMBED_PROVIDER")"
 else
     EMBED_PROVIDER="$DEFAULT_PROVIDER"
 fi
 
 if [ -n "$RERANK_PROVIDER" ]; then
-    RERANK_PROVIDER="$(printf '%s' "$RERANK_PROVIDER" | tr '[:upper:]' '[:lower:]')"
+    RERANK_PROVIDER="$(normalize_provider "$RERANK_PROVIDER")"
 else
     RERANK_PROVIDER="$DEFAULT_PROVIDER"
 fi
@@ -28,7 +36,7 @@ VOYAGE_API_KEY environment variable is not set. Voyage requires an API key for a
 requests, so the server would fail to index any code.
 
 We recommend signing up for a free Voyage account at https://voyage.ai/ to get an API key. The free tier is generous and should be sufficient for most use cases.
-Using a cloud provider, especially Voyage, gives you cutting-edge models and keeps your computer from getting overworked 😫. You'll also get embeddings in seconds, not minutes.
+Using a cloud provider, especially Voyage, gives you cutting-edge models and keeps your computer from getting overworked 😫. You'll also get embeddings much faster.
 
 Set VOYAGE_API_KEY before starting the container, for example:
 
