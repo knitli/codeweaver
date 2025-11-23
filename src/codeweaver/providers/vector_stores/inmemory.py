@@ -118,7 +118,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         Raises:
             PersistenceError: Failed to write persistence file.
         """
-        from qdrant_client.http.models import PointStruct
+        from qdrant_client.http.models import PointStruct, SparseVectorParams, VectorParams
 
         from codeweaver.providers.vector_stores.metadata import CollectionMetadata
 
@@ -169,15 +169,11 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
 
                                 dense_size = resolve_dimensions()
 
-                    # Get metadata from stored metadata or create default
-                    metadata_dict = self._collection_metadata.get(col.name)  # type: ignore
-                    if metadata_dict:
-                        metadata = CollectionMetadata.model_validate(metadata_dict)
+                    if raw_metadata := self._collection_metadata.get(col.name):  # ty: ignore[unresolved-attribute]
+                        metadata = CollectionMetadata.model_validate(raw_metadata)
                     else:
-                        # Create minimal metadata if not stored
-                        from qdrant_client.http.models import SparseVectorParams, VectorParams
-
                         metadata = CollectionMetadata(
+                            created_at=datetime.now(UTC),
                             provider=str(self._provider),
                             project_name=_get_project_name(),
                             collection_name=col.name,
@@ -316,9 +312,9 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
                     await self._persist_to_disk()
             except asyncio.CancelledError:
                 break
-            except Exception as exc:
+            except Exception:
                 # Log error but continue to avoid data loss
-                logger.exception("Periodic persistence failed: %s", exc)
+                logger.warning("Periodic persistence failed", exc_info=True)
 
     async def _on_shutdown(self) -> None:
         """Cleanup handler for graceful shutdown.
@@ -328,10 +324,11 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         self._shutdown = True
 
         # Cancel periodic task
-        if self._periodic_task:  # type: ignore
-            self._periodic_task.cancel()  # type: ignore
+        # ty can't identify the attribute because it's set with object.__setattr__
+        if self._periodic_task:  # ty: ignore[unresolved-attribute]
+            self._periodic_task.cancel()  # ty: ignore[unresolved-attribute]
             with contextlib.suppress(asyncio.CancelledError):
-                await self._periodic_task  # type: ignore
+                await self._periodic_task  # ty: ignore[unresolved-attribute]
 
         # Final persistence
         try:
