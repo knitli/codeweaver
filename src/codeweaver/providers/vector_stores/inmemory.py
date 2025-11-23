@@ -168,9 +168,11 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
 
                             dense_size = resolve_dimensions()
 
-                # Access metadata with lock protection
+                # Access metadata with lock protection (create a copy to avoid holding lock during validation)
                 async with self._collection_metadata_lock:  # type: ignore
                     raw_metadata = self._collection_metadata.get(col.name)  # type: ignore[unresolved-attribute]
+                    # Create a shallow copy to safely use outside the lock
+                    raw_metadata = dict(raw_metadata) if raw_metadata else None
 
                 if raw_metadata:
                     metadata = CollectionMetadata.model_validate(raw_metadata)
