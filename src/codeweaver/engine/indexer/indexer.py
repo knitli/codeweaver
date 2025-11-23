@@ -2423,6 +2423,36 @@ class Indexer(BasedModel):
                             vectors=batch_vectors,
                         )
                         chunks_updated += len(updates)
+                        
+                        # Only update manifest if vector store update succeeded
+                        if self._manifest_lock:
+                            async with self._manifest_lock:
+                                relative_path = set_relative_path(file_path)
+                                if relative_path:
+                                    entry = self._file_manifest.get_file(relative_path)
+                                    if entry:
+                                        # Update the entry to reflect new embeddings
+                                        self._file_manifest.add_file(
+                                            path=relative_path,
+                                            content_hash=entry["content_hash"],
+                                            chunk_ids=entry["chunk_ids"],
+                                            dense_embedding_provider=current_models["dense_provider"] if add_dense else entry.get("dense_embedding_provider"),
+                                            dense_embedding_model=current_models["dense_model"] if add_dense else entry.get("dense_embedding_model"),
+                                            sparse_embedding_provider=current_models["sparse_provider"] if add_sparse else entry.get("sparse_embedding_provider"),
+                                            sparse_embedding_model=current_models["sparse_model"] if add_sparse else entry.get("sparse_embedding_model"),
+                                            has_dense_embeddings=True if add_dense else entry.get("has_dense_embeddings", False),
+                                            has_sparse_embeddings=True if add_sparse else entry.get("has_sparse_embeddings", False),
+                                        )
+                        else:
+                            logger.warning(
+                                "Manifest update skipped for file %s because manifest lock is None. This may lead to inconsistent state.",
+                                file_path,
+                            )
+                        
+                        files_processed += 1
+                        # Save manifest after each successful file processing
+                        self._save_file_manifest()
+                        
                     except Exception as update_error:
                         logger.error(
                             "Failed to batch update vectors for file %s: %s",
@@ -2430,34 +2460,7 @@ class Indexer(BasedModel):
                             update_error,
                         )
                         errors.append(f"{file_path}: {update_error}")
-                
-                # Update manifest to reflect new embeddings
-                if self._manifest_lock:
-                    async with self._manifest_lock:
-                        relative_path = set_relative_path(file_path)
-                        if relative_path:
-                            entry = self._file_manifest.get_file(relative_path)
-                            if entry:
-                                # Update the entry to reflect new embeddings
-                                self._file_manifest.add_file(
-                                    path=relative_path,
-                                    content_hash=entry["content_hash"],
-                                    chunk_ids=entry["chunk_ids"],
-                                    dense_embedding_provider=current_models["dense_provider"] if add_dense else entry.get("dense_embedding_provider"),
-                                    dense_embedding_model=current_models["dense_model"] if add_dense else entry.get("dense_embedding_model"),
-                                    sparse_embedding_provider=current_models["sparse_provider"] if add_sparse else entry.get("sparse_embedding_provider"),
-                                    sparse_embedding_model=current_models["sparse_model"] if add_sparse else entry.get("sparse_embedding_model"),
-                                    has_dense_embeddings=True if add_dense else entry.get("has_dense_embeddings", False),
-                                    has_sparse_embeddings=True if add_sparse else entry.get("has_sparse_embeddings", False),
-                                )
-                else:
-                    logger.warning(
-                        "Manifest update skipped for file %s because manifest lock is None. This may lead to inconsistent state.",
-                        file_path,
-                    )
-                files_processed += 1
-                # Save manifest after each successful file processing
-                self._save_file_manifest()
+                        # Skip this file - don't update manifest or increment counter
             except Exception as e:
                 error_msg = f"{file_path}: {e}"
                 logger.error("Error adding embeddings to file %s: %s", file_path, e, exc_info=True)
