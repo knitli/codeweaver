@@ -2401,23 +2401,23 @@ class Indexer(BasedModel):
                 
                 # Update vectors in vector store using update_vectors
                 if updates:
-                    for point_id, vectors in updates:
-                        try:
-                            await self._vector_store.client.update_vectors(
-                                collection_name=collection_name,
-                                points=[
-                                    UUID(point_id)
-                                ],
-                                vectors=vectors,
-                            )
-                            chunks_updated += 1
-                        except Exception as update_error:
-                            logger.error(
-                                "Failed to update vectors for point %s: %s",
-                                point_id,
-                                update_error,
-                            )
-                            errors.append(f"{file_path} chunk {point_id}: {update_error}")
+                    try:
+                        # Batch update: collect all point IDs and vectors
+                        batch_points = [UUID(point_id) for point_id, _ in updates]
+                        batch_vectors = [vectors for _, vectors in updates]
+                        await self._vector_store.client.update_vectors(
+                            collection_name=collection_name,
+                            points=batch_points,
+                            vectors=batch_vectors,
+                        )
+                        chunks_updated += len(updates)
+                    except Exception as update_error:
+                        logger.error(
+                            "Failed to batch update vectors for file %s: %s",
+                            file_path,
+                            update_error,
+                        )
+                        errors.append(f"{file_path}: {update_error}")
                 
                 # Update manifest to reflect new embeddings
                 if self._manifest_lock:
