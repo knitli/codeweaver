@@ -16,6 +16,7 @@ from rich.live import Live
 from rich.progress import (
     BarColumn,
     Progress,
+    ProgressColumn,
     SpinnerColumn,
     TaskProgressColumn,
     TextColumn,
@@ -31,6 +32,50 @@ from codeweaver import __version__
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
     from typing import Self
+
+    from rich.console import RenderableType
+    from rich.progress import Task
+
+
+class AtomicAwareBarColumn(BarColumn):
+    """BarColumn that skips rendering for atomic tasks."""
+
+    def render(self, task: Task) -> RenderableType:
+        """Render the bar, or empty for atomic tasks."""
+        return Text("") if task.fields.get("atomic", False) else super().render(task)
+
+
+class AtomicAwarePercentColumn(ProgressColumn):
+    """Percentage column that skips rendering for atomic tasks."""
+
+    def render(self, task: Task) -> Text:
+        """Render percentage, or empty for atomic tasks."""
+        if task.fields.get("atomic", False):
+            return Text("")
+        percentage = task.percentage
+        return Text(f"{percentage:>3.0f}%")
+
+
+class AtomicAwareCountColumn(ProgressColumn):
+    """Completed/total column that skips rendering for atomic tasks."""
+
+    def render(self, task: Task) -> Text:
+        """Render count, or empty for atomic tasks."""
+        if task.fields.get("atomic", False):
+            return Text("")
+        return Text(f"{int(task.completed)}/{int(task.total)}")
+
+
+class AtomicAwareSeparatorColumn(ProgressColumn):
+    """Separator column that skips rendering for atomic tasks."""
+
+    def __init__(self, separator: str = "•") -> None:
+        super().__init__()
+        self._separator = separator
+
+    def render(self, task: Task) -> Text:
+        """Render separator, or empty for atomic tasks."""
+        return Text("") if task.fields.get("atomic", False) else Text(self._separator)
 
 
 class IndexingProgress:
@@ -59,10 +104,10 @@ class IndexingProgress:
         self.progress = Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            TextColumn("•"),
-            TextColumn("{task.completed}/{task.total}"),
+            AtomicAwareBarColumn(),
+            AtomicAwarePercentColumn(),
+            AtomicAwareSeparatorColumn("•"),
+            AtomicAwareCountColumn(),
             TimeElapsedColumn(),
             console=self.console,
             expand=False,
@@ -150,7 +195,7 @@ class IndexingProgress:
             )
         # Indexing is atomic - just show spinner, no bar progress
         self._indexing_task = self.progress.add_task(
-            "[dim]  Indexing...[/dim]", total=1, visible=True
+            "[dim]  Indexing...[/dim]", total=1, visible=True, atomic=True
         )
 
         self.progress.start()
@@ -403,12 +448,10 @@ class IndexingProgress:
         # Update overall files progress
         if files_in_batch > 0:
             self._cumulative_files_processed += files_in_batch
-        else:
-            # Estimate from checking task if not provided
-            if self._checking_task is not None:
-                task = self.progress.tasks[self._checking_task]
-                if task.total and task.total > 0:
-                    self._cumulative_files_processed += int(task.total)
+        elif self._checking_task is not None:
+            task = self.progress.tasks[self._checking_task]
+            if task.total and task.total > 0:
+                self._cumulative_files_processed += int(task.total)
 
         if self._overall_task is not None and self._total_files > 0:
             self.progress.update(

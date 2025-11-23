@@ -58,7 +58,7 @@ from codeweaver.server.health_service import HealthService
 
 
 if TYPE_CHECKING:
-    from codeweaver.cli.ui import StatusDisplay
+    from codeweaver.cli.ui import IndexingProgress, StatusDisplay
     from codeweaver.common.utils import LazyImport
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
@@ -222,7 +222,10 @@ async def _run_background_indexing(
         settings: Configuration settings
         status_display: StatusDisplay instance for user-facing output
         verbose: Whether to show verbose output
+        debug: Whether debug mode is enabled
     """
+    from codeweaver.cli.ui import IndexingProgress
+
     watcher_task = None
     try:
         if verbose:
@@ -235,81 +238,97 @@ async def _run_background_indexing(
                 logger.warning("No indexer configured, skipping background indexing")
             return
 
-        # Show discovery step to user
-        status_display.print_step("Discovering files...")
+        status_display.print_info("Initializing indexer...")
 
-        # Track progress with callback for live updates
-        progress_update = None
-        total_files = 0
-        files_processed = 0
+        # Check if sparse embeddings are configured
+        has_sparse = state.indexer._sparse_provider is not None
 
+        # Create progress tracker with batch support (same as index command)
+        progress_tracker: IndexingProgress = IndexingProgress(
+            console=status_display.console, has_sparse=has_sparse
+        )
+
+        # Track files in current batch for complete_batch
+        current_batch_files = [0]  # Use list to allow mutation in closure
+
+        # Create callback that maps to IndexingProgress methods (same as index command)
         def progress_callback(
             phase: str, current: int, total: int, *, extra: dict[str, Any] | None = None
         ) -> None:
-            nonlocal progress_update, total_files, files_processed
-            if phase == "discovery":
-                total_files = max(total_files, total, current)
+            if phase == "batch_start":
+                if current == 0:
+                    # Initial setup - start with total batches
+                    total_files = extra.get("total_files", 0) if extra else 0
+                    progress_tracker.start(total_batches=total, total_files=total_files)
+                else:
+                    # Start of a specific batch
+                    files_in_batch = extra.get("files_in_batch", 0) if extra else 0
+                    current_batch_files[0] = files_in_batch
+                    progress_tracker.start_batch(current, files_in_batch)
+            elif phase == "batch_complete":
+                progress_tracker.complete_batch(current_batch_files[0])
+                current_batch_files[0] = 0
+            elif phase == "discovery":
+                # Legacy discovery callback - maps to checking
+                progress_tracker.update_discovery(current, total)
+            elif phase == "checking":
+                progress_tracker.update_checking(current, total)
             elif phase == "chunking":
-                files_processed = min(files_processed + current, total_files or total)
-                if progress_update:
-                    progress_update(files_processed)
-            elif phase == "indexing" and progress_update:
-                progress_update(total_files or total)
+                chunks_created = extra.get("chunks_created", 0) if extra else 0
+                progress_tracker.update_chunking(current, total, chunks_created)
+            elif phase == "dense_embedding":
+                progress_tracker.update_dense_embedding(current, total)
+            elif phase == "sparse_embedding":
+                progress_tracker.update_sparse_embedding(current, total)
+            elif phase == "embedding":
+                # Legacy embedding callback - maps to dense
+                progress_tracker.update_embedding(current, total)
+            elif phase == "indexing":
+                progress_tracker.update_indexing(current, total)
 
-        # Prime index (initial indexing) with progress tracking
-        start_time = time.time()
+        status_display.print_success("Starting indexing process...")
 
-        # Show context: discovered files
-        stats = state.indexer.stats
-        files_discovered = stats.files_discovered or 0
-
-        # Only show progress bar if we have files to index
-        if total_files > 0 or files_discovered > 0:
-            with status_display.progress_bar(
-                total=max(total_files, files_discovered), description="Indexing codebase"
-            ) as update:
-                progress_update = update
-                await state.indexer.prime_index(
-                    force_reindex=False,
-                    progress_callback=progress_callback,
-                    status_display=None if verbose or debug else status_display,
-                )
-        else:
+        with progress_tracker:
             await state.indexer.prime_index(
                 force_reindex=False,
                 progress_callback=progress_callback,
                 status_display=None if verbose or debug else status_display,
             )
+            progress_tracker.complete()
 
-        time.time() - start_time
-
-        # Get final statistics from indexer
+        # Display final summary
         stats = state.indexer.stats
-        files_processed = stats.files_processed
-        chunks_created = stats.chunks_created
-        files_discovered = stats.files_discovered
-
-        # Calculate language breakdown from indexed chunks
-        language_breakdown = {}
-        if hasattr(state.indexer, "_store") and state.indexer._store:
-            for discovered_file in state.indexer._store.values():
-                lang = getattr(discovered_file, "language", None)
-                if lang:
-                    language_breakdown[lang] = language_breakdown.get(lang, 0) + 1
-
-        # Calculate averages
-        avg_chunks_per_file = chunks_created / files_processed if files_processed > 0 else 0
-        avg_tokens_per_chunk = 150  # Placeholder estimate
-
-        # Show index summary
-        status_display.print_index_summary(
-            files_indexed=files_processed,
-            chunks_created=chunks_created,
-            language_breakdown=language_breakdown or None,
-            avg_chunks_per_file=avg_chunks_per_file,
-            avg_tokens_per_chunk=avg_tokens_per_chunk,
+        status_display.console.print()
+        status_display.print_success("Indexing Complete!")
+        status_display.console.print()
+        status_display.console.print(f"  Files processed: [cyan]{stats.files_processed}[/cyan]")
+        status_display.console.print(f"  Chunks created: [cyan]{stats.chunks_created}[/cyan]")
+        status_display.console.print(f"  Chunks indexed: [cyan]{stats.chunks_indexed}[/cyan]")
+        status_display.console.print(
+            f"  Processing rate: [cyan]{stats.processing_rate():.2f}[/cyan] files/sec"
         )
 
+        # Format elapsed time in human-readable format
+        elapsed = stats.elapsed_time()
+        if elapsed >= 3600:
+            hours = int(elapsed // 3600)
+            minutes = int((elapsed % 3600) // 60)
+            seconds = int(elapsed % 60)
+            time_str = f"{hours}h {minutes}m {seconds}s"
+        elif elapsed >= 60:
+            minutes = int(elapsed // 60)
+            seconds = int(elapsed % 60)
+            time_str = f"{minutes}m {seconds}s"
+        else:
+            time_str = f"{elapsed:.1f}s"
+        status_display.console.print(f"  Time elapsed: [cyan]{time_str}[/cyan]")
+
+        if stats.total_errors > 0:
+            status_display.console.print(
+                f"  [yellow]Files with errors: {stats.total_errors}[/yellow]"
+            )
+
+        status_display.console.print()
         status_display.print_step("Watching for file changes...")
 
         # Start file watcher for real-time updates

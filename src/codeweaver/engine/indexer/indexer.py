@@ -591,6 +591,19 @@ class Indexer(BasedModel):
             self._manifest_lock = asyncio.Lock()
 
         try:
+            # Delete old chunks if file is being reindexed (already exists in manifest)
+            # This prevents stale embeddings from accumulating in the vector store
+            if self._file_manifest and self._vector_store:
+                relative_path = set_relative_path(path)
+                if relative_path and self._file_manifest.has_file(relative_path):
+                    try:
+                        await self._vector_store.delete_by_file(path)
+                        logger.debug("Deleted old chunks for reindexed file: %s", relative_path)
+                    except Exception:
+                        logger.warning(
+                            "Failed to delete old chunks for: %s", relative_path, exc_info=True
+                        )
+
             # 1. Discover and store file metadata
             self._last_indexing_phase = "discovery"
             discovered_file = DiscoveredFile.from_path(path)
@@ -1980,6 +1993,25 @@ class Indexer(BasedModel):
             )
             return
 
+        # Phase 1.5: Delete old chunks for files being reindexed
+        # This prevents stale embeddings from accumulating in the vector store
+        if self._file_manifest and self._vector_store:
+            files_deleted = 0
+            for file_path in files:
+                relative_path = set_relative_path(file_path)
+                if relative_path and self._file_manifest.has_file(relative_path):
+                    try:
+                        await self._vector_store.delete_by_file(file_path)
+                        files_deleted += 1
+                    except Exception:
+                        logger.warning(
+                            "Failed to delete old chunks for: %s", relative_path, exc_info=True
+                        )
+            if files_deleted > 0:
+                logger.debug(
+                    "Deleted old chunks for %d reindexed files in batch", files_deleted
+                )
+
         # Phase 2: Chunk files
         all_chunks = await self._phase_chunking(discovered_files, progress_callback, context)
         if not all_chunks:
@@ -2195,7 +2227,7 @@ class Indexer(BasedModel):
         return True
 
     async def validate_manifest_with_vector_store(self) -> dict[str, Any]:
-        """Validate that chunks in manifest exist in vector store.
+        """Validate that chunks in manifest exist in vector store and detect orphans.
 
         Returns:
             Dictionary with validation results including:
@@ -2203,6 +2235,8 @@ class Indexer(BasedModel):
             - missing_chunks: Number of chunks not found in vector store
             - missing_chunk_ids: List of missing chunk IDs
             - files_with_missing_chunks: List of file paths with missing chunks
+            - orphaned_chunks: Number of chunks in store but not in manifest
+            - orphaned_chunk_ids: List of orphaned chunk IDs (stale embeddings)
         """
         if not self._file_manifest:
             return {
@@ -2211,6 +2245,8 @@ class Indexer(BasedModel):
                 "missing_chunks": 0,
                 "missing_chunk_ids": [],
                 "files_with_missing_chunks": [],
+                "orphaned_chunks": 0,
+                "orphaned_chunk_ids": [],
             }
 
         if not self._vector_store:
@@ -2220,12 +2256,15 @@ class Indexer(BasedModel):
                 "missing_chunks": 0,
                 "missing_chunk_ids": [],
                 "files_with_missing_chunks": [],
+                "orphaned_chunks": 0,
+                "orphaned_chunk_ids": [],
             }
 
         from qdrant_client.models import UUID
 
         # Get all chunk IDs from manifest
         manifest_chunk_ids = self._file_manifest.get_all_chunk_ids()
+        manifest_chunk_set = set(manifest_chunk_ids)
 
         logger.info(
             "Validating %d chunks from manifest against vector store", len(manifest_chunk_ids)
@@ -2233,6 +2272,7 @@ class Indexer(BasedModel):
 
         # Try to retrieve chunks from vector store
         missing_chunk_ids: list[str] = []
+        orphaned_chunk_ids: list[str] = []
         files_with_missing: set[str] = set()
 
         # Batch retrieve chunks (Qdrant supports retrieving multiple points)
@@ -2249,13 +2289,14 @@ class Indexer(BasedModel):
                     "missing_chunks": 0,
                     "missing_chunk_ids": [],
                     "files_with_missing_chunks": [],
+                    "orphaned_chunks": 0,
+                    "orphaned_chunk_ids": [],
                 }
 
-            # Batch retrieval to avoid Qdrant limits (e.g., 1000 IDs per batch)
-            batch_size = 1000
+            # Retrieve points in batches to avoid Qdrant limits
             retrieved = []
-            for i in range(0, len(point_ids), batch_size):
-                batch_ids = point_ids[i : i + batch_size]
+            for i in range(0, len(point_ids), 1000):
+                batch_ids = point_ids[i : i + 1000]
                 batch_retrieved = await self._vector_store.client.retrieve(
                     collection_name=collection_name,
                     ids=batch_ids,
@@ -2264,7 +2305,7 @@ class Indexer(BasedModel):
                 )
                 retrieved.extend(batch_retrieved)
 
-            # Check which chunks are missing
+            # Check which chunks are missing from store
             retrieved_ids = {str(point.id) for point in retrieved}
             missing_chunk_ids = [cid for cid in manifest_chunk_ids if cid not in retrieved_ids]
 
@@ -2275,11 +2316,41 @@ class Indexer(BasedModel):
                     if any(cid in missing_chunk_ids for cid in chunk_ids):
                         files_with_missing.add(path_str)
 
+            # Detect orphaned chunks (in store but not in manifest)
+            # Use HasIdCondition filter to efficiently find points NOT in manifest
+            from qdrant_client.models import Filter, HasIdCondition
+
+            orphan_filter = Filter(
+                must_not=[HasIdCondition(has_id=point_ids)]  # Reuse point_ids from earlier
+            )
+
+            # Scroll with filter to get only orphaned points
+            orphaned_chunk_ids = []
+            offset = None
+            while True:
+                scroll_result = await self._vector_store.client.scroll(
+                    collection_name=collection_name,
+                    scroll_filter=orphan_filter,
+                    limit=1000,
+                    offset=offset,
+                    with_payload=False,
+                    with_vectors=False,
+                )
+                points, next_offset = scroll_result
+                if not points:
+                    break
+                for point in points:
+                    orphaned_chunk_ids.append(str(point.id))
+                if next_offset is None:
+                    break
+                offset = next_offset
+
             logger.info(
-                "Validation complete: %d/%d chunks found, %d missing",
+                "Validation complete: %d/%d manifest chunks found, %d missing, %d orphaned",
                 len(retrieved_ids),
                 len(manifest_chunk_ids),
                 len(missing_chunk_ids),
+                len(orphaned_chunk_ids),
             )
 
         except Exception as e:
@@ -2290,6 +2361,8 @@ class Indexer(BasedModel):
                 "missing_chunks": 0,
                 "missing_chunk_ids": [],
                 "files_with_missing_chunks": [],
+                "orphaned_chunks": 0,
+                "orphaned_chunk_ids": [],
             }
 
         return {
@@ -2297,6 +2370,8 @@ class Indexer(BasedModel):
             "missing_chunks": len(missing_chunk_ids),
             "missing_chunk_ids": missing_chunk_ids[:100],  # Limit to first 100 for logging
             "files_with_missing_chunks": sorted(files_with_missing),
+            "orphaned_chunks": len(orphaned_chunk_ids),
+            "orphaned_chunk_ids": orphaned_chunk_ids[:100],  # Limit to first 100 for logging
         }
 
     async def add_missing_embeddings_to_existing_chunks(
