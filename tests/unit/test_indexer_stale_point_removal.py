@@ -26,10 +26,7 @@ class TestStalePointRemovalInIndexFile:
     def mock_indexer(self, tmp_path: Path):
         """Create an indexer with mocked dependencies."""
         # Create indexer with proper initialization
-        indexer = Indexer(
-            project_path=tmp_path,
-            auto_initialize_providers=False,
-        )
+        indexer = Indexer(project_path=tmp_path, auto_initialize_providers=False)
 
         # Set up manifest
         indexer._file_manifest = IndexFileManifest(project_path=tmp_path)
@@ -77,9 +74,7 @@ class TestStalePointRemovalInIndexFile:
         mock_indexer._vector_store.delete_by_file.assert_called_once_with(test_file)
 
     @pytest.mark.asyncio
-    async def test_no_deletion_for_new_file(
-        self, mock_indexer: Indexer, tmp_path: Path
-    ) -> None:
+    async def test_no_deletion_for_new_file(self, mock_indexer: Indexer, tmp_path: Path) -> None:
         """Test that no deletion occurs for new files not in manifest."""
         # Create a test file (not in manifest)
         test_file = tmp_path / "new_file.py"
@@ -97,9 +92,7 @@ class TestStalePointRemovalInIndexFile:
         mock_indexer._vector_store.delete_by_file.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_deletion_continues_on_error(
-        self, mock_indexer: Indexer, tmp_path: Path
-    ) -> None:
+    async def test_deletion_continues_on_error(self, mock_indexer: Indexer, tmp_path: Path) -> None:
         """Test that indexing continues even if deletion fails."""
         # Create a test file
         test_file = tmp_path / "modified.py"
@@ -136,10 +129,7 @@ class TestStalePointRemovalInBatchIndexing:
     def mock_indexer_batch(self, tmp_path: Path):
         """Create an indexer configured for batch testing."""
         # Create indexer with proper initialization
-        indexer = Indexer(
-            project_path=tmp_path,
-            auto_initialize_providers=False,
-        )
+        indexer = Indexer(project_path=tmp_path, auto_initialize_providers=False)
 
         # Set up manifest
         indexer._file_manifest = IndexFileManifest(project_path=tmp_path)
@@ -187,9 +177,7 @@ class TestStalePointRemovalInBatchIndexing:
             await mock_indexer_batch._index_files_batch([modified_file, new_file])
 
         # Verify delete_by_file was called only for modified_file
-        mock_indexer_batch._vector_store.delete_by_file.assert_called_once_with(
-            modified_file
-        )
+        mock_indexer_batch._vector_store.delete_by_file.assert_called_once_with(modified_file)
 
     @pytest.mark.asyncio
     async def test_batch_deletes_multiple_modified_files(
@@ -205,14 +193,10 @@ class TestStalePointRemovalInBatchIndexing:
 
         # Add both files to manifest
         mock_indexer_batch._file_manifest.add_file(
-            path=Path("file1.py"),
-            content_hash=get_blake_hash(b"old1"),
-            chunk_ids=["chunk-1"],
+            path=Path("file1.py"), content_hash=get_blake_hash(b"old1"), chunk_ids=["chunk-1"]
         )
         mock_indexer_batch._file_manifest.add_file(
-            path=Path("file2.py"),
-            content_hash=get_blake_hash(b"old2"),
-            chunk_ids=["chunk-2"],
+            path=Path("file2.py"), content_hash=get_blake_hash(b"old2"), chunk_ids=["chunk-2"]
         )
 
         # Mock set_relative_path to return correct relative path for test
@@ -233,10 +217,7 @@ class TestOrphanDetectionInValidation:
     @pytest.fixture
     def mock_indexer_validation(self, tmp_path: Path):
         """Create an indexer configured for validation testing."""
-        indexer = Indexer(
-            project_path=tmp_path,
-            auto_initialize_providers=False,
-        )
+        indexer = Indexer(project_path=tmp_path, auto_initialize_providers=False)
 
         # Mock manifest with known chunks
         indexer._file_manifest = IndexFileManifest(project_path=tmp_path)
@@ -311,14 +292,10 @@ class TestOrphanDetectionInValidation:
         mock_point = MagicMock()
         mock_point.id = chunk_id_1
 
-        mock_indexer_validation._vector_store.client.retrieve = AsyncMock(
-            return_value=[mock_point]
-        )
+        mock_indexer_validation._vector_store.client.retrieve = AsyncMock(return_value=[mock_point])
 
         # Mock scroll to return no orphans
-        mock_indexer_validation._vector_store.client.scroll = AsyncMock(
-            return_value=([], None)
-        )
+        mock_indexer_validation._vector_store.client.scroll = AsyncMock(return_value=([], None))
 
         # Run validation
         result = await mock_indexer_validation.validate_manifest_with_vector_store()
@@ -355,9 +332,7 @@ class TestOrphanDetectionInValidation:
         )
 
         # Mock scroll to return no orphans (empty result)
-        mock_indexer_validation._vector_store.client.scroll = AsyncMock(
-            return_value=([], None)
-        )
+        mock_indexer_validation._vector_store.client.scroll = AsyncMock(return_value=([], None))
 
         # Run validation
         result = await mock_indexer_validation.validate_manifest_with_vector_store()

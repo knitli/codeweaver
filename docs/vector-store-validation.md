@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # Vector Store Validation and Selective Reindexing
 
 This document describes the new vector store validation and selective reindexing features added to the CodeWeaver indexer in PR #136 completion.

@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # MCP Registry Submission Guide
 
 This document explains how CodeWeaver is configured for submission to the [Model Context Protocol (MCP) Registry](https://registry.modelcontextprotocol.io) and other distribution channels.

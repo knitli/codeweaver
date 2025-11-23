@@ -1097,7 +1097,7 @@ class ProviderRegistry(BasedModel):
         ):
             return self._build_embedding_provider(
                 provider, provider_kind, retrieved_cls, kwargs_for_provider
-            )
+            )  # ty: ignore[invalid-argument-type]
         # Standard handling for other providers
         # Handle None case
         if retrieved_cls is None:

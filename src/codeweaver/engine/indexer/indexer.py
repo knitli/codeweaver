@@ -1337,28 +1337,7 @@ class Indexer(BasedModel):
 
         # Log error summary if there were errors
         if self._stats.total_errors > 0:
-            error_summary = self._stats.get_error_summary()
-            logger.warning(
-                "⚠️  Indexing completed with errors: %d total errors", error_summary["total_errors"]
-            )
-            logger.warning("Errors by phase: %s", error_summary["by_phase"])
-            logger.warning("Errors by type: %s", error_summary["by_type"])
-
-            # Log first 2 errors at WARNING for visibility, rest at DEBUG
-            for i, error in enumerate(self._stats.structured_errors[:5]):
-                log_func = logger.warning if i < 2 else logger.debug
-                log_func(
-                    "Error %d/%d: %s in %s - %s: %s",
-                    i + 1,
-                    error_summary["total_errors"],
-                    error["file_path"],
-                    error["phase"],
-                    error["error_type"],
-                    error["error_message"],
-                )
-            if error_summary["total_errors"] > 5:
-                logger.debug("... and %d more errors", error_summary["total_errors"] - 5)
-
+            self._log_error_summary()
         # Save file manifest
         self._save_file_manifest()
 
@@ -1370,6 +1349,29 @@ class Indexer(BasedModel):
         if self._checkpoint_manager and self._stats.total_errors == 0:
             self._checkpoint_manager.delete()
             logger.info("Checkpoint file deleted after successful completion")
+
+    def _log_error_summary(self):
+        error_summary = self._stats.get_error_summary()
+        logger.warning(
+            "⚠️  Indexing completed with errors: %d total errors", error_summary["total_errors"]
+        )
+        logger.warning("Errors by phase: %s", error_summary["by_phase"])
+        logger.warning("Errors by type: %s", error_summary["by_type"])
+
+        # Log first 2 errors at WARNING for visibility, rest at DEBUG
+        for i, error in enumerate(self._stats.structured_errors[:5]):
+            log_func = logger.warning if i < 2 else logger.debug
+            log_func(
+                "Error %d/%d: %s in %s - %s: %s",
+                i + 1,
+                error_summary["total_errors"],
+                error["file_path"],
+                error["phase"],
+                error["error_type"],
+                error["error_message"],
+            )
+        if error_summary["total_errors"] > 5:
+            logger.debug("... and %d more errors", error_summary["total_errors"] - 5)
 
     async def prime_index(
         self,
@@ -2008,9 +2010,7 @@ class Indexer(BasedModel):
                             "Failed to delete old chunks for: %s", relative_path, exc_info=True
                         )
             if files_deleted > 0:
-                logger.debug(
-                    "Deleted old chunks for %d reindexed files in batch", files_deleted
-                )
+                logger.debug("Deleted old chunks for %d reindexed files in batch", files_deleted)
 
         # Phase 2: Chunk files
         all_chunks = await self._phase_chunking(discovered_files, progress_callback, context)
@@ -2145,28 +2145,32 @@ class Indexer(BasedModel):
                 settings_hash=settings_hash,
             )
 
+        # Type narrowing for checkpoint - guaranteed to be IndexingCheckpoint at this point
+        checkpoint = self._checkpoint
+        assert isinstance(checkpoint, IndexingCheckpoint), "Checkpoint must be initialized"  # noqa: S101
+
         # Update checkpoint with current stats
         if not isinstance(self._stats, IndexingStats):
             self._stats = IndexingStats()
-        self._checkpoint.files_discovered = self._stats.files_discovered
-        self._checkpoint.files_embedding_complete = self._stats.files_processed
-        self._checkpoint.files_indexed = self._stats.files_processed
-        self._checkpoint.chunks_created = self._stats.chunks_created
-        self._checkpoint.chunks_embedded = self._stats.chunks_embedded
-        self._checkpoint.chunks_indexed = self._stats.chunks_indexed
-        self._checkpoint.files_with_errors = [str(p) for p in self._stats.files_with_errors]
-        self._checkpoint.settings_hash = settings_hash
+        checkpoint.files_discovered = self._stats.files_discovered
+        checkpoint.files_embedding_complete = self._stats.files_processed
+        checkpoint.files_indexed = self._stats.files_processed
+        checkpoint.chunks_created = self._stats.chunks_created
+        checkpoint.chunks_embedded = self._stats.chunks_embedded
+        checkpoint.chunks_indexed = self._stats.chunks_indexed
+        checkpoint.files_with_errors = [str(p) for p in self._stats.files_with_errors]
+        checkpoint.settings_hash = settings_hash
 
         # Update manifest info
         if self._file_manifest:
-            self._checkpoint.has_file_manifest = True
-            self._checkpoint.manifest_file_count = self._file_manifest.total_files
+            checkpoint.has_file_manifest = True
+            checkpoint.manifest_file_count = self._file_manifest.total_files
         else:
-            self._checkpoint.has_file_manifest = False
-            self._checkpoint.manifest_file_count = 0
+            checkpoint.has_file_manifest = False
+            checkpoint.manifest_file_count = 0
 
         # Save to disk
-        self._checkpoint_manager.save(self._checkpoint)
+        self._checkpoint_manager.save(checkpoint)
         self._last_checkpoint_time = time.time()
         self._files_since_checkpoint = 0
 
@@ -2264,7 +2268,6 @@ class Indexer(BasedModel):
 
         # Get all chunk IDs from manifest
         manifest_chunk_ids = self._file_manifest.get_all_chunk_ids()
-        manifest_chunk_set = set(manifest_chunk_ids)
 
         logger.info(
             "Validating %d chunks from manifest against vector store", len(manifest_chunk_ids)
@@ -2339,8 +2342,7 @@ class Indexer(BasedModel):
                 points, next_offset = scroll_result
                 if not points:
                     break
-                for point in points:
-                    orphaned_chunk_ids.append(str(point.id))
+                orphaned_chunk_ids.extend(str(point.id) for point in points)
                 if next_offset is None:
                     break
                 offset = next_offset
