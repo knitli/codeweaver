@@ -142,7 +142,7 @@ curl -L "https://github.com/modelcontextprotocol/registry/releases/download/v1.0
 # TODO: Verify checksum when official checksums are published by registry maintainers
 # Example: sha256sum -c mcp-publisher.tar.gz.sha256
 
-tar xz < mcp-publisher.tar.gz
+tar xzf mcp-publisher.tar.gz
 sudo mv mcp-publisher /usr/local/bin/
 
 # Initialize (creates server.json template)
