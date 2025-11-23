@@ -49,7 +49,7 @@ models.
 This build also uses a local qdrant vector store to minimize setup time. However, for some of the same reasons, we recommend using a [qdrant cloud instance](https://qdrant.io/cloud). Like Voyage, the free tier is generous and should be sufficient for most use cases.
 
 EOF
-                exit 78
+                exit 78  # EX_CONFIG: Configuration error (see BSD sysexits.h)
         fi
 fi
 
