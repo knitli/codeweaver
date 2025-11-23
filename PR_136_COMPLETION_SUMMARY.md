@@ -120,5 +120,5 @@ All requirements from the problem statement have been successfully implemented:
 - ✅ All reviewer comments from PR #136 addressed
 - ✅ TypedDict uses Required/NotRequired as specified
 - ✅ Vector store validation implemented
-- ✅ Selective reindexing with batch updates implemented
+- ✅ Selective reindexing using update_vectors API implemented
 - ✅ Comprehensive testing and documentation added
