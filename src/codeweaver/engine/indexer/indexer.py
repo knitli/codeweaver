@@ -2314,6 +2314,10 @@ class Indexer(BasedModel):
         if not (add_dense or add_sparse):
             return {"error": "Must specify add_dense or add_sparse", "files_processed": 0, "chunks_updated": 0}
 
+        if add_dense and not self._embedding_provider:
+            return {"error": "Dense embedding provider is not configured", "files_processed": 0, "chunks_updated": 0}
+        if add_sparse and not self._sparse_provider:
+            return {"error": "Sparse embedding provider is not configured", "files_processed": 0, "chunks_updated": 0}
         # Get current embedding configuration
         current_models = self._get_current_embedding_models()
         
