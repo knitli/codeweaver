@@ -62,6 +62,16 @@ if TYPE_CHECKING:
     from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 
 
+class IndexingError(TypedDict):
+    """Structured error information for failed file indexing."""
+
+    file_path: str  # Path to the file that failed
+    error_type: str  # Type of error (e.g., "ValueError", "RuntimeError")
+    error_message: str  # Error message
+    phase: str  # Phase where error occurred (discovery, chunking, embedding, storage)
+    timestamp: str  # ISO8601 timestamp when error occurred
+
+
 class ProgressCallback(Protocol):
     """Protocol for progress callback functions.
 
@@ -152,12 +162,9 @@ class IndexingStats:
     chunks_embedded: int = 0
     chunks_indexed: int = 0
     start_time: float = dataclasses.field(default_factory=time.time)
-    files_with_errors: ClassVar[
-        Annotated[
-            list[Path],
-            Field(description="""List of file paths that encountered errors during indexing."""),
-        ]
-    ] = []
+    files_with_errors: list[Path] = dataclasses.field(default_factory=list)
+    # Structured error tracking (new in v1.1.0)
+    structured_errors: list[IndexingError] = dataclasses.field(default_factory=list)
 
     def elapsed_time(self) -> float:
         """Calculate elapsed time since indexing started."""
@@ -171,13 +178,56 @@ class IndexingStats:
 
     @property
     def total_errors(self) -> int:
-        """Total number of files with errors."""
-        return len(self.files_with_errors)
+        """Total number of files with errors (based on structured error tracking)."""
+        return len(self.structured_errors)
 
     @property
     def total_files_discovered(self) -> int:
         """Total files discovered (alias for files_discovered)."""
         return self.files_discovered
+    
+    def add_error(self, file_path: Path, error: Exception, phase: str) -> None:
+        """Add a structured error to the tracking system.
+        
+        Args:
+            file_path: Path to the file that failed
+            error: The exception that occurred
+            phase: Phase where error occurred (discovery, chunking, embedding, storage)
+        """
+        from datetime import UTC, datetime
+        
+        self.files_with_errors.append(file_path)
+        self.structured_errors.append(IndexingError(
+            file_path=str(file_path),
+            error_type=type(error).__name__,
+            error_message=str(error),
+            phase=phase,
+            timestamp=datetime.now(UTC).isoformat(),
+        ))
+    
+    def get_error_summary(self) -> dict[str, Any]:
+        """Get summary of errors by phase and type.
+        
+        Returns:
+            Dictionary with error statistics
+        """
+        if not self.structured_errors:
+            return {"total_errors": 0, "by_phase": {}, "by_type": {}}
+        
+        by_phase: dict[str, int] = {}
+        by_type: dict[str, int] = {}
+        
+        for error in self.structured_errors:
+            phase = error["phase"]
+            error_type = error["error_type"]
+            by_phase[phase] = by_phase.get(phase, 0) + 1
+            by_type[error_type] = by_type.get(error_type, 0) + 1
+        
+        return {
+            "total_errors": len(self.structured_errors),
+            "by_phase": by_phase,
+            "by_type": by_type,
+        }
 
 
 class Indexer(BasedModel):
@@ -492,6 +542,37 @@ class Indexer(BasedModel):
 
         self._providers_initialized = True
 
+    def _get_current_embedding_models(self) -> dict[str, str | None]:
+        """Get current embedding model configuration.
+
+        Returns:
+            Dictionary with current dense and sparse model info
+        """
+        result: dict[str, str | None] = {
+            "dense_provider": None,
+            "dense_model": None,
+            "sparse_provider": None,
+            "sparse_model": None,
+        }
+        
+        # Get dense embedding provider info
+        if self._embedding_provider:
+            provider_name = type(self._embedding_provider).__name__.replace("Provider", "").lower()
+            result["dense_provider"] = provider_name
+            # Try to get model name from provider
+            # Use standardized model_identifier property
+            result["dense_model"] = getattr(self._embedding_provider, "model_identifier", None)
+        
+        # Get sparse embedding provider info
+        if self._sparse_provider:
+            provider_name = type(self._sparse_provider).__name__.replace("Provider", "").lower()
+            result["sparse_provider"] = provider_name
+            # Try to get model name from provider
+            # Use standardized model_identifier property
+            result["sparse_model"] = getattr(self._sparse_provider, "model_identifier", None)
+        
+        return result
+
     async def _index_file(self, path: Path, context: Any = None) -> None:
         """Execute full pipeline for a single file: discover → chunk → embed → index.
 
@@ -672,11 +753,20 @@ class Indexer(BasedModel):
                 chunk_ids = [str(chunk.chunk_id) for chunk in updated_chunks]
                 if relative_path := set_relative_path(path):
                     try:
+                        # Get current embedding model info
+                        model_info = self._get_current_embedding_models()
+                        
                         async with self._manifest_lock:
                             self._file_manifest.add_file(
                                 path=relative_path,
                                 content_hash=discovered_file.file_hash,
                                 chunk_ids=chunk_ids,
+                                dense_embedding_provider=model_info["dense_provider"],
+                                dense_embedding_model=model_info["dense_model"],
+                                sparse_embedding_provider=model_info["sparse_provider"],
+                                sparse_embedding_model=model_info["sparse_model"],
+                                has_dense_embeddings=bool(self._embedding_provider),
+                                has_sparse_embeddings=bool(self._sparse_provider),
                             )
                         logger.debug(
                             "Updated manifest for file: %s (%d chunks)",
@@ -706,8 +796,13 @@ class Indexer(BasedModel):
             )
 
         except Exception as e:
-            logger.warning("Failed to index file %s", path, exc_info=True)
-            self._stats.files_with_errors.append(path)
+            # Determine phase where error occurred based on progress
+            phase = "discovery"
+            if hasattr(self, "_last_indexing_phase"):
+                phase = self._last_indexing_phase
+            
+            logger.warning("Failed to index file %s in phase '%s'", path, phase, exc_info=True)
+            self._stats.add_error(path, e, phase)
 
             await log_to_client_or_fallback(
                 context,
@@ -718,7 +813,8 @@ class Indexer(BasedModel):
                         "file_path": str(path),
                         "error": str(e),
                         "error_type": type(e).__name__,
-                        "total_errors": len(self._stats.files_with_errors),
+                        "phase": phase,
+                        "total_errors": self._stats.total_errors,
                     },
                 },
             )
@@ -965,11 +1061,20 @@ class Indexer(BasedModel):
 
             if relative_path := set_relative_path(discovered_file.path):
                 try:
+                    # Get current embedding model info
+                    model_info = self._get_current_embedding_models()
+                    
                     async with self._manifest_lock:
                         self._file_manifest.add_file(
                             path=relative_path,
                             content_hash=discovered_file.file_hash,
                             chunk_ids=chunk_ids,
+                            dense_embedding_provider=model_info["dense_provider"],
+                            dense_embedding_model=model_info["dense_model"],
+                            sparse_embedding_provider=model_info["sparse_provider"],
+                            sparse_embedding_model=model_info["sparse_model"],
+                            has_dense_embeddings=bool(self._embedding_provider),
+                            has_sparse_embeddings=bool(self._sparse_provider),
                         )
                     logger.debug(
                         "Updated manifest for file: %s (%d chunks)", relative_path, len(chunk_ids)
@@ -1045,7 +1150,11 @@ class Indexer(BasedModel):
         # Filter to only new or modified files
         files_to_index: list[Path] = []
         unchanged_count = 0
+        model_changed_count = 0
         total_to_check = len(all_files)
+        
+        # Get current embedding model configuration for comparison
+        current_models = self._get_current_embedding_models()
 
         for idx, path in enumerate(all_files):
             try:
@@ -1060,9 +1169,21 @@ class Indexer(BasedModel):
                     continue
 
                 try:
-                    # Check if file is new or changed
-                    if self._file_manifest.file_changed(relative_path, current_hash):
+                    # Check if file needs reindexing (content or embedding model changed)
+                    needs_reindex, reason = self._file_manifest.file_needs_reindexing(
+                        relative_path,
+                        current_hash,
+                        current_dense_provider=current_models["dense_provider"],
+                        current_dense_model=current_models["dense_model"],
+                        current_sparse_provider=current_models["sparse_provider"],
+                        current_sparse_model=current_models["sparse_model"],
+                    )
+                    
+                    if needs_reindex:
                         files_to_index.append(path)
+                        if "model_changed" in reason:
+                            model_changed_count += 1
+                            logger.debug("File needs reindexing due to %s: %s", reason, relative_path)
                     else:
                         unchanged_count += 1
                 except ValueError as e:
@@ -1094,10 +1215,11 @@ class Indexer(BasedModel):
                 self._deleted_files = []
 
         logger.info(
-            "Incremental indexing: %d new/modified, %d unchanged, %d deleted",
+            "Incremental indexing: %d new/modified, %d unchanged, %d deleted%s",
             len(files_to_index),
             unchanged_count,
             len(deleted_files) if deleted_files else 0,
+            f", {model_changed_count} due to embedding model changes" if model_changed_count > 0 else "",
         )
 
         self._stats.files_discovered = len(files_to_index)
@@ -1181,10 +1303,34 @@ class Indexer(BasedModel):
             self._stats.files_processed,
             self._stats.chunks_created,
             self._stats.chunks_indexed,
-            len(self._stats.files_with_errors),
+            self._stats.total_errors,
             self._stats.elapsed_time(),
             self._stats.processing_rate(),
         )
+        
+        # Log error summary if there were errors
+        if self._stats.total_errors > 0:
+            error_summary = self._stats.get_error_summary()
+            logger.warning(
+                "⚠️  Indexing completed with errors: %d total errors",
+                error_summary["total_errors"]
+            )
+            logger.warning("Errors by phase: %s", error_summary["by_phase"])
+            logger.warning("Errors by type: %s", error_summary["by_type"])
+            
+            # Log first few errors for debugging
+            for i, error in enumerate(self._stats.structured_errors[:5]):
+                logger.debug(
+                    "Error %d/%d: %s in %s - %s: %s",
+                    i + 1,
+                    error_summary["total_errors"],
+                    error["file_path"],
+                    error["phase"],
+                    error["error_type"],
+                    error["error_message"],
+                )
+            if error_summary["total_errors"] > 5:
+                logger.debug("... and %d more errors", error_summary["total_errors"] - 5)
 
         # Save file manifest
         self._save_file_manifest()
@@ -1194,7 +1340,7 @@ class Indexer(BasedModel):
         logger.info("Final checkpoint saved")
 
         # Clean up checkpoint file on successful completion
-        if self._checkpoint_manager and len(self._stats.files_with_errors) == 0:
+        if self._checkpoint_manager and self._stats.total_errors == 0:
             self._checkpoint_manager.delete()
             logger.info("Checkpoint file deleted after successful completion")
 
