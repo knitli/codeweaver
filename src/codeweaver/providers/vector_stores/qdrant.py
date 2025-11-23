@@ -9,7 +9,7 @@ from pydantic import UUID4
 from codeweaver.config.providers import QdrantConfig
 from codeweaver.core.chunks import CodeChunk, SearchResult
 from codeweaver.core.spans import Span
-from codeweaver.engine.filter import Filter
+from codeweaver.engine.filter import Filter, to_qdrant_filter
 from codeweaver.exceptions import ProviderError
 from codeweaver.providers.embedding.providers import EmbeddingProvider
 from codeweaver.providers.provider import Provider
@@ -134,10 +134,7 @@ class QdrantVectorStore(VectorStoreProvider[AsyncQdrantClient]):
             raise ProviderError("No valid vector provided (expected 'dense' or 'sparse' key in dict)")
         try:
             # Convert generic Filter to Qdrant filter format
-            qdrant_filter = None
-            if query_filter:
-                from codeweaver.engine.filter import to_qdrant_filter
-                qdrant_filter = to_qdrant_filter(query_filter)
+            qdrant_filter = to_qdrant_filter(query_filter) if query_filter else None
             if query_vector == 'sparse' and isinstance(query_value, dict):
                 from qdrant_client.models import SparseVector
                 query_value = SparseVector(indices=query_value.get('indices', []), values=query_value.get('values', []))

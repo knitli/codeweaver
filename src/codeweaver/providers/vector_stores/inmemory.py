@@ -22,10 +22,11 @@ from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.providers import MemoryConfig
 from codeweaver.core.chunks import CodeChunk, SearchResult
 from codeweaver.core.spans import Span
-from codeweaver.engine.filter import Filter
+from codeweaver.engine.filter import Filter, to_qdrant_filter
 from codeweaver.exceptions import PersistenceError, ProviderError
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.vector_stores.base import VectorStoreProvider
+from codeweaver.providers.vector_stores.metadata import CollectionMetadata
 
 
 try:
@@ -71,6 +72,7 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
         object.__setattr__(self, "_persist_interval", persist_interval)
         object.__setattr__(self, "_periodic_task", None)
         object.__setattr__(self, "_shutdown", False)
+        object.__setattr__(self, "_collection_metadata", {})
 
         # Create in-memory Qdrant client
         self._client = AsyncQdrantClient(
@@ -205,8 +207,6 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
             # Perform search using Qdrant's query_points for hybrid support
 
             # Convert generic Filter to Qdrant filter format
-            from codeweaver.engine.filter import to_qdrant_filter
-
             qdrant_filter = to_qdrant_filter(query_filter) if query_filter else None
 
             # For sparse vectors, need to convert dict to SparseVector model
@@ -461,17 +461,29 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
                     dense_size = dense_params.size if hasattr(dense_params, "size") else 768
 
                 # Create proper CollectionMetadata instance
-                from codeweaver.providers.vector_stores.metadata import CollectionMetadata
+                # Preserve original created_at timestamp if metadata exists
+                existing_metadata = self._collection_metadata.get(col.name)  # type: ignore
+                created_at = datetime.now(UTC)
+                if existing_metadata and "created_at" in existing_metadata:
+                    # Parse existing timestamp
+                    try:
+                        created_at = datetime.fromisoformat(existing_metadata["created_at"])
+                    except (ValueError, TypeError):
+                        # If parsing fails, use current time
+                        pass
 
                 metadata = CollectionMetadata(
                     provider="memory",
                     version="1.0",
-                    created_at=datetime.now(UTC),
+                    created_at=created_at,
                     embedding_dim_dense=dense_size,
                     embedding_dim_sparse=None,
                     project_name=col.name,
                     vector_config={"dense": {"size": dense_size, "distance": "Cosine"}},
                 )
+
+                # Update stored metadata
+                self._collection_metadata[col.name] = metadata.model_dump(mode="json")  # type: ignore
 
                 collections_data[col.name] = {
                     "metadata": metadata.model_dump(mode="json"),
@@ -540,6 +552,10 @@ class MemoryVectorStore(VectorStoreProvider[AsyncQdrantClient]):
                     },
                     sparse_vectors_config={"sparse": {}},  # type: ignore
                 )
+
+                # Store collection metadata if it exists
+                if "metadata" in collection_data:
+                    self._collection_metadata[collection_name] = collection_data["metadata"]  # type: ignore
 
                 # Restore points in batches
                 points_data = collection_data.get("points", [])
