@@ -18,6 +18,9 @@ class SettingsEnvVars(TypedDict):
     CODEWEAVER_LOG_LEVEL: EnvVarInfo
     """Environment variable for setting the log level."""
 
+    CODEWEAVER_PROJECT_NAME: EnvVarInfo
+    """Environment variable for setting the project name."""
+
     CODEWEAVER_PROJECT_PATH: EnvVarInfo
     """Environment variable for setting the project path."""
 
@@ -150,6 +153,13 @@ def environment_variables() -> DictView[SettingsEnvVars]:
                 is_required=False,
                 is_secret=False,
                 variable_name="project_path",
+            ),
+            CODEWEAVER_PROJECT_NAME=EnvVarInfo(
+                env="CODEWEAVER_PROJECT_NAME",
+                description="Set the project name for CodeWeaver.",
+                is_required=False,
+                is_secret=False,
+                variable_name="project_name",
             ),
             CODEWEAVER_HOST=EnvVarInfo(
                 env="CODEWEAVER_HOST",

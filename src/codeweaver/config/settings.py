@@ -179,12 +179,12 @@ class FastMcpServerSettings(BasedModel):
         ),
     ] = "streamable-http"
     host: Annotated[str | None, Field(description="""Host address for the FastMCP server.""")] = (
-        "127.0.0.1"
+        os.environ.get("CODEWEAVER_HOST", "127.0.0.1")
     )
     port: Annotated[
         PositiveInt | None,
         Field(description="""Port number for the FastMCP server. Default is 9328 ('WEAV')"""),
-    ] = 9328
+    ] = int(os.environ.get("CODEWEAVER_PORT", 9328))
 
     auth: Annotated[AuthSettings | None, Field(description="""OAuth provider configuration""")] = (
         None
@@ -358,10 +358,10 @@ class CodeWeaverSettings(BaseSettings):
     project_path: Annotated[
         DirectoryPath | Unset,
         Field(
-            description="""Root path of the codebase to analyze. CodeWeaver will try to detect the project root automatically if you don't provide one.""",
+            description="""Root path of the codebase to analyze. CodeWeaver will try to detect the project path automatically if you don't provide one.""",
             validate_default=False,
         ),
-    ] = UNSET
+    ] = Path(project) if (project := os.environ.get("CODEWEAVER_PROJECT_PATH")) else UNSET
 
     project_name: Annotated[
         str | Unset,
@@ -369,7 +369,7 @@ class CodeWeaverSettings(BaseSettings):
             description="""Project name (auto-detected from directory if None)""",
             validate_default=False,
         ),
-    ] = UNSET
+    ] = os.environ.get("CODEWEAVER_PROJECT_NAME", UNSET)
 
     provider: Annotated[
         ProviderSettings | Unset,
@@ -396,7 +396,7 @@ class CodeWeaverSettings(BaseSettings):
     max_results: Annotated[
         PositiveInt | Unset,
         Field(
-            description="""Maximum code matches to return. Because CodeWeaver primarily indexes ast-nodes, a page can return multiple matches per file, so this is not the same as the number of files returned. This is the maximum number of code matches returned in a single response.""",
+            description="""Maximum code matches to return. Because CodeWeaver primarily indexes ast-nodes, a page can return multiple matches per file, so this is not the same as the number of files returned. This is the maximum number of code matches returned in a single response. The default is 30.""",
             validate_default=False,
         ),
     ] = UNSET
