@@ -11,10 +11,13 @@ These tests validate that:
 3. Services can communicate with each other
 4. Health endpoints are accessible
 5. Basic functionality works in containerized environment
+
+NOTE: Multiple tests here look for license information in files. They *must* be bracketed by reuse's `IgnoreStart` and `IgnoreEnd` comments or reuse will fail the repository check.
 """
 
 from __future__ import annotations
 
+import contextlib
 import subprocess
 import time
 
@@ -53,10 +56,11 @@ class TestDockerfile:
         """Verify Dockerfile has SPDX license headers."""
         dockerfile = repo_root / "Dockerfile"
         content = dockerfile.read_text()
-
+        # REUSE-IgnoreStart
         assert "SPDX-FileCopyrightText:" in content, "Missing SPDX copyright header"
         assert "SPDX-License-Identifier:" in content, "Missing SPDX license identifier"
         assert "MIT OR Apache-2.0" in content, "Incorrect license in header"
+        # REUSE-IgnoreEnd
 
     def test_dockerfile_syntax(self, repo_root):
         """Validate Dockerfile syntax using hadolint (if available)."""
@@ -256,16 +260,12 @@ ENABLE_TELEMETRY=false
             # Wait for Qdrant to be ready
             max_attempts = 30
             for _attempt in range(max_attempts):
-                try:
+                with contextlib.suppress(Exception):
                     result = run_command(
                         ["curl", "-sf", "http://localhost:16333/health"], check=False
                     )
                     if result.returncode == 0:
                         break
-                except Exception:
-                    # Ignore exceptions while waiting for Qdrant to become available; will retry.
-                    pass
-
                 time.sleep(2)
 
             # Verify health endpoint responds
@@ -320,9 +320,10 @@ class TestEnvironmentFile:
         """Verify .env.example has proper license header."""
         env_example = repo_root / ".env.example"
         content = env_example.read_text()
-
+        # REUSE-IgnoreStart
         assert "SPDX-FileCopyrightText:" in content, "Missing SPDX copyright header"
         assert "SPDX-License-Identifier:" in content, "Missing SPDX license identifier"
+        # REUSE-IgnoreEnd
 
 
 @pytest.fixture
