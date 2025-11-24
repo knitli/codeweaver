@@ -66,7 +66,14 @@ jobs:
       - name: Install mise
         run: |
           if [ ! -f "$HOME/.local/bin/mise" ]; then
-            curl https://mise.run | sh
+            # Install mise directly from GitHub releases for reliability
+            MISE_VERSION="v2025.11.7"
+            MISE_URL="https://github.com/jdx/mise/releases/download/${MISE_VERSION}/mise-${MISE_VERSION}-linux-x64.tar.gz"
+            mkdir -p "$HOME/.local/bin"
+            TMPDIR="$(mktemp -d)"
+            curl -fsSL "$MISE_URL" | tar -xz -C "$TMPDIR"
+            cp "$TMPDIR/mise/bin/mise" "$HOME/.local/bin/"
+            rm -rf "$TMPDIR"
             echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           fi
       - name: Install tools with mise
