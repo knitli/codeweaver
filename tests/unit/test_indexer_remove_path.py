@@ -189,15 +189,15 @@ class TestRemovePathWithDeletedFiles:
             discovered1 = DiscoveredFile(
                 path=discovered1.path,
                 ext_kind=discovered1.ext_kind,
-                file_hash=discovered1._file_hash,
-                git_branch=discovered1._git_branch,
+                file_hash=discovered1.file_hash,
+                git_branch=discovered1.git_branch,
                 source_id=id1,
             )
             discovered2 = DiscoveredFile(
                 path=discovered2.path,
                 ext_kind=discovered2.ext_kind,
-                file_hash=discovered2._file_hash,
-                git_branch=discovered2._git_branch,
+                file_hash=discovered2.file_hash,
+                git_branch=discovered2.git_branch,
                 source_id=id2,
             )
 
