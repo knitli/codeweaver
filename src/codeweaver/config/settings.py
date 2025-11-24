@@ -361,7 +361,11 @@ class CodeWeaverSettings(BaseSettings):
             description="""Root path of the codebase to analyze. CodeWeaver will try to detect the project path automatically if you don't provide one.""",
             validate_default=False,
         ),
-    ] = Path(project) if (project := os.environ.get("CODEWEAVER_PROJECT_PATH")) else UNSET
+    ] = (
+        Path(os.environ["CODEWEAVER_PROJECT_PATH"])
+        if "CODEWEAVER_PROJECT_PATH" in os.environ
+        else UNSET
+    )
 
     project_name: Annotated[
         str | Unset,
