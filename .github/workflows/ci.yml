@@ -69,7 +69,9 @@ jobs:
             MISE_VERSION="v2025.11.7"
             MISE_URL="https://github.com/jdx/mise/releases/download/${MISE_VERSION}/mise-${MISE_VERSION}-linux-x64.tar.gz"
             mkdir -p "$HOME/.local/bin"
-            curl -fsSL "$MISE_URL" | tar -xz -C "$HOME/.local/bin" --strip-components=1 mise/bin/mise
+            curl -fsSL "$MISE_URL" | tar -xz
+            cp mise/bin/mise "$HOME/.local/bin/"
+            rm -rf mise
             echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           fi
       - name: Install tools with mise
@@ -148,7 +150,9 @@ jobs:
             MISE_VERSION="v2025.11.7"
             MISE_URL="https://github.com/jdx/mise/releases/download/${MISE_VERSION}/mise-${MISE_VERSION}-linux-x64.tar.gz"
             mkdir -p "$HOME/.local/bin"
-            curl -fsSL "$MISE_URL" | tar -xz -C "$HOME/.local/bin" --strip-components=1 mise/bin/mise
+            curl -fsSL "$MISE_URL" | tar -xz
+            cp mise/bin/mise "$HOME/.local/bin/"
+            rm -rf mise
             echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           fi
       - name: Install tools with mise
