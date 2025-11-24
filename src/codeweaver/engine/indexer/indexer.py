@@ -23,7 +23,7 @@ import signal
 import time
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, Protocol, TypedDict, cast
+from typing import TYPE_CHECKING, Annotated, Any, Protocol, TypedDict
 
 import rignore
 
@@ -237,7 +237,7 @@ class Indexer(BasedModel):
 
     _store: Annotated[BlakeStore[DiscoveredFile] | None, PrivateAttr()] = None
     _walker_settings: Annotated[dict[str, Any] | None, PrivateAttr()] = None
-    _project_root: Annotated[DirectoryPath | None, PrivateAttr()] = None
+    _project_path: Annotated[DirectoryPath | None, PrivateAttr()] = None
     _checkpoint_manager: Annotated[CheckpointManager | None, PrivateAttr()] = None
     _checkpoint: Annotated[IndexingCheckpoint | None, PrivateAttr()] = None
     _manifest_manager: Annotated[FileManifestManager | None, PrivateAttr()] = None
@@ -261,7 +261,6 @@ class Indexer(BasedModel):
         *,
         auto_initialize_providers: bool = True,
         project_path: Path | None = None,
-        project_root: Path | None = None,
         walker_settings: dict[str, Any] | None = None,
     ) -> None:
         """Initialize the Indexer with optional pipeline components.
@@ -272,15 +271,15 @@ class Indexer(BasedModel):
             chunking_service: Service for chunking files (optional)
             auto_initialize_providers: Auto-initialize providers from global registry
             project_path: Project path for checkpoint management (preferred)
-            project_root: Alias for project_path (deprecated, use project_path)
             walker_settings: Settings dict for creating rignore.Walker instances
         """
         from codeweaver.common.utils.git import get_project_path
 
-        # Support both project_path and project_root for backward compatibility
-        if project_root is not None and project_path is None:
-            project_path = project_root
-
+        self._project_path = (
+            project_path
+            if project_path and not isinstance(project_path, Unset) and project_path.exists()
+            else get_project_path()
+        )
         # Store walker settings for creating fresh walkers
         # If walker is provided but not settings, extract settings from project_path
         if walker_settings is not None:
@@ -307,7 +306,6 @@ class Indexer(BasedModel):
         from codeweaver.core.discovery import DiscoveredFile
 
         self._store = store or make_blake_store(value_type=DiscoveredFile)
-        self._project_root = project_path
         self._chunking_service = chunking_service or _get_chunking_service()
         self._stats = IndexingStats()
         from codeweaver.common.statistics import get_session_statistics
@@ -320,19 +318,7 @@ class Indexer(BasedModel):
         self._providers_initialized: bool = False
 
         # Initialize checkpoint manager
-        if project_path and not isinstance(project_path, Unset):
-            self._checkpoint_manager = CheckpointManager(project_path=project_path)
-        else:
-            from codeweaver.config.settings import get_settings
-
-            self._checkpoint_manager = CheckpointManager(
-                project_path=cast(
-                    Path,
-                    get_project_path()
-                    if isinstance(get_settings().project_path, Unset)
-                    else get_settings().project_path,
-                )
-            )
+        self._checkpoint_manager = CheckpointManager(project_path=self._project_path)
 
         self._checkpoint = None
         self._last_checkpoint_time = time.time()
@@ -342,19 +328,8 @@ class Indexer(BasedModel):
         self._original_sigint_handler = None
 
         # Initialize file manifest manager
-        if project_path and not isinstance(project_path, Unset):
-            self._manifest_manager = FileManifestManager(project_path=project_path)
-        else:
-            from codeweaver.config.settings import get_settings
+        self._manifest_manager = FileManifestManager(project_path=self._project_path)
 
-            self._manifest_manager = FileManifestManager(
-                project_path=cast(
-                    Path,
-                    get_project_path()
-                    if isinstance(get_settings().project_path, Unset)
-                    else get_settings().project_path,
-                )
-            )
         self._file_manifest = None
         self._manifest_lock = None  # Initialize as None, created lazily in async context
 
@@ -1233,8 +1208,8 @@ class Indexer(BasedModel):
             logger.info("Detected %d deleted files to clean up", len(deleted_files))
             # Schedule cleanup (will be done in separate phase)
             # Convert relative paths from manifest to absolute paths for cleanup
-            if self._project_root:
-                self._deleted_files = [self._project_root / rel_path for rel_path in deleted_files]
+            if self._project_path:
+                self._deleted_files = [self._project_path / rel_path for rel_path in deleted_files]
             else:
                 logger.warning("No project root set, cannot resolve deleted file paths")
                 self._deleted_files = []
@@ -2077,25 +2052,22 @@ class Indexer(BasedModel):
         to_delete: list[Any] = []
 
         # Get project root for resolving relative paths
-        project_root = self._project_root
+        project_path = self._project_path
 
         for key, discovered_file in list(self._store.items()):
             try:
                 # Try samefile first (handles symlinks and different path representations)
                 if discovered_file.path.samefile(path):
                     to_delete.append(key)
-            except (FileNotFoundError, OSError):
+            except OSError:
                 # If either file doesn't exist, fall back to path comparison
                 # This happens when files are deleted, which is the typical case for _remove_path
                 try:
                     # Resolve paths for comparison
-                    # If discovered_file.path is relative and we have project_root, resolve relative to it
-                    if not discovered_file.path.is_absolute() and project_root:
-                        discovered_abs = (project_root / discovered_file.path).resolve()
-                    else:
-                        discovered_abs = discovered_file.path.resolve()
+                    # discovered_file.path is *always* relative to project path
+                    discovered_abs = (project_path / discovered_file.path).resolve()
 
-                    path_abs = path.resolve()
+                    path_abs = (project_path / path).resolve()
 
                     if discovered_abs == path_abs:
                         to_delete.append(key)
@@ -2243,7 +2215,11 @@ class Indexer(BasedModel):
         self._stats.chunks_created = checkpoint.chunks_created
         self._stats.chunks_embedded = checkpoint.chunks_embedded
         self._stats.chunks_indexed = checkpoint.chunks_indexed
-        type(self._stats).files_with_errors = [Path(p) for p in checkpoint.files_with_errors]
+        type(self._stats).files_with_errors = [  # ty: ignore[invalid-assignment]
+            path
+            for p in checkpoint.files_with_errors
+            if p and isinstance(p, str) and (path := Path(p)).exists()
+        ]
 
         self._checkpoint = checkpoint
         logger.info(

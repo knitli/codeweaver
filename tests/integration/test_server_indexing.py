@@ -129,7 +129,7 @@ def test_project_path(tmp_path: Path) -> Path:
 @pytest.fixture
 def indexer(test_project_path: Path) -> Indexer:
     """Create indexer instance for test project."""
-    return Indexer(project_root=test_project_path, auto_initialize_providers=True)
+    return Indexer(project_path=test_project_path, auto_initialize_providers=True)
 
 
 @pytest.mark.integration
@@ -142,7 +142,7 @@ async def test_server_starts_without_errors(indexer: Indexer):
     Then: Indexer starts without errors, providers initialized
     """
     # Verify indexer initialized
-    assert indexer._project_root is not None
+    assert indexer._project_path is not None
     assert indexer._walker_settings is not None
 
     # Verify providers initialized (if available)

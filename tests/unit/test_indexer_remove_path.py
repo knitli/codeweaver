@@ -27,8 +27,8 @@ class TestRemovePathWithDeletedFiles:
         """Create an indexer with mocked dependencies."""
         indexer = Indexer(project_path=tmp_path, auto_initialize_providers=False)
         indexer._file_manifest = IndexFileManifest(project_path=tmp_path)
-        # Ensure project root is set
-        indexer._project_root = tmp_path
+        # Ensure project path is set
+        indexer._project_path = tmp_path
         return indexer
 
     def test_remove_deleted_file_from_store(self, mock_indexer: Indexer, tmp_path: Path) -> None:
@@ -38,12 +38,12 @@ class TestRemovePathWithDeletedFiles:
         test_file.write_text("def example(): pass")
 
         # Mock set_relative_path to return relative path
-        with patch(
-            "codeweaver.core.discovery.set_relative_path",
-            side_effect=lambda p: Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p,
-        ), patch(
-            "codeweaver.core.discovery.get_git_branch",
-            return_value="main",
+        with (
+            patch(
+                "codeweaver.core.discovery.set_relative_path",
+                side_effect=lambda p: Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p,
+            ),
+            patch("codeweaver.core.discovery.get_git_branch", return_value="main"),
         ):
             discovered = DiscoveredFile.from_path(test_file)
             assert discovered is not None
@@ -71,12 +71,12 @@ class TestRemovePathWithDeletedFiles:
         test_file.write_text("def example(): pass")
 
         # Mock set_relative_path to return relative path
-        with patch(
-            "codeweaver.core.discovery.set_relative_path",
-            side_effect=lambda p: Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p,
-        ), patch(
-            "codeweaver.core.discovery.get_git_branch",
-            return_value="main",
+        with (
+            patch(
+                "codeweaver.core.discovery.set_relative_path",
+                side_effect=lambda p: Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p,
+            ),
+            patch("codeweaver.core.discovery.get_git_branch", return_value="main"),
         ):
             discovered = DiscoveredFile.from_path(test_file)
             assert discovered is not None
@@ -119,12 +119,12 @@ class TestRemovePathWithDeletedFiles:
         file3.write_text("def file3(): pass")
 
         # Add all files to store with unique source IDs to work around existing bug
-        with patch(
-            "codeweaver.core.discovery.set_relative_path",
-            side_effect=lambda p: Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p,
-        ), patch(
-            "codeweaver.core.discovery.get_git_branch",
-            return_value="main",
+        with (
+            patch(
+                "codeweaver.core.discovery.set_relative_path",
+                side_effect=lambda p: Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p,
+            ),
+            patch("codeweaver.core.discovery.get_git_branch", return_value="main"),
         ):
             for f in [file1, file2, file3]:
                 discovered = DiscoveredFile.from_path(f)
@@ -171,12 +171,12 @@ class TestRemovePathWithDeletedFiles:
         another_file.write_text("def another(): pass")
 
         # Add valid entry and another file to store with unique IDs
-        with patch(
-            "codeweaver.core.discovery.set_relative_path",
-            side_effect=lambda p: Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p,
-        ), patch(
-            "codeweaver.core.discovery.get_git_branch",
-            return_value="main",
+        with (
+            patch(
+                "codeweaver.core.discovery.set_relative_path",
+                side_effect=lambda p: Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p,
+            ),
+            patch("codeweaver.core.discovery.get_git_branch", return_value="main"),
         ):
             discovered1 = DiscoveredFile.from_path(valid_file)
             discovered2 = DiscoveredFile.from_path(another_file)
