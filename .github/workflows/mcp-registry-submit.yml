@@ -178,12 +178,13 @@ jobs:
         run: |
           ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
           OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-          VERSION="${MCP_PUBLISHER_VERSION}"
+          VERSION="${MCP_PUBLISHER_VERSION:- v1.0.0}"
+          NO_V_VERSION="${VERSION#v}"
 
           echo "Downloading mcp-publisher ${VERSION} for ${OS}/${ARCH}..."
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/download/${VERSION}/mcp-publisher_1.0.0_${OS}_${ARCH}.tar.gz" \
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/download/${VERSION}/mcp-publisher_${NO_V_VERSION}_${OS}_${ARCH}.tar.gz" \
             -o mcp-publisher.tar.gz
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/download/${VERSION}/mcp-publisher_1.0.0_${OS}_${ARCH}.tar.gz.sha256" \
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/download/${VERSION}/mcp-publisher_${NO_V_VERSION}_${OS}_${ARCH}.tar.gz.sha256" \
             -o mcp-publisher.tar.gz.sha256
 
           echo "Verifying checksum for mcp-publisher.tar.gz..."
@@ -219,50 +220,54 @@ jobs:
       - name: Submit to MCP Registry
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MCP_REGISTRY_KEY: ${{ secrets.MCP_REGISTRY_KEY }}
         run: |
           echo "Submitting to MCP Registry..."
 
           # Note: The exact submission process depends on mcp-publisher CLI implementation
           # and may require manual intervention if the API/CLI has changed.
           # The following attempts multiple submission methods in order of preference.
-
-          # Method 1: Try mcp-publisher submit command (if available)
+          MESSAGE=""
+          # login to mcp-publisher
           if command -v mcp-publisher &> /dev/null; then
-            echo "Attempting submission via mcp-publisher CLI..."
-            if mcp-publisher submit server.json --token "${GITHUB_TOKEN}" 2>&1; then
-              echo "✓ Successfully submitted via CLI"
-              exit 0
-            fi
-            echo "CLI submission not available or failed, trying API..."
+            echo "Logging in to mcp-publisher..."
+            mcp-publisher login dns --domain knitli.com --private-key "${MCP_REGISTRY_KEY}" || {
+              echo "WARNING: mcp-publisher login failed, proceeding without login"
+            }
+            MESSAGE="$(mcp-publisher publish)"
+          else
+            echo "WARNING: mcp-publisher CLI not available, skipping login"
           fi
-
-          # Method 2: Direct API submission
-          echo "Attempting direct API submission..."
-
-          RESPONSE=$(curl -X POST \
+          if [ -n "$MESSAGE" ] && [[ "$MESSAGE" == *Successfully* ]]; then
+            echo "✓ Successfully submitted to MCP Registry via mcp-publisher"
+            echo "$MESSAGE"
+            exit 0
+          else
+            RESPONSE=$(curl -X POST \
             -H "Authorization: Bearer ${GITHUB_TOKEN}" \
             -H "Content-Type: application/json" \
             -d @server.json \
             -w "\n%{http_code}" \
             https://registry.modelcontextprotocol.io/v0/servers 2>&1)
 
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-          BODY=$(echo "$RESPONSE" | head -n -1)
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+            BODY=$(echo "$RESPONSE" | head -n -1)
 
-          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
-            echo "✓ Successfully submitted to MCP Registry (HTTP ${HTTP_CODE})"
-            exit 0
+            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+              echo "✓ Successfully submitted to MCP Registry (HTTP ${HTTP_CODE})"
+              exit 0
+            else
+              # Submission failed - provide helpful error message
+              echo "ERROR: Failed to submit to MCP Registry (HTTP ${HTTP_CODE})"
+              echo "Response: ${BODY}"
+              echo ""
+              echo "This may require manual submission via:"
+              echo "  1. The registry web interface at https://registry.modelcontextprotocol.io"
+              echo "  2. The mcp-publisher CLI tool"
+              echo "  3. Contact registry maintainers for assistance"
+              exit 1
+            fi
           fi
-
-          # Submission failed - provide helpful error message
-          echo "ERROR: Failed to submit to MCP Registry (HTTP ${HTTP_CODE})"
-          echo "Response: ${BODY}"
-          echo ""
-          echo "This may require manual submission via:"
-          echo "  1. The registry web interface at https://registry.modelcontextprotocol.io"
-          echo "  2. The mcp-publisher CLI tool"
-          echo "  3. Contact registry maintainers for assistance"
-          exit 1
 
       - name: Summary
         if: always()
@@ -276,7 +281,7 @@ jobs:
           if [ "${{ job.status }}" = "success" ]; then
             echo "✅ Successfully submitted to MCP Registry" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "View your server at: https://registry.modelcontextprotocol.io/servers/io.github.knitli/codeweaver" >> $GITHUB_STEP_SUMMARY
+            echo "View your server at: https://registry.modelcontextprotocol.io/servers/com.knitli/codeweaver" >> $GITHUB_STEP_SUMMARY
           else
             echo "❌ Submission failed" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY

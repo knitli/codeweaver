@@ -100,8 +100,7 @@ class MyModel(BasedModel):
 
 - **No f-strings in log statements**: Use `%s` formatting or `extra={"key": value}`
 - **No print statements**: Use logging in production
-- **Use logging.exception**: For exceptions with **no exception object in the statements** (logging.exception automatically includes the object)
-  - Don't use logging.error if you can use logging.exception
+- **Use logging.warning for most errors**: Using logging.warning allows CodeWeaver's UI to handle displaying the error based on severity and user configuration (like the `--verbose` flag). `logging.exception` bypasses the UI handler.
 
 ### Exception Handling
 

@@ -61,7 +61,7 @@ ARG VCS_REF
 LABEL org.opencontainers.image.version="${VERSION}" \
     org.opencontainers.image.created="${BUILD_DATE}" \
     org.opencontainers.image.revision="${VCS_REF}" \
-    io.modelcontextprotocol.server-name="io.github.knitli/codeweaver"
+    io.modelcontextprotocol.server-name="com.knitli/codeweaver"
 
 # Install runtime dependencies
 # hadolint ignore=DL3008
@@ -87,9 +87,9 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     # CodeWeaver specific settings
     CODEWEAVER_HOST=0.0.0.0 \
-    CODEWEAVER_PORT=9328 \
-    # Disable telemetry in Docker by default (can be overridden)
-    CODEWEAVER_ENABLE_TELEMETRY=false
+    CODEWEAVER_PORT=9328
+# to disable telemetry (anonymous and only for product improvement)
+# CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY=true
 
 # Create directories for data persistence
 RUN mkdir -p /app/data /app/config /app/.codeweaver && \

@@ -107,7 +107,6 @@ async def find_code_tool(
             query=query,
             intent=intent,
             token_limit=token_limit,
-            include_tests=include_tests,
             focus_languages=focus_langs,
             max_results=50,  # Default from find_code signature
         )

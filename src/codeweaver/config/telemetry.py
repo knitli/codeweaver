@@ -10,7 +10,7 @@ Configuration sources (priority order):
 2. CodeWeaver configuration (see `CodeWeaverSettings` for priority order)
 3. Defaults defined in `TelemetrySettings`, which are:
     disable_telemetry: false
-    tools_before_privacy: false  (i.e., privacy first)
+    tools_over_privacy: false  (i.e., privacy first)
     posthog_project_key: CodeWeaver's PostHog key (not an API key)
     posthog_host: https://us.i.posthog.com
     batch_size: 10
@@ -18,7 +18,7 @@ Configuration sources (priority order):
 
 Environment Variables:
     CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY
-    CODEWEAVER__TELEMETRY__TOOLS_BEFORE_PRIVACY
+    CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY
     CODEWEAVER__TELEMETRY__POSTHOG_PROJECT_KEY
     CODEWEAVER__TELEMETRY__POSTHOG_HOST
     CODEWEAVER__TELEMETRY__BATCH_SIZE
@@ -68,7 +68,7 @@ class TelemetrySettings(BasedModel):
         ),
     ] = UNSET
 
-    tools_before_privacy: Annotated[
+    tools_over_privacy: Annotated[
         bool | Unset,
         Field(
             description="""Opt-in to allow us to collect anonymized query and result data. We want to make CodeWeaver great, and the best way to do that is for us to fully understand exactly how you use it -- particularly what you search for and how you interact with the results. Unlike with Google, we don't want to show you ads or sell your data, track you, or anything like that... and we don't think it's right to assume you're OK with us collecting search and result data.
@@ -108,7 +108,7 @@ class TelemetrySettings(BasedModel):
         """Set default values for unset fields."""
         return cls.model_construct(
             disable_telemetry=False,
-            tools_before_privacy=False,
+            tools_over_privacy=False,
             batch_size=10,
             batch_interval_seconds=60,
         )
@@ -127,8 +127,8 @@ class TelemetrySettings(BasedModel):
             }
         if isinstance(self.disable_telemetry, Unset):
             self.disable_telemetry = False  # default to telemetry enabled
-        if isinstance(self.tools_before_privacy, Unset):
-            self.tools_before_privacy = False  # default to privacy first
+        if isinstance(self.tools_over_privacy, Unset):
+            self.tools_over_privacy = False  # default to privacy first
         if isinstance(self.batch_size, Unset):
             self.batch_size = 10  # default batch size
         if isinstance(self.batch_interval_seconds, Unset):
@@ -137,7 +137,7 @@ class TelemetrySettings(BasedModel):
     def _dismantle_telemetry(self) -> None:
         """Disable telemetry by setting turning everything off."""
         self.disable_telemetry = True
-        self.tools_before_privacy = False
+        self.tools_over_privacy = False
         self.posthog_project_key = None
         self.posthog_host = None
 
@@ -173,7 +173,7 @@ class TelemetrySettingsDict(TypedDict, total=False):
     """
 
     disable_telemetry: NotRequired[bool | Unset]
-    tools_before_privacy: NotRequired[bool | Unset]
+    tools_over_privacy: NotRequired[bool | Unset]
     posthog_project_key: NotRequired[LiteralStringT | Unset]
     posthog_host: NotRequired[HttpUrl | None]
     batch_size: NotRequired[PositiveInt | Unset]

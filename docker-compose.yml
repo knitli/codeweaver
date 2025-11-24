@@ -79,6 +79,7 @@ services:
       # =================================================================
       - CODEWEAVER_PROJECT_PATH=/workspace
       - CODEWEAVER_TOKEN_LIMIT=${TOKEN_LIMIT:-30000}
+      - CODEWEAVER_PROJECT_NAME=${PROJECT_NAME}
 
       # Redirect user config to mounted volume for checkpoint persistence
       - XDG_CONFIG_HOME=/app/config
@@ -89,7 +90,7 @@ services:
       # Required for 'recommended' profile
       - VOYAGE_API_KEY=${VOYAGE_API_KEY:-}
 
-      # Required for agent functionality
+      # Required for agent functionality (future feature)
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
 
       # Optional: Alternative providers
@@ -100,8 +101,6 @@ services:
       # =================================================================
       # Operational Settings
       # =================================================================
-      - CODEWEAVER_TELEMETRY__ENABLED=${ENABLE_TELEMETRY:-false}
-
     depends_on:
       qdrant:
         condition: service_healthy

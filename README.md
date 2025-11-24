@@ -4,6 +4,9 @@ SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 
 SPDX-License-Identifier: MIT OR Apache-2.0
 -->
+<!--
+mcp-name: com.knitli/codeweaver
+-->
 # CodeWeaver
 ---
 by Knitli

@@ -809,7 +809,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         # Convert chunks to Qdrant points
         points = self._chunks_to_points(chunks, for_backup=for_backup)
 
-        # Upsert points
+        # Upsert points (retry logic handled by _upsert_with_retry in base class)
         _result = await self._client.upsert(collection_name=collection_name, points=points)
 
         await self.handle_persistence()

@@ -15,9 +15,13 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypedDict, cast, overload
 
+import httpx
 from pydantic import UUID7, ConfigDict, PrivateAttr
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 from typing_extensions import TypeIs
+
+# Common retryable exceptions for vector store operations
+RETRYABLE_EXCEPTIONS = (ConnectionError, TimeoutError, OSError, httpx.TimeoutException)
 
 from codeweaver.agent_api.find_code.types import StrategizedQuery
 from codeweaver.config.providers import EmbeddingModelSettings, SparseEmbeddingModelSettings
@@ -453,7 +457,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
     @retry(
         stop=stop_after_attempt(5),
         wait=wait_exponential(multiplier=1, min=1, max=16),  # 1s, 2s, 4s, 8s, 16s
-        retry=retry_if_exception_type((ConnectionError, TimeoutError, OSError)),
+        retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
         reraise=True,
     )
     async def _search_with_retry(
@@ -479,7 +483,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                     "extra": {"provider": type(self)._provider.value, "results_count": len(result)},
                 },
             )
-        except (ConnectionError, TimeoutError, OSError) as e:
+        except RETRYABLE_EXCEPTIONS as e:
             self._record_failure()
 
             await log_to_client_or_fallback(
@@ -552,7 +556,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
     @retry(
         stop=stop_after_attempt(5),
         wait=wait_exponential(multiplier=1, min=1, max=16),
-        retry=retry_if_exception_type((ConnectionError, TimeoutError, OSError)),
+        retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
         reraise=True,
     )
     async def _upsert_with_retry(
@@ -584,7 +588,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                     "extra": {"provider": type(self)._provider.value, "chunks_count": len(chunks)},
                 },
             )
-        except (ConnectionError, TimeoutError, OSError) as e:
+        except RETRYABLE_EXCEPTIONS as e:
             self._record_failure()
 
             await log_to_client_or_fallback(

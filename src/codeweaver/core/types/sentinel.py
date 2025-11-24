@@ -90,11 +90,11 @@ class Sentinel(BasedModel):
         return DontGenerateJsonSchema().generate(schema, repr(cls))
 
     def __new__(cls, name: SentinelName | None = None, module_name: str | None = None) -> Self:
-        """Create a new ."""
+        """Create a new Sentinel instance with singleton behavior."""
         # sourcery skip: avoid-builtin-shadow
         name = SentinelName(name or cast(LiteralStringT, cls.__name__.upper()).strip())
         module_name = module_name or (
-            cls.module_name if hasattr(cls, "module_name") else cls._get_module_name_generator()()
+            cls.module_name if hasattr(cls, "module_name") and isinstance(cls.module_name, str) else cls._get_module_name_generator()()
         )
 
         # Include the class's module and fully qualified name in the
@@ -105,20 +105,32 @@ class Sentinel(BasedModel):
         existing: Sentinel | None = _registry.get(registry_key)
         if existing is not None:
             return cast(Self, existing)
-        newcls = super().__new__(cls)
-        type(newcls).name = name
-        type(newcls).module_name = module_name or __name__
+
+        # Create instance using object.__new__ to avoid recursion
+        # Then manually set up Pydantic internals
+        newcls = object.__new__(cls)
+
+        # Set instance attributes (not type attributes!) using object.__setattr__
+        # because the model is frozen
+        object.__setattr__(newcls, "name", name)
+        object.__setattr__(newcls, "module_name", module_name or __name__)
+
+        # Initialize Pydantic's internal attributes for proper serialization
+        object.__setattr__(newcls, "__pydantic_fields_set__", {"name", "module_name"})
+        object.__setattr__(newcls, "__pydantic_extra__", None)
+        object.__setattr__(newcls, "__pydantic_private__", None)
+
         with _lock:
             return cast(Self, _registry.setdefault(registry_key, newcls))
 
     def __init__(self, name: SentinelName | None = None, module_name: str | None = None) -> None:
         """Initialize a Sentinel instance.
 
-        Note: This bypasses Pydantic validation because Sentinels are constructed
-        via __new__ with special singleton behavior.
+        Note: Initialization is handled in __new__ to maintain singleton behavior
+        while properly setting up Pydantic's serialization infrastructure.
         """
-        # Don't call super().__init__() to avoid Pydantic validation
-        # The attributes are already set in __new__
+        # Initialization already done in __new__
+        pass
 
     def __str__(self) -> str:
         """Return a string representation of the sentinel."""

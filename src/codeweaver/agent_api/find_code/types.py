@@ -154,10 +154,26 @@ class CodeMatch(BasedModel):
         }
 
 
+class FindCodeSubmission(BasedModel):
+    """Structured submission for find_code tool."""
+
+    model_config = BASEDMODEL_CONFIG
+
+    query: Annotated[str, Field(description="""Your code search query in natural language.""")]
+
+    intent: Annotated[
+        IntentType | None,
+        Field(
+            description="""Optional intent to guide search and ranking""",
+            examples=[i.variable for i in IntentType],
+        ),
+    ]
+
+
 class FindCodeResponseSummary(BasedModel):
     """Structured response from find_code tool."""
 
-    model_config = BASEDMODEL_CONFIG | ConfigDict(defer_build=True)
+    model_config = BASEDMODEL_CONFIG
 
     # Core results
     matches: Annotated[
@@ -219,10 +235,10 @@ class FindCodeResponseSummary(BasedModel):
     ]
 
     search_mode: Annotated[
-        Literal["hybrid", "dense_only", "sparse_only", "keyword"] | None,
+        Literal["hybrid", "dense_only", "sparse_only"] | None,
         Field(
             default=None,
-            description="""Actual search mode used: hybrid (dense+sparse embeddings), dense_only (semantic only), sparse_only (BM25/keyword-aware), keyword (text matching fallback)""",
+            description="""Actual search mode used: hybrid (dense+sparse embeddings), dense_only (semantic only), sparse_only (Splade/keyword-aware)""",
         ),
     ]
 

@@ -15,11 +15,6 @@ import pytest
 
 from pydantic.dataclasses import dataclass
 
-from codeweaver.common.telemetry.events import (
-    PerformanceBenchmarkEvent,
-    SemanticValidationEvent,
-    SessionSummaryEvent,
-)
 from codeweaver.core.types import (
     DATACLASS_CONFIG,
     AnonymityConversion,
@@ -184,115 +179,6 @@ class TestDataclassPrivacySerialization:
 
         assert "items" in serialized
         assert serialized["items"] == 3
-
-
-@pytest.mark.benchmark
-@pytest.mark.performance
-class TestTelemetryEventsSerialization:
-    """Test that telemetry events properly serialize."""
-
-    def test_session_summary_event_serializes(self) -> None:
-        """Test that SessionSummaryEvent serializes correctly."""
-        event = SessionSummaryEvent(
-            session_duration_minutes=5.5,
-            total_searches=10,
-            successful_searches=9,
-            failed_searches=1,
-            success_rate=0.9,
-            avg_response_ms=1250.0,
-            median_response_ms=1100.0,
-            p95_response_ms=2000.0,
-            total_tokens_generated=50000,
-            total_tokens_delivered=15000,
-            total_tokens_saved=35000,
-            context_reduction_pct=70.0,
-            estimated_cost_savings_usd=0.189,
-            languages={"python": 6, "typescript": 2},
-            semantic_frequencies={"definition_callable": 0.25},
-        )
-
-        serialized = event.serialize_for_telemetry()
-
-        # Verify all fields are present
-        assert "session_duration_minutes" in serialized
-        assert serialized["session_duration_minutes"] == 5.5
-        assert "total_searches" in serialized
-        assert serialized["total_searches"] == 10
-
-    def test_performance_benchmark_event_serializes(self) -> None:
-        """Test that PerformanceBenchmarkEvent serializes correctly."""
-        event = PerformanceBenchmarkEvent(
-            comparison_type="naive_vs_codeweaver",
-            baseline_approach="grep_full_files",
-            baseline_estimated_files=50,
-            baseline_estimated_lines=10000,
-            baseline_estimated_tokens=40000,
-            baseline_estimated_cost_usd=0.216,
-            codeweaver_files_returned=5,
-            codeweaver_lines_returned=500,
-            codeweaver_tokens_delivered=2000,
-            codeweaver_actual_cost_usd=0.0108,
-            files_reduction_pct=90.0,
-            lines_reduction_pct=95.0,
-            tokens_reduction_pct=95.0,
-            cost_savings_pct=95.0,
-        )
-
-        serialized = event.serialize_for_telemetry()
-
-        # Verify all fields are present
-        assert "comparison_type" in serialized
-        assert serialized["comparison_type"] == "naive_vs_codeweaver"
-        assert "baseline_approach" in serialized
-        assert serialized["baseline_approach"] == "grep_full_files"
-
-    def test_semantic_validation_event_serializes(self) -> None:
-        """Test that SemanticValidationEvent serializes correctly."""
-        event = SemanticValidationEvent(
-            period="daily",
-            total_chunks_analyzed=1000,
-            category_usage={"definition_callable": 250, "definition_class": 150},
-            usage_frequencies={"definition_callable": 0.25, "definition_class": 0.15},
-            correlation=0.85,
-            note="Strong correlation observed",
-        )
-
-        serialized = event.serialize_for_telemetry()
-
-        # Verify all fields are present
-        assert "period" in serialized
-        assert serialized["period"] == "daily"
-        assert "total_chunks_analyzed" in serialized
-        assert serialized["total_chunks_analyzed"] == 1000
-
-    def test_event_to_posthog_format(self) -> None:
-        """Test that events convert to PostHog format correctly."""
-        event = SessionSummaryEvent(
-            session_duration_minutes=5.5,
-            total_searches=10,
-            successful_searches=9,
-            failed_searches=1,
-            success_rate=0.9,
-            avg_response_ms=1250.0,
-            median_response_ms=1100.0,
-            p95_response_ms=2000.0,
-            total_tokens_generated=50000,
-            total_tokens_delivered=15000,
-            total_tokens_saved=35000,
-            context_reduction_pct=70.0,
-            estimated_cost_savings_usd=0.189,
-            languages={"python": 6, "typescript": 2},
-            semantic_frequencies={"definition_callable": 0.25},
-        )
-
-        event_name, properties = event.to_posthog_event()
-
-        assert event_name == "codeweaver_session_summary"
-        assert isinstance(properties, dict)
-        assert "total_searches" in properties
-        assert properties["total_searches"] == 10
-        assert "timing" in properties
-        assert "tokens" in properties
 
 
 @pytest.mark.benchmark

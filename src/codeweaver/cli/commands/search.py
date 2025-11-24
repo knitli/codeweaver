@@ -127,7 +127,6 @@ async def search(
     *,
     intent: IntentType | None = None,
     limit: int = 10,
-    include_tests: bool = True,
     project_path: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
     config_file: Annotated[
         FilePath | None,
@@ -167,7 +166,6 @@ async def search(
             query=query,
             intent=intent,
             token_limit=settings.get("token_limit", 10000),
-            include_tests=include_tests,
             focus_languages=None,
             context=None,
         )

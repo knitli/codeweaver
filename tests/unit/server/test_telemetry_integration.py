@@ -292,12 +292,12 @@ class TestSearchEvent:
             intent_type=IntentType.UNDERSTAND,
             strategies=[SearchStrategy.HYBRID_SEARCH],
             execution_time_ms=100.0,
-            tools_before_privacy=False,
+            tools_over_privacy=False,
             feature_flags={"test-flag": "variant-a"},
         )
 
         assert event._query == "test query"
-        assert event._tools_before_privacy is False
+        assert event._tools_over_privacy is False
 
     def test_search_event_to_posthog_event(self) -> None:
         """Test SearchEvent converts to PostHog event format."""
@@ -321,7 +321,7 @@ class TestSearchEvent:
             intent_type=IntentType.UNDERSTAND,
             strategies=[SearchStrategy.HYBRID_SEARCH],
             execution_time_ms=150.0,
-            tools_before_privacy=False,
+            tools_over_privacy=False,
             feature_flags={"search-ranking-v2": "variant-a"},
         )
 
@@ -336,8 +336,8 @@ class TestSearchEvent:
         assert properties["index"]["state"] == "complete"
         assert "$feature/search-ranking-v2" in properties
 
-    def test_search_event_with_tools_before_privacy(self) -> None:
-        """Test SearchEvent includes query details when tools_before_privacy=True."""
+    def test_search_event_with_tools_over_privacy(self) -> None:
+        """Test SearchEvent includes query details when tools_over_privacy=True."""
         from codeweaver.agent_api.find_code.intent import IntentType
         from codeweaver.agent_api.find_code.types import SearchStrategy
         from codeweaver.common.telemetry.events import SearchEvent
@@ -350,7 +350,7 @@ class TestSearchEvent:
             intent_type=IntentType.UNDERSTAND,
             strategies=[SearchStrategy.HYBRID_SEARCH],
             execution_time_ms=100.0,
-            tools_before_privacy=True,  # Opt-in to detailed tracking
+            tools_over_privacy=True,  # Opt-in to detailed tracking
             feature_flags=None,
         )
 
@@ -362,8 +362,8 @@ class TestSearchEvent:
         assert properties["query"]["char_count"] == len("find authentication functions")
         assert "hash" in properties["query"]
 
-    def test_search_event_without_tools_before_privacy(self) -> None:
-        """Test SearchEvent excludes query details when tools_before_privacy=False."""
+    def test_search_event_without_tools_over_privacy(self) -> None:
+        """Test SearchEvent excludes query details when tools_over_privacy=False."""
         from codeweaver.agent_api.find_code.intent import IntentType
         from codeweaver.agent_api.find_code.types import SearchStrategy
         from codeweaver.common.telemetry.events import SearchEvent
@@ -376,7 +376,7 @@ class TestSearchEvent:
             intent_type=IntentType.UNDERSTAND,
             strategies=[SearchStrategy.HYBRID_SEARCH],
             execution_time_ms=100.0,
-            tools_before_privacy=False,  # Privacy mode
+            tools_over_privacy=False,  # Privacy mode
             feature_flags=None,
         )
 

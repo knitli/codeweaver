@@ -107,10 +107,11 @@ def build_success_response(
         search_mode = "hybrid"
     elif SearchStrategy.DENSE_ONLY in strategies_used:
         search_mode = "dense_only"
-    elif SearchStrategy.SPARSE_ONLY in strategies_used:
+    elif (
+        SearchStrategy.SPARSE_ONLY in strategies_used
+        or SearchStrategy.KEYWORD_FALLBACK in strategies_used
+    ):
         search_mode = "sparse_only"
-    elif SearchStrategy.KEYWORD_FALLBACK in strategies_used:
-        search_mode = "keyword"
 
     # Get indexing state from indexer if available
     indexing_state = None

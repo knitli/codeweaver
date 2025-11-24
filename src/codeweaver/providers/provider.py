@@ -23,21 +23,11 @@ from __future__ import annotations
 import contextlib
 import os
 
-from typing import NamedTuple, NotRequired, TypedDict, cast, is_typeddict
+from typing import NotRequired, TypedDict, cast, is_typeddict
 
 from codeweaver.core.types.enum import BaseEnum
+from codeweaver.core.types.models import EnvVarInfo as ProviderEnvVarInfo
 from codeweaver.exceptions import ConfigurationError
-
-
-class ProviderEnvVarInfo(NamedTuple):
-    """Describes an environment variable and its description.
-
-    An optional variable name, if given, provides the key if the variable's value is passed to the provider's client (if different).
-    """
-
-    env: str
-    description: str
-    variable_name: str | None = None
 
 
 class ProviderEnvVars(TypedDict, total=False):
@@ -61,6 +51,7 @@ class ProviderEnvVars(TypedDict, total=False):
     tls_version: NotRequired[ProviderEnvVarInfo]
     config_path: NotRequired[ProviderEnvVarInfo]
     region: NotRequired[ProviderEnvVarInfo]
+    account_id: NotRequired[ProviderEnvVarInfo]
 
     port: NotRequired[ProviderEnvVarInfo]
     path: NotRequired[ProviderEnvVarInfo]
@@ -122,6 +113,8 @@ class Provider(BaseEnum):
         self,
     ) -> tuple[ProviderEnvVars, ...] | None:
         """Get the environment variables used by the provider's client that are not part of CodeWeaver's settings."""
+        from codeweaver.core.types.models import EnvFormat
+
         httpx_env_vars = {
             "http_proxy": ProviderEnvVarInfo(
                 env="HTTPS_PROXY", description="HTTP proxy for requests"
@@ -136,18 +129,25 @@ class Provider(BaseEnum):
                     ProviderEnvVars(
                         note="Qdrant supports setting **all** configuration options using environment variables. Like with CodeWeaver, nested variables are separated by double underscores (`__`). For all options, see [the Qdrant documentation](https://qdrant.tech/documentation/guides/configuration/)",
                         log_level=ProviderEnvVarInfo(
-                            env="QDRANT__LOG_LEVEL", description="DEBUG, INFO, WARNING, or ERROR"
+                            env="QDRANT__LOG_LEVEL",
+                            description="Log level for Qdrant service",
+                            choices={"DEBUG", "INFO", "WARNING", "ERROR"},
                         ),
                         api_key=ProviderEnvVarInfo(
-                            env="QDRANT__SERVICE__API_KEY", description="API key for Qdrant service"
+                            env="QDRANT__SERVICE__API_KEY",
+                            is_secret=True,
+                            description="API key for Qdrant service",
                         ),
                         tls_on_off=ProviderEnvVarInfo(
                             env="QDRANT__SERVICE__ENABLE_TLS",
                             description="Enable TLS for Qdrant service, expects truthy or false value (e.g. 1 for on, 0 for off).",
+                            fmt=EnvFormat.BOOLEAN,
+                            choices={"true", "false"},
                         ),
                         tls_cert_path=ProviderEnvVarInfo(
                             env="QDRANT__TLS__CERT",
                             description="Path to the TLS certificate file for Qdrant service. Only needed if using a self-signed certificate. If you're using qdrant-cloud, you don't need this.",
+                            fmt=EnvFormat.FILEPATH,
                         ),
                         host=ProviderEnvVarInfo(
                             env="QDRANT__SERVICE__HOST",
@@ -163,7 +163,9 @@ class Provider(BaseEnum):
                 return (
                     ProviderEnvVars(
                         api_key=ProviderEnvVarInfo(
-                            env="VOYAGE_API_KEY", description="API key for Voyage service"
+                            env="VOYAGE_API_KEY",
+                            is_secret=True,
+                            description="API key for Voyage service",
                         ),
                         **httpx_env_vars,
                     ),
@@ -172,17 +174,19 @@ class Provider(BaseEnum):
                 # Azure has env vars by model provider, so we return a tuple of them.
                 return (
                     ProviderEnvVars(
-                        note="These variables are for the Azure OpenAI service.",
+                        note="These variables are for the Azure OpenAI service. (OpenAI models on Azure)",
                         api_key=ProviderEnvVarInfo(
                             env="AZURE_OPENAI_API_KEY",
-                            description="API key for Azure OpenAI service",
+                            is_secret=True,
+                            description="API key for Azure OpenAI service (OpenAI models on Azure)",
                         ),
                         endpoint=ProviderEnvVarInfo(
                             env="AZURE_OPENAI_ENDPOINT",
-                            description="Endpoint for Azure OpenAI service",
+                            description="Endpoint for Azure OpenAI service (OpenAI models on Azure)",
                         ),
                         region=ProviderEnvVarInfo(
-                            env="AZURE_OPENAI_REGION", description="Region for Azure OpenAI service"
+                            env="AZURE_OPENAI_REGION",
+                            description="Region for Azure OpenAI service (OpenAI models on Azure)",
                         ),
                         **httpx_env_vars,
                     ),
@@ -190,11 +194,12 @@ class Provider(BaseEnum):
                         note="These variables are for the Azure Cohere service.",
                         api_key=ProviderEnvVarInfo(
                             env="AZURE_COHERE_API_KEY",
-                            description="API key for Azure Cohere service",
+                            is_secret=True,
+                            description="API key for Azure Cohere service (cohere models on Azure)",
                         ),
                         endpoint=ProviderEnvVarInfo(
                             env="AZURE_COHERE_ENDPOINT",
-                            description="Endpoint for Azure Cohere service",
+                            description="Endpoint for Azure Cohere service (cohere models on Azure)",
                         ),
                         region=ProviderEnvVarInfo(
                             env="AZURE_COHERE_REGION", description="Region for Azure Cohere service"
@@ -208,13 +213,17 @@ class Provider(BaseEnum):
                     ProviderEnvVars(
                         note="You may also use the OpenAI-compatible environment variables with Vercel, since it uses the OpenAI client.",
                         api_key=ProviderEnvVarInfo(
-                            env="AI_GATEWAY_API_KEY", description="API key for Vercel service"
+                            env="AI_GATEWAY_API_KEY",
+                            is_secret=True,
+                            description="API key for Vercel service",
                         ),
                         other=httpx_env_vars,
                     ),
                     ProviderEnvVars(
                         api_key=ProviderEnvVarInfo(
-                            env="VERCEL_OIDC_TOKEN", description="OIDC token for Vercel service"
+                            env="VERCEL_OIDC_TOKEN",
+                            is_secret=True,
+                            description="OIDC token for Vercel service",
                         )
                     ),
                     cast(ProviderEnvVars, *type(self).OPENAI.other_env_vars),
@@ -224,7 +233,9 @@ class Provider(BaseEnum):
                     ProviderEnvVars(
                         note="These variables are for the Together service.",
                         api_key=ProviderEnvVarInfo(
-                            env="TOGETHER_API_KEY", description="API key for Together service"
+                            env="TOGETHER_API_KEY",
+                            is_secret=True,
+                            description="API key for Together service",
                         ),
                         other=httpx_env_vars,
                     ),
@@ -235,7 +246,9 @@ class Provider(BaseEnum):
                     ProviderEnvVars(
                         note="These variables are for the Heroku service.",
                         api_key=ProviderEnvVarInfo(
-                            env="INFERENCE_KEY", description="API key for Heroku service"
+                            env="INFERENCE_KEY",
+                            is_secret=True,
+                            description="API key for Heroku service",
                         ),
                         host=ProviderEnvVarInfo(
                             env="INFERENCE_URL", description="Host URL for Heroku service"
@@ -254,7 +267,9 @@ class Provider(BaseEnum):
                     ProviderEnvVars(
                         note="These variables are for the DeepSeek service.",
                         api_key=ProviderEnvVarInfo(
-                            env="DEEPSEEK_API_KEY", description="API key for DeepSeek service"
+                            env="DEEPSEEK_API_KEY",
+                            is_secret=True,
+                            description="API key for DeepSeek service",
                         ),
                         other=httpx_env_vars,
                     ),
@@ -277,11 +292,13 @@ class Provider(BaseEnum):
                         note="These variables are for any OpenAI-compatible service, including OpenAI itself, Azure OpenAI, and others -- any provider that we use the OpenAI client to connect to.",
                         api_key=ProviderEnvVarInfo(
                             env="OPENAI_API_KEY",
-                            description="API key for OpenAI-compatible services (not necessarily an API key *for* OpenAI). The OpenAI client also requires an API key, even if you don't actually need one for your provider -- in that case, use a mock value like 'MADEUPAPIKEY'",
+                            description="API key for OpenAI-compatible services (not necessarily an API key *for* OpenAI). The OpenAI client also requires an API key, even if you don't actually need one for your provider (like local Ollama). So provide a dummy key if needed.",
+                            is_secret=True,
                         ),
                         log_level=ProviderEnvVarInfo(
                             env="OPENAI_LOG",
                             description="One of: 'debug', 'info', 'warning', 'error'",
+                            choices={"debug", "info", "warning", "error"},
                         ),
                         other=httpx_env_vars,
                     ),
@@ -295,15 +312,42 @@ class Provider(BaseEnum):
                         ),
                         log_level=ProviderEnvVarInfo(
                             env="HF_HUB_VERBOSITY",
-                            description="One of: 'debug', 'info', 'warning', 'error', or 'critical'",
+                            description="Log level for Hugging Face Hub client",
+                            choices={"debug", "info", "warning", "error", "critical"},
                         ),
                         other=httpx_env_vars,
                     ),
                 )
             case Provider.BEDROCK:
                 return (
-                    ProviderEnvVars(
-                        note="AWS allows for setting many configuration options by environment variable. See [the AWS documentation](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html#using-environment-variables) for more details. Because AWS has multiple authentication methods, and ways to configure settings, we don't provide them here. We'd just confuse people. Unlike other providers, we also don't check for AWS's environment variables, we just assume you're authorized to do what you need to do."
+                    (
+                        ProviderEnvVars(
+                            note="AWS allows for setting many configuration options by environment variable. See [the AWS documentation](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html#using-environment-variables) for more details. Because AWS has multiple authentication methods, and ways to configure settings, we don't provide them here. We'd just confuse people. Unlike other providers, we also don't check for AWS's environment variables, we just assume you're authorized to do what you need to do.",
+                            region=ProviderEnvVarInfo(
+                                env="AWS_REGION",
+                                description="AWS region for Bedrock service",
+                                variable_name="region",
+                            ),
+                            account_id=ProviderEnvVarInfo(
+                                env="AWS_ACCOUNT_ID",
+                                description="AWS Account ID for Bedrock service",
+                                variable_name="aws_account_id",
+                            ),
+                            api_key=ProviderEnvVarInfo(
+                                env="AWS_SECRET_ACCESS_KEY",
+                                description="AWS Secret Access Key for Bedrock service",
+                                is_secret=True,
+                                variable_name="aws_secret_access_key",
+                            ),
+                            other={
+                                "aws_access_key_id": ProviderEnvVarInfo(
+                                    env="AWS_ACCESS_KEY_ID",
+                                    description="AWS Access Key ID for Bedrock service",
+                                    is_secret=True,
+                                    variable_name="aws_access_key_id",
+                                )
+                            },
+                        )
                     ),
                 )
             case Provider.COHERE:

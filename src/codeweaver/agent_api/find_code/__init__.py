@@ -49,8 +49,9 @@ import logging
 import time
 
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
+from fastmcp.server.context import Context
 from pydantic import NonNegativeInt, PositiveInt
 
 from codeweaver.agent_api.find_code.conversion import convert_search_result_to_code_match
@@ -64,14 +65,19 @@ from codeweaver.agent_api.find_code.pipeline import (
 )
 from codeweaver.agent_api.find_code.response import build_error_response, build_success_response
 from codeweaver.agent_api.find_code.scoring import (
-    apply_hybrid_weights,
     process_reranked_results,
     process_unranked_results,
 )
 from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary, SearchStrategy
+from codeweaver.common.logging import log_to_client_or_fallback
 from codeweaver.common.telemetry.events import capture_search_event
 from codeweaver.core.spans import Span
 from codeweaver.semantic.classifications import AgentTask
+
+
+if TYPE_CHECKING:
+    from codeweaver.config.types import CodeWeaverSettingsDict
+    from codeweaver.core.types.dictview import DictView
 
 
 logger = logging.getLogger(__name__)
@@ -88,22 +94,35 @@ class MatchedSection(NamedTuple):
     chunk_number: PositiveInt | None = None
 
 
-def _get_settings(context: Any | None) -> Any:
-    """Get settings from MCP context or load fresh.
+def get_max_tokens() -> int:
+    """Get maximum tokens allowed in find_code response.
 
-    Args:
-        context: Optional MCP context containing settings
+    Returns:
+        Maximum tokens (int)
+    """
+    settings = _get_settings()
+    return settings["token_limit"]
+
+
+def get_max_results() -> int:
+    """Get maximum results allowed in find_code response.
+
+    Returns:
+        Maximum results (int)
+    """
+    settings = _get_settings()
+    return settings["max_results"]
+
+
+def _get_settings() -> DictView[CodeWeaverSettingsDict]:
+    """Get settings view from codeweaver settings.
 
     Returns:
         CodeWeaverSettings instance
     """
-    if context and hasattr(context, "settings"):
-        return context.settings
+    from codeweaver.config.settings import get_settings_map
 
-    # Load fresh (CLI usage)
-    from codeweaver.config.settings import get_settings
-
-    return get_settings()
+    return get_settings_map()
 
 
 async def _check_index_status(context: Any | None) -> tuple[bool, int]:
@@ -120,7 +139,7 @@ async def _check_index_status(context: Any | None) -> tuple[bool, int]:
     from codeweaver.common.registry import get_provider_registry
 
     try:
-        _ = _get_settings(context)  # Ensure settings loaded
+        _ = _get_settings()  # Ensure settings loaded
         registry = get_provider_registry()
 
         # Get vector store provider
@@ -175,18 +194,14 @@ async def _ensure_index_ready(context: Any | None) -> None:
     Raises:
         Does not raise - logs warnings and continues on failure
     """
-    from codeweaver.core.types.dictview import DictView
     from codeweaver.engine.indexer import Indexer
 
     try:
         logger.info("Auto-indexing: Starting initial indexing...")
 
-        # Get settings (from context or load)
-        settings = _get_settings(context)
+        settings = _get_settings()
 
-        # Create indexer (pattern from cli.commands.index)
-        settings_dict = settings.model_dump() if hasattr(settings, "model_dump") else settings
-        indexer = await Indexer.from_settings_async(DictView(settings_dict))
+        indexer = await Indexer.from_settings_async(settings)
 
         # Run initial indexing (blocks until complete)
         await indexer.prime_index()
@@ -205,15 +220,18 @@ async def _ensure_index_ready(context: Any | None) -> None:
         # Don't fail find_code - let it try to search anyway
 
 
+_set_max = get_max_tokens()
+_set_max_results = get_max_results()
+
+
 async def find_code(  # noqa: C901
     query: str,
     *,
     intent: IntentType | None = None,
-    token_limit: int = 10000,
-    include_tests: bool = False,
+    token_limit: int = _set_max,
     focus_languages: tuple[str, ...] | None = None,
-    max_results: int = 50,
-    context: Any | None = None,  # ADD THIS for MCP communication
+    max_results: int = _set_max_results,
+    context: Context | None = None,
 ) -> FindCodeResponseSummary:
     """Find relevant code based on semantic search with intent-driven ranking.
 
@@ -231,7 +249,6 @@ async def find_code(  # noqa: C901
         query: Natural language search query
         intent: Optional explicit intent (if None, will be detected)
         token_limit: Maximum tokens to return (default: 10000)
-        include_tests: Whether to include test files in results
         focus_languages: Optional language filter
         max_results: Maximum number of results to return (default: 50)
         context: Optional FastMCP Context for client communication
@@ -257,7 +274,13 @@ async def find_code(  # noqa: C901
 
         if not index_exists or chunk_count == 0:
             # Full indexing needed - BLOCK and wait
-            logger.info("Index not ready, triggering auto-indexing...")
+            log_to_client_or_fallback(
+                context,
+                "warning",
+                {
+                    "message": "The code index is not ready. Starting index. This could take awhile..."
+                },
+            )
             await _ensure_index_ready(context)
         # If index exists with chunks, proceed to search
         # (incremental updates handled by background watcher if server running)
@@ -287,16 +310,20 @@ async def find_code(  # noqa: C901
         # Step 4: Execute vector search
         candidates = await execute_vector_search(query_vector, context=context)  # THREAD CONTEXT
 
-        # Step 5: Post-search filtering (v0.1 simple approach)
+        # Step 5: Post-search filtering (alpha 1 simple approach)
         candidates = apply_filters(
-            candidates, include_tests=include_tests, focus_languages=focus_languages
+            candidates,
+            include_tests=intent_type in {IntentType.DEBUG, IntentType.TEST},
+            focus_languages=focus_languages,
         )
 
         logger.info("Vector search returned %d candidates after filtering", len(candidates))
 
-        # Step 6: Apply static dense/sparse weights (v0.1)
-        if SearchStrategy.HYBRID_SEARCH in strategies_used:
-            apply_hybrid_weights(candidates)
+        # Step 6: Apply static dense/sparse weights (alpha 1)
+        # This step is currently handled by the vector store itself.
+        # After Alpha 1 we can re-examine the need for this step.
+        # if SearchStrategy.HYBRID_SEARCH in strategies_used:
+        #     apply_hybrid_weights(candidates)
 
         # Step 7: Rerank (optional, if provider configured)
         reranked_results, rerank_strategy = await rerank_results(
@@ -345,8 +372,8 @@ async def find_code(  # noqa: C901
 
         # Step 12: Capture search telemetry
         try:
-            settings = _get_settings(context)
-            tools_before_privacy = getattr(settings, "tools_before_privacy", False)
+            settings = _get_settings()
+            tools_over_privacy = settings["telemetry"]["tools_over_privacy"]
 
             # Get feature flags for A/B testing
             from codeweaver.common.telemetry import get_telemetry_client
@@ -363,7 +390,7 @@ async def find_code(  # noqa: C901
                 intent_type=intent_type,
                 strategies=strategies_used,
                 execution_time_ms=execution_time_ms,
-                tools_before_privacy=tools_before_privacy,
+                tools_over_privacy=tools_over_privacy,
                 feature_flags=feature_flags,
             )
         except Exception:
@@ -384,7 +411,7 @@ async def find_code(  # noqa: C901
                 intent_type=intent or IntentType.UNDERSTAND,
                 strategies=strategies_used,
                 execution_time_ms=execution_time_ms,
-                tools_before_privacy=False,
+                tools_over_privacy=False,
                 feature_flags=None,
             )
         except Exception:

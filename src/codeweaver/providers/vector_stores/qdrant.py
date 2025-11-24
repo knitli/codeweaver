@@ -78,7 +78,9 @@ class QdrantVectorStoreProvider(QdrantBaseProvider):
             )
 
         # Build client kwargs based on connection type
-        client_kwargs: dict[str, Any] = {"url": url, "api_key": api_key}
+        # Use longer timeout for large batch operations (default httpx is 5s which is too short)
+        timeout = self.config.get("timeout", 120)  # 2 minutes default
+        client_kwargs: dict[str, Any] = {"url": url, "api_key": api_key, "timeout": timeout}
 
         client = AsyncQdrantClient(**client_kwargs)
         # Store client before calling _ensure_collection (which needs self._client)

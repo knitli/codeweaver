@@ -444,11 +444,14 @@ type FilteredCallable = Callable[[Any], bool] | Callable[[Any], int] | Callable[
 type FilteredReturn = bool | int | dict[Any, int] | None
 
 
-def _hash_it(value: Any) -> BlakeHashKey:
-    """Hash a value using Blake2b and return the hex digest."""
+def _hash_it(value: Any) -> int:
+    """Hash a value using Blake3 and return as integer."""
     from codeweaver.core.stores import get_blake_hash
 
-    return get_blake_hash(str(value).encode("utf-8")).hexdigest()
+    # get_blake_hash already returns the hex digest string
+    hash_hex = get_blake_hash(str(value))
+    # Convert to int for anonymized but consistent representation
+    return int(hash_hex, 16)
 
 
 class AnonymityConversion(BaseEnum):

@@ -575,7 +575,7 @@ class CodeWeaverSettings(BaseSettings):
             provider=AllDefaultProviderSettings,
             token_limit=30_000,
             max_file_size=1 * 1024 * 1024,
-            max_results=75,
+            max_results=15,
             server=DefaultFastMcpServerSettings,
             indexer=DefaultIndexerSettings,
             chunker=DefaultChunkerSettings,
@@ -636,7 +636,7 @@ class CodeWeaverSettings(BaseSettings):
                 - `FastMcpServerSettings` (`CODEWEAVER__SERVER__HOST`, etc)
                 - `IndexerSettings` (`CODEWEAVER__INDEXER__USE_GITIGNORE`, etc)
                 - `ChunkerSettings` (`CODEWEAVER__CHUNKER__SEMANTIC_IMPORTANCE_THRESHOLD`, etc)
-                - `TelemetrySettings` (`CODEWEAVER__TELEMETRY__TOOLS_BEFORE_PRIVACY`, etc)
+                - `TelemetrySettings` (`CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY`, etc)
                 - UvicornServerSettings (`CODEWEAVER__UVICORN__LOG_LEVEL`, etc)
             - It does NOT apply to `LoggingSettings`, `MiddlewareOptions`, `MCPServerConfig`, or any other fields using TypedDict, including those in the above models.
             - It *does* apply to nested models in those models, currently only `CustomDelimiter`, `PerformanceSettings`, and `ConcurrencySettings`, which are fields in `ChunkerSettings`. You could set: `CODEWEAVER__CHUNKER__PERFORMANCE__MAX_PARALLEL_FILES=4`

@@ -106,7 +106,7 @@ class TestStalePointRemovalInIndexFile:
         )
 
         # Make delete_by_file raise an exception
-        mock_indexer._vector_store.delete_by_file = AsyncMock(
+        mock_indexer._vector_store.delete_by_file = AsyncMock(  # ty: ignore[invalid-assignment]
             side_effect=Exception("Deletion failed")
         )
 

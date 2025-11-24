@@ -10,8 +10,8 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 **Purpose**: This document serves as the authoritative reference for CodeWeaver's architectural decisions, design principles, and technical philosophy. It consolidates design decisions scattered across multiple project files into a unified resource.
 
 **Status**: Living document - Updated as architectural decisions evolve  
-**Version**: 1.0.0  
-**Last Updated**: 2025-10-21
+**Version**: 1.1.0  
+**Last Updated**: 2025-11-23
 
 ---
 
@@ -582,7 +582,7 @@ async def test_find_code_authentication_query():
 
 **Logging**:
 - No f-strings in log statements (use `%s` formatting or `extra=`)
-- Use `logging.exception` for exceptions (automatically includes traceback)
+- Most errors should use `logging.warning` to allow them to get handled by codeweaver's UI (logging.exception bypasses our UI)
 - No print statements in production code
 
 **Exception Handling**:
@@ -833,6 +833,24 @@ Bridge the gap between human expectations and AI agent capabilities through "exq
 
 **Trade-off**: More upfront cataloging work → Superior precision and user experience
 
+### Decision: Generate Backup Embeddings and Storage
+
+**Context**: Prevent offline or unexpected vector store unavailability from disabling CodeWeaver's core functions.
+
+**Options Considered**:
+1. Offer a backup system but don't enable by default
+2. Let CodeWeaver fail, explaining the root issue with the vector store.
+3. Automatic backup-as-a-feature.
+
+**Decision**: Option 3 -- Create a robust backup/fallback system by default, continually prepared to take over. Use lightweight models and persisted json to keep an effective but relatively lightweight backup using the in-memory provider.
+
+**Rationale**:
+- **Resilience**: CodeWeaver's single point of failure is the vector store. Without a backup, if the vector store is unavailable, such as by being offline or disrupted service, then CodeWeaver can't function. A backup allows for service to continue.
+- **Flexibility**: User's don't have to worry about whether CodeWeaver will work or not. It always will be available, with slightly degraded capabilities.
+- **Reduces Confusion**: AI Agents don't encounter cryptic errors about CodeWeaver's internals. They can continue to focus on their job.
+
+**Trade-off**: Increased implementation and complexity; more resource demand (mitigated by smart/low priority resource management)
+
 ## Strategic Design Principles
 
 These principles guide CodeWeaver's technical decision-making and differentiate our approach from typical MCP servers.
@@ -876,7 +894,7 @@ These principles guide CodeWeaver's technical decision-making and differentiate 
 These principles support CodeWeaver's evolution from search tool → context platform → unified MCP orchestration hub (see [PRODUCT.md - Product Vision](PRODUCT.md#product-vision)).
 
 **Phase 1 (Current)**: Deep quality in search establishes credibility
-**Phase 2 (2025-2026)**: Thread integration builds on solid foundation
+**Phase 2 (2025-2026)**: Thread integration builds on solid foundation; rudimentary cloud offerings
 **Phase 3 (2026+)**: Platform play enabled by principle-driven architecture 
 
 ---
@@ -940,7 +958,7 @@ These principles support CodeWeaver's evolution from search tool → context pla
 
 **Impact**: Tied to MCP ecosystem evolution
 
-**Mitigation**: Abstract MCP-specific code, design for protocol flexibility
+**Mitigation**: Abstract MCP-specific code, design for protocol flexibility (MCP is a transport, not the product)
 
 **Justification**: MCP is the emerging standard for agent tools. CodeWeaver designed to work with and without MCP.
 
@@ -960,12 +978,11 @@ These principles support CodeWeaver's evolution from search tool → context pla
 
 ### Primary Documents
 
-- [Project Constitution](specify/memory/constitution.md) - Authoritative governance
+- [Project Constitution](.specify/memory/constitution.md) - Authoritative governance
 - [README.md](README.md) - Project overview and quickstart
 - [PRODUCT.md](PRODUCT.md) - Product vision and strategy
 - [CODE_STYLE.md](CODE_STYLE.md) - Code style and patterns
 - [AGENTS.md](AGENTS.md) - Agent development guidelines
-- [CLAUDE.md](CLAUDE.md) - AI assistant guidance
 - [IMPLEMENTATION_PLAN.md](plans/IMPLEMENTATION_PLAN.md) - Technical roadmap
 
 ### Architecture Decisions Evolution
@@ -989,3 +1006,4 @@ This document serves as the historical record of significant architectural decis
 
 **Version History**:
 - v1.0.0 (2025-10-21): Initial unified architecture document
+- v1.1.0 (2025-11-23): Updated to include recent design decisions and project structure changes.

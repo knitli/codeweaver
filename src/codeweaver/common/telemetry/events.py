@@ -217,7 +217,7 @@ class SearchEvent:
     - Index state
     - Feature flags for A/B testing
 
-    Supports privacy-aware detailed tracking via tools_before_privacy setting.
+    Supports privacy-aware detailed tracking via tools_over_privacy setting.
     """
 
     EVENT_NAME = "codeweaver_search"
@@ -230,7 +230,7 @@ class SearchEvent:
         strategies: list[SearchStrategy],
         execution_time_ms: float,
         *,
-        tools_before_privacy: bool = False,
+        tools_over_privacy: bool = False,
         feature_flags: dict[str, str | None] | None = None,
     ) -> None:
         """
@@ -242,7 +242,7 @@ class SearchEvent:
             intent_type: Detected or specified intent
             strategies: Search strategies used
             execution_time_ms: Total execution time
-            tools_before_privacy: Whether to include detailed query data
+            tools_over_privacy: Whether to include detailed query data
             feature_flags: Feature flag variants for A/B testing
         """
         self._response = response
@@ -250,7 +250,7 @@ class SearchEvent:
         self._intent_type = intent_type
         self._strategies = strategies
         self._execution_time_ms = execution_time_ms
-        self._tools_before_privacy = tools_before_privacy
+        self._tools_over_privacy = tools_over_privacy
         self._feature_flags = feature_flags or {}
 
     def to_posthog_event(self) -> tuple[str, dict[str, Any]]:
@@ -330,8 +330,8 @@ class SearchEvent:
             if variant is not None:
                 properties[f"$feature/{flag_key}"] = variant
 
-        # Opt-in detailed tracking (only when tools_before_privacy=True)
-        if self._tools_before_privacy:
+        # Opt-in detailed tracking (only when tools_over_privacy=True)
+        if self._tools_over_privacy:
             properties["query"] = {
                 "token_count": len(self._query.split()),
                 "char_count": len(self._query),
@@ -388,7 +388,7 @@ def capture_search_event(
     strategies: list[SearchStrategy],
     execution_time_ms: float,
     *,
-    tools_before_privacy: bool = False,
+    tools_over_privacy: bool = False,
     feature_flags: dict[str, str | None] | None = None,
 ) -> None:
     """
@@ -400,7 +400,7 @@ def capture_search_event(
         intent_type: Detected or specified intent
         strategies: Search strategies used
         execution_time_ms: Total execution time
-        tools_before_privacy: Whether to include detailed query data
+        tools_over_privacy: Whether to include detailed query data
         feature_flags: Feature flag variants for A/B testing
     """
     from codeweaver.common.telemetry import get_telemetry_client
@@ -415,7 +415,7 @@ def capture_search_event(
         intent_type=intent_type,
         strategies=strategies,
         execution_time_ms=execution_time_ms,
-        tools_before_privacy=tools_before_privacy,
+        tools_over_privacy=tools_over_privacy,
         feature_flags=feature_flags,
     )
 

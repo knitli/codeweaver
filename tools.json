@@ -1,250 +1,16 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-16/tools.schema.json",
-  "tools": [
-    {
-      "name": "find_code",
-      "description": "Find relevant code in your codebase using semantic search with AI-powered intent detection. Returns precisely targeted code snippets based on natural language queries, reducing context bloat by 60-80%. Supports 170+ programming languages with intelligent chunking and multi-provider embeddings.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "query": {
-            "type": "string",
-            "description": "Natural language search query describing what code you're looking for. Examples: 'authentication logic', 'error handling for API calls', 'database connection setup', 'how we validate user input'."
-          },
-          "intent": {
-            "type": "string",
-            "enum": [
-              "understand",
-              "debug",
-              "implement",
-              "refactor",
-              "document",
-              "test",
-              "review"
-            ],
-            "description": "Optional: Explicit intent for search optimization. If not provided, CodeWeaver will automatically detect intent from the query. 'understand' = learning/exploration, 'debug' = finding bugs, 'implement' = adding features, 'refactor' = improving code, 'document' = writing docs, 'test' = creating tests, 'review' = code review."
-          },
-          "token_limit": {
-            "type": "integer",
-            "minimum": 1000,
-            "maximum": 100000,
-            "default": 10000,
-            "description": "Maximum tokens to return in results. Controls how much code context is provided. Default 10000 (~8K tokens of actual code). Increase for broader context, decrease for focused results."
-          },
-          "include_tests": {
-            "type": "boolean",
-            "default": false,
-            "description": "Whether to include test files in search results. Set to true when specifically looking for test code or examples."
-          },
-          "focus_languages": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "Optional: Filter results to specific programming languages. Use standard language names like 'Python', 'JavaScript', 'TypeScript', 'Java', 'Go', etc. Supports 170+ languages."
-          },
-          "max_results": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 100,
-            "default": 50,
-            "description": "Maximum number of code matches to return. Higher values provide more context but may include less relevant results."
-          }
-        },
-        "required": ["query"]
-      },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "description": "Whether the search completed successfully"
-          },
-          "query": {
-            "type": "string",
-            "description": "The original search query"
-          },
-          "detected_intent": {
-            "type": "string",
-            "enum": [
-              "understand",
-              "debug",
-              "implement",
-              "refactor",
-              "document",
-              "test",
-              "review"
-            ],
-            "description": "The detected or provided search intent"
-          },
-          "strategy": {
-            "type": "string",
-            "enum": ["hybrid", "semantic", "keyword"],
-            "description": "Search strategy used (hybrid = vector + keyword, semantic = vector only, keyword = text only)"
-          },
-          "results": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "file_path": {
-                  "type": "string",
-                  "description": "Relative path to the file containing the match"
-                },
-                "language": {
-                  "type": "string",
-                  "description": "Programming language of the file"
-                },
-                "content": {
-                  "type": "string",
-                  "description": "The matched code snippet with context"
-                },
-                "start_line": {
-                  "type": "integer",
-                  "description": "Starting line number in the file"
-                },
-                "end_line": {
-                  "type": "integer",
-                  "description": "Ending line number in the file"
-                },
-                "relevance_score": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 1,
-                  "description": "Relevance score (0-1, higher is more relevant)"
-                },
-                "match_reason": {
-                  "type": "string",
-                  "description": "Why this code matched the query"
-                },
-                "semantic_classification": {
-                  "type": "string",
-                  "description": "Semantic role of the code (e.g., 'function_definition', 'class', 'import')"
-                },
-                "chunk_id": {
-                  "type": "string",
-                  "description": "Unique identifier for this code chunk"
-                }
-              },
-              "required": ["file_path", "content", "start_line", "end_line", "relevance_score"]
-            },
-            "description": "Array of matching code snippets ranked by relevance"
-          },
-          "total_matches": {
-            "type": "integer",
-            "description": "Total number of matches found"
-          },
-          "search_time_ms": {
-            "type": "number",
-            "description": "Time taken to execute search in milliseconds"
-          },
-          "token_count": {
-            "type": "integer",
-            "description": "Approximate token count of returned content"
-          },
-          "languages_found": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "Programming languages present in results"
-          },
-          "index_status": {
-            "type": "object",
-            "properties": {
-              "indexed": {
-                "type": "boolean",
-                "description": "Whether the codebase is indexed"
-              },
-              "chunk_count": {
-                "type": "integer",
-                "description": "Number of code chunks in the index"
-              }
-            },
-            "description": "Status of the code index"
-          },
-          "error": {
-            "type": "string",
-            "description": "Error message if success is false"
-          }
-        },
-        "required": ["success", "query", "detected_intent", "strategy", "results", "total_matches"]
-      },
-      "examples": [
-        {
-          "input": {
-            "query": "authentication middleware"
-          },
-          "output": {
-            "success": true,
-            "query": "authentication middleware",
-            "detected_intent": "understand",
-            "strategy": "hybrid",
-            "results": [
-              {
-                "file_path": "src/middleware/auth.ts",
-                "language": "TypeScript",
-                "content": "export function authMiddleware(req, res, next) { ... }",
-                "start_line": 12,
-                "end_line": 35,
-                "relevance_score": 0.92,
-                "match_reason": "Function definition for authentication middleware",
-                "semantic_classification": "function_definition"
-              }
-            ],
-            "total_matches": 1,
-            "search_time_ms": 145,
-            "token_count": 850,
-            "languages_found": ["TypeScript"]
-          }
-        },
-        {
-          "input": {
-            "query": "how do we handle database errors",
-            "intent": "debug",
-            "include_tests": true
-          },
-          "output": {
-            "success": true,
-            "query": "how do we handle database errors",
-            "detected_intent": "debug",
-            "strategy": "hybrid",
-            "results": [
-              {
-                "file_path": "src/db/connection.py",
-                "language": "Python",
-                "content": "try:\\n    conn = create_connection()\\nexcept DatabaseError as e:\\n    logger.error(f'Database error: {e}')\\n    raise",
-                "start_line": 45,
-                "end_line": 50,
-                "relevance_score": 0.88,
-                "match_reason": "Error handling for database connections",
-                "semantic_classification": "error_handler"
-              }
-            ],
-            "total_matches": 1,
-            "search_time_ms": 132,
-            "token_count": 420,
-            "languages_found": ["Python"]
-          }
-        }
-      ],
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false,
-        "idempotentHint": true,
-        "openWorldHint": false
-      }
-    }
-  ],
-  "version": "0.0.1rc778",
-  "server": {
-    "name": "io.github.knitli/codeweaver",
-    "version": "0.0.1rc778"
-  },
   "_meta": {
     "io.modelcontextprotocol.registry/publisher-provided": {
       "description": "CodeWeaver provides a single, powerful find_code tool that replaces the need for multiple specialized code search tools. It uses semantic search with intent detection to deliver precisely targeted code snippets.",
-      "tool_count": 1,
+      "key_features": [
+        "AI-first intent detection",
+        "Hybrid (sparse + dense vector) search of AST nodes and semantic chunks",
+        "Support for 170+ programming languages",
+        "Intelligent chunking and context",
+        "Multi-provider embeddings, sparse embeddings, and reranking",
+        "Automatic reranking based on search intent and objective",
+        "CLI for developer search workflows"
+      ],
       "primary_use_cases": [
         "Code exploration and understanding",
         "Finding implementation examples",
@@ -253,15 +19,272 @@
         "Documentation research",
         "Test discovery"
       ],
-      "key_features": [
-        "AI-powered intent detection",
-        "Semantic + keyword hybrid search",
-        "Support for 170+ programming languages",
-        "Intelligent chunking and context",
-        "Multi-provider embeddings",
-        "60-80% context reduction",
-        "Automatic reranking"
-      ]
+      "tool_count": 1
     }
-  }
+  },
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-16/tools.schema.json",
+  "server": {
+    "name": "io.github.knitli/codeweaver",
+    "version": "0.0.1rc778"
+  },
+  "tools": [
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Find relevant code in your codebase using semantic search with AI-powered intent detection. Returns precisely targeted code snippets based on natural language queries, reducing context bloat by 60-80%. Supports 170+ programming languages with intelligent chunking and multi-provider embeddings.",
+      "examples": [
+        {
+          "input": {
+            "query": "authentication middleware"
+          },
+          "output": {
+            "detected_intent": "understand",
+            "languages_found": [
+              "TypeScript"
+            ],
+            "query": "authentication middleware",
+            "results": [
+              {
+                "content": "export function authMiddleware(req, res, next) { ... }",
+                "end_line": 35,
+                "file_path": "src/middleware/auth.ts",
+                "language": "TypeScript",
+                "match_reason": "Function definition for authentication middleware",
+                "relevance_score": 0.92,
+                "semantic_classification": "function_definition",
+                "start_line": 12
+              }
+            ],
+            "search_time_ms": 145,
+            "strategy": "hybrid",
+            "success": true,
+            "token_count": 850,
+            "total_matches": 1
+          }
+        },
+        {
+          "input": {
+            "include_tests": true,
+            "intent": "debug",
+            "query": "how do we handle database errors"
+          },
+          "output": {
+            "detected_intent": "debug",
+            "languages_found": [
+              "Python"
+            ],
+            "query": "how do we handle database errors",
+            "results": [
+              {
+                "content": "try:\\n    conn = create_connection()\\nexcept DatabaseError as e:\\n    logger.error(f'Database error: {e}')\\n    raise",
+                "end_line": 50,
+                "file_path": "src/db/connection.py",
+                "language": "Python",
+                "match_reason": "Error handling for database connections",
+                "relevance_score": 0.88,
+                "semantic_classification": "error_handler",
+                "start_line": 45
+              }
+            ],
+            "search_time_ms": 132,
+            "strategy": "hybrid",
+            "success": true,
+            "token_count": 420,
+            "total_matches": 1
+          }
+        }
+      ],
+      "inputSchema": {
+        "properties": {
+          "focus_languages": {
+            "description": "Optional: Filter results to specific programming languages. Use standard language names like 'Python', 'JavaScript', 'TypeScript', 'Java', 'Go', etc. Supports 170+ languages.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "include_tests": {
+            "default": false,
+            "description": "Whether to include test files in search results. Set to true when specifically looking for test code or examples.",
+            "type": "boolean"
+          },
+          "intent": {
+            "description": "Optional: Explicit intent for search optimization. If not provided, CodeWeaver will automatically detect intent from the query. 'understand' = learning/exploration, 'debug' = finding bugs, 'implement' = adding features, 'refactor' = improving code, 'document' = writing docs, 'test' = creating tests, 'review' = code review.",
+            "enum": [
+              "understand",
+              "debug",
+              "implement",
+              "refactor",
+              "document",
+              "test",
+              "review"
+            ],
+            "type": "string"
+          },
+          "max_results": {
+            "default": 50,
+            "description": "Maximum number of code matches to return. Higher values provide more context but may include less relevant results.",
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "query": {
+            "description": "Natural language search query describing what code you're looking for. Examples: 'authentication logic', 'error handling for API calls', 'database connection setup', 'how we validate user input'.",
+            "type": "string"
+          },
+          "token_limit": {
+            "default": 10000,
+            "description": "Maximum tokens to return in results. Controls how much code context is provided. Default 10000 (~8K tokens of actual code). Increase for broader context, decrease for focused results.",
+            "maximum": 100000,
+            "minimum": 1000,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "name": "find_code",
+      "outputSchema": {
+        "properties": {
+          "detected_intent": {
+            "description": "The detected or provided search intent",
+            "enum": [
+              "understand",
+              "debug",
+              "implement",
+              "refactor",
+              "document",
+              "test",
+              "review"
+            ],
+            "type": "string"
+          },
+          "error": {
+            "description": "Error message if success is false",
+            "type": "string"
+          },
+          "index_status": {
+            "description": "Status of the code index",
+            "properties": {
+              "chunk_count": {
+                "description": "Number of code chunks in the index",
+                "type": "integer"
+              },
+              "indexed": {
+                "description": "Whether the codebase is indexed",
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          },
+          "languages_found": {
+            "description": "Programming languages present in results",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "query": {
+            "description": "The original search query",
+            "type": "string"
+          },
+          "results": {
+            "description": "Array of matching code snippets ranked by relevance",
+            "items": {
+              "properties": {
+                "chunk_id": {
+                  "description": "Unique identifier for this code chunk",
+                  "type": "string"
+                },
+                "content": {
+                  "description": "The matched code snippet with context",
+                  "type": "string"
+                },
+                "end_line": {
+                  "description": "Ending line number in the file",
+                  "type": "integer"
+                },
+                "file_path": {
+                  "description": "Relative path to the file containing the match",
+                  "type": "string"
+                },
+                "language": {
+                  "description": "Programming language of the file",
+                  "type": "string"
+                },
+                "match_reason": {
+                  "description": "Why this code matched the query",
+                  "type": "string"
+                },
+                "relevance_score": {
+                  "description": "Relevance score (0-1, higher is more relevant)",
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "semantic_classification": {
+                  "description": "Semantic role of the code (e.g., 'function_definition', 'class', 'import')",
+                  "type": "string"
+                },
+                "start_line": {
+                  "description": "Starting line number in the file",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "file_path",
+                "content",
+                "start_line",
+                "end_line",
+                "relevance_score"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "search_time_ms": {
+            "description": "Time taken to execute search in milliseconds",
+            "type": "number"
+          },
+          "strategy": {
+            "description": "Search strategy used (hybrid = vector + keyword, semantic = vector only, keyword = text only)",
+            "enum": [
+              "hybrid",
+              "semantic",
+              "keyword"
+            ],
+            "type": "string"
+          },
+          "success": {
+            "description": "Whether the search completed successfully",
+            "type": "boolean"
+          },
+          "token_count": {
+            "description": "Approximate token count of returned content",
+            "type": "integer"
+          },
+          "total_matches": {
+            "description": "Total number of matches found",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "success",
+          "query",
+          "detected_intent",
+          "strategy",
+          "results",
+          "total_matches"
+        ],
+        "type": "object"
+      }
+    }
+  ],
+  "version": "0.0.1rc778"
 }
