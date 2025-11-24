@@ -135,8 +135,8 @@ class TestRemovePathWithDeletedFiles:
                 discovered = DiscoveredFile(
                     path=discovered.path,
                     ext_kind=discovered.ext_kind,
-                    file_hash=discovered._file_hash,
-                    git_branch=discovered._git_branch,
+                    file_hash=discovered.file_hash,
+                    git_branch=discovered.git_branch,
                     source_id=unique_id,
                 )
                 mock_indexer._store[unique_id] = discovered
