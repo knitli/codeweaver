@@ -10,6 +10,7 @@ Helper functions for CodeWeaver utilities.
 from __future__ import annotations
 
 import contextlib
+import datetime
 import logging
 import os
 import sys
@@ -39,6 +40,24 @@ def uuid7() -> UUID7:
     return cast(
         UUID7, uuid7_gen()
     )  # it's always UUID7 and not str | int | bytes because we don't take kwargs
+
+
+def uuid7_as_timestamp(
+    uuid: str | UUID7 | int, *, as_datetime: bool = False
+) -> int | datetime.datetime | None:
+    """Utility to extract the timestamp from a UUID7, optionally as a datetime."""
+    if sys.version_info < (3, 14):
+        from uuid_extensions import timestamp_ns, uuid_to_datetime
+
+        return uuid_to_datetime(uuid) if as_datetime else timestamp_ns(uuid)
+    from uuid import uuid7
+
+    uuid = uuid7(uuid) if isinstance(uuid, str | int) else uuid
+    return (
+        datetime.datetime.fromtimestamp(uuid.time // 1_000, datetime.UTC)
+        if as_datetime
+        else uuid.time
+    )
 
 
 type DictInputTypesT = (

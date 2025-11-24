@@ -20,7 +20,7 @@ import os
 from collections.abc import Callable
 from importlib import util
 from pathlib import Path
-from typing import Annotated, Any, Literal, Self, Unpack, cast
+from typing import Annotated, Any, Literal, Self, Unpack, cast, overload
 
 from fastmcp.server.middleware import Middleware
 from fastmcp.server.server import DuplicateBehavior
@@ -184,7 +184,7 @@ class FastMcpServerSettings(BasedModel):
     port: Annotated[
         PositiveInt | None,
         Field(description="""Port number for the FastMCP server. Default is 9328 ('WEAV')"""),
-    ] = int(port) if (port := os.environ.get("CODEWEAVER_PORT")) else 9328
+    ] = int(_port) if (_port := os.environ.get("CODEWEAVER_PORT")) else 9328
 
     auth: Annotated[AuthSettings | None, Field(description="""OAuth provider configuration""")] = (
         None
@@ -302,8 +302,22 @@ class FastMcpServerSettings(BasedModel):
 _ = ProviderSettings.model_rebuild()
 
 
-def _resolve_config_file() -> FilePath | None:
-    """Resolve the configuration file path from environment variable, if set."""
+@overload
+def _resolve_env_settings_path(*, directory: Literal[False]) -> FilePath | Unset: ...
+@overload
+def _resolve_env_settings_path(*, directory: Literal[True]) -> DirectoryPath | Unset: ...
+def _resolve_env_settings_path(*, directory: bool = False) -> FilePath | DirectoryPath | Unset:
+    """Resolve the configuration file path or project directory path from environment variable, if set."""
+    if (
+        directory
+        and (env_var := os.environ.get("CODEWEAVER_PROJECT_PATH"))
+        and (env_path := Path(env_var))
+        and env_path.exists()
+        and env_path.is_dir()
+    ):
+        return env_path
+    if directory:
+        return UNSET
     if (
         (env_var := os.environ.get("CODEWEAVER_CONFIG_FILE"))
         and (env_config := Path(env_var))
@@ -311,7 +325,7 @@ def _resolve_config_file() -> FilePath | None:
         and env_config.is_file()
     ):
         return env_config
-    return None
+    return UNSET
 
 
 class CodeWeaverSettings(BaseSettings):
@@ -361,11 +375,7 @@ class CodeWeaverSettings(BaseSettings):
             description="""Root path of the codebase to analyze. CodeWeaver will try to detect the project path automatically if you don't provide one.""",
             validate_default=False,
         ),
-    ] = (
-        Path(os.environ["CODEWEAVER_PROJECT_PATH"])
-        if "CODEWEAVER_PROJECT_PATH" in os.environ
-        else UNSET
-    )
+    ] = _resolve_env_settings_path(directory=True)
 
     project_name: Annotated[
         str | Unset,
@@ -384,9 +394,9 @@ class CodeWeaverSettings(BaseSettings):
     ] = UNSET
 
     config_file: Annotated[
-        FilePath | None,
+        FilePath | Unset,
         Field(description="""Path to the configuration file, if any""", exclude=True),
-    ] = _resolve_config_file()
+    ] = _resolve_env_settings_path()
 
     # Performance settings
     token_limit: Annotated[
@@ -480,6 +490,14 @@ class CodeWeaverSettings(BaseSettings):
         set[str], Field(description="Set of fields that were unset", exclude=True)
     ] = set()
 
+    def __init__(self, **kwargs: Any) -> None:
+        """Initialize CodeWeaverSettings, loading from config file if provided."""
+        if self.config_file is not UNSET:
+            content = from_json(self.config_file.read_bytes())
+            if content and content != kwargs:
+                kwargs |= content
+        super().__init__(**kwargs)
+
     def model_post_init(self, __context: Any, /) -> None:
         """Post-initialization validation."""
         self._unset_fields = {
@@ -496,47 +514,8 @@ class CodeWeaverSettings(BaseSettings):
             else self.project_name  # type: ignore
         )
         self.profile = None if isinstance(self.profile, Unset) else self.profile
-        if (
-            self.profile
-            and self.provider is not UNSET
-            and (
-                (vector_url := os.environ.get("CODEWEAVER_VECTOR_STORE_URL"))
-                or (
-                    (
-                        vector_settings := self.provider.vector_store
-                        if isinstance(self.provider.vector_store, dict)
-                        else self.provider.vector_store[0]
-                        if isinstance(self.provider.vector_store, tuple)
-                        else None
-                    )
-                    and (
-                        vector_url := vector_settings.get("provider_settings", {}).get("url")
-                        or vector_settings.get("connection", {}).get("url")
-                    )
-                )
-            )
-        ):
-            from urllib.parse import urlparse
-
-            from codeweaver.config.profiles import get_profile
-
-            is_cloud = urlparse(vector_url).hostname not in ("localhost", "127.0.0.1")
-            self.provider = ProviderSettings.model_validate(
-                get_profile(
-                    self.profile if self.profile != "testing" else "backup",
-                    vector_deployment="cloud" if is_cloud else "local",
-                    url=vector_url if is_cloud else None,
-                )  # ty: ignore[no-matching-overload]
-            )  # type: ignore
-        elif self.profile:
-            from codeweaver.config.profiles import get_profile
-
-            self.provider = ProviderSettings.model_validate(
-                get_profile(
-                    self.profile if self.profile != "testing" else "backup",
-                    vector_deployment="local",
-                )  # ty: ignore[no-matching-overload]
-            )
+        if self.profile:
+            self._setup_profile()
         else:
             self.provider = (
                 ProviderSettings.model_validate(AllDefaultProviderSettings)
@@ -603,6 +582,44 @@ class CodeWeaverSettings(BaseSettings):
             FilteredKey("project_name"): AnonymityConversion.BOOLEAN,
             FilteredKey("config_file"): AnonymityConversion.HASH,
         }
+
+    def _setup_profile(self) -> None:
+        """Set up provider settings based on the selected profile."""
+        from codeweaver.config.profiles import get_profile
+
+        if self.provider is not UNSET and (
+            (vector_url := os.environ.get("CODEWEAVER_VECTOR_STORE_URL"))
+            or (
+                (
+                    vector_settings := self.provider.vector_store
+                    if isinstance(self.provider.vector_store, dict)
+                    else self.provider.vector_store[0]
+                    if isinstance(self.provider.vector_store, tuple)
+                    else None
+                )
+                and (
+                    vector_url := vector_settings.get("provider_settings", {}).get("url")
+                    or vector_settings.get("connection", {}).get("url")
+                )
+            )
+        ):
+            from urllib.parse import urlparse
+
+            is_cloud = urlparse(vector_url).hostname not in ("localhost", "127.0.0.1")
+            self.provider = ProviderSettings.model_validate(
+                get_profile(
+                    self.profile if self.profile != "testing" else "backup",
+                    vector_deployment="cloud" if is_cloud else "local",
+                    url=vector_url if is_cloud else None,
+                )  # ty: ignore[no-matching-overload]
+            )  # type: ignore
+        else:
+            self.provider = ProviderSettings.model_validate(
+                get_profile(
+                    self.profile if self.profile != "testing" else "backup",
+                    vector_deployment="local",
+                )  # ty: ignore[no-matching-overload]
+            )
 
     @classmethod
     def json_schema(cls) -> bytes:

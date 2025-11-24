@@ -206,6 +206,27 @@ class LoggingConfigDict(TypedDict, total=False):
     ]
 
 
+def _from_env_log_level() -> Literal[0, 10, 20, 30, 40, 50]:
+    """Get log level from environment variable."""
+    if level_str := os.environ.get("CODEWEAVER_LOG_LEVEL"):
+        if level_str.isdigit():
+            return (
+                int(level_str)
+                if level_str in {"0", "10", "20", "30", "40", "50"}
+                else logging.WARNING
+            )
+        level_str = level_str.upper()
+        level_map = {
+            "DEBUG": logging.DEBUG,
+            "INFO": logging.INFO,
+            "WARNING": logging.WARNING,
+            "ERROR": logging.ERROR,
+            "CRITICAL": logging.CRITICAL,
+        }
+        return level_map.get(level_str, logging.WARNING)
+    return logging.WARNING
+
+
 class LoggingSettings(TypedDict, total=False):
     """Global logging settings."""
 
@@ -232,9 +253,7 @@ class LoggingSettings(TypedDict, total=False):
 
 DefaultLoggingSettings: LoggingSettings = {
     "name": "codeweaver",
-    "level": cast(
-        Literal[0, 10, 20, 30, 40, 50], os.environ.get("CODEWEAVER_LOG_LEVEL", logging.INFO)
-    ),
+    "level": cast(Literal[0, 10, 20, 30, 40, 50], _from_env_log_level()),
     "use_rich": is_tty(),
     "rich_options": {
         "show_time": True,

@@ -415,4 +415,9 @@ def get_provider_vars() -> MappingProxyType[ProviderField, SetProviderEnvVarsDic
     return MappingProxyType(env_map)
 
 
-__all__ = ("SettingsEnvVars", "environment_variables", "get_provider_vars")
+__all__ = (
+    "SettingsEnvVars",
+    "environment_variables",
+    "get_provider_vars",
+    "get_skeleton_provider_dict",
+)
