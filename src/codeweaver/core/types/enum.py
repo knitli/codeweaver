@@ -25,7 +25,6 @@ from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializatio
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.stores import BlakeHashKey
     from codeweaver.core.types.aliases import FilteredKeyT
 
 

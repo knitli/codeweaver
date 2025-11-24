@@ -94,7 +94,9 @@ class Sentinel(BasedModel):
         # sourcery skip: avoid-builtin-shadow
         name = SentinelName(name or cast(LiteralStringT, cls.__name__.upper()).strip())
         module_name = module_name or (
-            cls.module_name if hasattr(cls, "module_name") and isinstance(cls.module_name, str) else cls._get_module_name_generator()()
+            cls.module_name
+            if hasattr(cls, "module_name") and isinstance(cls.module_name, str)
+            else cls._get_module_name_generator()()
         )
 
         # Include the class's module and fully qualified name in the
@@ -130,7 +132,6 @@ class Sentinel(BasedModel):
         while properly setting up Pydantic's serialization infrastructure.
         """
         # Initialization already done in __new__
-        pass
 
     def __str__(self) -> str:
         """Return a string representation of the sentinel."""

@@ -16,9 +16,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypedDict, cast, overload
 
 import httpx
+
 from pydantic import UUID7, ConfigDict, PrivateAttr
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 from typing_extensions import TypeIs
+
 
 # Common retryable exceptions for vector store operations
 RETRYABLE_EXCEPTIONS = (ConnectionError, TimeoutError, OSError, httpx.TimeoutException)
