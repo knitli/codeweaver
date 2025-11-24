@@ -34,7 +34,7 @@ try:
     from sentence_transformers import SentenceTransformer
 except ImportError as e:
     raise ConfigurationError(
-        'Please install the `sentence-transformers` package to use the Sentence Transformers provider, \nyou can use the `sentence-transformers` optional group — `pip install "codeweaver[sentence-transformers]"` or `codeweaver[sentence-transformers-gpu]`'
+        'Please install the `sentence-transformers` package to use the Sentence Transformers provider, \nyou can use the `sentence-transformers` optional group -- `pip install "codeweaver[sentence-transformers]"` or `codeweaver[sentence-transformers-gpu]`'
     ) from e
 
 # SparseEncoder is not available in all versions of sentence-transformers
