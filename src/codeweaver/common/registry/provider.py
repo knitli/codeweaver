@@ -1096,8 +1096,11 @@ class ProviderRegistry(BasedModel):
             and not isinstance(retrieved_cls, tuple)
         ):
             return self._build_embedding_provider(
-                provider, provider_kind, retrieved_cls, kwargs_for_provider
-            )  # ty: ignore[invalid-argument-type]
+                provider,
+                provider_kind,  # ty: ignore[invalid-argument-type]
+                retrieved_cls,
+                kwargs_for_provider,
+            )
         # Standard handling for other providers
         # Handle None case
         if retrieved_cls is None:
@@ -1806,6 +1809,8 @@ class ProviderRegistry(BasedModel):
             ProviderKind.EMBEDDING,
             ProviderKind.SPARSE_EMBEDDING,
             ProviderKind.RERANKING,
+            ProviderKind.DATA,
+            ProviderKind.VECTOR_STORE,
             ProviderKind.AGENT,
         ):
             raise ValueError("We didn't recognize that provider kind, %s.", provider_kind)

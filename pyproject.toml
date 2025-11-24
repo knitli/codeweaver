@@ -128,8 +128,6 @@ dependencies = [
   "tiktoken>=0.12.0",
   "tokenizers>=0.22.1",
   "tomli-w>=1.2.0",
-  "types-boto3-bedrock-agent-runtime>=1.40.61",
-  "types-boto3-bedrock-runtime>=1.40.61",
   "typing_extensions>=4.15.0",
   "uuid7>=0.1.0; python_version < '3.14'",
   "uvicorn[standard]>=0.38.0",
@@ -194,7 +192,6 @@ gcp-secret-manager = ["pydantic-settings[yaml,toml,gcp-secret-manager]"]
 #    --- Agent-only Providers --- (no embedding/rerank)
 provider-anthropic = ["pydantic-ai-slim[anthropic]"]
 # --- Embedding, Rerank and Agent Providers --- (the trifecta)
-# we need types for runtime because our implementation is a pydantic model that uses boto3 types
 provider-bedrock = [
   "pydantic-ai-slim[bedrock]",
 ]
@@ -257,6 +254,7 @@ dev = [
   "ruff>=0.14.2",
   "superclaude>=4.1.6",
   "ty>=0.0.1a25",
+  "types-boto3-custom",
   "uv>=0.9.5",
 ]
 build = ["hatchling>=1.27.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.11.2"]
@@ -505,3 +503,6 @@ bump = true
 dirty = true  # Add .dirty suffix when working directory has uncommitted changes
 # tag-branch = "main"  # Commented out to allow building on feature branches
 commit-prefix = "g"
+
+[tool.uv.sources]
+types-boto3-custom = { path = "vendored/types_boto3_custom-1.41.0-py3-none-any.whl" }

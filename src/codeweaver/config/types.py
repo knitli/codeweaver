@@ -146,8 +146,8 @@ class UvicornServerSettings(BasedModel):
     model_config = BASEDMODEL_CONFIG
 
     name: Annotated[str, Field(exclude=True)] = "CodeWeaver_http"
-    host: str = "127.0.0.1"
-    port: PositiveInt = 9328
+    host: str = os.environ.get("CODEWEAVER_HOST", "127.0.0.1")
+    port: PositiveInt = int(port) if (port := os.environ.get("CODEWEAVER_PORT")) else 9328
     uds: str | None = None
     fd: int | None = None
     http: type[asyncio.Protocol] | HTTPProtocolType | str = "auto"

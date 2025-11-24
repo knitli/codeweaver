@@ -756,8 +756,6 @@ dependencies = [
     { name = "tiktoken" },
     { name = "tokenizers" },
     { name = "tomli-w" },
-    { name = "types-boto3-bedrock-agent-runtime" },
-    { name = "types-boto3-bedrock-runtime" },
     { name = "typing-extensions" },
     { name = "uuid7", marker = "python_full_version < '3.14'" },
     { name = "uvicorn", extra = ["standard"] },
@@ -885,6 +883,7 @@ dev = [
     { name = "ruff" },
     { name = "superclaude" },
     { name = "ty" },
+    { name = "types-boto3-custom" },
     { name = "uv" },
 ]
 docs = [
@@ -983,8 +982,6 @@ requires-dist = [
     { name = "tokenizers", marker = "extra == 'recommended-local-only'" },
     { name = "tomli-w", specifier = ">=1.2.0" },
     { name = "tomli-w", marker = "extra == 'cli'" },
-    { name = "types-boto3-bedrock-agent-runtime", specifier = ">=1.40.61" },
-    { name = "types-boto3-bedrock-runtime", specifier = ">=1.40.61" },
     { name = "typing-extensions", specifier = ">=4.15.0" },
     { name = "uuid7", marker = "python_full_version < '3.14'", specifier = ">=0.1.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.38.0" },
@@ -1018,6 +1015,7 @@ dev = [
     { name = "ruff", specifier = ">=0.14.2" },
     { name = "superclaude", specifier = ">=4.1.6" },
     { name = "ty", specifier = ">=0.0.1a25" },
+    { name = "types-boto3-custom", path = "vendored/types_boto3_custom-1.41.0-py3-none-any.whl" },
     { name = "uv", specifier = ">=0.9.5" },
 ]
 docs = [
@@ -6200,21 +6198,22 @@ wheels = [
 ]
 
 [[package]]
-name = "types-boto3-bedrock-agent-runtime"
-version = "1.40.61"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/49/48/e1943bcc54def83f012f3c880498c87daadf3d06fe2fc6f389a9e3674c95/types_boto3_bedrock_agent_runtime-1.40.61.tar.gz", hash = "sha256:700be68d977541899dcd5eb20917863181cc0196b2c64f578baeb8e4d966ca89", size = 41928, upload-time = "2025-10-28T19:43:23.22Z" }
+name = "types-boto3-custom"
+version = "1.41.0"
+source = { path = "vendored/types_boto3_custom-1.41.0-py3-none-any.whl" }
+dependencies = [
+    { name = "botocore-stubs" },
+    { name = "types-s3transfer" },
+]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2c/cf/22af42dec5a421128f29e1e876e3333884041794b73d65317f462f9c5e9d/types_boto3_bedrock_agent_runtime-1.40.61-py3-none-any.whl", hash = "sha256:63682d00eb95a7d70a7abb67dbd3b43fe07575246adcec98f21be65a62479968", size = 50459, upload-time = "2025-10-28T19:43:15.803Z" },
+    { filename = "types_boto3_custom-1.41.0-py3-none-any.whl", hash = "sha256:e751c80d803c7b5198a05d62adf26a3fd753829c593b5628d9e20d3ae3f5662d" },
 ]
 
-[[package]]
-name = "types-boto3-bedrock-runtime"
-version = "1.40.62"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/03/0b/04fa4c71353d9219968fb9eac728b1f6a40f0060eac7fdb225e7b1c32edc/types_boto3_bedrock_runtime-1.40.62.tar.gz", hash = "sha256:d63ff392b88c6c8e86c8d6605c188b6833d120983122c7e77648ae8cc28a35c6", size = 28774, upload-time = "2025-10-29T21:43:03.91Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9e/e6/db1ee1754e4fdf13ed69a9ff7c085e303fc2cfd5ee6898cd3cfbb42ef175/types_boto3_bedrock_runtime-1.40.62-py3-none-any.whl", hash = "sha256:db250bb350465ae1ed06e198ec02871a4ff7ea2010bc40d662cf18cc65ad3007", size = 34460, upload-time = "2025-10-29T21:43:02.362Z" },
+[package.metadata]
+requires-dist = [
+    { name = "botocore-stubs" },
+    { name = "types-s3transfer" },
+    { name = "typing-extensions", marker = "python_full_version < '3.12'" },
 ]
 
 [[package]]

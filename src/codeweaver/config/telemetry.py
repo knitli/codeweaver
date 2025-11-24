@@ -27,6 +27,8 @@ Environment Variables:
 
 from __future__ import annotations
 
+import os
+
 from typing import Annotated, Any, NotRequired, TypedDict
 
 from pydantic import Field, HttpUrl, PositiveInt, PrivateAttr, SecretStr
@@ -35,6 +37,14 @@ from codeweaver.config._project import CODEWEAVER_POSTHOG_PROJECT_KEY
 from codeweaver.core.types.aliases import LiteralStringT
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.sentinel import UNSET, Unset
+
+
+def _set_bool_env_var(env_var: str) -> bool | Unset:
+    """Helper to set boolean env vars with Unset support."""
+    value = os.environ.get(env_var)
+    if value is not False and not value:
+        return UNSET
+    return value in ("true", "1", "yes")
 
 
 class TelemetrySettings(BasedModel):
@@ -66,7 +76,7 @@ class TelemetrySettings(BasedModel):
             3. install CodeWeaver with the `codeweaver[recommended-no-telemetry]` extra, or use the a-la-carte install with `codeweaver[required-core]` and your choice of providers (like, `codeweaver[required-core,cli,provider-anthropic,provider-fastembed,provider-azure]`) to install without telemetry
             4. Point the `CODEWEAVER__TELEMETRY__POSTHOG_PROJECT_KEY` environment variable to your own Posthog project (if you're a data nerd, or want to collect internal telemetry for your organization). If you disable telemetry, we won't collect any data at all."""
         ),
-    ] = UNSET
+    ] = _set_bool_env_var("CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY")
 
     tools_over_privacy: Annotated[
         bool | Unset,
@@ -77,7 +87,7 @@ class TelemetrySettings(BasedModel):
 
             If you enable this setting, we will collect anonymized data about your searches and the results you interact with. Because of the nature of searches and results and codebases, we can't guarantee complete anonymity -- but we will do our best to filter out any potential secrets or PII, using multiple filters both in CodeWeaver and on ingest at Posthog. We will hash file paths and repository names, and we won't collect any raw queries or result content. This data will help us improve CodeWeaver's search algorithms, agent prompting, ranking, and overall user experience. If you care about making CodeWeaver better and are OK with us collecting this data, please enable this setting. If you value your privacy more than helping us improve CodeWeaver; that's cool too -- you can just leave this setting disabled."""
         ),
-    ] = UNSET
+    ] = _set_bool_env_var("CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY")
 
     posthog_project_key: Annotated[
         SecretStr | None,

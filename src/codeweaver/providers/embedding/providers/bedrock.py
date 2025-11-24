@@ -23,8 +23,6 @@ from typing import (
     cast,
 )
 
-import types_boto3_bedrock_runtime.client
-
 from pydantic import (
     AliasGenerator,
     ConfigDict,
@@ -36,7 +34,7 @@ from pydantic import (
     model_validator,
 )
 from pydantic.alias_generators import to_camel, to_snake
-from types_boto3_bedrock_runtime import BedrockRuntimeClient
+from types_boto3_bedrock_runtime.client import BedrockRuntimeClient
 
 from codeweaver.core.types.models import BasedModel
 from codeweaver.exceptions import ConfigurationError, ProviderError
@@ -440,9 +438,7 @@ except ImportError as e:
     ) from e
 
 
-class BedrockEmbeddingProvider(
-    EmbeddingProvider[types_boto3_bedrock_runtime.client.BedrockRuntimeClient]
-):
+class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
     """Bedrock embedding provider."""
 
     client: BedrockRuntimeClient

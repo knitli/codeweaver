@@ -235,10 +235,10 @@ class FindCodeResponseSummary(BasedModel):
     ]
 
     search_mode: Annotated[
-        Literal["hybrid", "dense_only", "sparse_only"] | None,
+        Literal["hybrid", "dense_only", "sparse_only", "unknown"] | None,
         Field(
             default=None,
-            description="""Actual search mode used: hybrid (dense+sparse embeddings), dense_only (semantic only), sparse_only (Splade/keyword-aware)""",
+            description="""Actual search mode used: hybrid (dense+sparse embeddings), dense_only (semantic only), sparse_only (Splade/keyword-aware), unknown (unable to determine, likely because of a critical error)""",
         ),
     ]
 

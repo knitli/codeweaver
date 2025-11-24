@@ -17,11 +17,9 @@ The recommended flag gives you access to:
 """
 
 import contextlib
-import os
 
-from collections.abc import Callable
 from importlib import util
-from typing import Literal, cast, overload
+from typing import Literal, overload
 
 from pydantic import AnyHttpUrl
 
@@ -124,7 +122,7 @@ def _recommended_default(
 ) -> ProviderSettingsDict:
     """Recommended default settings profile.
 
-    This profile leans towards high-quality providers, but without excessive cost or setup. Voyage AI used for embeddings and reranking, which has a generous free tier and class-leading performance. Qdrant can be deployed locally for free or as a cloud service with a generous free tier. Anthropic Claude Haiku is used for agents, which has a strong balance of cost and performance.
+    This profile leans towards high-quality providers, but without excessive cost or setup. It uses Voyage AI for embeddings and rerankings, which has a generous free tier and class-leading performance. Qdrant can be deployed locally for free or as a cloud service with a generous free tier. Anthropic Claude Haiku is used for agents, which has a strong balance of cost and performance.
     """
     from codeweaver.providers.provider import Provider
 
@@ -264,28 +262,6 @@ def _backup_profile() -> ProviderSettingsDict:
     )
 
     return ProviderSettingsDict(**backup_settings)
-
-
-def set_defaults_from_env_and_profiles() -> Callable[
-    [Literal["local", "cloud"], str | None], ProviderSettingsDict | None
-]:
-    """Set default configuration values from environment variables and profiles."""
-    if (profile := os.environ.get("CODEWEAVER_PROFILE")) is not None and profile in (
-        "recommended",
-        "quickstart",
-        "backup",
-        "testing",
-    ):
-        if profile == "testing":
-            profile = "backup"
-        if profile in ("quickstart", "backup"):
-            return lambda _x, _y: get_profile(
-                cast(Literal["quickstart", "backup"], profile), vector_deployment="local", url=None
-            )
-        return lambda vector_deployment, url: get_profile(
-            cast(Literal["recommended"], profile), vector_deployment=vector_deployment, url=url
-        )
-    return lambda _x, _y: None
 
 
 __all__ = ("get_profile",)

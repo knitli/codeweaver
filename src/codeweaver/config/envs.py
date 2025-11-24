@@ -6,10 +6,21 @@
 """Environment variables for codeweaver configuration."""
 
 # sourcery skip:snake-case-variable-declarations
-from typing import Literal, TypedDict
+
+import os
+
+from collections import defaultdict
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any, Literal, TypedDict
+
+from pydantic import AnyUrl, SecretStr
 
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.models import EnvFormat, EnvVarInfo
+
+
+if TYPE_CHECKING:
+    from codeweaver.providers.provider import Provider
 
 
 class SettingsEnvVars(TypedDict):
@@ -328,4 +339,80 @@ def environment_variables() -> DictView[SettingsEnvVars]:
     )
 
 
-__all__ = ("SettingsEnvVars", "environment_variables")
+type ProviderField = Literal["embedding", "reranking", "sparse_embedding", "vector_store"]
+type ProviderKey = Literal["provider", "model", "api_key", "url", "host", "port"]
+
+
+class SetProviderEnvVarsDict(TypedDict):
+    """Dictionary of provider environment variables."""
+
+    provider: Provider | None
+    model: str | None
+    api_key: SecretStr | None
+    url: AnyUrl | None
+    host: str | None
+    port: int | None
+
+
+def get_skeleton_provider_dict() -> dict[str, Any]:
+    """Get a skeleton dictionary of provider settings from environment variables.
+
+    The return type is a sparse version of `ProviderSettingsDict` where only keys with both environment variables and values are set.
+    """
+    env_map = get_provider_vars()
+    skeleton = defaultdict(
+        lambda: {"provider_settings": {}, "model_settings": {}, "connection": {}}
+    )
+    for kind, vars_dict in env_map.items():
+        if vars_dict:
+            for key, value in vars_dict.items():
+                if key == "url":
+                    skeleton[kind]["provider_settings"]["url"] = value
+                elif key in {"host", "port"}:
+                    skeleton[kind]["connection"][key] = value
+                elif key != "model":
+                    skeleton[kind][key] = value
+                else:
+                    skeleton[kind]["model_settings"][key] = value
+
+    return skeleton
+
+
+def get_provider_vars() -> MappingProxyType[ProviderField, SetProviderEnvVarsDict]:
+    """Get all environment variable names related to providers."""
+    env_vars = {
+        var_info.env
+        for var_info in environment_variables().values()
+        if any(
+            k
+            for k in ProviderKey.__args__
+            if k.upper() in var_info.env
+            and not any(x for x in {"AGENT", "DATA"} if x in var_info.env)
+        )
+    }
+    env_map: dict[ProviderField, SetProviderEnvVarsDict] = dict.fromkeys(
+        ("embedding", "reranking", "sparse_embedding", "vector_store"), None
+    )
+    for env_var in env_vars:
+        kind = next(k for k in ProviderKey.__args__ if k.upper() in env_var)
+        if env_map[kind] is None:
+            env_map[kind] = {}
+        if value := os.environ.get(env_var):
+            if "API_KEY" in env_var:
+                env_map[kind]["api_key"] = SecretStr(value)
+            elif env_var.endswith("PROVIDER"):
+                from codeweaver.providers.provider import Provider
+
+                env_map[kind]["provider"] = Provider.from_string(value)
+            elif "PORT" in env_var:
+                env_map[kind]["port"] = int(value)
+            elif "URL" in env_var:
+                env_map[kind]["url"] = AnyUrl(value)
+            else:
+                env_map[kind][
+                    next(k for k in ProviderKey.__args__ if k.upper() in env_var.lower())
+                ] = value
+    return MappingProxyType(env_map)
+
+
+__all__ = ("SettingsEnvVars", "environment_variables", "get_provider_vars")

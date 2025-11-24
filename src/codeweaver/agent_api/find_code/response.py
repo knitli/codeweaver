@@ -11,10 +11,54 @@ from search results, including summary generation and metadata calculation.
 
 from __future__ import annotations
 
+import contextlib
+
+from typing import Literal
+
 from codeweaver.agent_api.find_code.intent import IntentType
 from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary, SearchStrategy
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.types import LanguageName
+
+
+def get_indexer_state_info() -> tuple[
+    Literal["complete", "in_progress", "not_started", "unknown"], float | None
+]:
+    """Get indexing state and coverage from global application state.
+
+    Returns:
+        Tuple of (indexing_state, index_coverage):
+        - indexing_state: "complete", "in_progress", "not_started", or "unknown"
+        - index_coverage: Percentage of files indexed (0-100), or None if unavailable
+    """
+    try:
+        from codeweaver.server.server import get_state
+
+        state = get_state()
+
+        if state.indexer is None:
+            return ("not_started", None)
+
+        stats = state.indexer.stats
+        files_discovered = stats.files_discovered
+        files_processed = stats.files_processed
+
+        # Calculate coverage
+        coverage = files_processed / files_discovered * 100 if files_discovered > 0 else None
+
+        # Determine state
+        if files_discovered == 0:
+            indexing_state = "not_started"
+        elif files_processed >= files_discovered:
+            indexing_state = "complete"
+        else:
+            indexing_state = "in_progress"
+
+    except Exception:
+        # If state is not initialized or any error occurs, return unknown
+        return ("unknown", None)
+    else:
+        return (indexing_state, coverage)
 
 
 def calculate_token_count(code_matches: list[CodeMatch], token_limit: int) -> int:
@@ -113,16 +157,11 @@ def build_success_response(
     ):
         search_mode = "sparse_only"
 
-    # Get indexing state from indexer if available
-    indexing_state = None
-    index_coverage = None
+    # Get indexing state from global application state
+    indexing_state, index_coverage = get_indexer_state_info()
+
     warnings = []
     status = "success"
-
-    # NOTE: Indexer state tracking not yet implemented
-    # When implemented, this will check global indexer instance
-    # For now, we mark state as unknown
-    indexing_state = "unknown"
 
     # Add warnings for degraded search modes
     if search_mode == "sparse_only":
@@ -130,9 +169,6 @@ def build_success_response(
         status = "partial"
     elif search_mode == "dense_only":
         warnings.append("Sparse embeddings unavailable - using dense search only")
-    elif search_mode == "keyword":
-        warnings.append("Embedding providers unavailable - using keyword fallback")
-        status = "partial"
 
     return FindCodeResponseSummary(
         matches=code_matches,
@@ -166,13 +202,25 @@ def build_error_response(
     Returns:
         FindCodeResponseSummary indicating failure
     """
-    # Get indexing state even in error case
-    # NOTE: Indexer state tracking not yet implemented
-    # When implemented, this will check global indexer instance
-    # For now, we mark state as unknown
-    indexing_state = "unknown"
-    index_coverage = None
+    # Get indexing state from global application state
+    indexing_state, index_coverage = get_indexer_state_info()
+    from codeweaver.common.registry.provider import get_provider_registry
+    from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
+    mode = "unknown"
+    with contextlib.suppress(Exception):
+        registry = get_provider_registry()
+        provider = registry.get_provider_enum_for("vector_store")
+        vector_store: VectorStoreProvider = registry.get_provider_instance(
+            provider, "vector_store", singleton=True
+        )  # ty: ignore[no-matching-overload]
+        capabilities = vector_store.embedding_capabilities
+        mode = (
+            "hybrid"
+            if ((dense := capabilities.get("dense")) and (sparse := capabilities.get("sparse")))
+            else ("dense_only" if dense else "sparse_only" if sparse else "unknown")
+        )
+    error_message = f"Critical error: {type(error).__name__}: {str(error)!s}"
     return FindCodeResponseSummary(
         matches=[],
         summary=f"Search failed: {str(error)[:500]}",
@@ -184,10 +232,10 @@ def build_error_response(
         search_strategy=(SearchStrategy.KEYWORD_FALLBACK,),
         languages_found=(),
         status="error",
-        warnings=[f"Critical error: {type(error).__name__}: {str(error)[:200]}"],
+        warnings=[(error_message if len(error_message) <= 200 else f"{error_message[:200]}...")],
         indexing_state=indexing_state,
         index_coverage=index_coverage,
-        search_mode="keyword",
+        search_mode=mode,
         metadata={},
     )
 
@@ -198,4 +246,5 @@ __all__ = (
     "calculate_token_count",
     "extract_languages",
     "generate_summary",
+    "get_indexer_state_info",
 )

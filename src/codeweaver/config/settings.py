@@ -184,7 +184,7 @@ class FastMcpServerSettings(BasedModel):
     port: Annotated[
         PositiveInt | None,
         Field(description="""Port number for the FastMCP server. Default is 9328 ('WEAV')"""),
-    ] = int(os.environ.get("CODEWEAVER_PORT", 9328))
+    ] = int(port) if (port := os.environ.get("CODEWEAVER_PORT")) else 9328
 
     auth: Annotated[AuthSettings | None, Field(description="""OAuth provider configuration""")] = (
         None
@@ -449,6 +449,19 @@ class CodeWeaverSettings(BaseSettings):
         ),
     ] = UNSET
 
+    profile: Annotated[  # ty: ignore[invalid-assignment]
+        Literal["recommended", "quickstart", "testing"] | Unset | None,
+        Field(
+            description="""Use a premade provider profile.  The recommended profile uses Voyage AI for top-quality embedding and reranking, but requires an API key. The quickstart profile is entirely free and local, and does not require any API key. It sacrifices some search quality and performance compared to the recommended profile. The testing profile is only recommended for testing -- it uses an in-memory vector store and very light weight local models. The testing profile is also CodeWeaver's backup system when a cloud embedding or vector store provider isn't available. Both the quickstart and recommended profiles default to a local qdrant instance for the vector store. If you want to use a cloud or remote instance (which we recommend) you must also provide a URL for it, either with the environment variable CODEWEAVER_VECTOR_STORE_URL or in your codeweaver config in the vector_store settings.""",
+            validate_default=False,
+        ),
+    ] = (
+        profile
+        if (profile := os.environ.get("CODEWEAVER_PROFILE"))
+        and profile in ("recommended", "quickstart", "testing")
+        else UNSET
+    )  # ty: ignore[invalid-assignment]
+
     __version__: Annotated[
         str,
         Field(
@@ -478,11 +491,54 @@ class CodeWeaverSettings(BaseSettings):
             if isinstance(self.project_name, Unset)
             else self.project_name  # type: ignore
         )
-        self.provider = (
-            ProviderSettings.model_validate(AllDefaultProviderSettings)
-            if isinstance(self.provider, Unset) or self.provider is None
-            else self.provider
-        )
+        self.profile = None if isinstance(self.profile, Unset) else self.profile
+        if (
+            self.profile
+            and self.provider is not UNSET
+            and (
+                (vector_url := os.environ.get("CODEWEAVER_VECTOR_STORE_URL"))
+                or (
+                    (
+                        vector_settings := self.provider.vector_store
+                        if isinstance(self.provider.vector_store, dict)
+                        else self.provider.vector_store[0]
+                        if isinstance(self.provider.vector_store, tuple)
+                        else None
+                    )
+                    and (
+                        vector_url := vector_settings.get("provider_settings", {}).get("url")
+                        or vector_settings.get("connection", {}).get("url")
+                    )
+                )
+            )
+        ):
+            from urllib.parse import urlparse
+
+            from codeweaver.config.profiles import get_profile
+
+            is_cloud = urlparse(vector_url).hostname not in ("localhost", "127.0.0.1")
+            self.provider = ProviderSettings.model_validate(
+                get_profile(
+                    self.profile if self.profile != "testing" else "backup",
+                    vector_deployment="cloud" if is_cloud else "local",
+                    url=vector_url if is_cloud else None,
+                )  # ty: ignore[no-matching-overload]
+            )  # type: ignore
+        elif self.profile:
+            from codeweaver.config.profiles import get_profile
+
+            self.provider = ProviderSettings.model_validate(
+                get_profile(
+                    self.profile if self.profile != "testing" else "backup",
+                    vector_deployment="local",
+                )  # ty: ignore[no-matching-overload]
+            )
+        else:
+            self.provider = (
+                ProviderSettings.model_validate(AllDefaultProviderSettings)
+                if isinstance(self.provider, Unset) or self.provider is None
+                else self.provider
+            )
         # Serena uses 17,000 tokens *each turn*, so I feel like 30,000 is a reasonable default limit. We'll strive to keep it well under that.
         self.token_limit = 30_000 if isinstance(self.token_limit, Unset) else self.token_limit
         self.max_file_size = (
@@ -568,9 +624,9 @@ class CodeWeaverSettings(BaseSettings):
         """Get a default settings dictionary."""
         from codeweaver.common.utils import get_project_path
 
-        path = get_project_path()
+        path = get_project_path() or Path.cwd()
         return CodeWeaverSettingsDict(
-            project_path=path or Path.cwd(),
+            project_path=path,
             project_name=path.name,
             provider=AllDefaultProviderSettings,
             token_limit=30_000,

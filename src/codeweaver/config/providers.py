@@ -613,6 +613,22 @@ class ProviderSettings(BasedModel):
             new_vector_store.append(new_vector)  # type: ignore[missing-typed-dict-key]
         return tuple(new_vector_store)
 
+    def _reconcile_env_vars(self) -> ProviderSettings:
+        """Reconcile provider settings with environment variables, if any."""
+        from codeweaver.config.profiles import get_skeleton_provider_settings
+
+        serialized_self = self.model_dump()
+        skeleton = get_skeleton_provider_settings()
+        for key, value in serialized_self.items():
+            if skeleton_value := skeleton.get(key):
+                if value is Unset:
+                    serialized_self[key] = (skeleton_value,)
+                else:
+                    value = value[0] if isinstance(value, tuple) else value
+                    new_value = value.copy() | skeleton_value
+                    serialized_self[key] = (new_value,)
+        return self.model_copy(update=serialized_self)
+
     @model_validator(mode="after")
     def validate_and_normalize_providers(self) -> ProviderSettings:
         """Validate and normalize provider settings after initialization."""
@@ -621,12 +637,7 @@ class ProviderSettings(BasedModel):
             value = getattr(self, key)
             if value is not Unset and not isinstance(value, tuple):
                 setattr(self, key, (value,))
-            if len(getattr(self, key)) > 1:
-                logger.warning(
-                    "Multiple providers configured for '%s'. We hope to support this in the future, but for now we'll only use the first one.",
-                    key,
-                )
-        return self
+        return self._reconcile_env_vars()
 
     def _telemetry_keys(self) -> None:
         return None

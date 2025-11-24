@@ -11,6 +11,7 @@ from unittest.mock import patch
 import pytest
 
 from codeweaver.common.utils import uuid7
+from codeweaver.common.utils.git import Missing
 from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.engine.indexer.indexer import Indexer
 from codeweaver.engine.indexer.manifest import IndexFileManifest
@@ -48,9 +49,11 @@ class TestRemovePathWithDeletedFiles:
             discovered = DiscoveredFile.from_path(test_file)
             assert discovered is not None
             # Add to store
+            assert mock_indexer._store is not None
             mock_indexer._store[str(discovered.source_id)] = discovered
 
         # Verify file is in store
+        assert mock_indexer._store is not None
         assert len(mock_indexer._store) == 1
 
         # Now delete the file
@@ -62,6 +65,7 @@ class TestRemovePathWithDeletedFiles:
 
         # Verify removal succeeded
         assert removed_count == 1
+        assert mock_indexer._store is not None
         assert len(mock_indexer._store) == 0
 
     def test_remove_existing_file_from_store(self, mock_indexer: Indexer, tmp_path: Path) -> None:
@@ -81,9 +85,11 @@ class TestRemovePathWithDeletedFiles:
             discovered = DiscoveredFile.from_path(test_file)
             assert discovered is not None
             # Add to store
+            assert mock_indexer._store is not None
             mock_indexer._store[str(discovered.source_id)] = discovered
 
         # Verify file is in store
+        assert mock_indexer._store is not None
         assert len(mock_indexer._store) == 1
 
         # Remove the path while file still exists
@@ -91,6 +97,7 @@ class TestRemovePathWithDeletedFiles:
 
         # Verify removal succeeded
         assert removed_count == 1
+        assert mock_indexer._store is not None
         assert len(mock_indexer._store) == 0
 
     def test_remove_nonexistent_file_returns_zero(
@@ -126,22 +133,27 @@ class TestRemovePathWithDeletedFiles:
             ),
             patch("codeweaver.core.discovery.get_git_branch", return_value="main"),
         ):
+            assert mock_indexer._store is not None
             for f in [file1, file2, file3]:
                 discovered = DiscoveredFile.from_path(f)
                 assert discovered is not None
                 # Use a unique source_id for each file to work around UUID reuse bug
                 unique_id = str(uuid7())
+                # Get git_branch, converting Missing to None for __init__
+                git_branch = discovered.git_branch
+                resolved_branch = None if isinstance(git_branch, Missing) else git_branch
                 # Re-create with unique ID
                 discovered = DiscoveredFile(
                     path=discovered.path,
                     ext_kind=discovered.ext_kind,
                     file_hash=discovered.file_hash,
-                    git_branch=discovered.git_branch,
+                    git_branch=resolved_branch,
                     source_id=unique_id,
                 )
                 mock_indexer._store[unique_id] = discovered
 
         # Verify all files are in store
+        assert mock_indexer._store is not None
         assert len(mock_indexer._store) == 3
 
         # Delete file2 and remove it from store
@@ -150,6 +162,7 @@ class TestRemovePathWithDeletedFiles:
 
         # Verify only file2 was removed
         assert removed_count == 1
+        assert mock_indexer._store is not None
         assert len(mock_indexer._store) == 2
 
         # Verify file1 and file3 are still in store
@@ -183,24 +196,28 @@ class TestRemovePathWithDeletedFiles:
             assert discovered1 is not None
             assert discovered2 is not None
 
-            # Create with unique IDs
+            # Create with unique IDs, converting Missing to None
             id1 = str(uuid7())
             id2 = str(uuid7())
+            git_branch1 = discovered1.git_branch
+            git_branch1_str = None if isinstance(git_branch1, Missing) else git_branch1
+            git_branch2 = discovered2.git_branch
+            git_branch2_str = None if isinstance(git_branch2, Missing) else git_branch2
             discovered1 = DiscoveredFile(
                 path=discovered1.path,
                 ext_kind=discovered1.ext_kind,
                 file_hash=discovered1.file_hash,
-                git_branch=discovered1.git_branch,
+                git_branch=git_branch1_str,
                 source_id=id1,
             )
             discovered2 = DiscoveredFile(
                 path=discovered2.path,
                 ext_kind=discovered2.ext_kind,
                 file_hash=discovered2.file_hash,
-                git_branch=discovered2.git_branch,
+                git_branch=git_branch2_str,
                 source_id=id2,
             )
-
+            assert mock_indexer._store is not None
             mock_indexer._store[id1] = discovered1
             mock_indexer._store[id2] = discovered2
 
@@ -213,6 +230,7 @@ class TestRemovePathWithDeletedFiles:
             mock_indexer._store["malformed_key"] = bad_discovered
 
         # Verify store has 3 entries
+        assert mock_indexer._store is not None
         assert len(mock_indexer._store) == 3
 
         # Delete another_file and remove it
@@ -222,6 +240,7 @@ class TestRemovePathWithDeletedFiles:
         # Should have removed only another_file, other entries should remain
         # (even the malformed one, because it doesn't match)
         assert removed_count == 1
+        assert mock_indexer._store is not None
         assert len(mock_indexer._store) == 2
         assert "malformed_key" in mock_indexer._store
 
