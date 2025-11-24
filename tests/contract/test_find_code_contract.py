@@ -62,9 +62,9 @@ class TestFindCodeSignature:
         # Optional parameters (keyword-only)
         assert "intent" in params, "find_code must have 'intent' parameter"
         assert "token_limit" in params, "find_code must have 'token_limit' parameter"
-        assert "include_tests" in params, "find_code must have 'include_tests' parameter"
         assert "focus_languages" in params, "find_code must have 'focus_languages' parameter"
         assert "max_results" in params, "find_code must have 'max_results' parameter"
+        assert "context" in params, "find_code must have 'context' parameter"
 
     def test_find_code_parameter_defaults(self):
         """Verify optional parameters have correct default values per contract."""
@@ -74,17 +74,17 @@ class TestFindCodeSignature:
         # intent default: None
         assert params["intent"].default is None, "intent default must be None"
 
-        # token_limit default: 10000
-        assert params["token_limit"].default == 10000, "token_limit default must be 10000"
-
-        # include_tests default: False
-        assert params["include_tests"].default is False, "include_tests default must be False"
+        # token_limit default: 30000
+        assert params["token_limit"].default == 30000, "token_limit default must be 30000"
 
         # focus_languages default: None
         assert params["focus_languages"].default is None, "focus_languages default must be None"
 
-        # max_results default: 50
-        assert params["max_results"].default == 50, "max_results default must be 50"
+        # max_results default: 75
+        assert params["max_results"].default == 75, "max_results default must be 75"
+
+        # context default: None
+        assert params["context"].default is None, "context default must be None"
 
     def test_find_code_return_type(self):
         """Verify find_code returns FindCodeResponseSummary."""
@@ -370,13 +370,13 @@ class TestParameterValidation:
     def test_token_limit_constraints(self):
         """Verify token_limit is validated per contract (min: 1000, max: 100000)."""
         self._test_find_code_min_max_constraints(
-            "token_limit", 10000, "token_limit default must be 10000"
+            "token_limit", 30000, "token_limit default must be 30000"
         )
 
     def test_max_results_constraints(self):
         """Verify max_results is validated per contract (min: 1, max: 100)."""
         self._test_find_code_min_max_constraints(
-            "max_results", 50, "max_results default must be 50"
+            "max_results", 75, "max_results default must be 75"
         )
 
     def _test_find_code_min_max_constraints(self, constraint: str, bound: int, statement: str):
