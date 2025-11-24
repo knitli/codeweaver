@@ -33,7 +33,7 @@ except ImportError as e:
     from codeweaver.exceptions import ConfigurationError
 
     raise ConfigurationError(
-        'Please install the `cohere` package to use the Cohere provider, \nyou can use the `cohere` optional group — `pip install "codeweaver[cohere]"`'
+        'Please install the `cohere` package to use the Cohere provider, \nyou can use the `cohere` optional group -- `pip install "codeweaver[cohere]"`'
     ) from e
 
 
