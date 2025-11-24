@@ -66,8 +66,7 @@ async def find_code_tool(
     query: str,
     intent: IntentType | None = None,
     *,
-    token_limit: int = 10000,
-    include_tests: bool = False,
+    token_limit: int = 30000,
     focus_languages: tuple[SemanticSearchLanguage, ...] | None = None,
     context: Context | None = None,
 ) -> FindCodeResponseSummary:
@@ -76,7 +75,7 @@ async def find_code_tool(
     Args:
         query: Natural language search query
         intent: Optional search intent (if None, will be detected)
-        token_limit: Maximum tokens to return (default: 10000)
+        token_limit: Maximum tokens to return (default: 30000)
         include_tests: Whether to include test files in results
         focus_languages: Optional language filter
         context: MCP context for request tracking
@@ -108,7 +107,7 @@ async def find_code_tool(
             intent=intent,
             token_limit=token_limit,
             focus_languages=focus_langs,
-            max_results=50,  # Default from find_code signature
+            max_results=30,  # Default from find_code signature
         )
 
         with contextlib.suppress(RuntimeError):

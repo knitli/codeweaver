@@ -8,7 +8,7 @@ project_path = "."
 project_name = "codeweaver-test"
 token_limit = 30000
 max_file_size = 1048576
-max_results = 75
+max_results = 30
 
 [provider]
 agent = [

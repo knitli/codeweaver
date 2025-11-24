@@ -488,7 +488,7 @@ class CodeWeaverSettings(BaseSettings):
         self.max_file_size = (
             1 * 1024 * 1024 if isinstance(self.max_file_size, Unset) else self.max_file_size
         )
-        self.max_results = 75 if isinstance(self.max_results, Unset) else self.max_results
+        self.max_results = 30 if isinstance(self.max_results, Unset) else self.max_results
         self.server = (
             FastMcpServerSettings.model_validate(DefaultFastMcpServerSettings)
             if isinstance(self.server, Unset)
@@ -575,7 +575,7 @@ class CodeWeaverSettings(BaseSettings):
             provider=AllDefaultProviderSettings,
             token_limit=30_000,
             max_file_size=1 * 1024 * 1024,
-            max_results=15,
+            max_results=30,
             server=DefaultFastMcpServerSettings,
             indexer=DefaultIndexerSettings,
             chunker=DefaultChunkerSettings,

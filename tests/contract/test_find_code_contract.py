@@ -80,8 +80,8 @@ class TestFindCodeSignature:
         # focus_languages default: None
         assert params["focus_languages"].default is None, "focus_languages default must be None"
 
-        # max_results default: 75
-        assert params["max_results"].default == 75, "max_results default must be 75"
+        # max_results default: 30
+        assert params["max_results"].default == 30, "max_results default must be 30"
 
         # context default: None
         assert params["context"].default is None, "context default must be None"
@@ -376,7 +376,7 @@ class TestParameterValidation:
     def test_max_results_constraints(self):
         """Verify max_results is validated per contract (min: 1, max: 100)."""
         self._test_find_code_min_max_constraints(
-            "max_results", 75, "max_results default must be 75"
+            "max_results", 30, "max_results default must be 30"
         )
 
     def _test_find_code_min_max_constraints(self, constraint: str, bound: int, statement: str):

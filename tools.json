@@ -68,7 +68,6 @@
         },
         {
           "input": {
-            "include_tests": true,
             "intent": "debug",
             "query": "how do we handle database errors"
           },
@@ -126,7 +125,7 @@
             "type": "string"
           },
           "max_results": {
-            "default": 50,
+            "default": 30,
             "description": "Maximum number of code matches to return. Higher values provide more context but may include less relevant results.",
             "maximum": 100,
             "minimum": 1,
@@ -137,8 +136,8 @@
             "type": "string"
           },
           "token_limit": {
-            "default": 10000,
-            "description": "Maximum tokens to return in results. Controls how much code context is provided. Default 10000 (~8K tokens of actual code). Increase for broader context, decrease for focused results.",
+            "default": 30000,
+            "description": "Maximum tokens to return in results. Controls how much code context is provided. Default 30000 (~24K tokens of actual code). Increase for broader context, decrease for focused results.",
             "maximum": 100000,
             "minimum": 1000,
             "type": "integer"

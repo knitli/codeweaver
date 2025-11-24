@@ -12,7 +12,7 @@ CodeWeaver differentiates between *internal* and *external* tools. External tool
 You, or your AI agents, simply ask a question, explain what you are trying to do or what you need information for, and CodeWeaver will answer it.
 
 For example, your agent might say:
-    > Note: The main parameters for `find_code` that are exposed to users and agents are `query`, `intent`, and `focus_languages`. There are also `token_limit` and `include_tests`, but those are fairly self-explanatory.
+    > Note: The main parameters for `find_code` that are exposed to users and agents are `query`, `intent`, and `focus_languages`. There's also `token_limit`, but that's self-explanatory.
     ```
     ```
 
@@ -248,9 +248,9 @@ async def find_code(  # noqa: C901
     Args:
         query: Natural language search query
         intent: Optional explicit intent (if None, will be detected)
-        token_limit: Maximum tokens to return (default: 10000)
+        token_limit: Maximum tokens to return (default: 30000)
         focus_languages: Optional language filter
-        max_results: Maximum number of results to return (default: 50)
+        max_results: Maximum number of results to return (default: 30)
         context: Optional FastMCP Context for client communication
 
     Returns:

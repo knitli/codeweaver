@@ -165,7 +165,7 @@ async def search(
         response = await find_code(
             query=query,
             intent=intent,
-            token_limit=settings.get("token_limit", 10000),
+            token_limit=settings.get("token_limit", 30000),
             focus_languages=None,
             context=None,
         )

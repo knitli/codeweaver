@@ -124,7 +124,7 @@ async def test_cli_search_returns_results(test_project_path: Path, initialized_a
     response = await find_code_tool(
         query="authentication logic",
         intent=None,
-        token_limit=10000,
+        token_limit=30000,
         include_tests=False,
         focus_languages=None,
         context=None,
@@ -171,7 +171,7 @@ async def test_cli_search_output_formats(test_project_path: Path, initialized_ap
     response = await find_code_tool(
         query="database connection",
         intent=None,
-        token_limit=10000,
+        token_limit=30000,
         include_tests=False,
         focus_languages=None,
         context=None,
@@ -222,7 +222,7 @@ async def test_mcp_find_code_tool(test_project_path: Path, initialized_app_state
     response = await find_code_tool(
         query="session management",
         intent=IntentType.UNDERSTAND,
-        token_limit=10000,
+        token_limit=30000,
         include_tests=True,
         focus_languages=None,
         context=None,
@@ -280,7 +280,7 @@ async def test_mcp_find_code_required_parameters(test_project_path: Path, initia
     response = await find_code_tool(
         query="",  # Empty query
         intent=None,
-        token_limit=10000,
+        token_limit=30000,
         include_tests=False,
         focus_languages=None,
         context=None,
@@ -295,7 +295,7 @@ async def test_mcp_find_code_required_parameters(test_project_path: Path, initia
     response = await find_code_tool(
         query="test",
         intent=None,
-        token_limit=10000,
+        token_limit=30000,
         include_tests=False,
         focus_languages=None,
         context=None,
@@ -335,7 +335,7 @@ async def test_search_with_intent_parameter(initialized_app_state):
         response = await find_code_tool(
             query="authentication logic",
             intent=intent,
-            token_limit=10000,
+            token_limit=30000,
             include_tests=False,
             focus_languages=None,
             context=None,
@@ -373,7 +373,7 @@ async def test_search_filters_work(initialized_app_state):
     response_with_tests = await find_code_tool(
         query="test user creation",
         intent=None,
-        token_limit=10000,
+        token_limit=30000,
         include_tests=True,
         focus_languages=None,
         context=None,
@@ -382,7 +382,7 @@ async def test_search_filters_work(initialized_app_state):
     response_without_tests = await find_code_tool(
         query="test user creation",
         intent=None,
-        token_limit=10000,
+        token_limit=30000,
         include_tests=False,
         focus_languages=None,
         context=None,
@@ -439,7 +439,7 @@ async def test_empty_query_handling(initialized_app_state):
     response = await find_code_tool(
         query="",
         intent=None,
-        token_limit=10000,
+        token_limit=30000,
         include_tests=False,
         focus_languages=None,
         context=None,
@@ -465,7 +465,7 @@ async def test_no_results_scenario(initialized_app_state):
     response = await find_code_tool(
         query="xyzabc123nonexistentquerythatmatchesnothing",
         intent=None,
-        token_limit=10000,
+        token_limit=30000,
         include_tests=False,
         focus_languages=None,
         context=None,
@@ -503,7 +503,7 @@ async def test_search_performance(test_project_path: Path, initialized_app_state
     response = await find_code(
         query="authentication session management database",
         intent=IntentType.UNDERSTAND,
-        token_limit=10000,
+        token_limit=30000,
         include_tests=True,
         focus_languages=None,
     )
@@ -533,7 +533,7 @@ async def test_search_response_time_tracking(initialized_app_state):
     response = await find_code_tool(
         query="authentication",
         intent=None,
-        token_limit=10000,
+        token_limit=30000,
         include_tests=False,
         focus_languages=None,
         context=None,
@@ -570,7 +570,7 @@ async def test_search_strategy_reporting(test_project_path: Path, configured_pro
     response = await find_code(
         query="how does authentication work",
         intent=IntentType.UNDERSTAND,
-        token_limit=10000,
+        token_limit=30000,
         include_tests=False,
         focus_languages=None,
     )
@@ -596,7 +596,7 @@ async def test_search_languages_found(initialized_app_state):
     response = await find_code_tool(
         query="authentication database",
         intent=None,
-        token_limit=10000,
+        token_limit=30000,
         include_tests=True,
         focus_languages=None,
         context=None,

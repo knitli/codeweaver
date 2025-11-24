@@ -21,9 +21,8 @@ response = await find_code("how does authentication work")
 response = await find_code(
     "find login bugs",
     intent=IntentType.DEBUG,
-    include_tests=True,
     focus_languages=("python", "javascript"),
-    max_results=20
+    max_results=30
 )
 ```
 

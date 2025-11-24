@@ -594,10 +594,9 @@ cw config --project ./my-project    # Show project-specific config
 **Parameters**:
 - `query` (str, required): Natural language search query
 - `intent` (str, optional): Search intent (understand|implement|debug|optimize|test|configure|document)
-- `token_limit` (int, default=10000): Maximum tokens in response
-- `include_tests` (bool, default=False): Include test files in results
+- `token_limit` (int, default=30000): Maximum tokens in response
 - `focus_languages` (tuple[str], optional): Filter by programming languages
-- `max_results` (int, default=50): Maximum matches to return
+- `max_results` (int, default=30): Maximum matches to return
 
 **Response Structure** (`FindCodeResponseSummary`):
 ```python
