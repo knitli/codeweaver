@@ -2075,10 +2075,34 @@ class Indexer(BasedModel):
             Number of entries removed
         """
         to_delete: list[Any] = []
+
+        # Get project root for resolving relative paths
+        project_root = self._project_root
+
         for key, discovered_file in list(self._store.items()):
             try:
+                # Try samefile first (handles symlinks and different path representations)
                 if discovered_file.path.samefile(path):
                     to_delete.append(key)
+            except (FileNotFoundError, OSError):
+                # If either file doesn't exist, fall back to path comparison
+                # This happens when files are deleted, which is the typical case for _remove_path
+                try:
+                    # Resolve paths for comparison
+                    # If discovered_file.path is relative and we have project_root, resolve relative to it
+                    if not discovered_file.path.is_absolute() and project_root:
+                        discovered_abs = (project_root / discovered_file.path).resolve()
+                    else:
+                        discovered_abs = discovered_file.path.resolve()
+
+                    path_abs = path.resolve()
+
+                    if discovered_abs == path_abs:
+                        to_delete.append(key)
+                except Exception:
+                    # defensive: malformed entry shouldn't break cleanup
+                    logger.warning("Error checking stored item for deletion", exc_info=True)
+                    continue
             except Exception:
                 # defensive: malformed entry shouldn't break cleanup
                 logger.warning("Error checking stored item for deletion", exc_info=True)
