@@ -7,7 +7,6 @@
 """Global pytest configuration and fixtures for CodeWeaver tests."""
 
 import contextlib
-import os
 
 from collections.abc import Sequence
 from pathlib import Path
