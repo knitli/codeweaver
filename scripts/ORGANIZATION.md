@@ -27,8 +27,10 @@ scripts/
 ├── ORGANIZATION.md                    # This file - organization design
 │
 ├── build/                           # Packaging and background scripts (scripts run by other scripts)
+│   ├── generate-docker-server-yaml.py
+│   ├── generate-mcp-server-json.py
 │   ├── generate-supported-languages.py
-│   ├── git-merge-latest-version.py
+│   └── git-merge-latest-version.py
 │
 ├── dev-env/                           # Development environment setup
 │   ├── dev-shell-init.zsh
@@ -70,7 +72,13 @@ scripts/
 ├── utils/                             # Shared utilities and debugging
 │   ├── ansi-color-tests.py
 │   ├── check-imports.py
-│   └── get-all-exceptions.py
+│   ├── get-all-exceptions.py
+│   ├── lazy-import-demo.py
+│   └── LAZY_IMPORT_GUIDE.md
+│
+├── project/                           # Project management and contributor tools
+│   ├── contributors.py
+│   └── generate-contributors-list.sh
 │
 └── [deprecated/]                      # Optional: for phased removal
 ```
@@ -125,6 +133,13 @@ Shared utilities and debugging tools.
 - Import checking
 - Exception analysis
 - Other diagnostic tools
+
+### project/
+Project management and contributor tracking tools.
+- Contributor list generation
+- CLA signature aggregation
+- Cross-repository contributor analysis
+- Project statistics and reports
 
 ## Future Considerations
 

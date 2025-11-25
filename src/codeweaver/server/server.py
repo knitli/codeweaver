@@ -395,7 +395,7 @@ def _initialize_app_state(
         project_path=get_project_path()
         if isinstance(settings.project_path, Unset)
         else settings.project_path,
-        config_path=settings.config_file if settings else get_settings._resolve()().config_file,
+        config_path=None if isinstance(settings.config_file, Unset) else settings.config_file,
         provider_registry=get_provider_registry._resolve()(),
         services_registry=get_services_registry._resolve()(),
         model_registry=get_model_registry._resolve()(),

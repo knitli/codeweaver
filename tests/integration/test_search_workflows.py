@@ -125,7 +125,6 @@ async def test_cli_search_returns_results(test_project_path: Path, initialized_a
         query="authentication logic",
         intent=None,
         token_limit=30000,
-        include_tests=False,
         focus_languages=None,
         context=None,
     )
@@ -172,7 +171,6 @@ async def test_cli_search_output_formats(test_project_path: Path, initialized_ap
         query="database connection",
         intent=None,
         token_limit=30000,
-        include_tests=False,
         focus_languages=None,
         context=None,
     )
@@ -223,7 +221,6 @@ async def test_mcp_find_code_tool(test_project_path: Path, initialized_app_state
         query="session management",
         intent=IntentType.UNDERSTAND,
         token_limit=30000,
-        include_tests=True,
         focus_languages=None,
         context=None,
     )
@@ -281,7 +278,6 @@ async def test_mcp_find_code_required_parameters(test_project_path: Path, initia
         query="",  # Empty query
         intent=None,
         token_limit=30000,
-        include_tests=False,
         focus_languages=None,
         context=None,
     )
@@ -296,7 +292,6 @@ async def test_mcp_find_code_required_parameters(test_project_path: Path, initia
         query="test",
         intent=None,
         token_limit=30000,
-        include_tests=False,
         focus_languages=None,
         context=None,
     )
@@ -336,7 +331,6 @@ async def test_search_with_intent_parameter(initialized_app_state):
             query="authentication logic",
             intent=intent,
             token_limit=30000,
-            include_tests=False,
             focus_languages=None,
             context=None,
         )
@@ -369,12 +363,11 @@ async def test_search_filters_work(initialized_app_state):
     """
     from codeweaver.server.app_bindings import find_code_tool
 
-    # Test include_tests filter
+    # Test include_tests filter (parameter removed from API)
     response_with_tests = await find_code_tool(
         query="test user creation",
         intent=None,
         token_limit=30000,
-        include_tests=True,
         focus_languages=None,
         context=None,
     )
@@ -383,7 +376,6 @@ async def test_search_filters_work(initialized_app_state):
         query="test user creation",
         intent=None,
         token_limit=30000,
-        include_tests=False,
         focus_languages=None,
         context=None,
     )

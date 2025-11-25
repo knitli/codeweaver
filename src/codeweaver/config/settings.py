@@ -20,7 +20,7 @@ import os
 from collections.abc import Callable
 from importlib import util
 from pathlib import Path
-from typing import Annotated, Any, Literal, Self, Unpack, cast, overload
+from typing import Annotated, Any, Literal, Self, Unpack, cast, get_origin, overload
 
 from fastmcp.server.middleware import Middleware
 from fastmcp.server.server import DuplicateBehavior
@@ -106,9 +106,11 @@ def _determine_setting(
         and (other_sources := tuple(arg for arg in args if arg is not Unset and arg is not None))
         and (other := other_sources[0])
     ):
-        # Don't return class references - return None instead
-        # This prevents TypedDict classes from being returned as values
-        return None if inspect.isclass(other) else other
+        # Don't return class references or typing constructs - return None instead
+        # This prevents TypedDict classes and Annotated types from being returned as values
+        if inspect.isclass(other) or get_origin(other) is not None:
+            return None
+        return other
     return None
 
 
@@ -492,8 +494,8 @@ class CodeWeaverSettings(BaseSettings):
 
     def __init__(self, **kwargs: Any) -> None:
         """Initialize CodeWeaverSettings, loading from config file if provided."""
-        if self.config_file is not UNSET:
-            content = from_json(self.config_file.read_bytes())
+        if (config := kwargs.get("config_file")) and config is not UNSET:
+            content = from_json(config.read_bytes())
             if content and content != kwargs:
                 kwargs |= content
         super().__init__(**kwargs)

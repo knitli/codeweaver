@@ -35,6 +35,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
       - name: Extract version information
         id: version
         run: |
@@ -52,13 +57,17 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Detected version: ${VERSION}"
 
-      - name: Update server.json with release version
+      - name: Regenerate server.json from code
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          # Update the version fields in server.json
+          echo "Regenerating server.json from code with version ${VERSION}..."
+
+          # Run the generation script (uses PEP 723 dependencies)
+          uv run scripts/build/generate-mcp-server-json.py
+
+          # Update version in generated server.json
           python -c "
           import json
-          import sys
 
           with open('server.json', 'r') as f:
               data = json.load(f)
@@ -66,15 +75,15 @@ jobs:
           # Update top-level version
           data['version'] = '${VERSION}'
 
-          # Update package version
-          if 'packages' in data and len(data['packages']) > 0:
+          # Update package versions
+          if 'packages' in data:
               for pkg in data['packages']:
                   pkg['version'] = '${VERSION}'
 
           with open('server.json', 'w') as f:
               json.dump(data, f, indent=2)
 
-          print(f'Updated server.json to version ${VERSION}')
+          print(f'✓ Regenerated and versioned server.json to ${VERSION}')
           "
 
       - name: Update tools.json with release version

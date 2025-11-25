@@ -46,9 +46,9 @@ app = App(
     version=__version__,
     console=console,
 )
-app.command("codeweaver.cli.commands.server:app", name="server")
 app.command("codeweaver.cli.commands.config:app", name="config")
 app.command("codeweaver.cli.commands.search:app", name="search")
+app.command("codeweaver.cli.commands.server:app", name="server")
 app.command("codeweaver.cli.commands.index:app", name="index")
 app.command("codeweaver.cli.commands.doctor:app", name="doctor")
 app.command("codeweaver.cli.commands.list:app", name="list", alias="ls")
@@ -60,22 +60,26 @@ app.command("codeweaver.cli.commands.status:app", name="status")
 # app.command("codeweaver.cli.commands.context:app", name="context", alias="prep")
 
 
+def _handle_keyboard_interrupt():
+    console.print(
+        f"\n{CODEWEAVER_PREFIX} [yellow]⚠️ We got a keyboard interrupt signal...⚠️[/yellow]"
+    )
+    console.print(f"{CODEWEAVER_PREFIX} [yellow]Thanks for using CodeWeaver![/yellow]")
+    console.print(
+        f"{CODEWEAVER_PREFIX} [yellow]If you like CodeWeaver, please take a second to give us a star on GitHub! 🌟[/yellow] [cyan]https://github.com/knitli/codeweaver [/cyan] \n"
+    )
+    console.print()
+    console.print("[dim]If you have feedback, please open an issue or discussion:[/dim]")
+    console.print("  [dim]issues: https://github.com/knitli/codeweaver/issues[/dim]")
+    console.print("  [dim]discussions: https://github.com/knitli/codeweaver/discussions[/dim]")
+
+
 def main() -> None:
     """Main CLI entry point."""
     try:
         app()
     except KeyboardInterrupt:
-        console.print(
-            f"\n{CODEWEAVER_PREFIX} [yellow]⚠️ We got a keyboard interrupt signal...⚠️[/yellow]"
-        )
-        console.print(f"{CODEWEAVER_PREFIX} [yellow]Thanks for using CodeWeaver![/yellow]")
-        console.print(
-            f"{CODEWEAVER_PREFIX} [yellow]If you like CodeWeaver, please take a second to give us a star on GitHub! 🌟[/yellow] [cyan]https://github.com/knitli/codeweaver [/cyan] \n"
-        )
-        console.print()
-        console.print("[dim]If you have feedback, please open an issue or discussion:[/dim]")
-        console.print("  [dim]issues: https://github.com/knitli/codeweaver/issues[/dim]")
-        console.print("  [dim]discussions: https://github.com/knitli/codeweaver/discussions[/dim]")
+        _handle_keyboard_interrupt()
     except Exception as e:
         console.print(f"{CODEWEAVER_PREFIX} [bold red]Fatal error: {e}[/bold red]")
         console.print("\n[red]Traceback:[/red]")

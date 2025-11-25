@@ -1,9 +1,0 @@
-
-1. Incorporate new codeweaver.config.envs into settings resolution (codeweaver.config.settings and related modules)
-
-2. Use pydantic models to produce most of the input for server.json and tools.json dynamically to minimize risk of drift (new work in scripts/_models and work refining the find_code tool)
-    - produce flags by querying cyclopts directly or inspecting the function signature
-
-3. Finish cleaning up find_code
-
-4. double-check Docker variables

@@ -5,13 +5,15 @@
 
 """Environment variables for codeweaver configuration."""
 
+from __future__ import annotations
+
 # sourcery skip:snake-case-variable-declarations
 
 import os
 
 from collections import defaultdict
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, get_args
 
 from pydantic import AnyUrl, SecretStr
 
@@ -380,12 +382,13 @@ def get_skeleton_provider_dict() -> dict[str, Any]:
 
 def get_provider_vars() -> MappingProxyType[ProviderField, SetProviderEnvVarsDict]:
     """Get all environment variable names related to providers."""
+    provider_keys = get_args(ProviderKey)
     env_vars = {
         var_info.env
         for var_info in environment_variables().values()
         if any(
             k
-            for k in ProviderKey.__args__
+            for k in provider_keys
             if k.upper() in var_info.env
             and not any(x for x in {"AGENT", "DATA"} if x in var_info.env)
         )
@@ -394,7 +397,7 @@ def get_provider_vars() -> MappingProxyType[ProviderField, SetProviderEnvVarsDic
         ("embedding", "reranking", "sparse_embedding", "vector_store"), None
     )
     for env_var in env_vars:
-        kind = next(k for k in ProviderKey.__args__ if k.upper() in env_var)
+        kind = next(k for k in provider_keys if k.upper() in env_var)
         if env_map[kind] is None:
             env_map[kind] = {}
         if value := os.environ.get(env_var):
@@ -410,7 +413,7 @@ def get_provider_vars() -> MappingProxyType[ProviderField, SetProviderEnvVarsDic
                 env_map[kind]["url"] = AnyUrl(value)
             else:
                 env_map[kind][
-                    next(k for k in ProviderKey.__args__ if k.upper() in env_var.lower())
+                    next(k for k in provider_keys if k.upper() in env_var.lower())
                 ] = value
     return MappingProxyType(env_map)
 

@@ -30,7 +30,7 @@ class SearchResult(BasedModel):
 
     model_config = ConfigDict(validate_assignment=False, extra="allow")
 
-    content: str | CodeChunk
+    content: CodeChunk
     file_path: Annotated[
         Path | None,
         Field(description="""Path to the source file"""),
@@ -75,11 +75,10 @@ class SearchResult(BasedModel):
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
-        base = {FilteredKey("content"): AnonymityConversion.TEXT_COUNT}
         return {
             FilteredKey("file_path"): AnonymityConversion.BOOLEAN,
             FilteredKey("metadata"): AnonymityConversion.BOOLEAN,
-        } | (base if isinstance(self.content, str) else {})
+        }
 
 
 __all__ = ("SearchResult",)

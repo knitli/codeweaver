@@ -402,7 +402,6 @@ async def rerank_results(
     """
     from codeweaver.common.logging import log_to_client_or_fallback
     from codeweaver.common.registry import get_provider_registry  # Lazy import
-    from codeweaver.core.chunks import CodeChunk
 
     registry = get_provider_registry()
     reranking_enum = registry.get_provider_enum_for("reranking")
@@ -433,13 +432,43 @@ async def rerank_results(
 
     try:
         reranking = registry.get_provider_instance(reranking_enum, "reranking", singleton=True)
-        chunks_for_reranking = [c.content for c in candidates if isinstance(c.content, CodeChunk)]
+
+        # Create mapping to preserve search metadata through reranking
+        # Map chunk_id to SearchResult to lookup original scores after reranking
+        metadata_map: dict[str, SearchResult] = {
+            str(c.content.chunk_id): c for c in candidates
+        }
+
+        chunks_for_reranking = [c.content for c in candidates]
 
         if not chunks_for_reranking:
             logger.warning("No CodeChunk objects available for reranking, skipping")
             return None, None
 
         reranked_results = await reranking.rerank(query, chunks_for_reranking)
+
+        # Enrich reranked results with preserved search metadata
+        from codeweaver.providers.reranking.providers.base import RerankingResult
+
+        enriched_results = [
+            RerankingResult(
+                original_index=r.original_index,
+                batch_rank=r.batch_rank,
+                score=r.score,
+                chunk=r.chunk,
+                original_score=metadata_map[str(r.chunk.chunk_id)].score
+                if str(r.chunk.chunk_id) in metadata_map
+                else None,
+                dense_score=metadata_map[str(r.chunk.chunk_id)].dense_score
+                if str(r.chunk.chunk_id) in metadata_map
+                else None,
+                sparse_score=metadata_map[str(r.chunk.chunk_id)].sparse_score
+                if str(r.chunk.chunk_id) in metadata_map
+                else None,
+            )
+            for r in reranked_results
+        ]
+        reranked_results = enriched_results
 
         await log_to_client_or_fallback(
             context,

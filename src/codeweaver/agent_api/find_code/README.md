@@ -50,7 +50,6 @@ find_code/
 #### `conversion.py`
 Converts between different result formats:
 - `convert_search_result_to_code_match()` - Vector store → API format
-- `create_code_chunk_from_result()` - String content → CodeChunk
 
 #### `filters.py`
 Post-search filtering:

@@ -5,6 +5,7 @@
 # ! GitHub Action to check CLA signatures for Knitli repositories
 # ! This action is triggered on issue comments and pull request events.
 name: CLA Assistant
+
 on:
   issue_comment:
     types:
@@ -15,142 +16,14 @@ on:
       - closed
       - synchronize
 permissions:
-  actions: write
-  contents: write # this can be 'read' if the signatures are in remote repository
-  pull-requests: write
-  statuses: write
-jobs:
-  set-pr-title:
-    runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'pull_request_target' && github.event.pull_request.user.login != 'github-actions[bot]' && github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.user.login != 'codegen-sh' && github.event.pull_request.user.login != 'changeset-bot' && github.event.pull_request.user.login != 'claude' && github.event.pull_request.user.login != 'copilot'
-    steps:
-      - name: Set PR Title
-        env:
-          EV_TITLE: ${{ github.event.pull_request.title }}
-          EV_BODY: ${{ github.event.pull_request.body }}
-        run: |
-          echo "${EV_TITLE}"
-  set-issue-title:
-    runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'issue_comment' && github.event.issue.user.login != 'github-actions[bot]' && github.event.issue.user.login != 'dependabot[bot]' && github.event.issue.user.login != 'codegen-sh' && github.event.issue.user.login != 'changeset-bot' && github.event.issue.user.login != 'claude' && github.event.issue.user.login != 'copilot'
-    steps:
-      - name: Set Issue Title
-        env:
-          EV_TITLE: ${{ toJson(github.event.issue.title) }}
-          EV_BODY: ${{ toJson(github.event.comment.body) }}
-        run: |
-          echo "${EV_TITLE}"
-  check-cla:
-    runs-on: ubuntu-latest
-    steps:
-      - name: SetVariables
-        run: |
-          # shellcheck disable=SC2296
-          # This script sets up environment variables based on the GitHub event context.
-          echo "Setting up variables..."
-          repo="${{ github.repository }}"
-          if [[ $repo != knitli* ]]; then
-            echo "This action is only for Knitli repositories, exiting..."
-            echo "looks like we're in a forked repository, exiting..."
-            exit 0
-          fi
-          actor="${{ github.actor }}"
-          echo "EV_ACTOR=$actor" >> "$GITHUB_ENV"
-          event="${{ github.event_name }}"
-          event="${event//_target/}"
-          event="${event//_comment/}"
-          if [[ $event == pull_request* ]]; then
-            author="${{ github.event.pull_request.user.login }}"
-            email="${{ github.event.pull_request.user.email }}"
-            {
-            echo "IS_PR=true";
-            echo "IS_ISSUE=false";
-            echo "EV_NUMBER=\"${{ github.event.pull_request.number }}\"";
-            echo "EV_AUTHOR=\"$author\"";
-            echo "EV_URL=\"${{ github.event.pull_request.html_url }}\"";
-            echo "EV_EMAIL=\"$email\"";
-            echo "IS_RECHECK=false";
-            } >> "$GITHUB_ENV"
-          else
-            author="${{ github.event.issue.user.login }}"
-            email="${{ github.event.issue.user.email }}"
-            {
-            echo "IS_PR=false";
-            echo "IS_ISSUE=true";
-            echo "EV_NUMBER=\"${{ github.event.issue.number }}\"";
-            echo "EV_AUTHOR=\"$author\"";
-            echo "EV_URL=\"${{ github.event.issue.html_url }}\"";
-            echo "EV_EMAIL=\"$email\"";
-            } >> "$GITHUB_ENV"
-            if [[ "$EV_BODY" == 'recheck' || "$EV_BODY" == *'I read the contributors license agreement and I agree to it.'* ]]; then
-              echo "IS_RECHECK=true" >> "$GITHUB_ENV"
-            else
-              echo "IS_RECHECK=false" >> "$GITHUB_ENV"
-            fi
-          fi
-          # if it's a rerun of the action, then the author is the actor
-          if [[ -z $author ]] || [[ $author != "$actor" ]]; then
-            author="$actor"
-            if [[ -z $email ]]; then
-              email="${author}@users.noreply.github.com"
-            fi
-            echo "EV_AUTHOR=$author" >> "$GITHUB_ENV"
-            echo "EV_EMAIL=$email" >> "$GITHUB_ENV"
-          fi
-          response=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/orgs/knitli/members/$author")
-          if [ "$response" == "204" ]; then
-            echo "is_member=true" >> "$GITHUB_OUTPUT"
-            echo "User $author is a member of Knitli."
-            echo "MEMBER=true" >> "$GITHUB_ENV"
-          else
-            if [[ $email == *@knit.li || $email == *@knitli.com || $author == bashandbone ]]; then
-              echo "MEMBER=true" >> "$GITHUB_ENV"
-              echo "User $author has a Knitli email or is its founder. Provided email: $email"
-              echo "is_member=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "MEMBER=false" >> "$GITHUB_ENV"
-              echo "is_member=false" >> "$GITHUB_OUTPUT"
-            fi
-          fi
-  cla-assistant:
-    needs: check-cla
-    if: |
-      (needs.check-cla.outputs.is_member && needs.check-cla.outputs.is_member == 'false' && needs.check-cla.outputs.is_member != 'true') || needs.check-cla.outputs.is_member == ''
-    runs-on: ubuntu-latest
-    steps:
-      - name: Debug
-        run: |
-          if [[ $DEBUG_ACTIONS == 'true' ]]; then
-            printenv
-          fi
-      - name: CLA Assistant
-        if: |
-          (env.IS_RECHECK && env.IS_PR) && (env.IS_RECHECK == 'true' || env.IS_PR == 'true')
-        uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          path-to-signatures: cla.json
-          path-to-document: https://github.com/knitli/codeweaver/blob/main/CONTRIBUTORS_LICENSE_AGREEMENT.md
-          branch: staging
-          allowlist: |
-            bashandbone,codegen-sh[bot],dependabot[bot],github-actions[bot],actions-user,changeset-bot,claude
-          create-file-commit-message: Adding file for tracking CLA signatures
-          signed-commit-message: "$env.EV_AUTHOR signed \U0001F58A️ the Thread \U0001F9F5 CLA in [$env.GITHUB_REPOSITORY # $env.EV_NUMBER]($env.EV_URL)\n"
-          custom-notsigned-prcomment: "✋\U0001F6D1 Hey $env.EV_AUTHOR,\n\n## Thanks for your contribution to Thread!\n\n### You need to agree to the CLA first... \U0001F58A️\n\nBefore we can accept your (awesome) contribution, **we need you to agree to our contributors license agreement (CLA)**. \U0001F58A️\n\n### To agree to the CLA, please comment:\n> I read the contributors license agreement and I agree to it.\nThose words are important[^1], so please don't change them. \U0001F609\n\n[^1]: Our bot needs those *exact* words to recognize that you agree to the CLA. If you want to add something else, please do so after those words. \U0001F609\n"
-          custom-pr-sign-comment: |
-            $env.EV_AUTHOR, agrees to the Thread CLA.
+  contents: read
+  pull-requests: read
+  issues: read
 
-            $env.EV_AUTHOR acknowledges they read and agree to the [Thread contributors license agreement](https://github.com/knitli/codeweaver/blob/main/CONTRIBUTORS_LICENSE_AGREEMENT.md).
-          custom-allsigned-prcomment: "## \U0001F680 GOOD TO GO. Everyone has agreed to the CLA. \U0001F44D\n\n### Thanks for your contribution to Thread! \U0001F9F5\nYour contribution is now ready to be merged[^1]. \U0001F389\n\n### Maintainers: Ship this PR! \U0001F4E6\U0001F680\n\n[^1]: If it passes the other CI checks, of course. \U0001F609 I'm just here for the legal stuff.\n"
-          # UNUSED OPTIONS
-          #lock-pullrequest-aftermerge: false - if you don't want this bot to automatically lock the pull request after merging (default - true)
-          #use-dco-flag: true - If you are using DCO instead of CLA
-          #TODO: move the signatures to a remote repository
-          #remote-organization-name: enter the remote organization name where the signatures should be stored (Default is storing the signatures in the same repository)
-          #remote-repository-name: enter the  remote repository name where the signatures should be stored (Default is storing the signatures in the same repository)
-          # PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+jobs:
+  cla-check:
+    uses: knitli/.github/.github/workflows/cla-check.yml@main
+    with:
+      repo_name: "codeweaver"
+      cla_document_url: "https://github.com/knitli/codeweaver/blob/main/CONTRIBUTORS_LICENSE_AGREEMENT.md"
+    secrets: inherit

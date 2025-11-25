@@ -264,4 +264,19 @@ def _backup_profile() -> ProviderSettingsDict:
     return ProviderSettingsDict(**backup_settings)
 
 
-__all__ = ("get_profile",)
+def get_skeleton_provider_settings() -> dict[str, object]:
+    """Get a skeleton provider settings structure for reconciling environment variables.
+
+    Returns a minimal provider settings dict structure that can be used as a base
+    for merging with environment variables in ProviderSettings._reconcile_env_vars().
+
+    Returns:
+        A skeleton dict populated from environment variables that can be merged with
+        provider settings.
+    """
+    from codeweaver.config.envs import get_skeleton_provider_dict
+
+    return get_skeleton_provider_dict()
+
+
+__all__ = ("get_profile", "get_skeleton_provider_settings")

@@ -81,8 +81,6 @@ def test_validate_version_derivation(git_state: dict):
     - Tagged release: "0.1.0" (clean semantic version)
     - Pre-release: "0.1.0rc295+gfc4f90a" (with commit distance and hash)
     - Dirty working directory: appends ".dirty" suffix
-
-    This test MUST FAIL initially (TDD) until implementation is complete.
     """
     project_root = git_state["project_root"]
 
@@ -183,8 +181,8 @@ def test_version_consistency():
     if not wheel_match or not sdist_match:
         pytest.fail(f"Could not extract versions from artifacts: {wheel_name}, {sdist_name}")
 
-    wheel_version = wheel_match.group(1)
-    sdist_version = sdist_match.group(1)
+    wheel_version = wheel_match[1]
+    sdist_version = sdist_match[1]
 
     # Versions must match
     assert wheel_version == sdist_version, (

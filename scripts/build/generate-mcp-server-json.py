@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # ///script
 # python-version = ">=3.12"
-# dependencies = ["pydantic", "textcase"]
+# dependencies = ["pydantic", "textcase", "jsonschema", "httpx"]
 # ///
 """MCP server.json models."""
 
@@ -47,22 +47,25 @@ class McpInputDict(TypedDict):
 def get_settings_env_vars() -> list[McpInputDict]:
     """Get all general codeweaver settings environment variables."""
     return sorted(
-        (McpInputDict(**var.as_mcp_info()) for var in environment_variables()),  # ty: ignore[missing-typed-dict-key]
+        (McpInputDict(**var.as_mcp_info()) for var in environment_variables().values()),  # type: ignore[misc]
         key=lambda v: v["name"],
     )
 
 
-def _all_var_infos() -> dict[Provider, set[ProviderEnvVarInfo]]:
+def _all_var_infos() -> dict[Provider, list[ProviderEnvVarInfo]]:
     """Get all environment variable infos for all providers."""
-    all_vars: dict[Provider, set[ProviderEnvVarInfo]] = {}
+    all_vars: dict[Provider, list[ProviderEnvVarInfo]] = {}
     for provider in Provider:
-        var_infos: set[ProviderEnvVarInfo] = set()
-        if envvars := _env_vars_for_provider(provider):
-            var_infos |= {
-                val for key, val in envvars.items() if key not in ("note", "other" and val)
-            }
-            if other := envvars.get("other"):
-                var_infos |= set(other)
+        var_infos: list[ProviderEnvVarInfo] = []
+        if envvars_tuple := _env_vars_for_provider(provider):
+            # envvars_tuple is a tuple of ProviderEnvVars dicts
+            for envvars in envvars_tuple:
+                var_infos.extend([
+                    val for key, val in envvars.items()
+                    if key not in ("note", "other") and isinstance(val, ProviderEnvVarInfo)
+                ])
+                if other := envvars.get("other"):
+                    var_infos.extend([v for v in other if isinstance(v, ProviderEnvVarInfo)])
         all_vars[provider] = var_infos
     return all_vars
 
@@ -71,7 +74,7 @@ def get_provider_env_vars() -> dict[Provider, list[McpInputDict]]:
     """Get all provider-specific environment variables."""
     return {
         provider: sorted(
-            (McpInputDict(**var.as_mcp_info()) for var in var_infos),  # type: ignore[missing-typed-dict-key]
+            (McpInputDict(**var.as_mcp_info()) for var in var_infos),  # type: ignore[misc]
             key=lambda v: v["name"],
         )
         for provider, var_infos in _all_var_infos().items()
@@ -79,33 +82,44 @@ def get_provider_env_vars() -> dict[Provider, list[McpInputDict]]:
 
 
 def _providers_for_kind(kind: ProviderKind) -> set[Provider]:
-    return {prov for prov in Provider if kind in PROVIDER_CAPABILITIES[prov]}
+    return {prov for prov in Provider if prov in PROVIDER_CAPABILITIES and kind in PROVIDER_CAPABILITIES[prov]}
 
 
-def _shared_env_vars() -> dict[ProviderEnvVarInfo, set[Provider]]:
+def _shared_env_vars() -> dict[str, tuple[ProviderEnvVarInfo, list[Provider]]]:
     """Get environment variables shared across multiple providers."""
     all_vars = _all_var_infos()
-    shared_vars: dict[ProviderEnvVarInfo, set[Provider]] = {}
+    # Use env name as key since ProviderEnvVarInfo is not hashable
+    shared_vars: dict[str, tuple[ProviderEnvVarInfo, list[Provider]]] = {}
     for provider, var_infos in all_vars.items():
         for var_info in var_infos:
-            if var_info not in shared_vars:
-                shared_vars[var_info] = set()
-            shared_vars[var_info].add(provider)
+            if var_info.env not in shared_vars:
+                shared_vars[var_info.env] = (var_info, [])
+            shared_vars[var_info.env][1].append(provider)
     # Filter to only those vars shared by multiple providers
     return {
-        var_info: providers for var_info, providers in shared_vars.items() if len(providers) > 1
+        env: (var_info, providers)
+        for env, (var_info, providers) in shared_vars.items()
+        if len(providers) > 1
     }
 
 
 def _generalized_provider_env_vars() -> list[ProviderEnvVarInfo]:
     """Get generalized environment variables shared across multiple providers."""
     generalized_vars: list[ProviderEnvVarInfo] = []
-    for var_info, providers in _shared_env_vars().items():
+    for env, (var_info, providers) in _shared_env_vars().items():
         provider_names = ", ".join(sorted(prov.as_title for prov in providers))
+        # Create a new ProviderEnvVarInfo with updated description
         generalized_vars.append(
-            ProviderEnvVarInfo._replace({
-                "description": f"{var_info.description} (Used by: {provider_names})"
-            })
+            ProviderEnvVarInfo(
+                env=var_info.env,
+                description=f"{var_info.description} (Used by: {provider_names})",
+                is_required=var_info.is_required,
+                is_secret=var_info.is_secret,
+                fmt=var_info.fmt,
+                default=var_info.default,
+                choices=var_info.choices,
+                variable_name=var_info.variable_name,
+            )
         )
     return generalized_vars
 
@@ -252,7 +266,7 @@ class Input(BaseModel):
         description="Indicates whether the input is required. If true, clients should prompt the user to provide a value if one is not already set.",
     )
     fmt: EnvFormat | None = Field(
-        EnvFormat.string,
+        None,
         description='Specifies the input format. Supported values include `filepath`, which should be interpreted as a file on the user\'s filesystem.\n\nWhen the input is converted to a string, booleans should be represented by the strings "true" and "false", and numbers should be represented as decimal values.',
         alias="format",
     )
@@ -520,8 +534,8 @@ def all_env_vars() -> list[McpInputDict]:
     """Get all environment variables, both general and provider-specific."""
     general_vars = get_settings_env_vars()
     generalized_provider_vars = sorted(
-        (McpInputDict(**var.as_mcp_info()) for var in _generalized_provider_env_vars()),  # type: ignore[missing-typed-dict-key]
-        key=lambda v: v["env"],
+        (McpInputDict(**var.as_mcp_info()) for var in _generalized_provider_env_vars()),  # type: ignore[misc]
+        key=lambda v: v["name"],
     )
     return (
         general_vars
@@ -537,3 +551,435 @@ def load_server_detail() -> ServerDetail:
     """Load the MCP server detail from server.json."""
     file_path = Path(__file__).parent.parent.parent / "server.json"
     return ServerDetail.model_validate_json(file_path.read_text())
+
+
+def _create_uvx_package() -> Package:
+    """Create the uvx (PyPI) package configuration."""
+    env_vars = all_env_vars()
+
+    return Package(
+        registry_type="pypi",
+        registry_base_url=AnyUrl("https://pypi.org"),
+        identifier="codeweaver",
+        version=__version__,
+        runtime_hint="uvx",
+        transport=StreamableHttpTransport(
+            type_=StreamableHttpTransportType.streamable_http,
+            url="http://{host}:{port}",
+        ),
+        package_arguments=[
+            # Subcommand
+            PositionalArgument(
+                type_=PositionalArgumentType.positional,
+                description="Start the MCP server",
+                value="server",
+                is_required=True,
+            ),
+            # Server command flags (from server.py CLI)
+            NamedArgument(
+                type_=NamedArgumentType.named,
+                name="--project",
+                description="Path to the code repository to index and search",
+                is_required=False,
+                value_hint="path",
+            ),
+            NamedArgument(
+                type_=NamedArgumentType.named,
+                name="--config",
+                description="Path to configuration file (TOML, YAML or JSON format)",
+                is_required=False,
+                value_hint="file_path",
+            ),
+            NamedArgument(
+                type_=NamedArgumentType.named,
+                name="--host",
+                description="Host address for MCP server",
+                is_required=False,
+                default="127.0.0.1",
+            ),
+            NamedArgument(
+                type_=NamedArgumentType.named,
+                name="--port",
+                description="Port for MCP server",
+                is_required=False,
+                default="9328",
+                fmt=EnvFormat.NUMBER,
+            ),
+            NamedArgument(
+                type_=NamedArgumentType.named,
+                name="--transport",
+                description="Transport type for MCP communication (only streamable-http supported for persistent state)",
+                is_required=False,
+                default="streamable-http",
+                choices=["streamable-http"],
+            ),
+            NamedArgument(
+                type_=NamedArgumentType.named,
+                name="--verbose",
+                description="Enable verbose logging with timestamps",
+                is_required=False,
+                fmt=EnvFormat.BOOLEAN,
+            ),
+            NamedArgument(
+                type_=NamedArgumentType.named,
+                name="--debug",
+                description="Enable debug logging",
+                is_required=False,
+                fmt=EnvFormat.BOOLEAN,
+            ),
+        ],
+        environment_variables=[
+            KeyValueInput(
+                name=var["name"],
+                description=var.get("description"),
+                is_required=var.get("is_required", False),
+                is_secret=var.get("is_secret", False),
+                default=var.get("default"),
+                fmt=var.get("fmt"),
+            )
+            for var in env_vars
+        ],
+    )
+
+
+def _get_docker_env_vars() -> list[KeyValueInput]:
+    """Get environment variables for Docker package from actual code."""
+    # Start with CodeWeaver settings variables
+    settings_vars = get_settings_env_vars()
+
+    # Get common provider API keys that Docker users will need
+    provider_vars = get_provider_env_vars()
+
+    # Common provider API keys to include
+    common_api_keys = {
+        "VOYAGE_API_KEY",
+        "COHERE_API_KEY",
+        "OPENAI_API_KEY",
+        "MISTRAL_API_KEY",
+        "GOOGLE_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "BEDROCK_AWS_ACCESS_KEY_ID",
+        "BEDROCK_AWS_SECRET_ACCESS_KEY",
+        "QDRANT_API_KEY",
+        "QDRANT__SERVICE__API_KEY",
+    }
+
+    docker_vars = []
+
+    # Add all CodeWeaver settings (already filtered for Docker relevance)
+    for var in settings_vars:
+        docker_vars.append(KeyValueInput(
+            name=var["name"],
+            description=var.get("description", ""),
+            is_required=var.get("is_required", False),
+            is_secret=var.get("is_secret", False),
+            default=var.get("default"),
+            fmt=var.get("fmt"),
+        ))
+
+    # Add common provider API keys
+    seen_keys = {v["name"] for v in settings_vars}
+    for provider_var_list in provider_vars.values():
+        for var in provider_var_list:
+            if var["name"] in common_api_keys and var["name"] not in seen_keys:
+                docker_vars.append(KeyValueInput(
+                    name=var["name"],
+                    description=var.get("description", ""),
+                    is_required=var.get("is_required", False),
+                    is_secret=var.get("is_secret", False),
+                    default=var.get("default"),
+                    fmt=var.get("fmt"),
+                ))
+                seen_keys.add(var["name"])
+
+    return docker_vars
+
+
+def _create_docker_package() -> Package:
+    """Create the Docker (OCI) package configuration."""
+    return Package(
+        registry_type="oci",
+        registry_base_url=AnyUrl("https://docker.io"),
+        identifier="knitli/codeweaver",
+        version=__version__,
+        runtime_hint="docker",
+        transport=StreamableHttpTransport(
+            type_=StreamableHttpTransportType.streamable_http,
+            url="http://localhost:{host_port}",
+        ),
+        runtime_arguments=[
+            NamedArgument(
+                type_=NamedArgumentType.named,
+                name="--rm",
+                description="Automatically remove container when it exits",
+                is_required=False,
+            ),
+            NamedArgument(
+                type_=NamedArgumentType.named,
+                name="-v",
+                description="Mount workspace directory as read-only",
+                is_required=False,
+                value="{workspace}:/workspace:ro",
+                variables={
+                    "workspace": Input(
+                        description="Path to your codebase to index and search",
+                        is_required=True,
+                    )
+                },
+            ),
+            NamedArgument(
+                type_=NamedArgumentType.named,
+                name="-e",
+                description="Set repository path inside container",
+                is_required=False,
+                value="CODEWEAVER_PROJECT_PATH=/workspace",
+            ),
+            NamedArgument(
+                type_=NamedArgumentType.named,
+                name="-e",
+                description="Voyage AI API key for embeddings",
+                is_required=False,
+                value="VOYAGE_API_KEY={voyage_api_key}",
+                variables={
+                    "voyage_api_key": Input(
+                        description="Your Voyage AI API key",
+                        is_required=False,
+                    )
+                },
+            ),
+            NamedArgument(
+                type_=NamedArgumentType.named,
+                name="-e",
+                description="Embedding provider selection",
+                is_required=False,
+                value="CODEWEAVER_EMBEDDING_PROVIDER={embedding_provider}",
+                variables={
+                    "embedding_provider": Input(
+                        description="Provider to use for embeddings",
+                        default="voyage",
+                        choices=["voyage", "cohere", "openai", "fastembed", "sentence_transformers"],
+                    )
+                },
+            ),
+            NamedArgument(
+                type_=NamedArgumentType.named,
+                name="-p",
+                description="Port mapping for MCP server",
+                is_required=False,
+                value="{host_port}:9328",
+                variables={
+                    "host_port": Input(
+                        description="Host port to expose MCP server",
+                        default="9328",
+                    )
+                },
+            ),
+            NamedArgument(
+                type_=NamedArgumentType.named,
+                name="--network",
+                description="Docker network for Qdrant connectivity",
+                is_required=False,
+                value="{network}",
+                variables={
+                    "network": Input(
+                        description="Docker network name (use 'host' for local Qdrant or custom network)",
+                        default="bridge",
+                    )
+                },
+            ),
+        ],
+        package_arguments=[
+            # Subcommand
+            PositionalArgument(
+                type_=PositionalArgumentType.positional,
+                description="Start CodeWeaver MCP server",
+                value="server",
+            ),
+            # Server command flags (from server.py CLI)
+            NamedArgument(
+                type_=NamedArgumentType.named,
+                name="--host",
+                description="Bind to all interfaces in container",
+                value="0.0.0.0",
+            ),
+            NamedArgument(
+                type_=NamedArgumentType.named,
+                name="--port",
+                description="MCP server port inside container",
+                value="9328",
+            ),
+            NamedArgument(
+                type_=NamedArgumentType.named,
+                name="--transport",
+                description="Use streamable-http for persistent state and continuous indexing",
+                value="streamable-http",
+            ),
+        ],
+        environment_variables=_get_docker_env_vars(),
+    )
+
+
+def _create_field_meta() -> FieldMeta:
+    """Create the _meta field with capabilities and build info."""
+    caps = capabilities()
+
+    # Add tags based on capabilities
+    tags = [
+        "agent-tools",
+        "ast-parsing",
+        "code-search",
+        "code-understanding",
+        "developer-tools",
+        "embeddings",
+        "hybrid-search",
+        "multi-language",
+        "natural-language-processing",
+        "reranking",
+        "semantic-search",
+        "sparse-embeddings",
+        "vector-database",
+    ]
+
+    # Add search types
+    caps["search_types"] = ["semantic", "hybrid", "keyword"]
+
+    # Add chunking strategies
+    caps["chunking_strategies"] = ["semantic", "semantically-aware-delimiters"]
+
+    return FieldMeta(
+        io_modelcontextprotocol_registry_publisher_provided={
+            "build_info": {
+                "framework": "fastmcp",
+                "package_manager": "uv",
+                "python_version": ">=3.12",
+            },
+            "capabilities": caps,
+            "tags": tags,
+        }
+    )
+
+
+def generate_server_detail() -> ServerDetail:
+    """Generate the complete ServerDetail object from code."""
+    return ServerDetail(
+        field_schema=AnyUrl("https://static.modelcontextprotocol.io/schemas/2025-09-16/server.schema.json"),
+        name="io.github.knitli/codeweaver",
+        description="Semantic code search built for AI agents. Hybrid AST-aware embeddings for 170+ languages.",
+        title="CodeWeaver - Semantic Code Search",
+        version=__version__,
+        status=Status.active,
+        repository=REPOSITORY,
+        website_url=AnyUrl("https://github.com/knitli/codeweaver"),
+        packages=[_create_uvx_package(), _create_docker_package()],
+        field_meta=_create_field_meta(),
+    )
+
+
+def validate_against_official_schema(server_detail: ServerDetail) -> None:
+    """Validate the generated server.json against the official MCP schema.
+
+    Args:
+        server_detail: The ServerDetail object to validate
+
+    Raises:
+        ValueError: If validation fails with details about the validation errors
+    """
+    import json
+
+    import httpx
+    from jsonschema import Draft202012Validator, ValidationError
+
+    # Get schema URL from the server detail
+    schema_url = str(server_detail.field_schema)
+
+    print(f"🔍 Fetching official schema from {schema_url}...")
+
+    try:
+        # Fetch the official schema
+        response = httpx.get(schema_url, timeout=10.0, follow_redirects=True)
+        response.raise_for_status()
+        schema = response.json()
+
+        print("✅ Schema fetched successfully")
+    except httpx.HTTPError as e:
+        raise ValueError(f"Failed to fetch schema from {schema_url}: {e}") from e
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON schema at {schema_url}: {e}") from e
+
+    # Convert server_detail to dict for validation
+    server_json = json.loads(
+        server_detail.model_dump_json(
+            by_alias=True,
+            exclude_none=True,
+        )
+    )
+
+    print("🔍 Validating against official MCP schema...")
+
+    # Create validator and check
+    validator = Draft202012Validator(schema)
+
+    try:
+        # Validate and collect all errors
+        errors = list(validator.iter_errors(server_json))
+
+        if errors:
+            error_messages = []
+            for error in errors:
+                path = " → ".join(str(p) for p in error.path) if error.path else "root"
+                error_messages.append(f"  • {path}: {error.message}")
+
+            raise ValueError(
+                f"Schema validation failed with {len(errors)} error(s):\n" + "\n".join(error_messages)
+            )
+
+        print("✅ Schema validation passed")
+
+    except ValidationError as e:
+        path = " → ".join(str(p) for p in e.path) if e.path else "root"
+        raise ValueError(f"Schema validation failed at {path}: {e.message}") from e
+
+
+def save_server_detail(server_detail: ServerDetail | None = None) -> Path:
+    """Save the generated server detail to server.json."""
+    if server_detail is None:
+        server_detail = generate_server_detail()
+
+    file_path = Path(__file__).parent.parent.parent / "server.json"
+
+    # Write with proper formatting
+    json_content = server_detail.model_dump_json(
+        by_alias=True,
+        exclude_none=True,
+        indent=2,
+    )
+
+    file_path.write_text(json_content + "\n")
+    return file_path
+
+
+if __name__ == "__main__":
+    import sys
+
+    # Generate the server.json
+    print("🔄 Generating server.json from code...")
+    try:
+        server_detail = generate_server_detail()
+
+        # Validate against official schema before saving
+        validate_against_official_schema(server_detail)
+
+        # Save to file
+        file_path = save_server_detail(server_detail)
+
+        print(f"✅ Successfully generated server.json at {file_path}")
+        print(f"📦 Version: {__version__}")
+        print(f"🌐 Languages supported: {server_detail.field_meta.io_modelcontextprotocol_registry_publisher_provided['capabilities']['languages_supported']}")
+        print(f"🔧 Embedding providers: {', '.join(server_detail.field_meta.io_modelcontextprotocol_registry_publisher_provided['capabilities']['embedding_providers'])}")
+        print(f"💾 Vector stores: {', '.join(server_detail.field_meta.io_modelcontextprotocol_registry_publisher_provided['capabilities']['vector_store_providers'])}")
+    except Exception as e:
+        print(f"❌ Error generating server.json: {e}", file=sys.stderr)
+        import traceback
+
+        traceback.print_exc()
+        sys.exit(1)

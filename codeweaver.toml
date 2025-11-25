@@ -2,6 +2,7 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+# This schema won't exist until we merge this branch with main, at which time, we can remove the comment.
 # "$schema" = "https://raw.githubusercontent.com/knitli/codeweaver/refs/heads/main/schema/codeweaver.schema.json"
 project_path = "."
 project_name = "codeweaver"

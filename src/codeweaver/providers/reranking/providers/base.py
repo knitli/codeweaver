@@ -76,6 +76,10 @@ class RerankingResult(NamedTuple):
     batch_rank: int
     score: float
     chunk: CodeChunk
+    # Optional search metadata preserved from vector search results
+    original_score: float | None = None
+    dense_score: float | None = None
+    sparse_score: float | None = None
 
 
 @cache

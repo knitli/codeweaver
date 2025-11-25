@@ -16,8 +16,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from codeweaver.agent_api.find_code.types import CodeMatch, CodeMatchType
-from codeweaver.common.utils import uuid7
-from codeweaver.core.chunks import ChunkSource, CodeChunk
 from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.spans import Span
 
@@ -35,11 +33,8 @@ def convert_search_result_to_code_match(result: SearchResult) -> CodeMatch:
     Returns:
         CodeMatch with all required fields populated
     """
-    # Extract CodeChunk (SearchResult.content can be str or CodeChunk)
-    if isinstance(result.content, str):
-        chunk = create_code_chunk_from_result(result)
-    else:
-        chunk = result.content
+    # Extract CodeChunk (VectorStore always returns CodeChunk objects)
+    chunk = result.content
 
     # Get file info (prefer from chunk, fallback to result.file_path, then create fallback)
     file: DiscoveredFile | None = None
@@ -94,41 +89,4 @@ def convert_search_result_to_code_match(result: SearchResult) -> CodeMatch:
     )
 
 
-def create_code_chunk_from_result(result: SearchResult) -> CodeChunk:
-    """Create a CodeChunk from a SearchResult with string content.
-
-    Args:
-        result: SearchResult with string content
-
-    Returns:
-        CodeChunk with extracted information
-    """
-    from codeweaver.core.metadata import ExtKind
-
-    if isinstance(result.content, CodeChunk):
-        return result.content
-
-    # Determine ext_kind from file_path or use default
-    ext_kind = (
-        ExtKind.from_file(result.file_path)
-        if result.file_path
-        else ExtKind.from_language("text", "other")
-    )
-
-    # Create Span for line_range with proper UUID7 source_id
-    source_id = uuid7()
-    line_count = (result.content.count("\n") + 1) if result.content else 1
-    line_span = Span(1, line_count, source_id)  # Positional args: start, end, source_id
-
-    return CodeChunk(
-        content=result.content,
-        line_range=line_span,
-        file_path=result.file_path,
-        language=None,
-        ext_kind=ext_kind,
-        source=ChunkSource.TEXT_BLOCK,
-        chunk_id=uuid7(),
-    )
-
-
-__all__ = ("convert_search_result_to_code_match", "create_code_chunk_from_result")
+__all__ = ("convert_search_result_to_code_match",)

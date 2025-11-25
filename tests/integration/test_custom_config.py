@@ -41,8 +41,10 @@ pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
 
 @pytest.mark.skipif(
-    not os.environ.get("VOYAGE_API_KEY") or not os.environ.get("QDRANT__SERVICE__API_KEY"),
-    reason="VOYAGE_API_KEY and QDRANT__SERVICE__API_KEY environment variables required",
+    not os.environ.get("VOYAGE_API_KEY")
+    or not os.environ.get("QDRANT__SERVICE__API_KEY")
+    or not os.environ.get("CODEWEAVER_VECTOR_STORE_URL"),
+    reason="VOYAGE_API_KEY, QDRANT__SERVICE__API_KEY, and CODEWEAVER_VECTOR_STORE_URL environment variables required",
 )
 async def test_custom_configuration():
     """
@@ -55,7 +57,7 @@ async def test_custom_configuration():
 
     # Get base test config with proper authentication
     base_config = {
-        "url": "https://f3b7755c-ee6e-4605-8786-c4218f9e148b.us-east-1-1.aws.cloud.qdrant.io",
+        "url": os.environ["CODEWEAVER_VECTOR_STORE_URL"],
         "api_key": os.environ["QDRANT__SERVICE__API_KEY"],
         "prefer_grpc": True,
     }

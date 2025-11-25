@@ -14,12 +14,13 @@ Scripts are organized into functional categories:
 
 ```
 scripts/
-├── build/                # package-building related scripts
+├── build/                # Package-building related scripts
 ├── code-quality/          # Code formatting, linting, and licensing
 ├── dev-env/              # Development environment setup
 ├── docs/                 # Documentation generation
 ├── language-support/     # Tree-sitter grammars and language mappings
 ├── model-data/          # Model metadata and data conversions
+├── project/             # Project management and contributor tools
 ├── testing/             # Test management and benchmarking
 └── utils/               # Shared utilities and debugging tools
 ```
@@ -39,7 +40,95 @@ These scripts are called by project tooling (pyproject.toml, mise.toml, hk.pkl, 
 
 ---
 
+## Contributor Management
+
+### contributors.py
+
+**Location:** `scripts/project/contributors.py`
+
+Generate comprehensive contributor lists from CLA signatures across all Knitli repositories.
+
+**Usage:**
+```bash
+# Generate markdown list
+python scripts/project/contributors.py --format markdown
+
+# Generate JSON data
+python scripts/project/contributors.py --format json
+
+# Generate CSV export
+python scripts/project/contributors.py --format csv
+
+# Per-repo breakdown
+python scripts/project/contributors.py --by-repo
+
+# Custom output path
+python scripts/project/contributors.py --format markdown --output /path/to/CONTRIBUTORS.md
+```
+
+**Requirements:** Python 3.7+, GitHub CLI (`gh`)
+
+**What it does:**
+1. Clones `knitli/.github` repo temporarily
+2. Reads all CLA signature files from `cla-signatures/`
+3. Aggregates contributors across repos (or shows per-repo breakdown)
+4. Generates formatted output
+
+**Data tracked:**
+- GitHub username and ID
+- Total contributions across all repos
+- Which repos they've contributed to
+- First contribution date
+- Individual PR numbers
+- Repository ID for cross-repo tracking
+
+**See also:** [claudedocs/cla-centralization-setup.md](../claudedocs/cla-centralization-setup.md) for CLA setup details.
+
+### generate-contributors-list.sh
+
+**Location:** `scripts/project/generate-contributors-list.sh`
+
+Bash version of the contributor list generator with the same functionality as the Python version.
+
+**Usage:**
+```bash
+./scripts/project/generate-contributors-list.sh markdown
+./scripts/project/generate-contributors-list.sh json
+./scripts/project/generate-contributors-list.sh csv
+```
+
+**Requirements:** bash, jq, GitHub CLI (`gh`)
+
+---
+
 ## Build
+
+### generate-mcp-server-json.py
+
+**Location:** `scripts/build/generate-mcp-server-json.py`
+
+Generates the MCP `server.json` registry file from actual code definitions, ensuring accuracy and eliminating hallucinated values.
+
+**Usage:**
+```bash
+python scripts/build/generate-mcp-server-json.py
+# or via mise
+mise run generate-mcp-server-json
+```
+
+**Features:**
+- Generates both UVX (PyPI) and Docker (OCI) package configurations
+- Pulls environment variables from actual `envs.py` definitions
+- Auto-generates CLI flags from `server.py` command signature
+- Extracts provider capabilities from code
+- Configures transport correctly (streamable-http for Docker, configurable for UVX)
+- Automated Docker environment variable generation (28+ variables)
+- **Validates against official MCP schema** before saving
+- Zero manual maintenance required
+
+**Outputs:**
+- Updates `server.json` in project root
+- Displays summary (version, languages, providers, vector stores)
 
 ### generate-supported-languages.py
 
@@ -57,7 +146,43 @@ uv run scripts/build/generate-supported-languages.py
 - Updates build configuration
 
 
-### use_latest.py
+### generate-docker-server-yaml.py
+
+**Location:** `scripts/build/generate-docker-server-yaml.py`
+
+Generates `server.yaml` configuration for Docker MCP Registry submission.
+
+**Usage:**
+```bash
+uv run scripts/build/generate-docker-server-yaml.py
+# or via mise
+mise run generate-docker-server-yaml
+```
+
+**Features:**
+- Generates server.yaml for github.com/docker/mcp-registry submission
+- Pulls environment variables from actual `envs.py` definitions
+- Auto-generates configuration parameters with types and defaults
+- Separates secrets from regular environment variables
+- Includes provider enums from capabilities
+- Gets current git commit for source tracking
+- **For Option A (Docker-built images)** with enhanced security
+
+**Outputs:**
+- Creates `server.yaml` in project root
+- Displays submission instructions
+
+**Submission Process:**
+1. Fork `github.com/docker/mcp-registry`
+2. Add `server.yaml` to `servers/codeweaver/`
+3. Submit PR
+4. Docker builds and publishes to `mcp/codeweaver` namespace with:
+   - Cryptographic signatures
+   - Provenance tracking
+   - SBOMs
+   - Automatic security updates
+
+### git-merge-latest-version.py
 
 **Location** `scripts/build/git-merge-latest-version.py`
 

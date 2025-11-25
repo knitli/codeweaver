@@ -2,11 +2,11 @@ SPDXVersion: SPDX-2.1
 DataLicense: CC0-1.0
 SPDXID: SPDXRef-DOCUMENT
 DocumentName: codeweaver
-DocumentNamespace: http://spdx.org/spdxdocs/spdx-v2.1-2ef02f60-a066-43c4-b69d-98cd1791cda4
+DocumentNamespace: http://spdx.org/spdxdocs/spdx-v2.1-a782d849-b773-419f-8181-bf34e6cb7b08
 Creator: Person: Adam Poulemanos ()
 Creator: Organization: Knitli Inc. ()
 Creator: Tool: reuse-6.2.0
-Created: 2025-11-24T12:28:41Z
+Created: 2025-11-25T03:03:48Z
 CreatorComment: <text>This document was created automatically using available reuse information consistent with REUSE.</text>
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-59d0d7c6d374444458040e2c5ca0bdf1
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-976c8898d6bbfcfdb6e33cf38645727a
@@ -34,16 +34,16 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-3c973f73e67d40d50e9e3af2f67518f
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-7e65f6c794923a4a6b872db458cfd899
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-0414c1880fc67d141b62b4e98a61c61c
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-934ac8fa681ecbe87f41c3c89c8b54fe
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-f10d9a05a82fc8b570dfe820f137cf53
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-da6f899dedb01427ef800f2354e0d600
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-3924512e61c05dfc60aec2423e6a43fd
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-8e3371d173fe74864188ef3a0eec5c80
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-2339a734adc01a933a95cb7435c42281
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-8d8fbd06920ee8cc58b7c7ee739ff635
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-561b6eb25cdf7f1e4b32cd7550afff77
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-18578b45593d627571bad857b87d852c
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-85942cde4d1acafacaa417389fb10504
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-8843313d03d3c3980921af985c579777
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-3bfefede9ff3c2c6512829dc547253b9
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-05574c8ea4b5b37c0ff7d86dac4cdc74
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-a501047da6eff1273dffc83d4428a9e4
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-e40843532dcbcaa6d78f0d32123de7f1
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-65bc9d48121ec7ac1b91795db9d892eb
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-ac7f4e59708d05017680cba73a7d21bd
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-8b0af4ce570e6f2d2dd6cde8e8eae8bc
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-651168d35d571f22c217996321bff508
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-5a1795f0939631b1811369cd537d14be
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-801e026de29609164f63cd0350a88e59
@@ -96,15 +96,16 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-f34e213bf6f4b14d1a34e78fe815c7e
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-57f625256f66c5c62b2fc97c3b257b97
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-5c02f07dc728f3716df081419a0e163e
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-6e8638c587a89e13bf602d40df87e6f3
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-b64e8244ab9144bdf4a8b2c86a057688
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-5a6ed2b2fdf7b8ba19cb29571b7d5b5e
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-2a79e01de9cd4098159ec44604b398d5
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-616ceb281a6ab19da3b8913896b967f8
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-2e8dcb281380e3a83c3c8d0f42b0d0c2
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-d98f557d58d63d2d03ca877a02273527
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-9819e4ed891e8391d9b23bcab92daf47
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-5146be5927e6bbb431b7af954123dfdd
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-8484a071413538356e3f5a9c62182d77
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-2940b0049ecc9c1d0d527088893b95d2
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-5ac2ff608adc70ce48760c10cbc754ba
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-16a38000ec74839f3c694e525bfa0a88
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-8a91cd949bf55631e2275851d3bb2f0d
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-17b768a83f2945325862aa51a2769c6a
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-cc5639e602a2aa58dffce7161026c256
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-67053feb6466410c71b70d74a2569fdc
@@ -178,12 +179,13 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-9e711c3fc834d8a5f446c380d477123
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-63dd05de47735b92a7f423b9ee8837cb
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-c21f728bca74e1d23518970ff77abc31
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-5102640e6f99e00da70c599e3cbbdb92
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-8a54060b19c662b983cff11044f4b637
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-43c941d583c9d95c990a9d82d7da69b2
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-e4768453565f7a08ce597a87f004c189
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-09e091688f6c935a6419ca7c1785fd64
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-6d39cdb9ed3ecdc693b171efe5b6dff6
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-aa2ef2fdf1e8fcb95c3e8946fd47cace
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-986c666425e29e9c0bf8857d880fc144
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-e4adc5c99964c1b396046430a62d2f0a
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-e241d020a7932eb0d3480017a8eeca2d
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-b76c35a4263da25c06bfc96d450b6e29
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-a24a0cd243351517b650c426faecfb65
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-5943b19d0e07257b0c68f462e5d3dfa9
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-f5b6e4a3e75c8bad1af8562bd248b423
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-94fb3c83a2e3f2cf5c0a09fcf7f3c137
@@ -224,6 +226,9 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-dcaaf9a9a7a9335c2899cbf7fda8b60
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-14f07b5be76ff440998249d3454e674c
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-2bd0b4c65b54c4271768718bc890ebba
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-1995d7f92e8b71af5f931c0cbf504369
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-0ee9140bfc3fcf40d85c5f318f45abd3
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-0839581502ca699ba49d3b022a62d98a
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-5760fc555ecb3ec6ba1e6b7c16ae79b1
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-06a8acd2acf5fc768fe137a4d773de5f
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-8144e0a667b876293e18a11d3f09fd42
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-1cd38b041fd5220994f69568236d5ec1
@@ -234,7 +239,8 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-f6acfc3289ed947faa692c7c7c9713a
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-5de563794393a88e5cb0f6ce0ac837dc
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-031e3229f2c32865298d31d2321660c0
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-99bbbe945747f8bb51813addb5da27ce
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-60b90f889070a7ed0f543e224f261ef7
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-a990718558ffa808be57eebcd9796381
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-c0d6db0c2d411fe9d84e936d60130ebd
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-e74a1e3355585142608d2d3bd32737b4
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-00823044bd90daddcc56712eda4f2741
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-75082322bb8152a2f63ef30ec7d8f431
@@ -265,21 +271,21 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-84abf5bf45a3405a8faae3012835a88
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-0ddac6c6c6f2ea1a5074d40dffa03d4a
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-d8302a3ec589de71867d9696bbbefc9a
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-5662552b8f5101f9ec7e4ac6ad11aadd
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-2ea18fbe967ded261d2fc0c1613d0088
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-b0c6c72a1a1f34887e683ed56d21e9a9
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-b3dfb1521e3078b5e3bb8556664c3a19
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-042c2a852bc6d7418e107012ecc41242
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-2285fefbaf56ca3f83fdae9ffd3096f4
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-718eaef9a5d32e4aa70073f27c3122bf
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-a27aae04627bb07fc355d292e868df97
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-7b82bc9c4395f50ee52f84693a16fb52
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-dfde65ded21a1a3f27649f717a5a648b
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-26b50274c9d8e1e043d21c3c0f13a8ac
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-2660f87f220674f645860f3edc4f0d1a
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-c493cc3d5c5b7a66f2a14c9e8a72f862
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-94b6e65ffa2abc4945197382bb342150
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-8be73cec1abc644c681c44925231c3e7
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-65c5a0ae79bd7c239a180c3090be4ce8
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-fe21121c3051c925682e0e283bcce768
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-5c033f342673bb3a9ea3f57b80b657a6
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-a691ec43679ebafbc801d2ac3ff845d4
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-e960c71ffe206d4be04b58dbaa998ce0
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-8a70aee4cf31a7383a1d42072ed3afbc
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-e01888fd4d8eed5a96e4222ef48aa5cd
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-e5649c729dfb760002276737110b9eaa
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-15e58a9f746223dd045da8ccfec84e8c
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-2413a0f6aab1e94a796f5f3fc4738cf8
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-c3b07fa96844860b4f2fdd7876dc4ad2
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-ee89628e4d2e56ff4c4493c0f65e47f5
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-ecb55b962d2bd54fc4953d2dc7690f87
@@ -298,7 +304,7 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-43dd6d537337bd299ee7516ea993e28
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-d7a379340e7c80570be4db0b9ef0a5b5
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-70105c6c7a5066f66ad425bfbb807786
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-e4b9eaee39bc78559dc5276fbe034147
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-55f56a8fb0f01c32e6ab8cd740f3cdfe
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-eca9d47bd266a5d3b7e0622dbcaef6d6
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-ce7484e2f28461d101bb29f3f831dfbb
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-edec8c5ef93ff71f2df332d102df911d
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-9b591f6ea121dbc9f08a1f27c1960e69
@@ -316,21 +322,21 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-a6292acb60c96e2a315d1a8a4ca0d92
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-acfba43797209c76843ad4442d1d265b
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-9fb9fa39b3d6d77a1536d2bbb950b3af
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-6823ad13582f6b1e6367e9b384a72983
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-d0e0cd9690f082c5d2a6a6ffd1b0973e
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-74a51d06b2da0ab9941f8279b2ab6fbc
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-5fd195b6aa17211f2812308aa0463814
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-0a9a43b830bf340c485f20544dff3c96
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-c98697131f5569ee37b8a03240988e5a
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-ce83c2c797268e1c46e2aed63835f387
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-21e782e7ee2a01dca0ade8593b368292
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-0abab910ae6bcc6212ddecbe57fb670f
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-d0ee1c15dd865de1c6ca6c6bc0ac4bc1
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-a040b7d91fedeb64a72d6fc31f445fbf
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-84a9b2d35cc42833ab3287f23b55f3c5
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-40b040f6b18128f147123a431e1cdd6e
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-8fc4afaa4dc4fba3743b0578c30ede4a
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-a8dcb68b59921ff9b8a05c25618cc69a
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-316a345a60c6f60e8cba5a9638b1e867
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-65602446ebedd26627f76fdf066ca64e
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-794b1a761c1652dbfa10d69f75847250
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-c1f011db52be947a70dd5f5c9971f05a
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-aa77791eb6db0c05ab07d0993c3ad6a3
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-de006fedad68509ee0435ffac5e68d16
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-b219c1788b5a89b9a5c15027fa678504
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-58dc2c66ba189888512aea592404ea11
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-167927b4a5809be591c07ad5b2298b00
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-51ee40f62d1a446c6511b4328a8af241
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-de28fb9f8d510316036586b9b29588f8
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-d5bdfba1eeb21ab6422f295b8e491f23
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-281c9bd1ddb6e684e912f28bfab917ab
@@ -395,7 +401,7 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-4b778a39c1d38a518960f220f373cb1
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-fb39b6b499ea4a649fc642b8ca61d0a4
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-46286570550ad1cc685ab7db0477f021
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-f62e702e2419a90e17a400fb30cf076c
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-dc540ed35bf57fd1c77624af3a5b57d5
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-ee74566c38fd0d1ad75a7951e53b464e
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-8103785383e2f01481235afb64e4fa98
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-231b47825971bef1e66e6677c85454af
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-1b33acf90d73a73e5bdb1daa8da6f16e
@@ -422,16 +428,16 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-e2daad96855412561276333898311ce
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-f96bfa87e173f62244f521e91be03b1b
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-9eefcbb59b2c9cc92f595319dfd335a1
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-7700198c6be4dbed0b0d9ed919cab651
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-ed03b22e2f63421e46eb165a8a23f5b7
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-0d6357ac9c83502bafccf6007bc180ff
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-727e6d0f911f925cb301a4e15c819abb
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-c27343325843ebcede1d88ee7fc601dd
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-932b42c3154cd1a2f599e2d53cb510e9
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-e409958527116fe40a4b50d944516c30
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-04853fba3811dd64c3f3197e040b1fd4
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-86d89fe8df5e8a49135635a59bff0c75
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-40fd69d8929e671ed1be87f29f6fe6c1
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-ca6861851d8912aa1c439d689dd5b11e
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-644ecec98477d92d575408f11ee9f9a2
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-3e0b7be46c9a2b4a268110fab7392ede
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-efd5a7a9118c022b86cb5909ac75a872
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-5f9f6783a863f06f3a01065c4ea3f49f
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-6b8d6442b4fd963848077817c0e51980
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-02013bf5f6768d65a4df0e3f41057371
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-56102f99beaa2d5055094d0a94155a31
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-ef386a3b80dd10c15676ab17a71bd627
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-9f67af9cc9ac97c94a7eb0631352a166
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-bb650c15524fc9f9b2567038e755295a
@@ -450,9 +456,9 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-a23dbe515ee0bfb95b7fc287f0ed352
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-916cfdd6d906fd7cec2b9b5a3fbe400e
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-3512a107ef634bd04e8483b83669bd55
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-f89cc12a62213351c07b547cdbba53ab
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-9cbdca30b7cd74229048b024e63b2860
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-ed68e1c74e6fc9c3adb62a4a04816f4d
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-a5f3c9a2e24dbb6a6f99fd640e43050d
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-9f926c0dbc82225d60e396298916a1a3
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-9a36e40504649d92309d90aa661c71ca
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-ee3034946e4e7d091619c3a5de9f08a4
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-82247a9d69180e28a03de9cd9b51fe15
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-516031c9078c8897948c2f005462c41c
@@ -479,7 +485,7 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-f7f76a90412a1bb5761985c8d078920
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-fe0eba09349dd3846507df2d05b5cfc1
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-0ca27a93303a771692860f1c7473ca66
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-0109cf6d7ea5e8a9eede78732b5d9ac8
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-25c7d93b0e0627e1cb731a21b0ed5d25
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-3e05e3021dd8b56e2f0d63432a0c63f7
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-913f7a807b9b8a7be613b6b446185c3c
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-a696427960fdb1e424b56045588c9005
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-59a6d800a65f6c42f8aefdad34d32ed9
@@ -498,7 +504,7 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-6019644746e04abc32f8228ce5d9e5f
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-6ff51d8ee0e3889f5a58ec8ae2734c65
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-f76312515cb39c76e6e2e4eded0b31d4
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-838b3fae33cd4937c9d89fa29839cfee
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-1d387dae45a8fed695102ef319734647
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-cc700964cb6587786c8637e66f253cfb
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-a7e2d7d4b286de42f631f52bd224370d
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-b0df262aa6f45a703bb4ab5ecce04fa9
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-baff800f8c57d254f8eafe9c9a32ac8b
@@ -529,7 +535,7 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-1a0f79c4da7d1ecca053a36152e03cf
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-f52be6ec689feb20fa6d277fcf8b763f
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-f268b69f43e6ab7980c1e4922b460581
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-e90a4a29bd56bbb7d98bd688781f800f
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-e77aab6a2cb9c356145dae9a52952d51
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-b7449358b5a4d4f42e1b57fd7a512ed5
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-bd764038bf59e7f55c57ac2ad83b98f0
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-6df1b74ed72a35d07854ce8ce803f996
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-15582dd5307e77fe04c24bc63bd86094
@@ -596,17 +602,19 @@ Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-47e3609e28fd40115aa59e63f9eb3b0
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-4d22c561a9ac398d8d177a86d242aadb
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-e7cddb3d6e5c1f8f7e7a3cb0dc061972
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-cd3f18b26ac6db316b77cac91c01f258
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-02109691091141fa8d2bb7db204a9459
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-b94b90d3fbf57a9cbf97a2a51f0b227d
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-f33735d43099458425ff09c364a1b806
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-f6d459ce6631f7f765427aeb166ef857
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-433a19ad58303cd4eab0b4871c2fde09
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-c0dc5c74b18dc996a3713b9a0bb5b5d9
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-26419976479be723c6e7520f169e236b
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-38b5bb194d6c86a3695fd5eeafc2e058
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-27367c82d49d9cbaa8623928694e1cb2
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-65a8ba8f499045111b6cafb73dbbd6ef
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-833724a94d322ec07a46ba12e3baec62
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-5d86d66936f89e3f3e27936391aef0a0
-Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-2eec1fb96e9f22b4c2391d476dc4bec8
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-7b5fc50f1845968d53c8b307978d4755
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-9f9cac8cf8a5c09fa5e3a69c071e497a
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-9a06fe907dc4f3baddd1499173803403
 
 FileName: ./.claude/agents/cli-ux-designer.md
 SPDXID: SPDXRef-59d0d7c6d374444458040e2c5ca0bdf1
@@ -818,32 +826,32 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./.github/workflows/ci.yml
-SPDXID: SPDXRef-f10d9a05a82fc8b570dfe820f137cf53
-FileChecksum: SHA1: bf5da55a39bb877cb90ffa78b8fa2cf4a133131e
+SPDXID: SPDXRef-2339a734adc01a933a95cb7435c42281
+FileChecksum: SHA1: 913b371c363d16906e0aeff63f47cf52488b9f7a
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./.github/workflows/cla.yml
-SPDXID: SPDXRef-da6f899dedb01427ef800f2354e0d600
-FileChecksum: SHA1: 0cdea64e2b98cd200edbd703879012ead702add3
+SPDXID: SPDXRef-8d8fbd06920ee8cc58b7c7ee739ff635
+FileChecksum: SHA1: c5168c4752eda7d384012e1aca6ae42fe6cc97a9
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc. <knitli@knit.li></text>
 
 FileName: ./.github/workflows/claude.yml
-SPDXID: SPDXRef-3924512e61c05dfc60aec2423e6a43fd
-FileChecksum: SHA1: 6458d05a5d412ca751716f2a2222c0ee3ac63802
+SPDXID: SPDXRef-561b6eb25cdf7f1e4b32cd7550afff77
+FileChecksum: SHA1: 5f3d4ac28f2bebb39dc9abf5f662a4531826606e
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./.github/workflows/copilot-setup-steps.yml
-SPDXID: SPDXRef-8e3371d173fe74864188ef3a0eec5c80
-FileChecksum: SHA1: 4fc32eaf92f02428229126ea8758eedf0957038d
+SPDXID: SPDXRef-18578b45593d627571bad857b87d852c
+FileChecksum: SHA1: 3a8faa3159b7f383f6ad7b7fe0d7e0387fd54799
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -866,8 +874,8 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./.github/workflows/mcp-registry-submit.yml
-SPDXID: SPDXRef-3bfefede9ff3c2c6512829dc547253b9
-FileChecksum: SHA1: 1c8394f4aa072b9572fbdd18e68b57cbb210ca37
+SPDXID: SPDXRef-05574c8ea4b5b37c0ff7d86dac4cdc74
+FileChecksum: SHA1: ac5e5f9d8b6100301f71a3714faa6ecc8e34d446
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -882,16 +890,16 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./.github/workflows/publish-test.yml
-SPDXID: SPDXRef-e40843532dcbcaa6d78f0d32123de7f1
-FileChecksum: SHA1: 96f8f01186c509e66ed7c5ff16b9fd1421a98caf
+SPDXID: SPDXRef-ac7f4e59708d05017680cba73a7d21bd
+FileChecksum: SHA1: 1ef70625e3ecb495818c43742eb7172d91b468bb
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./.github/workflows/release.yml
-SPDXID: SPDXRef-65bc9d48121ec7ac1b91795db9d892eb
-FileChecksum: SHA1: 8336ae040fa5d7c7b6c0f6c28b048ec61f92de83
+SPDXID: SPDXRef-8b0af4ce570e6f2d2dd6cde8e8eae8bc
+FileChecksum: SHA1: 7f8d900027c25c9e6d2e1bc68b68c0aaf8731d09
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -1313,14 +1321,6 @@ LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
-FileName: ./TODO_BEFORE_RELEASE.txt
-SPDXID: SPDXRef-b64e8244ab9144bdf4a8b2c86a057688
-FileChecksum: SHA1: fdb209815c20cd74e3c1fce2736d0ef24f84f567
-LicenseConcluded: Apache-2.0 OR MIT
-LicenseInfoInFile: Apache-2.0
-LicenseInfoInFile: MIT
-FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
-
 FileName: ./_typos.toml
 SPDXID: SPDXRef-5a6ed2b2fdf7b8ba19cb29571b7d5b5e
 FileChecksum: SHA1: 69d947911601d6eba4fcd76e0363110699773e22
@@ -1345,9 +1345,25 @@ LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
+FileName: ./claudedocs/cla-centralization-setup.md
+SPDXID: SPDXRef-2e8dcb281380e3a83c3c8d0f42b0d0c2
+FileChecksum: SHA1: 9a5ad8fae6709c842edc0fd8771d8735b38a62f0
+LicenseConcluded: Apache-2.0 OR MIT
+LicenseInfoInFile: Apache-2.0
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc. <knitli@knit.li></text>
+
 FileName: ./claudedocs/codeweaver_feature_comparison_chart.md
 SPDXID: SPDXRef-d98f557d58d63d2d03ca877a02273527
 FileChecksum: SHA1: ef373afe8691c63a16e97572d0b360c5635c407a
+LicenseConcluded: Apache-2.0 OR MIT
+LicenseInfoInFile: Apache-2.0
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
+
+FileName: ./claudedocs/mcp_schema_investigation_results.md
+SPDXID: SPDXRef-9819e4ed891e8391d9b23bcab92daf47
+FileChecksum: SHA1: 7266318217d0374124f9bdc8f25cbd93af41e715
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -1370,16 +1386,16 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./codeweaver.toml
-SPDXID: SPDXRef-2940b0049ecc9c1d0d527088893b95d2
-FileChecksum: SHA1: 5fcb4558d05ee376be7f33c149ae7ac739e035ce
+SPDXID: SPDXRef-16a38000ec74839f3c694e525bfa0a88
+FileChecksum: SHA1: 8205c69c2d621f46d635d186393d89a4de7b3f0f
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./context7.json
-SPDXID: SPDXRef-5ac2ff608adc70ce48760c10cbc754ba
-FileChecksum: SHA1: fa8a60e571d9303fe3db3f532ef623628d0d8116
+SPDXID: SPDXRef-8a91cd949bf55631e2275851d3bb2f0d
+FileChecksum: SHA1: 8d2ed81f6341edc38e8a392d62659497061138ff
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -1971,8 +1987,8 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./pyproject.toml
-SPDXID: SPDXRef-8a54060b19c662b983cff11044f4b637
-FileChecksum: SHA1: ab7412162e17c3b8778b013a5edb89b6c066c90c
+SPDXID: SPDXRef-43c941d583c9d95c990a9d82d7da69b2
+FileChecksum: SHA1: 0c56b75511eccc73615617e1d72913a78a8ce682
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -1995,24 +2011,32 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./scripts/ORGANIZATION.md
-SPDXID: SPDXRef-6d39cdb9ed3ecdc693b171efe5b6dff6
-FileChecksum: SHA1: 0801c69a2d89b3d5b0aae312a23ea437442fe6e5
+SPDXID: SPDXRef-e4adc5c99964c1b396046430a62d2f0a
+FileChecksum: SHA1: b7f103a5f81f7f4037e1eb77ad90bfd362c722ad
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./scripts/README.md
-SPDXID: SPDXRef-aa2ef2fdf1e8fcb95c3e8946fd47cace
-FileChecksum: SHA1: 0d195470ee74b30307aeb4d8e710906ab5d5186f
+SPDXID: SPDXRef-e241d020a7932eb0d3480017a8eeca2d
+FileChecksum: SHA1: 6b0e5d6fdb031c69c7e8414004ae241304e6a2ca
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
-FileName: ./scripts/_models/mcp_server_json.py
-SPDXID: SPDXRef-986c666425e29e9c0bf8857d880fc144
-FileChecksum: SHA1: a7f73c6d774e7b9487c7cbb9a5829361979d656f
+FileName: ./scripts/build/generate-docker-server-yaml.py
+SPDXID: SPDXRef-b76c35a4263da25c06bfc96d450b6e29
+FileChecksum: SHA1: 9939923864ac2fe89889027d7aa713096fb21dc0
+LicenseConcluded: Apache-2.0 OR MIT
+LicenseInfoInFile: Apache-2.0
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
+
+FileName: ./scripts/build/generate-mcp-server-json.py
+SPDXID: SPDXRef-a24a0cd243351517b650c426faecfb65
+FileChecksum: SHA1: df4927e39d737064720115d908ae7f38edc2d6e0
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -2338,6 +2362,30 @@ LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
+FileName: ./scripts/project/README.md
+SPDXID: SPDXRef-0ee9140bfc3fcf40d85c5f318f45abd3
+FileChecksum: SHA1: a249d029633cd3b9a8630e69c10f8678f510fb8c
+LicenseConcluded: Apache-2.0 OR MIT
+LicenseInfoInFile: Apache-2.0
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
+
+FileName: ./scripts/project/contributors.py
+SPDXID: SPDXRef-0839581502ca699ba49d3b022a62d98a
+FileChecksum: SHA1: a693da0d39a077ce087d37ba1544e4c46ebb72ad
+LicenseConcluded: Apache-2.0 OR MIT
+LicenseInfoInFile: Apache-2.0
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc. <knitli@knit.li></text>
+
+FileName: ./scripts/project/generate-contributors-list.sh
+SPDXID: SPDXRef-5760fc555ecb3ec6ba1e6b7c16ae79b1
+FileChecksum: SHA1: e007a8cf0c2996d530fd04a59dd19b826aecb5e3
+LicenseConcluded: Apache-2.0 OR MIT
+LicenseInfoInFile: Apache-2.0
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc. <knitli@knit.li></text>
+
 FileName: ./scripts/testing/apply-test-marks.py
 SPDXID: SPDXRef-06a8acd2acf5fc768fe137a4d773de5f
 FileChecksum: SHA1: 88fc1370c66aa4be25a1eb744c64963146998da2
@@ -2418,8 +2466,16 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./server.json
-SPDXID: SPDXRef-60b90f889070a7ed0f543e224f261ef7
-FileChecksum: SHA1: 56a7c46466e6b119aaad62a5e305cb0452f3411d
+SPDXID: SPDXRef-a990718558ffa808be57eebcd9796381
+FileChecksum: SHA1: 0901a7fb516a34984d93112c77a4980c524e6d2f
+LicenseConcluded: Apache-2.0 OR MIT
+LicenseInfoInFile: Apache-2.0
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
+
+FileName: ./server.yaml
+SPDXID: SPDXRef-c0d6db0c2d411fe9d84e936d60130ebd
+FileChecksum: SHA1: 2f1def574c82983d417c6fce7f0f616cd0d266c8
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -2666,8 +2722,8 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/_version.py
-SPDXID: SPDXRef-2ea18fbe967ded261d2fc0c1613d0088
-FileChecksum: SHA1: 7843929738c06fc687c238c8416cb4cb5b9ab283
+SPDXID: SPDXRef-b0c6c72a1a1f34887e683ed56d21e9a9
+FileChecksum: SHA1: 4f00754754d8f17cfbc07aeaf8c8e0216a72ed2e
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -2682,16 +2738,16 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/agent_api/find_code/ARCHITECTURE.md
-SPDXID: SPDXRef-042c2a852bc6d7418e107012ecc41242
-FileChecksum: SHA1: 3c33747f164ec17b0951a2b23a04e6eb394dec95
+SPDXID: SPDXRef-718eaef9a5d32e4aa70073f27c3122bf
+FileChecksum: SHA1: 1b4012adf8ad43cdd73ec14adb8e3f0f3aaee974
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/agent_api/find_code/README.md
-SPDXID: SPDXRef-2285fefbaf56ca3f83fdae9ffd3096f4
-FileChecksum: SHA1: 8c536f0b7edc97d0106115b13070fdf209738c59
+SPDXID: SPDXRef-a27aae04627bb07fc355d292e868df97
+FileChecksum: SHA1: d3f3a4c5b7dddbd3e3fc9f452124233d93b20b5e
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -2706,8 +2762,8 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/agent_api/find_code/conversion.py
-SPDXID: SPDXRef-dfde65ded21a1a3f27649f717a5a648b
-FileChecksum: SHA1: dbd0fd70952db1f59320e6c95a97a6b104457333
+SPDXID: SPDXRef-26b50274c9d8e1e043d21c3c0f13a8ac
+FileChecksum: SHA1: f2797a001ce13ee437d98dea3d7d4f9df93d87e3
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -2730,24 +2786,24 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/agent_api/find_code/pipeline.py
-SPDXID: SPDXRef-94b6e65ffa2abc4945197382bb342150
-FileChecksum: SHA1: ba5d45c374a7d0a7b51b1fd93d90e31aabb9f5b9
+SPDXID: SPDXRef-fe21121c3051c925682e0e283bcce768
+FileChecksum: SHA1: a84b2ba581f6a2111e9484d021716a5570a0da7b
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/agent_api/find_code/response.py
-SPDXID: SPDXRef-8be73cec1abc644c681c44925231c3e7
-FileChecksum: SHA1: e6a21e301f3dc8f7f47028d3f54c9917783e99c5
+SPDXID: SPDXRef-5c033f342673bb3a9ea3f57b80b657a6
+FileChecksum: SHA1: 096093ee79bd7108eb1d5ae7b1bf16de9723dfb4
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/agent_api/find_code/results.py
-SPDXID: SPDXRef-65c5a0ae79bd7c239a180c3090be4ce8
-FileChecksum: SHA1: 180df3b36eb8947f5236c3bcecffa5716df9d943
+SPDXID: SPDXRef-a691ec43679ebafbc801d2ac3ff845d4
+FileChecksum: SHA1: 99212201152f2a3417eeeaf524116e58065e3abf
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -2762,8 +2818,8 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/agent_api/find_code/types.py
-SPDXID: SPDXRef-8a70aee4cf31a7383a1d42072ed3afbc
-FileChecksum: SHA1: 01a8893daa0369b3c54ad01acd2f4a6b093abd1a
+SPDXID: SPDXRef-e01888fd4d8eed5a96e4222ef48aa5cd
+FileChecksum: SHA1: d31372f3840dad15daf9f589a13b54325c930deb
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -2778,8 +2834,8 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/cli/__main__.py
-SPDXID: SPDXRef-15e58a9f746223dd045da8ccfec84e8c
-FileChecksum: SHA1: f5f3eeb37f9b02bbdb862fe10f939f33e4bad1ea
+SPDXID: SPDXRef-2413a0f6aab1e94a796f5f3fc4738cf8
+FileChecksum: SHA1: a802c7772ca92d49a83adfb0f4732b0a6bc0651b
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -2930,8 +2986,8 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/common/registry/provider.py
-SPDXID: SPDXRef-55f56a8fb0f01c32e6ab8cd740f3cdfe
-FileChecksum: SHA1: 2a9ab23af03bfeff1567198fe5c06bc7118282ec
+SPDXID: SPDXRef-eca9d47bd266a5d3b7e0622dbcaef6d6
+FileChecksum: SHA1: 0de15798b341b4ad4dd45aedf4b720766da961ea
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -3074,8 +3130,8 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/common/utils/utils.py
-SPDXID: SPDXRef-d0e0cd9690f082c5d2a6a6ffd1b0973e
-FileChecksum: SHA1: 66cdff3595560529e8edd710d3dc8c782eb598c1
+SPDXID: SPDXRef-74a51d06b2da0ab9941f8279b2ab6fbc
+FileChecksum: SHA1: cf709611ba28279ed5b6444aeb0eea9087842f10
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -3106,8 +3162,8 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/config/envs.py
-SPDXID: SPDXRef-ce83c2c797268e1c46e2aed63835f387
-FileChecksum: SHA1: 19759116bec47e401becfc959675e6dde0a5d5d9
+SPDXID: SPDXRef-21e782e7ee2a01dca0ade8593b368292
+FileChecksum: SHA1: 4d8e4e5520db23c284df262633e9b90483dea1db
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -3122,8 +3178,8 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/config/logging.py
-SPDXID: SPDXRef-d0ee1c15dd865de1c6ca6c6bc0ac4bc1
-FileChecksum: SHA1: eea0904e4b3c169fe9cecaaad389c45765d06030
+SPDXID: SPDXRef-a040b7d91fedeb64a72d6fc31f445fbf
+FileChecksum: SHA1: e2869ba817caf889911eefe7b8303feefee3180c
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -3138,24 +3194,24 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/config/middleware.py
-SPDXID: SPDXRef-40b040f6b18128f147123a431e1cdd6e
-FileChecksum: SHA1: c08358a8e35efaf1f8c893e753022d628fcf89af
+SPDXID: SPDXRef-316a345a60c6f60e8cba5a9638b1e867
+FileChecksum: SHA1: 898b01759d0d08898ea00c80b8b61f6ed87986e0
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/config/profiles.py
-SPDXID: SPDXRef-8fc4afaa4dc4fba3743b0578c30ede4a
-FileChecksum: SHA1: 66cb1707daf8eb3999a9710703f3538457264db2
+SPDXID: SPDXRef-65602446ebedd26627f76fdf066ca64e
+FileChecksum: SHA1: b772cb52590c50572cfd509cce216566854f1822
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/config/providers.py
-SPDXID: SPDXRef-a8dcb68b59921ff9b8a05c25618cc69a
-FileChecksum: SHA1: 14cbca1b2e658e2d58319dae1ea66b88bb2b5d0a
+SPDXID: SPDXRef-794b1a761c1652dbfa10d69f75847250
+FileChecksum: SHA1: 4c4713e0504d517a9e65d6b536bd19b892c02d04
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -3170,24 +3226,24 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/config/settings.py
-SPDXID: SPDXRef-aa77791eb6db0c05ab07d0993c3ad6a3
-FileChecksum: SHA1: 6414f321a401d3717916a37674f458fc97625735
+SPDXID: SPDXRef-58dc2c66ba189888512aea592404ea11
+FileChecksum: SHA1: ebeb6ea3fd308426a14860118e0edec85cdd3152
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/config/telemetry.py
-SPDXID: SPDXRef-de006fedad68509ee0435ffac5e68d16
-FileChecksum: SHA1: e3a02c6f556a9f23c377f3e8692f2b013f615072
+SPDXID: SPDXRef-167927b4a5809be591c07ad5b2298b00
+FileChecksum: SHA1: 140ad3b19ce314b16a4322d835e21e88f0388f9b
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/config/types.py
-SPDXID: SPDXRef-b219c1788b5a89b9a5c15027fa678504
-FileChecksum: SHA1: dfab515a9d194d9d12cf79581d60845e195b7210
+SPDXID: SPDXRef-51ee40f62d1a446c6511b4328a8af241
+FileChecksum: SHA1: c7a4ae82a5d763056468110e29a97b62805a5327
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -3723,8 +3779,8 @@ FileCopyrightText: <text>Copyright (C) 2024 to present Pydantic Services Inc
 SPDX-FileCopyrightText: 2025, 2025 (c) Knitli Inc.</text>
 
 FileName: ./src/codeweaver/providers/capabilities.py
-SPDXID: SPDXRef-dc540ed35bf57fd1c77624af3a5b57d5
-FileChecksum: SHA1: 4615c6fb65bc206ffe5b2b5ce4ae193c01416d10
+SPDXID: SPDXRef-ee74566c38fd0d1ad75a7951e53b464e
+FileChecksum: SHA1: 0ec946a0b2c7a285f39b39bcdd3778e6bf9fef53
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -3941,16 +3997,16 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/providers/embedding/providers/bedrock.py
-SPDXID: SPDXRef-ed03b22e2f63421e46eb165a8a23f5b7
-FileChecksum: SHA1: 6c3ff204d04725846158760e0825a0ffa9a9b08a
+SPDXID: SPDXRef-727e6d0f911f925cb301a4e15c819abb
+FileChecksum: SHA1: bed25aa660262aa635a03a49e8d79b7cede62c65
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025, 2025 (c) Knitli Inc.</text>
 
 FileName: ./src/codeweaver/providers/embedding/providers/cohere.py
-SPDXID: SPDXRef-0d6357ac9c83502bafccf6007bc180ff
-FileChecksum: SHA1: d14c546db77aecf7f7aaa39f9f038e8b3e6323a0
+SPDXID: SPDXRef-c27343325843ebcede1d88ee7fc601dd
+FileChecksum: SHA1: bbcc350cf42bf9a53f8b5d74cdf5199289a450c6
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -3973,8 +4029,8 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025, 2025 (c) Knitli Inc.</text>
 
 FileName: ./src/codeweaver/providers/embedding/providers/huggingface.py
-SPDXID: SPDXRef-04853fba3811dd64c3f3197e040b1fd4
-FileChecksum: SHA1: 6d83fa31c7b8b2abb86e166cbf8ca7d92f3af1eb
+SPDXID: SPDXRef-86d89fe8df5e8a49135635a59bff0c75
+FileChecksum: SHA1: 36ef799570256d4cd7be4874c1c199f65f2f145e
 LicenseConcluded: MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -3991,16 +4047,16 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/providers/embedding/providers/mistral.py
-SPDXID: SPDXRef-ca6861851d8912aa1c439d689dd5b11e
-FileChecksum: SHA1: 5e02ad8c7c853888a5b130284728e7b5a8c6b056
+SPDXID: SPDXRef-5f9f6783a863f06f3a01065c4ea3f49f
+FileChecksum: SHA1: 28746f07818bb2c337000157b22109f68de26b07
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025, 2025 (c) Knitli Inc.</text>
 
 FileName: ./src/codeweaver/providers/embedding/providers/openai_factory.py
-SPDXID: SPDXRef-644ecec98477d92d575408f11ee9f9a2
-FileChecksum: SHA1: be77e58349491e0e5a835a8e5f4cdbd62534a7bd
+SPDXID: SPDXRef-6b8d6442b4fd963848077817c0e51980
+FileChecksum: SHA1: 7663e5a15ca4316d05944680ee8d9fcb6b4c9da3
 LicenseConcluded: MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -4009,16 +4065,16 @@ FileCopyrightText: <text>Copyright (C) 2024 to present Pydantic Services Inc
 SPDX-FileCopyrightText: 2025, 2025 (c) Knitli Inc.</text>
 
 FileName: ./src/codeweaver/providers/embedding/providers/sentence_transformers.py
-SPDXID: SPDXRef-3e0b7be46c9a2b4a268110fab7392ede
-FileChecksum: SHA1: 3a1fea87d8b99ba52c09eb53a38a6dfc850b76e6
+SPDXID: SPDXRef-02013bf5f6768d65a4df0e3f41057371
+FileChecksum: SHA1: 66b50ded3638b87232dda8b9b24f86d4623e96ef
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/providers/embedding/providers/voyage.py
-SPDXID: SPDXRef-efd5a7a9118c022b86cb5909ac75a872
-FileChecksum: SHA1: 321325227257d345612ed3331d25975a39e408a6
+SPDXID: SPDXRef-56102f99beaa2d5055094d0a94155a31
+FileChecksum: SHA1: 182bea4367290d8ced5029799b748e10d855b75a
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -4169,8 +4225,8 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/providers/reranking/providers/base.py
-SPDXID: SPDXRef-9cbdca30b7cd74229048b024e63b2860
-FileChecksum: SHA1: 373f7baa8ff79eabb2b153a5b6f223fce6be7332
+SPDXID: SPDXRef-ed68e1c74e6fc9c3adb62a4a04816f4d
+FileChecksum: SHA1: 20441f273c27ff2a4a33bebe0de8fb09926fb3ee
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -4185,8 +4241,8 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/providers/reranking/providers/cohere.py
-SPDXID: SPDXRef-9f926c0dbc82225d60e396298916a1a3
-FileChecksum: SHA1: ce3e28cfd0add8d562de91ab980ecc3a6bb9352a
+SPDXID: SPDXRef-9a36e40504649d92309d90aa661c71ca
+FileChecksum: SHA1: d93bebb8ea8e60f2bb7ced18a3ad6a332afa042c
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -4401,8 +4457,8 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./src/codeweaver/server/server.py
-SPDXID: SPDXRef-25c7d93b0e0627e1cb731a21b0ed5d25
-FileChecksum: SHA1: a2b15d34018a392e99825a909cf3bf8d8a03b146
+SPDXID: SPDXRef-3e05e3021dd8b56e2f0d63432a0c63f7
+FileChecksum: SHA1: 49c86f7e70fff89278a33288dbc312948ce50eb6
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -4553,8 +4609,8 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./tests/contract/test_version_derivation.py
-SPDXID: SPDXRef-1d387dae45a8fed695102ef319734647
-FileChecksum: SHA1: 583e4d587e6ff974ef46e83ba1a930d81adb569d
+SPDXID: SPDXRef-cc700964cb6587786c8637e66f253cfb
+FileChecksum: SHA1: 8f1ba76adf1a78c4a7d2db38fca12a351e0da61a
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -4801,8 +4857,8 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./tests/integration/test_custom_config.py
-SPDXID: SPDXRef-e77aab6a2cb9c356145dae9a52952d51
-FileChecksum: SHA1: da752fde1b9c5cad0cf772c5f1c392b8842f1945
+SPDXID: SPDXRef-b7449358b5a4d4f42e1b57fd7a512ed5
+FileChecksum: SHA1: 9ae68e4c206d0bc69ed1eb359eeb921571db5a63
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -5337,8 +5393,8 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./tests/unit/test_indexer_remove_path.py
-SPDXID: SPDXRef-02109691091141fa8d2bb7db204a9459
-FileChecksum: SHA1: b90540b44e1fe3c5195a5965d0eb579fcf7fb49e
+SPDXID: SPDXRef-b94b90d3fbf57a9cbf97a2a51f0b227d
+FileChecksum: SHA1: 0b91bb9f179b9fe73e6a3a078f3fb4d3504ec952
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -5393,8 +5449,8 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./tools.json
-SPDXID: SPDXRef-27367c82d49d9cbaa8623928694e1cb2
-FileChecksum: SHA1: 6f89bd5830e54f5a9b976d63308a5a559df67a25
+SPDXID: SPDXRef-65a8ba8f499045111b6cafb73dbbd6ef
+FileChecksum: SHA1: b5b7188f3d145dd19b824a2e11672d13864b3506
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
@@ -5417,10 +5473,24 @@ LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
 FileName: ./uv.lock
-SPDXID: SPDXRef-2eec1fb96e9f22b4c2391d476dc4bec8
-FileChecksum: SHA1: a30aa7a6000e9260c78beb34f4dadfa2f6eb3370
+SPDXID: SPDXRef-7b5fc50f1845968d53c8b307978d4755
+FileChecksum: SHA1: 9778f5c6e9e3581a93c2defed3311e587c0f0fb2
 LicenseConcluded: Apache-2.0 OR MIT
 LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
+
+FileName: ./vendored/types_boto3_custom-1.41.0-py3-none-any.whl
+SPDXID: SPDXRef-9f9cac8cf8a5c09fa5e3a69c071e497a
+FileChecksum: SHA1: 4dc933b1b362798062745a652d2c21b822c18a2b
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2024 Vlad Emelianov <vlad.emelianov.nz@gmail.com></text>
+
+FileName: ./vendored/types_boto3_custom-1.41.2-py3-none-any.whl
+SPDXID: SPDXRef-9a06fe907dc4f3baddd1499173803403
+FileChecksum: SHA1: 82eb6bfde0d908eb8021ef14df3697d272236dbf
+LicenseConcluded: MIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2024 Vlad Emelianov <vlad.emelianov.nz@gmail.com></text>
 

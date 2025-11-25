@@ -47,7 +47,6 @@ Handles conversion between different result formats.
 
 **Key Functions:**
 - `convert_search_result_to_code_match()` - Converts SearchResult to CodeMatch
-- `create_code_chunk_from_result()` - Creates CodeChunk from string content
 
 **Purpose:** Isolates the complexity of mapping between vector store results and API response formats.
 
