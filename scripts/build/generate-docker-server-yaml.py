@@ -1,3 +1,4 @@
+# sourcery skip: no-complex-if-expressions
 #!/usr/bin/env -S uv run -s
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
@@ -85,11 +86,9 @@ def generate_server_yaml() -> dict:
             })
             # Secrets also get added to parameters as required strings
             parameters_props[param_name] = {"type": "string"}
-            if var_info.is_required:
-                parameters_required.append(param_name)
         else:
             # Add to regular environment variables
-            example = var_info.default if var_info.default else f"<{env_name}>"
+            example = var_info.default or f"<{env_name}>"
             regular_env.append({
                 "name": env_name,
                 "example": example,
@@ -110,9 +109,8 @@ def generate_server_yaml() -> dict:
 
             parameters_props[param_name] = param_def
 
-            if var_info.is_required:
-                parameters_required.append(param_name)
-
+        if var_info.is_required:
+            parameters_required.append(param_name)
     return {
         "name": "codeweaver",
         "image": "mcp/codeweaver",  # Docker will build and publish to mcp/ namespace
@@ -141,12 +139,12 @@ def generate_server_yaml() -> dict:
         },
         "config": {
             "description": "Configure CodeWeaver with your project path, embedding provider, and optional vector store settings. Supports 17+ embedding providers and 170+ programming languages.",
-            "secrets": secrets if secrets else None,
-            "env": regular_env if regular_env else None,
+            "secrets": secrets or None,
+            "env": regular_env or None,
             "parameters": {
                 "type": "object",
                 "properties": parameters_props,
-                "required": parameters_required if parameters_required else None,
+                "required": parameters_required or None,
             } if parameters_props else None,
         },
     }
@@ -197,11 +195,11 @@ if __name__ == "__main__":
         print(f"🏷️  Category: {config['meta']['category']}")
         print(f"🔖 Tags: {', '.join(config['meta']['tags'])}")
         print(f"\n📋 Next steps:")
-        print(f"   1. Review server.yaml and adjust descriptions if needed")
-        print(f"   2. Ensure Dockerfile is at repository root")
-        print(f"   3. Fork github.com/docker/mcp-registry")
-        print(f"   4. Add server.yaml to servers/codeweaver/")
-        print(f"   5. Submit PR to Docker MCP Registry")
+        print("   1. Review server.yaml and adjust descriptions if needed")
+        print("   2. Ensure Dockerfile is at repository root")
+        print("   3. Fork github.com/docker/mcp-registry")
+        print("   4. Add server.yaml to servers/codeweaver/")
+        print("   5. Submit PR to Docker MCP Registry")
 
     except Exception as e:
         print(f"❌ Error generating server.yaml: {e}", file=sys.stderr)
