@@ -12,7 +12,6 @@ from collections.abc import Sequence
 from pathlib import Path
 from types import AsyncGeneratorType, GeneratorType
 from typing import Any, cast
-from unittest.mock import MagicMock
 from uuid import UUID
 
 import pytest
