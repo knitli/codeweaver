@@ -105,11 +105,12 @@ def test_validate_version_derivation(git_state: dict):
 
     wheel_name = artifacts[0].name
     # Extract version from wheel filename: codeweaver_mcp-{version}-py3-none-any.whl
-    match = re.match(r"codeweaver_mcp-(.+?)-py3-none-any\.whl", wheel_name)
+    # Note: Package name may be normalized (codeweaver -> codeweaver_mcp or codeweaver)
+    match = re.match(r"codeweaver[_-]?(?:mcp)?-(.+?)-py3-none-any\.whl", wheel_name)
     if not match:
         pytest.fail(f"Could not extract version from wheel: {wheel_name}")
-
-    derived_version = match.group(1)
+    assert match
+    derived_version = match[1]
 
     # Validate version format based on git state
     if git_state["commit_distance"] == 0 and not git_state["is_dirty"]:
@@ -174,13 +175,13 @@ def test_version_consistency():
     wheel_name = wheels[0].name
     sdist_name = sdists[0].name
 
-    # Extract versions
-    wheel_match = re.match(r"codeweaver_mcp-(.+?)-py3-none-any\.whl", wheel_name)
-    sdist_match = re.match(r"codeweaver_mcp-(.+?)\.tar\.gz", sdist_name)
+    # Extract versions - handle both normalized package names
+    wheel_match = re.match(r"codeweaver[_-]?(?:mcp)?-(.+?)-py3-none-any\.whl", wheel_name)
+    sdist_match = re.match(r"codeweaver[_-]?(?:mcp)?-(.+?)\.tar\.gz", sdist_name)
 
     if not wheel_match or not sdist_match:
         pytest.fail(f"Could not extract versions from artifacts: {wheel_name}, {sdist_name}")
-
+    assert wheel_match and sdist_match
     wheel_version = wheel_match[1]
     sdist_version = sdist_match[1]
 

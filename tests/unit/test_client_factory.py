@@ -259,13 +259,15 @@ class TestInstantiateClient:
         """Test Qdrant defaults to in-memory when no settings."""
         mock_client_class = Mock(return_value="qdrant_client")
 
-        result = registry._instantiate_client(
-            Provider.QDRANT,
-            ProviderKind.VECTOR_STORE,
-            mock_client_class,
-            None,  # No provider_settings
-            {},
-        )
+        # Clear env var so it doesn't get picked up
+        with patch.dict("os.environ", {}, clear=True):
+            result = registry._instantiate_client(
+                Provider.QDRANT,
+                ProviderKind.VECTOR_STORE,
+                mock_client_class,
+                None,  # No provider_settings
+                {},
+            )
 
         assert result == "qdrant_client"
         # When no provider_settings are provided, Qdrant tries to create with empty options
@@ -292,19 +294,24 @@ class TestInstantiateClient:
         """Test Qdrant uses path when provided."""
         mock_client_class = Mock(return_value="qdrant_client")
 
-        _result = registry._instantiate_client(
-            Provider.QDRANT,
-            ProviderKind.VECTOR_STORE,
-            mock_client_class,
-            {"path": "/data/qdrant"},
-            {},
-        )
+        # Clear env var so it doesn't get picked up
+        with patch.dict("os.environ", {}, clear=True):
+            _result = registry._instantiate_client(
+                Provider.QDRANT,
+                ProviderKind.VECTOR_STORE,
+                mock_client_class,
+                {"path": "/data/qdrant"},
+                {},
+            )
 
         mock_client_class.assert_called_once_with(path="/data/qdrant")
 
     def test_local_model_with_model_name(self, registry):
         """Test local models (FastEmbed, SentenceTransformers) with model name."""
-        mock_client_class = Mock(return_value="model_instance")
+        # For FastEmbed EMBEDDING, client_class() is called first (line 803)
+        # So we need a mock that returns a callable mock
+        mock_instance = Mock(return_value="model_instance")
+        mock_client_class = Mock(return_value=mock_instance)
 
         _result = registry._instantiate_client(
             Provider.FASTEMBED,
@@ -314,14 +321,20 @@ class TestInstantiateClient:
             {},
         )
 
-        # FastEmbed now gets lazy_load=True by default
-        mock_client_class.assert_called_once_with(
-            model_name="BAAI/bge-small-en-v1.5", lazy_load=True
-        )
+        # FastEmbed now gets lazy_load=True by default and cache_dir
+        # Verify the returned callable was called with correct args
+        assert mock_instance.call_count == 1
+        call_kwargs = mock_instance.call_args.kwargs
+        assert call_kwargs["model_name"] == "BAAI/bge-small-en-v1.5"
+        assert call_kwargs["lazy_load"] is True
+        assert "cache_dir" in call_kwargs
 
     def test_local_model_without_model_name(self, registry):
         """Test local models default when no model name."""
-        mock_client_class = Mock(return_value="model_instance")
+        # For FastEmbed EMBEDDING, client_class() is called first (line 803)
+        # So we need a mock that returns a callable mock
+        mock_instance = Mock(return_value="model_instance")
+        mock_client_class = Mock(return_value=mock_instance)
 
         # Use patch on the class method instead of instance
         with patch(
@@ -336,8 +349,12 @@ class TestInstantiateClient:
                 {},
             )
 
-        # FastEmbed now gets lazy_load=True by default
-        mock_client_class.assert_called_once_with(lazy_load=True)
+        # FastEmbed now gets lazy_load=True by default and cache_dir
+        # Verify the returned callable was called with correct args
+        assert mock_instance.call_count == 1
+        call_kwargs = mock_instance.call_args.kwargs
+        assert call_kwargs["lazy_load"] is True
+        assert "cache_dir" in call_kwargs
 
     def test_api_key_from_provider_settings(self, registry):
         """Test API key extracted from provider_settings."""

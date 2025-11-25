@@ -398,7 +398,7 @@ class CodeWeaverSettings(BaseSettings):
     config_file: Annotated[
         FilePath | Unset,
         Field(description="""Path to the configuration file, if any""", exclude=True),
-    ] = _resolve_env_settings_path()
+    ] = _resolve_env_settings_path(directory=False)
 
     # Performance settings
     token_limit: Annotated[
@@ -618,7 +618,7 @@ class CodeWeaverSettings(BaseSettings):
         else:
             self.provider = ProviderSettings.model_validate(
                 get_profile(
-                    self.profile if self.profile != "testing" else "backup",
+                    self.profile if self.profile != "testing" else "backup",  # ty: ignore[invalid-argument-type]
                     vector_deployment="local",
                 )  # ty: ignore[no-matching-overload]
             )
@@ -981,7 +981,13 @@ class CodeWeaverSettings(BaseSettings):
 
         The file format is determined by the file extension (.toml, .yaml/.yml, .json).
         """
-        path = path or self.config_file
+        path = (  # ty:ignore[invalid-assignment]
+            path
+            if path and path is not Unset
+            else self.config_file
+            if self.config_file is not UNSET
+            else None
+        )
         if path is None and isinstance(self.project_path, Path):
             path = self.project_path / "codeweaver.toml"
         if path is None:

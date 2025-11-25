@@ -435,9 +435,7 @@ async def rerank_results(
 
         # Create mapping to preserve search metadata through reranking
         # Map chunk_id to SearchResult to lookup original scores after reranking
-        metadata_map: dict[str, SearchResult] = {
-            str(c.content.chunk_id): c for c in candidates
-        }
+        metadata_map: dict[str, SearchResult] = {str(c.content.chunk_id): c for c in candidates}
 
         chunks_for_reranking = [c.content for c in candidates]
 

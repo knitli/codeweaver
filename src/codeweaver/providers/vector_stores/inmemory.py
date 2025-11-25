@@ -14,7 +14,7 @@ import logging
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import ClassVar, Literal, cast
+from typing import Any, ClassVar, Literal, cast
 
 from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.providers import MemoryConfig
@@ -59,6 +59,18 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
     config: MemoryConfig = MemoryConfig()
     _client: AsyncQdrantClient | None = None
 
+    def model_post_init(self, __context: Any, /) -> None:
+        """Capture config values before they get overwritten during initialization."""
+        # Store persist_path, auto_persist, and persist_interval from original config
+        # These will be used in _init_provider after base class overwrites self.config
+        persist_path_config = self.config.get("persist_path", get_user_config_dir())
+        object.__setattr__(self, "_initial_persist_path", persist_path_config)
+        object.__setattr__(self, "_initial_auto_persist", self.config.get("auto_persist", True))
+        object.__setattr__(
+            self, "_initial_persist_interval", self.config.get("persist_interval", 300)
+        )
+        super().model_post_init(__context)
+
     @property
     def base_url(self) -> str | None:
         """Get the base URL for the memory provider - always :memory:."""
@@ -73,14 +85,14 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
             PersistenceError: Failed to restore from persistence file.
             ValidationError: Persistence file format invalid.
         """
-        # Handle persist_path - if it's a file path, use it directly; otherwise treat as directory
-        persist_path_config = self.config.get("persist_path", get_user_config_dir())
+        # Use the values captured in model_post_init before self.config was overwritten
+        persist_path_config = getattr(self, "_initial_persist_path", get_user_config_dir())
         persist_path = Path(persist_path_config)
         # If path doesn't end with .json, treat it as a directory and append default filename
         if persist_path.suffix != ".json":
             persist_path = persist_path / f"{_get_project_name()}_vector_store.json"
-        auto_persist = self.config.get("auto_persist", True)
-        persist_interval = self.config.get("persist_interval", 300)
+        auto_persist = getattr(self, "_initial_auto_persist", True)
+        persist_interval = getattr(self, "_initial_persist_interval", 300)
 
         # Store as private attributes
         object.__setattr__(self, "_persist_path", persist_path)
@@ -118,7 +130,12 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         Raises:
             PersistenceError: Failed to write persistence file.
         """
-        from qdrant_client.http.models import PointStruct, SparseVectorParams, VectorParams
+        from qdrant_client.http.models import (
+            Distance,
+            PointStruct,
+            SparseVectorParams,
+            VectorParams,
+        )
 
         from codeweaver.providers.vector_stores.metadata import CollectionMetadata
 
@@ -172,17 +189,29 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
                     # Create a shallow copy to safely use outside the lock
                     raw_metadata = dict(raw_metadata) if raw_metadata else None
 
+                # Try to validate existing metadata, fall back to creating new if invalid
+                metadata: CollectionMetadata | None = None
                 if raw_metadata:
-                    metadata = CollectionMetadata.model_validate(raw_metadata)
-                else:
+                    try:
+                        metadata = CollectionMetadata.model_validate(raw_metadata)
+                    except Exception:
+                        # Metadata exists but is incomplete/invalid - will create new below
+                        metadata = None
+
+                if metadata is None:
                     metadata = CollectionMetadata(
                         created_at=datetime.now(UTC),
                         provider=str(self._provider),
                         project_name=_get_project_name(),
                         collection_name=col.name,
-                        vector_config={"dense": VectorParams(size=dense_size)},
+                        vector_config={
+                            "dense": VectorParams(size=dense_size, distance=Distance.COSINE)
+                        },
                         sparse_config={"sparse": SparseVectorParams()},
                     )
+                    # Store the newly created metadata for future use
+                    async with self._collection_metadata_lock:  # type: ignore
+                        self._collection_metadata[col.name] = metadata.model_dump(mode="json")  # type: ignore
 
                 collections_data[col.name] = {
                     "metadata": metadata.model_dump(mode="json"),

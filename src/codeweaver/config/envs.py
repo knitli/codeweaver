@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 # sourcery skip:snake-case-variable-declarations
-
 import os
 
 from collections import defaultdict
@@ -393,13 +392,13 @@ def get_provider_vars() -> MappingProxyType[ProviderField, SetProviderEnvVarsDic
             and not any(x for x in {"AGENT", "DATA"} if x in var_info.env)
         )
     }
-    env_map: dict[ProviderField, SetProviderEnvVarsDict] = dict.fromkeys(
+    env_map: dict[ProviderField, SetProviderEnvVarsDict] = dict.fromkeys(  # ty: ignore[invalid-assignment]
         ("embedding", "reranking", "sparse_embedding", "vector_store"), None
     )
     for env_var in env_vars:
         kind = next(k for k in provider_keys if k.upper() in env_var)
         if env_map[kind] is None:
-            env_map[kind] = {}
+            env_map[kind] = {}  # ty: ignore[invalid-assignment]
         if value := os.environ.get(env_var):
             if "API_KEY" in env_var:
                 env_map[kind]["api_key"] = SecretStr(value)
@@ -412,9 +411,9 @@ def get_provider_vars() -> MappingProxyType[ProviderField, SetProviderEnvVarsDic
             elif "URL" in env_var:
                 env_map[kind]["url"] = AnyUrl(value)
             else:
-                env_map[kind][
-                    next(k for k in provider_keys if k.upper() in env_var.lower())
-                ] = value
+                env_map[kind][next(k for k in provider_keys if k.upper() in env_var.lower())] = (
+                    value
+                )
     return MappingProxyType(env_map)
 
 

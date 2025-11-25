@@ -15,7 +15,6 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Any, Literal, NoReturn
 
-from fastembed.sparse.sparse_embedding_base import SparseEmbedding
 from pydantic import UUID7
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.exceptions import UnexpectedResponse
@@ -28,6 +27,7 @@ from qdrant_client.http.models.models import (
     PointStruct,
     QueryResponse,
     SparseIndexParams,
+    SparseVector,
     SparseVectorParams,
     VectorParams,
 )
@@ -40,6 +40,7 @@ from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types import DictView
 from codeweaver.engine.search import Filter
 from codeweaver.exceptions import ProviderError
+from codeweaver.providers.embedding.types import SparseEmbedding as CodeWeaverSparseEmbedding
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.vector_stores.base import MixedQueryInput, VectorStoreProvider
 from codeweaver.providers.vector_stores.metadata import CollectionMetadata, HybridVectorPayload
@@ -180,14 +181,29 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
 
     async def _initialize(self) -> None:
         """Initialize the Qdrant provider with configurations."""
+        # Preserve any explicitly provided collection_name before fetching registry config
+        # This is critical for test isolation where tests provide their own collection names
+        provided_collection_name = self.config.get("collection_name") if self.config else None
+
         # Always fetch from registry to get the full configuration
         # The registry merges env vars and config files properly
         config = self._fetch_config()
         qdrant_config = config["provider_settings"]
 
         # Update self.config so _build_client can use it
-        object.__setattr__(self, "config", qdrant_config)
-        collection_name = qdrant_config.get("collection_name") or self._default_collection_name()
+        # But preserve the explicitly provided collection_name if one was given
+        if provided_collection_name:
+            # Merge registry config with explicitly provided collection_name
+            merged_config = dict(qdrant_config)
+            merged_config["collection_name"] = provided_collection_name
+            object.__setattr__(self, "config", merged_config)
+            collection_name = provided_collection_name
+        else:
+            object.__setattr__(self, "config", qdrant_config)
+            collection_name = (
+                qdrant_config.get("collection_name") or self._default_collection_name()
+            )
+
         base_url = qdrant_config.get("url") if self._provider == Provider.QDRANT else ":memory:"
         object.__setattr__(self, "_collection", collection_name)
         object.__setattr__(self, "_base_url", base_url)
@@ -445,13 +461,34 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             "query_filter": qdrant_filter or None,
             "with_vectors": False,
         }
-        response = await self._client.query_points(
-            **vector.to_hybrid_query(  # ty: ignore[invalid-argument-type]
+
+        if vector.is_hybrid():
+            query_params = vector.to_hybrid_query(
                 query_kwargs=args, kwargs={"collection_name": collection_name}
             )
-            if vector.is_hybrid()
-            else vector.to_query(kwargs=args | {"collection_name": collection_name})
-        )
+            # Debug logging
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.info("Hybrid query dict keys: %s", query_params.keys())
+            logger.info("Query type: %s", type(query_params.get("query")))
+            prefetch = query_params.get("prefetch", [])
+            prefetch_len = len(prefetch) if isinstance(prefetch, list) else 0
+            logger.info("Prefetch length: %s", prefetch_len)
+            if isinstance(prefetch, list) and prefetch:
+                for i, p in enumerate(prefetch):
+                    logger.info(
+                        "Prefetch[%d]: query type=%s, using=%s",
+                        i,
+                        type(p.query),
+                        getattr(p, "using", None),
+                    )
+
+            response = await self._client.query_points(**query_params)
+        else:
+            response = await self._client.query_points(
+                **vector.to_query(kwargs=args | {"collection_name": collection_name})
+            )
 
         return response.points if hasattr(response, "points") else response
 
@@ -488,15 +525,10 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                     values=[
                         float(x) if isinstance(x, int) else x
                         for x in vector["sparse"].get("values", [])
-                        if vector["sparse"].get("values", [])
                     ],  # type: ignore
                 )
             if "dense" in vector:
-                dense = [
-                    float(x) if isinstance(x, int) else x
-                    for x in vector["dense"]
-                    if vector["dense"]
-                ]
+                dense = [float(x) if isinstance(x, int) else x for x in vector["dense"]]
         elif isinstance(vector, list | tuple):
             dense = [float(x) if isinstance(x, int) else x for x in vector]
 
@@ -555,34 +587,56 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         """
         from qdrant_client.http.models import SparseVector
 
+        from codeweaver.providers.embedding.types import EmbeddingBatchInfo
+
         vectors: dict[str, Any] = {}
 
+        # Extract dense embeddings
         if chunk.dense_embeddings:
-            vectors["dense"] = list(chunk.dense_embeddings.embeddings)
+            dense_info = chunk.dense_embeddings
+            # Handle both direct embeddings and EmbeddingBatchInfo wrapper
+            if isinstance(dense_info, EmbeddingBatchInfo):
+                vectors["dense"] = list(dense_info.embeddings)
+            else:
+                vectors["dense"] = list(dense_info)
 
-        if chunk.sparse_embeddings and isinstance(chunk.sparse_embeddings, SparseEmbedding):
-            sparse = chunk.sparse_embeddings
-            indices, values = sparse.embeddings
-
-            # Normalize indices and values to lists
-            normed_indices = (
-                indices
-                if isinstance(indices, list)
-                else list(indices)
-                if isinstance(indices, Iterable)
-                else [indices]
-            )
-            normed_values = (
-                values
-                if isinstance(values, list)
-                else list(values)
-                if isinstance(values, Iterable)
-                else [values]
-            )
-
-            vectors["sparse"] = SparseVector(indices=normed_indices, values=normed_values)  # type: ignore[arg-type]
-
+        if sparse_info := chunk.sparse_embeddings:
+            # sparse_embeddings returns EmbeddingBatchInfo, which has embeddings as SparseEmbedding
+            if isinstance(sparse_info, EmbeddingBatchInfo):
+                sparse_emb = sparse_info.embeddings
+                if isinstance(sparse_emb, CodeWeaverSparseEmbedding):
+                    self._prepare_sparse_vector_data(sparse_emb, SparseVector, vectors)
+            elif isinstance(sparse_info, CodeWeaverSparseEmbedding):
+                self._extracted_from__prepare_vectors_34(sparse_info, SparseVector, vectors)
         return vectors
+
+    def _prepare_sparse_vector_data(
+        self,
+        sparse_embedding: CodeWeaverSparseEmbedding,
+        sparse_vector: SparseVector,
+        vectors: dict[str, Any],
+    ):
+        # SparseEmbedding is a NamedTuple with indices and values fields
+        indices = sparse_embedding.indices
+        values = sparse_embedding.values
+
+        # Normalize indices and values to lists
+        normed_indices = (
+            indices
+            if isinstance(indices, list)
+            else list(indices)
+            if isinstance(indices, Iterable)
+            else [indices]
+        )
+        normed_values = (
+            values
+            if isinstance(values, list)
+            else list(values)
+            if isinstance(values, Iterable)
+            else [values]
+        )
+
+        vectors["sparse"] = sparse_vector(indices=normed_indices, values=normed_values)  # type: ignore[arg-type]
 
     def _create_payload(self, chunk: CodeChunk, *, for_backup: bool = False) -> HybridVectorPayload:
         """Create payload for a code chunk.

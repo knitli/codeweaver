@@ -249,7 +249,7 @@ async def test_indexing_error_recovery(test_project_path: Path):
     corrupted_file.write_bytes(b"\x00\x01\x02\xff\xfe\xfd")
 
     # Create indexer
-    indexer = Indexer(project_root=test_project_path, auto_initialize_providers=True)
+    indexer = Indexer(project_path=test_project_path, auto_initialize_providers=True)
 
     # Run indexing
     await indexer.prime_index(force_reindex=True)

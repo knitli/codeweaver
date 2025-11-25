@@ -289,11 +289,7 @@ async def test_mcp_find_code_required_parameters(test_project_path: Path, initia
 
     # Test with minimal valid query
     response = await find_code_tool(
-        query="test",
-        intent=None,
-        token_limit=30000,
-        focus_languages=None,
-        context=None,
+        query="test", intent=None, token_limit=30000, focus_languages=None, context=None
     )
 
     assert isinstance(response, FindCodeResponseSummary)
@@ -402,7 +398,6 @@ async def test_search_token_limit(initialized_app_state):
         query="authentication",
         intent=None,
         token_limit=5000,  # Lower limit
-        include_tests=False,
         focus_languages=None,
         context=None,
     )
@@ -429,12 +424,7 @@ async def test_empty_query_handling(initialized_app_state):
 
     # Test empty query
     response = await find_code_tool(
-        query="",
-        intent=None,
-        token_limit=30000,
-        include_tests=False,
-        focus_languages=None,
-        context=None,
+        query="", intent=None, token_limit=30000, focus_languages=None, context=None
     )
 
     from codeweaver.agent_api.find_code.types import FindCodeResponseSummary
@@ -458,7 +448,6 @@ async def test_no_results_scenario(initialized_app_state):
         query="xyzabc123nonexistentquerythatmatchesnothing",
         intent=None,
         token_limit=30000,
-        include_tests=False,
         focus_languages=None,
         context=None,
     )
@@ -496,7 +485,6 @@ async def test_search_performance(test_project_path: Path, initialized_app_state
         query="authentication session management database",
         intent=IntentType.UNDERSTAND,
         token_limit=30000,
-        include_tests=True,
         focus_languages=None,
     )
 
@@ -523,12 +511,7 @@ async def test_search_response_time_tracking(initialized_app_state):
     start_time = time.time()
 
     response = await find_code_tool(
-        query="authentication",
-        intent=None,
-        token_limit=30000,
-        include_tests=False,
-        focus_languages=None,
-        context=None,
+        query="authentication", intent=None, token_limit=30000, focus_languages=None, context=None
     )
 
     end_time = time.time()
@@ -563,7 +546,6 @@ async def test_search_strategy_reporting(test_project_path: Path, configured_pro
         query="how does authentication work",
         intent=IntentType.UNDERSTAND,
         token_limit=30000,
-        include_tests=False,
         focus_languages=None,
     )
 
@@ -589,7 +571,6 @@ async def test_search_languages_found(initialized_app_state):
         query="authentication database",
         intent=None,
         token_limit=30000,
-        include_tests=True,
         focus_languages=None,
         context=None,
     )

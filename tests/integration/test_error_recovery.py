@@ -363,7 +363,7 @@ async def test_warning_at_25_errors(initialize_test_settings, tmp_path: Path):
     (project_root / "good1.py").write_text("def test(): pass")
     (project_root / "good2.py").write_text("def hello(): pass")
 
-    indexer = Indexer(project_root=project_root, auto_initialize_providers=False)
+    indexer = Indexer(project_path=project_root, auto_initialize_providers=False)
 
     # Capture stderr
     import io
@@ -508,7 +508,7 @@ async def test_graceful_shutdown_with_checkpoint(initialize_test_settings):
         project_root = Path(tmpdir)
         (project_root / "test.py").write_text("def test(): pass")
 
-        indexer = Indexer(project_root=project_root, auto_initialize_providers=False)
+        indexer = Indexer(project_path=project_root, auto_initialize_providers=False)
 
         # Start indexing
         indexer.prime_index(force_reindex=True)

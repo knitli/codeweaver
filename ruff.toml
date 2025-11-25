@@ -262,6 +262,9 @@ convention = "google"
 "src/codeweaver/engine/chunker/base.py" = [
   "C901",  # too complex - `from_backup_profile` has complex branching
 ]
+"src/codeweaver/providers/vector_stores/inmemory.py" = [
+  "C901",  # too complex - vector store initialization has many conditions
+]
 
 [lint.isort]
 force-single-line = false

@@ -78,12 +78,14 @@ async def test_custom_configuration():
     provider = QdrantVectorStoreProvider(client=client, config=config)
     await provider._initialize()
 
-    # Verify custom collection name
+    # Verify collection name behavior
+    # When collection_name is provided in config, it should be used instead of auto-generation
+    assert provider.collection is not None
     assert provider.collection == "my_custom_collection"
 
-    # Verify collection exists
+    # Verify the collection that was actually created exists in the list
     collections = await provider.list_collections()
-    assert "my_custom_collection" in collections  # type: ignore
+    assert provider.collection in collections  # type: ignore
 
     # Cleanup
     with contextlib.suppress(Exception):

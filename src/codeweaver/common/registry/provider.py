@@ -1031,7 +1031,8 @@ class ProviderRegistry(BasedModel):
             # For vector stores, settings are in "config" key (from _prepare_vector_store_kwargs)
             # For other providers, settings are in "provider_settings" key
             if self._is_literal_vector_store_kind(provider_kind):
-                provider_settings = kwargs.get("config")
+                # Try both "config" (from _prepare_vector_store_kwargs) and "provider_settings" (direct call)
+                provider_settings = kwargs.get("config") or kwargs.get("provider_settings")
             else:
                 provider_settings = kwargs.get("provider_settings")
             client_options = kwargs.get("client_options")
@@ -1066,6 +1067,14 @@ class ProviderRegistry(BasedModel):
         kwargs_for_provider = {
             k: v for k, v in kwargs.items() if k not in ("provider_settings", "client_options")
         }
+
+        # For vector stores, if provider_settings was passed but config wasn't, convert it to config
+        if (
+            self._is_literal_vector_store_kind(provider_kind)
+            and "provider_settings" in kwargs
+            and "config" not in kwargs_for_provider
+        ):
+            kwargs_for_provider["config"] = kwargs["provider_settings"]
 
         # Note: We don't validate client presence here because:
         # 1. Client creation failure is already logged as a warning above

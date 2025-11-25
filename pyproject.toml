@@ -496,6 +496,21 @@ invalid-assignment = "ignore"
 invalid-argument-type = "ignore"
 unresolved-reference = "ignore"
 
+[[tool.ty.overrides]]
+include = ["scripts/build/generate-mcp-server-json.py"]
+
+[tool.ty.overrides.rules]
+unknown-argument = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/codeweaver/providers/vector_stores/qdrant_base.py"]
+
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+
+[tool.uv.sources]
+types-boto3-custom = { path = "vendored/types_boto3_custom-1.41.0-py3-none-any.whl" }
+
 [tool.uv-dynamic-versioning]
 vcs = "git"
 style = "semver"
@@ -503,6 +518,3 @@ bump = true
 dirty = true  # Add .dirty suffix when working directory has uncommitted changes
 # tag-branch = "main"  # Commented out to allow building on feature branches
 commit-prefix = "g"
-
-[tool.uv.sources]
-types-boto3-custom = { path = "vendored/types_boto3_custom-1.41.0-py3-none-any.whl" }

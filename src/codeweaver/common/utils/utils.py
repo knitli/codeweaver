@@ -47,9 +47,9 @@ def uuid7_as_timestamp(
 ) -> int | datetime.datetime | None:
     """Utility to extract the timestamp from a UUID7, optionally as a datetime."""
     if sys.version_info < (3, 14):
-        from uuid_extensions import timestamp_ns, uuid_to_datetime
+        from uuid_extensions import time_ns, uuid_to_datetime
 
-        return uuid_to_datetime(uuid) if as_datetime else timestamp_ns(uuid)
+        return uuid_to_datetime(uuid) if as_datetime else time_ns(uuid)
     from uuid import uuid7
 
     uuid = uuid7(uuid) if isinstance(uuid, str | int) else uuid

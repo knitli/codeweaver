@@ -106,7 +106,7 @@ def _shared_env_vars() -> dict[str, tuple[ProviderEnvVarInfo, list[Provider]]]:
 def _generalized_provider_env_vars() -> list[ProviderEnvVarInfo]:
     """Get generalized environment variables shared across multiple providers."""
     generalized_vars: list[ProviderEnvVarInfo] = []
-    for env, (var_info, providers) in _shared_env_vars().items():
+    for (var_info, providers) in _shared_env_vars().values():
         provider_names = ", ".join(sorted(prov.as_title for prov in providers))
         # Create a new ProviderEnvVarInfo with updated description
         generalized_vars.append(
@@ -667,16 +667,17 @@ def _get_docker_env_vars() -> list[KeyValueInput]:
     docker_vars = []
 
     # Add all CodeWeaver settings (already filtered for Docker relevance)
-    for var in settings_vars:
-        docker_vars.append(KeyValueInput(
+    docker_vars.extend(
+        KeyValueInput(
             name=var["name"],
             description=var.get("description", ""),
             is_required=var.get("is_required", False),
             is_secret=var.get("is_secret", False),
             default=var.get("default"),
             fmt=var.get("fmt"),
-        ))
-
+        )
+        for var in settings_vars
+    )
     # Add common provider API keys
     seen_keys = {v["name"] for v in settings_vars}
     for provider_var_list in provider_vars.values():
@@ -800,7 +801,7 @@ def _create_docker_package() -> Package:
                 type_=NamedArgumentType.named,
                 name="--host",
                 description="Bind to all interfaces in container",
-                value="0.0.0.0",
+                value="0.0.0.0", # noqa: S104
             ),
             NamedArgument(
                 type_=NamedArgumentType.named,
@@ -887,6 +888,7 @@ def validate_against_official_schema(server_detail: ServerDetail) -> None:
     import json
 
     import httpx
+
     from jsonschema import Draft202012Validator, ValidationError
 
     # Get schema URL from the server detail
@@ -965,13 +967,12 @@ if __name__ == "__main__":
     print("🔄 Generating server.json from code...")
     try:
         server_detail = generate_server_detail()
-
+        assert server_detail is not None  # noqa: S101
         # Validate against official schema before saving
         validate_against_official_schema(server_detail)
-
+        assert server_detail.field_meta.io_modelcontextprotocol_registry_publisher_provided is not None  # noqa: S101
         # Save to file
         file_path = save_server_detail(server_detail)
-
         print(f"✅ Successfully generated server.json at {file_path}")
         print(f"📦 Version: {__version__}")
         print(f"🌐 Languages supported: {server_detail.field_meta.io_modelcontextprotocol_registry_publisher_provided['capabilities']['languages_supported']}")

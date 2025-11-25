@@ -48,14 +48,14 @@ async def test_inmemory_persistence():
         await provider1._initialize()
 
         # Get the actual dimension from the created collection
-        # Default voyage-3-lite has 1024 dimensions
+        # Default dimension when no embedding provider configured is 512 (from base.py)
         chunk = create_test_chunk_with_embeddings(
             chunk_id=uuid7(),
             chunk_name="memory_test.py:func",
             file_path=Path("memory_test.py"),
             language=Language.PYTHON,
             content="test function",
-            dense_embedding=[0.7] * 1024,  # Match voyage-3-lite dimension
+            dense_embedding=[0.7] * 512,  # Match default dimension (512)
             line_start=1,
             line_end=5,
         )
@@ -79,7 +79,7 @@ async def test_inmemory_persistence():
             StrategizedQuery(
                 query="test function",
                 strategy=SearchStrategy.DENSE_ONLY,
-                dense=[0.7] * 1024,  # Match voyage-3-lite dimension
+                dense=[0.7] * 512,  # Match default dimension (512)
                 sparse=None,
             )
         )

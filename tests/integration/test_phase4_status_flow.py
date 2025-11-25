@@ -56,6 +56,8 @@ def mock_primary_store() -> Mock:
     store.search = AsyncMock(return_value=[])
     store.count = AsyncMock(return_value=100)
     store.list_collections = AsyncMock(return_value=[])  # Add for health verification
+    store.get_collection = AsyncMock(return_value=Mock())  # Add for failover initialization
+    store.create_payload_index = AsyncMock()  # Add for payload index creation
     store.circuit_breaker_state = CircuitBreakerState.CLOSED  # Circuit breaker is healthy
     return store
 
@@ -69,6 +71,8 @@ def mock_backup_store() -> Mock:
     store.upsert = AsyncMock()
     store.search = AsyncMock(return_value=[])
     store.count = AsyncMock(return_value=0)
+    store.get_collection = AsyncMock(return_value=Mock())  # Add for failover initialization
+    store.create_payload_index = AsyncMock()  # Add for payload index creation
     # Add _persist_to_disk for shutdown
     store._persist_to_disk = AsyncMock()
     # Make sure the store is considered "truthy" for if checks

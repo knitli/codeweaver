@@ -33,7 +33,8 @@ def get_version_from_build(project_root: Path) -> str:
         raise RuntimeError("No wheel found")
 
     wheel_name = wheels[0].name
-    match = re.match(r"codeweaver_mcp-(.+?)-py3-none-any\.whl", wheel_name)
+    # Package name may vary based on build configuration (codeweaver vs codeweaver_mcp)
+    match = re.match(r"codeweaver[_-]?(?:mcp)?-(.+?)-py3-none-any\.whl", wheel_name)
     if not match:
         raise RuntimeError(f"Could not extract version from: {wheel_name}")
 
@@ -149,8 +150,8 @@ def test_version_consistency_across_formats():
     assert len(wheels) == 1, "Missing wheel"
     assert len(sdists) == 1, "Missing sdist"
 
-    wheel_match = re.match(r"codeweaver_mcp-(.+?)-py3-none-any\.whl", wheels[0].name)
-    sdist_match = re.match(r"codeweaver_mcp-(.+?)\.tar\.gz", sdists[0].name)
+    wheel_match = re.match(r"codeweaver[_-]?(?:mcp)?-(.+?)-py3-none-any\.whl", wheels[0].name)
+    sdist_match = re.match(r"codeweaver[_-]?(?:mcp)?-(.+?)\.tar\.gz", sdists[0].name)
 
     assert wheel_match, f"Could not extract wheel version from: {wheels[0].name}"
     assert sdist_match, f"Could not extract sdist version from: {sdists[0].name}"

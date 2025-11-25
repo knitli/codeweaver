@@ -1,3 +1,4 @@
+# sourcery skip: no-relative-imports
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -8,15 +9,20 @@
 import contextlib
 
 from pathlib import Path
-from types import GeneratorType
+from types import AsyncGeneratorType, GeneratorType
 from typing import cast
 from uuid import UUID
 
 import pytest
 
+from pydantic.types import UUID7
 from qdrant_client import AsyncQdrantClient
 
+from codeweaver.core.chunks import CodeChunk
+from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.metadata import ChunkKind, ExtKind
+
+from .qdrant_test_manager import QdrantTestManager
 
 
 # ===========================================================================
@@ -32,7 +38,7 @@ from codeweaver.core.metadata import ChunkKind, ExtKind
 
 
 @pytest.fixture
-def initialize_test_settings():
+def initialize_test_settings() -> GeneratorType:
     """Initialize settings for test environment.
 
     This fixture ensures that the global settings are properly initialized
@@ -56,7 +62,7 @@ def initialize_test_settings():
 
 
 @pytest.fixture
-async def qdrant_client_cleanup():
+async def qdrant_client_cleanup() -> AsyncGeneratorType:
     """Fixture that provides a cleanup function for Qdrant collections.
 
     Yields a cleanup function that can be called with (client, collection_name).
@@ -108,7 +114,7 @@ def clear_semantic_chunker_stores() -> GeneratorType:
 
 
 @pytest.fixture
-async def qdrant_test_manager(tmp_path: Path):
+async def qdrant_test_manager(tmp_path: Path) -> AsyncGeneratorType:
     """Provide a QdrantTestManager for integration tests.
 
     This fixture:
@@ -189,7 +195,7 @@ async def qdrant_test_manager(tmp_path: Path):
 
 
 @pytest.fixture
-async def qdrant_test_client(qdrant_test_manager):
+async def qdrant_test_client(qdrant_test_manager: QdrantTestManager) -> AsyncQdrantClient:
     """Provide a connected Qdrant client for testing.
 
     This is a convenience fixture that just returns the client.
@@ -199,7 +205,9 @@ async def qdrant_test_client(qdrant_test_manager):
 
 
 @pytest.fixture
-async def qdrant_test_collection(qdrant_test_manager):
+async def qdrant_test_collection(
+    qdrant_test_manager: QdrantTestManager,
+) -> AsyncGeneratorType[tuple[AsyncQdrantClient, str]]:
     """Provide a test collection with automatic cleanup.
 
     Yields:
@@ -220,16 +228,16 @@ async def qdrant_test_collection(qdrant_test_manager):
 
 
 def create_test_chunk_with_embeddings(
-    chunk_id,
+    chunk_id: UUID7,
     chunk_name: str,
     file_path: Path,
-    language,
+    language: SemanticSearchLanguage | ConfigLanguage | str,
     content: str,
     dense_embedding: list[float] | None = None,
     sparse_embedding: dict | None = None,
     line_start: int = 1,
     line_end: int = 1,
-):
+) -> CodeChunk:
     """Create a CodeChunk with embeddings registered in the EmbeddingRegistry.
 
     Args:
@@ -318,7 +326,7 @@ def create_test_chunk_with_embeddings(
 
 
 @pytest.fixture
-def clean_cli_env(monkeypatch):
+def clean_cli_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Clean environment variables for isolated CLI testing."""
     env_vars_to_remove = [
         "CODEWEAVER_PROJECT_PATH",
@@ -336,7 +344,7 @@ def clean_cli_env(monkeypatch):
 
 
 @pytest.fixture
-def isolated_home(tmp_path: Path, monkeypatch):
+def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Create isolated home directory for CLI testing."""
     home = tmp_path / "home"
     home.mkdir()
@@ -345,7 +353,7 @@ def isolated_home(tmp_path: Path, monkeypatch):
 
 
 @pytest.fixture
-def cli_test_project(tmp_path: Path, monkeypatch):
+def cli_test_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Create test project with git repository for CLI testing."""
     project = tmp_path / "test_project"
     project.mkdir()
@@ -369,7 +377,7 @@ def cli_test_project(tmp_path: Path, monkeypatch):
 
 
 @pytest.fixture
-def cli_api_keys(monkeypatch):
+def cli_api_keys(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     """Set test API keys for CLI testing."""
     keys = {
         "VOYAGE_API_KEY": "test-voyage-key",
@@ -385,7 +393,7 @@ def cli_api_keys(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def reset_cli_settings_cache():
+def reset_cli_settings_cache() -> GeneratorType:
     """Reset settings cache between CLI tests."""
     from codeweaver.config.settings import reset_settings
 

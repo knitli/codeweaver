@@ -12,6 +12,7 @@ import pytest
 
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+from codeweaver.providers.embedding.providers.base import EmbeddingErrorInfo
 from codeweaver.providers.provider import Provider
 
 
@@ -53,7 +54,7 @@ def cohere_capabilities():
         provider=Provider.COHERE,
         default_dimension=1024,
         default_dtype="float",
-        tokenizer="tiktoken",
+        tokenizer=None,  # No tokenizer to avoid HuggingFace lookups in tests
     )
 
 
@@ -65,7 +66,7 @@ def cohere_4_capabilities():
         provider=Provider.COHERE,
         default_dimension=1024,
         default_dtype="float",
-        tokenizer="tiktoken",
+        tokenizer=None,  # No tokenizer to avoid HuggingFace lookups in tests
     )
 
 
@@ -156,9 +157,12 @@ class TestCohereEmbeddingProviderEmbedding:
         """Test successful document embedding."""
         from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
 
-        # Setup mock response
+        # Setup mock response with correct dimension (1024)
         mock_embeddings = MagicMock()
-        mock_embeddings.float = [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
+        mock_embeddings.float = [
+            [0.1] * 1024,
+            [0.2] * 1024,
+        ]  # Two embeddings with 1024 dimensions each
 
         mock_response = MagicMock()
         mock_response.embeddings = mock_embeddings
@@ -200,8 +204,11 @@ class TestCohereEmbeddingProviderEmbedding:
 
         # Verify result
         assert len(result) == 2
-        assert result[0] == [0.1, 0.2, 0.3]  # ty: ignore[invalid-key]
-        assert result[1] == [0.4, 0.5, 0.6]  # ty: ignore[invalid-key]
+        assert result is not EmbeddingErrorInfo
+        assert len(result[0]) == 1024
+        assert len(result[1]) == 1024
+        assert result[0][0] == 0.1  # Check first element of first embedding
+        assert result[1][0] == 0.2  # Check first element of second embedding
 
         # Verify client was called
         mock_cohere_client.embed.assert_called_once()

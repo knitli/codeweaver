@@ -213,7 +213,7 @@ def _from_env_log_level() -> Literal[0, 10, 20, 30, 40, 50]:
             return (
                 int(level_str)
                 if level_str in {"0", "10", "20", "30", "40", "50"}
-                else logging.WARNING
+                else logging.WARNING  # ty: ignore[invalid-return-type]
             )
         level_str = level_str.upper()
         level_map = {
@@ -223,7 +223,7 @@ def _from_env_log_level() -> Literal[0, 10, 20, 30, 40, 50]:
             "ERROR": logging.ERROR,
             "CRITICAL": logging.CRITICAL,
         }
-        return level_map.get(level_str, logging.WARNING)
+        return level_map.get(level_str, logging.WARNING)  # ty: ignore[invalid-return-type]
     return logging.WARNING
 
 

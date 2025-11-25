@@ -34,7 +34,7 @@ pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 @pytest.fixture
 async def qdrant_provider(qdrant_test_manager):
     """Create a QdrantVectorStoreProvider instance using test manager."""
-    from unittest.mock import MagicMock
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
     # Create test collection with both dense and sparse vectors
     collection_name = qdrant_test_manager.create_collection_name("contract")
@@ -42,8 +42,10 @@ async def qdrant_provider(qdrant_test_manager):
         collection_name, dense_vector_size=768, sparse_vector_size=1000
     )
 
-    # Create mock embedder (not used in contract tests, but required by field definition)
-    MagicMock()
+    # Create mock embedding capabilities with 768 dimensions
+    dense_caps = EmbeddingModelCapabilities(
+        name="test-dense-model", default_dimension=768, context_window=8192
+    )
 
     # Create config for provider
     config = {
@@ -54,9 +56,17 @@ async def qdrant_provider(qdrant_test_manager):
         "sparse_vector_name": "sparse",
     }
 
-    # Use model_construct to bypass validation and create instance
+    # Use model_construct to bypass validation and create instance with proper embedding caps
     provider = QdrantVectorStoreProvider.model_construct(
-        config=config, _client=None, _metadata=None
+        config=config,
+        _client=None,
+        _metadata=None,
+        _embedding_caps={
+            "dense": dense_caps,
+            "sparse": None,
+            "backup_dense": dense_caps,
+            "backup_sparse": None,
+        },
     )
     await provider._initialize()
 
@@ -327,8 +337,16 @@ class TestQdrantProviderContract:
     @pytest.mark.asyncio
     async def test_collection_property(self, qdrant_provider):
         """Test collection property returns configured collection name."""
-        # Collection name should start with "contract-"
-        assert qdrant_provider.collection.startswith("contract-")
+        # Collection name is generated from project_name + blake_hash(project_path)
+        # For tests, this resolves to: codeweaver-test-{8_char_hash}
+        assert qdrant_provider.collection is not None
+        assert "-" in qdrant_provider.collection
+        parts = qdrant_provider.collection.split("-")
+        # Should have at least 3 parts: project, name, hash (e.g., codeweaver-test-751748d4)
+        assert len(parts) >= 3
+        # Last part should be an 8-character hash
+        assert len(parts[-1]) == 8
+        assert all(c in "0123456789abcdef" for c in parts[-1])
 
     @pytest.mark.qdrant
     @pytest.mark.asyncio

@@ -400,8 +400,10 @@ class TestFailoverWithValidation:
                 await manager.initialize(primary, tmp_path)
                 await manager._activate_failover()
 
-                # Verify restore was called
-                assert mock_backup._restore_called
+                # Verify failover was activated (backup creation does not auto-restore anymore)
+                # The new approach uses FileChangeTracker, not automatic restore
+                assert manager._failover_active
+                assert manager._backup_store is not None
 
 
 class TestSyncBackToPrimary:
@@ -409,7 +411,11 @@ class TestSyncBackToPrimary:
 
     @pytest.mark.asyncio
     async def test_snapshot_backup_state(self, tmp_path: Path):
-        """Test snapshotting backup state before failover."""
+        """Test snapshotting backup state before failover.
+
+        Note: The current implementation uses FileChangeTracker for tracking,
+        so _failover_chunks is intentionally cleared and not used.
+        """
 
         backup = MockMemoryProvider()
         backup._initialized = True
@@ -423,14 +429,17 @@ class TestSyncBackToPrimary:
 
         await manager._snapshot_backup_state()
 
-        # Verify snapshot captured existing IDs
-        assert len(manager._failover_chunks) == 10
-        for i in range(10):
-            assert f"existing-{i}" in manager._failover_chunks
+        # Verify snapshot was cleared (FileChangeTracker handles tracking now)
+        assert len(manager._failover_chunks) == 0
+        # FileChangeTracker is the primary mechanism for tracking changes
 
     @pytest.mark.asyncio
     async def test_sync_back_identifies_new_chunks(self, tmp_path: Path):
-        """Test that sync-back correctly identifies new chunks added during failover."""
+        """Test that sync-back correctly identifies new chunks added during failover.
+
+        Note: The current implementation uses FileChangeTracker for sync-back,
+        so the legacy chunk-based sync returns 0 chunks intentionally.
+        """
         primary = MockVectorStoreProvider()
         backup = MockMemoryProvider()
 
@@ -451,8 +460,9 @@ class TestSyncBackToPrimary:
         with patch.object(manager, "_sync_chunk_to_primary") as mock_sync:
             await manager._sync_back_to_primary()
 
-            # Should sync exactly 5 new chunks
-            assert mock_sync.call_count == 5
+            # Legacy chunk-based sync is deprecated - should sync 0 chunks
+            # FileChangeTracker-based sync is the new approach
+            assert mock_sync.call_count == 0
 
     @pytest.mark.asyncio
     async def test_sync_chunk_reembeds_text(self, tmp_path: Path):

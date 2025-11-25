@@ -296,21 +296,33 @@ class TestVectorStoreProviderWithClientFactory:
             )
         }
 
-        with patch("codeweaver.providers.capabilities.CLIENT_MAP", mock_client_map):
-            registry.register(Provider.QDRANT, ProviderKind.VECTOR_STORE, mock_provider_lazy)
+        # Patch os.getenv to return None for QDRANT__SERVICE__API_KEY
+        # This prevents the environment variable from interfering with test expectations
+        import os
 
-            # Create provider with URL
-            registry.create_provider(
-                Provider.QDRANT,
-                ProviderKind.VECTOR_STORE,
-                provider_settings={"url": "http://localhost:6333", "api_key": "test_key"},
-            )
+        original_getenv = os.getenv
 
-            # Verify client was created with URL (explicit settings override global config)
-            mock_client_class.assert_called_once()
-            call_kwargs = mock_client_class.call_args[1]
-            assert call_kwargs["url"] == "http://localhost:6333"
-            assert call_kwargs["api_key"] == "test_key"
+        def mock_getenv(key, default=None):
+            if key == "QDRANT__SERVICE__API_KEY":
+                return None
+            return original_getenv(key, default)
+
+        with patch("os.getenv", side_effect=mock_getenv):
+            with patch("codeweaver.providers.capabilities.CLIENT_MAP", mock_client_map):
+                registry.register(Provider.QDRANT, ProviderKind.VECTOR_STORE, mock_provider_lazy)
+
+                # Create provider with URL
+                registry.create_provider(
+                    Provider.QDRANT,
+                    ProviderKind.VECTOR_STORE,
+                    provider_settings={"url": "http://localhost:6333", "api_key": "test_key"},
+                )
+
+                # Verify client was created with URL (explicit settings override global config)
+                mock_client_class.assert_called_once()
+                call_kwargs = mock_client_class.call_args[1]
+                assert call_kwargs["url"] == "http://localhost:6333"
+                assert call_kwargs["api_key"] == "test_key"
 
 
 @pytest.mark.external_api

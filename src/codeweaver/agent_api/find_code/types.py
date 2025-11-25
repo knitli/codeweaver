@@ -400,19 +400,41 @@ class StrategizedQuery(NamedTuple):
         )
 
         # Extract Prefetch-specific parameters (limit, score_threshold, filter, params)
-        # Exclude top-level query parameters (with_payload, with_vectors, query_filter)
         prefetch_params = {
             k: v
             for k, v in query_kwargs.items()
             if k in ("limit", "score_threshold", "filter", "params")
         }
 
+        # Extract top-level query_points parameters (with_payload, with_vectors, query_filter)
+        # These should be passed to query_points, not to Prefetch
+        # Exclude None values and parameters already in prefetch to avoid duplication
+        top_level_params = {
+            k: v
+            for k, v in query_kwargs.items()
+            if k
+            in (
+                "with_payload",
+                "with_vectors",
+                "query_filter",
+                "offset",
+                "consistency",
+                "shard_key_selector",
+                "timeout",
+                "lookup_from",
+            )
+            and v is not None
+        }
+
+        # Use bare vectors with 'using' parameter for named vector search in Prefetch
+        assert self.dense is not None  # noqa: S101
         return {
             "query": RrfQuery(rrf=Rrf(k=2)),
             "prefetch": [
-                Prefetch(query=self.dense, using="dense", **prefetch_params),
+                Prefetch(query=list(self.dense), using="dense", **prefetch_params),
                 Prefetch(query=sparse_vector, using="sparse", **prefetch_params),
             ],
+            **top_level_params,  # Include top-level query_points parameters
             **kwargs,
         }
 
