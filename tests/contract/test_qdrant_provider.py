@@ -37,7 +37,7 @@ async def qdrant_provider(qdrant_test_manager):
     from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
     # Create test collection with both dense and sparse vectors
-    collection_name = qdrant_test_manager.create_collection_name("contract")
+    collection_name = qdrant_test_manager.create_collection_name("codeweaver-test-contract")
     await qdrant_test_manager.create_collection(
         collection_name, dense_vector_size=768, sparse_vector_size=1000
     )

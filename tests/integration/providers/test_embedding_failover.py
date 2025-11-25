@@ -26,6 +26,19 @@ from codeweaver.core.spans import Span
 from codeweaver.providers.embedding.registry import get_embedding_registry
 
 
+@pytest.fixture(autouse=True)
+def cleanup_registry():
+    """Cleanup the embedding registry before and after each test.
+
+    This ensures test isolation by clearing the global singleton registry
+    between test runs to prevent cross-test contamination.
+    """
+    registry = get_embedding_registry()
+    registry.clear()
+    yield
+    registry.clear()
+
+
 @pytest.fixture
 def sample_chunk() -> CodeChunk:
     """Create a sample code chunk for testing."""
@@ -166,10 +179,10 @@ async def test_deduplication_prevents_reembedding(sample_chunk, primary_embeddin
     1. Chunk is embedded with primary provider
     2. Content hash is stored in _hash_store
     3. Try to re-embed same chunk (simulating sync-back)
-    4. Chunk is filtered out due to deduplication
-    5. Returns empty list, sync-back fails
+    4. With default behavior: chunk is filtered out due to deduplication
+    5. With skip_deduplication=True: chunk is re-embedded successfully
 
-    Expected Behavior: Second embed returns empty list
+    Expected Behavior: skip_deduplication flag should allow re-embedding
     """
     # Step 1: First embedding
     embeddings_first = await primary_embedding_provider.embed_documents([sample_chunk])
@@ -185,16 +198,20 @@ async def test_deduplication_prevents_reembedding(sample_chunk, primary_embeddin
         "Content hash should be in provider's hash store"
     )
 
-    # Step 2: Try to re-embed the SAME chunk (simulates sync-back scenario)
+    # Step 2: Try to re-embed without skip_deduplication (default behavior)
     embeddings_second = await primary_embedding_provider.embed_documents([sample_chunk])
 
-    # Check result
-    print(f"\n❌ BUG CONFIRMED: Re-embedding returned {len(embeddings_second)} embeddings")
-    print("   Expected: New embeddings generated")
-    print("   Got: Empty list (filtered by deduplication)")
-
+    print(f"\nDefault behavior: Re-embedding returned {len(embeddings_second)} embeddings")
     assert len(embeddings_second) == 0, "Second embedding should return empty due to deduplication"
-    print("   This means sync-back would silently fail for unchanged chunks!")
+
+    # Step 3: Re-embed WITH skip_deduplication=True (should succeed)
+    embeddings_third = await primary_embedding_provider.embed_documents(
+        [sample_chunk], skip_deduplication=True
+    )
+
+    print(f"With skip_deduplication=True: Re-embedding returned {len(embeddings_third)} embeddings")
+    assert len(embeddings_third) > 0, "✓ FIXED: Re-embedding with skip_deduplication=True succeeds"
+    print("   ✓ This allows sync-back to work for unchanged chunks!")
 
 
 @pytest.mark.asyncio

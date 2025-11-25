@@ -21,9 +21,6 @@ from tests.conftest import create_test_chunk_with_embeddings
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
 
-@pytest.mark.xfail(
-    reason="ISSUE-001: Sparse-only search data flow issue - API usage fixed, storage/retrieval needs investigation"
-)
 async def test_partial_embeddings(qdrant_test_manager):
     """
     User Story: Handle cases where dense embedding generation fails.
@@ -67,9 +64,6 @@ async def test_partial_embeddings(qdrant_test_manager):
     from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
     from codeweaver.providers.embedding.types import SparseEmbedding
 
-    # KNOWN ISSUE (ISSUE-001): Sparse-only search not finding results in Qdrant
-    # See KNOWN_ISSUES.md for details. This test validates partial embedding handling,
-    # but sparse-only search currently has known issues.
     # Use same sparse embedding for search to ensure we find the chunk
     results = await provider.search(
         StrategizedQuery(

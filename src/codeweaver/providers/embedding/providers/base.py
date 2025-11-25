@@ -449,6 +449,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         *,
         batch_id: UUID7 | None = None,
         for_backup: bool = False,
+        skip_deduplication: bool = False,
         context: Any = None,
         **kwargs: Any,
     ) -> list[list[float]] | list[list[int]] | list[SparseEmbedding] | EmbeddingErrorInfo:
@@ -467,7 +468,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             )  # type: ignore
             is_old_batch = True
         chunks_iter, cache_key = self._process_input(
-            documents, is_old_batch=is_old_batch, for_backup=for_backup
+            documents, is_old_batch=is_old_batch, for_backup=for_backup, skip_deduplication=skip_deduplication
         )  # type: ignore
 
         # Convert iterator to tuple once to avoid exhaustion issues
@@ -972,6 +973,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         *,
         is_old_batch: bool = False,
         for_backup: bool = False,
+        skip_deduplication: bool = False,
     ) -> tuple[Iterator[CodeChunk], UUID7 | None]:
         """Process input data for embedding."""
         processed_chunks = default_input_transformer(input_data)
@@ -990,19 +992,23 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         hashes = [get_blake_hash(chunk.content.encode("utf-8")) for chunk in chunk_list]
 
         # Check which chunks are NEW (hash not in store)
-        starter_chunks = (
-            [
-                chunk
-                for i, chunk in enumerate(chunk_list)
-                if chunk and hashes[i] not in type(self)._backup_hash_store
-            ]
-            if for_backup
-            else [
-                chunk
-                for i, chunk in enumerate(chunk_list)
-                if chunk and hashes[i] not in type(self)._hash_store
-            ]
-        )
+        # When skip_deduplication is True, include all chunks regardless of hash store
+        if skip_deduplication:
+            starter_chunks = chunk_list
+        else:
+            starter_chunks = (
+                [
+                    chunk
+                    for i, chunk in enumerate(chunk_list)
+                    if chunk and hashes[i] not in type(self)._backup_hash_store
+                ]
+                if for_backup
+                else [
+                    chunk
+                    for i, chunk in enumerate(chunk_list)
+                    if chunk and hashes[i] not in type(self)._hash_store
+                ]
+            )
 
         # Add NEW chunks with batch keys and add their hashes to store
         for i, chunk in enumerate(starter_chunks):

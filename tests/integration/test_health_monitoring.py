@@ -323,16 +323,32 @@ async def test_health_during_indexing(
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_health_status_healthy(health_service: HealthService):
+async def test_health_status_healthy(health_service: HealthService, mocker):
     """T012: Health status determined as 'healthy' when all services up.
 
     Given: All services operational, indexing idle or progressing normally
     When: get_health_response() called
     Then: Status is 'healthy'
     """
+    # Mock resource collection to return healthy values
+    from codeweaver.server.health_models import ResourceInfo
+
+    async def mock_resource_info():
+        return ResourceInfo(
+            memory_mb=1024,  # <2048 (healthy threshold)
+            cpu_percent=50.0,  # <80 (healthy threshold)
+            disk_total_mb=10000,
+            disk_index_mb=5000,
+            disk_cache_mb=2000,
+            file_descriptors=100,
+            file_descriptors_limit=1024,  # 9.8% usage (healthy)
+        )
+
+    mocker.patch.object(health_service, "_collect_resource_info", side_effect=mock_resource_info)
+
     response = await health_service.get_health_response()
 
-    # With mock providers all returning "up", should be healthy
+    # With mock providers all returning "up" and healthy resources, should be healthy
     assert response.status == "healthy"
     assert response.services.vector_store.status == "up"
     assert response.services.embedding_provider.status == "up"

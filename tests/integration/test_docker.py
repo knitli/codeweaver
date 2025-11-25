@@ -18,8 +18,10 @@ NOTE: Multiple tests here look for license information in files. They *must* be 
 from __future__ import annotations
 
 import contextlib
+import socket
 import subprocess
 import time
+import uuid
 
 import pytest
 
@@ -41,6 +43,28 @@ def run_command(
         CompletedProcess with stdout/stderr
     """
     return subprocess.run(cmd, check=check, capture_output=capture, text=True, timeout=300)
+
+
+def find_free_port() -> int:
+    """Find a free port by binding to port 0 and letting OS assign one.
+
+    Returns:
+        An available port number
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        s.listen(1)
+        port = s.getsockname()[1]
+    return port
+
+
+def generate_unique_project_name() -> str:
+    """Generate a unique project name for test isolation.
+
+    Returns:
+        Unique project name in format: test-codeweaver-{8-char-uuid}
+    """
+    return f"test-codeweaver-{uuid.uuid4().hex[:8]}"
 
 
 class TestDockerfile:
@@ -168,13 +192,20 @@ class TestDockerCompose:
     @pytest.mark.network
     def test_docker_compose_services_start(self, repo_root, tmp_path):
         """Test that docker-compose services can start."""
-        # Create a minimal .env file
+        # Generate unique project name and find free ports for test isolation
+        project_name = generate_unique_project_name()
+        codeweaver_port = find_free_port()
+        qdrant_port = find_free_port()
+        qdrant_grpc_port = find_free_port()
+
+        # Create a minimal .env file with unique project name and dynamic ports
         env_file = tmp_path / ".env"
-        env_file.write_text("""
+        env_file.write_text(f"""
+PROJECT_NAME={project_name}
 PROJECT_PATH=.
-CODEWEAVER_PORT=19328
-QDRANT_PORT=16333
-QDRANT_GRPC_PORT=16334
+CODEWEAVER_PORT={codeweaver_port}
+QDRANT_PORT={qdrant_port}
+QDRANT_GRPC_PORT={qdrant_grpc_port}
 VOYAGE_API_KEY=test-key
 COLLECTION_NAME=test-collection
 ENABLE_TELEMETRY=false
@@ -184,13 +215,15 @@ LOG_LEVEL=DEBUG
         compose_file = repo_root / "docker-compose.yml"
 
         try:
-            # Start services
+            # Start services with unique project name
             result = run_command(
                 [
                     "docker",
                     "compose",
                     "-f",
                     str(compose_file),
+                    "-p",
+                    project_name,
                     "--env-file",
                     str(env_file),
                     "up",
@@ -205,7 +238,7 @@ LOG_LEVEL=DEBUG
             max_attempts = 30
             for _attempt in range(max_attempts):
                 result_ps = run_command(
-                    ["docker", "compose", "-f", str(compose_file), "ps", "--format", "json"],
+                    ["docker", "compose", "-f", str(compose_file), "-p", project_name, "ps", "--format", "json"],
                     check=False,
                 )
                 if result_ps.returncode == 0:
@@ -215,25 +248,32 @@ LOG_LEVEL=DEBUG
                 pytest.fail("Services did not become healthy in time")
 
             # Check that services are running
-            result = run_command(["docker", "compose", "-f", str(compose_file), "ps"], check=True)
+            result = run_command(["docker", "compose", "-f", str(compose_file), "-p", project_name, "ps"], check=True)
 
             assert "qdrant" in result.stdout, "Qdrant service not running"
             assert "codeweaver" in result.stdout, "CodeWeaver service not running"
 
         finally:
-            # Cleanup
-            run_command(["docker", "compose", "-f", str(compose_file), "down", "-v"], check=False)
+            # Cleanup with unique project name
+            run_command(["docker", "compose", "-f", str(compose_file), "-p", project_name, "down", "-v"], check=False)
 
     @pytest.mark.slow
     @pytest.mark.network
     def test_qdrant_health_endpoint(self, repo_root, tmp_path):
         """Test that Qdrant health endpoint is accessible."""
+        # Generate unique project name and find free ports for test isolation
+        project_name = generate_unique_project_name()
+        codeweaver_port = find_free_port()
+        qdrant_port = find_free_port()
+        qdrant_grpc_port = find_free_port()
+
         env_file = tmp_path / ".env"
-        env_file.write_text("""
+        env_file.write_text(f"""
+PROJECT_NAME={project_name}
 PROJECT_PATH=.
-CODEWEAVER_PORT=19328
-QDRANT_PORT=16333
-QDRANT_GRPC_PORT=16334
+CODEWEAVER_PORT={codeweaver_port}
+QDRANT_PORT={qdrant_port}
+QDRANT_GRPC_PORT={qdrant_grpc_port}
 VOYAGE_API_KEY=test-key
 COLLECTION_NAME=test-collection
 ENABLE_TELEMETRY=false
@@ -242,13 +282,15 @@ ENABLE_TELEMETRY=false
         compose_file = repo_root / "docker-compose.yml"
 
         try:
-            # Start services
+            # Start services with unique project name
             run_command(
                 [
                     "docker",
                     "compose",
                     "-f",
                     str(compose_file),
+                    "-p",
+                    project_name,
                     "--env-file",
                     str(env_file),
                     "up",
@@ -257,25 +299,25 @@ ENABLE_TELEMETRY=false
                 check=True,
             )
 
-            # Wait for Qdrant to be ready
+            # Wait for Qdrant to be ready using dynamic port
             max_attempts = 30
             for _attempt in range(max_attempts):
                 with contextlib.suppress(Exception):
                     result = run_command(
-                        ["curl", "-sf", "http://localhost:16333/health"], check=False
+                        ["curl", "-sf", f"http://localhost:{qdrant_port}/health"], check=False
                     )
                     if result.returncode == 0:
                         break
                 time.sleep(2)
 
             # Verify health endpoint responds
-            result = run_command(["curl", "-sf", "http://localhost:16333/health"], check=False)
+            result = run_command(["curl", "-sf", f"http://localhost:{qdrant_port}/health"], check=False)
 
             assert result.returncode == 0, "Qdrant health endpoint not accessible"
 
         finally:
-            # Cleanup
-            run_command(["docker", "compose", "-f", str(compose_file), "down", "-v"], check=False)
+            # Cleanup with unique project name
+            run_command(["docker", "compose", "-f", str(compose_file), "-p", project_name, "down", "-v"], check=False)
 
 
 class TestDockerIgnore:

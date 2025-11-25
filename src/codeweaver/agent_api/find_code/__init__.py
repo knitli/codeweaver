@@ -265,7 +265,7 @@ async def find_code(  # noqa: C901
         >>> response.search_strategy
         (SearchStrategy.HYBRID_SEARCH, SearchStrategy.SEMANTIC_RERANK)
     """
-    start_time = time.time()
+    start_time = time.monotonic()
     strategies_used: list[SearchStrategy] = []
 
     try:
@@ -358,7 +358,7 @@ async def find_code(  # noqa: C901
                 continue
 
         # Step 11: Build response
-        execution_time_ms = (time.time() - start_time) * 1000
+        execution_time_ms = (time.monotonic() - start_time) * 1000
 
         response = build_success_response(
             code_matches=code_matches,
@@ -400,7 +400,7 @@ async def find_code(  # noqa: C901
     except Exception as e:
         logger.warning("find_code failed")
         # Return empty response on failure (graceful degradation)
-        execution_time_ms = (time.time() - start_time) * 1000
+        execution_time_ms = (time.monotonic() - start_time) * 1000
         error_response = build_error_response(e, intent, execution_time_ms)
 
         # Capture error telemetry
