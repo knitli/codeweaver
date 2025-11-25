@@ -32,12 +32,15 @@ from .qdrant_test_manager import QdrantTestManager
 # *                    Mock Tokenizer for Network-Isolated Tests
 # ===========================================================================
 
+# Token estimation constant: average characters per token for general text
+CHARS_PER_TOKEN = 4
+
 
 class MockTokenizer:
     """Mock tokenizer that doesn't require network access.
 
     This avoids tiktoken's need to download encoding files from the network.
-    Uses a simple character-based estimation (1 token per 4 characters).
+    Uses a simple character-based estimation (1 token per CHARS_PER_TOKEN characters).
     """
 
     def __init__(self, model: str = "mock") -> None:
@@ -47,7 +50,7 @@ class MockTokenizer:
         """Mock encode - returns list of integers based on character positions."""
         if isinstance(text, bytes):
             text = text.decode("utf-8", errors="ignore")
-        return list(range(len(text) // 4 + 1))
+        return list(range(len(text) // CHARS_PER_TOKEN + 1))
 
     def encode_batch(
         self, texts: Sequence[str] | Sequence[bytes], **kwargs: Any
@@ -67,7 +70,7 @@ class MockTokenizer:
         """Estimate token count using simple character ratio."""
         if isinstance(text, bytes):
             text = text.decode("utf-8", errors="ignore")
-        return max(1, len(text) // 4)
+        return max(1, len(text) // CHARS_PER_TOKEN)
 
     def estimate_batch(self, texts: Sequence[str] | Sequence[bytes]) -> int:
         """Estimate total tokens for a batch."""
