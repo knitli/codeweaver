@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from codeweaver.agent_api.find_code.types import CodeMatch, CodeMatchType
-from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.spans import Span
 
