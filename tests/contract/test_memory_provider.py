@@ -266,13 +266,14 @@ class TestMemoryProviderContract:
 
     async def test_collection_property(self, memory_provider, memory_config):
         """Test collection property returns configured collection name."""
-        # Collection name is generated from project_name + blake_hash(project_path)
-        # For tests, this resolves to: codeweaver-test-{8_char_hash}
+        # Collection name can be either:
+        # 1. Custom name from config (e.g., test_memory_{8_char_hex})
+        # 2. Generated name: project_name-{8_char_hash} (e.g., codeweaver-test-751748d4)
         assert memory_provider.collection is not None
-        assert "-" in memory_provider.collection
-        parts = memory_provider.collection.split("-")
-        # Should have at least 3 parts: project, name, hash (e.g., codeweaver-test-751748d4)
-        assert len(parts) >= 3
-        # Last part should be an 8-character hash
-        assert len(parts[-1]) == 8
-        assert all(c in "0123456789abcdef" for c in parts[-1])
+        # Either format should have an 8-character hex suffix
+        collection_name = memory_provider.collection
+        # Check the last segment (after last underscore or hyphen) is 8-char hex
+        parts = collection_name.replace("-", "_").split("_")
+        last_part = parts[-1]
+        assert len(last_part) == 8, f"Expected 8-char hex suffix, got '{last_part}'"
+        assert all(c in "0123456789abcdef" for c in last_part), f"Expected hex characters, got '{last_part}'"

@@ -248,9 +248,10 @@ class TestCohereEmbeddingProviderEmbedding:
         """Test embedding with v4.0 model uses correct embedding_types."""
         from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
 
-        # Setup mock response
+        # Setup mock response - use capabilities dimension for consistency
+        expected_dimension = cohere_4_capabilities.default_dimension
         mock_embeddings = MagicMock()
-        mock_embeddings.float = [[0.1, 0.2, 0.3]]
+        mock_embeddings.float = [[0.1] * expected_dimension]
 
         mock_response = MagicMock()
         mock_response.embeddings = mock_embeddings

@@ -8,9 +8,10 @@
 
 import contextlib
 
+from collections.abc import Sequence
 from pathlib import Path
 from types import AsyncGeneratorType, GeneratorType
-from typing import cast
+from typing import Any, cast
 from uuid import UUID
 
 import pytest
@@ -26,6 +27,65 @@ from .qdrant_test_manager import QdrantTestManager
 
 
 # ===========================================================================
+# *                    Mock Tokenizer for Network-Isolated Tests
+# ===========================================================================
+
+# Token estimation constant: average characters per token for general text
+CHARS_PER_TOKEN = 4
+
+
+class MockTokenizer:
+    """Mock tokenizer that doesn't require network access.
+
+    This avoids tiktoken's need to download encoding files from the network.
+    Uses a simple character-based estimation (1 token per CHARS_PER_TOKEN characters).
+    """
+
+    def __init__(self, model: str = "mock") -> None:
+        self.encoder_name = model
+
+    def encode(self, text: str | bytes, **kwargs: Any) -> Sequence[int]:
+        """Mock encode - returns list of integers based on character positions."""
+        if isinstance(text, bytes):
+            text = text.decode("utf-8", errors="ignore")
+        return list(range(len(text) // CHARS_PER_TOKEN + 1))
+
+    def encode_batch(
+        self, texts: Sequence[str] | Sequence[bytes], **kwargs: Any
+    ) -> Sequence[Sequence[int]]:
+        """Mock batch encode."""
+        return [self.encode(text) for text in texts]
+
+    def decode(self, tokens: Sequence[int], **kwargs: Any) -> str:
+        """Mock decode - returns placeholder string."""
+        return f"decoded_{len(tokens)}_tokens"
+
+    def decode_batch(self, token_lists: Sequence[Sequence[int]], **kwargs: Any) -> Sequence[str]:
+        """Mock batch decode."""
+        return [self.decode(tokens) for tokens in token_lists]
+
+    def estimate(self, text: str | bytes) -> int:
+        """Estimate token count using simple character ratio."""
+        if isinstance(text, bytes):
+            text = text.decode("utf-8", errors="ignore")
+        return max(1, len(text) // CHARS_PER_TOKEN)
+
+    def estimate_batch(self, texts: Sequence[str] | Sequence[bytes]) -> int:
+        """Estimate total tokens for a batch."""
+        return sum(self.estimate(text) for text in texts)
+
+    @staticmethod
+    def encoders() -> Sequence[str]:
+        """List mock encoder names."""
+        return ["mock", "cl100k_base", "gpt2"]
+
+
+def _mock_get_tokenizer(tokenizer: str, model: str) -> MockTokenizer:
+    """Mock replacement for codeweaver.tokenizers.get_tokenizer."""
+    return MockTokenizer(model)
+
+
+# ===========================================================================
 # *                    Test Configuration
 # ===========================================================================
 # Note: Qdrant configuration now handled by qdrant_test_manager fixture
@@ -35,6 +95,33 @@ from .qdrant_test_manager import QdrantTestManager
 # ===========================================================================
 # *                    Fixtures
 # ===========================================================================
+
+
+@pytest.fixture(autouse=True)
+def mock_tokenizer_for_unit_tests(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Auto-patch the tokenizer for unit tests that are marked as mock_only.
+
+    This prevents network calls to download tiktoken encodings during unit tests.
+    Only applies to tests marked with @pytest.mark.mock_only or @pytest.mark.unit.
+    """
+    # Check if test is marked as mock_only or unit
+    markers = [marker.name for marker in request.node.iter_markers()]
+    should_mock = "mock_only" in markers or ("unit" in markers and "network" not in markers)
+
+    if should_mock:
+        # Patch get_tokenizer to return our mock in all modules that use it
+        modules_to_patch = [
+            "codeweaver.tokenizers.get_tokenizer",
+            "codeweaver.providers.embedding.providers.base.get_tokenizer",
+            "codeweaver.providers.reranking.providers.base.get_tokenizer",
+            "codeweaver.providers.reranking.capabilities.base.get_tokenizer",
+        ]
+        for module_path in modules_to_patch:
+            try:
+                monkeypatch.setattr(module_path, _mock_get_tokenizer)
+            except AttributeError:
+                # Module or attribute not loaded yet, skip
+                pass
 
 
 @pytest.fixture
