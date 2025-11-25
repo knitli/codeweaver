@@ -27,6 +27,18 @@ from codeweaver.exceptions import InitializationError
 from codeweaver.providers.provider import Provider as Provider  # needed for pydantic models
 
 
+class UvicornAccessLogFilter(logging.Filter):
+    """Filter that blocks uvicorn access log messages."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Return False for uvicorn access logs to block them."""
+        # Block if it looks like an HTTP access log
+        return not (
+            record.name in ("uvicorn.access", "uvicorn", "uvicorn.error")
+            and ("HTTP" in record.getMessage() or "GET" in record.getMessage() or "POST" in record.getMessage())
+        )
+
+
 if TYPE_CHECKING:
     from codeweaver.config.settings import CodeWeaverSettings
     from codeweaver.server import AppState, ServerSetup
@@ -59,10 +71,9 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
         shutdown_count += 1
 
         if shutdown_count == 1:
-            logger.info("Shutting down gracefully (press Ctrl+C again to force)...")
-            # Let the signal propagate normally for graceful shutdown
-            if original_sigint_handler and callable(original_sigint_handler):
-                original_sigint_handler(signum, frame)
+            # Silent first interrupt - let lifespan cleanup handle the message
+            # Raise KeyboardInterrupt to trigger graceful shutdown
+            raise KeyboardInterrupt
         else:
             logger.warning("Force shutdown requested, exiting immediately...")
             sys.exit(1)
@@ -74,6 +85,11 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
         app = server if isinstance(server, FastMCP) else server["app"]
         resolved_kwargs: dict[str, Any] = kwargs or {}
         server_setup: ServerSetup | EllipsisType = server if is_server_setup(server) else ...
+
+        # Get verbose/debug flags early for use throughout
+        verbose = False
+        debug = False
+
         if server_setup and is_server_setup(server_setup):
             settings: CodeWeaverSettings = server_setup["settings"]
 
@@ -95,9 +111,7 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
             # Configure uvicorn based on verbosity
             uvicorn_config = settings.uvicorn or {}
             if not (verbose or debug):
-                # Non-verbose mode: Suppress all uvicorn logging
-                # Use a custom log_config that routes access logs to null
-
+                # Non-verbose mode: Suppress all uvicorn logging completely
                 uvicorn_log_config = {
                     "version": 1,
                     "disable_existing_loggers": False,
@@ -110,24 +124,14 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
                     },
                     "handlers": {
                         "null": {"class": "logging.NullHandler"},
-                        "default": {
-                            "formatter": "default",
-                            "class": "logging.StreamHandler",
-                            "stream": "ext://sys.stderr",
-                        },
                     },
                     "loggers": {
                         "uvicorn": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
-                        "uvicorn.error": {
-                            "handlers": ["null"],
-                            "level": "CRITICAL",
-                            "propagate": False,
-                        },
-                        "uvicorn.access": {
-                            "handlers": ["null"],
-                            "level": "CRITICAL",
-                            "propagate": False,
-                        },
+                        "uvicorn.error": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
+                        "uvicorn.access": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
+                        # Additional loggers that may leak through
+                        "fastapi": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
+                        "fastmcp": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
                     },
                 }
 
@@ -168,7 +172,26 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
             }  # type: ignore
         registry = lazy_import("codeweaver.common.registry.provider", "get_provider_registry")  # type: ignore
         _ = registry()  # type: ignore
-        await app.run_http_async(**resolved_kwargs)  # type: ignore
+
+        # Aggressively suppress uvicorn loggers BEFORE starting server
+        if not (verbose or debug):
+            # Add filter to root logger to block uvicorn access logs
+            access_filter = UvicornAccessLogFilter()
+            logging.getLogger().addFilter(access_filter)
+
+            for logger_name in ["uvicorn", "uvicorn.access", "uvicorn.error"]:
+                logger_obj = logging.getLogger(logger_name)
+                logger_obj.setLevel(logging.CRITICAL)
+                logger_obj.handlers.clear()
+                logger_obj.propagate = False
+                logger_obj.addFilter(access_filter)
+
+        # Wrap in try-except to catch KeyboardInterrupt cleanly without traceback
+        try:
+            await app.run_http_async(**resolved_kwargs)  # type: ignore
+        except KeyboardInterrupt:
+            # Silent shutdown - message handled by lifespan cleanup
+            pass
     finally:
         # Restore original signal handler
         if original_sigint_handler:

@@ -1,4 +1,4 @@
-# sourcery skip: no-complex-if-expressions
+# sourcery skip: no-complex-if-expressions, no-relative-imports
 #!/usr/bin/env -S uv run -s
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
@@ -25,8 +25,38 @@ from pathlib import Path
 import yaml
 
 from codeweaver import __version__
+from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
+from codeweaver.core.file_extensions import ALL_LANGUAGES
 from codeweaver.config.envs import environment_variables
+from codeweaver.providers.provider import Provider
 
+def _languages() -> list[str]:
+    """Get all supported programming languages."""
+    semantic = {lang.variable for lang in SemanticSearchLanguage}
+    all_languages = {str(lang) for lang in ALL_LANGUAGES if str(lang).lower() not in semantic}
+    return sorted(
+        all_languages
+        | {f"{lang} (AST support)" for lang in SemanticSearchLanguage}
+        | {lang.variable for lang in ConfigLanguage if not lang.is_semantic_search_language}
+    )
+
+def embedding_providers() -> list[Provider]:
+    """Get a list of embedding providers."""
+    return [
+        provider
+        for provider in Provider if provider.is_embedding_provider()
+    ]
+
+def reranking_providers() -> list[Provider]:
+    """Get a list of reranking providers."""
+    return [
+        provider
+        for provider in Provider if provider.is_reranking_provider()
+    ]
+
+def sparse_embedding_providers() -> list[Provider]:
+    """Get a list of sparse embedding providers."""
+    return [Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS]
 
 def get_git_commit() -> str:
     """Get the current git commit hash."""
@@ -129,16 +159,16 @@ def generate_server_yaml() -> dict:
             ],
         },
         "about": {
-            "title": "CodeWeaver - Semantic Code Search",
-            "description": "Semantic code search built for AI agents. Hybrid AST-aware embeddings for 170+ languages with intelligent chunking, intent detection, and multi-provider support.",
-            "icon": "https://avatars.githubusercontent.com/u/182288589?s=200&v=4",
+            "title": "CodeWeaver - Code Search for AI Agents",
+            "description": f"Semantic code search built for AI agents. Hybrid AST-aware context for {len(_languages())} languages with intelligent chunking, intent detection, and multi-provider support.",
+            "icon": "",
         },
         "source": {
             "project": "https://github.com/knitli/codeweaver",
             "commit": get_git_commit(),
         },
         "config": {
-            "description": "Configure CodeWeaver with your project path, embedding provider, and optional vector store settings. Supports 17+ embedding providers and 170+ programming languages.",
+            "description": f"Configure CodeWeaver with your project path, optional choice of providers and models, and optional vector store settings. Supports {len(embedding_providers())} embedding providers, {len(sparse_embedding_providers())} sparse embedding providers, {len(reranking_providers())} reranking providers, and {len(_languages())} programming languages.",
             "secrets": secrets or None,
             "env": regular_env or None,
             "parameters": {

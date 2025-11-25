@@ -13,15 +13,15 @@ Privacy-preserving telemetry system for collecting anonymized metrics to prove C
 
 The telemetry module provides:
 
-- **PostHog Integration**: Wrapper around PostHog Python client
-- **Event Schemas**: Structured event types for session summaries, performance benchmarks, and semantic validation  
+- **PostHog Integration**: Wrapper around PostHog Python client with context API support
+- **Event Schemas**: Structured event types for session statistics and per-search analytics
 - **Privacy Filtering**: Automatic privacy filtering via `serialize_for_telemetry()` on data models
-- **Baseline Comparison**: Calculator for estimating naive search approaches vs CodeWeaver
+- **Feature Flags**: A/B testing support via PostHog feature flags
 - **Configuration**: Easy opt-out mechanism via environment variables or config files
 
 ## Privacy Guarantees
 
-### What We NEVER Collect (unless you explicitly opt-in with the `tools-before-privacy` config option)
+### What We NEVER Collect (unless you explicitly opt-in with `CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY=true`)
 
 - ❌ Query content or search terms
 - ❌ Code snippets or file contents
@@ -35,6 +35,16 @@ The telemetry module provides:
 - ✅ Language distribution (counts only, no file names)
 - ✅ Semantic category usage frequencies
 - ✅ Config settings used (True/False, not the content)
+
+### Opt-In for Enhanced Telemetry
+
+If you want to help us improve CodeWeaver with richer data:
+
+```bash
+export CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY=true
+```
+
+This allows collection of query patterns and result quality metrics (still anonymized).
 
 ## Quick Start
 
@@ -54,23 +64,33 @@ uv pip install "codeweaver[recommended-no-telemetry]"
 
 ### Configuration
 
-Users can choose to divert telemetry to their own Posthog instance:
+**Disable telemetry:**
 
 ```bash
-export CODEWEAVER_POSTHOG_API_KEY="phc_your_key_here"
+export CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY=true
 ```
 
-Disable telemetry:
+**Opt-in to enhanced telemetry:**
 
 ```bash
-export CODEWEAVER_TELEMETRY_ENABLED=false
+export CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY=true
+```
+
+**Use your own PostHog instance:**
+
+```bash
+export CODEWEAVER__TELEMETRY__POSTHOG_API_KEY="phc_your_key_here"
+# also accepts:
+export CODEWEAVER_POSTHOG_API_KEY
+export CODEWEAVER__TELEMETRY__POSTHOG_HOST="https://your-posthog-instance.com"
 ```
 
 Or in config file:
 
 ```toml
 [telemetry]
-enabled = false
+disable_telemetry = true  # to disable
+tools_above_privacy = true  # to opt-in to enhanced
 ```
 
 ### Basic Usage
@@ -81,50 +101,52 @@ from codeweaver.common.telemetry import get_telemetry_client
 # Get singleton client (configured from settings)
 client = get_telemetry_client()
 
+# Start session with metadata
+client.start_session({"version": "0.5.0", "backend": "qdrant"})
+
 if client.enabled:
     # Send event
     client.capture(
-        event="codeweaver_session_summary",
+        event="codeweaver_search",
         properties={
-            "total_searches": 10,
-            "success_rate": 0.95,
-            # ... more aggregated metrics
+            "intent": "UNDERSTAND",
+            "execution_time_ms": 125.5,
+            "results": {"candidates": 50, "returned": 10},
         }
     )
 
-# Shutdown at application exit
-client.shutdown()
+# End session and flush events
+client.end_session()
 ```
 
 ### Using Event Schemas
 
 ```python
-from codeweaver.common.telemetry.events import SessionSummaryEvent
+from codeweaver.common.telemetry.events import capture_search_event
+from codeweaver.agent_api.find_code.intent import IntentType
+from codeweaver.agent_api.find_code.types import SearchStrategy
 
-# Create structured event
-event = SessionSummaryEvent(
-    session_duration_minutes=45.0,
-    total_searches=12,
-    successful_searches=11,
-    failed_searches=1,
-    success_rate=0.917,
-    avg_response_ms=1250.0,
-    # ... more fields
+# Capture a search event (convenience function)
+capture_search_event(
+    response=find_code_response,  # FindCodeResponseSummary
+    query="how does authentication work",
+    intent_type=IntentType.UNDERSTAND,
+    strategies=[SearchStrategy.HYBRID],
+    execution_time_ms=125.5,
+    tools_over_privacy=False,  # Opt-in for enhanced tracking
 )
-
-# Send to PostHog
-client.capture_from_event(event)
 ```
 
-## Module Structure
+### Context Manager Pattern
 
-```
-src/codeweaver/telemetry/
-├── __init__.py           # Package exports
-├── client.py             # PostHog client wrapper
-├── config.py             # Configuration settings
-├── events.py             # Event schemas
-└── comparison.py         # Baseline comparison
+```python
+from codeweaver.common.telemetry import get_telemetry_client
+
+# Automatic session cleanup
+with get_telemetry_client() as client:
+    client.start_session({"version": "0.5.0"})
+    # ... use client ...
+    # end_session() called automatically on exit
 ```
 
 ## Privacy Filtering
@@ -158,91 +180,78 @@ telemetry_data = model.serialize_for_telemetry()
 - **AGGREGATE**: Aggregate values (e.g., sum)
 - **TEXT_COUNT**: Convert text to character count
 
-## Baseline Comparison
+## Feature Flags
 
-Calculate efficiency improvements vs naive approaches:
+CodeWeaver supports A/B testing via PostHog feature flags:
 
 ```python
-from codeweaver.common.telemetry.comparison import (
-    BaselineComparator,
-    CodeWeaverMetrics,
-)
+from codeweaver.common.telemetry import get_telemetry_client
 
-comparator = BaselineComparator()
+client = get_telemetry_client()
 
-# Estimate naive grep approach
-baseline = comparator.estimate_naive_grep_approach(
-    query_keywords=["authentication", "middleware"],
-    repository_files=[
-        (Path("auth.py"), "python", 5000),
-        # ... more files
-    ]
-)
+# Get single feature flag
+variant = client.get_feature_flag("new_reranker")
+if variant == "test":
+    # Use experimental reranker
+    pass
 
-# Create CodeWeaver metrics
-codeweaver = CodeWeaverMetrics(
-    files_returned=8,
-    lines_returned=450,
-    actual_tokens=12000,
-    actual_cost_usd=0.065,
-)
-
-# Generate comparison report
-comparison = comparator.compare(baseline, codeweaver)
-
-print(f"Token reduction: {comparison.tokens_reduction_pct:.1f}%")
-print(f"Cost savings: {comparison.cost_savings_pct:.1f}%")
+# Get all feature flags
+all_flags = client.get_all_feature_flags()
 ```
 
 ## Event Types
 
-### SessionSummaryEvent
+### SessionEvent
 
-Aggregated session metrics sent at session end or periodically:
+Aggregated session statistics sent at session end:
 
 ```python
-SessionSummaryEvent(
-    session_duration_minutes=45.0,
-    total_searches=12,
-    success_rate=0.917,
-    avg_response_ms=1250.0,
-    total_tokens_generated=50000,
-    total_tokens_delivered=15000,
-    total_tokens_saved=35000,
-    languages={"python": 6, "typescript": 2},
-    semantic_frequencies={"definition_callable": 0.25},
+from codeweaver.common.telemetry.events import capture_session_event
+
+# Capture session event (convenience function)
+capture_session_event(
+    stats=session_statistics,  # SessionStatistics object
+    version="0.5.0",
+    setup_success=True,
+    setup_attempts=1,
+    config_errors=[],
+    duration_seconds=3600.0,
 )
 ```
 
-### PerformanceBenchmarkEvent
+**Tracks:**
+- Setup success/failure
+- Request statistics and performance
+- Token economics and savings
+- Repository characteristics (languages, file counts)
+- Failover statistics
 
-Comparison metrics showing improvements vs baselines:
+### SearchEvent
+
+Per-search analytics for find_code:
 
 ```python
-PerformanceBenchmarkEvent(
-    comparison_type="naive_vs_codeweaver",
-    baseline_approach="grep_full_files",
-    baseline_estimated_tokens=45000,
-    codeweaver_tokens_delivered=12000,
-    tokens_reduction_pct=73.3,
-    cost_savings_pct=80.0,
-    # ... more fields
+from codeweaver.common.telemetry.events import capture_search_event
+
+# Capture search event
+capture_search_event(
+    response=find_code_response,  # FindCodeResponseSummary
+    query="authentication flow",
+    intent_type=IntentType.UNDERSTAND,
+    strategies=[SearchStrategy.HYBRID],
+    execution_time_ms=125.5,
+    tools_over_privacy=False,
+    feature_flags={"new_reranker": "control"},
 )
 ```
 
-### SemanticValidationEvent
-
-Semantic category usage analysis:
-
-```python
-SemanticValidationEvent(
-    period="daily",
-    total_chunks_analyzed=5000,
-    category_usage={"definition_callable": 1250},
-    usage_frequencies={"definition_callable": 0.25},
-    correlation=0.85,
-)
-```
+**Tracks:**
+- Search intent and strategies used
+- Performance timing
+- Result quality metrics (relevance scores, match types)
+- Index state
+- Feature flags for A/B testing
+- Optional query patterns (with `tools_over_privacy=True`)
 
 ## Testing
 
@@ -260,67 +269,48 @@ pytest tests/unit/telemetry/test_privacy_serialization.py -v -m telemetry
 
 ## Development
 
-### Running the POC
-
-Test the telemetry system without full CodeWeaver:
-
-```bash
-python scripts/testing/metrics-poc.py
-
-# With detailed output:
-python scripts/testing/metrics-poc.py --detailed
-
-# Send to PostHog (requires API key):
-CODEWEAVER_POSTHOG_API_KEY="phc_..." python scripts/testing/metrics-poc.py --send-telemetry
-```
-
 ### Adding New Events
 
 1. Create event class in `events.py`:
 
 ```python
-from codeweaver.core.types import DATACLASS_CONFIG, DataclassSerializationMixin
-from pydantic.dataclasses import dataclass
+from typing import Any
 
-@dataclass(config=DATACLASS_CONFIG)
-class MyCustomEvent(DataclassSerializationMixin):
+class MyCustomEvent:
     """My custom telemetry event."""
-    
-    my_metric: int
-    
-    def _telemetry_keys(self):
-        return None  # No sensitive fields
-    
-    def to_posthog_event(self) -> tuple[str, dict]:
-        return ("my_custom_event", {"my_metric": self.my_metric})
+
+    EVENT_NAME = "my_custom_event"
+
+    def __init__(self, my_metric: int):
+        self.my_metric = my_metric
+
+    def to_posthog_event(self) -> tuple[str, dict[str, Any]]:
+        """Convert to PostHog format."""
+        return (self.EVENT_NAME, {"my_metric": self.my_metric})
 ```
 
-2. Add test in test file:
+2. Use in application:
 
 ```python
-def test_my_custom_event_serializes():
-    event = MyCustomEvent(my_metric=10)
-    serialized = event.serialize_for_telemetry()
-    assert "my_metric" in serialized
-    assert serialized["my_metric"] == 10
-```
+from codeweaver.common.telemetry import get_telemetry_client
 
-3. Use in application:
-
-```python
+client = get_telemetry_client()
 event = MyCustomEvent(my_metric=10)
 client.capture_from_event(event)
 ```
 
+**Note**: If your event data comes from BasedModel or DataclassSerializationMixin objects, use `capture_with_serialization()` to automatically apply privacy filtering via `serialize_for_telemetry()`.
+
 ## Configuration Options
 
-All settings use `CODEWEAVER_` prefix:
+All settings use `CODEWEAVER__TELEMETRY__` prefix (note the double underscores):
 
 | Environment Variable | Type | Default | Description |
 |---------------------|------|---------|-------------|
-| `TELEMETRY_ENABLED` | bool | true | Enable/disable telemetry |
-| `POSTHOG_API_KEY` | str | None | PostHog API key |
-| `POSTHOG_HOST` | str | https://app.posthog.com | PostHog host |
+| `DISABLE_TELEMETRY` | bool | false | Disable all telemetry |
+| `TOOLS_OVER_PRIVACY` | bool | false | Opt-in to enhanced telemetry (query patterns, results) |
+| `POSTHOG_API_KEY` | str | None | PostHog API key (for custom instance) |
+| `POSTHOG_HOST` | str | https://us.i.posthog.com | PostHog host |
 | `BATCH_SIZE` | int | 10 | Events per batch |
 | `BATCH_INTERVAL_SECONDS` | int | 60 | Batch interval |
 
@@ -333,12 +323,17 @@ All settings use `CODEWEAVER_` prefix:
 python -c "from codeweaver.common.telemetry import get_telemetry_client; print(get_telemetry_client().enabled)"
 ```
 
-2. Verify API key:
+2. Check if disabled:
 ```bash
-echo $CODEWEAVER_POSTHOG_API_KEY
+echo $CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY
 ```
 
-3. Check logs:
+3. Verify API key (if using custom instance):
+```bash
+echo $CODEWEAVER__TELEMETRY__POSTHOG_API_KEY
+```
+
+4. Check logs:
 ```python
 import logging
 logging.basicConfig(level=logging.DEBUG)
@@ -365,10 +360,8 @@ print(event.serialize_for_telemetry())
 
 ## Links
 
-- [Implementation Plan](../../../plans/telemetry-metrics-implementation-plan.md)
-- [POC Script](../../../scripts/testing/metrics-poc.py)
-- [Privacy Tests](../../../tests/unit/telemetry/test_privacy_serialization.py)
-- [PostHog Documentation](https://posthog.com/docs)
+- [Privacy Tests](../../../tests/unit/telemetry/test_privacy_serialization.py) - Verify anonymization works correctly
+- [PostHog Documentation](https://posthog.com/docs) - Official PostHog docs
 
 ## License
 

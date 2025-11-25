@@ -1,8 +1,3 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-#
-# SPDX-License-Identifier: MIT OR Apache-2.0
-
 name: codeweaver
 image: mcp/codeweaver
 type: server
@@ -18,18 +13,18 @@ meta:
   - hybrid-search
   - rag
 about:
-  title: CodeWeaver - Semantic Code Search
-  description: Semantic code search built for AI agents. Hybrid AST-aware embeddings
-    for 170+ languages with intelligent chunking, intent detection, and multi-provider
+  title: CodeWeaver - Code Search for AI Agents
+  description: Semantic code search built for AI agents. Hybrid AST-aware context
+    for 166 languages with intelligent chunking, intent detection, and multi-provider
     support.
-  icon: https://avatars.githubusercontent.com/u/182288589?s=200&v=4
+  icon: ''
 source:
   project: https://github.com/knitli/codeweaver
-  commit: b5a967d47b30025959684696c67c030fce5071b2
+  commit: cfc8b961d36dc528182d3c1650932b8e0729d2bd
 config:
   description: Configure CodeWeaver with your project path, embedding provider, and
-    optional vector store settings. Supports 17+ embedding providers and 170+ programming
-    languages.
+    optional vector store settings. Supports 17 embedding providers, 2 sparse embedding
+    providers, 5 reranking providers, and 166 programming languages.
   secrets:
   - name: codeweaver.embedding_api_key
     env: CODEWEAVER_EMBEDDING_API_KEY

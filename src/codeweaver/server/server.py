@@ -687,7 +687,8 @@ def _set_log_levels():
         "mcp",
         "mcp.server",
         "fastmcp",
-        "fastmcp.server",  # Add this one
+        "fastmcp.server",
+        "fastapi",
         "httpx",
         "httpcore",
     ]

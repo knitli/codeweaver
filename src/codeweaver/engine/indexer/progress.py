@@ -169,6 +169,9 @@ class IndexingProgressTracker:
         if self.live:
             self.live.stop()
             self.live = None
+            # Explicitly flush to ensure clean terminal state
+            if hasattr(self.console.file, 'flush'):
+                self.console.file.flush()
 
     def update(self, stats: IndexingStats, phase: str | None = None) -> None:
         """Update progress based on current indexing statistics.
@@ -257,8 +260,11 @@ class IndexingProgressTracker:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:  # type: ignore
-        """Context manager exit."""
+        """Context manager exit - ensures clean terminal state."""
         self.stop()
+        # Additional flush to ensure terminal is fully reset
+        if hasattr(self.console.file, 'flush'):
+            self.console.file.flush()
 
 
 __all__ = ("IndexingPhase", "IndexingProgressTracker", "IndexingStats")

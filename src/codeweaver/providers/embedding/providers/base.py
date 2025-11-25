@@ -1110,6 +1110,65 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
         value_type=UUID, size_limit=1024 * 128
     )  # 128kb limit -- separate from dense embeddings
 
+    @override
+    def _batch_and_key(
+        self, chunk_list: Sequence[CodeChunk], *, for_backup: bool, skip_deduplication: bool
+    ) -> tuple[Iterator[CodeChunk], UUID7]:
+        """Override to create batch keys with sparse=True.
+
+        This ensures chunks get their sparse_batch_key set correctly, which is
+        required for sparse embeddings to be stored in the vector store.
+        """
+        from codeweaver.core.chunks import BatchKeys
+        from codeweaver.core.stores import get_blake_hash
+
+        key = uuid7()
+        final_chunks: list[CodeChunk] = []
+
+        hashes = [get_blake_hash(chunk.content.encode("utf-8")) for chunk in chunk_list]
+
+        # Check which chunks are NEW (hash not in store)
+        # When skip_deduplication is True, include all chunks regardless of hash store
+        if skip_deduplication:
+            starter_chunks = chunk_list
+        else:
+            starter_chunks = (
+                [
+                    chunk
+                    for i, chunk in enumerate(chunk_list)
+                    if chunk and hashes[i] not in type(self)._backup_hash_store
+                ]
+                if for_backup
+                else [
+                    chunk
+                    for i, chunk in enumerate(chunk_list)
+                    if chunk and hashes[i] not in type(self)._hash_store
+                ]
+            )
+
+        # Add NEW chunks with batch keys (sparse=True for sparse providers) and add their hashes to store
+        for i, chunk in enumerate(starter_chunks):
+            # Find the original index in chunk_list to get correct hash
+            original_idx = chunk_list.index(chunk)
+            # *** FIX: Create batch keys with sparse=True for sparse embedding providers ***
+            batch_keys = BatchKeys(id=key, idx=i, sparse=True)
+            final_chunks.append(chunk.set_batch_keys(batch_keys, secondary=for_backup))
+            # Now add the hash to store, mapping it to this batch key
+            if for_backup:
+                type(self)._backup_hash_store[hashes[original_idx]] = key
+                if not type(self)._backup_store:
+                    type(self)._backup_store = make_uuid_store(
+                        value_type=list, size_limit=1024 * 1024
+                    )  # type: ignore
+                type(self)._backup_store[key] = final_chunks  # type: ignore
+            else:
+                type(self)._hash_store[hashes[original_idx]] = key
+                if not type(self)._store:
+                    type(self)._store = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)  # type: ignore
+                type(self)._store[key] = final_chunks  # type: ignore
+
+        return iter(final_chunks), key
+
     @abstractmethod
     @override
     async def _embed_documents(

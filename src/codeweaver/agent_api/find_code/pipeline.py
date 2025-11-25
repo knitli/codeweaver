@@ -166,6 +166,9 @@ async def _embed_sparse(
     else:
         if isinstance(result, SparseEmbedding):
             return result
+        # Handle list[SparseEmbedding] from sparse provider's embed_query
+        if isinstance(result, list) and len(result) > 0 and isinstance(result[0], SparseEmbedding):
+            return result[0]
         if isinstance(result, dict) and "indices" in result and "values" in result:
             return SparseEmbedding(**result)
         if isinstance(result, list) and len(result) > 0 and isinstance(result[0], dict):

@@ -14,6 +14,7 @@ from __future__ import annotations
 from enum import Enum
 from pathlib import Path
 from typing import Any, TypedDict
+from types import MappingProxyType
 
 from pydantic import AnyUrl, BaseModel, ConfigDict, Field, RootModel
 
@@ -131,10 +132,12 @@ def _env_vars_for_provider(provider: Provider) -> tuple[ProviderEnvVars, ...] | 
 
 def _languages() -> list[str]:
     """Get all supported programming languages."""
+    semantic = {lang.variable for lang in SemanticSearchLanguage}
+    all_languages = {str(lang) for lang in ALL_LANGUAGES if str(lang).lower() not in semantic}
     return sorted(
-        ALL_LANGUAGES
-        | {lang.variable for lang in SemanticSearchLanguage}
-        | {lang.variable for lang in ConfigLanguage}
+        all_languages
+        | {f"{lang} (AST support)" for lang in SemanticSearchLanguage}
+        | {lang.variable for lang in ConfigLanguage if not lang.is_semantic_search_language}
     )
 
 
@@ -142,6 +145,7 @@ def capabilities() -> dict[str, Any]:
     """Get the server capabilities."""
     return {
         "languages_supported": len(_languages()),
+
         "embedding_providers": [
             prov.as_title for prov in _providers_for_kind(ProviderKind.EMBEDDING)
         ],
@@ -223,7 +227,7 @@ class Server(BaseModel):
         examples=["io.github.user/weather"],
     )
     description: str = Field(
-        "Semantic code search built for AI agents. Hybrid AST-aware embeddings for 170+ languages.",
+        f"Semantic code search built for AI agents. Hybrid AST-aware embeddings for {len(_languages())} languages.",
         max_length=100,
         min_length=1,
         description="Clear human-readable explanation of server functionality. Should focus on capabilities, not implementation details.",
@@ -537,13 +541,20 @@ def all_env_vars() -> list[McpInputDict]:
         (McpInputDict(**var.as_mcp_info()) for var in _generalized_provider_env_vars()),  # type: ignore[misc]
         key=lambda v: v["name"],
     )
+    
+    # Deduplicate provider vars by name
+    seen_names: set[str] = set()
+    unique_provider_vars: list[McpInputDict] = []
+    for provider_vars in get_provider_env_vars().values():
+        for var in provider_vars:
+            if var["name"] not in seen_names:
+                seen_names.add(var["name"])
+                unique_provider_vars.append(var)
+    
     return (
         general_vars
         + generalized_provider_vars
-        + sorted(
-            (var for provider_vars in get_provider_env_vars().values() for var in provider_vars),
-            key=lambda v: v["name"],
-        )
+        + sorted(unique_provider_vars, key=lambda v: v["name"])
     )
 
 
@@ -565,8 +576,9 @@ def _create_uvx_package() -> Package:
         runtime_hint="uvx",
         transport=StreamableHttpTransport(
             type_=StreamableHttpTransportType.streamable_http,
-            url="http://{host}:{port}",
+            url="http://{host}:{port}/mcp/",
         ),
+        
         package_arguments=[
             # Subcommand
             PositionalArgument(
@@ -629,14 +641,7 @@ def _create_uvx_package() -> Package:
             ),
         ],
         environment_variables=[
-            KeyValueInput(
-                name=var["name"],
-                description=var.get("description"),
-                is_required=var.get("is_required", False),
-                is_secret=var.get("is_secret", False),
-                default=var.get("default"),
-                fmt=var.get("fmt"),
-            )
+            KeyValueInput.model_validate(var)
             for var in env_vars
         ],
     )
@@ -658,8 +663,8 @@ def _get_docker_env_vars() -> list[KeyValueInput]:
         "MISTRAL_API_KEY",
         "GOOGLE_API_KEY",
         "ANTHROPIC_API_KEY",
-        "BEDROCK_AWS_ACCESS_KEY_ID",
-        "BEDROCK_AWS_SECRET_ACCESS_KEY",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
         "QDRANT_API_KEY",
         "QDRANT__SERVICE__API_KEY",
     }
@@ -698,6 +703,21 @@ def _get_docker_env_vars() -> list[KeyValueInput]:
 
 def _create_docker_package() -> Package:
     """Create the Docker (OCI) package configuration."""
+    env_vars = all_env_vars()
+    as_keyvalues = [KeyValueInput(
+        **(var)
+    ) for var in env_vars]
+    as_named_args = [NamedArgument(
+        type_=NamedArgumentType.named,
+        name="-e",
+        description=var.get("description"),
+        is_required=var.get("is_required", False),
+        value=var["name"] + "={" + var["name"] + "}",
+        is_secret=var.get("is_secret", False),
+        default=var.get("default"),
+        fmt=var.get("fmt"),
+    ) for var in env_vars]
+        
     return Package(
         registry_type="oci",
         registry_base_url=AnyUrl("https://docker.io"),
@@ -734,33 +754,6 @@ def _create_docker_package() -> Package:
                 description="Set repository path inside container",
                 is_required=False,
                 value="CODEWEAVER_PROJECT_PATH=/workspace",
-            ),
-            NamedArgument(
-                type_=NamedArgumentType.named,
-                name="-e",
-                description="Voyage AI API key for embeddings",
-                is_required=False,
-                value="VOYAGE_API_KEY={voyage_api_key}",
-                variables={
-                    "voyage_api_key": Input(
-                        description="Your Voyage AI API key",
-                        is_required=False,
-                    )
-                },
-            ),
-            NamedArgument(
-                type_=NamedArgumentType.named,
-                name="-e",
-                description="Embedding provider selection",
-                is_required=False,
-                value="CODEWEAVER_EMBEDDING_PROVIDER={embedding_provider}",
-                variables={
-                    "embedding_provider": Input(
-                        description="Provider to use for embeddings",
-                        default="voyage",
-                        choices=["voyage", "cohere", "openai", "fastembed", "sentence_transformers"],
-                    )
-                },
             ),
             NamedArgument(
                 type_=NamedArgumentType.named,
@@ -816,7 +809,7 @@ def _create_docker_package() -> Package:
                 value="streamable-http",
             ),
         ],
-        environment_variables=_get_docker_env_vars(),
+        environment_variables=as_keyvalues,
     )
 
 
@@ -842,7 +835,7 @@ def _create_field_meta() -> FieldMeta:
     ]
 
     # Add search types
-    caps["search_types"] = ["semantic", "hybrid", "keyword"]
+    caps["search_types"] = ["semantic", "hybrid", "traditional"]
 
     # Add chunking strategies
     caps["chunking_strategies"] = ["semantic", "semantically-aware-delimiters"]
@@ -856,6 +849,7 @@ def _create_field_meta() -> FieldMeta:
             },
             "capabilities": caps,
             "tags": tags,
+            "all_supported_languages": _languages(),
         }
     )
 
@@ -865,8 +859,8 @@ def generate_server_detail() -> ServerDetail:
     return ServerDetail(
         field_schema=AnyUrl("https://static.modelcontextprotocol.io/schemas/2025-09-16/server.schema.json"),
         name="io.github.knitli/codeweaver",
-        description="Semantic code search built for AI agents. Hybrid AST-aware embeddings for 170+ languages.",
-        title="CodeWeaver - Semantic Code Search",
+        description=f"Semantic code search built for AI agents. Hybrid AST-aware context for {len(_languages())} languages.",
+        title="CodeWeaver - Code Search for AI Agents",
         version=__version__,
         status=Status.active,
         repository=REPOSITORY,
@@ -922,10 +916,7 @@ def validate_against_official_schema(server_detail: ServerDetail) -> None:
     validator = Draft202012Validator(schema)
 
     try:
-        # Validate and collect all errors
-        errors = list(validator.iter_errors(server_json))
-
-        if errors:
+        if errors := list(validator.iter_errors(server_json)):
             error_messages = []
             for error in errors:
                 path = " → ".join(str(p) for p in error.path) if error.path else "root"

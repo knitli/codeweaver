@@ -74,9 +74,8 @@ async def find_code_tool(
 
     Args:
         query: Natural language search query
-        intent: Optional search intent (if None, will be detected)
+        intent: Optional search intent. One of `understand`, `implement`, `debug`, `optimize`, `test`, `configure`, `document`
         token_limit: Maximum tokens to return (default: 30000)
-        include_tests: Whether to include test files in results
         focus_languages: Optional language filter
         context: MCP context for request tracking
 
