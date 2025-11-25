@@ -2,6 +2,8 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+# CodeQL suppression: Test container binding - no production risk
+# nosemgrep: python.lang.security.audit.network.bind.bind-0.0.0.0
 
 """Integration tests for Docker and Docker Compose setup.
 
@@ -52,10 +54,9 @@ def find_free_port() -> int:
         An available port number
     """
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(('', 0))
+        s.bind(("", 0))
         s.listen(1)
-        port = s.getsockname()[1]
-    return port
+        return s.getsockname()[1]
 
 
 def generate_unique_project_name() -> str:
@@ -238,7 +239,17 @@ LOG_LEVEL=DEBUG
             max_attempts = 30
             for _attempt in range(max_attempts):
                 result_ps = run_command(
-                    ["docker", "compose", "-f", str(compose_file), "-p", project_name, "ps", "--format", "json"],
+                    [
+                        "docker",
+                        "compose",
+                        "-f",
+                        str(compose_file),
+                        "-p",
+                        project_name,
+                        "ps",
+                        "--format",
+                        "json",
+                    ],
                     check=False,
                 )
                 if result_ps.returncode == 0:
@@ -248,14 +259,19 @@ LOG_LEVEL=DEBUG
                 pytest.fail("Services did not become healthy in time")
 
             # Check that services are running
-            result = run_command(["docker", "compose", "-f", str(compose_file), "-p", project_name, "ps"], check=True)
+            result = run_command(
+                ["docker", "compose", "-f", str(compose_file), "-p", project_name, "ps"], check=True
+            )
 
             assert "qdrant" in result.stdout, "Qdrant service not running"
             assert "codeweaver" in result.stdout, "CodeWeaver service not running"
 
         finally:
             # Cleanup with unique project name
-            run_command(["docker", "compose", "-f", str(compose_file), "-p", project_name, "down", "-v"], check=False)
+            run_command(
+                ["docker", "compose", "-f", str(compose_file), "-p", project_name, "down", "-v"],
+                check=False,
+            )
 
     @pytest.mark.slow
     @pytest.mark.network
@@ -311,13 +327,18 @@ ENABLE_TELEMETRY=false
                 time.sleep(2)
 
             # Verify health endpoint responds
-            result = run_command(["curl", "-sf", f"http://localhost:{qdrant_port}/health"], check=False)
+            result = run_command(
+                ["curl", "-sf", f"http://localhost:{qdrant_port}/health"], check=False
+            )
 
             assert result.returncode == 0, "Qdrant health endpoint not accessible"
 
         finally:
             # Cleanup with unique project name
-            run_command(["docker", "compose", "-f", str(compose_file), "-p", project_name, "down", "-v"], check=False)
+            run_command(
+                ["docker", "compose", "-f", str(compose_file), "-p", project_name, "down", "-v"],
+                check=False,
+            )
 
 
 class TestDockerIgnore:
