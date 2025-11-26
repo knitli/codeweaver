@@ -10,6 +10,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+# Skip this entire module if the cohere package is not installed
+pytest.importorskip("cohere", reason="cohere package is required for these tests")
+
 from codeweaver.common.utils.utils import uuid7
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage
