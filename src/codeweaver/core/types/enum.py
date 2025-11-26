@@ -62,6 +62,7 @@ class BaseEnumData(DataclassSerializationMixin):
         object.__setattr__(self, "_description", description)
         for key, val in kwargs.items():
             object.__setattr__(self, key, val)
+        super().__init__()
 
 
 @unique

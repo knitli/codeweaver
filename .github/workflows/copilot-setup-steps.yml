@@ -45,7 +45,7 @@ jobs:
             ~/.local/share/mise/shims
             ~/.cache/mise
             ~/.local/bin
-          key: mise-copilot-${{ runner.os }}-${{ hashFiles('mise.toml') }}
+          key: mise-copilot-${{ runner.os }}-${{ hashFiles('mise.ci.toml') }}
           restore-keys: |
             mise-copilot-${{ runner.os }}-
             mise-${{ runner.os }}-

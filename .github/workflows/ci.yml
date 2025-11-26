@@ -54,7 +54,7 @@ jobs:
             ~/.local/share/mise/shims
             ~/.cache/mise
             ~/.local/bin
-          key: mise-${{ runner.os }}-${{ hashFiles('mise.toml') }}
+          key: mise-${{ runner.os }}-${{ hashFiles('mise.ci.toml') }}
           restore-keys: |
             mise-${{ runner.os }}-
       - name: Cache UV dependencies
@@ -136,7 +136,7 @@ jobs:
             ~/.local/share/mise/shims
             ~/.cache/mise
             ~/.local/bin
-          key: mise-lint-${{ runner.os }}-${{ hashFiles('mise.toml') }}
+          key: mise-lint-${{ runner.os }}-${{ hashFiles('mise.ci.toml') }}
           restore-keys: |
             mise-lint-${{ runner.os }}-
             mise-${{ runner.os }}-

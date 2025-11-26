@@ -41,6 +41,7 @@ def _get_shared_openai_embedding_capabilities() -> PartialCapabilities:
         "supports_custom_prompts": False,
         "is_normalized": True,
         "tokenizer": "tiktoken",
+        "max_batch_tokens": 64_000,
         "tokenizer_model": "cl100k_base",
         "supports_context_chunk_embedding": False,
         "context_window": 8192,

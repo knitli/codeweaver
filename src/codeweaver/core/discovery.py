@@ -109,6 +109,7 @@ class DiscoveredFile(DataclassSerializationMixin):
         else:
             object.__setattr__(self, "_git_branch", Missing)
         object.__setattr__(self, "source_id", kwargs.get("source_id", uuid7()))
+        super().__init__(**kwargs)
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey

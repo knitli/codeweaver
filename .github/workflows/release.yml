@@ -17,6 +17,10 @@ on:
   release:
     types:
       - published
+permissions:
+  contents: read
+  packages: write
+  actions: read
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
@@ -55,7 +59,7 @@ jobs:
             ~/.local/share/mise/shims
             ~/.cache/mise
             ~/.local/bin
-          key: mise-${{ runner.os }}-${{ hashFiles('mise.toml') }}
+          key: mise-${{ runner.os }}-${{ hashFiles('mise.ci.toml') }}
           restore-keys: |
             mise-${{ runner.os }}-
       - name: Cache UV dependencies
