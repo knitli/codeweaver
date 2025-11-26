@@ -331,6 +331,7 @@ async def test_reference_queries_comprehensive(
 
 @pytest.mark.integration
 @pytest.mark.asyncio
+@pytest.mark.skip_ci  # This test uses real providers and times out in CI; use for local debugging only
 @pytest.mark.parametrize(
     "query_index",
     range(25),  # 25 reference queries in fixture
