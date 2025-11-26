@@ -37,6 +37,7 @@ These scripts are called by project tooling (pyproject.toml, mise.toml, hk.pkl, 
 | **[code-quality/update-licenses.py](#update-licensespy)** | Update REUSE license headers | mise.toml, hk.pkl |
 | **[testing/apply-test-marks.py](#apply-test-markspy)** | Apply pytest marks to test files | hk.pkl |
 | **[dev-env/install-mise.sh](#install-misesh)** | Install mise task runner | .github/workflows |
+| **[dev-env/ci-free-disk-space.sh](#ci-free-disk-spacesh)** | Free disk space on CI runners | .github/workflows |
 
 ---
 
@@ -282,6 +283,34 @@ Contains scripts and rules for fixing ruff linting violations. See [ruff-fixes/R
 ---
 
 ## Development Environment
+
+### ci-free-disk-space.sh
+
+**Location:** `scripts/dev-env/ci-free-disk-space.sh`
+
+Frees up disk space on GitHub Actions runners by removing unused pre-installed packages and Docker artifacts. This prevents disk space exhaustion during UV cache extraction (~3.5 GB).
+
+**Usage:**
+```bash
+./scripts/dev-env/ci-free-disk-space.sh
+# or via mise
+mise run ci-free-disk-space
+```
+
+**Referenced in:**
+- `.github/workflows/ci.yml`
+- `.github/workflows/release.yml`
+- `.github/workflows/publish-test.yml`
+- `.github/workflows/copilot-setup-steps.yml`
+
+**What it removes:**
+- Docker images and containers (via `docker system prune`)
+- CodeQL (`/opt/hostedtoolcache/CodeQL`)
+- Java (`/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk`)
+- Ruby (`/opt/hostedtoolcache/Ruby`)
+- Go (`/opt/hostedtoolcache/go`)
+- .NET SDK (`/usr/share/dotnet`)
+- Android SDK (`/usr/local/lib/android`)
 
 ### install-mise.sh
 
