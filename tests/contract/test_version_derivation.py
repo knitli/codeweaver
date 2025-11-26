@@ -104,9 +104,9 @@ def test_validate_version_derivation(git_state: dict):
         pytest.fail("No wheel artifact found")
 
     wheel_name = artifacts[0].name
-    # Extract version from wheel filename: codeweaver_mcp-{version}-py3-none-any.whl
-    # Note: Package name may be normalized (codeweaver -> codeweaver_mcp or codeweaver)
-    match = re.match(r"codeweaver[_-]?(?:mcp)?-(.+?)-py3-none-any\.whl", wheel_name)
+    # Extract version from wheel filename: code_weaver-{version}-py3-none-any.whl
+    # Note: Package name may be normalized (codeweaver's package name is code-weaver, which normalizes to code_weaver)
+    match = re.match(r"code_weaver[_-]?(?:mcp)?-(.+?)-py3-none-any\.whl", wheel_name)
     if not match:
         pytest.fail(f"Could not extract version from wheel: {wheel_name}")
     assert match
@@ -176,8 +176,8 @@ def test_version_consistency():
     sdist_name = sdists[0].name
 
     # Extract versions - handle both normalized package names
-    wheel_match = re.match(r"codeweaver[_-]?(?:mcp)?-(.+?)-py3-none-any\.whl", wheel_name)
-    sdist_match = re.match(r"codeweaver[_-]?(?:mcp)?-(.+?)\.tar\.gz", sdist_name)
+    wheel_match = re.match(r"code_weaver[_-]?(?:mcp)?-(.+?)-py3-none-any\.whl", wheel_name)
+    sdist_match = re.match(r"code_weaver[_-]?(?:mcp)?-(.+?)\.tar\.gz", sdist_name)
 
     if not wheel_match or not sdist_match:
         pytest.fail(f"Could not extract versions from artifacts: {wheel_name}, {sdist_name}")
