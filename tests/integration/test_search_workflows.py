@@ -107,6 +107,7 @@ def test_project_path(tmp_path: Path) -> Path:
 
 
 @pytest.mark.integration
+@pytest.mark.network
 @pytest.mark.asyncio
 async def test_cli_search_returns_results(test_project_path: Path, initialized_app_state):
     """T010: CLI search command returns results (stub validation).
@@ -156,6 +157,7 @@ async def test_cli_search_returns_results(test_project_path: Path, initialized_a
 
 
 @pytest.mark.integration
+@pytest.mark.network
 @pytest.mark.asyncio
 async def test_cli_search_output_formats(test_project_path: Path, initialized_app_state):
     """T010: CLI search supports multiple output formats.
@@ -202,6 +204,7 @@ async def test_cli_search_output_formats(test_project_path: Path, initialized_ap
 
 
 @pytest.mark.integration
+@pytest.mark.network
 @pytest.mark.asyncio
 async def test_mcp_find_code_tool(test_project_path: Path, initialized_app_state):
     """T010: MCP find_code tool returns valid response conforming to contract.
@@ -263,6 +266,7 @@ async def test_mcp_find_code_tool(test_project_path: Path, initialized_app_state
 
 
 @pytest.mark.integration
+@pytest.mark.network
 @pytest.mark.asyncio
 async def test_mcp_find_code_required_parameters(test_project_path: Path, initialized_app_state):
     """T010: MCP find_code handles parameter validation.
@@ -301,6 +305,7 @@ async def test_mcp_find_code_required_parameters(test_project_path: Path, initia
 
 
 @pytest.mark.integration
+@pytest.mark.network
 @pytest.mark.asyncio
 async def test_search_with_intent_parameter(initialized_app_state):
     """T010: Search with explicit intent parameter.
@@ -349,6 +354,7 @@ async def test_search_with_intent_parameter(initialized_app_state):
 
 
 @pytest.mark.integration
+@pytest.mark.network
 @pytest.mark.asyncio
 async def test_search_filters_work(initialized_app_state):
     """T010: Search filters (include_tests) parameter handling.
@@ -384,6 +390,7 @@ async def test_search_filters_work(initialized_app_state):
 
 
 @pytest.mark.integration
+@pytest.mark.network
 @pytest.mark.asyncio
 async def test_search_token_limit(initialized_app_state):
     """T010: Search respects token_limit parameter.
@@ -412,6 +419,7 @@ async def test_search_token_limit(initialized_app_state):
 
 
 @pytest.mark.integration
+@pytest.mark.network
 @pytest.mark.asyncio
 async def test_empty_query_handling(initialized_app_state):
     """T010: Empty query handled gracefully.
@@ -434,6 +442,7 @@ async def test_empty_query_handling(initialized_app_state):
 
 
 @pytest.mark.integration
+@pytest.mark.network
 @pytest.mark.asyncio
 async def test_no_results_scenario(initialized_app_state):
     """T010: No matching results handled gracefully.
@@ -465,6 +474,7 @@ async def test_no_results_scenario(initialized_app_state):
 
 
 @pytest.mark.integration
+@pytest.mark.network
 @pytest.mark.asyncio
 @pytest.mark.benchmark
 async def test_search_performance(test_project_path: Path, initialized_app_state):
@@ -497,6 +507,7 @@ async def test_search_performance(test_project_path: Path, initialized_app_state
 
 
 @pytest.mark.integration
+@pytest.mark.network
 @pytest.mark.asyncio
 @pytest.mark.benchmark
 async def test_search_response_time_tracking(initialized_app_state):
@@ -557,6 +568,7 @@ async def test_search_strategy_reporting(test_project_path: Path, configured_pro
 
 
 @pytest.mark.integration
+@pytest.mark.network
 @pytest.mark.asyncio
 async def test_search_languages_found(initialized_app_state):
     """T010: Languages found correctly reported.

@@ -34,7 +34,7 @@ import sys
 from pathlib import Path
 from typing import Literal, NamedTuple
 
-import botocore
+import botocore.exceptions
 
 from rich.console import Console
 from rich.panel import Panel
