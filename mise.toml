@@ -20,6 +20,7 @@ uv_venv_create_args = [
 python = "3.13"
 gh = "latest"
 hk = "latest"
+pkl = "latest"
 uv = "latest"
 
 [env]

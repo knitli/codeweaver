@@ -74,12 +74,12 @@ def test_validate_build_output(clean_dist: Path):
     sdist = sdists[0]
 
     # Filenames must follow conventions
-    assert wheel.name.startswith("codeweaver-"), (
+    assert wheel.name.startswith("code_weaver-"), (
         f"Wheel name must start with package name, got: {wheel.name}"
     )
-    assert "-py3-none-any.whl" in wheel.name, f"Wheel must be pure Python, got: {wheel.name}"
+    assert wheel.name.endswith("-py3-none-any.whl"), f"Wheel must be pure Python, got: {wheel.name}"
 
-    assert sdist.name.startswith("codeweaver-"), (
+    assert sdist.name.startswith("code_weaver-"), (
         f"Sdist name must start with package name, got: {sdist.name}"
     )
     assert sdist.name.endswith(".tar.gz"), f"Sdist must be .tar.gz, got: {sdist.name}"
@@ -90,9 +90,10 @@ def test_validate_build_output(clean_dist: Path):
 
     # Version must be consistent across artifacts
     # Extract version from both filenames and verify they match
-    # Format: codeweaver_mcp-{version}-py3-none-any.whl
-    # Format: codeweaver_mcp-{version}.tar.gz
+    # Format: code_weaver-{version}-py3-none-any.whl
+    # Format: code_weaver-{version}.tar.gz
     wheel_parts = wheel.name.split("-")
+    # Version is between package name and python tag (py3)
     wheel_version = wheel_parts[1] if len(wheel_parts) > 1 else ""
 
     sdist_parts = sdist.name.replace(".tar.gz", "").split("-")

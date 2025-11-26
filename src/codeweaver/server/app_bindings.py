@@ -70,7 +70,9 @@ async def find_code_tool(
     focus_languages: tuple[SemanticSearchLanguage, ...] | None = None,
     context: Context | None = None,
 ) -> FindCodeResponseSummary:
-    """Use CodeWeaver to find code in the codebase.
+    """CodeWeaver's `find_code` tool is an advanced code search function that leverages context and task-aware semantic search to identify and retrieve relevant code snippets from a codebase using natural language queries. `find_code` uses advanced sparse and dense embedding models, and reranking models to provide the best possible results. It is purpose-built for AI coding agents to assist with code understanding, implementation, debugging, optimization, testing, configuration, and documentation tasks.
+
+    To use it, provide a natural language query describing what you are looking for. You can optionally specify an intent to help narrow down the search results. You can also set a token limit to control the size of the response, and filter results by programming language.
 
     Args:
         query: Natural language search query
@@ -372,8 +374,8 @@ async def favicon(_request: Request) -> Response:
         content=svg_data,
         media_type="image/svg+xml",
         headers={
-            "Cache-Control": "public, max-age=86400",  # Cache for 24 hours
-        }
+            "Cache-Control": "public, max-age=86400"  # Cache for 24 hours
+        },
     )
 
 
