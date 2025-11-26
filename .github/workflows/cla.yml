@@ -16,9 +16,10 @@ on:
       - closed
       - synchronize
 permissions:
+  actions: write
   contents: read
-  pull-requests: read
-  issues: read
+  pull-requests: write
+  statuses: write
 
 jobs:
   cla-check:
