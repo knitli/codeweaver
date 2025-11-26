@@ -32,11 +32,26 @@ def cleanup_registry():
 
     This ensures test isolation by clearing the global singleton registry
     between test runs to prevent cross-test contamination.
+
+    Also clears the hash stores from the embedding providers to prevent
+    deduplication across tests.
     """
+    from codeweaver.providers.embedding.providers.sentence_transformers import (
+        SentenceTransformersEmbeddingProvider,
+    )
+
     registry = get_embedding_registry()
     registry.clear()
+
+    # Clear the hash stores (ClassVar shared across all instances)
+    SentenceTransformersEmbeddingProvider._hash_store.clear()
+    SentenceTransformersEmbeddingProvider._backup_hash_store.clear()
+
     yield
+
     registry.clear()
+    SentenceTransformersEmbeddingProvider._hash_store.clear()
+    SentenceTransformersEmbeddingProvider._backup_hash_store.clear()
 
 
 @pytest.fixture

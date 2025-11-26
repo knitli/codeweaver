@@ -468,7 +468,10 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             )  # type: ignore
             is_old_batch = True
         chunks_iter, cache_key = self._process_input(
-            documents, is_old_batch=is_old_batch, for_backup=for_backup, skip_deduplication=skip_deduplication
+            documents,
+            is_old_batch=is_old_batch,
+            for_backup=for_backup,
+            skip_deduplication=skip_deduplication,
         )  # type: ignore
 
         # Convert iterator to tuple once to avoid exhaustion issues
@@ -954,7 +957,37 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
         for i, info in enumerate(chunk_infos):
             if (registered := registry.get(info.chunk_id)) is not None:
-                registry[info.chunk_id] = registered.add(info)
+                # Check if we already have this type of embedding
+                has_existing = (
+                    (
+                        info.kind.value == "dense"
+                        and not info.backup
+                        and registered.dense is not None
+                    )
+                    or (
+                        info.kind.value == "sparse"
+                        and not info.backup
+                        and registered.sparse is not None
+                    )
+                    or (
+                        info.kind.value == "dense"
+                        and info.backup
+                        and registered.backup_dense is not None
+                    )
+                    or (
+                        info.kind.value == "sparse"
+                        and info.backup
+                        and registered.backup_sparse is not None
+                    )
+                )
+
+                if has_existing:
+                    # Replace existing embedding (e.g., during re-embedding with skip_deduplication=True)
+                    registry[info.chunk_id] = registered.update(info)
+                else:
+                    # Add new embedding kind to existing entry
+                    registry[info.chunk_id] = registered.add(info)
+
                 if registered.chunk != chunks[i]:
                     # because we create new CodeChunk instances during processing, we need to update the chunk reference
                     registry[info.chunk_id] = registry[info.chunk_id]._replace(chunk=chunks[i])

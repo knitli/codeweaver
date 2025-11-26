@@ -185,14 +185,28 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         preprocessed = cast(list[str], self.chunks_to_strings(documents))
         if "nomic" in self.model_name:
             preprocessed = [f"search_document: {doc}" for doc in preprocessed]
-        embed_partial = rpartial(  # type: ignore
-            self.client.encode,  # type: ignore
-            **(
-                self.doc_kwargs.get("client_options", {})
-                | {"model_kwargs": self.doc_kwargs.get("model_kwargs", {})}
-                | {**kwargs, "convert_to_numpy": True}
-            ),
-        )
+
+        # Filter out client initialization params - only pass encode-time params
+        # Client init params: model_name_or_path, trust_remote_code, model_kwargs, etc.
+        # Encode params: normalize_embeddings, convert_to_numpy, batch_size, show_progress_bar, etc.
+        client_options = self.doc_kwargs.get("client_options", {})
+        encode_kwargs = {
+            k: v
+            for k, v in client_options.items()
+            if k
+            not in {
+                "model_name_or_path",
+                "trust_remote_code",
+                "model_kwargs",
+                "device",
+                "cache_folder",
+                "use_auth_token",
+                "token",
+            }
+        }
+        encode_kwargs.update({**kwargs, "convert_to_numpy": True})
+
+        embed_partial = rpartial(self.client.encode, **encode_kwargs)  # type: ignore
         loop = asyncio.get_running_loop()
         results: np.ndarray = await loop.run_in_executor(None, embed_partial, preprocessed)  # type: ignore
         _ = self._fire_and_forget(lambda: self._update_token_stats(from_docs=preprocessed))
@@ -207,14 +221,26 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
             preprocessed = self.preprocess(preprocessed)  # type: ignore
         elif "nomic" in self.model_name:
             preprocessed = [f"search_query: {query}" for query in preprocessed]
-        embed_partial = rpartial(  # type: ignore
-            self.client.encode,  # type: ignore
-            **(
-                self.query_kwargs.get("client_options", {})
-                | {"model_kwargs": self.query_kwargs.get("model_kwargs", {})}
-                | {**kwargs, "convert_to_numpy": True}
-            ),
-        )
+
+        # Filter out client initialization params - only pass encode-time params
+        client_options = self.query_kwargs.get("client_options", {})
+        encode_kwargs = {
+            k: v
+            for k, v in client_options.items()
+            if k
+            not in {
+                "model_name_or_path",
+                "trust_remote_code",
+                "model_kwargs",
+                "device",
+                "cache_folder",
+                "use_auth_token",
+                "token",
+            }
+        }
+        encode_kwargs.update({**kwargs, "convert_to_numpy": True})
+
+        embed_partial = rpartial(self.client.encode, **encode_kwargs)  # type: ignore
         loop = asyncio.get_running_loop()
         results: np.ndarray = await loop.run_in_executor(None, embed_partial, preprocessed)  # type: ignore
         _ = self._fire_and_forget(

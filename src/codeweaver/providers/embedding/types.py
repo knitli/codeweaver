@@ -245,6 +245,37 @@ class ChunkEmbeddings(NamedTuple):
             else self.backup_sparse,
         )
 
+    def update(self, embedding_info: EmbeddingBatchInfo) -> ChunkEmbeddings:
+        """Update or replace an EmbeddingBatchInfo in the ChunkEmbeddings.
+
+        Unlike `add()`, this method will replace existing embeddings of the same kind.
+        This is useful for re-embedding scenarios where we want to update embeddings.
+
+        Args:
+            embedding_info (EmbeddingBatchInfo): The embedding information to update/replace.
+
+        Returns:
+            ChunkEmbeddings: A new ChunkEmbeddings instance with the updated embedding.
+        """
+        if self.chunk.chunk_id != embedding_info.chunk_id:
+            raise ValueError(
+                f"Embedding chunk ID {embedding_info.chunk_id} does not match ChunkEmbeddings chunk ID {self.chunk.chunk_id}."
+            )
+        return self._replace(
+            dense=embedding_info
+            if embedding_info.kind == EmbeddingKind.DENSE and not embedding_info.backup
+            else self.dense,
+            sparse=embedding_info
+            if embedding_info.kind == EmbeddingKind.SPARSE and not embedding_info.backup
+            else self.sparse,
+            backup_dense=embedding_info
+            if embedding_info.kind == EmbeddingKind.DENSE and embedding_info.backup
+            else self.backup_dense,
+            backup_sparse=embedding_info
+            if embedding_info.kind == EmbeddingKind.SPARSE and embedding_info.backup
+            else self.backup_sparse,
+        )
+
     @property
     def models(self) -> tuple[ModelNameT] | tuple[ModelNameT, ModelNameT]:
         """Get the set of models used for the embeddings."""

@@ -439,7 +439,11 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
     def clear(self) -> None:
         """Clear the store."""
         if self._trash_heap is not None:  # type: ignore
-            self._trash_heap.update(self.store)
+            # Try to move items to trash heap, but if value type doesn't support weak refs
+            # (e.g., NamedTuple), just skip the trash heap
+            with contextlib.suppress(TypeError):
+                # Value type doesn't support weak references (e.g., NamedTuple)
+                self._trash_heap.update(self.store)
         self.store.clear()
 
     def clear_trash(self) -> None:
