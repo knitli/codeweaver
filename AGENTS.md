@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code), Github Copilot, Roo
 
 CodeWeaver is an extensible MCP (Model Context Protocol) server for semantic code search. It provides intelligent codebase context discovery through a single `find_code` tool interface, supporting multiple embedding providers, vector databases, and data sources through a plugin architecture.
 
-**Current Status**: Nearing Alpha release. Most core features complete; completing integration and testing.
+**Current Status**: Alpha Release 1. Most core features complete and relatively stable. Advanced functionality planned in several epics.
 
 > [!IMPORTANT]
 > Because it is an MCP server, you can use CodeWeaver while assisting with CodeWeaver development!
@@ -348,6 +348,7 @@ src/codeweaver/
 │
 ├── server/              # MCP server implementation
 │   ├── __init__.py
+
 │   ├── app_bindings.py  # Application dependency bindings and http admin endpoints (i.e. /metrics)
 │   ├── health_endpoint.py # Health check endpoint
 │   ├── health_models.py # Health check data models

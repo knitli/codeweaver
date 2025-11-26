@@ -51,6 +51,7 @@ Using the [CLI](#cli):
 In your project:
 ```bash
 uv add --prerelease allow --dev codeweaver
+# or poetry: 
 
 cw init
 cw doctor

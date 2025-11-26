@@ -78,7 +78,7 @@ keywords = [
   "voyageai",
 ]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 3 - Alpha",
   "Environment :: Console",
   "Intended Audience :: Developers",
   "Intended Audience :: Information Technology",
@@ -120,7 +120,7 @@ dependencies = [
   "pydantic-ai>=1.20.0",
   "pydantic-graph>=1.20.0",
   "pydantic-settings[toml,yaml]>=2.12.0",  # Pulls: tomli>=2.0.1, pyyaml>=6.0.1
-  "qdrant-client>=1.16.0",
+  "qdrant-client>=1.16.1",
   "rich>=14.2.0",
   "rignore>=0.7.6",
   "tenacity>=9.1.2",
@@ -185,7 +185,7 @@ full-gpu = [
   "fastembed-gpu",
   "permit-fastmcp",
   "pydantic-settings[yaml,toml,aws-secrets-manager,azure-key-vault,gcp-secret-manager]",
-  "sentence-transformers[onnx-gpu]",
+  "sentence-transformers[onnx-gpu]>=5.0.0",
 ]
 gcp-secret-manager = ["pydantic-settings[yaml,toml,gcp-secret-manager]"]
 # ==== Providers ====
@@ -214,12 +214,12 @@ provider-mistral = ["pydantic-ai-slim[mistral]"]
 provider-openai = ["pydantic-ai-slim[openai]"]
 provider-qdrant = ["qdrant-client"]
 provider-sentence-transformers = [
-  "sentence-transformers",
+  "sentence-transformers>=5.0.0",
   "py-cpuinfo",
 ]
 provider-sentence-transformers-gpu = [
   # GPU requires additional setup
-  "sentence-transformers[onnx-gpu]",
+  "sentence-transformers[onnx-gpu]>5.0.0",
 ]
 # disabled until we can fully integrate and resolve dependency conflicts
 # provider-sentence-transformers-openvino = [
@@ -229,7 +229,7 @@ provider-sentence-transformers-gpu = [
 provider-voyageai = ["voyageai"]
 recommended-local-only = [
   "fastembed",
-  "sentence-transformers",
+  "sentence-transformers>=5.0.0",
   "tokenizers",
 ]
 # ==== Data Sources ====
