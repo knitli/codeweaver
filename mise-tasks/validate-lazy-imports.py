@@ -63,6 +63,7 @@ NO_LAZY_PACKAGES = [
 PACKAGE_MODULES = list(SRC_DIR.rglob("**/__init__.py"))
 
 IS_EXCEPTION = (
+    "codeweaver.__version__",
     "codeweaver.common.CODEWEAVER_PREFIX",
     "codeweaver.agent_api.get_user_agent",
     "codeweaver.common.utils.LazyImport",

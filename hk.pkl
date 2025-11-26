@@ -87,7 +87,7 @@ local linters = new Mapping<String, Step> {
     }
     ["check-python-ast"] = new Step {
         glob = "*.py"
-        check = "hk util check-python-ast {{ files }}"
+        check = "hk util python-check-ast {{ files }}"
     }
     ["check-trailing-whitespace"] = new Step {
         glob = "*.{py,md,txt,toml,ini,cfg,conf,sh,bash,yml,yaml,json,jsonc,js,ts,tsx,rs,go,java,css,scss,html,xml}"
