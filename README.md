@@ -7,309 +7,392 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 <!--
 mcp-name: com.knitli/codeweaver
 -->
-# CodeWeaver
+<div align="center">
 
 <picture>
   <source srcset="docs/assets/codeweaver-reversed.svg" media="(prefers-color-scheme: dark)">
   <source srcset="docs/assets/codeweaver-primary.svg" media="(prefers-color-scheme: light)">
-  <img 
-    src="docs/assets/codeweaver-primary.svg" 
+  <img
+    src="docs/assets/codeweaver-primary.svg"
     alt="CodeWeaver by Knitli"
     width="200"
     height="200"
-    style="display: block; margin: 0 auto;"
   >
 </picture>
----
-by Knitli
 
-> *Alpha Release 1*
----
-**CodeWeaver is the missing abstraction layer between AI and your code.**
+# CodeWeaver
 
-It gives both humans and AI a deep, structural understanding of your project — not just text search, but real context: symbols, blocks, relationships, intent. [MCP][mcp] is just the delivery mechanism; CodeWeaver is the capability.
+### The missing abstraction layer between AI and your code
 
-If you want AI that actually knows your code instead of guessing, this is the foundation.
+[![Python Version](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green.svg)](LICENSE)
+[![Alpha Release](https://img.shields.io/badge/release-alpha%201-orange.svg)](https://github.com/knitli/codeweaver/releases)
+[![MCP Compatible](https://img.shields.io/badge/MCP-compatible-purple.svg)](https://modelcontextprotocol.io)
 
----
+[Installation](#-getting-started) •
+[Features](#-features) •
+[How It Works](#-how-it-works) •
+[Documentation](#-documentation) •
+[Contributing](#-contributing)
 
-## **Why CodeWeaver exists**
-
-**The problems:**
-* **Poor Context = Poor Results** - Agents are better at generating new code than finding and understanding existing structure
-* **Massive Inefficiency** - Agents read the same huge files repeatedly, carrying bloated context with every tool call (50%+ waste is common)
-* **Wrong Abstraction** - Agents get handed complex tools built for humans, not tools built for how agents actually work
-* **No Ownership** - Existing solutions are locked into specific IDEs or MCP clients; you can't deploy them how you want
-
-The result: shallow, inconsistent, fragile context. And you don't control it.
-
-**CodeWeaver's approach:**
-* One focused capability: structural + semantic code understanding
-* Hybrid search built for code, not text
-* Works offline, airgapped, or degraded
-* Deploy it however you want
-* One great tool instead of 30 mediocre ones
-
-[Read the detailed rationale →][WHY]
+</div>
 
 ---
 
-## **Getting Started**
+## 🎯 What is CodeWeaver?
 
-Using the [CLI](#cli):
+**CodeWeaver gives both humans and AI a deep, structural understanding of your project** — not just text search, but real context: symbols, blocks, relationships, intent. [MCP][mcp] is just the delivery mechanism; CodeWeaver is the capability.
 
-In your project (with [uv](https://astral.sh/uv)):
+**If you want AI that actually knows your code instead of guessing, this is the foundation.**
+
+> ⚠️ **Alpha Release**: CodeWeaver is in active development. [Use it, break it, shape it, help make it better][report].
+
+---
+
+## 🔍 Why CodeWeaver Exists
+
+### The Problems
+
+| Problem | Impact |
+|---------|--------|
+| 🔴 **Poor Context = Poor Results** | Agents are better at generating new code than understanding existing structure |
+| 💸 **Massive Inefficiency** | Agents read the same huge files repeatedly (50%+ context waste is common) |
+| 🔧 **Wrong Abstraction** | Tools built for humans, not for how agents actually work |
+| 🔒 **No Ownership** | Existing solutions locked into specific IDEs or agent clients like Claude Code |
+
+**The result**: Shallow, inconsistent, fragile context. And you don't control it.
+
+### CodeWeaver's Approach
+
+✅ **One focused capability**: Structural + semantic code understanding
+✅ **Hybrid search built for code**, not text
+✅ **Works offline, airgapped, or degraded**
+✅ **Deploy it however you want**
+✅ **One great tool instead of 30 mediocre ones**
+
+📖 [Read the detailed rationale →][WHY]
+
+---
+
+## 🚀 Getting Started
+
+### Quick Install
+
+Using the [CLI](#cli) with [uv](https://astral.sh/uv):
+
 ```bash
-# or "codeweaver[full]"
-uv add --prerelease allow --dev codeweaver 
+# Install CodeWeaver
+uv add --prerelease allow --dev codeweaver
 
-# Init will create a config and .mcp.json (or add to it) in your project
+# Initialize config and MCP setup
 cw init
+
+# Verify setup
 cw doctor
-# resolve any issues identified by cw doctor, then:
+
+# Start the server
 cw server
 ```
 
-> [!NOTE]
-> `cw init` defaults to CodeWeaver's `recommended` profile, which requires a Voyage AI API key
-> Voyage has a generous free tier, you can get an API key by signing up at http://voyage.ai
-> The default install also requires a local qdrant instance. We recommend Qdrant cloud,
-> which also requires an API key and also has a generous free tier: https://qdrant.tech
+> **📝 Note**: `cw init` defaults to CodeWeaver's `recommended` profile, which requires:
+> - 🔑 [Voyage AI API key](http://voyage.ai) (generous free tier)
+> - 🗄️ [Qdrant instance](https://qdrant.tech) (cloud or local, generous free tier for cloud, free local)
 
-You're ready, but you can customize *just about everything if you want to*.
-
-Or [with Docker](DOCKER.md)
+🐳 **Prefer Docker?** [See Docker setup guide →](DOCKER.md)
 
 ### MCP Configuration
 
-`cw init` will add CodeWeaver to your project's `.mcp.json`, or you can pass `--client` flags for other options. 
+`cw init` will add CodeWeaver to your project's `.mcp.json`:
 
-> [!IMPORTANT]
-> Unlike most MCP servers, CodeWeaver **defaults** to the `streamable-http` transport, meaning it runs like a web server.
-> We decided to take that route because we think it provides a more predictable, smoother experience overall even when run locally.
-> So your mcp config will look something like:
->
-> ```json
-> "mcpServers": {
->   "codeweaver": {
->      "type": "http",
->      "url": "http://127.0.0.1:9328/mcp"
->    } 
-> }
-> ```
+```json
+{
+  "mcpServers": {
+    "codeweaver": {
+      "type": "http",
+      "url": "http://127.0.0.1:9328/mcp"
+    }
+  }
+}
+```
 
-> [!WARNING]
-> While CodeWeaver *can* technically use the usual `stdio` transport. We have not tested it.
-> CodeWeaver relies on complex background orchestration that may produce undesirable results
-> if you run it with the `stdio` transport (like corrupted files, dogs :dog: and cats :cat:  living together, mass hysteria)
-> ⚠️ **use at your own risk!**
-> If you want to volunteer to test it and work out the bugs, we'd love your help.
+> **💡 Why HTTP?** Unlike most MCP servers, CodeWeaver defaults to `streamable-http` transport for a more predictable, smoother experience.
+
+> ⚠️ **Warning**: While `stdio` transport is technically possible, it's **untested** and may cause issues due to complex background orchestration. Use at your own risk!
 
 ---
 
-## **How It Works**
+## ✨ Features
 
-CodeWeaver mixes [AST][wiki_ask]-level understanding, semantic relationships, and hybrid embeddings (sparse + dense) to deliver contextual and literal understanding of your codebase.
+<table>
+<tr>
+<td width="50%">
+
+### 🧠 Smart Search
+- **Hybrid search** (sparse + dense)
+- **AST-level understanding**
+- **Semantic relationships**
+- **Context-aware chunking**
+
+</td>
+<td width="50%">
+
+### 🌐 Language Support
+- **26 languages** with full AST/semantic
+- **136+ languages** with intelligent chunking
+- **Family heuristics** for smart parsing
+
+</td>
+</tr>
+<tr>
+<td>
+
+### 🔄 Resilient & Offline
+- **Automatic fallback** to local models
+- **Works offline/airgapped**
+- **Health monitoring** with graceful degradation
+- **Better degraded than others' primary mode**
+
+</td>
+<td>
+
+### ⚙️ Flexible Configuration
+- **~15 config sources** (TOML/YAML/JSON)
+- **Cloud secret stores** (AWS/Azure/GCP)
+- **Hierarchical merging**
+- **Environment overrides**
+
+</td>
+</tr>
+<tr>
+<td>
+
+### 🔌 Provider Support
+- **Multiple embedding providers**
+- **Sparse & dense models**
+- **Reranking support**
+- [See full provider list →](overrides/partials/providers.md)
+
+</td>
+<td>
+
+### 🛠️ Developer Experience
+- **Live indexing** with file watching
+- **Low CPU overhead**
+- **Full CLI** (`cw` / `codeweaver`)
+- **Health, metrics, status endpoints**
+
+</td>
+</tr>
+</table>
+
+---
+
+## 🏗️ How It Works
+
+CodeWeaver combines [AST][wiki_ask]-level understanding, semantic relationships, and hybrid embeddings (sparse + dense) to deliver both contextual and literal understanding of your codebase.
 
 **The goal: give AI the fragments it *should* see, not whatever it can grab.**
 
-### **Language Support**
+### Architecture Highlights
 
-* **AST/Semantic Hybrid Search:** 26 languages
-* **Context-Aware Chunking:** 136+ languages
-  Uses language family heuristics to intelligently chunk (like "this is a Lisp-style form", "this looks like a function block", etc.)
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Your Codebase                        │
+└────────────────┬────────────────────────────────────────┘
+                 │
+                 ▼
+        ┌────────────────┐
+        │  Live Indexing  │ ← AST parsing + semantic analysis
+        └────────┬───────┘
+                 │
+                 ▼
+    ┌────────────────────────┐
+    │   Hybrid Vector Store   │ ← Sparse + Dense embeddings
+    └────────┬───────────────┘
+             │
+             ▼
+    ┌─────────────────┐
+    │  Reranking Layer │ ← Relevance optimization
+    └────────┬────────┘
+             │
+             ▼
+    ┌──────────────────┐
+    │   MCP Interface   │ ← Simple "find_code" tool
+    └────────┬─────────┘
+             │
+             ▼
+       ┌─────────┐
+       │   AI    │
+       └─────────┘
+```
 
-### **Provider Support**
+### CLI Commands
 
-CodeWeaver supports many different providers for embedding, sparse embedding, and reranking models. See [the full list](overrides/partials/providers.md) or use `cw list` to explore them.
+```bash
+cw server    # Run the MCP server
+cw doctor    # Full setup diagnostic
+cw index     # Run indexing without server
+cw init      # Set up MCP + config
+cw list      # List providers, models, capabilities
+cw status    # Live server status, health, index state
+cw search    # Test the search engine
+cw config    # View resolved configuration
+```
 
-### **Search & Context**
+📖 [Full CLI Guide →][cli_guide]
 
-* Hybrid (sparse + dense) search is always available — offline, airgapped; no problem.
-* Vector store and embedding provider health monitoring with automatic fallback to lightweight, local models
-* Performs better than generic MCP search because it's built for structure, not text
-
-### **Indexing & Watching**
-
-* Live indexing with stable, fast file watching
-* Low CPU overhead (background tasks run at low process priority)
-* Index stays warm as you edit
-
-### **CLI**
-
-Both `cw` and `codeweaver` work.
-
-* `server` - run the server
-* `doctor` – full setup diagnostic and troubleshooting
-* `index` – run indexing without the server
-* `init` – set up MCP + CodeWeaver config (or each separately with `mcp` and `config` subcommands)
-* `list` - list available providers, models, and similar capabilities
-* `status` – live server status, provider health, index state
-* `search` – same engine AI uses; works with or without server
-* `config` – view final resolved config (hierarchical, merged, secrets-aware)
-
-Full CLI Guide [available here][cli_guide]
-
-### **Configuration**
-
-* ~15 config sources (TOML/YAML/JSON, env, workspace overrides, secrets, etc.)
-* Default config is `codeweaver.toml` in your project. Use `cw init config` to generate.
-* Cloud secret stores supported (AWS/Azure/GCP)
-* Priority-based hierarchical merging
-* [Schema][config_schema]
-
-Full guide coming soon. 
-
-### **Server & Programmatic Access**
-
-* Health endpoint (`/health/`)
-* Metrics (`/metrics/`)
-* Versioning info (`/version/`)
-* Settings view (`/settings/`)
-* Full state dump for external tooling or debugging
-* Docker image for painless setup
-
-### **Resilient Fallback**
-
-If your embedding provider dies, or Qdrant crashes, or your laptop goes offline:
-
-* CodeWeaver detects the failure
-* Automatically falls back to a separate hybrid (dense + sparse) vector index with lightweight local models
-* Still includes reranking for quality results
-* Keeps serving context without you doing anything
-
-Your degraded mode is better than most tools' primary mode (which often lack sparse vectors or reranking entirely).
-
-### **The MCP layer is thin**
-
-It's not "MCP as product." MCP is just the pipe AI drinks from.
 
 ---
 
-## **Current Status & Stability (Alpha)**
+## 📊 Current Status (Alpha)
 
-> [!IMPORTANT]
-> Codeweaver **is in alpha**. *Use* it, *break* it, *shape* it, *help make it better*. [Report issues][report].
+### Stability Snapshot: Strong Core, Prickly Edges
 
+| Component | Status | Notes |
+|-----------|--------|-------|
+| 🔄 **Live indexing & file watching** | ⭐⭐⭐⭐ | Runs continuously; reliable |
+| 🌳 **AST-based chunking** | ⭐⭐⭐⭐ | Full semantic/AST for 26 languages |
+| 📝 **Context-aware chunking** | ⭐⭐⭐⭐ | 136+ languages, heuristic AST-lite |
+| 🔌 **Provider integration** | ⭐⭐⭐ | Voyage/FastEmbed reliable, others vary |
+| 🛡️ **Automatic fallback** | ⭐⭐⭐ | Seamless offline/degraded mode |
+| 💻 **CLI** | ⭐⭐⭐⭐ | Core commands fully wired and tested |
+| 🐳 **Docker build** | ⭐⭐⭐ | Skip local Qdrant setup entirely |
+| 🔗 **MCP interface** | ⭐⭐⭐ | Core ops reliable, some edge cases |
+| 🌐 **HTTP endpoints** | ⭐⭐⭐ | Health, metrics, state, versions stable |
 
-### **Stability Snapshot** -- Strong Core; Prickly Edges
-
-| Area                                      | Status                 | Notes                                              |
-| ----------------------------------------- | ---------------------- | -------------------------------------------------- |
-| **Live indexing & file watching**         | ⭐⭐⭐⭐           | Runs continuously; reliable
-| **Ast-Based Chunking**                  | ⭐⭐⭐⭐           | Full semantic/AST for 26 languages.                |
-| **Context-aware chunking**                | ⭐⭐⭐⭐         | 136+ languages. Heuristic AST-lite. Usually right. |
-| **Provider integration**                  | ⭐⭐⭐             | Voyage/FastEmbed reliable. Others: ¯\_(ツ)_/¯       |
-| **Automatic fallback (offline/degraded)** | ⭐⭐⭐            | Seamless switch to local hybrid backup search.        |
-| **CLI (cw / codeweaver)**                 | ⭐⭐⭐⭐            | Core commands fully wired and tested.              |
-| **Docker build**                          | ⭐⭐⭐             | Skip local Qdrant setup entirely.
-| **MCP interface**                         | ⭐⭐⭐             | Core ops reliable; some edge-case weirdness.       |
-| **HTTP endpoints**                        | ⭐⭐⭐              | Health, metrics, state, versions. Stable.          |
-
-*(Legend: ⭐⭐⭐⭐ = solid, ⭐⭐⭐ = works with some quirks, ⭐⭐ = experimental, ⭐ = chaos gremlin)*
+_Legend: ⭐⭐⭐⭐ = solid | ⭐⭐⭐ = works with quirks | ⭐⭐ = experimental | ⭐ = chaos gremlin_
 
 ---
 
-## **Roadmap**
+## 🗺️ Roadmap
 
-The `enhancement` issues describe plans in detail; the short version:
+The [`enhancement`](https://github.com/knitli/codeweaver/labels/enhancement) issues describe detailed plans. Short version:
 
-- Way better docs.
-- Integrate AI agents into the context delivery pipeline to identify purpose and intent and curate results
-- Integrate data providers and tools for *internal* agents to use to provide better, more accurate context (Tavily and DuckDuckGo scaffolded; we'd like to add Context7 and others)
-- Replace the existing registry system with a true DI injection system.
-- Integrate `pydantic-graph` for advanced orchestration of context delivery.
+- 📚 **Way better docs** – comprehensive guides and tutorials
+- 🤖 **AI-powered context curation** – agents identify purpose and intent
+- 🔧 **Data provider integration** – Tavily, DuckDuckGo, Context7, and more
+- 💉 **True DI system** – replace existing registry
+- 🕸️ **Advanced orchestration** – integrate `pydantic-graph`
 
 ### What Will Stay: One Tool
 
 **One tool**. We give AI agents one simple tool: `find_code`.
 
-Agents just need to explain what they need. No complex schemas. No pages long prompts and tool instructions.
-
-We would never read a novella-length document to learn how to use a basic coding tool; AI agents shouldn't either.
----
-
-# **Documentation**
-
-### **For Users**
-- [Docker Setup Notes](docs/docker/DOCKER_BUILD_NOTES.md) - Docker build troubleshooting and using pre-built images
-
-### **For Developers**
-- [Overall architecture](ARCHITECTURE.md)
-- [find_code API](src/codeweaver/agent_api/find_code/README.md) - Core search API documentation
-- [find_code Architecture](src/codeweaver/agent_api/find_code/ARCHITECTURE.md) - Detailed architecture and extension points
-
-### **For Anyone**
-
-We think transparency is important, so here's our product decisions:
-
-- [product decisions](PRODUCT.md)
-
-<!-- More comprehensive documentation is in progress at https://dev.knitli.com/codeweaver -->
+Agents just need to explain what they need. No complex schemas. No novella-length prompts.
 
 ---
 
-# **Contributing**
+## 📚 Documentation
 
-PRs, issues, weird edge cases, feature requests — all welcome.
+### For Users
+- 🐳 [Docker Setup Notes](docs/docker/DOCKER_BUILD_NOTES.md)
+- 🚀 [Getting Started Guide](#-getting-started)
+
+### For Developers
+- 🏗️ [Overall Architecture](ARCHITECTURE.md)
+- 🔍 [find_code API](src/codeweaver/agent_api/find_code/README.md)
+- 📐 [find_code Architecture](src/codeweaver/agent_api/find_code/ARCHITECTURE.md)
+
+### Product Philosophy
+- 💭 [Product Decisions](PRODUCT.md) – transparency matters
+- 🤔 [Why CodeWeaver?](docs/WHY.md) – detailed rationale
+
+<!-- Comprehensive documentation coming soon at https://dev.knitli.com/codeweaver -->
+
+---
+
+## 🤝 Contributing
+
+**PRs, issues, weird edge cases, feature requests — all welcome!**
+
 This is still early, and the best time to help shape the direction.
 
-You will need to agree to our [CLA](CONTRIBUTORS_LICENSE_AGREEMENT.md)
+### How to Contribute
+
+1. 🍴 Fork the repository
+2. 🌿 Create a feature branch
+3. ✨ Make your changes
+4. ✅ Add tests if applicable
+5. 📝 Update documentation
+6. 🚀 Submit a PR
+
+You'll need to agree to our [Contributor License Agreement](CONTRIBUTORS_LICENSE_AGREEMENT.md).
+
+### Found a Bug?
+
+🐛 [Report it here][report] – include as much detail as possible!
 
 ---
 
-## Links
+## 🔗 Links
 
-**Project**:
-- Repository: https://github.com/knitli/codeweaver
-- Issues: https://github.com/knitli/codeweaver/issues
-<!-- Documentation: https://dev.knitli.com/codeweaver (in progress) -->
-- Changelog: https://github.com/knitli/codeweaver/blob/main/CHANGELOG.md
+### Project
+- 📦 **Repository**: [github.com/knitli/codeweaver](https://github.com/knitli/codeweaver)
+- 🐛 **Issues**: [Report bugs & request features](https://github.com/knitli/codeweaver/issues)
+- 📋 **Changelog**: [View release history](https://github.com/knitli/codeweaver/blob/main/CHANGELOG.md)
+<!-- - 📖 **Documentation**: https://dev.knitli.com/codeweaver (in progress) -->
 
-**Company**:
-- Knitli: https://knitli.com
-- Blog: https://blog.knitli.com
-- X/Twitter: https://x.com/knitli_inc
-- LinkedIn: https://linkedin.com/company/knitli
-- GitHub: https://github.com/knitli
+### Company
+- 🏢 **Knitli**: [knitli.com](https://knitli.com)
+- ✍️ **Blog**: [blog.knitli.com](https://blog.knitli.com)
+- 🐦 **X/Twitter**: [@knitli_inc](https://x.com/knitli_inc)
+- 💼 **LinkedIn**: [company/knitli](https://linkedin.com/company/knitli)
+- 💻 **GitHub**: [@knitli](https://github.com/knitli)
 
-We're a [one-person company](@bashandbone) at the moment... and make no money... if you like CodeWeaver, and want to keep it going, please consider sponsoring me 😄
+### Support the Project
 
-**Package Info**:
-- Python package: `codeweaver`
-- CLI command: `codeweaver`
-- Python requirement: ≥3.12 (tested on 3.12, 3.13, 3.14)
-- Entry point: `codeweaver.cli.app:main`
+We're a [one-person company](https://github.com/bashandbone) at the moment... and make no money... if you like CodeWeaver and want to keep it going, please consider **[sponsoring me](https://github.com/sponsors/knitli)** 😄
 
 ---
 
-## License
+## 📦 Package Info
 
-Licensed under MIT **or** Apache 2.0. You choose.  Some vendored code is Apache 2.0 only and some is MIT only. Everything is permissively licensed.
-
-The project follows the [reuse specification](https://reuse.software). Every file has detailed licensing information, and we regularly generate a [software bill of materials](sbom.spdx)
-
----
-## Telemetry
-
-The default includes very anonymized telemetry. It will only be used to improve CodeWeaver. [You can see the implementation for yourself](src/codeweaver/common/telemetry/) or read [the README](src/codeweaver/common/telemetry/README.md). Opt out by exporting `CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY=true`
-
-If you want to be awesome and let us collect information on queries and results, you can *opt in* with `CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY=true`. That will give us the information we need to really make your queries better.
-
-[See our privacy policy](PRIVACY_POLICY.md)
+- **Python package**: `codeweaver`
+- **CLI commands**: `cw` / `codeweaver`
+- **Python requirement**: ≥3.12 (tested on 3.12, 3.13, 3.14)
+- **Entry point**: `codeweaver.cli.app:main`
 
 ---
-## API
 
-> [!WARNING]
-> The API *will change*. Our priority right now is giving your and your coding agent and awesome tool.
-> To deliver on that, we can't get locked into API contracts while we're in alpha.
-> We also want you to be able to extend and build on CodeWeaver -- once we get to stable releases.
+## 📄 License
 
+Licensed under **MIT OR Apache 2.0** — you choose! Some vendored code is Apache 2.0 only and some is MIT only. Everything is permissively licensed.
+
+The project follows the [REUSE specification](https://reuse.software). Every file has detailed licensing information, and we regularly generate a [software bill of materials](sbom.spdx).
+
+---
+
+## 📊 Telemetry
+
+The default includes **very anonymized telemetry** to improve CodeWeaver. [See the implementation](src/codeweaver/common/telemetry/) or read [the README](src/codeweaver/common/telemetry/README.md).
+
+**Opt out**: `export CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY=true`
+
+**Opt in to detailed feedback** (helps us improve): `export CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY=true`
+
+📋 [See our privacy policy](PRIVACY_POLICY.md)
+
+---
+
+## ⚠️ API Stability
+
+> **Warning**: The API *will change*. Our priority right now is giving you and your coding agent an awesome tool.
+>
+> To deliver on that, we can't get locked into API contracts while we're in alpha. We also want you to be able to extend and build on CodeWeaver — once we get to stable releases.
+
+---
+
+<div align="center">
+
+**Built with ❤️ by [Knitli](https://knitli.com)**
+
+[⬆ Back to top](#codeweaver)
+
+</div>
 
 [cli_guide]: <docs/CLI.md> "Command Line Reference"
 [config_schema]: <schema/codeweaver.schema.json> "The CodeWeaver Config Schema"
 [mcp]: <https://modelcontextprotocol.io> "Learn About the Model Context Protocol"
 [report]: <https://github.com/knitli/codeweaver/issues> "Report an Issue"
-[wiki_ask]: <https://https://en.wikipedia.org/wiki/Abstract_syntax_tree> "About Abstract Syntax Trees"
+[wiki_ask]: <https://en.wikipedia.org/wiki/Abstract_syntax_tree> "About Abstract Syntax Trees"
 [WHY]: <docs/WHY.md> "Why I built CodeWeaver"

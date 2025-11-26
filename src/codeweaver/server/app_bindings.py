@@ -24,7 +24,7 @@ from mcp.types import ToolAnnotations
 from pydantic import BaseModel, TypeAdapter
 from pydantic_core import to_json
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse
+from starlette.responses import PlainTextResponse, Response
 
 from codeweaver.agent_api.find_code import find_code
 from codeweaver.agent_api.find_code.intent import IntentType
@@ -359,6 +359,23 @@ async def health(_request: Request) -> PlainTextResponse:
         )
 
 
+async def favicon(_request: Request) -> Response:
+    """Serve the CodeWeaver favicon (SVG format)."""
+    from codeweaver.server._assets import CODEWEAVER_SVG_ICON
+    import base64
+
+    # Decode the base64 SVG data
+    svg_data = base64.b64decode(CODEWEAVER_SVG_ICON.src.split(",")[1])
+
+    return Response(
+        content=svg_data,
+        media_type="image/svg+xml",
+        headers={
+            "Cache-Control": "public, max-age=86400",  # Cache for 24 hours
+        }
+    )
+
+
 @timed_http("status")
 async def status_info(_request: Request) -> PlainTextResponse:
     """Return current operational status (progress, failover, runtime state).
@@ -509,6 +526,11 @@ async def register_app_bindings(
     else:
         endpoint_settings = DefaultEndpointSettings
     # Routes
+    # Always register favicon route (browsers always request it)
+    app.custom_route("/favicon.ico", methods=["GET"], name="favicon", include_in_schema=False)(
+        favicon
+    )  # type: ignore[arg-type]
+
     if endpoint_settings.get("enable_state", True):
         app.custom_route("/state", methods=["GET"], name="state", include_in_schema=True)(
             state_info
