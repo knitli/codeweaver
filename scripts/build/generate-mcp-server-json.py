@@ -14,7 +14,6 @@ from __future__ import annotations
 from enum import Enum
 from pathlib import Path
 from typing import Any, TypedDict
-from types import MappingProxyType
 
 from pydantic import AnyUrl, BaseModel, ConfigDict, Field, RootModel
 
@@ -541,7 +540,7 @@ def all_env_vars() -> list[McpInputDict]:
         (McpInputDict(**var.as_mcp_info()) for var in _generalized_provider_env_vars()),  # type: ignore[misc]
         key=lambda v: v["name"],
     )
-    
+
     # Deduplicate provider vars by name
     seen_names: set[str] = set()
     unique_provider_vars: list[McpInputDict] = []
@@ -550,7 +549,7 @@ def all_env_vars() -> list[McpInputDict]:
             if var["name"] not in seen_names:
                 seen_names.add(var["name"])
                 unique_provider_vars.append(var)
-    
+
     return (
         general_vars
         + generalized_provider_vars
@@ -571,14 +570,14 @@ def _create_uvx_package() -> Package:
     return Package(
         registry_type="pypi",
         registry_base_url=AnyUrl("https://pypi.org"),
-        identifier="codeweaver",
+        identifier="code-weaver",
         version=__version__,
         runtime_hint="uvx",
         transport=StreamableHttpTransport(
             type_=StreamableHttpTransportType.streamable_http,
             url="http://{host}:{port}/mcp/",
         ),
-        
+
         package_arguments=[
             # Subcommand
             PositionalArgument(
@@ -707,17 +706,7 @@ def _create_docker_package() -> Package:
     as_keyvalues = [KeyValueInput(
         **(var)
     ) for var in env_vars]
-    as_named_args = [NamedArgument(
-        type_=NamedArgumentType.named,
-        name="-e",
-        description=var.get("description"),
-        is_required=var.get("is_required", False),
-        value=var["name"] + "={" + var["name"] + "}",
-        is_secret=var.get("is_secret", False),
-        default=var.get("default"),
-        fmt=var.get("fmt"),
-    ) for var in env_vars]
-        
+
     return Package(
         registry_type="oci",
         registry_base_url=AnyUrl("https://docker.io"),

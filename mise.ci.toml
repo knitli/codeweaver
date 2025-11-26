@@ -40,6 +40,7 @@ hk = "latest"  # Task runner (used by check/format tasks)
 ruff = "latest"  # Python linting/formatting
 # CI/CD tools
 gh = "latest"  # GitHub CLI (for workflows)
+"pipx:tombi" = "latest"
 
 # ============================================================================
 # Environment Variables

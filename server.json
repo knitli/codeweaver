@@ -8,19 +8,19 @@
     "id": "1024985391",
     "subfolder": "src/codeweaver"
   },
-  "version": "0.0.1rc903+g05d89b76.dirty",
+  "version": "0.0.1rc947+gf3d70949.dirty",
   "websiteUrl": "https://github.com/knitli/codeweaver",
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-16/server.schema.json",
   "packages": [
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org/",
-      "identifier": "codeweaver",
-      "version": "0.0.1rc903+g05d89b76.dirty",
+      "identifier": "code-weaver",
+      "version": "0.0.1rc947+gf3d70949.dirty",
       "runtimeHint": "uvx",
       "transport": {
         "type": "streamable-http",
-        "url": "http://{host}:{port}"
+        "url": "http://{host}:{port}/mcp/"
       },
       "packageArguments": [
         {
@@ -112,8 +112,8 @@
           "isSecret": false,
           "default": "false",
           "choices": [
-            "true",
-            "false"
+            "false",
+            "true"
           ],
           "name": "CODEWEAVER_DEBUG"
         },
@@ -123,21 +123,21 @@
           "format": "string",
           "isSecret": true,
           "choices": [
-            "heroku",
-            "bedrock",
+            "openai",
+            "fireworks",
+            "vercel",
             "ollama (cloud only)",
-            "groq",
+            "google",
             "mistral",
             "cohere",
-            "together",
-            "voyage",
-            "github",
-            "google",
-            "vercel",
-            "azure",
-            "fireworks",
             "hf_inference",
-            "openai"
+            "github",
+            "together",
+            "azure",
+            "heroku",
+            "voyage",
+            "groq",
+            "bedrock"
           ],
           "name": "CODEWEAVER_EMBEDDING_API_KEY"
         },
@@ -156,23 +156,23 @@
           "isSecret": false,
           "default": "voyage",
           "choices": [
+            "openai",
+            "fireworks",
+            "vercel",
             "fastembed",
-            "heroku",
-            "bedrock",
-            "groq",
+            "google",
             "mistral",
             "cohere",
+            "hf_inference",
+            "github",
+            "ollama",
+            "azure",
+            "heroku",
+            "sentence_transformers",
             "together",
             "voyage",
-            "github",
-            "google",
-            "vercel",
-            "sentence_transformers",
-            "azure",
-            "fireworks",
-            "hf_inference",
-            "ollama",
-            "openai"
+            "groq",
+            "bedrock"
           ],
           "name": "CODEWEAVER_EMBEDDING_PROVIDER"
         },
@@ -191,11 +191,11 @@
           "isSecret": false,
           "default": "WARNING",
           "choices": [
-            "INFO",
-            "ERROR",
-            "CRITICAL",
             "WARNING",
-            "DEBUG"
+            "INFO",
+            "CRITICAL",
+            "DEBUG",
+            "ERROR"
           ],
           "name": "CODEWEAVER_LOG_LEVEL"
         },
@@ -239,9 +239,9 @@
           "format": "string",
           "isSecret": true,
           "choices": [
-            "bedrock",
+            "cohere",
             "voyage",
-            "cohere"
+            "bedrock"
           ],
           "name": "CODEWEAVER_RERANKING_API_KEY"
         },
@@ -261,10 +261,10 @@
           "default": "voyage",
           "choices": [
             "fastembed",
-            "bedrock",
-            "voyage",
             "cohere",
-            "sentence_transformers"
+            "sentence_transformers",
+            "voyage",
+            "bedrock"
           ],
           "name": "CODEWEAVER_RERANKING_PROVIDER"
         },
@@ -283,8 +283,8 @@
           "isSecret": false,
           "default": "fastembed",
           "choices": [
-            "sentence_transformers",
-            "fastembed"
+            "fastembed",
+            "sentence_transformers"
           ],
           "name": "CODEWEAVER_SPARSE_EMBEDDING_PROVIDER"
         },
@@ -294,8 +294,8 @@
           "format": "string",
           "isSecret": true,
           "choices": [
-            "qdrant (cloud only)",
-            "qdrant"
+            "qdrant",
+            "qdrant (cloud only)"
           ],
           "name": "CODEWEAVER_VECTOR_STORE_API_KEY"
         },
@@ -314,8 +314,8 @@
           "isSecret": false,
           "default": "qdrant",
           "choices": [
-            "memory",
-            "qdrant"
+            "qdrant",
+            "memory"
           ],
           "name": "CODEWEAVER_VECTOR_STORE_PROVIDER"
         },
@@ -334,8 +334,8 @@
           "isSecret": false,
           "default": "false",
           "choices": [
-            "true",
-            "false"
+            "false",
+            "true"
           ],
           "name": "CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY"
         },
@@ -346,8 +346,8 @@
           "isSecret": false,
           "default": "false",
           "choices": [
-            "true",
-            "false"
+            "false",
+            "true"
           ],
           "name": "CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY"
         },
@@ -371,10 +371,10 @@
           "format": "string",
           "isSecret": false,
           "choices": [
-            "warning",
-            "debug",
+            "error",
             "info",
-            "error"
+            "warning",
+            "debug"
           ],
           "name": "OPENAI_LOG"
         },
@@ -496,11 +496,11 @@
           "format": "string",
           "isSecret": false,
           "choices": [
-            "warning",
-            "debug",
+            "error",
             "critical",
+            "debug",
             "info",
-            "error"
+            "warning"
           ],
           "name": "HF_HUB_VERBOSITY"
         },
@@ -552,10 +552,10 @@
           "format": "string",
           "isSecret": false,
           "choices": [
-            "warning",
-            "debug",
+            "error",
             "info",
-            "error"
+            "warning",
+            "debug"
           ],
           "name": "OPENAI_LOG"
         },
@@ -565,9 +565,9 @@
           "format": "string",
           "isSecret": false,
           "choices": [
-            "INFO",
-            "WARNING",
             "ERROR",
+            "WARNING",
+            "INFO",
             "DEBUG"
           ],
           "name": "QDRANT__LOG_LEVEL"
@@ -585,8 +585,8 @@
           "format": "boolean",
           "isSecret": false,
           "choices": [
-            "true",
-            "false"
+            "false",
+            "true"
           ],
           "name": "QDRANT__SERVICE__ENABLE_TLS"
         },
@@ -652,7 +652,7 @@
       "registryType": "oci",
       "registryBaseUrl": "https://docker.io/",
       "identifier": "knitli/codeweaver",
-      "version": "0.0.1rc903+g05d89b76.dirty",
+      "version": "0.0.1rc947+gf3d70949.dirty",
       "runtimeHint": "docker",
       "transport": {
         "type": "streamable-http",
@@ -779,8 +779,8 @@
           "isSecret": false,
           "default": "false",
           "choices": [
-            "true",
-            "false"
+            "false",
+            "true"
           ],
           "name": "CODEWEAVER_DEBUG"
         },
@@ -790,21 +790,21 @@
           "format": "string",
           "isSecret": true,
           "choices": [
-            "heroku",
-            "bedrock",
+            "openai",
+            "fireworks",
+            "vercel",
             "ollama (cloud only)",
-            "groq",
+            "google",
             "mistral",
             "cohere",
-            "together",
-            "voyage",
-            "github",
-            "google",
-            "vercel",
-            "azure",
-            "fireworks",
             "hf_inference",
-            "openai"
+            "github",
+            "together",
+            "azure",
+            "heroku",
+            "voyage",
+            "groq",
+            "bedrock"
           ],
           "name": "CODEWEAVER_EMBEDDING_API_KEY"
         },
@@ -823,23 +823,23 @@
           "isSecret": false,
           "default": "voyage",
           "choices": [
+            "openai",
+            "fireworks",
+            "vercel",
             "fastembed",
-            "heroku",
-            "bedrock",
-            "groq",
+            "google",
             "mistral",
             "cohere",
+            "hf_inference",
+            "github",
+            "ollama",
+            "azure",
+            "heroku",
+            "sentence_transformers",
             "together",
             "voyage",
-            "github",
-            "google",
-            "vercel",
-            "sentence_transformers",
-            "azure",
-            "fireworks",
-            "hf_inference",
-            "ollama",
-            "openai"
+            "groq",
+            "bedrock"
           ],
           "name": "CODEWEAVER_EMBEDDING_PROVIDER"
         },
@@ -858,11 +858,11 @@
           "isSecret": false,
           "default": "WARNING",
           "choices": [
-            "INFO",
-            "ERROR",
-            "CRITICAL",
             "WARNING",
-            "DEBUG"
+            "INFO",
+            "CRITICAL",
+            "DEBUG",
+            "ERROR"
           ],
           "name": "CODEWEAVER_LOG_LEVEL"
         },
@@ -906,9 +906,9 @@
           "format": "string",
           "isSecret": true,
           "choices": [
-            "bedrock",
+            "cohere",
             "voyage",
-            "cohere"
+            "bedrock"
           ],
           "name": "CODEWEAVER_RERANKING_API_KEY"
         },
@@ -928,10 +928,10 @@
           "default": "voyage",
           "choices": [
             "fastembed",
-            "bedrock",
-            "voyage",
             "cohere",
-            "sentence_transformers"
+            "sentence_transformers",
+            "voyage",
+            "bedrock"
           ],
           "name": "CODEWEAVER_RERANKING_PROVIDER"
         },
@@ -950,8 +950,8 @@
           "isSecret": false,
           "default": "fastembed",
           "choices": [
-            "sentence_transformers",
-            "fastembed"
+            "fastembed",
+            "sentence_transformers"
           ],
           "name": "CODEWEAVER_SPARSE_EMBEDDING_PROVIDER"
         },
@@ -961,8 +961,8 @@
           "format": "string",
           "isSecret": true,
           "choices": [
-            "qdrant (cloud only)",
-            "qdrant"
+            "qdrant",
+            "qdrant (cloud only)"
           ],
           "name": "CODEWEAVER_VECTOR_STORE_API_KEY"
         },
@@ -981,8 +981,8 @@
           "isSecret": false,
           "default": "qdrant",
           "choices": [
-            "memory",
-            "qdrant"
+            "qdrant",
+            "memory"
           ],
           "name": "CODEWEAVER_VECTOR_STORE_PROVIDER"
         },
@@ -1001,8 +1001,8 @@
           "isSecret": false,
           "default": "false",
           "choices": [
-            "true",
-            "false"
+            "false",
+            "true"
           ],
           "name": "CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY"
         },
@@ -1013,8 +1013,8 @@
           "isSecret": false,
           "default": "false",
           "choices": [
-            "true",
-            "false"
+            "false",
+            "true"
           ],
           "name": "CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY"
         },
@@ -1038,10 +1038,10 @@
           "format": "string",
           "isSecret": false,
           "choices": [
-            "warning",
-            "debug",
+            "error",
             "info",
-            "error"
+            "warning",
+            "debug"
           ],
           "name": "OPENAI_LOG"
         },
@@ -1163,11 +1163,11 @@
           "format": "string",
           "isSecret": false,
           "choices": [
-            "warning",
-            "debug",
+            "error",
             "critical",
+            "debug",
             "info",
-            "error"
+            "warning"
           ],
           "name": "HF_HUB_VERBOSITY"
         },
@@ -1219,10 +1219,10 @@
           "format": "string",
           "isSecret": false,
           "choices": [
-            "warning",
-            "debug",
+            "error",
             "info",
-            "error"
+            "warning",
+            "debug"
           ],
           "name": "OPENAI_LOG"
         },
@@ -1232,9 +1232,9 @@
           "format": "string",
           "isSecret": false,
           "choices": [
-            "INFO",
-            "WARNING",
             "ERROR",
+            "WARNING",
+            "INFO",
             "DEBUG"
           ],
           "name": "QDRANT__LOG_LEVEL"
@@ -1252,8 +1252,8 @@
           "format": "boolean",
           "isSecret": false,
           "choices": [
-            "true",
-            "false"
+            "false",
+            "true"
           ],
           "name": "QDRANT__SERVICE__ENABLE_TLS"
         },
@@ -1326,23 +1326,23 @@
       "capabilities": {
         "languages_supported": 166,
         "embedding_providers": [
-          "Voyage",
-          "Sentence Transformers",
-          "Openai",
-          "Vercel",
-          "Cohere",
-          "Github",
-          "Google",
           "Bedrock",
-          "Fastembed",
           "Ollama",
-          "Azure",
-          "Fireworks",
-          "Heroku",
+          "Google",
+          "Sentence Transformers",
           "Together",
-          "Groq",
+          "Vercel",
+          "Heroku",
+          "Azure",
+          "Openai",
+          "Hf Inference",
+          "Fireworks",
           "Mistral",
-          "Hf Inference"
+          "Fastembed",
+          "Cohere",
+          "Groq",
+          "Github",
+          "Voyage"
         ],
         "vector_store_providers": [
           "Memory",
@@ -1353,11 +1353,11 @@
           "Fastembed"
         ],
         "reranking_providers": [
-          "Voyage",
+          "Bedrock",
           "Sentence Transformers",
-          "Cohere",
           "Fastembed",
-          "Bedrock"
+          "Cohere",
+          "Voyage"
         ],
         "search_types": [
           "semantic",

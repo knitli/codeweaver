@@ -17,10 +17,10 @@ local linters = new Mapping<String, Step> {
         // yaml
 
         ["yq"] = new Step {
-        glob = List( "*.{.yaml,yml,yaml,.yml,json,jsonc,.json,.jsonc}")
+        glob = List("*.{yaml,yml,json,jsonc}")
         batch = false
-        check  = "echo {{ files }} | rust-parallel -d stderr -i - --no-run-if-empty yq -P eval '.' >/dev/null"
-        fix = "echo {{ files }} | rust-parallel -d stderr -i - --no-run-if-empty yq -iP --indent=2 '.' "
+        check  = "printf '%s\\n' {{ files }} | xargs -n1 yq -P eval '.' >/dev/null"
+        fix = "printf '%s\\n' {{ files }} | xargs -n1 yq -iP --indent=2 '.'"
         }
     
         ["typos"] = new Step {
