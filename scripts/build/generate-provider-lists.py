@@ -7,8 +7,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from codeweaver.providers.provider import Provider, ProviderKind
 from codeweaver.providers.capabilities import PROVIDER_CAPABILITIES
+from codeweaver.providers.provider import Provider, ProviderKind
+
 
 def generate_category(category: str) -> list[str]:
     """Generate a list of providers for a given category."""
@@ -20,6 +21,7 @@ def generate_category(category: str) -> list[str]:
 
 def get_heading() -> list[str]:
     """Get the heading for the provider lists."""
+    # REUSE-IgnoreStart
     return [
         "<!-- SPDX-FileCopyrightText: 2025 Knitli Inc.",
         "SPDX-FileContributor: Adam Poulemanos <adam@knit.li>",
@@ -29,6 +31,7 @@ def get_heading() -> list[str]:
         "# CodeWeaver Supported Providers",
         "",
     ]
+    # REUSE-IgnoreEnd
 
 def generate_provider_lists() -> str:
     """Generate the provider lists markdown content."""

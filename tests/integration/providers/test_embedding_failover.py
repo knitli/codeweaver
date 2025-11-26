@@ -117,6 +117,7 @@ async def backup_embedding_provider():
 
 
 @pytest.mark.asyncio
+@pytest.mark.network  # Requires network to download models from HuggingFace
 async def test_registry_cross_provider_collision(
     sample_chunk, primary_embedding_provider, backup_embedding_provider
 ):
@@ -172,6 +173,7 @@ async def test_registry_cross_provider_collision(
 
 
 @pytest.mark.asyncio
+@pytest.mark.network  # Requires network to download models from HuggingFace
 async def test_deduplication_prevents_reembedding(sample_chunk, primary_embedding_provider):
     """Test Bug #3: Deduplication prevents sync-back re-embedding.
 
@@ -215,6 +217,7 @@ async def test_deduplication_prevents_reembedding(sample_chunk, primary_embeddin
 
 
 @pytest.mark.asyncio
+@pytest.mark.network  # Requires network to download models from HuggingFace
 async def test_hash_store_is_class_variable(primary_embedding_provider, backup_embedding_provider):
     """Test Bug #4: Hash store is ClassVar (shared across instances).
 
@@ -256,6 +259,7 @@ async def test_hash_store_is_class_variable(primary_embedding_provider, backup_e
 
 
 @pytest.mark.asyncio
+@pytest.mark.network  # Requires network to download models from HuggingFace
 async def test_chunk_property_fetches_from_global_registry(
     sample_chunk, primary_embedding_provider
 ):

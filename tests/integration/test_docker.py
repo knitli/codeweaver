@@ -374,7 +374,12 @@ class TestEnvironmentFile:
         env_example = repo_root / ".env.example"
         content = env_example.read_text()
 
-        required_vars = ["VOYAGE_API_KEY", "PROJECT_PATH", "CODEWEAVER_PORT", "QDRANT_PORT"]
+        required_vars = [
+            "VOYAGE_API_KEY",
+            "CODEWEAVER_PROJECT_PATH",
+            "CODEWEAVER_PORT",
+            "CODEWEAVER_VECTOR_STORE_PORT",
+        ]
 
         for var in required_vars:
             assert var in content, f".env.example missing variable: {var}"
