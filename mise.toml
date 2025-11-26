@@ -18,37 +18,12 @@ uv_venv_create_args = [
 ]
 
 [tools]
-"cargo:rust-parallel" = "latest"
-"cargo:tree-sitter-cli" = "latest"
-"pipx:changesets" = "latest"
-"pipx:claude-monitor" = "latest"
-"pipx:copychat" = "latest"
-"pipx:fastmcp" = "latest"
-"pipx:git+https://github.com/microsoft/mcp-interviewer.git" = "latest"
-"pipx:mike" = "latest"
-"pipx:mteb" = "latest"
-"pipx:reuse" = "latest"
-"pipx:tombi" = "latest"
-"pipx:ty" = "latest"
-ast-grep = "latest"
 gh = "latest"
-gitsign = "latest"
 hk = "latest"
-node = "24"
-pkl = "latest"
-python = "3.13"
-ripgrep = "latest"
-ruff = "latest"
-shellcheck = "latest"
-shfmt = "latest"
-typos = "latest"
-usage = "latest"
 uv = "latest"
-"npm:changesets" = "latest"
-yq = "latest"
 
 [env]
-GH_REPO = "{{config_root}}"
+GH_REPO = "knitli/codeweaver"
 REMOTE_ORIGIN_URL = '''http://github.com/knitli/codeweaver.git'''
 # Use the project name derived from the current directory
 PROJECT_NAME = "{{ config_root | basename }}"
@@ -64,6 +39,7 @@ _.path = [
   "scripts/utils",
   ".venv/bin",
 ]
+MISE_ENV = '''{% if `get_env(name="GITHUB_ACTIONS", default="") != ""` %}ci{% else %}dev{% endif %}'''
 
 [hooks]
 [hooks.enter]
@@ -98,7 +74,6 @@ if not "%pythonPath%"=="%pythonPath:.venv\Scripts\python=%" (
 '''
 
 [tasks.enter.env]
-GH_REPO = '''knitli/codeweaver'''
 ACTIVE_SHELL = '''{{ exec(command='basename "$SHELL" 2>/dev/null || echo zsh') }}'''
 python_path = '''{{ exec(command='command -v python 2>/dev/null || echo ""') }}'''
 
@@ -125,19 +100,6 @@ echo Syncing dependencies...
 uv sync --extra full --group dev --group docs --group build --group test
 '''
 
-[tasks.update-dependencies]
-tools.uv = "latest"
-depends = ["source"]
-run = '''
-#!/usr/bin/env zsh
-print -P "%F{209}[codeweaver]%f Updating dependencies..."
-uv sync --extra full --group dev --group docs --group build --group test -U
-'''
-run_windows = '''
-echo [codeweaver] Updating dependencies...
-uv sync --extra full --group dev --group docs --group build --group test -U
-'''
-
 [tasks.source]
 run = '''
 #!/usr/bin/env zsh
@@ -151,27 +113,6 @@ echo [codeweaver] Sourcing virtual environment...
 git rev-parse --show-toplevel
 .venv\Scripts\activate.bat
 '''
-
-[tasks.update]
-silent = "stdout"
-alias = "update-tools"
-shell = "zsh -c"
-run = [
-  "print -P \"%F{209}[codeweaver]%f Updating tools...\"",
-  "mise -y upgrade",
-  "mise -y self-update",
-  "mise -y reshim",
-  "mise -y prune",
-  "print -P \"%F{209}[codeweaver]%f ✅ Tools updated! 🧰\"",
-]
-run_windows = [
-  "echo [codeweaver] Updating tools...",
-  "mise -y upgrade",
-  "mise -y self-update",
-  "mise -y reshim",
-  "mise -y prune",
-  "echo [codeweaver] Tools updated!",
-]
 
 [tasks.setup]
 # Development setup
@@ -221,16 +162,6 @@ run_windows = [
 file = "scripts/code-quality/fix-ruff-patterns.sh"
 sources = ["{src,scripts,tests}/*.py"]
 
-[tasks.fix-other]
-run = "hk fix"
-run_windows = "hk fix"
-
-[tasks.fix]
-shell = "zsh -c"
-run = ["mise run fix-other", "mise run fix-python"]
-run_windows = ["mise run fix-other", "mise run fix-python"]
-quiet = true
-
 [tasks.check]
 tools.hk = "latest"
 run = '''
@@ -267,11 +198,11 @@ if "%CI%"=="true" (
 run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Running formatting checks..."
-hk check
+hk fix
 '''
 run_windows = '''
 echo [codeweaver] Running formatting checks...
-hk check
+hk fix
 '''
 
 [tasks.format-fix]
@@ -364,33 +295,6 @@ echo Running tests with coverage...
 uv run pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v %*
 '''
 
-[tasks.test-watch]
-run = '''
-#!/bin/bash
-echo "Running tests in watch mode..."
-uv run pytest tests/ -f --tb=short
-'''
-run_windows = '''
-echo Running tests in watch mode...
-uv run pytest tests/ -f --tb=short
-'''
-
-[tasks.build]
-# Building and packaging
-run = '''
-#!/bin/bash
-echo "Building package..."
-uv build &&
-echo "✅ Package built successfully!"
-'''
-run_windows = '''
-echo Building package...
-uv build
-if %ERRORLEVEL% equ 0 (
-    echo Package built successfully!
-)
-'''
-
 [tasks.clean]
 run = '''
 #!/bin/bash
@@ -410,31 +314,6 @@ if exist test-results.xml del test-results.xml
 for /d /r . %%d in (__pycache__) do @if exist "%%d" rd /s /q "%%d"
 del /s /q *.pyc 2>NUL
 echo Build artifacts cleaned!
-'''
-
-# Documentation
-[tasks.docs-serve]
-tools.uv = "latest"
-run = '''
-#!/usr/bin/env zsh
-print -P "%F{209}[codeweaver]%f Starting %F{209}CodeWeaver%f documentation server..."
-uv run --group docs mkdocs serve
-'''
-run_windows = '''
-echo [codeweaver] Starting CodeWeaver documentation server...
-uv run --group docs mkdocs serve
-'''
-
-[tasks.docs-build]
-tools.uv = "latest"
-run = '''
-#!/bin/bash
-echo "Building documentation..."
-uv run --group docs mkdocs build
-'''
-run_windows = '''
-echo Building documentation...
-uv run --group docs mkdocs build
 '''
 
 # Release and maintenance
@@ -457,7 +336,7 @@ for /f "delims=" %%v in ('uv --version') do echo [codeweaver] UV version: %%v
 run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Generating changelog..."
-npm exec changeset version
+mise x -- npm exec changeset version
 '''
 run_windows = '''
 echo [codeweaver] Generating changelog...

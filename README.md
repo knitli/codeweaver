@@ -9,16 +9,10 @@ mcp-name: com.knitli/codeweaver
 -->
 <div align="center">
 
-<picture>
-  <source srcset="docs/assets/codeweaver-reversed.svg" media="(prefers-color-scheme: dark)">
-  <source srcset="docs/assets/codeweaver-primary.svg" media="(prefers-color-scheme: light)">
-  <img
-    src="docs/assets/codeweaver-primary.svg"
-    alt="CodeWeaver by Knitli"
-    width="200"
-    height="200"
-  >
-</picture>
+<p align="center">
+  <img src="docs/assets/codeweaver-secondary.svg#gh-dark-mode-only" width="200" height="200" alt="CodeWeaver Logo">
+  <img src="docs/assets/codeweaver-primary.svg#gh-light-mode-only" width="200" height="200" alt="CodeWeaver Logo">
+</p>
 
 # CodeWeaver
 

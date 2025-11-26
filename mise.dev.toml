@@ -1,0 +1,146 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+[settings]
+idiomatic_version_file_enable_tools = []
+status.show_env = true
+
+[settings.python]
+uv_venv_auto = true
+compile = true
+uv_venv_create_args = [
+  "--seed",
+  "--keyring-provider",
+  "subprocess",
+  "--python",
+  "3.13",
+]
+
+[tools]
+"cargo:rust-parallel" = "latest"
+"cargo:tree-sitter-cli" = "latest"
+"pipx:changesets" = "latest"
+"pipx:claude-monitor" = "latest"
+"pipx:copychat" = "latest"
+"pipx:fastmcp" = "latest"
+"pipx:git+https://github.com/microsoft/mcp-interviewer.git" = "latest"
+"pipx:mike" = "latest"
+"pipx:mteb" = "latest"
+"pipx:reuse" = "latest"
+"pipx:tombi" = "latest"
+"pipx:ty" = "latest"
+ast-grep = "latest"
+gh = "latest"
+gitsign = "latest"
+hk = "latest"
+node = "24"
+pkl = "latest"
+python = "3.13"
+ripgrep = "latest"
+ruff = "latest"
+shellcheck = "latest"
+shfmt = "latest"
+typos = "latest"
+usage = "latest"
+uv = "latest"
+"npm:changesets" = "latest"
+yq = "latest"
+
+[env]
+_.path = [
+  "scripts/dev-env",
+  "scripts/code-quality",
+  "scripts/build",
+  "scripts/language-support",
+  "scripts/testing",
+  "scripts/utils",
+  ".venv/bin",
+]
+MISE_ENV = "dev"
+
+[tasks.update-dependencies]
+tools.uv = "latest"
+depends = ["source"]
+run = '''
+#!/usr/bin/env zsh
+print -P "%F{209}[codeweaver]%f Updating dependencies..."
+uv sync --extra full --group dev --group docs --group build --group test -U
+'''
+run_windows = '''
+echo [codeweaver] Updating dependencies...
+uv sync --extra full --group dev --group docs --group build --group test -U
+'''
+
+[tasks.update]
+silent = "stdout"
+alias = "update-tools"
+shell = "zsh -c"
+run = [
+  "print -P \"%F{209}[codeweaver]%f Updating tools...\"",
+  "mise -y upgrade",
+  "mise -y self-update",
+  "mise -y reshim",
+  "mise -y prune",
+  "print -P \"%F{209}[codeweaver]%f ✅ Tools updated! 🧰\"",
+]
+run_windows = [
+  "echo [codeweaver] Updating tools...",
+  "mise -y upgrade",
+  "mise -y self-update",
+  "mise -y reshim",
+  "mise -y prune",
+  "echo [codeweaver] Tools updated!",
+]
+
+[tasks.test-watch]
+run = '''
+#!/bin/bash
+echo "Running tests in watch mode..."
+uv run pytest tests/ -f --tb=short
+'''
+run_windows = '''
+echo Running tests in watch mode...
+uv run pytest tests/ -f --tb=short
+'''
+
+[tasks.build]
+# Building and packaging
+run = '''
+#!/bin/bash
+echo "Building package..."
+uv build &&
+echo "✅ Package built successfully!"
+'''
+run_windows = '''
+echo Building package...
+uv build
+if %ERRORLEVEL% equ 0 (
+    echo Package built successfully!
+)
+'''
+
+# Documentation
+[tasks.docs-serve]
+tools.uv = "latest"
+run = '''
+#!/usr/bin/env zsh
+print -P "%F{209}[codeweaver]%f Starting %F{209}CodeWeaver%f documentation server..."
+uv run --group docs mkdocs serve
+'''
+run_windows = '''
+echo [codeweaver] Starting CodeWeaver documentation server...
+uv run --group docs mkdocs serve
+'''
+
+[tasks.docs-build]
+tools.uv = "latest"
+run = '''
+#!/bin/bash
+echo "Building documentation..."
+uv run --group docs mkdocs build
+'''
+run_windows = '''
+echo Building documentation...
+uv run --group docs mkdocs build
+'''

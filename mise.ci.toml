@@ -52,10 +52,6 @@ typos = "latest"  # Spell checking
 # CI/CD tools
 gh = "latest"  # GitHub CLI (for workflows)
 
-# Optional: Include only if your CI tasks explicitly need them
-# node = "24"        # Uncomment if running npm tasks in CI
-# ripgrep = "latest" # Uncomment if search operations needed
-
 # ============================================================================
 # Environment Variables
 # ============================================================================
@@ -99,7 +95,16 @@ uv run pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing
 run = '''
 #!/bin/bash
 echo "Building package..."
-uv build && echo "✅ Package built successfully!"
+uv build &&
+echo "✅ Package built successfully!"
+'''
+
+[tasks.docs-build]
+tools.uv = "latest"
+run = '''
+#!/bin/bash
+echo "Building documentation..."
+uv run --group docs mkdocs build
 '''
 
 [tasks.check]
