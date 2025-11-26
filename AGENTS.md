@@ -15,6 +15,11 @@ CodeWeaver is an extensible MCP (Model Context Protocol) server for semantic cod
 
 **Current Status**: Nearing Alpha release. Most core features complete; completing integration and testing.
 
+> [!IMPORTANT]
+> Because it is an MCP server, you can use CodeWeaver while assisting with CodeWeaver development!
+> In your list of available tools, you may see `find_code` or `codeweaver__find_code`
+> Congrats! You're both an alpha tester and contributor!
+
 ## Project Constitution (DEFINITIVE GUIDANCE)
 
 **This project is governed by the CodeWeaver Constitution at `.specify/memory/constitution.md`.** (path relative to repo root)
@@ -119,6 +124,10 @@ src/codeweaver/
 │   ├── __main__.py      # CLI entry point
 │   ├── __init__.py
 │   ├── utils.py         # CLI utilities
+│   └── ui/              # CLI/TUI UI management
+        ├── __init__.py
+        ├── status_display.py # main StatusDisplay class
+        ├── error_handler.py # class to filter and display errors for the UI
 │   └── commands/        # CLI command implementations
 │       ├── __init__.py
 │       ├── config.py    # Configuration management commands
@@ -145,7 +154,6 @@ src/codeweaver/
 │   ├── telemetry/       # Usage tracking and analytics
 │   │   ├── __init__.py
 │   │   ├── client.py    # PostHog telemetry client
-│   │   ├── comparison.py # Telemetry comparison utilities
 │   │   ├── events.py    # Event definitions and tracking
 │   │   └── README.md
 │   └── utils/           # Common utility functions
@@ -155,13 +163,16 @@ src/codeweaver/
 │       ├── introspect.py # Reflection and introspection
 │       ├── lazy_importer.py # Lazy dependency and module loading
 │       ├── normalize.py # Data normalization utilities
+        ├── procs.py     # process management utilities
+        ├── textify.py   # text manipulation utilities
 │       └── utils.py     # General utilities
 │
 ├── config/              # Configuration system (pydantic-settings based)
 │   ├── __init__.py
 │   ├── _project.py      # Project-specific configuration
 │   ├── chunker.py       # Chunker configuration
-│   ├── indexing.py      # Indexing configuration
+│   ├── envs.py          # environment variable definitions
+│   ├── indexer.py       # Indexer configuration
 │   ├── logging.py       # Logging configuration
 │   ├── mcp.py           # MCP server configuration (supports cli/commands/init.py)
 │   ├── middleware.py    # Middleware configuration
@@ -319,6 +330,7 @@ src/codeweaver/
 │       ├── base.py      # Base vector store interface
 │       ├── inmemory.py  # In-memory vector store (qdrant_client w/ json persistence)
 │       ├── metadata.py  # Vector metadata handling 
+│       ├── qdrant_base.py # Qdrant base class for all common function to inmemory and qdrant
 │       ├── qdrant.py    # Qdrant vector database (local and cloud/remote)
 │       └── utils.py     # Vector store utilities
 │
@@ -346,7 +358,7 @@ src/codeweaver/
 │   ├── __init__.py
 │   ├── base.py          # Base tokenizer interface
 │   ├── tiktoken.py      # OpenAI tiktoken integration
-│   └── tokenizers.py    # Tokenizer implementation (most models use this tokenizer)
+│   └── tokenizers.py    # Tokenizers implementation (most models use this tokenizer)
 │
 ├── __init__.py          # Package root
 ├── _version.py          # Version information
@@ -413,7 +425,7 @@ Apply relevant pytest markers to new tests (see pyproject.toml for full list).
 3. Build provider abstractions and concrete implementations
 4. Add basic pipeline orchestration
 
-### Phase 2: Core Functionality  ✅ **complete - integrating/testing**
+### Phase 2: Core Functionality  ✅ **complete**
 5. Implement background indexing with watchfiles
 6. Add comprehensive error handling and graceful degradation
 7. Integrate telemetry and observability

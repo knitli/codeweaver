@@ -954,7 +954,11 @@ def build_app(
     host = base_fast_mcp_settings.pop("host", "127.0.0.1")
     port = base_fast_mcp_settings.pop("port", 9328)
     http_path = "/codeweaver"
-    server = FastMCP[AppState](name="CodeWeaver", **base_fast_mcp_settings)  # type: ignore
+    server = FastMCP[AppState](
+        name="CodeWeaver",
+        **base_fast_mcp_settings,  # type: ignore
+        icons=[lazy_import("codeweaver.server._assets", "CODEWEAVER_SVG_ICON")],  # type: ignore
+    )
     if verbose or debug:
         local_logger.info("FastMCP application initialized successfully.")
     return ServerSetup(

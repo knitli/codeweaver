@@ -35,7 +35,11 @@ class UvicornAccessLogFilter(logging.Filter):
         # Block if it looks like an HTTP access log
         return not (
             record.name in ("uvicorn.access", "uvicorn", "uvicorn.error")
-            and ("HTTP" in record.getMessage() or "GET" in record.getMessage() or "POST" in record.getMessage())
+            and (
+                "HTTP" in record.getMessage()
+                or "GET" in record.getMessage()
+                or "POST" in record.getMessage()
+            )
         )
 
 
@@ -74,9 +78,8 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
             # Silent first interrupt - let lifespan cleanup handle the message
             # Raise KeyboardInterrupt to trigger graceful shutdown
             raise KeyboardInterrupt
-        else:
-            logger.warning("Force shutdown requested, exiting immediately...")
-            sys.exit(1)
+        logger.warning("Force shutdown requested, exiting immediately...")
+        sys.exit(1)
 
     # Install force shutdown handler
     with contextlib.suppress(ValueError, OSError):
@@ -122,13 +125,19 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
                             "use_colors": None,
                         }
                     },
-                    "handlers": {
-                        "null": {"class": "logging.NullHandler"},
-                    },
+                    "handlers": {"null": {"class": "logging.NullHandler"}},
                     "loggers": {
                         "uvicorn": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
-                        "uvicorn.error": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
-                        "uvicorn.access": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
+                        "uvicorn.error": {
+                            "handlers": ["null"],
+                            "level": "CRITICAL",
+                            "propagate": False,
+                        },
+                        "uvicorn.access": {
+                            "handlers": ["null"],
+                            "level": "CRITICAL",
+                            "propagate": False,
+                        },
                         # Additional loggers that may leak through
                         "fastapi": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
                         "fastmcp": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
@@ -187,11 +196,8 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
                 logger_obj.addFilter(access_filter)
 
         # Wrap in try-except to catch KeyboardInterrupt cleanly without traceback
-        try:
+        with contextlib.suppress(KeyboardInterrupt):
             await app.run_http_async(**resolved_kwargs)  # type: ignore
-        except KeyboardInterrupt:
-            # Silent shutdown - message handled by lifespan cleanup
-            pass
     finally:
         # Restore original signal handler
         if original_sigint_handler:

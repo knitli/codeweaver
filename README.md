@@ -8,12 +8,16 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 mcp-name: com.knitli/codeweaver
 -->
 # CodeWeaver
+
+![codeweaver logo](docs/assets/codeweaver-primary.svg "CodeWeaver by Knitli)
 ---
 by Knitli
+
+> *Alpha Release 1*
 ---
 **CodeWeaver is the missing abstraction layer between AI and your code.**
 
-It gives both humans and AI a deep, structural understanding of your project — not just text search, but real context: symbols, blocks, relationships, intent. MCP is just the delivery mechanism; CodeWeaver is the capability.
+It gives both humans and AI a deep, structural understanding of your project — not just text search, but real context: symbols, blocks, relationships, intent. [MCP][mcp] is just the delivery mechanism; CodeWeaver is the capability.
 
 If you want AI that actually knows your code instead of guessing, this is the foundation.
 
@@ -36,16 +40,18 @@ The result: shallow, inconsistent, fragile context. And you don't control it.
 * Deploy it however you want
 * One great tool instead of 30 mediocre ones
 
-[Read the detailed rationale →](docs/WHY.md)
+[Read the detailed rationale →][WHY]
 
 ---
 
-# **Getting Started**
+## **Getting Started**
 
 Using the [CLI](#cli):
 
+In your project:
 ```bash
-uv pip install codeweaver
+uv add --prerelease allow --dev codeweaver
+
 cw init
 cw doctor
 ```
@@ -54,17 +60,17 @@ You're ready, but you can customize *just about everything if you want to*.
 
 ---
 
-# **How It Works**
+## **How It Works**
 
-CodeWeaver mixes AST-level understanding, semantic relationships, and hybrid embeddings (sparse + dense) to deliver contextual and literal understanding.
+CodeWeaver mixes [AST][wiki_ask]-level understanding, semantic relationships, and hybrid embeddings (sparse + dense) to deliver contextual and literal understanding of your codebase.
 
 **The goal: give AI the fragments it *should* see, not whatever it can grab.**
 
 ### **Language Support**
 
 * **AST/Semantic Hybrid Search:** 26 languages
-* **Context-Aware Chunking:** 170+ languages
-  Uses family-level delimiter heuristics to chunk intelligently ("this is a Lisp-style form", "this looks like a function block", etc.)
+* **Context-Aware Chunking:** 136+ languages
+  Uses language family heuristics to intelligently chunk (like "this is a Lisp-style form", "this looks like a function block", etc.)
 
 ### **Search & Context**
 
@@ -74,7 +80,7 @@ CodeWeaver mixes AST-level understanding, semantic relationships, and hybrid emb
 
 ### **Indexing & Watching**
 
-* Fully live indexing with stable, fast file watching
+* Live indexing with stable, fast file watching
 * Low CPU overhead (background tasks run at low process priority)
 * Index stays warm as you edit
 
@@ -82,14 +88,16 @@ CodeWeaver mixes AST-level understanding, semantic relationships, and hybrid emb
 
 Both `cw` and `codeweaver` work.
 
+* `server` - run the server
 * `doctor` – full setup diagnostic and troubleshooting
 * `index` – run indexing without the server
-* `init` – set up MCP + CodeWeaver config (or each separately)
+* `init` – set up MCP + CodeWeaver config (or each separately with `mcp` and `config` subcommands)
+* `list` - list available providers, models, and similar capabilities
 * `status` – live server status, provider health, index state
 * `search` – same engine AI uses; works with or without server
 * `config` – view final resolved config (hierarchical, merged, secrets-aware)
 
-Full CLI Guide [available here](docs/CLI.md)
+Full CLI Guide [available here][cli_guide]
 
 ### **Configuration**
 
@@ -97,7 +105,7 @@ Full CLI Guide [available here](docs/CLI.md)
 * Default config is `codeweaver.toml` in your project. Use `cw init config` to generate.
 * Cloud secret stores supported (AWS/Azure/GCP)
 * Priority-based hierarchical merging
-* (Schema)[schema/codeweaver.schema.json]
+* [Schema][config_schema]
 
 Full guide coming soon. 
 
@@ -127,10 +135,11 @@ It's not "MCP as product." MCP is just the pipe AI drinks from.
 
 ---
 
-# **Current Status & Stability (Alpha)**
+## **Current Status & Stability (Alpha)**
 
-CodeWeaver works **really well today**, but it's still an alpha.
-Use it. Break it. File issues. Help shape it.
+> [!IMPORTANT]
+> Codeweaver **is in alpha**. *Use* it, *break* it, *shape* it, *help make it better*. [Report issues][report].
+
 
 ### **Stability Snapshot** -- Strong Core; Prickly Edges
 
@@ -138,7 +147,7 @@ Use it. Break it. File issues. Help shape it.
 | ----------------------------------------- | ---------------------- | -------------------------------------------------- |
 | **Live indexing & file watching**         | ⭐⭐⭐⭐           | Runs continuously; reliable
 | **Ast-Based Chunking**                  | ⭐⭐⭐⭐           | Full semantic/AST for 26 languages.                |
-| **Context-aware chunking**                | ⭐⭐⭐⭐         | 170+ languages. Heuristic AST-lite. Usually right. |
+| **Context-aware chunking**                | ⭐⭐⭐⭐         | 136+ languages. Heuristic AST-lite. Usually right. |
 | **Provider integration**                  | ⭐⭐⭐             | Voyage/FastEmbed reliable. Others: ¯\_(ツ)_/¯       |
 | **Automatic fallback (offline/degraded)** | ⭐⭐⭐            | Seamless switch to local hybrid backup search.        |
 | **CLI (cw / codeweaver)**                 | ⭐⭐⭐⭐            | Core commands fully wired and tested.              |
@@ -150,19 +159,23 @@ Use it. Break it. File issues. Help shape it.
 
 ---
 
-# **Roadmap**
+## **Roadmap**
 
-Everything is described in more detail in the issues, but here's the short version:
+The `enhancement` issues describe plans in detail; the short version:
 
-- Stability across the existing features. Of course.
 - Way better docs.
 - Integrate AI agents into the context delivery pipeline to identify purpose and intent and curate results
 - Integrate data providers and tools for *internal* agents to use to provide better, more accurate context (Tavily and DuckDuckGo scaffolded; we'd like to add Context7 and others)
 - Replace the existing registry system with a true DI injection system.
 - Integrate `pydantic-graph` for advanced orchestration of context delivery.
 
-What won't change:
- - We give *your coding agents* one tool with a simple interface. `find_code` asks agents to give a plain language description of what they need, offers a couple optional refinement arguments, but otherwise *stays out of their way*. We think the practice of giving agents what amounts to many complex tasks in order to solve the actual task you want them to do is... really dumb.
+### What Will Stay: One Tool
+
+**One tool**. We give AI agents one simple tool: `find_code`.
+
+Agents just need to explain what they need. No complex schemas. No pages long prompts and tool instructions.
+
+We would never read a novella-length document to learn how to use a basic coding tool; AI agents shouldn't either.
 ---
 
 # **Documentation**
@@ -209,7 +222,7 @@ You will need to agree to our [CLA](CONTRIBUTORS_LICENSE_AGREEMENT.md)
 - LinkedIn: https://linkedin.com/company/knitli
 - GitHub: https://github.com/knitli
 
-We're a [one-person company](@bashandbone) at the moment... and make no money... **sponsors wanted**
+We're a [one-person company](@bashandbone) at the moment... and make no money... if you like CodeWeaver, and want to keep it going, please consider sponsoring me 😄
 
 **Package Info**:
 - Python package: `codeweaver`
@@ -221,7 +234,9 @@ We're a [one-person company](@bashandbone) at the moment... and make no money...
 
 ## License
 
-Licensed under MIT **or** Apache 2.0. You choose.  Some vendored code is Apache 2.0 only and some is MIT only.
+Licensed under MIT **or** Apache 2.0. You choose.  Some vendored code is Apache 2.0 only and some is MIT only. Everything is permissively licensed.
+
+The project follows the [reuse specification](https://reuse.software). Every file has detailed licensing information, and we regularly generate a [software bill of materials](sbom.spdx)
 
 ---
 ## Telemetry
@@ -230,9 +245,20 @@ The default includes very anonymized telemetry. It will only be used to improve 
 
 If you want to be awesome and let us collect information on queries and results, you can *opt in* with `CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY=true`. That will give us the information we need to really make your queries better.
 
+[See our privacy policy](PRIVACY_POLICY.md)
+
 ---
 ## API
 
-As an early alpha project, the API **is completely unstable** -- it will change. Our main mission is giving you and your coding agent an awesome tool. **We do not guarantee any API stability while in alpha**. We need to have the flexibility to make big changes for now.
+> [!WARNING]
+> The API *will change*. Our priority right now is giving your and your coding agent and awesome tool.
+> To deliver on that, we can't get locked into API contracts while we're in alpha.
+> We also want you to be able to extend and build on CodeWeaver -- once we get to stable releases.
 
-**Note**: This is **an early alpha release**. There will be bugs. Please report them and help us get better!
+
+[cli_guide]: <docs/CLI.md> "Command Line Reference"
+[config_schema]: <schema/codeweaver.schema.json> "The CodeWeaver Config Schema"
+[mcp]: <https://modelcontextprotocol.io> "Learn About the Model Context Protocol"
+[report]: <https://github.com/knitli/codeweaver/issues> "Report an Issue"
+[wiki_ask]: <https://https://en.wikipedia.org/wiki/Abstract_syntax_tree> "About Abstract Syntax Trees"
+[WHY]: <docs/WHY.md> "Why I built CodeWeaver"
