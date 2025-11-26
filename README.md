@@ -10,7 +10,7 @@ mcp-name: com.knitli/codeweaver
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/codeweaver-secondary.svg" width="200" height="200">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/codeweaver-secondary.svg">
   <img src="docs/assets/codeweaver-primary.svg" width="200" height="200" alt="CodeWeaver Logo">
 </picture>
 
