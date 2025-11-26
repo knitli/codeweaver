@@ -357,11 +357,11 @@ uv run pytest
 run = '''
 #!/bin/bash
 echo "Running tests with coverage..."
-uv run pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v
+uv run pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v "$@"
 '''
 run_windows = '''
 echo Running tests with coverage...
-uv run pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v
+uv run pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v %*
 '''
 
 [tasks.test-watch]

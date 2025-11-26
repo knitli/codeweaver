@@ -93,10 +93,12 @@ jobs:
       - name: Run tests with coverage
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          # Skip docker and qdrant tests in CI - qdrant container health checks fail in GitHub Actions
-          # Tests marked with these markers should use in-memory store or be run locally
-          # Also skip dev_only and skip_ci marked tests
-          mise run test-cov -m "not docker and not qdrant and not dev_only and not skip_ci"
+          # Skip tests that require external resources in CI:
+          # - docker/qdrant: container health checks fail in GitHub Actions
+          # - dev_only/skip_ci: tests that should only run locally
+          # - network: tests requiring network access to download models
+          # - external_api: tests requiring external API keys (even if available, flaky in CI)
+          mise run test-cov -m "not docker and not qdrant and not dev_only and not skip_ci and not network and not external_api"
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.12'
         uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7

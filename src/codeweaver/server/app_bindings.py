@@ -361,8 +361,9 @@ async def health(_request: Request) -> PlainTextResponse:
 
 async def favicon(_request: Request) -> Response:
     """Serve the CodeWeaver favicon (SVG format)."""
-    from codeweaver.server._assets import CODEWEAVER_SVG_ICON
     import base64
+
+    from codeweaver.server._assets import CODEWEAVER_SVG_ICON
 
     # Decode the base64 SVG data
     svg_data = base64.b64decode(CODEWEAVER_SVG_ICON.src.split(",")[1])
