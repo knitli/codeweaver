@@ -777,12 +777,6 @@ aws-secrets-manager = [
 azure-key-vault = [
     { name = "pydantic-settings", extra = ["azure-key-vault", "toml", "yaml"] },
 ]
-cli = [
-    { name = "cyclopts" },
-    { name = "httpx" },
-    { name = "rich" },
-    { name = "tomli-w" },
-]
 full = [
     { name = "eunomia-mcp" },
     { name = "permit-fastmcp" },
@@ -794,10 +788,14 @@ full-gpu = [
     { name = "fastembed-gpu" },
     { name = "permit-fastmcp" },
     { name = "pydantic-settings", extra = ["aws-secrets-manager", "azure-key-vault", "gcp-secret-manager", "toml", "yaml"] },
-    { name = "sentence-transformers" },
+    { name = "sentence-transformers", marker = "python_full_version < '3.14'" },
 ]
 gcp-secret-manager = [
     { name = "pydantic-settings", extra = ["gcp-secret-manager", "toml", "yaml"] },
+]
+gpu-support = [
+    { name = "fastembed-gpu" },
+    { name = "sentence-transformers", marker = "python_full_version < '3.14'" },
 ]
 provider-anthropic = [
     { name = "pydantic-ai-slim", extra = ["anthropic"] },
@@ -843,7 +841,7 @@ provider-sentence-transformers = [
     { name = "sentence-transformers" },
 ]
 provider-sentence-transformers-gpu = [
-    { name = "sentence-transformers" },
+    { name = "sentence-transformers", marker = "python_full_version < '3.14'" },
 ]
 provider-voyageai = [
     { name = "voyageai" },
@@ -921,7 +919,6 @@ requires-dist = [
     { name = "ast-grep-py", specifier = ">=0.40.0" },
     { name = "blake3", specifier = ">=1.0.8" },
     { name = "cyclopts", specifier = ">=4.2.4" },
-    { name = "cyclopts", marker = "extra == 'cli'" },
     { name = "eunomia-mcp", marker = "extra == 'auth-eunomia'" },
     { name = "eunomia-mcp", marker = "extra == 'full'" },
     { name = "eunomia-mcp", marker = "extra == 'full-gpu'" },
@@ -929,9 +926,9 @@ requires-dist = [
     { name = "fastembed", marker = "extra == 'provider-fastembed'" },
     { name = "fastembed", marker = "extra == 'recommended-local-only'" },
     { name = "fastembed-gpu", marker = "extra == 'full-gpu'" },
+    { name = "fastembed-gpu", marker = "extra == 'gpu-support'" },
     { name = "fastembed-gpu", marker = "extra == 'provider-fastembed-gpu'" },
     { name = "fastmcp", specifier = ">=2.13.1" },
-    { name = "httpx", marker = "extra == 'cli'" },
     { name = "httpx", extras = ["http2"], specifier = ">=0.28.1" },
     { name = "mcp", specifier = ">=1.19.0" },
     { name = "numpy", specifier = ">=2.3.5" },
@@ -963,17 +960,17 @@ requires-dist = [
     { name = "pydantic-settings", extras = ["azure-key-vault", "toml", "yaml"], marker = "extra == 'azure-key-vault'" },
     { name = "pydantic-settings", extras = ["gcp-secret-manager", "toml", "yaml"], marker = "extra == 'gcp-secret-manager'" },
     { name = "pydantic-settings", extras = ["toml", "yaml"], specifier = ">=2.12.0" },
-    { name = "qdrant-client", specifier = ">=1.16.0" },
+    { name = "qdrant-client", specifier = ">=1.16.1" },
     { name = "qdrant-client", marker = "extra == 'provider-in-memory'" },
     { name = "qdrant-client", marker = "extra == 'provider-qdrant'" },
     { name = "rich", specifier = ">=14.2.0" },
-    { name = "rich", marker = "extra == 'cli'" },
     { name = "rignore", specifier = ">=0.7.6" },
     { name = "sentence-transformers", marker = "extra == 'full'" },
     { name = "sentence-transformers", marker = "extra == 'provider-sentence-transformers'" },
     { name = "sentence-transformers", marker = "extra == 'recommended-local-only'" },
-    { name = "sentence-transformers", extras = ["onnx-gpu"], marker = "extra == 'full-gpu'" },
-    { name = "sentence-transformers", extras = ["onnx-gpu"], marker = "extra == 'provider-sentence-transformers-gpu'" },
+    { name = "sentence-transformers", extras = ["onnx-gpu"], marker = "python_full_version >= '3.12' and python_full_version < '3.14' and extra == 'full-gpu'" },
+    { name = "sentence-transformers", extras = ["onnx-gpu"], marker = "python_full_version >= '3.12' and python_full_version < '3.14' and extra == 'gpu-support'" },
+    { name = "sentence-transformers", extras = ["onnx-gpu"], marker = "python_full_version >= '3.12' and python_full_version < '3.14' and extra == 'provider-sentence-transformers-gpu'" },
     { name = "tenacity", specifier = ">=9.1.2" },
     { name = "textcase", specifier = ">=0.4.5" },
     { name = "tiktoken", specifier = ">=0.12.0" },
@@ -981,7 +978,6 @@ requires-dist = [
     { name = "tokenizers", marker = "extra == 'provider-in-memory'" },
     { name = "tokenizers", marker = "extra == 'recommended-local-only'" },
     { name = "tomli-w", specifier = ">=1.2.0" },
-    { name = "tomli-w", marker = "extra == 'cli'" },
     { name = "typing-extensions", specifier = ">=4.15.0" },
     { name = "uuid7", marker = "python_full_version < '3.14'", specifier = ">=0.1.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.38.0" },
@@ -990,7 +986,7 @@ requires-dist = [
     { name = "voyageai", marker = "extra == 'provider-voyageai'" },
     { name = "watchfiles", specifier = ">=1.1.1" },
 ]
-provides-extras = ["auth-eunomia", "auth-permitio", "aws-secrets-manager", "azure-key-vault", "cli", "full", "full-gpu", "gcp-secret-manager", "provider-anthropic", "provider-bedrock", "provider-cohere", "provider-fastembed", "provider-fastembed-gpu", "provider-google", "provider-groq", "provider-huggingface", "provider-in-memory", "provider-mistral", "provider-openai", "provider-qdrant", "provider-sentence-transformers", "provider-sentence-transformers-gpu", "provider-voyageai", "recommended-local-only", "source-duckduckgo", "source-tavily"]
+provides-extras = ["auth-eunomia", "auth-permitio", "aws-secrets-manager", "azure-key-vault", "full", "full-gpu", "gcp-secret-manager", "gpu-support", "provider-anthropic", "provider-bedrock", "provider-cohere", "provider-fastembed", "provider-fastembed-gpu", "provider-google", "provider-groq", "provider-huggingface", "provider-in-memory", "provider-mistral", "provider-openai", "provider-qdrant", "provider-sentence-transformers", "provider-sentence-transformers-gpu", "provider-voyageai", "recommended-local-only", "source-duckduckgo", "source-tavily"]
 
 [package.metadata.requires-dev]
 build = [
@@ -5164,7 +5160,7 @@ wheels = [
 
 [[package]]
 name = "qdrant-client"
-version = "1.16.0"
+version = "1.16.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "grpcio" },
@@ -5175,9 +5171,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/fa/16/366541897d270ee3f9c3f87da145baa8a5c9cc5190e0e53e8bbec1267cff/qdrant_client-1.16.0.tar.gz", hash = "sha256:0716aa0b7cca39745829c2e8ea0beb275fe2990e743ad803eabd6218e4b35c1b", size = 284128, upload-time = "2025-11-17T13:19:52.726Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d9/68/fec3816a223c0b73b0e0036460be45c61ce2770ffb9197ac371e4f615ddc/qdrant_client-1.16.1.tar.gz", hash = "sha256:676c7c10fd4d4cb2981b8fcb32fd764f5f661b04b7334d024034d07212f971fd", size = 332130, upload-time = "2025-11-25T04:31:54.212Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a5/ff/3a69bb56835c4b2e9fa780655790937011ac389b0408b9a1147eaa2cee22/qdrant_client-1.16.0-py3-none-any.whl", hash = "sha256:6b932393e84e4c0233e5b2eb96b0918e968725855adae4d9c541761f4c50cf11", size = 328579, upload-time = "2025-11-17T13:19:51.092Z" },
+    { url = "https://files.pythonhosted.org/packages/60/e2/60a20d04b0595c641516463168909c5bbcc192d3d6eacb637c1677109c6a/qdrant_client-1.16.1-py3-none-any.whl", hash = "sha256:1eefe89f66e8a468ba0de1680e28b441e69825cfb62e8fb2e457c15e24ce5e3b", size = 378481, upload-time = "2025-11-25T04:31:52.629Z" },
 ]
 
 [[package]]
