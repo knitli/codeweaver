@@ -44,7 +44,8 @@ local linters = new Mapping<String, Step> {
     ["reuse"] = new Step {
         check = "reuse lint"
         interactive = !isCI()
-        fix = if (isCI()) "./scripts/code-quality/update-licenses.py add {{ files }}" else "./scripts/code-quality/update-licenses.py add --interactive {{ files }}"
+        // this doesn't work ... until we can figure it out, linting only
+        // fix = if (isCI()) "./scripts/code-quality/update-licenses.py add {{ files }}" else "./scripts/code-quality/update-licenses.py add --interactive {{ files }}"
     }
 
     ["shellcheck"] = new Step {
