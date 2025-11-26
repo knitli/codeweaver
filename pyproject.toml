@@ -312,6 +312,8 @@ omit = ["scripts/*", "mise-tasks/*", "typings/*", ".venv/*"]
 [tool.hatch.build.hooks.version]
 additionalProperties = true
 path = "src/codeweaver/_version.py"
+# The reuse statements prevent REUSE from considering this snippet for license compliance, which would error
+# REUSE-IgnoreStart
 template = '''# SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Version information for CodeWeaver."""
@@ -322,6 +324,7 @@ __version__: Final[str] = "{version}"
 
 __all__ = ("__version__",)
 '''
+# REUSE-IgnoreEnd
 
 [tool.hatch.build.targets.wheel]
 artifacts = ["*.so", "src/**"]
