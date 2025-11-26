@@ -29,8 +29,8 @@
   ],
   "projectTitle": "CodeWeaver",
   "rules": [
-    "All components are fully configurable with CodeWeaver's TOML config system, built on pydantic-settings.",
     "Config files can also be YAML or JSON, use environment variables, .env files, Azure/GCP/AWS secrets, and any combination of these.",
+    "All components are fully configurable with CodeWeaver's TOML config system, built on pydantic-settings.",
     "You can add new sources, providers, backends, and services by creating new classes that implement the required interfaces.",
     "CodeWeaver supports multiple AI Agents and vector models, allowing you to choose the best fit for your use case.",
     "Focus on types. CodeWeaver has a strong type system that ensures all components are type-safe and can be easily extended."
