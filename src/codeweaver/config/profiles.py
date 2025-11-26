@@ -138,6 +138,9 @@ def _recommended_default(
             SparseEmbeddingProviderSettings(
                 provider=Provider.FASTEMBED,
                 enabled=True,
+                # Splade is a strong sparse embedding model that works well for code search
+                # This version comes without license complications associated with `naver`'s versions
+                # There is a v2 available, but not yet supported by FastEmbed
                 model_settings=SparseEmbeddingModelSettings(model="prithivida/Splade_PP_en_v1"),
             ),
         ),

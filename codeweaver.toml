@@ -2,8 +2,7 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-# This schema won't exist until we merge this branch with main, at which time, we can remove the comment.
-# "$schema" = "https://raw.githubusercontent.com/knitli/codeweaver/refs/heads/main/schema/codeweaver.schema.json"
+"$schema" = "https://raw.githubusercontent.com/knitli/codeweaver/refs/heads/main/schema/codeweaver.schema.json"
 project_path = "."
 project_name = "codeweaver"
 token_limit = 30000
@@ -12,7 +11,9 @@ max_results = 30
 
 [provider]
 agent = [
-  { provider = "anthropic", enabled = true, model = "claude-haiku-4.5", model_settings = {  } },
+  # model_settings is a required field with no required settings currently
+  # When we integrate agents, we can re-evaluate the settings needed here
+  { provider = "anthropic", enabled = true, model = "anthropic:claude-haiku-4.5", model_settings = {  } },
 ]
 data = [
   { provider = "tavily", enabled = true },
@@ -28,6 +29,9 @@ vector_store = [
   { provider = "qdrant", enabled = true },
 ]
 sparse_embedding = [
+  # this is codeweaver's default sparse embedding model because of its relative quality
+  # and availability -- it's the strongest sparse model available on fastembed
+  # We need to do more testing against real codebases to refine sparse model choices more generally
   { provider = "fastembed", enabled = true, model_settings = { model = "prithivida/Splade_PP_en_v1" } },
 ]
 

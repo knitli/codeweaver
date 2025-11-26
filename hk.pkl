@@ -1,23 +1,28 @@
 amends "package://github.com/jdx/hk/releases/download/v1.2.0/hk@1.2.0#/Config.pkl"
 import "package://github.com/jdx/hk/releases/download/v1.2.0/hk@1.2.0#/Builtins.pkl"
 
+local function isCI() = (read?("env:CI")?.toBoolean() ?? false) || (read?("env:GITHUB_ACTIONS")?.toBoolean() ?? false)
+
 local linters = new Mapping<String, Step> {
     // uses builtin prettier linter config
     ["actionlint"] = Builtins.actionlint
 
+    // we don't perform these in CI to reduce download times
+    when (!isCI()) {
     ["tombi"] = new Step {
         glob = List("*.toml", "*.toml.*", ".*.toml")
         check = "tombi format --check {{ files }}"
         fix = "tombi format {{ files }}"
     }
         // yaml
-    ["yq"] = new Step {
-      glob = List( "*.{.yaml,yml,yaml,.yml,json,jsonc,.json,.jsonc}")
-      batch = false
-      check  = "echo {{ files }} | rust-parallel -d stderr -i - --no-run-if-empty yq -P eval '.' >/dev/null"
-      fix = "echo {{ files }} | rust-parallel -d stderr -i - --no-run-if-empty yq -iP --indent=2 '.' "
-    }
 
+        ["yq"] = new Step {
+        glob = List( "*.{.yaml,yml,yaml,.yml,json,jsonc,.json,.jsonc}")
+        batch = false
+        check  = "echo {{ files }} | rust-parallel -d stderr -i - --no-run-if-empty yq -P eval '.' >/dev/null"
+        fix = "echo {{ files }} | rust-parallel -d stderr -i - --no-run-if-empty yq -iP --indent=2 '.' "
+        }
+    }
     ["typos"] = new Step {
         workspace_indicator = "_typos.toml"
         glob = List( "*README", "*.{login,astro,bash,bash_logout,bashrc,browserlistrc,conf,config,csh,css,cts,fish,gitattributes,gitmodules,html,htmx,ini,j2,jinja,jinja2,json,json5,jsonc,jsonl,ksh,md,mdown,mdtext,mdtxt,mdwn,mdx,mk,mkd,mts,nix,nu,pkl,profile,py,quokka,rs,sass,scss,sh,sh,shellcheckrc,sql,sqlite,stylelintrc,svelte,tcsh,toml,ts,tsx,txt,yaml,yml,zlogin,zlogout,zprofile,zsh,zshenv,zshrc}", "*Dockerfile*", "*Makefile*", "*makefile*", "CHANGELOG*", "CODE_OF_CONDUCT*", "CONTRIBUTING*", "HACKING*", "LICENSE", "README*", "SECURITY*", "UNLICENSE").filter((f) -> !f.endsWith("hf_models.json") && !f.contains("external"))
@@ -37,8 +42,8 @@ local linters = new Mapping<String, Step> {
 
     ["reuse"] = new Step {
         check = "reuse lint"
-        interactive = true
-        fix = "./scripts/code-quality/update-licenses.py add --interactive {{ files }}"
+        interactive = !isCI()
+        fix = if (isCI()) "./scripts/code-quality/update-licenses.py add {{ files }}" else "./scripts/code-quality/update-licenses.py add --interactive {{ files }}"
     }
 
     ["shellcheck"] = new Step {

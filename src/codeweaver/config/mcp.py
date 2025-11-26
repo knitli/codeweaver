@@ -63,14 +63,16 @@ if TYPE_CHECKING:
     from codeweaver.core.types.enum import AnonymityConversion
 
 CODEWEAVER_DESCRIPTION = "CodeWeaver advanced code search and understanding server."
-# TODO: add icon
-CODEWEAVER_ICON = None
+
+CODEWEAVER_ICON = (
+    "https://raw.githubusercontent.com/knitli/codeweaver/main/docs/assets/codeweaver-primary.svg"
+)
 
 
 class CodeWeaverMCPConfig(BasedModel, FastMCPRemoteMCPServer):
     """Configuration model for CodeWeaver configuration in mcp.json files."""
 
-    url: str = "127.0.0.1:9328"
+    url: str = "http://127.0.0.1:9328/mcp"
 
     timeout: int | None = 120
     description: str | None = CODEWEAVER_DESCRIPTION

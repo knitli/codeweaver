@@ -8,7 +8,9 @@
 **/*.local.*
 **/*.local.*.license
 mise.local.toml
+mise.*.local.toml
 mise.local.toml.license
+mise.*.local.toml.license
 hk.local.pkl.license
 .ruff_cache
 .roo/mcp.json

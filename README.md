@@ -9,7 +9,17 @@ mcp-name: com.knitli/codeweaver
 -->
 # CodeWeaver
 
-![codeweaver logo](docs/assets/codeweaver-primary.svg "CodeWeaver by Knitli)
+<picture>
+  <source srcset="docs/assets/codeweaver-reversed.svg" media="(prefers-color-scheme: dark)">
+  <source srcset="docs/assets/codeweaver-primary.svg" media="(prefers-color-scheme: light)">
+  <img 
+    src="docs/assets/codeweaver-primary.svg" 
+    alt="CodeWeaver by Knitli"
+    width="200"
+    height="200"
+    style="display: block; margin: 0 auto;"
+  >
+</picture>
 ---
 by Knitli
 
@@ -48,16 +58,52 @@ The result: shallow, inconsistent, fragile context. And you don't control it.
 
 Using the [CLI](#cli):
 
-In your project:
+In your project (with [uv](https://astral.sh/uv)):
 ```bash
-uv add --prerelease allow --dev codeweaver
-# or poetry: 
+# or "codeweaver[full]"
+uv add --prerelease allow --dev codeweaver 
 
+# Init will create a config and .mcp.json (or add to it) in your project
 cw init
 cw doctor
+# resolve any issues identified by cw doctor, then:
+cw server
 ```
 
+> [!NOTE]
+> `cw init` defaults to CodeWeaver's `recommended` profile, which requires a Voyage AI API key
+> Voyage has a generous free tier, you can get an API key by signing up at http://voyage.ai
+> The default install also requires a local qdrant instance. We recommend Qdrant cloud,
+> which also requires an API key and also has a generous free tier: https://qdrant.tech
+
 You're ready, but you can customize *just about everything if you want to*.
+
+Or [with Docker](DOCKER.md)
+
+### MCP Configuration
+
+`cw init` will add CodeWeaver to your project's `.mcp.json`, or you can pass `--client` flags for other options. 
+
+> [!IMPORTANT]
+> Unlike most MCP servers, CodeWeaver **defaults** to the `streamable-http` transport, meaning it runs like a web server.
+> We decided to take that route because we think it provides a more predictable, smoother experience overall even when run locally.
+> So your mcp config will look something like:
+>
+> ```json
+> "mcpServers": {
+>   "codeweaver": {
+>      "type": "http",
+>      "url": "http://127.0.0.1:9328/mcp"
+>    } 
+> }
+> ```
+
+> [!WARNING]
+> While CodeWeaver *can* technically use the usual `stdio` transport. We have not tested it.
+> CodeWeaver relies on complex background orchestration that may produce undesirable results
+> if you run it with the `stdio` transport (like corrupted files, dogs :dog: and cats :cat:  living together, mass hysteria)
+> ⚠️ **use at your own risk!**
+> If you want to volunteer to test it and work out the bugs, we'd love your help.
 
 ---
 
@@ -72,6 +118,10 @@ CodeWeaver mixes [AST][wiki_ask]-level understanding, semantic relationships, an
 * **AST/Semantic Hybrid Search:** 26 languages
 * **Context-Aware Chunking:** 136+ languages
   Uses language family heuristics to intelligently chunk (like "this is a Lisp-style form", "this looks like a function block", etc.)
+
+### **Provider Support**
+
+CodeWeaver supports many different providers for embedding, sparse embedding, and reranking models. See [the full list](overrides/partials/providers.md) or use `cw list` to explore them.
 
 ### **Search & Context**
 

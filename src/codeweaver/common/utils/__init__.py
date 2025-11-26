@@ -64,7 +64,7 @@ if TYPE_CHECKING:
     )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "asyncio_or_uvloop": (__spec__.parent, "proc"),
+    "asyncio_or_uvloop": (__spec__.parent, "procs"),
     "backup_file_path": (__spec__.parent, "utils"),
     "ensure_iterable": (__spec__.parent, "utils"),
     "estimate_tokens": (__spec__.parent, "utils"),

@@ -1,0 +1,121 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+# ============================================================================
+# CI-Specific Mise Configuration
+# ============================================================================
+# This lightweight configuration is used in CI/CD environments when MISE_ENV=ci
+# It includes only essential tools needed for testing and building, significantly
+# reducing installation time and cache size.
+#
+# Usage in GitHub Actions:
+#   - name: Setup mise
+#     env:
+#       MISE_ENV: ci
+#     run: mise install
+# ============================================================================
+
+[settings]
+idiomatic_version_file_enable_tools = []
+status.show_env = false  # Reduce CI output noise
+
+[settings.python]
+uv_venv_auto = true
+compile = true
+uv_venv_create_args = [
+  "--seed",
+  "--keyring-provider",
+  "subprocess",
+  "--python",
+  "3.13",
+]
+
+# ============================================================================
+# CI-Essential Tools Only
+# ============================================================================
+# These are the minimal tools required to run CI tasks:
+# - check, lint, format, test-cov, build
+# ============================================================================
+
+[tools]
+# Core language runtimes
+python = "3.13"
+uv = "latest"
+# Quality & validation tools
+"pipx:reuse" = "latest"  # License validation
+"pipx:ty" = "latest"  # Type checking
+hk = "latest"  # Task runner (used by check/format tasks)
+ruff = "latest"  # Python linting/formatting
+typos = "latest"  # Spell checking
+# CI/CD tools
+gh = "latest"  # GitHub CLI (for workflows)
+
+# Optional: Include only if your CI tasks explicitly need them
+# node = "24"        # Uncomment if running npm tasks in CI
+# ripgrep = "latest" # Uncomment if search operations needed
+
+# ============================================================================
+# Environment Variables
+# ============================================================================
+[env]
+GH_REPO = "{{config_root}}"
+REMOTE_ORIGIN_URL = '''http://github.com/knitli/codeweaver.git'''
+PROJECT_NAME = "{{ config_root | basename }}"
+CODEWEAVER_PROJECT_PATH = '''{{ config_root }}'''
+CODEWEAVER_VERSION = '''{{ read_file(path='src/codeweaver/_version.py') | split(pat=' = "') | nth(n=1) | split(pat='"') | nth(n=0) | trim }}'''
+CI = "true"  # Explicitly set for CI environment
+# Simplified PATH for CI (no dev scripts needed)
+_.path = [".venv/bin"]
+
+# ============================================================================
+# No Enter Hook for CI
+# ============================================================================
+# CI environments don't need interactive shell hooks
+# [hooks.enter] is intentionally omitted
+
+# ============================================================================
+# CI Tasks
+# ============================================================================
+# Only include essential CI tasks; others inherit from base mise.toml
+
+[tasks.lint]
+tools.uv = "latest"
+run = '''
+#!/bin/bash
+echo "Running linting checks..."
+uv run ruff check . --output-format=github
+'''
+
+[tasks.test-cov]
+run = '''
+#!/bin/bash
+echo "Running tests with coverage..."
+uv run pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v
+'''
+
+[tasks.build]
+run = '''
+#!/bin/bash
+echo "Building package..."
+uv build && echo "✅ Package built successfully!"
+'''
+
+[tasks.check]
+tools.hk = "latest"
+run = '''
+#!/bin/bash
+echo "Running quality checks..."
+hk check
+'''
+
+# Combined CI workflow
+[tasks.ci]
+run = [
+  "mise run check",
+  "mise run lint",
+  "mise run test-cov",
+  "mise run build",
+]
+description = "Run all CI checks (lightweight CI mode)"

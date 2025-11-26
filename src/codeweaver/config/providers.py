@@ -191,7 +191,7 @@ class AzureOpenAIProviderSettings(TypedDict, total=False):
 class FastembedGPUProviderSettings(TypedDict, total=False):
     """Special settings for Fastembed-GPU provider.
 
-    These settings only apply if you are using a Fastembed provider, installed the `codeweaver[fastembed-gpu]` extra, have a CUDA-capable GPU, and have properly installed and configured the ONNX GPU runtime.
+    These settings only apply if you are using a Fastembed provider, installed the `codeweaver[fastembed-gpu]` or `codeweaver[full-gpu]` extra, have a CUDA-capable GPU, and have properly installed and configured the ONNX GPU runtime.
     You can provide these settings with your CodeWeaver embedding provider settings, or rerank provider settings. If you're using fastembed-gpu for both, we'll assume you are using the same settings for both if we find one of them.
 
     Important: You cannot have both `fastembed` and `fastembed-gpu` installed at the same time. They conflict with each other. Make sure to uninstall `fastembed` if you want to use `fastembed-gpu`.
@@ -373,10 +373,7 @@ def _get_default_embedding_settings() -> DeterminedDefaults:
                 )
             if lib in {"fastembed_gpu", "fastembed"}:
                 return DeterminedDefaults(
-                    # showing its age but it's still a solid lightweight option
-                    provider=Provider.FASTEMBED,
-                    model="Alibaba-NLP/gte-modernbert-base",
-                    enabled=True,
+                    provider=Provider.FASTEMBED, model="BAAI/bge-small-en-v1.5", enabled=True
                 )
             if lib == "sentence_transformers":
                 return DeterminedDefaults(

@@ -45,6 +45,7 @@ typos = "latest"
 usage = "latest"
 uv = "latest"
 "npm:changesets" = "latest"
+yq = "latest"
 
 [env]
 GH_REPO = "{{config_root}}"

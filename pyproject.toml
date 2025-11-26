@@ -175,7 +175,7 @@ full = [
   "eunomia-mcp",
   "pydantic-settings[yaml,toml,aws-secrets-manager,azure-key-vault,gcp-secret-manager]",
   "permit-fastmcp",
-  "sentence-transformers",
+  "sentence-transformers>=5.1.2",
 ]
 full-gpu = [
   "permit-fastmcp",
@@ -183,12 +183,14 @@ full-gpu = [
   "fastembed-gpu",
   "permit-fastmcp",
   "pydantic-settings[yaml,toml,aws-secrets-manager,azure-key-vault,gcp-secret-manager]",
-  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
+  # see note below about why this is commented out
+  #  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
 ]
 gcp-secret-manager = ["pydantic-settings[yaml,toml,gcp-secret-manager]"]
 gpu-support = [
   "fastembed-gpu",
-  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
+  # see note below about why this is commented out
+  #  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
 ]
 # ==== Providers ====
 #    --- Agent-only Providers --- (no embedding/rerank)
@@ -219,11 +221,18 @@ provider-sentence-transformers = [
   "sentence-transformers",
   "py-cpuinfo",
 ]
-provider-sentence-transformers-gpu = [
-  # GPU requires additional setup
-  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
-]
-# disabled until we can fully integrate and resolve dependency conflicts
+# NOTE: Why not GPU or OpenVino support for sentence-transformers?
+# The underlying runtimes for these packages, when resolved against our other dependencies,
+# essentially require us to choose between support for Python 3.14 and these packages.
+# When python 3.14 is included, then the only compatible build results in transformers version 3.x
+# Which does not have the `SparseEncoder` class required for sparse-encodings.
+# We think the sparse-encoding use case is much broader than GPU or OpenVino acceleration for most users,
+# so we are leaving these out of the official optional dependencies for now.
+# If you need GPU or OpenVino support, you can install these packages manually in your environment.
+# provider-sentence-transformers-gpu = [
+# GPU requires additional setup
+#  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
+# ]
 # provider-sentence-transformers-openvino = [
 #     "sentence-transformers[openvino]",
 #     "py-cpuinfo",

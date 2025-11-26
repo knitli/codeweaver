@@ -614,7 +614,7 @@ docker run --rm codeweaver:local codeweaver --version
 
 ## Known Limitations
 
-- **Resource Usage**: Indexing large codebases (>100k files) requires significant memory
+- **Resource Usage**: Indexing large codebases may require significant memory
 - **Platform Support**: Tested on linux/amd64 and linux/arm64
 - **CI/CD SSL Issues**: Some CI environments have SSL certificate issues. Use pre-built images as a workaround. See [DOCKER_BUILD_NOTES.md](docs/docker/DOCKER_BUILD_NOTES.md).
 
