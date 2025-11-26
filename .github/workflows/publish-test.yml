@@ -35,18 +35,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Free up disk space
-        run: |
-          df -h
-          # Remove unused Docker images and containers
-          docker system prune -af --volumes || true
-          # Remove unnecessary large packages to free disk space
-          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
-          sudo rm -rf /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk || true
-          sudo rm -rf /opt/hostedtoolcache/Ruby || true
-          sudo rm -rf /opt/hostedtoolcache/go || true
-          sudo rm -rf /usr/share/dotnet || true
-          sudo rm -rf /usr/local/lib/android || true
-          df -h
+        run: ./scripts/dev-env/ci-free-disk-space.sh
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@9b03c627221f32cb88b299427119da30671cf9cc
         with:
@@ -117,18 +106,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Free up disk space
-        run: |
-          df -h
-          # Remove unused Docker images and containers
-          docker system prune -af --volumes || true
-          # Remove unnecessary large packages to free disk space
-          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
-          sudo rm -rf /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk || true
-          sudo rm -rf /opt/hostedtoolcache/Ruby || true
-          sudo rm -rf /opt/hostedtoolcache/go || true
-          sudo rm -rf /usr/share/dotnet || true
-          sudo rm -rf /usr/local/lib/android || true
-          df -h
+        run: ./scripts/dev-env/ci-free-disk-space.sh
       - name: Set up Python
         uses: actions/setup-python@9b03c627221f32cb88b299427119da30671cf9cc
         with:

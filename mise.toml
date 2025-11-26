@@ -539,6 +539,13 @@ print -P "%F{209}[codeweaver]%f Installing Mise..."
 ./scripts/dev-env/install-mise.sh
 '''
 
+[tasks.ci-free-disk-space]
+description = "Free up disk space on CI runners by removing unused packages"
+run = '''
+#!/usr/bin/env bash
+./scripts/dev-env/ci-free-disk-space.sh
+'''
+
 [tasks.vscode-terminal-bootstrap]
 run = '''
 #!/usr/bin/env zsh

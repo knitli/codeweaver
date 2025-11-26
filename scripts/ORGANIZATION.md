@@ -33,6 +33,7 @@ scripts/
 │   └── git-merge-latest-version.py
 │
 ├── dev-env/                           # Development environment setup
+│   ├── ci-free-disk-space.sh
 │   ├── dev-shell-init.zsh
 │   ├── install-mise.sh
 │   └── vscode-terminal-bootstrap.sh
