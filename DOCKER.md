@@ -294,7 +294,7 @@ The entrypoint generates config to the user config dir. You can override by plac
 
 ```bash
 # Install CodeWeaver locally (or use pipx)
-pipx install codeweaver
+pipx install code-weaver
 
 # Generate a config file
 cw init config --profile quickstart --config-path ./codeweaver.toml

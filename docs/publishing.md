@@ -97,7 +97,7 @@ Watch workflow at: https://github.com/knitli/codeweaver/actions/workflows/publis
 After workflow completes:
 ```bash
 # Install from PyPI
-pip install codeweaver==0.1.0
+pip install code-weaver==0.1.0
 
 # Verify
 python -c "import codeweaver; print(codeweaver.__version__)"

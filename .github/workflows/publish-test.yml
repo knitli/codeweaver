@@ -22,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
+      MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      MISE_ENV: "ci"
     permissions:
       contents: read
     strategy:

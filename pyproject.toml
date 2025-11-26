@@ -5,7 +5,8 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
 [project]
-name = "codeweaver"
+# It seems 'codeweaver' is too similar to 'codeweave' on PyPI, so we use 'code-weaver' as the package name
+name = "code-weaver"
 description = "Extensible MCP server for semantic code search with plugin architecture supporting multiple embedding providers, vector databases, and data sources."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.12"

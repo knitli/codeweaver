@@ -6,13 +6,13 @@
 """Prebuilt settings profiles for CodeWeaver quick setup.
 
 A few important things to note about profiles (or any provider settings):
-- Most providers are *not* available with the default installation of CodeWeaver. CodeWeaver has multiple install paths that include different sets of providers. The `recommended` install flag (`pip install codeweaver[recommended]`) includes *most* of the providers available in CodeWeaver, but not all.
-The `full` or `full-gpu` install flags (`pip install codeweaver[full]` or `pip install codeweaver[full-gpu]`) include *all* providers, and all optional dependencies, such as auth providers and GPU support (for the gpu flag).
+- Most providers are *not* available with the default installation of CodeWeaver. CodeWeaver has multiple install paths that include different sets of providers. The `recommended` install flag (`pip install code-weaver[recommended]`) includes *most* of the providers available in CodeWeaver, but not all.
+The `full` or `full-gpu` install flags (`pip install code-weaver[full]` or `pip install code-weaver[full-gpu]`) include *all* providers, and all optional dependencies, such as auth providers and GPU support (for the gpu flag).
 The recommended flag gives you access to:
     - All current vector, agent and data providers
     - All embedding and reranking providers except for Sentence Transformers (because these install paths are aligned with pydantic-ai's default dependencies, and Sentence Transformers is not a default dependency of pydantic-ai).
-- A-la-Carte installations: You can also use the `required-core` install flag (`pip install codeweaver[required-core]`) to install only the core dependencies of CodeWeaver, and then add individual providers using their own install flags (all prefixed with `provider-`), like:
-    `pip install codeweaver[required-core,provider-openai,provider-qdrant]`
+- A-la-Carte installations: You can also use the `required-core` install flag (`pip install code-weaver[required-core]`) to install only the core dependencies of CodeWeaver, and then add individual providers using their own install flags (all prefixed with `provider-`), like:
+    `pip install code-weaver[required-core,provider-openai,provider-qdrant]`
 
 """
 

@@ -434,7 +434,7 @@ except ImportError as e:
         exc_info=True,
     )
     raise ConfigurationError(
-        "Failed to import boto3. You need to install the boto3 package, you can do this by running 'pip install codeweaver[bedrock]'"
+        "Failed to import boto3. You need to install the boto3 package, you can do this by running 'pip install code-weaver[bedrock]'"
     ) from e
 
 

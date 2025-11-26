@@ -28,6 +28,7 @@ jobs:
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
       CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
       MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      MISE_ENV: "ci"
     strategy:
       matrix:
         python-version:

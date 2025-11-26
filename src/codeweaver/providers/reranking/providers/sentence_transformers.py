@@ -33,7 +33,7 @@ except ImportError as e:
     from codeweaver.exceptions import ConfigurationError
 
     raise ConfigurationError(
-        "SentenceTransformers is not installed. Please install it with `pip install codeweaver[sentence-transformers]` or `codeweaver[sentence-transformers-gpu]`."
+        "SentenceTransformers is not installed. Please install it with `pip install code-weaver[sentence-transformers]` or `codeweaver[sentence-transformers-gpu]`."
     ) from e
 
 

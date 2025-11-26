@@ -661,7 +661,7 @@ Open questions/decisions on measurement:
 
 **Step 3: Installation** (3 minutes)
 ```bash
-uv pip install "codeweaver[recommended]"
+uv pip install "code-weaver[recommended]"
 ```
 - Installs successfully with clear progress indicators
 - Receives setup guidance for API keys (if needed)

@@ -162,8 +162,8 @@ def check_required_dependencies() -> DoctorCheck:
         "fail" if missing else "success",
         f"Missing packages: {', '.join(missing)}" if missing else "All required packages installed",
         [
-            "Run: uv pip install codeweaver[full]",
-            "Or: pip install codeweaver[full]",
+            "Run: uv pip install code-weaver[full]",
+            "Or: pip install code-weaver[full]",
             f"Missing: {', '.join(missing)}",
         ]
         if missing
@@ -654,8 +654,8 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
                             "Package not installed",
                             [
                                 f"Install extra dependencies for {provider.as_title}",
-                                "Run: uv pip install codeweaver[full]",
-                                "Or: pip install codeweaver[full]",
+                                "Run: uv pip install code-weaver[full]",
+                                "Or: pip install code-weaver[full]",
                             ],
                         )
                     )

@@ -43,7 +43,7 @@ def _voyage_max_limit(chunks: list[CodeChunk], query: str) -> tuple[bool, NonNeg
         from codeweaver.exceptions import ConfigurationError
 
         raise ConfigurationError(
-            "The `tokenizers` package is required for Voyage capabilities. Please install it with `pip install codeweaver[voyage]` or `pip install tokenizers`."
+            "The `tokenizers` package is required for Voyage capabilities. Please install it with `pip install code-weaver[voyage]` or `pip install tokenizers`."
         ) from e
     tokenizer = get_tokenizer("tokenizers", "voyageai/voyage-rerank-2.5")
     stringified_chunks = [chunk.serialize_for_embedding() for chunk in chunks]

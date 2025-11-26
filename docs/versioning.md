@@ -202,13 +202,13 @@ Users who want to test alpha/beta versions must explicitly opt-in:
 pip install --pre codeweaver
 
 # Install specific alpha version
-pip install codeweaver==0.1.0a1
+pip install code-weaver==0.1.0a1
 
 # Upgrade to latest pre-release
 pip install --pre --upgrade codeweaver
 ```
 
-By default, `pip install codeweaver` will **not** install pre-releases.
+By default, `pip install code-weaver` will **not** install pre-releases.
 
 ## Integration with Changesets
 

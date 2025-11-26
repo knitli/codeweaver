@@ -26,7 +26,7 @@ try:
 
 except ImportError as _import_error:
     raise ConfigurationError(
-        'Please install the `voyageai` package to use the Voyage provider, you can use the `voyage` optional group -- `pip install "codeweaver[voyage]"`'
+        'Please install the `voyageai` package to use the Voyage provider, you can use the `voyage` optional group -- `pip install "code-weaver[voyage]"`'
     ) from _import_error
 
 

@@ -63,7 +63,7 @@ try:
 except ImportError as e:
     logger.debug("HuggingFace Hub is not installed.")
     raise ConfigurationError(
-        'Please install the `huggingface_hub` package to use the HuggingFace provider, you can use the `huggingface` optional group -- `pip install "codeweaver[huggingface]"`'
+        'Please install the `huggingface_hub` package to use the HuggingFace provider, you can use the `huggingface` optional group -- `pip install "code-weaver[huggingface]"`'
     ) from e
 
 

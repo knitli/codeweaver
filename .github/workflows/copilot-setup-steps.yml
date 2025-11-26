@@ -23,6 +23,7 @@ jobs:
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
       CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
       MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      MISE_ENV: "ci"
     runs-on: ubuntu-latest
     # Set the permissions to the lowest permissions possible needed for your steps.
     # Copilot will be given its own token for its operations.

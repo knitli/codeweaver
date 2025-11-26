@@ -53,7 +53,7 @@ This allows collection of query patterns and result quality metrics (still anony
 Telemetry is included by default in the `recommended` install:
 
 ```bash
-uv pip install "codeweaver[recommended]"
+uv pip install "code-weaver[recommended]"
 ```
 
 Or opt-out with:
