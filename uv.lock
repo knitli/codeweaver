@@ -729,7 +729,7 @@ wheels = [
 ]
 
 [[package]]
-name = "codeweaver"
+name = "code-weaver"
 source = { editable = "." }
 dependencies = [
     { name = "aenum" },

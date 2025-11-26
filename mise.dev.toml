@@ -3,19 +3,7 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 [settings]
-idiomatic_version_file_enable_tools = []
 status.show_env = true
-
-[settings.python]
-uv_venv_auto = true
-compile = true
-uv_venv_create_args = [
-  "--seed",
-  "--keyring-provider",
-  "subprocess",
-  "--python",
-  "3.13",
-]
 
 [tools]
 "cargo:rust-parallel" = "latest"
@@ -58,6 +46,42 @@ _.path = [
   ".venv/bin",
 ]
 MISE_ENV = "dev"
+
+[hooks]
+[hooks.enter]
+script = "mise run enter"
+
+[tasks]
+[tasks.enter]
+shell = "zsh -c"
+silent = "stdout"
+run = '''
+case "$python_path" in
+*.venv/bin/python*)
+    # Already in venv, do nothing
+    ;;
+*)
+    # Not in venv or python not found, source it
+    source .venv/bin/activate 2>/dev/null || true
+    ;;
+esac
+'''
+run_windows = '''
+@echo off
+set "pythonPath=%python_path%"
+if not "%pythonPath%"=="%pythonPath:.venv\Scripts\python=%" (
+    rem Already in venv, do nothing
+) else (
+    rem Not in venv or python not found, source it
+    if exist .venv\Scripts\activate.bat (
+        call .venv\Scripts\activate.bat 2>NUL
+    )
+)
+'''
+
+[tasks.enter.env]
+ACTIVE_SHELL = '''{{ exec(command='basename "$SHELL" 2>/dev/null || echo zsh') }}'''
+python_path = '''{{ exec(command='command -v python 2>/dev/null || echo ""') }}'''
 
 [tasks.update-dependencies]
 tools.uv = "latest"

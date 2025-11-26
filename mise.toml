@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 [settings]
 idiomatic_version_file_enable_tools = []
-status.show_env = true
 
 [settings.python]
 uv_venv_auto = true
@@ -18,6 +17,7 @@ uv_venv_create_args = [
 ]
 
 [tools]
+python = "3.13"
 gh = "latest"
 hk = "latest"
 uv = "latest"
@@ -28,7 +28,9 @@ REMOTE_ORIGIN_URL = '''http://github.com/knitli/codeweaver.git'''
 # Use the project name derived from the current directory
 PROJECT_NAME = "{{ config_root | basename }}"
 CODEWEAVER_PROJECT_PATH = '''{{ config_root }}'''
-CODEWEAVER_VERSION = '''{{ read_file(path='src/codeweaver/_version.py') | split(pat=' = "') | nth(n=1) | split(pat='"') | nth(n=0) | trim }}'''
+# Get version from git tags (uv-dynamic-versioning uses git as source)
+# Falls back to "dev" if git command fails
+CODEWEAVER_VERSION = '''{{ exec(command='git describe --tags --always --dirty 2>/dev/null || echo "dev"') | trim }}'''
 CI = '''{% if get_env(name="GITHUB_ACTIONS", default="") != "" %}true{% else %}false{% endif %}'''
 _.path = [
   "scripts/dev-env",
@@ -40,42 +42,6 @@ _.path = [
   ".venv/bin",
 ]
 MISE_ENV = '''{% if `get_env(name="GITHUB_ACTIONS", default="") != ""` %}ci{% else %}dev{% endif %}'''
-
-[hooks]
-[hooks.enter]
-script = "mise run enter"
-
-[tasks]
-[tasks.enter]
-shell = "zsh -c"
-silent = "stdout"
-run = '''
-case "$python_path" in
-*.venv/bin/python*)
-    # Already in venv, do nothing
-    ;;
-*)
-    # Not in venv or python not found, source it
-    source .venv/bin/activate 2>/dev/null || true
-    ;;
-esac
-'''
-run_windows = '''
-@echo off
-set "pythonPath=%python_path%"
-if not "%pythonPath%"=="%pythonPath:.venv\Scripts\python=%" (
-    rem Already in venv, do nothing
-) else (
-    rem Not in venv or python not found, source it
-    if exist .venv\Scripts\activate.bat (
-        call .venv\Scripts\activate.bat 2>NUL
-    )
-)
-'''
-
-[tasks.enter.env]
-ACTIVE_SHELL = '''{{ exec(command='basename "$SHELL" 2>/dev/null || echo zsh') }}'''
-python_path = '''{{ exec(command='command -v python 2>/dev/null || echo ""') }}'''
 
 [tasks.info]
 description = "Print project information"
@@ -223,7 +189,7 @@ if [ -n "$files" ]; then
 fi
 '''
 run_windows = '''
-echo [codeweaver] Applying formatting...hold onto your butts 🚬...🦖 
+echo [codeweaver] Applying formatting...hold onto your butts 🚬...🦖
 uv run ruff format .
 for /f "delims=" %%f in ('git ls-files "*.yaml" "*.yml" "*.json" 2^>NUL') do (
     yq -iP --indent=2 "." "%%f" 2>NUL
@@ -342,17 +308,6 @@ run_windows = '''
 echo [codeweaver] Generating changelog...
 npm exec changeset version
 '''
-
-# Combined workflows
-[tasks.ci]
-run = [
-  "mise run check",
-  "mise run lint",
-  "mise run format",
-  "mise run test-cov",
-  "mise run build",
-]
-description = "Run all CI checks."
 
 [tasks.pre-commit]
 shell = "zsh -c"
