@@ -1,6 +1,6 @@
 {
   "$schema": "https://context7.com/schema/context7.json",
-  "description": "CodeWeaver is the context layer for MCP. It provides an extensible framework for semantic code search, and curated context from any source, delivering it to AI Agents from plain language requests.",
+  "description": "CodeWeaver is the context layer for MCP. It provides an extensible framework for semantic code search, for curated context from any source, delivering it to AI Agents from plain language requests.",
   "excludeFiles": [
     "codeweaver.toml",
     "mcp.json",
