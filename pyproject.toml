@@ -301,7 +301,11 @@ test = [
 ]
 
 [build-system]
-requires = ["hatchling>=1.27.0", "uv-dynamic-versioning>=0.11.2"]
+requires = [
+  "hatchling>=1.27.0",
+  "twine>=6.2.0",
+  "uv-dynamic-versioning>=0.11.2"
+]
 build-backend = "hatchling.build"
 
 # TODO: Integrate hatch plugins for:
