@@ -32,8 +32,6 @@ on:
 jobs:
   build:
     name: Build Package
-    permissions:
-      contents: read
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -51,7 +49,7 @@ jobs:
       - name: Build package
         run: |
           if [ "${{ inputs.clean-build }}" = "true" ]; then
-            rm -rf dist/ && uv build
+            uv build --clear
           else
             uv build
           fi

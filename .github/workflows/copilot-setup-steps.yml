@@ -26,7 +26,7 @@ jobs:
       MISE_ENV: "ci"
       MISE_YES: 1
     runs-on: ubuntu-latest
-    # Set the permissions to the lowest permissions possible needed for your steps. 
+    # Set the permissions to the lowest permissions possible needed for your steps.
     # Copilot will be given its own token for its operations.
     permissions:
       # If you want to clone the repository as part of your setup steps, for example to install dependencies, you'll need the `contents: read` permission. If you don't clone the repository in your[...]
@@ -83,7 +83,7 @@ jobs:
           # Trust the config globally
           "$MISE" --quiet -y trust
           # Also set the trusted config paths environment variable for subprocesses
-          echo "MISE_TRUSTED_CONFIG_PATHS=$PWD/mise.toml:$PWD/mise.ci.toml" >> $GITHUB_ENV
+          echo "MISE_TRUSTED_CONFIG_PATHS=$PWD/mise.toml:$PWD/mise.ci.toml" >> "$GITHUB_ENV"
           "$MISE" --quiet -y install 2>&1 || echo "Warning: Some tools failed to install due to network limitations in CI environment"
         env:
           MISE_DIR: ${{ runner.temp }}/mise
