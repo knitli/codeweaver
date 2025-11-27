@@ -25,5 +25,13 @@
     "${userHome}/.local/share/mise/shims/python"
   ],
   "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
-  "shellcheck.executablePath": "${userHome}/.local/share/mise/shims/shellcheck"
+  "shellcheck.executablePath": "${userHome}/.local/share/mise/shims/shellcheck",
+  "chat.mcp.serverSampling": {
+    "codeweaver/.vscode/mcp.json: codeweaver": {
+      "allowedModels": [
+        "copilot/claude-haiku-4.5",
+        "copilot/claude-sonnet-4.5"
+      ]
+    }
+  }
 }
