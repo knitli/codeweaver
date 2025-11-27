@@ -323,6 +323,35 @@ class TestGetProjectPath:
         result = get_project_path(non_git_nested)
         assert result == temp_git_repo
 
+    def test_uses_codeweaver_project_path_env_var(
+        self, mocker: MockerFixture, temp_non_git_dir: Path
+    ) -> None:
+        """Test uses CODEWEAVER_PROJECT_PATH env var when no git repository found.
+
+        This is critical for Docker containers where .git directories are not present.
+        The environment variable provides a fallback mechanism to specify the project path.
+        """
+        # Mock environment to simulate Docker container scenario
+        mocker.patch("codeweaver.common.utils.git.try_git_rev_parse", return_value=None)
+        mocker.patch.dict("os.environ", {"CODEWEAVER_PROJECT_PATH": str(temp_non_git_dir)})
+        mocker.patch("pathlib.Path.cwd", return_value=temp_non_git_dir)
+
+        result = get_project_path()
+        assert result == temp_non_git_dir
+
+    def test_env_var_fallback_requires_existing_directory(
+        self, mocker: MockerFixture, tmp_path: Path
+    ) -> None:
+        """Test that CODEWEAVER_PROJECT_PATH must point to an existing directory."""
+        non_existent_path = tmp_path / "does_not_exist"
+        mocker.patch("codeweaver.common.utils.git.try_git_rev_parse", return_value=None)
+        mocker.patch.dict("os.environ", {"CODEWEAVER_PROJECT_PATH": str(non_existent_path)})
+        mocker.patch("pathlib.Path.cwd", return_value=tmp_path)
+
+        # Should raise FileNotFoundError since path doesn't exist and no git repo found
+        with pytest.raises(FileNotFoundError, match=r"No \.git directory found"):
+            get_project_path()
+
 
 # ===========================================================================
 # *                            set_relative_path() Tests
