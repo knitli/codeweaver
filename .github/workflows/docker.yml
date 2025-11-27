@@ -115,6 +115,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@b3498302c5c423fa896b97a26bb183df735d08f8
+        with:
+          fetch-depth: 0
+      - name: Verify .git directory exists
+        run: |
+          if [ ! -d ".git" ]; then
+            echo "Error: .git directory not found!"
+            exit 1
+          fi
       - name: Create test environment file
         run: |
           cat > .env << EOF
