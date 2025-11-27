@@ -107,20 +107,20 @@ jobs:
                       else:
                           for i, pkg in enumerate(data['packages']):
                               pkg_errors = []
-                              
+
                               # Required package fields
                               pkg_required = ['registryType', 'identifier', 'version', 'transport']
                               for field in pkg_required:
                                   if field not in pkg:
                                       pkg_errors.append(f'Missing required field: {field}')
-                              
+
                               # Validate transport
                               if 'transport' in pkg:
                                   if 'type' not in pkg['transport']:
                                       pkg_errors.append('transport must have \"type\" field')
                                   elif pkg['transport']['type'] == 'stdio' and pkg['transport'].get('url'):
                                       pkg_errors.append('stdio transport cannot have \"url\" field')
-                              
+
                               # Validate argument names
                               if 'packageArguments' in pkg:
                                   for arg in pkg['packageArguments']:
@@ -130,7 +130,7 @@ jobs:
                                               pkg_errors.append(f'Invalid argument name \"{name}\": cannot contain <, >, \$, or spaces')
                                           if '=' in name:
                                               pkg_errors.append(f'Invalid argument name \"{name}\": value should be in separate \"value\" field')
-                              
+
                               if pkg_errors:
                                   errors.append(f'Package {i}: ' + '; '.join(pkg_errors))
 
@@ -205,9 +205,9 @@ jobs:
                           if pkg.get('registryType') == 'pypi':
                               identifier = pkg['identifier']
                               version = pkg.get('version', 'unknown')
-                              
+
                               print(f'Checking PyPI package: {identifier} version {version}')
-                              
+
                               try:
                                   # Check if package exists
                                   url = f'https://pypi.org/pypi/{identifier}/json'
@@ -215,9 +215,9 @@ jobs:
                                       if response.status == 200:
                                           pkg_data = json.loads(response.read())
                                           available_versions = list(pkg_data.get('releases', {}).keys())
-                                          
+
                                           print(f'  ✓ Package \"{identifier}\" exists on PyPI')
-                                          
+
                                           # Check if specific version exists
                                           if version in available_versions:
                                               print(f'  ✓ Version {version} is available')
@@ -225,7 +225,7 @@ jobs:
                                               print(f'  ⚠️  Version {version} not yet published')
                                               print(f'      Latest version: {pkg_data.get(\"info\", {}).get(\"version\", \"unknown\")}')
                                               print(f'      Note: This is expected for pre-release validation')
-                              
+
                               except HTTPError as e:
                                   if e.code == 404:
                                       print(f'  ⚠️  Package \"{identifier}\" not found on PyPI')

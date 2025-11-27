@@ -362,69 +362,69 @@ source = "uv-dynamic-versioning"
 
 [tool.pytest]
 addopts = [
-  "-ra",
-  "--strict-markers",
-  "--strict-config",
-  "--cov=codeweaver",
-  "--cov-report=term-missing",
-  "--cov-report=html",
-  "--cov-report=xml",
   # While we don't chase coverage, we want to ensure a minimum bar to catch missing tests
   # We can raise this over time as the project matures
   "--cov-fail-under=50",
+  "--cov-report=html",
+  "--cov-report=term-missing",
+  "--cov-report=xml",
+  "--cov=codeweaver",
   "--import-mode=importlib",
+  "--strict-config",
+  "--strict-markers",
+  "-ra",
 ]
 filterwarnings = [
   "error",
-  "ignore::UserWarning",
   "ignore::DeprecationWarning",
   "ignore::PendingDeprecationWarning",
+  "ignore::UserWarning",
 ]
 markers = [
-  # Test categories
-  "unit: Unit tests that test individual components in isolation",
-  "integration: Integration tests that test component interactions",
-  "validation: Validation tests that ensure system consistency",
-  "e2e: End-to-end tests that test complete workflows",
+  "async_test: Asynchronous tests (in addition to pytest.mark.asyncio)",
   # Performance & benchmarks
   "benchmark: Performance benchmark tests",
-  "slow: Tests that take a significant amount of time to run",
-  "performance: Performance-related tests",
-  # External dependencies
-  "real_providers: Tests that require real provider configurations",
-  "network: Tests that require network access",
-  "external_api: Tests that interact with external APIs",
-  "voyageai: Tests that require VoyageAI API access",
-  "qdrant: Tests that require Qdrant vector database",
-  "docker: Tests that require Docker and Docker Compose (may fail in some CI environments)",
   # Configuration & environment
   "config: Configuration-related tests",
-  "env_vars: Tests that depend on environment variables",
-  "mock_only: Tests that only use mocked dependencies",
-  # Feature-specific
-  "embeddings: Tests related to embedding functionality",
-  "search: Tests related to search functionality",
-  "indexing: Tests related to code indexing",
-  "telemetry: Tests related to telemetry and metrics",
-  "mcp: Tests related to MCP protocol functionality",
-  "services: Tests related to services layer",
-  "server: Tests related to server functionality",
-  # Test types
-  "parametrize: Parametrized tests with multiple test cases",
-  "fixtures: Tests that heavily rely on pytest fixtures",
-  "async_test: Asynchronous tests (in addition to pytest.mark.asyncio)",
-  # Stability & reliability
-  "flaky: Tests that may occasionally fail due to timing or external factors",
-  "timeout: Tests with specific timeout requirements",
-  "retry: Tests that may need retries",
   # Development & debugging
   "debug: Tests for debugging purposes",
   "dev_only: Tests that should only run in development",
+  "docker: Tests that require Docker and Docker Compose (may fail in some CI environments)",
+  "e2e: End-to-end tests that test complete workflows",
+  # Feature-specific
+  "embeddings: Tests related to embedding functionality",
+  "env_vars: Tests that depend on environment variables",
+  "external_api: Tests that interact with external APIs",
+  "fixtures: Tests that heavily rely on pytest fixtures",
+  # Stability & reliability
+  "flaky: Tests that may occasionally fail due to timing or external factors",
+  "indexing: Tests related to code indexing",
+  "integration: Integration tests that test component interactions",
+  "mcp: Tests related to MCP protocol functionality",
+  "mock_only: Tests that only use mocked dependencies",
+  "network: Tests that require network access",
+  # Test types
+  "parametrize: Parametrized tests with multiple test cases",
+  "performance: Performance-related tests",
+  "qdrant: Tests that require Qdrant vector database",
+  # External dependencies
+  "real_providers: Tests that require real provider configurations",
+  "retry: Tests that may need retries",
+  "search: Tests related to search functionality",
+  "server: Tests related to server functionality",
+  "services: Tests related to services layer",
   "skip_ci: Tests to skip in CI/CD environments",
+  "slow: Tests that take a significant amount of time to run",
+  "telemetry: Tests related to telemetry and metrics",
+  "timeout: Tests with specific timeout requirements",
+  # Test categories
+  "unit: Unit tests that test individual components in isolation",
+  "validation: Validation tests that ensure system consistency",
+  "voyageai: Tests that require VoyageAI API access",
 ]
 minversion = "6.0"
 python_classes = ["Test*"]
-python_files = ["test_*.py", "*_test.py"]
+python_files = ["*_test.py", "test_*.py"]
 python_functions = ["test_*"]
 testpaths = ["tests"]
 asyncio_mode = "auto"

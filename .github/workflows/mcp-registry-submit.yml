@@ -118,30 +118,30 @@ jobs:
           try:
               with open('server.json', 'r') as f:
                   data = json.load(f)
-              
+
               # Basic validation checks
               required_fields = ['name', 'description', 'version']
               missing = [f for f in required_fields if f not in data]
-              
+
               if missing:
                   print(f'ERROR: Missing required fields: {missing}')
                   sys.exit(1)
-              
+
               # Validate name format (must be namespace/server-name)
               if '/' not in data['name']:
                   print('ERROR: name must be in format namespace/server-name')
                   sys.exit(1)
-              
+
               # Validate packages or remotes exist
               if 'packages' not in data and 'remotes' not in data:
                   print('ERROR: Must have either packages or remotes array')
                   sys.exit(1)
-              
+
               print('✓ server.json validation passed')
               print(f'  Name: {data[\"name\"]}')
               print(f'  Version: {data[\"version\"]}')
               print(f'  Description: {data[\"description\"][:80]}...')
-              
+
           except json.JSONDecodeError as e:
               print(f'ERROR: Invalid JSON in server.json: {e}')
               sys.exit(1)
@@ -161,11 +161,11 @@ jobs:
 
           for i in $(seq 1 "$MAX_ATTEMPTS"); do
             echo "Attempt $i/$MAX_ATTEMPTS..."
-            
+
             # Check if package version exists on PyPI
             HTTP_CODE="$(curl -s -o /dev/null -w "%{http_code}" \
               "https://pypi.org/pypi/codeweaver/${VERSION}/json")"
-            
+
             if [ "$HTTP_CODE" = "200" ]; then
               echo "✓ Package codeweaver ${VERSION} is available on PyPI"
               exit 0
