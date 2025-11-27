@@ -308,30 +308,6 @@ async def test_chunk_property_fetches_from_global_registry(
     print("   This means backup will get primary's embeddings when upserting!")
 
 
-@pytest.mark.integration
-@pytest.mark.asyncio
-async def test_full_failover_scenario(sample_chunk, tmp_path):
-    """Integration test: Full primary→backup→primary failover scenario.
-
-    This test requires actual provider instances and may be slow.
-    It validates the complete bug chain.
-    """
-    pytest.skip("Integration test - run manually to validate full scenario")
-
-    # This would require:
-    # 1. Real vector stores (primary Qdrant, backup Memory)
-    # 2. Real embedding providers (Voyage, FastEmbed)
-    # 3. Indexer instance
-    # 4. Failover manager
-    #
-    # Steps:
-    # 1. Index chunks with primary
-    # 2. Trigger failover
-    # 3. Verify backup can't upsert (dimension mismatch)
-    # 4. Restore primary
-    # 5. Verify sync-back fails for unchanged chunks
-
-
 if __name__ == "__main__":
     # Run tests with pytest
     pytest.main([__file__, "-v", "-s"])
