@@ -69,16 +69,12 @@ jobs:
           sudo apt-get update && sudo apt-get install -y zsh curl git
       - name: Setup Mise
         run: |
-          current_dir
-          subdirs
           current_dir="$(pwd)"
           subdirs="$(ls -d -- */ 2>/dev/null || echo '')"
           if [[ "$current_dir" != "*codeweaver*" && "$current_dir" =~ $subdirs ]]; then
             cd codeweaver
           fi
           echo "Mise setup in directory: $(pwd)"
-          MISE
-          MISE_DIR
           MISE="$(which mise)"
           export MISE
           MISE_DIR="$(dirname "$MISE")"
